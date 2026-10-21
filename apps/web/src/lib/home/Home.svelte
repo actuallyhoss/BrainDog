@@ -132,6 +132,9 @@
 
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
   import { keepPart, keptPart, tileOnce } from '$lib/home/today-kept.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { painted } from '$lib/data/timing.ts';
+  import type { Near } from '$lib/data/local.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -229,13 +232,18 @@
    */
   let learnt = $state(0);
   const asked = new Map<string, Promise<void>>();
+  /* THE LOCAL COPY IS LOOKED IN FIRST (below), for a moment at most: what it holds of the lists is the declarations
+     Today was last drawn under, so a warm open asks none of them before its first read. */
+  let looked = $state(false);
   $effect(() => {
-    if (data.refused || (declares !== null && !tell)) return;
+    if (data.refused || (declares !== null && !tell) || !looked) return;
     const missing = data.lists.map((l) => l.id).filter((id) => REGISTERS[id] === undefined);
-    /* ALL OF THEM LEARNT ALREADY: said once, so a later read of the shell does not draw Today's body again for nothing. */
-    if (missing.length === 0) {
+    /* ALL OF THEM LEARNT ALREADY: said once, so a later read of the shell does not draw Today's body again for nothing.
+       AND WITH THE COPY'S PUT BACK, Today is read on them at once, and the few the copy never holds (a list of keys) are
+       asked beside it. */
+    if (missing.length === 0 || restored.length > 0) {
       if (untrack(() => learnt) === 0) learnt = 1;
-      return;
+      if (missing.length === 0) return;
     }
     const client = createClient({ base: apiBase() });
     void Promise.all(missing.map((id) => learn(client.schema, id, asked))).finally(() => (learnt += 1));
@@ -324,18 +332,120 @@
   type KeptBody = { got: Opened; news: News | null };
   const bodyKey = (slug: string | null, spoken: HomeVoice, held: Holds): string => JSON.stringify([apiBase(), slug, spoken, held]);
 
+  /**
+   * TODAY AS THIS BROWSER LAST DREW IT, from the local copy (`local-tab.ts`): drawn at once on an open this tab has drawn
+   * nothing for, under the quiet mark, and replaced by the record's answer when it lands. Kept `always`, so it is only
+   * ever drawn while the record is asked again. It carries the declarations of every list, so the lists are not asked
+   * before the first read; they are asked again once Today has drawn (`verified`), in case one changed since.
+   */
+  const HOME_COPY = 'Home';
+  const copyKey = (slug: string | null): string => JSON.stringify([apiBase(), slug]);
+  let fromCopy = $state(false);
+  $effect(() => {
+    if (!fromCopy) return;
+    return untrack(() => holdCopyMark());
+  });
+  /** The lists the copy put back, learnt again once the record's own Today has drawn. */
+  let restored: string[] = [];
+  function drawCopy(slug: string | null, near: Near<KeptBody>): void {
+    if (got !== null || declares !== slug || near.value.got.from !== 'live') return;
+    got = near.value.got;
+    news = near.value.news;
+    newLines = near.value.news?.lines ?? [];
+    fromCopy = true;
+    painted('Today', 'copy');
+  }
+  /* TODAY IS BEING READ FROM THE MOMENT IT OPENS: the copy is looked in and the lists learnt before its page is asked, and
+     with nothing out meanwhile the screen read as settled over an empty page and gave its sentence's room back. Closed
+     when the first read of the page closes. */
+  let firstHeld: number | null = null;
+  const firstClosed = (ok: boolean): void => {
+    if (firstHeld === null) return;
+    closed(ok, firstHeld);
+    firstHeld = null;
+  };
+  $effect(() => () => firstClosed(true));
+  $effect(() => {
+    if (data.refused) {
+      looked = true;
+      return;
+    }
+    untrack(() => {
+      if (firstHeld === null && !settled) firstHeld = opened();
+      const slug = declares;
+      const before = new Set(Object.keys(REGISTERS));
+      /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
+      if (data.lists.every((l) => REGISTERS[l.id] !== undefined)) looked = true;
+      if (got !== null) {
+        looked = true;
+        return;
+      }
+      void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/plain.ts')])
+        .then(([m, p]) => {
+          const revive = (near: Near<unknown>): Near<KeptBody> => ({ ...near, value: p.revivedOf<KeptBody>(near.value) });
+          return m.nearLocal<unknown>(HOME_COPY, copyKey(slug), apiBase(), (late) => drawCopy(slug, revive(late))).then((near) => (near ? revive(near) : null));
+        })
+        .then((near) => {
+          if (near) drawCopy(slug, near);
+          restored = data.lists.map((l) => l.id).filter((id) => !before.has(id) && REGISTERS[id] !== undefined);
+        })
+        .catch(() => undefined)
+        .finally(() => (looked = true));
+    });
+  });
+  /**
+   * Keep the record's answer in the local copy, for the next open of this browser. A catch-up of the copy landing while
+   * Today was read refuses it (the ticket moved); it is kept once the copy has caught up, if nothing has moved since.
+   */
+  function keepCopy(slug: string | null, out: Opened, said: News | null, mark: number, stamp: string): void {
+    if (out.from !== 'live') return;
+    const reader = data.me.person;
+    void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/local.ts'), import('$lib/data/plain.ts')]).then(async ([tab, l, p]) => {
+      /* EVERY LIST'S DECLARATION GOES WITH IT, but a list the copy never keeps and one that holds a secret. */
+      const lists = data.lists.map((x) => x.id).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
+      let ticket = mark;
+      if (tab.localTicket() !== mark) {
+        await tab.settledLocal();
+        if (asOf() !== stamp || data.me.person !== reader || slug !== declares) return;
+        ticket = tab.localTicket();
+      }
+      tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf({ got: out, news: said }), ticket, {}, { always: true });
+    });
+  }
+  /* THE LISTS THE COPY PUT BACK ARE ASKED AGAIN once Today has drawn, off its path, and Today reads again if one moved. */
+  let verified = false;
+  $effect(() => {
+    if (!settled || fromCopy || verified || restored.length === 0) return;
+    verified = true;
+    const lists = restored;
+    untrack(() => {
+      void idle().then(() => {
+        const client = createClient({ base: apiBase() });
+        const fresh = new Map<string, Promise<void>>();
+        const was = JSON.stringify(lists.map((id) => REGISTERS[id] ?? null));
+        void Promise.all(lists.map((id) => learn(client.schema, id, fresh))).then(() => {
+          if (JSON.stringify(lists.map((id) => REGISTERS[id] ?? null)) !== was) learnt += 1;
+        });
+      });
+    });
+  });
+
   /** Home's page, from whichever of the three sources the record holds. */
   async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
     if (slug !== null) {
       const m = await import('$lib/record/page-live.ts');
-      return m.pageReader(apiBase()).read(slug);
+      const asking = m.pageReader(apiBase()).read(slug);
+      bodyAsked = true;
+      return asking;
     }
     /* TODAY'S BODY IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an installed
        one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. A host built
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
     const m = await import('../../routes/decide/[id]/proposed.ts');
-    const drawn = await m.drawnOf(body, apiBase());
+    const asking = m.drawnOf(body, apiBase());
+    bodyAsked = true;
+    const drawn = await asking;
     if (drawn.from === 'live')
       return {
         from: 'live',
@@ -363,11 +473,15 @@
       newLines = was.news?.lines ?? [];
       settled = true;
       untrack(() => drew('ready'));
+      /* WHAT THIS TAB DREW IS THE SCREEN: it is not held as reading for the quiet read behind it. */
+      firstClosed(true);
     }
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = was ? null : untrack(opened);
     let ok = false;
     reading = true;
+    const mark = import('$lib/data/local-tab.ts').then((m) => m.localTicket(), () => 0);
+    const stamp = untrack(asOf);
     const mine = ++pageRead;
     const before = newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
@@ -377,15 +491,22 @@
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
         if (was && out?.from !== 'live') return;
         got = out;
+        fromCopy = false;
         ok = out?.from === 'live';
         if (ok && out) keepPart('body', key, { got: out, news: null } satisfies KeptBody);
         if (ok) keepNews(before, mine, key);
+        if (ok && out) {
+          painted('Today', 'network');
+          void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said, at, stamp));
+        }
       })
       .catch(() => {})
       .finally(() => {
         reading = false;
         settled = true;
+        bodyAsked = true;
         if (at !== null) closed(ok, at);
+        firstClosed(true);
       });
   });
 
@@ -399,11 +520,15 @@
     const spoken = untrack(() => voice);
     const held = untrack(() => holds);
     /* A home that draws no feed of the log has shown nothing new, and asks nothing. */
+    const mark = import('$lib/data/local-tab.ts').then((m) => m.localTicket(), () => 0);
+    const stamp = untrack(asOf);
     const before = untrack(() => feeds) ? newsNow() : null;
     try {
       const out = await readBody(slug, spoken, held);
       if (slug === declares && out?.from === 'live') {
         got = out;
+        fromCopy = false;
+        void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said ?? untrack(() => news), at, stamp));
         const key = bodyKey(slug, spoken, held);
         keepPart('body', key, { got: out, news: untrack(() => news) } satisfies KeptBody);
         if (before) keepNews(before, mine, key);
@@ -580,8 +705,14 @@
    * each effect, so a move of the record still asks every tile again.
    */
   const asOf = (): string => `${moving.version} ${wrote()}`;
+  /**
+   * TODAY'S PAGE IS ASKED BEFORE THE TILES BEHIND MORE. The record answers one call at a time, so the briefing, the
+   * matches and what went stale, asked as the screen mounted, were answered ahead of the page they sit under. They are
+   * asked the moment the page's own read has gone out, and are still part of the screen's first read.
+   */
+  let bodyAsked = $state(false);
   $effect(() => {
-    if (data.refused) return;
+    if (data.refused || !bodyAsked) return;
     const ver = asOf();
     const base = apiBase();
     let here = true;

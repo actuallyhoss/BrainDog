@@ -371,7 +371,7 @@ export const sameOwner = (a: Owner, b: Owner): boolean => a.base === b.base && a
 export const cursorAt = (line: Line): Cursor => (typeof line.rowid === 'number' ? line.rowid : `e.${line.id}`);
 
 /** Whether a declaration holds a secret field. A list with one is never kept. */
-const holdsSecret = (decl: unknown): boolean => {
+export const holdsSecret = (decl: unknown): boolean => {
   const fields = (decl as { fields?: unknown } | null)?.fields;
   if (!Array.isArray(fields)) return true;
   return fields.some((f) => (f as { type?: unknown })?.type === 'secret' || (f as { of?: unknown })?.of === 'secret');
