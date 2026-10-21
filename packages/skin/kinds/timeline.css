@@ -27,7 +27,10 @@
     min-block-size: 44px;
   }
 
+  /* BLOCK, NOT THE FLEX EVERY TITLE IS (`blocks.css`): a flex box clips its words and draws no ellipsis, so a long
+     name on a phone stopped mid-word, "Grangemoor Events, Sta". A working glyph inside it is inline and stays. */
   .list[data-kind='timeline'] > .item > .item-title {
+    display: block;
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
