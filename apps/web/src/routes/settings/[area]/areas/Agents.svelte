@@ -549,13 +549,17 @@
           {#each agents as a (a.key)}
             {@const working = workingOf(a)}
             {@const line = heardLine(a, working, (at) => since(at, nowMs))}
+            <!-- THE FACE BESIDE THE BUTTON, NEVER IN IT: a face that names a run is a link to the run, and a link inside a
+                 button is two controls in one that a screen reader cannot tell apart. The button's press still covers the
+                 whole row (`.agent::before`), and the face sits over it as its own door. -->
             <li data-default={a.key === 'default' ? '' : undefined}>
-              <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
+              <div class="agent-row">
                 {#if a.kind === null}
                   <IconWell name={a.key === 'default' ? 'plus' : 'key'} size="l" />
                 {:else}
                   <AgentFace agent={a.kind} run={a.heard?.seq != null ? `S${a.heard.seq}` : ''} live={working ? 'working' : 'stopped'} size="m" />
                 {/if}
+                <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
                 <span class="who-words">
                   <span class="who-name" dir="auto">{a.name}</span>
                   <span class="agent-says">{a.says}</span>
@@ -568,7 +572,8 @@
                 </span>
                 <span class="who-scope agent-may">{a.may ? LEVEL_WORDS[a.may] : ''}</span>
                 <Icon name="chevron" size="s" />
-              </button>
+                </button>
+              </div>
             </li>
           {/each}
         </ul>
@@ -820,38 +825,61 @@
     border-block-start: 1px solid var(--rule);
   }
 
-  .agent {
+  /* THE ROW: the face, then the button, which takes the rest. Hover and focus are the row's, so the row reads as the one
+     press it was when the face sat inside the button. */
+  .agent-row {
+    position: relative;
     display: grid;
-    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
     align-items: center;
     column-gap: var(--sp-3);
-    inline-size: 100%;
     min-block-size: var(--row-h-2);
-    margin: 0;
     padding: var(--sp-3) var(--sp-2);
     margin-inline: calc(-1 * var(--sp-2));
-    box-sizing: content-box;
+    border-radius: var(--r-ctl);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .agent-row:has(.agent:hover) {
+    background: var(--hover);
+  }
+
+  .agent-row > :global(.agent-face) {
+    z-index: var(--z-raise);
+    justify-self: center;
+  }
+
+  .agent {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
   }
 
-  .agent:hover {
-    background: var(--hover);
+  /* THE PRESS COVERS THE ROW, the face's own door over it. */
+  .agent::before {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-ctl);
+    content: '';
   }
 
   .agent:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
+    /* focus-ok: the row's press (`.agent::before`) draws the ring round the whole row, below. */
+    outline: none;
   }
 
-  .agent > :global(.agent-face) {
-    justify-self: center;
+  .agent:focus-visible::before {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
 
   .agent > :global(svg) {
@@ -875,8 +903,12 @@
   }
 
   @media (width < 640px) {
+    .agent-row {
+      align-items: start;
+    }
+
     .agent {
-      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: start;
     }
 
