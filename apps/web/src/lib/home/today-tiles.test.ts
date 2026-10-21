@@ -40,11 +40,11 @@ test('THE SENTENCE (today F2, polish 7): short sentences, what needs you first a
   const late = { owed: '£7,200', bills: null };
   assert.deepEqual(sentenceOf({ needYou: 8, late, agents: 2 }), { text: '8 need you. £7,200 owed to you is late. 2 agents are working.', needs: '8 need you' });
   assert.deepEqual(sentenceOf({ needYou: 8, late: { owed: '£7,200', bills: '£10,593' }, agents: 2 }), {
-    text: '8 need you. £7,200 owed to you is late, and £10,593 of bills. 2 agents are working.',
+    text: '8 need you. £7,200 owed to you is late, and £10,593 you owe. 2 agents are working.',
     needs: '8 need you',
   });
   /* EITHER AMOUNT AT NOUGHT DROPS ITS CLAUSE. */
-  assert.equal(sentenceOf({ needYou: 8, late: { owed: null, bills: '£10,593' }, agents: 0 }).text, '8 need you. £10,593 of bills is late.');
+  assert.equal(sentenceOf({ needYou: 8, late: { owed: null, bills: '£10,593' }, agents: 0 }).text, '8 need you. £10,593 you owe is late.');
   /* WITH SOMETHING TO ASK AND NOTHING LATE, the line says so, where what is late was read at all. */
   assert.deepEqual(sentenceOf({ needYou: 1, agents: 1, lateRead: true }), { text: '1 needs you. Nothing is late. 1 agent is working.', needs: '1 needs you' });
   assert.deepEqual(sentenceOf({ needYou: 26, late: { owed: null, bills: null }, agents: 0 }), { text: '26 need you. Nothing is late.', needs: '26 need you' });

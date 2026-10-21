@@ -39,9 +39,6 @@ import { words } from './words.ts';
 import { TASKS } from '../work/list.ts';
 import { daysBetween, dueSaid } from '../work/board.ts';
 
-/** The list of bills and invoices, the one Money counts late bills in. */
-const BILLS = 'obligations';
-
 /** The headings a use case's voice may say its own way, with the house line each falls back to. */
 export type HomeVoice = {
   rightNow: string;
@@ -1300,12 +1297,8 @@ export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSum
       if (seen.has(key)) continue;
       seen.add(key);
       const amount = fields.amount;
-      const list = typeof fields.row === 'string' ? fields.row.split('#')[0]! : null;
-      /* A BILL IS A ROW OF BILLS AND INVOICES, as Money counts them (VERIFY H7): a late payment kept in another list (the
-         ledger's £39 post) made Today say "4 bills are late, £10,593" beside Money's "2 late · £10,540". It is still a
-         late thing, said where no late money is. */
-      if (!isMoney(amount) || (list !== null && list !== BILLS && fields.direction !== 'in')) {
-        lateRow(list);
+      if (!isMoney(amount)) {
+        lateRow(typeof fields.row === 'string' ? fields.row.split('#')[0]! : null);
         continue;
       }
       const into = fields.direction === 'in' ? out.owed : out.bills;

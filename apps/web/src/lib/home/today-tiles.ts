@@ -111,7 +111,7 @@ export type SentenceParts = {
 const NOTHING_LATE = 'nothing is late';
 
 /**
- * "8 need you. £7,200 owed to you is late, and £10,593 of bills. 2 agents are working." (spec 4.1, today F2, and the
+ * "8 need you. £7,200 owed to you is late, and £10,593 you owe. 2 agents are working." (spec 4.1, today F2, and the
  * Today polish of 20 October: short sentences.) WHAT NEEDS YOU LEADS, as the badge's number and in red; the late money
  * is its own sentence, or "Nothing is late." with something to ask; who is working closes it, in ink.
  * Numbers are always digits (SF14). With nothing needing you it says so ("Nothing needs you."), and then the late money,
@@ -123,7 +123,9 @@ const NOTHING_LATE = 'nothing is late';
 export function sentenceOf({ needYou, late = null, lateThings = 0, lateRead = late !== null, agents, inbox = 0 }: SentenceParts): Sentence {
   /* WHAT IS LATE, ONE SENTENCE: what is owed to you first, then the bills, each left out at nought. */
   const owed = late?.owed ? `${late.owed} owed to you` : null;
-  const bills = late?.bills ? `${late.bills} of bills` : null;
+  /* WHAT YOU OWE, NOT "BILLS": the late money going out counts every list's (a missed repeat's £39 as well), which Money's
+     "Bills late" does not, so calling it bills put two figures under one name (VERIFY H7). */
+  const bills = late?.bills ? `${late.bills} you owe` : null;
   const lateClause =
     owed && bills
       ? `${owed} is late, and ${bills}`
