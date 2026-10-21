@@ -12,7 +12,7 @@
  * day for are on the same day. A blank day starts no group, and its row sits under the day above it.
  */
 
-import { readable, zeroFigure } from './format.ts';
+import { barFigures, readable, zeroFigure, type Home } from './format.ts';
 
 /** For each row, the day to say over it, or null where it carries on the day above it (or the timeline is not grouped). */
 export function timelineDays(rows: readonly { cells: readonly string[] }[]): (string | null)[] {
@@ -66,3 +66,14 @@ export const timelineTitle = (text: string | undefined): string =>
  */
 export const rowsCell = (text: string | undefined, now?: number): string =>
   text === undefined ? '' : zeroFigure(text, true) ? '' : dayThisYear(text, now);
+
+/**
+ * EVERY ROW'S THIRD CELL, AS A SET (the UI pass of 20 October, H16): each said by `timelineCell`, and where one amount
+ * carries pence, every amount of its currency does, as a chart's figures are (`barFigures`). The Ledger read "−£2,500 …
+ * −£964 −£39.61", whole pounds beside pence down one column. A cell that is no figure is left as it is said.
+ */
+export const timelineDetails = (rows: readonly { cells: readonly string[] }[], now?: number, home?: Home): string[] =>
+  barFigures(
+    rows.map((r) => timelineCell(r.cells[2], now)),
+    home,
+  );

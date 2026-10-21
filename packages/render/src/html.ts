@@ -35,7 +35,7 @@ import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoLines, todoMeta as metaCells } from './todo.ts';
-import { rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
+import { rowsCell, timelineCell, timelineDays, timelineDetails, timelineTitle } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
@@ -648,6 +648,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'link') return links(b, o);
   const tag = kindSpec(b.kind, o.kinds)?.ordered ? 'ol' : 'ul';
   const days = b.kind === 'timeline' ? timelineDays(b.rows) : [];
+  const details = b.kind === 'timeline' ? timelineDetails(b.rows, o.now, o.home) : [];
   const grouped = days.some((d) => d !== null);
   const body = b.rows
     .map((r, i) => {
@@ -668,7 +669,7 @@ function list(b: Block, o: RenderOptions): string {
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
         const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', timelineCell(r.cells[0], o.now), o);
-        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', timelineCell(r.cells[2], o.now), o)}</li>`;
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', details[i] ?? '', o)}</li>`;
       }
       return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })

@@ -37,7 +37,7 @@
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoLines } from '../../src/todo.ts';
-  import { timelineCell, timelineDays, timelineTitle } from '../../src/timeline.ts';
+  import { timelineCell, timelineDays, timelineDetails, timelineTitle } from '../../src/timeline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -105,6 +105,8 @@
   }
 
   const days = $derived(block.kind === 'timeline' ? timelineDays(block.rows) : []);
+  /* A TIMELINE'S AMOUNTS AS ONE SET: pence on every one where one has them (`timelineDetails`). */
+  const details = $derived(block.kind === 'timeline' ? timelineDetails(block.rows, opts.now, opts.home) : []);
   const grouped = $derived(days.some((d) => d !== null));
 
   /** One listener on the list, so a row reports focus however deep the control that took it. */
@@ -324,7 +326,7 @@
           />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
         >
         <!-- Each cell as it is said (`timelineCell`): a day this year without its year, an amount of nothing not at all. -->
-        <span class="item-detail"><Text nodes={inline(timelineCell(row.cells[2], opts.now), opts)} {opts} /></span>
+        <span class="item-detail"><Text nodes={inline(details[i] ?? '', opts)} {opts} /></span>
         {@render rowActs(row)}
       </li>
     {:else}
