@@ -338,7 +338,7 @@
 
     .brand {
       gap: 6px;
-      font-size: 17px;
+      font-size: var(--t-site-17);
     }
 
     .go :global(.btn) {
