@@ -338,7 +338,12 @@ const axisSaid = (n: number, unit: string | undefined, home: string | null): str
 
 /* ---- The plan ------------------------------------------------------------------------------------------------ */
 
-export type KpisOptions = { home?: string | null; now?: string | number | Date };
+export type KpisOptions = {
+  home?: string | null;
+  now?: string | number | Date;
+  /** A Today row's small chart: whole periods only, with no dot for the one still running (`kpisPlan` sets it). */
+  spark?: boolean;
+};
 
 const nowOf = (now: KpisOptions['now']): number => {
   if (now instanceof Date) return now.getTime();
@@ -439,7 +444,11 @@ export function kpiView(k: KpiInput, opts: KpisOptions = {}): KpiView {
   const stale: KpiStale | null =
     newest === null ? { said: KPI_NO_VALUE, fix } : now - newest > limit ? { said: kpiStaleSaid(kpiDay(newest, now)), fix } : null;
 
-  const chart = plots.filter((p) => p.n !== null).length >= KPI_CHART_POINTS ? chartOf(plots, kind, target, k.unit, home, now, period) : null;
+  /* A TODAY ROW'S SPARK IS WHOLE PERIODS ONLY. The period still running is a faint dot past the last whole one, which a
+     tile explains with its "so far" line; a row says no "so far", so on Hours billed it was a stray dot right of the
+     line, half cut by the row's edge. */
+  const charted = opts.spark === true ? plots.filter((p) => !p.partial) : plots;
+  const chart = charted.filter((p) => p.n !== null).length >= KPI_CHART_POINTS ? chartOf(charted, kind, target, k.unit, home, now, period) : null;
 
   const whenSaid = when === '' || when === 'today' || kind === 'flow' ? when : `on ${when}`;
   const sentence = [
@@ -613,6 +622,7 @@ export function kpisPlan(kpis: readonly KpiInput[], opts: KpisOptions = {}): Kpi
   const leadAt = Math.max(0, views.findIndex((v) => v.headline));
   const lead = views[leadAt] ?? null;
   const rest = views.filter((_, i) => i !== leadAt).slice(0, KPIS_MORE);
-  return { lead, rest, rows: views.slice(0, KPIS_TODAY) };
+  const rows = kpis.slice(0, KPIS_TODAY).map((k, i) => (views[i]!.chart?.partial ? kpiView(k, { ...opts, spark: true }) : views[i]!));
+  return { lead, rest, rows };
 }
 

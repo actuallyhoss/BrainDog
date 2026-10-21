@@ -79,6 +79,18 @@ test('a flow is an area from the floor, the running month a lone faint dot and n
   assert.ok(c.ticks.length <= 5);
 });
 
+test('a Today row draws whole periods only: no running dot past its line, which runs to the end', () => {
+  const plan = kpisPlan([revenue], { home: 'GBP', now: NOW });
+  const row = plan.rows[0]!.chart!;
+  assert.equal(row.partial, '', 'a row says no "so far", so it draws no dot for it');
+  assert.match(row.line, /L1000 [\d.]+$/u, 'the last whole month is the end of the row');
+  assert.match(row.end, /^M1000 [\d.]+l0 0$/u);
+  assert.equal(plan.rows[0]!.figure?.text, '£4,610');
+  /* A tile still shows where the month stands so far, beside its words. */
+  assert.match(plan.lead!.chart!.partial, /^M1000 [\d.]+l0 0$/u);
+  assert.equal(plan.lead!.sofar, '£1,350 so far in Oct');
+});
+
 test('MONEY IS NEVER ADDED ACROSS CURRENCIES: a reading in another currency is left out and said', () => {
   const v = kpiView(
     {
