@@ -1232,7 +1232,8 @@
     const read = 'chips' in c ? c.chips.map((chip) => chip.said) : [];
     const said = read.length > 0 ? createWords.addedWith(list, c.title, read) : createWords.added(list, c.title);
     const back = out.back;
-    toasts.push(out.filled.length > 0 ? `${said} ${copy.captureFilled(out.filled)}` : said, {
+    /* WHAT IT FILLED IN IS NOT READ OUT (VERIFY H23): the toast names what was added and where, and no more. */
+    toasts.push(said, {
       intent: 'good',
       undo: () =>
         void back().then((undone) => {

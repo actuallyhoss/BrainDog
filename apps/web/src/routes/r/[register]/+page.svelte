@@ -1519,10 +1519,10 @@
    * product had worked was a count changing somewhere above the fold. The mark says which row is new, the receipt
    * says what happened to it, and the scroll happens ONLY when the row is not already in front of them.
    *
-   * `filled` IS SAID ON THE ROW AND IN THE TOAST, because a field this screen answered on somebody's behalf is a
-   * fact nobody told it. The chip takes the long form where there is room for it and `Added` where there is not.
+   * THE CHIP SAYS "Added" AND NO MORE (VERIFY H23): what the line filled in is in the row's own cells, where it can be
+   * changed, and "Added, with which way Money out, amount £0 ... filled in" read like a form dump.
    */
-  function addLanded(entry: Entry, filled: readonly string[] = [], mark?: string) {
+  function addLanded(entry: Entry, mark?: string) {
     /* THE POLL MAY HAVE BROUGHT IT ALREADY. The record commits before this tab hears back, so a re-ask landing in that
        gap draws the row, and prepending it again would draw it twice and count it twice. */
     const already = pages.some((p) => p.some((e) => e.seq === entry.seq));
@@ -1530,7 +1530,7 @@
     if (!already) matched += 1;
     if (booted && !already) booted = { ...booted, registers: booted.registers.map((r) => (r.id === id ? { ...r, count: r.count + 1 } : r)) };
     receipt(entry.seq, {
-      mark: mark ?? (filled.length > 0 ? copy.markAddedFilled(filled) : copy.writeMarkAdded),
+      mark: mark ?? copy.writeMarkAdded,
       short: copy.writeMarkAdded,
       intent: 'good',
       undo: takeBack(entry),
@@ -1640,7 +1640,7 @@
   async function createRow(said: string, onBack: (back: string) => void, mark?: string): Promise<Entry | null> {
     const was = asked;
     /* UNDER "or" NO CHIP IS SOMETHING EVERY ENTRY HERE HOLDS, so none of them is written onto a new one. */
-    const { fields, filled } = capturedFields(id, said, either ? [] : filters, now, result.entries);
+    const { fields } = capturedFields(id, said, either ? [] : filters, now, result.entries);
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
     const line = typedRows.add({ seq, fields, version: 0, created: new Date(now).toISOString(), by: '' });
@@ -1657,11 +1657,11 @@
       return null;
     }
     if (asked !== was) return null;
-    addLanded(out.entry, filled, mark);
-    /* AND THE FILLED FIELDS ARE SAID ONCE, WHERE THEY ARE LOOKING. The chip carries it on the row for as long as
-       the answer is up; this is for the reader whose eye is on the line they just typed in. The toast carries the
-       chip's own way back, because a row filled in with guesses is the row most likely to be unwanted. */
-    if (filled.length > 0) toasts.push(copy.captureFilled(filled), { undo: takeBack(out.entry), offer: false });
+    addLanded(out.entry, mark);
+    /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
+       invoices." The fields it filled in are each in their own cell on the row, so they are not read out here. The
+       row's chip carries Put back, so the toast offers no second Undo; ⌘Z still takes it back. */
+    if (decl) toasts.push(copy.captureAdded(titleSaid(out.entry), decl.name), { undo: takeBack(out.entry), offer: false });
     return out.entry;
   }
 

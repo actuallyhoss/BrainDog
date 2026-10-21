@@ -426,19 +426,13 @@ export const shell = {
   viewsSection: 'Views',
   /* Lane H */
   /**
-   * WHAT THE CAPTURE LINE FILLED IN, AND THE FACT THAT IT DID.
+   * WHAT THE CAPTURE LINE ADDED, SAID BY NAME AND NOTHING MORE (motion F12, F20, VERIFY H23).
    *
-   * A required field the screen answers on somebody's behalf is a fact written into their record that nobody told
-   * it. The row is the cheapest thing in the product to make and it must not also be the quietest: the chip says
-   * it on the row, and this says it once where they are looking, in the reader's own spelling of each value rather
-   * than the record's — `direction` filled as `owed_by_me` is said back as "which way owed by me".
-   *
-   * IT SAYS WHERE TO CHANGE IT, because the answer is one press away on the row itself and a sentence reporting a
-   * value with nowhere to go is a sentence that makes somebody open a form.
+   * It used to list every field it filled in ("Filled in which way Money out, amount £0, due 3 Sep 2026 and status
+   * Open. Change any of it where it is."), which read like a form dump; the row is on screen with each value in its
+   * own cell, and its chip says "Added" with its own Put back.
    */
-  captureFilled: (what: readonly string[]) => `Filled in ${list([...what])}. Change any of it where it is.`,
-  /* The same fact as the chip on the row, which has the width for it only on a card. The grid wears `Added`. */
-  markAddedFilled: (what: readonly string[]) => `Added, with ${list([...what])} filled in`,
+  captureAdded: (title: string, list: string) => `Added “${title}” to ${list}.`,
   editCancel: 'Cancel',
   searchDecided: 'Decided',
   proposalKind: (kind: string): string =>
