@@ -19,7 +19,7 @@ import type { Readable, Writable } from 'node:stream';
 import type { McpSurface } from '@braindog/mcp';
 import { agreed, handle, type Reply } from '@braindog/mcp/rpc';
 
-import type { ClientInfo } from './position.ts';
+import { cliBuild, type ClientInfo } from './position.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -74,7 +74,8 @@ export async function serveStdio<C>(
     const said = helloOf(message);
     if (said !== null) hello?.(said);
     /* `handle` never throws, so a failed call is a reply and the loop goes on. */
-    const job = handle(message, surface, ctxOf(), origin, version).then((reply) => {
+    /* WITH THIS COMMAND'S BUILD, which these answers are made by: `serverInfo.version` says it, never `0.0.0`. */
+    const job = handle(message, surface, ctxOf(), origin, version, '', cliBuild()).then((reply) => {
       version = agreed(reply) ?? version;
       return reply ? send(reply) : undefined;
     });

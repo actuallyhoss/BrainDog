@@ -307,6 +307,8 @@ type Site = {
   api: Api;
   token: string | undefined;
   origin: string;
+  /** The build this process runs (`BRAINDOG_BUILD`, or the one it was started with), `''` when it was told none. */
+  build: string;
   mode: CookieMode | null;
   /** The Directory's sign-in, or `null` where this host holds no sessions: open mode, or nothing to check them with. */
   auth: Auth | null;
@@ -2016,6 +2018,7 @@ export async function start(options: {
   const origins = new Set([...loopback.map((h) => `${options.tls === undefined ? 'http' : 'https'}://${h}`), origin]);
 
   site = {
+    build: buildApp,
     usage: directory.usage,
     /* THE ONE RECORD THIS PROCESS HOLDS, AND ONLY THAT ONE. `switcherRows` asks every record the
        Directory says this person can reach, and a self-host process can truthfully answer only for
@@ -2613,6 +2616,8 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
     session: (ctx, said) => withSession(ctx, hintsOf(said)),
     /* WHERE THIS PROCESS SERVES THE APP (`BRAINDOG_ORIGIN`), so a filed `propose` carries its `decide` link here. */
     origin: site.origin,
+    /* AND ITS BUILD, as `serverInfo.version` and the `braindog-build` header, as the Worker says its own (W1-B). */
+    ...(site.build === '' ? {} : { build: site.build }),
   });
 }
 

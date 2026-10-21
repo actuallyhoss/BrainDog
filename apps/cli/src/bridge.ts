@@ -306,7 +306,8 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     inFlight.add(job);
     void job.finally(() => inFlight.delete(job));
   };
-  const onMachine = (message: unknown, surface: McpSurface<Ctx>, m?: Message) => handle(message, surface, ctx(), target.base, (m && versionIn(m)) ?? version);
+  /* AN ANSWER MADE ON THE MACHINE SAYS THE BUILD THAT MADE IT, this command's (`serverInfo.version`), never `0.0.0`. */
+  const onMachine = (message: unknown, surface: McpSurface<Ctx>, m?: Message) => handle(message, surface, ctx(), target.base, (m && versionIn(m)) ?? version, '', cliBuild());
 
   /** One POST to the host's `/mcp`, and what came of it. Never throws, and no sentence here quotes the request. */
   const post = async (message: Message, signal: AbortSignal): Promise<Outcome> => {
