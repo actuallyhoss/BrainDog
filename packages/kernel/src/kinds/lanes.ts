@@ -2,7 +2,10 @@
  * `lanes`: a stretch of work as swimlanes, one lane a row, from the instant it started to the instant it ended.
  *
  * OVER A LIST it names three columns, the title, the start and the end (`columns: [title, started, ended]`), and the
- * start and the end are `instant` fields. A row with no end is still going, and its lane runs to now. A fourth column
+ * start and the end are `instant` fields. A row with no end is still going, and its lane runs to now. So is a run the
+ * record counts as working now (`sessionsWorking`, the one clock in `presence.ts`), whatever its end column says: over
+ * the list of runs the end is when it was last heard from, and a run at work drew "11:30 to 14:57" and a bar that
+ * stopped short of now, or past it, where it is still going. A fourth column
  * picks each lane's tone: its value is looked up in the block's `tones:`, such as `{ blocked: bad, working: info }`,
  * the words a `bar` and a `split` tone their parts with. It may instead write its rows out, each
  * `{ cells: [title, start, end, value] }`, the end left empty for one still going.
@@ -238,9 +241,12 @@ export const lanes: KindModule = {
     }
     const more = Math.max(0, listed.matched - listed.rows.length);
 
+    /* A RUN AT WORK HAS NOT ENDED: its lane runs to now, as the record's one clock says who works. */
+    const working = listed.register === 'session' ? new Set((deps.sessionsWorking?.() ?? []).map((w) => w.run.id)) : null;
+
     /* ONE LANE A ROW, IN THE ROWS' ORDER, so a host that wants more of a row than its lane reads `rows` at the same place. */
     const drawn = listed.rows.map((row): Lane => {
-      const ended = row.fields[end ?? ''];
+      const ended = working?.has(row.id) ? null : row.fields[end ?? ''];
       const value = toned === undefined ? undefined : row.fields[toned];
       return {
         title: String(row.fields[title ?? ''] ?? ''),

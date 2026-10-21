@@ -266,3 +266,28 @@ test('the window is written in the record\'s zone, and the lanes are the same mo
   );
   sql.close();
 });
+
+test('over the list of runs, a run at work has not ended: its lane runs to now, whatever its last heard says', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const run = (doing: string, state: string, startedAgo: number, heardAgo: number) => {
+    const made = k.create(
+      'session',
+      { doing, agent: 'claude', state },
+      { actor: 'p_1', stamp: { started: new Date(NOW - startedAgo * 60_000).toISOString(), last_seen: new Date(NOW - heardAgo * 60_000).toISOString() } },
+    );
+    assert.ok(made.ok, JSON.stringify(made));
+  };
+  run('Variable axis QA', 'active', 210, 3);
+  run('Release notes', 'active', 300, 95);
+  run('Invoice check', 'done', 240, 120);
+  const read = answerOf(k.block(block({ kind: 'lanes', source: 'register.session', columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }] })));
+  assert.deepEqual(read.refusals, []);
+  const ends = Object.fromEntries(read.lanes.map((l) => [l.title, l.end]));
+  /* WORKING BY THE ONE CLOCK, heard three minutes ago: still going, so the host draws it to now and says "Since". */
+  assert.equal(ends['Variable axis QA'], null);
+  /* GONE QUIET AN HOUR AND A HALF AGO, and done: each ends when it was last heard from. */
+  assert.equal(ends['Release notes'], new Date(NOW - 95 * 60_000).toISOString());
+  assert.equal(ends['Invoice check'], new Date(NOW - 120 * 60_000).toISOString());
+  sql.close();
+});

@@ -344,9 +344,10 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
 /**
  * THE DAY AS LANES, SINCE 1.8.0: the last 24 hours, one lane for each run from when it started to when it was last heard
  * from, the working ones toned, under the page's line and over the groups. Read off a seeded record's page answer, so
- * the block is declared against the field the kernel really keeps (`started`, its migration 26).
+ * the block is declared against the field the kernel really keeps (`started`, its migration 26). A RUN AT WORK NOW (the
+ * kernel's one clock: active and heard from inside fifteen minutes) has no end: its lane runs to now and says "Since".
  */
-test("TODAY'S LANES ARE THE RUNS OF THE LAST 24 HOURS, each from its start to when it was last heard from", async () => {
+test("TODAY'S LANES ARE THE RUNS OF THE LAST 24 HOURS, each from its start to when it was last heard from, or to now while it works", async () => {
   const { k, sql } = await seeded();
   type Lanes = Drawn & { lanes?: { title: string; start: string; end: string | null; tone?: string; href?: string }[]; window?: { from: string; to: string } };
   const declared = AGENTS_PAGES.agents!.blocks as { kind: string; lead?: boolean; heading?: string; limit?: number }[];
@@ -365,10 +366,16 @@ test("TODAY'S LANES ARE THE RUNS OF THE LAST 24 HOURS, each from its start to wh
   assert.ok(inDay.length >= 3 && inDay.length < RUNS.length, 'the seed needs runs inside the day and outside it');
   assert.deepEqual(
     block.lanes?.map((l) => ({ title: l.title, start: l.start, end: l.end, tone: l.tone })),
-    inDay.map((r) => ({ title: r.doing, start: r.started, end: r.last_seen, tone: r.state === 'active' ? 'info' : undefined })),
+    inDay.map((r) => ({
+      title: r.doing,
+      start: r.started,
+      end: r.state === 'active' && NOW - Date.parse(String(r.last_seen)) < 15 * 60_000 ? null : r.last_seen,
+      tone: r.state === 'active' ? 'info' : undefined,
+    })),
   );
+  assert.ok((block.lanes ?? []).some((l) => l.end === null), 'the seed needs a run at work, drawn to now');
   for (const l of block.lanes ?? []) {
-    assert.ok(Date.parse(l.start) < Date.parse(String(l.end)), `${l.title} ends before it starts`);
+    if (l.end !== null) assert.ok(Date.parse(l.start) < Date.parse(l.end), `${l.title} ends before it starts`);
     assert.match(String(l.href), /^\/r\/session\/\d+$/u, `${l.title} opens no run`);
   }
   assert.equal(Date.parse(block.window!.to) - Date.parse(block.window!.from), 24 * 3_600_000);
