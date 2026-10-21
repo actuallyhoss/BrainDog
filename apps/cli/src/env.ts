@@ -27,8 +27,10 @@ import type { Client, Page } from '@braindog/client';
 
 import { oneLine } from './clip.ts';
 import { ccenvHome, isFolder, profilesIn, shown } from './doctor.ts';
+import type { CheckIo } from './env-check.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { looksLikeToken, serversFileOf } from './install.ts';
+import { envPins } from './pins.ts';
 import { isObject, sha256, Stopped, valueOf } from './skills.ts';
 import { canonical } from './tools.ts';
 
@@ -121,9 +123,10 @@ export function namer(): (name: string) => string {
 
 /**
  * What each profile is called in the lines: `default` for `~/.claude`, the rest of `.claude-<name>`, a ccenv profile's
- * own name, or else where it is. Two profiles that would share a name are each called by where they are.
+ * own name, or else where it is. Two profiles that would share a name are each called by where they are. `env apply`
+ * and `env check` name them the same way, and `--profile` takes these names.
  */
-function labelsOf(dirs: string[], home: string, ccenv: string): string[] {
+export function labelsOf(dirs: string[], home: string, ccenv: string): string[] {
   const first = dirs.map((dir) => {
     const name = basename(dir);
     const parent = resolve(dirname(dir));
@@ -310,25 +313,55 @@ const PAGES = 40;
 /** What makes the client the record is read with: `clientFor`, or a test's own. */
 export type MakeClient = (to: Target, headers: () => Promise<Record<string, string>>, signal: AbortSignal) => Pick<Client, 'list'>;
 
+/** One row of a list as a whole read hands it: its id (what a ref to it holds), its spoken id, and its fields. */
+export type ListRow = { id: string | null; spoken: string; fields: Record<string, unknown> };
+
 /**
- * The names in one of the record's lists that apply everywhere and are not retired, read whole a page at a time as
- * `skills sync` reads the skills `context` cut short; `null` when the record refuses. A project's row is left out.
+ * Every row of one of the record's lists that is not retired, read whole a page at a time as `skills sync` reads the
+ * skills `context` cut short; `null` when the record refuses. Throws `Stopped` when it does not answer.
  */
-async function everywhere(client: Pick<Client, 'list'>, register: string, takes: (fields: Record<string, unknown>) => boolean): Promise<string[] | null> {
-  const names = new Set<string>();
+export async function rowsOf(client: Pick<Client, 'list'>, register: string): Promise<ListRow[] | null> {
+  const rows: ListRow[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < PAGES; page++) {
     const value: Page<unknown> | null = valueOf(await client.list({ register, limit: PAGE, ...(cursor === null ? {} : { cursor }) }));
     if (value === null) return null;
     for (const r of value.rows) {
       if (!isObject(r) || !isObject(r.fields) || r.state === 'retired') continue;
-      const { name, project } = r.fields;
-      if (typeof name === 'string' && (project === undefined || project === null || project === '') && takes(r.fields)) names.add(name);
+      rows.push({ id: typeof r.id === 'string' ? r.id : null, spoken: typeof r.seq === 'number' ? `${register}#${String(r.seq)}` : '', fields: r.fields });
     }
     cursor = typeof value.cursor === 'string' && value.cursor !== '' ? value.cursor : null;
     if (cursor === null) break;
   }
+  return rows;
+}
+
+/**
+ * The names in one of the record's lists that apply everywhere and are not retired, read whole (`rowsOf`); `null`
+ * when the record refuses. A project's row is left out.
+ */
+async function everywhere(client: Pick<Client, 'list'>, register: string, takes: (fields: Record<string, unknown>) => boolean): Promise<string[] | null> {
+  const rows = await rowsOf(client, register);
+  if (rows === null) return null;
+  const names = new Set<string>();
+  for (const { fields } of rows) {
+    const { name, project } = fields;
+    if (typeof name === 'string' && (project === undefined || project === null || project === '') && takes(fields)) names.add(name);
+  }
   return [...names].sort();
+}
+
+/**
+ * The list that plays a role for the record's agents (`role: profiles` on its declaration, `AGENT_ROLES`), by its id
+ * and the field its rows are named by, read off every list's declaration in one `schemas` read; `null` when no list
+ * declares the role, and when the record will not say, which an older record without the read or the role is.
+ * Throws `Stopped` when it does not answer.
+ */
+export async function listPlaying(client: Pick<Client, 'call'>, role: string): Promise<{ id: string; title: string } | null> {
+  const value = valueOf(await client.call<{ lists?: unknown }>('schemas', { every: true }));
+  const lists = isObject(value) && isObject(value.lists) ? value.lists : {};
+  for (const [id, decl] of Object.entries(lists)) if (isObject(decl) && decl.role === role) return { id, title: typeof decl.title === 'string' && decl.title !== '' ? decl.title : 'name' };
+  return null;
 }
 
 /**
@@ -380,9 +413,15 @@ export async function envDiff(args: string[], io: EnvIo = {}): Promise<{ lines: 
   return { lines: printEnvDiff(report), report, json: values.json === true, code: anyDiffers(report) ? 1 : 0 };
 }
 
-/** `braindog env <verb>`, of which `diff` is the one. */
-export async function envCommand(args: string[], io: EnvIo = {}): ReturnType<typeof envDiff> {
+/**
+ * `braindog env diff|pins|check`, each a plan and its lines: `apply` asks at a terminal as it goes, so `main.ts`
+ * dispatches it on its own (`env-apply.ts`).
+ */
+export async function envCommand(args: string[], io: EnvIo & { check?: CheckIo } = {}): Promise<{ lines: string[]; report: unknown; json: boolean; code: 0 | 1 }> {
   const [verb, ...rest] = args;
-  if (verb !== 'diff') throw new Error('braindog env takes diff, as in braindog env diff.');
-  return envDiff(rest, io);
+  if (verb === 'diff') return envDiff(rest, io);
+  if (verb === 'pins') return envPins(rest, { home: io.home ?? homedir() });
+  /* LOADED WHEN ASKED, because it reads this file's names and this file would otherwise read it. */
+  if (verb === 'check') return (await import('./env-check.ts')).envCheck(rest, { home: io.home ?? homedir(), env: io.env ?? process.env, ...io.check });
+  throw new Error('braindog env takes diff, apply, pins or check, as in braindog env diff.');
 }

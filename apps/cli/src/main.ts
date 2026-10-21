@@ -52,6 +52,7 @@ import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './
 import { context } from './context.ts';
 import { doctor } from './doctor.ts';
 import { envCommand } from './env.ts';
+import { envApply } from './env-apply.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
 import { syncCommand } from './sync.ts';
@@ -229,6 +230,8 @@ const usage = () =>
     '  The same as keys exec, under a shorter name.',
     'braindog keys headers <credentials#n | label> --as <Header> [--vault <project>] [--host <host>]',
     "  Print the key as one header, {\"<Header>\":\"<value>\"}, for a program that reads it, such as Claude Code's headersHelper. It refuses to print to a terminal.",
+    'braindog keys helper <credentials#n | label> [--vault <project>] [--host <host>]',
+    "  Print the key alone, for Claude Code's apiKeyHelper in a profile that runs on an API key. It refuses to print to a terminal, as keys headers does.",
     'braindog skills sync [--host <host>] [--dry-run]',
     "  Write the record's skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand.",
     'braindog tools scan [--host <host>] [--dry-run]',
@@ -333,6 +336,12 @@ const usage = () =>
     "  Read this machine and list, by file and entry, what still names a tool BrainDog replaced, what holds something shaped like a key, and each profile missing BrainDog's server or a hook. It changes nothing and shows no value, and exits 1 when anything is listed.",
     'braindog env diff [--config-dir <folder>] [--host <host>] [--json]',
     "  Compare every Claude Code profile on this machine by name: its MCP servers, plugins, hook events and skills, with a short hash of each server's entry and of its CLAUDE.md, and the record's tools and skills when signed in. It changes nothing and shows no value, and exits 1 when anything differs.",
+    'braindog env apply [--profile <name>] [--dry-run] [--yes-data] [--host <host>]',
+    "  Do what setup does in every Claude Code profile on this machine, or the ones named: BrainDog's hooks and server, the record's tools and skills, and with the Profiles add-on what each profile is given and its rules in a marked block of its CLAUDE.md. Anything that runs a program is shown whole and asked y/N, then pinned; with no terminal, --yes-data writes the plain data alone.",
+    'braindog env pins [--forget <name>] [--json]',
+    '  List the programs approved on this machine, by name, profile, hash and day; --forget drops one, and it is asked about again the next time it is placed.',
+    'braindog env check [--profile <name>] [--json]',
+    "  Run claude mcp list in each profile and say each server as connected, needing a sign-in, or failed, by name only. claude is asked about once, as a program, and it changes nothing else.",
     'braindog sync inventory [--under <folder>] [--host <host>] [--json]',
     "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills the record does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why. It opens no file it lists and changes nothing.",
     'braindog verify <file> [--key <pubkey|url>]',
@@ -357,7 +366,7 @@ const usage = () =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, run, hook, setup, init and serve do not take it.',
+    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, init and serve do not take it.',
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
@@ -781,9 +790,10 @@ function doctorCommand(args: string[]): void {
 }
 
 /**
- * `braindog env diff` and `braindog sync inventory`: how this machine's profiles differ, and what a setup sync would
- * carry from it. BOTH ONLY READ, the files by name, hash and size, and the record, when signed in, by its lists. As
- * `doctor`'s, the exit code is the plan's and under `--json` the document is the plan either way.
+ * `braindog env diff|pins|check` and `braindog sync inventory`: how this machine's profiles differ, what is approved
+ * on it, what each profile's servers say, and what a setup sync would carry from it. THEY READ, but for the pins file:
+ * `env pins --forget` drops a pin, and `env check` keeps the one a yes gives. As `doctor`'s, the exit code is the
+ * plan's and under `--json` the document is the plan either way.
  */
 async function readsCommand(which: 'env' | 'sync', args: string[]): Promise<void> {
   let result: Awaited<ReturnType<typeof envCommand>> | Awaited<ReturnType<typeof syncCommand>>;
@@ -797,6 +807,32 @@ async function readsCommand(which: 'env' | 'sync', args: string[]): Promise<void
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives: the record may have been read. */
   process.exitCode = result.code;
   setTimeout(() => process.exit(result.code), 1_000).unref();
+}
+
+/**
+ * `braindog env apply`, over the real terminal (`env-apply.ts`), and its exit code. NOT ONE OF `readsCommand`'s,
+ * because it asks y/N at the terminal as it goes and prints each step as it happens, as `setup` does, and for the same
+ * reason it takes no `--json`: its strict `parseArgs` refuses the flag in its own words. Ctrl+C at a question is a no.
+ */
+async function envApplyCommand(args: string[]): Promise<void> {
+  const stopping = new AbortController();
+  process.on('SIGINT', () => stopping.abort());
+  const cwd = process.cwd();
+  const code = await envApply(args, {
+    env: process.env,
+    cwd,
+    home: homedir(),
+    out: (line: string) => writeFileSync(1, `${line}\n`),
+    say,
+    signal: stopping.signal,
+    cli: fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/'),
+    scripts: hookScripts(),
+    /* The record is read with no session headers (`env-apply.ts`), so this is never asked; `AgentIo` has it. */
+    headers: async () => ({}),
+  });
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
 }
 
 function install(args: string[]): void {
@@ -902,7 +938,9 @@ const cut = takeJson(rest);
    left `BrainDog self-host listening on http://localhost:5870` on stdout and then the document beneath
    it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
    `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
-const noEnvelope = (command === 'usecase' || command === 'pack') && rest[0] === 'preview';
+/* AND `env apply`, WHICH PRINTS FOR A PERSON AND ASKS AT THE TERMINAL AS `setup` DOES, so the flag reaches its own strict
+   `parseArgs` and is refused there in its own words. */
+const noEnvelope = ((command === 'usecase' || command === 'pack') && rest[0] === 'preview') || (command === 'env' && rest[0] === 'apply');
 const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list' || rest[0] === 'scan')));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);
@@ -925,8 +963,8 @@ try {
     process.exitCode = code;
   } else if (command === 'keys') await keysCommand(args);
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: it opens a key into one
-     environment variable. The one verb that prints a key is `keys headers`, to a program and never to a
-     terminal, and it has no shorter name, so nobody reaches it by typing less. */
+     environment variable. The two verbs that print a key are `keys headers` and `keys helper`, through one
+     function, to a program and never to a terminal, and neither has a shorter name, so nobody reaches one by typing less. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
   else if (command === 'export') await brainfileCommand('export', args);
   else if (command === 'token') await brainfileCommand('token', args);
@@ -937,6 +975,7 @@ try {
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'doctor') doctorCommand(args);
+  else if (command === 'env' && rest[0] === 'apply') await envApplyCommand(rest.slice(1));
   else if (command === 'env' || command === 'sync') await readsCommand(command, args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
      `dev+0000000` and `update` refuses before it touches anything. */

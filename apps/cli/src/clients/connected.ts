@@ -33,9 +33,16 @@ export type ConnectedList = { entries: Connected[]; lines: string[] };
 
 /**
  * Run `claude` with these arguments in this folder within `ms`: its exit code and what it printed, `absent` when it
- * did not start, `late` when it ran past the limit and was stopped.
+ * did not start, `late` when it ran past the limit and was stopped. `env`, when given, is its whole environment, so
+ * `CLAUDE_CONFIG_DIR` picks the profile (`env check`), and `program` the file found for `claude`.
  */
-export type ListRunner = (args: string[], cwd: string, ms: number) => Promise<{ code: number | 'absent' | 'late'; out: string }>;
+export type ListRunner = (
+  args: string[],
+  cwd: string,
+  ms: number,
+  env?: Record<string, string | undefined>,
+  program?: string,
+) => Promise<{ code: number | 'absent' | 'late'; out: string }>;
 
 /** The most of the output read, far beyond any list a person keeps. */
 const MOST_OUT = 512 * 1024;
@@ -47,11 +54,11 @@ export const LIST_MS = 30_000;
  * The real one. NO SHELL, as `runClaude` runs it (`claude.ts`), with standard output read and standard error not:
  * `runClaude` hands back only an exit code, so this one is its own.
  */
-export const runClaudeList: ListRunner = (args, cwd, ms) =>
+export const runClaudeList: ListRunner = (args, cwd, ms, env, program = 'claude') =>
   new Promise((done) => {
     let out = '';
     let late = false;
-    const child = spawn('claude', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'], shell: false, windowsHide: true, env: { ...process.env, NO_COLOR: '1' } });
+    const child = spawn(program, args, { cwd, stdio: ['ignore', 'pipe', 'ignore'], shell: false, windowsHide: true, env: { ...(env ?? process.env), NO_COLOR: '1' } });
     const timer = setTimeout(() => {
       late = true;
       child.kill();
@@ -71,7 +78,14 @@ export const runClaudeList: ListRunner = (args, cwd, ms) =>
   });
 
 /** The status marks Claude Code prints, ASCII and not. */
-const LINE = /^(.+?): (.*?) - [✔✓✘✗×!⏸⊘] \S/u;
+const LINE = /^(.+?): (.*?) - ([✔✓✘✗×!⏸⊘]) \S/u;
+
+/**
+ * How a server stood when the list checked it, by its mark alone, never by the words after it, which may quote an
+ * error: connected, waiting on a sign-in, failed, waiting on an approval in a session, or turned off.
+ */
+export type Health = 'connected' | 'needs sign-in' | 'failed' | 'waiting' | 'off';
+const HEALTH: Readonly<Record<string, Health>> = { '✔': 'connected', '✓': 'connected', '!': 'needs sign-in', '✘': 'failed', '✗': 'failed', '×': 'failed', '⏸': 'waiting', '⊘': 'off' };
 const ADDRESS = /^(https?:\/\/\S+)(?: \((?:HTTP|SSE)\))?$/i;
 const NOT_ENTRIES = [/^Checking MCP server health/i, /^No MCP servers configured/i];
 /* The colours a terminal is sent, when NO_COLOR is not honoured. */
@@ -85,9 +99,9 @@ function nameOf(listed: string): string {
   return listed;
 }
 
-/** The entries of one printed list, and how many lines that are not entries could not be read. */
-export function parseList(text: string): { entries: Connected[]; skipped: number } {
-  const entries: Connected[] = [];
+/** The entries of one printed list, each with how it stood, and how many lines that are not entries could not be read. */
+export function healthOf(text: string): { entries: (Connected & { health: Health })[]; skipped: number } {
+  const entries: (Connected & { health: Health })[] = [];
   let skipped = 0;
   for (const raw of text.replace(COLOUR, '').split(/\r?\n/)) {
     const line = raw.trim();
@@ -100,9 +114,15 @@ export function parseList(text: string): { entries: Connected[]; skipped: number
       continue;
     }
     const address = ADDRESS.exec(at[2]!.trim())?.[1] ?? null;
-    if (!entries.some((e) => e.listed === listed)) entries.push({ name, listed, address });
+    if (!entries.some((e) => e.listed === listed)) entries.push({ name, listed, address, health: HEALTH[at[3]!] ?? 'failed' });
   }
   return { entries, skipped };
+}
+
+/** The entries of one printed list, and how many lines that are not entries could not be read. */
+export function parseList(text: string): { entries: Connected[]; skipped: number } {
+  const { entries, skipped } = healthOf(text);
+  return { entries: entries.map(({ name, listed, address }) => ({ name, listed, address })), skipped };
 }
 
 /**
