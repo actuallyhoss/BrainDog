@@ -351,6 +351,11 @@
   const people = $derived(shape?.facts.people ?? []);
   const runsOn = $derived(shape?.facts.runsOn ?? []);
   const sessions = $derived(read?.sessions ?? []);
+  /* ONE TILE FOR THE AGENTS ON IT (the UI review of 21 October): the band below, Working here now or Tell agents, is drawn
+     for the owner and for anyone while a run is on it, and then it carries the day bar and who was here today itself.
+     "Agents here today" stands on its own only where the band is not drawn, so the two runs are never listed twice. */
+  const band = $derived(owner || here > 0);
+  const todayAlone = $derived(sessions.length > 0 && !band);
 
   /* WHAT THE SHAPE DRAWS, said to the page so a declared block that repeats one is left out (`repeatOf`). */
   $effect(() => onshape(shape ? blocksOf(shape.facts) : [], shape && read ? read.fields : null, read !== null || settled === `${register}#${seq}`));
@@ -500,49 +505,60 @@
         {/if}
       </div>
     {/if}
-    {#if runsOn.length > 0 || sessions.length > 0}
-      <div class="shape-row half" data-alone={runsOn.length > 0 && sessions.length > 0 ? undefined : ''}>
+    {#snippet dayBar(now: number)}
+      {@const day0 = midnightOf(now)}
+      <div class="day" aria-hidden="true">
+        <div class="track">
+          {#each sessions as s, n (s.seq ?? n)}
+            <span class="d-seg" data-live={s.working ? '' : undefined} style:inset-inline-start="{hours(s.from, day0) * 100}%" style:inline-size="{Math.max(0.6, (hours(s.to, day0) - hours(s.from, day0)) * 100)}%"></span>
+          {/each}
+          <span class="nowline" style:inset-inline-start="{hours(now, day0) * 100}%"></span>
+        </div>
+        <div class="ticks num">{#each ['00', '06', '12', '18', '24'] as t (t)}<span>{t}</span>{/each}</div>
+      </div>
+    {/snippet}
+    {#snippet todayList(list: readonly SessionRow[])}
+      <ul class="a-list">
+        {#each list.slice(0, 4) as s, n (s.seq ?? n)}
+          <li class="a-row">
+            <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
+            <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
+                 (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
+            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{s.doing || actor(s.agent).name}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
+          </li>
+        {/each}
+      </ul>
+    {/snippet}
+    {#if runsOn.length > 0 || todayAlone}
+      <div class="shape-row half" data-alone={runsOn.length > 0 && todayAlone ? undefined : ''}>
         {#if runsOn.length > 0}
           <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs">
-            <ul class="r-list" data-wide={sessions.length === 0 ? '' : undefined}>
-              {#each runsOn.slice(0, sessions.length === 0 ? 8 : 4) as x (x.key)}
+            <ul class="r-list" data-wide={todayAlone ? undefined : ''}>
+              {#each runsOn.slice(0, todayAlone ? 4 : 8) as x (x.key)}
                 <li class="r-row"><Icon name={runsIcon(x.kind)} size="s" /><span class="r-name" dir="auto">{x.title}</span>{#if x.kind}<span class="r-kind">{singular(x.kind)}</span>{/if}</li>
               {/each}
             </ul>
           </Tile>
         {/if}
-        {#if sessions.length > 0}
-          {@const day0 = midnightOf(read.now)}
+        {#if todayAlone}
           <Tile icon="session" title="Agents here today" class="t-today">
-            <div class="day" aria-hidden="true">
-              <div class="track">
-                {#each sessions as s, n (s.seq ?? n)}
-                  <span class="d-seg" data-live={s.working ? '' : undefined} style:inset-inline-start="{hours(s.from, day0) * 100}%" style:inline-size="{Math.max(0.6, (hours(s.to, day0) - hours(s.from, day0)) * 100)}%"></span>
-                {/each}
-                <span class="nowline" style:inset-inline-start="{hours(read.now, day0) * 100}%"></span>
-              </div>
-              <div class="ticks num">{#each ['00', '06', '12', '18', '24'] as t (t)}<span>{t}</span>{/each}</div>
-            </div>
-            <ul class="a-list">
-              {#each sessions.slice(0, 4) as s, n (s.seq ?? n)}
-                <li class="a-row">
-                  <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
-                  <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
-                       (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
-                  <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{s.doing || actor(s.agent).name}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
-                </li>
-              {/each}
-            </ul>
+            {@render dayBar(read.now)}
+            {@render todayList(sessions)}
           </Tile>
         {/if}
       </div>
     {/if}
     <!-- WHO IS ON IT NOW AND THE BOX TO TELL THEM (plan §7.2): the Agents page's run rows and composer, scoped to this
          project, so a stop or a tell from here says what it says there. With nobody on it the composer stands alone, and
-         the next run to start here gets what he types; for a reader who may not tell, nobody on it draws nothing. -->
+         the next run to start here gets what he types; for a reader who may not tell, nobody on it draws nothing.
+         THE DAY BAR ON TOP when a run was here today, and with nobody on it now, who was: the one tile for the agents. -->
     {#key read.key}
-      {#if owner || here > 0}
+      {#if band}
         <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here>
+          {#if sessions.length > 0}
+            {@render dayBar(read.now)}
+            {#if here === 0}{@render todayList(sessions)}{/if}
+          {/if}
           <PresencePanel {owner} project={read.key} oncount={(n) => (here = n)} />
           <TellPanel {owner} project={read.key} projectName={name} first={3} />
         </Tile>
