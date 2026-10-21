@@ -8,9 +8,12 @@
 
 import { createClient } from '@braindog/client';
 
+import { homeCurrency } from '../record/api.ts';
+import { recordNow } from '../record/boot-live.ts';
 import { learn } from '../record/remote.ts';
 import { REGISTERS } from '../record/held.ts';
-import { cardsOf, projectsOf, type CardDecl, type CardRow, type ProjectCard } from './project-cards.ts';
+import { readLeads } from './card-kpis.ts';
+import { cardsOf, projectsOf, withKpis, type CardDecl, type CardRow, type ProjectCard } from './project-cards.ts';
 
 /** The most rows of the projects list read for the desk. */
 const READ = 200;
@@ -24,11 +27,13 @@ export async function readCards(base: string, lists: readonly { id: string; name
   const decls = lists.flatMap((l) => (REGISTERS[l.id] ? [{ ...(REGISTERS[l.id] as unknown as CardDecl), id: l.id }] : []));
   const decl = projectsOf(decls);
   if (decl === null) return null;
-  const out = await client.list({ register: decl.id, limit: READ });
+  /* EACH CARD LEADS WITH ITS PROJECT'S KEY NUMBER, asked beside the rows, and a card with none says what it did. */
+  const [out, leads] = await Promise.all([client.list({ register: decl.id, limit: READ }), readLeads(base).catch(() => [])]);
   if (!out.ok) return null;
   const rows = (out.value.rows as unknown[]).filter(
     (r): r is CardRow => typeof r === 'object' && r !== null && typeof (r as CardRow).seq === 'number' && typeof (r as CardRow).fields === 'object',
   );
-  const { cards, more } = cardsOf(decl, rows);
+  const { cards: plain, more } = cardsOf(decl, rows);
+  const cards = withKpis(plain, leads, { home: homeCurrency(), now: recordNow() });
   return cards.length === 0 ? null : { cards, more, list: decl.id, name: lists.find((l) => l.id === decl.id)?.name ?? '' };
 }

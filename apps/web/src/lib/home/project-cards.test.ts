@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { REGISTERS } from '../record/held.ts';
 import { learnRowPages } from '../record/row-href.ts';
 import type { RegisterDecl } from '../record/schema.ts';
-import { DESK_MOST, agentsOn, cardsOf, trendsOf, projectsOf, type CardDecl } from './project-cards.ts';
+import { DESK_MOST, agentsOn, cardKpiOf, cardsOf, trendsOf, projectsOf, withKpis, type CardDecl, type KpiAnswered } from './project-cards.ts';
 
 const decl: CardDecl = {
   id: 'ventures',
@@ -134,4 +134,78 @@ test('a declared card\'s line is read off its drawing by its column, with three 
   ];
   assert.deepEqual([...trendsOf(rows)], [[3, { values: [1, 2, 3, 4], label: 'Done a week' }]]);
   assert.equal(trendsOf([{ cells: ['title', 'trend'] }, rows[1]!]).size, 0, 'a bare line says nothing');
+});
+
+/* ── the key number a card leads with ── */
+
+const NOW = Date.parse('2026-10-21T10:00:00Z');
+const at = { home: 'GBP', now: NOW };
+/** Licence revenue a month, in pounds: June to September whole, October still running. */
+const revenue: KpiAnswered = {
+  kpi: 'k1',
+  name: 'Licence revenue',
+  thing: 'row-kiln',
+  project: 'Kiln',
+  unit: 'GBP',
+  kind: 'flow',
+  every: '1m',
+  headline: true,
+  points: [
+    { at: '2026-06-03', amount: 'GBP 1,200.00' },
+    { at: '2026-07-03', amount: 'GBP 1,500.00' },
+    { at: '2026-08-03', amount: 'GBP 1,400.00' },
+    { at: '2026-09-03', amount: 'GBP 1,900.00' },
+    { at: '2026-10-03', amount: 'GBP 600.00' },
+  ],
+};
+
+test("a card leads with its key number: the name small, a flow's last whole month, how it moved and its own line", () => {
+  const k = cardKpiOf(revenue, at);
+  assert.equal(k?.name, 'Licence revenue');
+  assert.equal(k?.figure, '£1,900', 'September, not October so far');
+  assert.deepEqual(k?.move, { said: 'Up 36% on Aug', tone: 'good' });
+  assert.equal(k?.stale, null);
+  assert.ok(k?.line?.line.startsWith('M'), 'four whole months draw a line');
+  assert.notEqual(k?.line?.partial, '', 'the month still running is its own faint dot');
+});
+
+test('a key number with under three points is the number alone, and a stale one says so instead of how it moved', () => {
+  const two = cardKpiOf({ name: 'Players', unit: 'players', kind: 'level', points: [{ at: '2026-10-19', value: 1180 }, { at: '2026-10-20', value: 1240 }] }, at);
+  assert.equal(two?.figure, '1,240', 'the name beside it says what it counts');
+  assert.equal(two?.line, null);
+  const old = cardKpiOf({ name: 'Players', unit: 'players', kind: 'level', every: '1d', points: [{ at: '2026-09-01', value: 900 }, { at: '2026-09-02', value: 950 }, { at: '2026-09-03', value: 990 }] }, at);
+  assert.equal(old?.stale, 'Not updated since 3 Sep');
+  assert.equal(old?.move, null);
+});
+
+test('money in another currency is never added into a key number', () => {
+  const k = cardKpiOf({ ...revenue, points: [...revenue.points, { at: '2026-09-10', amount: 'USD 9,000.00' }] }, at);
+  assert.equal(k?.figure, '£1,900');
+});
+
+test('cards take the key number of their own project, by its row, and a card with none keeps its money figure', () => {
+  const { cards } = cardsOf(decl, [
+    { seq: 1, id: 'row-kiln', fields: { name: 'Kiln', lane: 'earning', revenue: { amount: 1840000, currency: 'GBP' } } },
+    { seq: 2, id: 'row-portage', fields: { name: 'Portage', lane: 'earning', revenue: { amount: 500000, currency: 'GBP' } } },
+  ]);
+  assert.deepEqual(
+    cards.map((c) => [c.id, c.kpi]),
+    [
+      ['row-kiln', null],
+      ['row-portage', null],
+    ],
+  );
+  const led = withKpis(cards, [revenue], at);
+  assert.equal(led[0]?.kpi?.figure, '£1,900');
+  assert.deepEqual(led[0]?.figure, { minor: 1840000, currency: 'GBP', field: 'revenue' }, 'kept for when the number goes');
+  assert.equal(led[1]?.kpi, null, 'Portage keeps no key number, so it says what it did');
+  /* A NAME IS NO ROW: another project of the same name is matched by its row, and a card with no row by its name. */
+  assert.equal(withKpis(cards, [{ ...revenue, thing: 'row-other' }], at)[0]?.kpi, null);
+  assert.equal(withKpis([{ ...cards[0]!, id: null }], [revenue], at)[0]?.kpi?.name, 'Licence revenue');
+});
+
+test('a key number nothing has arrived for leaves the card as it was', () => {
+  const { cards } = cardsOf(decl, [{ seq: 1, id: 'row-kiln', fields: { name: 'Kiln', lane: 'earning' } }]);
+  assert.equal(cardKpiOf({ ...revenue, points: [] }, at), null);
+  assert.equal(withKpis(cards, [{ ...revenue, points: [] }], at)[0]?.kpi, null);
 });

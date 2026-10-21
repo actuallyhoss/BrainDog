@@ -68,7 +68,7 @@
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
-  import { agentsOn, cardFactsOf, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import { agentsOn, cardFactsOf, cardsOf, trendsOf, withKpis, type CardDecl, type KpiAnswered } from '$lib/home/project-cards.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { valueSaid } from '$lib/voice.ts';
   import { flip } from 'svelte/animate';
@@ -509,13 +509,32 @@
         .catch(() => {});
     });
   });
+  /* THE KEY NUMBER EACH CARD LEADS WITH (`card-kpis.ts`), read beside the cards and again when the record moves; a card
+     whose project keeps none says what it did. */
+  let leads = $state.raw<readonly KpiAnswered[]>([]);
+  $effect(() => {
+    const said = cardSeqs;
+    void liveRecord.version;
+    if (said === '') return;
+    untrack(() => {
+      void import('$lib/home/card-kpis.ts')
+        .then((m) => m.readLeads(apiBase()))
+        .then((got) => {
+          if (said === cardSeqs) leads = got;
+        })
+        .catch(() => {});
+    });
+  });
   const projectCards = $derived.by(() => {
     const list = block.register;
     const d = list ? REGISTERS[list] : undefined;
     if (block.kind !== 'cards' || block.group || drawn.refusal || !list || !d || !isProject(d)) return null;
-    const rows = (block.entries ?? []).flatMap((e) => (typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null ? [{ seq: e.seq, fields: e.fields }] : []));
-    const { cards } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true, true);
-    if (cards.length === 0) return null;
+    const rows = (block.entries ?? []).flatMap((e) =>
+      typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null ? [{ seq: e.seq, fields: e.fields, ...(typeof (e as { id?: unknown }).id === 'string' ? { id: (e as { id: string }).id } : {}) }] : [],
+    );
+    const { cards: plain } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true, true);
+    if (plain.length === 0) return null;
+    const cards = withKpis(plain, leads, { home: homeCurrency(), now });
     const seg = drawn.segments.find((x) => x.type === 'block' && x.kind === 'cards');
     const trends = seg && seg.type === 'block' ? trendsOf(seg.rows) : new Map();
     const facts = seg && seg.type === 'block' ? cardFactsOf(seg.rows) : new Map();

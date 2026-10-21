@@ -1093,7 +1093,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'agent', label: 'Agent', as: 'who' },
           /* HOW ITS WORK IS MOVING, AS A LINE ON THE CARD: what was finished on it each week, over Work's
              `project-done-by-week`, the same numbers the project's own page charts. A record without Work, or a project
-             nothing was finished on, draws no line, and the card is as it was. */
+             nothing was finished on, draws no line, and the card is as it was.
+             ONLY WHERE THE PROJECT KEEPS NO KEY NUMBER, SINCE the KPI plan of 21 October (2.5, decided 3): a card leads
+             with its project's headline key number and draws that number's own readings (`withKpis` in the app's
+             `project-cards.ts`, over the `kpis` source `for: cards`), so this line is the card's fallback, never drawn
+             beside a key number. A card column reads a figure cut by a date and not a key number's readings, so the
+             headline is not a column here. */
           { metric: 'project-done-by-week:{{name}}', as: 'trend' },
           /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0 (W096, REC-C16): Work's `project-last-worked` for the
              card's own project, the reading the project page's Where it stands draws, said in the card's head as "Worked on 2

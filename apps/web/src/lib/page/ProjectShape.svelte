@@ -8,7 +8,8 @@
   THE HERO HOLDS THE NAME (proj F7): the 56px well and the `h1` at 34 side by side, where it stands under the name ("Earning
   · ● At risk · since Mar 2024"), what it is in a line with the late phrase in the red, the next step once as its last
   line, and three figures on the right: what it earned in a year, how far along it is as a ring in the project's colour,
-  and who works on it now. Its colour is the project's slot (`slotStyle`), the same `--ph` its card is drawn in.
+  and who works on it now. WHERE THE PROJECT KEEPS KEY NUMBERS, THE FIRST FIGURE IS THE ONE ITS CARD LEADS WITH (the KPI
+  plan of 21 October, 2.5): its name, the figure, how it moved, and its own line, as the card says it (`cardKpiOf`). Its colour is the project's slot (`slotStyle`), the same `--ph` its card is drawn in.
 
   ONE CLOCK (SF3): open work and what is late are counted on the record's day (`recordNow`), as Work counts it. One read
   of the work list that points here holds the hero's counts, the Work tile and the Path.
@@ -38,7 +39,7 @@
   import { actor } from '$lib/record/names.ts';
   import { midnightOf, sessionsOf, type SessionRow } from '$lib/record/today-live.ts';
   import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block, type Figure } from '$lib/record/project.ts';
-  import { HEALTH, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
+  import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle, type KpiAnswered } from '$lib/home/project-cards.ts';
   import { pathOf, trendOf, type Months } from '$lib/record/visuals.ts';
   import { rowReader } from '$lib/record/row-live.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
@@ -82,6 +83,8 @@
     noun: string;
     /** The runs on this project heard from today. */
     sessions: SessionRow[];
+    /** The key number its card leads with, as the `kpis` source answered it, where it keeps one. */
+    kpi: KpiAnswered | null;
     now: number;
   };
   let read = $state.raw<Read | null>(null);
@@ -147,12 +150,13 @@
       const now = recordNow();
       const today = localDay(now);
       const asWhere = (w: string) => ({ toJSON: () => w });
-      const [i, o, w, listed, runRows, inByMonth, outByMonth] = await Promise.all([
+      const [i, o, w, listed, runRows, inByMonth, outByMonth, kpi] = await Promise.all([
         ...(['project-in-month', 'project-out-month', 'project-owed'] as const).map((m) => (name === '' ? Promise.resolve(null) : quiet(f.scalar(m, name), null))),
         work && via ? quiet(client.list({ register: work, where: asWhere(`${via.field} is ${spoken}`) as never, limit: WORK_READ }), null) : Promise.resolve(null),
         runs && runsVia ? quiet(client.list({ register: runs, where: asWhere(`${runsVia} is ${spoken}`) as never, limit: 40, order: [{ field: 'last_seen', dir: 'desc' }] }), null) : Promise.resolve(null),
         name === '' ? Promise.resolve(null) : quiet(f.moneyIn(name), null),
         name === '' ? Promise.resolve(null) : quiet(f.moneyOut(name), null),
+        quiet(import('$lib/home/card-kpis.ts').then((m) => m.readLead(base, spoken)), null),
       ] as const);
       const got = listed && (listed as { ok?: boolean }).ok ? (listed as { value: { rows: { seq: number; fields: Record<string, unknown> }[]; cursor: unknown } }).value : null;
       const rows: WorkRow[] = (got?.rows ?? []).filter((x) => typeof x.seq === 'number').map((x) => ({ seq: x.seq, fields: x.fields }));
@@ -173,6 +177,7 @@
         open,
         noun: (work ? (REGISTERS[work]?.name ?? '') : '').toLowerCase(),
         sessions: sessionsOf(runGot, midnightOf(now), now),
+        kpi: (kpi as KpiAnswered | null | undefined) ?? null,
         now,
       };
       if (read && read.key === key) mark(read, next);
@@ -192,6 +197,7 @@
     if (!same(was.money, now.money)) out.add('money:lead').add('money:owed').add('hero:money');
     if (!same(was.open, now.open)) out.add('hero:along').add('open-list');
     if (!same(was.fields, now.fields)) out.add('hero:along').add('hero:money');
+    if (!same(was.kpi, now.kpi)) out.add('hero:kpi');
     const before = new Map(was.rows.map((x) => [x.seq, x.fields[was.via?.state.id ?? 'state']]));
     for (const x of now.rows) if (before.has(x.seq) && before.get(x.seq) !== x.fields[now.via?.state.id ?? 'state']) out.add(`stop:s${x.seq}`).add(`row:${x.seq}`);
     if (out.size === 0) return;
@@ -223,6 +229,10 @@
     return typeof v === 'number' && Number.isFinite(v) ? { value: v, aim: typeof aim === 'string' && aim !== '' ? daySaid(aim) : null } : null;
   });
   const hero = $derived(shape && read ? heroOf({ facts: shape.facts, figure: lead, open: read.open, noun: read.noun, format: said, progress }) : null);
+  /* THE KEY NUMBER IT LEADS WITH, planned as its card plans it, and in the money figure's place: one number leads. */
+  const kpiLead = $derived(read?.kpi ? cardKpiOf(read.kpi, { home: homeCurrency(), now: read.now }) : null);
+  type Shown = NonNullable<typeof hero>['figures'][number] | { key: 'kpi'; kpi: NonNullable<typeof kpiLead> };
+  const figs = $derived<Shown[]>(hero ? (kpiLead ? [{ key: 'kpi', kpi: kpiLead }, ...hero.figures.filter((f) => f.key !== 'money')] : hero.figures) : []);
   /* HOW MUCH OF ITS WORK IS DONE, for the ring where nobody typed how far along it is: done of done and open. */
   const doneCount = $derived(read?.via ? read.rows.filter((x) => x.fields[read!.via!.state.id] === read!.via!.done[0]).length : 0);
   /* WHERE IT STANDS: its lane, how it is going with its dot, and since when, in the list's own words. */
@@ -357,11 +367,20 @@
         <p class="h-next"><Icon name="arrow" size="s" /><span dir="auto">{nextLine.text}</span></p>
       {/if}
     {/if}
-    {#if hero.figures.length > 0}
-      <ul class="h-figs" style:--figs={hero.figures.length}>
-        {#each hero.figures as f (f.key)}
+    {#if figs.length > 0}
+      <ul class="h-figs" style:--figs={figs.length}>
+        {#each figs as f (f.key)}
           <li class="h-fig" data-arrived={arrived.has(`hero:${f.key === 'open' ? 'along' : f.key}`) ? '' : undefined}>
-            {#if f.key === 'money'}
+            {#if f.key === 'kpi'}
+              <span class="k" dir="auto">{f.kpi.name}</span>
+              <span class="v num" aria-label={f.kpi.sentence}>{f.kpi.figure}</span>
+              {#if f.kpi.line}
+                <svg class="trace" data-stale={f.kpi.stale ? '' : undefined} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"
+                  >{#if f.kpi.line.area}<path d={f.kpi.line.area} class="trace-area" />{/if}<path d={f.kpi.line.line} class="trace-line" vector-effect="non-scaling-stroke" />{#if f.kpi.line.end}<path d={f.kpi.line.end} class="trace-dot" vector-effect="non-scaling-stroke" />{/if}</svg
+                >
+              {/if}
+              {#if f.kpi.stale || f.kpi.move}<span class="sub move" data-tone={f.kpi.stale ? 'stale' : (f.kpi.move?.tone ?? undefined)}>{f.kpi.stale ?? f.kpi.move?.said}</span>{/if}
+            {:else if f.key === 'money'}
               <span class="k"><span class="long">{f.label}</span><span class="short">{HERO_WORDS.short.money}</span></span>
               <span class="v num">{said(f.minor, f.currency)}</span>
               {#if trace}
@@ -406,7 +425,7 @@
       inByMonth={read.inByMonth}
       outByMonth={read.outByMonth}
       {trend}
-      earnedSaid={hero?.figures.some((f) => f.key === 'money') ?? false}
+      earnedSaid={figs.some((f) => f.key === 'money')}
       format={said}
       money={shape?.facts.money ?? []}
       moneyRows={shape?.data.money ?? []}
@@ -752,6 +771,37 @@
 
   .trace-end {
     fill: var(--ph);
+  }
+
+  /* A KEY NUMBER'S LINE, drawn in the renderer's box at the hero's size: its dot is a round stroke, so it stays round. */
+  .trace-dot {
+    fill: none;
+    stroke: var(--ph);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+
+  .trace[data-stale] .trace-line,
+  .trace[data-stale] .trace-dot {
+    stroke: var(--ink-3);
+  }
+
+  .trace[data-stale] .trace-area {
+    fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
+  }
+
+  /* HOW IT MOVED, with its words: the good way in the good colour, the other and stale in the warn, never red. */
+  .move {
+    text-wrap: balance;
+  }
+
+  .move[data-tone='good'] {
+    color: var(--good);
+  }
+
+  .move[data-tone='warn'],
+  .move[data-tone='stale'] {
+    color: var(--warn);
   }
 
   @media (width >= 640px) {

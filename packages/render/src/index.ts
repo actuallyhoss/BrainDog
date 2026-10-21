@@ -283,3 +283,5 @@ export * from './form.ts';
 export { GLYPH_GROUPS, GROUP_SAYS, glyphGroups, groupOf, markGlyphs, markGroups, type GlyphGroup } from './glyphs/groups.ts';
 /* A long block of cards or a series (`most`): how many it shows before "Show all", and the words for the rest. */
 export { MOST_CARDS, MOST_LEAST, MOST_MOST, isMost, mostOf, moreSaid, showAllSaid, type MostKeys } from './most.ts';
+/* A key number planned as every screen says it (`kpis`): its figure, change, stale line and chart, for a card or a hero. */
+export { kpiView, type KpiInput, type KpiView } from './kpis.ts';

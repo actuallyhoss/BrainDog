@@ -9,8 +9,11 @@
   FIVE ROWS, each drawn only when it has something to say:
     A  the mark in its 40 well, the name (Geist 17/600) with its lane and how it is going under it, and "3 late" at the
        end (a red dot and the word, never a pill);
-    B  its figure at 28 in Lexend with its label, and its line at the right from three points; a project with no money
-       leads with how far along it is instead ("35%", "of the way"), so no card has a hole;
+    B  its figure at 28 in Lexend with its label, and its line at the right from three points. THE FIGURE IS THE
+       PROJECT'S LEAD KEY NUMBER where it keeps one (`card.kpi`, the KPI plan of 21 October, 2.5): its name small, the
+       figure, how it moved under them ("Up 36% on Aug", or "Not updated since 3 Oct" in the warn colour, never red),
+       and its own line, never tasks done by week. With no key number it is the money figure as before, and a project
+       with no money leads with how far along it is instead ("35%", "of the way"), so no card has a hole;
     C  the meter, "60% · aiming 20 Sep";
     D  the next step after an arrow, two lines at most;
     E  pinned to the foot: who is on it, and how long since anybody worked on it. Not on a phone, where Today's Working
@@ -53,8 +56,11 @@
   /* The lane as a word: its first letter up, since a list keeps it lower case. */
   const lane = $derived(card.lane === '' ? '' : card.lane.charAt(0).toUpperCase() + card.lane.slice(1).replace(/_/gu, ' '));
   const health = $derived(HEALTH[card.health] ?? null);
-  const drawn = $derived(trend && trend.values.length >= 3 ? trend : null);
-  const figure = $derived(card.figure ? symbolText(money(card.figure.minor, card.figure.currency), homeCurrency(), true) : null);
+  /* ITS LEAD KEY NUMBER, where its project keeps one: its figure, its name and its own line stand for the money ones. */
+  const kpi = $derived(card.kpi ?? null);
+  const drawn = $derived(kpi === null && trend && trend.values.length >= 3 ? trend : null);
+  const figure = $derived(kpi ? kpi.figure : card.figure ? symbolText(money(card.figure.minor, card.figure.currency), homeCurrency(), true) : null);
+  const figureLabel = $derived(kpi ? kpi.name : label);
   /* A PROJECT WITH NO MONEY LEADS WITH HOW FAR ALONG IT IS, so its card has no hole where the figure would be. */
   const leadsWithProgress = $derived(figure === null && card.progress !== null);
   const meterSaid = $derived.by(() => {
@@ -71,7 +77,7 @@
       card.name,
       lane.toLowerCase(),
       health?.word.toLowerCase(),
-      figure ? `${figure} ${label.toLowerCase()}`.trim() : '',
+      kpi ? kpi.sentence : figure ? `${figure} ${label.toLowerCase()}`.trim() : '',
       card.progress !== null ? `${card.progress}% along` : '',
       card.late > 0 ? `${card.late} late` : '',
     ]
@@ -121,13 +127,25 @@
       {#if figure}
         <!-- SAID SHORT, AS A TILE SAYS A FIGURE: £18,400, never £18,400.00. -->
         {#key figure}<span class="pc-num num" data-arrived={arrived.has('figure') ? '' : undefined}>{figure}</span>{/key}
-        {#if label}<span class="pc-label">{label}</span>{/if}
+        {#if figureLabel}<span class="pc-label" dir="auto">{figureLabel}</span>{/if}
       {:else}
         {#key card.progress}<span class="pc-num num" data-arrived={arrived.has('progress') ? '' : undefined}>{card.progress}%</span>{/key}
         <span class="pc-label">of the way</span>
       {/if}
-      {#if drawn}<span class="pc-line"><Sparkline values={drawn.values} width={84} height={28} tone="var(--ph)" subject={drawn.label} /></span>{/if}
+      {#if kpi?.line}
+        <!-- ITS OWN LINE, AS THE RENDERER PLANNED IT for every screen that draws this number, in the project's colour, and in
+             the quiet ink once it has stopped arriving. -->
+        <span class="pc-line" data-stale={kpi.stale ? '' : undefined}
+          ><svg class="pc-trend" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"
+            >{#if kpi.line.area}<path class="pc-trend-area" d={kpi.line.area} />{/if}<path class="pc-trend-line" d={kpi.line.line} vector-effect="non-scaling-stroke" />{#if kpi.line.partial}<path class="pc-trend-dot" data-partial="" d={kpi.line.partial} vector-effect="non-scaling-stroke" />{/if}{#if kpi.line.end}<path class="pc-trend-dot" d={kpi.line.end} vector-effect="non-scaling-stroke" />{/if}</svg
+          ></span
+        >
+      {:else if drawn}<span class="pc-line"><Sparkline values={drawn.values} width={84} height={28} tone="var(--ph)" subject={drawn.label} /></span>{/if}
     </span>
+    {#if kpi && (kpi.stale || kpi.move)}
+      <!-- HOW IT MOVED, IN WORDS, or that it has stopped arriving, in the warn colour with the words: never red. -->
+      <span class="pc-move" data-tone={kpi.stale ? 'stale' : (kpi.move?.tone ?? undefined)}>{kpi.stale ?? kpi.move?.said}</span>
+    {/if}
   {/if}
   {#if card.progress !== null}
     <span class="pc-c">
@@ -293,6 +311,7 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.035em;
     line-height: 34px;
+    white-space: nowrap;
     animation: roll var(--d-swap) var(--ease-out);
   }
 
@@ -310,6 +329,64 @@
     flex: none;
     inline-size: 84px;
     margin-inline-start: auto;
+  }
+
+  /* ITS OWN LINE, drawn in the renderer's box at the card's size: the stroke and the dots keep their width as it stretches. */
+  .pc-trend {
+    display: block;
+    inline-size: 100%;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  .pc-trend-line {
+    fill: none;
+    stroke: var(--ph);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .pc-trend-area {
+    fill: color-mix(in oklab, var(--ph) 12%, transparent);
+  }
+
+  .pc-trend-dot {
+    fill: none;
+    stroke: var(--ph);
+    stroke-width: 6;
+    stroke-linecap: round;
+  }
+
+  /* THE MONTH STILL RUNNING is a faint dot, never a fall. */
+  .pc-trend-dot[data-partial] {
+    opacity: 0.4;
+  }
+
+  .pc-line[data-stale] .pc-trend-line,
+  .pc-line[data-stale] .pc-trend-dot {
+    stroke: var(--ink-3);
+  }
+
+  .pc-line[data-stale] .pc-trend-area {
+    fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
+  }
+
+  /* HOW IT MOVED: the good way in the good colour, the other in the warn, and stale in the warn, each with its words. */
+  .pc-move {
+    margin-block-start: 2px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .pc-move[data-tone='good'] {
+    color: var(--good);
+  }
+
+  .pc-move[data-tone='warn'],
+  .pc-move[data-tone='stale'] {
+    color: var(--warn);
   }
 
   /* ── row C: how far along ── */
