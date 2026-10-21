@@ -486,9 +486,9 @@
   a second person exists, which is the day each of them means something.
 -->
 {#if peopleFrom === 'reading'}
-  <Tile class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
+  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
-  <Tile class="section" data-surface="tile" title={copy.whoCanSee}>
+  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee}>
     <div class="section-body">
       <Empty kind="error" title={peopleRefusal} />
     </div>
@@ -513,7 +513,7 @@
       {/each}
     </ul>
   </Tile>
-  <Tile class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
+  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
     <div class="section-body">
       <p class="hint">{copy.accessScope}</p>
       <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
@@ -774,13 +774,13 @@
   own refusal is on this screen, in the record's own words, over the list this form adds to.
 -->
 {#if anOwner && teamsHeld}
-<Tile class="section" data-surface="tile" title={copy.inviteTitle}>
+<Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
   <div class="section-body">
     <p class="hint">{copy.inviteHeld}</p>
   </div>
 </Tile>
 {:else if anOwner}
-<Tile class="section" data-surface="tile" title={copy.inviteTitle}>
+<Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
   <div class="section-body">
     <p class="hint">{copy.inviteHow}</p>
     <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
@@ -905,7 +905,7 @@
   <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
        that is not about access at all: it is `02 §10`'s cascade over sixteen stores, in one
        transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
-  <Tile class="section" data-surface="tile" title={copy.erasePerson}>
+  <Tile icon="trash" class="section" data-surface="tile" title={copy.erasePerson}>
     <div class="section-body">
       <div class="danger">
         <p class="danger-title">{copy.eraseWhat}</p>

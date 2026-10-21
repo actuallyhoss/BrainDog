@@ -101,7 +101,7 @@
   }
 </script>
 
-<Tile class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
+<Tile icon="monitor" class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
   <div class="section-body">
     <p class="hint">{copy.sessionsHow}</p>
     {#if me === null}
@@ -140,7 +140,7 @@
   </div>
 </Tile>
 
-<Tile class="section" data-surface="tile" title={keptWords.title}>
+<Tile icon="download" class="section" data-surface="tile" title={keptWords.title}>
   <div class="section-body">
     {#if forgot}
       <p class="hint" role="status">{keptWords.forgot}</p>

@@ -271,7 +271,7 @@
      · 4" over three copies and a row saying *nothing kept*, counting the failure as a backup,
      which is the same class of error as hiding it. -->
 {#if copiesFrom === 'refused'}
-  <Tile class="section" data-surface="tile" title={copy.kept}>
+  <Tile icon="history" class="section" data-surface="tile" title={copy.kept}>
     <div class="section-body">
       <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
            out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
@@ -286,11 +286,11 @@
 {:else if copiesFrom === 'reading'}
   <!-- NOTHING UNTIL THE RECORD ANSWERS: "No backup yet" drawn while the list is read is a sentence the answer may take
        straight back. -->
-  <Tile class="section" data-surface="tile" title={copy.kept}><div class="section-body">{''}</div></Tile>
+  <Tile icon="history" class="section" data-surface="tile" title={copy.kept}><div class="section-body">{''}</div></Tile>
 {:else if copyLines.length === 0}
   <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
        first backup has not run it describes a policy over nothing, above nothing. -->
-  <Tile class="section" data-surface="tile" title={copy.kept} actions={backUpButton}>
+  <Tile icon="history" class="section" data-surface="tile" title={copy.kept} actions={backUpButton}>
     <div class="section-body">
       {@render lastCopyLine()}
       <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
@@ -342,9 +342,9 @@
   {#each months as month, i (`${month.key}:${i}`)}
     {@const kept = month.lines.filter((line) => line.failed === null).length}
     {#if i === 0}
-      <Tile class="section" data-surface="tile" title={month.label} count={kept || undefined} actions={backUpButton}><div class="section-body">{@render lastCopyLine()}{@render monthRows(month.lines)}</div></Tile>
+      <Tile icon="history" class="section" data-surface="tile" title={month.label} count={kept || undefined} actions={backUpButton}><div class="section-body">{@render lastCopyLine()}{@render monthRows(month.lines)}</div></Tile>
     {:else}
-      <Tile class="section" data-surface="tile" title={month.label} count={kept || undefined}><div class="section-body">{@render monthRows(month.lines)}</div></Tile>
+      <Tile icon="history" class="section" data-surface="tile" title={month.label} count={kept || undefined}><div class="section-body">{@render monthRows(month.lines)}</div></Tile>
     {/if}
   {/each}
 {/if}
@@ -352,7 +352,7 @@
 <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
      SEPARATELY; Settings > backups says so in one line." A snapshot sealed with a key that
      is only inside the snapshot is a snapshot nobody can open. -->
-<Tile class="section" data-surface="tile" title={copy.theKey}>
+<Tile icon="key" class="section" data-surface="tile" title={copy.theKey}>
   <div class="section-body">
     <!-- IT GAVE AN INSTRUCTION AND WITHHELD THE ONE THING NEEDED TO FOLLOW IT. This section had
          no button, no link and no value: "Back that key up somewhere else, or the copies cannot
@@ -384,7 +384,7 @@
   record's own answer and was drawn only for the sample, and with the sample gone it is not
   drawn at all: a restore is to one of the copies listed above, or it is asked for.
 -->
-<Tile class="section" data-surface="tile" title={copy.restore}>
+<Tile icon="refresh" class="section" data-surface="tile" title={copy.restore}>
   <div class="section-body">
     <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
          two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the

@@ -140,7 +140,7 @@
   <Button href="/packs/share">{copy.shareSetup}</Button>
 {/snippet}
 
-<Tile class="section" data-surface="tile" title={copy.yourData}>
+<Tile icon="download" class="section" data-surface="tile" title={copy.yourData}>
   <div class="section-body">
     <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
          product's central promise: take your record and go. They say what they would do.
@@ -202,7 +202,7 @@
      The screen offered one button for the whole record and nothing for the other three, so the
      only exit this product appeared to have was all-or-nothing. A pack is the readable-text
      half: your lists, pages, metrics and rules without a single row of your business in it. -->
-<Tile class="section" data-surface="tile" title={copy.takeAway}>
+<Tile icon="download" class="section" data-surface="tile" title={copy.takeAway}>
   <div class="section-body">
     <p class="hint">{copy.takeAwayWhat}</p>
     <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
@@ -237,7 +237,7 @@
   well-known URL is served by none of the three apps. The value, a copy button and advice on
   verifying come back together, the day there is a real key to stand beside them.
 -->
-<Tile class="section" data-surface="tile" title={copy.theSignature}>
+<Tile icon="key" class="section" data-surface="tile" title={copy.theSignature}>
   <div class="section-body">
     <StateRow icon="key" title={words.notHereYet} line={copy.theSignatureNotHere} />
   </div>

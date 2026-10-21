@@ -92,7 +92,7 @@
 {#if livePasskeys}
   <!-- THE HOST'S OWN PASSKEYS, for somebody signed in to a host that offers them. Adding one is
        real only here, because only a live session can say whose passkey it is. -->
-  <Tile class="section" data-surface="tile" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
+  <Tile icon="key" class="section" data-surface="tile" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
     <div class="section-body">
       <p class="hint">{copy.passkeyHow}</p>
       {#if liveKeys === null}
@@ -153,7 +153,7 @@
 <!-- AND THE WAY TO ONE, WHERE THE HOST OFFERS PASSKEYS AND NOBODY IS SIGNED IN. There is
      still nobody to add a passkey for, so the action is signing in, which lands back here with
      "Add a passkey" drawn by the arm above. A host that offers no passkeys is offered nothing. -->
-<Tile class="section" data-surface="tile" title={copy.passkeys}>
+<Tile icon="key" class="section" data-surface="tile" title={copy.passkeys}>
   <div class="section-body">
     <p class="hint">{copy.passkeyHow}</p>
     <Empty
@@ -171,7 +171,7 @@
 {/snippet}
 
 <!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->
-<Tile class="section" data-surface="tile" title={words.wayBack}>
+<Tile icon="clock" class="section" data-surface="tile" title={words.wayBack}>
   <div class="section-body">
     <!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
          and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the

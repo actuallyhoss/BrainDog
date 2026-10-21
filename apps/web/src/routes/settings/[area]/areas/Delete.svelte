@@ -103,7 +103,7 @@
   who is not one has no second step to take on this screen except asking somebody.
 -->
 {#if !anOwner}
-  <Tile class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+  <Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
     <div class="section-body">
       <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
     </div>
@@ -111,7 +111,7 @@
 {:else}
 <!-- ON THE GROUND AND UNBOXED: the sentence, what it costs, the typed name and the verb. The box this
      sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
-<Tile class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+<Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
   <div class="section-body">
     <div class="danger">
       <p class="danger-title">{copy.deleteWhat(RECORD)}</p>

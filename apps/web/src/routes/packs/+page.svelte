@@ -677,7 +677,7 @@
   {#if installed.length > 0}
     <!-- ONE ROW PER ADD-ON: its well, its name, its line and what it holds, its "…" holding Settings, What this adds and
          Uninstall, destructive last, and its switch. In one tile, a hairline between rows. -->
-    <Tile title={words.installedTitle} count={installed.length}>
+    <Tile icon="packs" title={words.installedTitle} count={installed.length}>
       <ul class="ledger addons">
         {#each installed as state (state.id)}
           {@const pack = byId.get(state.id)}
@@ -768,7 +768,7 @@
        to date. The same row as an installed add-on, and its one press, which reads the plan. "Update all" is the
        screen's one primary, at the tile's heading. -->
   {#if updates && updates.length > 0}
-    <Tile title={words.updatesTitle} count={updates.length}>
+    <Tile icon="refresh" title={words.updatesTitle} count={updates.length}>
       {#snippet actions()}
         <Button weight="primary" size="sm" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
       {/snippet}

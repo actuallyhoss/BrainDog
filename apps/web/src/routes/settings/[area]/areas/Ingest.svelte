@@ -212,7 +212,7 @@
   </Tile>
 {/if}
 
-<Tile class="section" data-surface="tile" title={copy.sources}>
+<Tile icon="globe" class="section" data-surface="tile" title={copy.sources}>
   <div class="section-body">
     <p class="hint">{copy.sourcesHow}</p>
     <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
@@ -265,7 +265,7 @@
   either: `mintsHere === false` is true of every reader, and only after that does it matter
   who is asking.
 -->
-<Tile class="section" data-surface="tile" title={mailWords.title}>
+<Tile icon="mail" class="section" data-surface="tile" title={mailWords.title}>
   <div class="section-body">
     <p class="hint">{mailWords.how}</p>
     {#if mintsHere === false}

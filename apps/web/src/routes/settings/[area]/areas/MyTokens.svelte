@@ -106,7 +106,7 @@
   const put = (line: string, said: string): void => void clipboard.put(line, line, said);
 </script>
 
-<Tile class="section" data-surface="tile" title={words.title}>
+<Tile icon="key" class="section" data-surface="tile" title={words.title}>
   <div class="section-body">
     <p class="mine-why">{words.why}</p>
     {#if minted}
@@ -154,7 +154,7 @@
   </div>
 </Tile>
 
-<Tile class="section" data-surface="tile" title={words.mine} count={rows.length || undefined}>
+<Tile icon="key" class="section" data-surface="tile" title={words.mine} count={rows.length || undefined}>
   <div class="section-body">
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />

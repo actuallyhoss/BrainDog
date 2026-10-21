@@ -349,7 +349,7 @@
   `33 §10` is the fact that makes the area make sense at all: "Login is account-level (a
   person may hold several records), so identity lives OUTSIDE the record."
 -->
-<Tile class="section" data-surface="tile" title={copy.you}>
+<Tile icon="user-check" class="section" data-surface="tile" title={copy.you}>
   <div class="section-body">
     <div class="person">
       <span class="person-face"><Face name={faceName} you size="l" /></span>
@@ -554,7 +554,7 @@
      lands on, so the keyboard and the middle button have a real place to go. Two surfaces
      offering one act must not answer it two ways. The record you are already in is not a link
      at all: you are in it. -->
-<Tile class="section" data-surface="tile" title={copy.yourRecords} count={me.records.length || undefined}>
+<Tile icon="grid" class="section" data-surface="tile" title={copy.yourRecords} count={me.records.length || undefined}>
   <div class="section-body">
     <ul class="ledger ledger-lead">
       {#each me.records as r}
@@ -597,7 +597,7 @@
      red text button here and the one filled red button inside the sheet that does it. At 390px
      `row-actions` stacks, so the button is full width. -->
 {#if closable || closedNow}
-  <Tile class="section" data-surface="tile" title={copy.closeTitle}>
+  <Tile icon="trash" class="section" data-surface="tile" title={copy.closeTitle}>
     <div class="section-body">
       <p class="hint">{copy.closeSays}</p>
       <div class="row-actions">

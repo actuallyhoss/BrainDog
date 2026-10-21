@@ -51,7 +51,7 @@
   }
 </script>
 
-<Tile class="section" data-surface="tile" title={PUT_BACK.title} count={rows.length || undefined}>
+<Tile icon="archive" class="section" data-surface="tile" title={PUT_BACK.title} count={rows.length || undefined}>
   <div class="section-body">
     <ul class="ledger removed">
       {#each rows as r, i (r.id)}

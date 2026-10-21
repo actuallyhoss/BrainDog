@@ -77,7 +77,7 @@
 </script>
 
 {#if !unrouted}
-<Tile class="section" data-surface="tile" title={words.linksTitle} count={openCount || undefined}>
+<Tile icon="link" class="section" data-surface="tile" title={words.linksTitle} count={openCount || undefined}>
   <div class="section-body">
     <p class="links-lead">{words.linksLead}</p>
     {#if refused !== null}

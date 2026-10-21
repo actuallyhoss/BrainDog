@@ -677,7 +677,7 @@
     </Tile>
   {/if}
 
-  <Tile class="section" data-surface="tile" title={words.keys} count={keys.length || undefined}>
+  <Tile icon="key" class="section" data-surface="tile" title={words.keys} count={keys.length || undefined}>
     {#snippet actions()}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
       {#if acts && index.kind === 'held'}
@@ -805,7 +805,7 @@
     </div>
   </Tile>
 
-  <Tile class="section" data-surface="tile" title={words.mayOpen} count={holding.length || undefined}>
+  <Tile icon="monitor" class="section" data-surface="tile" title={words.mayOpen} count={holding.length || undefined}>
     <div class="section-body">
       {#if machinesTell}
         <!-- THE HALF THAT IS OWNER-ONLY SAYS SO IN THE RECORD'S WORDS, and it no longer takes the page with it. -->

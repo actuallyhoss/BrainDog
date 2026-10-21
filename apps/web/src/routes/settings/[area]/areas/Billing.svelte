@@ -166,7 +166,7 @@
   on both hosts: "At no point is export withheld." A lapsed record says so in its own sentence.
 -->
 {#if hosted}
-  <Tile class="section" data-surface="tile" title={copy.billingYours}>
+  <Tile icon="money" class="section" data-surface="tile" title={copy.billingYours}>
     <div class="section-body">
       {#if bill.state === 'ready' && bill.value}
         <!-- A HOST THAT SELLS PACKS AND NO PLAN is taking payments, for credits, so it is never told it is not. -->
@@ -242,7 +242,7 @@
     </div>
   </Tile>
 {:else}
-  <Tile class="section" data-surface="tile" title={copy.billing}>
+  <Tile icon="money" class="section" data-surface="tile" title={copy.billing}>
     <div class="section-body">
       <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
            every shipped bundle, so a live Cloud record was told "This record runs on your own

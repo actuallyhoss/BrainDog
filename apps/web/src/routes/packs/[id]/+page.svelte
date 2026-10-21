@@ -410,7 +410,7 @@
     </div>
 
     {#if entries.length}
-      <Tile class="section" data-surface="tile" title={words.settings}>
+      <Tile icon="settings" class="section" data-surface="tile" title={words.settings}>
         <div class="section-body">
           <form class="settings" bind:this={form} onsubmit={submit} novalidate>
             {#if holds === null}<p class="when">{words.when}</p>{/if}
@@ -632,7 +632,7 @@
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
            where somebody comes to find out what they were. Nothing to set is a quiet line under its
            own heading, never a whole-screen state with a glyph above what the add-on does bring. -->
-      <Tile class="section" data-surface="tile" title={words.settings}>
+      <Tile icon="settings" class="section" data-surface="tile" title={words.settings}>
         <div class="section-body">
           <Empty
             kind="no-data-yet"
@@ -644,7 +644,7 @@
       </Tile>
     {/if}
     {#if pack && (pack.registers.length || pack.pages.length)}
-      <Tile class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + pack.pages.length) || undefined}>
+      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + pack.pages.length) || undefined}>
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
           <ul class="ledger">
