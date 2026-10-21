@@ -313,7 +313,7 @@
   alone, and the People matrix cites that rule and gets it right, which is the tell: the fix
   was known, written down, and applied to one group.
 -->
-<Tile class="section" data-surface="tile" title={words.looks}>
+<Tile icon="sun" class="section" data-surface="tile" title={words.looks}>
   <div class="section-body">
     <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
     <div class="looks">
@@ -494,7 +494,7 @@
   THE RECORD'S LOOK, which is everybody's, under the person's own choices, which are theirs alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
-<Tile class="section" data-surface="tile" title={copy.lookTitle}>
+<Tile icon="eye" class="section" data-surface="tile" title={copy.lookTitle}>
   <div class="section-body">
     <p class="hint">{copy.lookHint}</p>
     <LookEditor {owner} {staged} />
