@@ -57,6 +57,8 @@ export interface BarsOptions {
 export const ROW_ALONE = 22;
 export const ROW_PAIRED = 20;
 const GAP = 12;
+/** The size a bar's label, value and note are drawn at (`viz.css`, `--fs-meta`). */
+const LABEL = 13;
 
 /** A bar's rectangle: never under 2px when its value is above zero, and its radius never more than half of it. */
 export function barRect(x: number, y: number, value: number, max: number, space: number, h: number): BarRect {
@@ -71,9 +73,10 @@ export function bars(items: readonly BarsInput[], o: BarsOptions): BarsGeometry 
   const values = items.map((it) => format(it.value));
 
   /* The label column is the longest label, and never more than two fifths of the chart. */
-  const gutter = Math.min(Math.max(0, ...items.map((it) => textWidth(it.label))) + GAP, Math.round(o.width * 0.4));
-  const valueCol = Math.max(0, ...values.map((v) => textWidth(v))) + GAP;
-  const noteCol = Math.max(0, ...items.map((it) => (it.note ? textWidth(it.note) + 8 : 0)));
+  /* AT 13, the size the labels are drawn at (P29): at 12 a bar's name was the smallest words on its page. */
+  const gutter = Math.min(Math.max(0, ...items.map((it) => textWidth(it.label, LABEL))) + GAP, Math.round(o.width * 0.4));
+  const valueCol = Math.max(0, ...values.map((v) => textWidth(v, LABEL))) + GAP;
+  const noteCol = Math.max(0, ...items.map((it) => (it.note ? textWidth(it.note, LABEL) + 8 : 0)));
   const space = Math.max(0, o.width - gutter - valueCol - noteCol);
 
   const all = [...items.map((it) => it.value), ...(o.paired ?? [])].filter(Number.isFinite);

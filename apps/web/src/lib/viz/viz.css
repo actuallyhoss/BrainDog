@@ -228,6 +228,13 @@
     font-weight: 500;
   }
 
+  /* A BAR CHART'S NAMES AND FIGURES ARE WORDS A PERSON READS, at 13 (P29): "Created 149" on Activity was 12, the
+     smallest words on the page. An axis's ticks stay at 12. `bars.ts` measures them at the same size. */
+  .viz-bars .viz-label,
+  .viz-bars .viz-value {
+    font-size: var(--fs-meta);
+  }
+
   /* The words a screen reader reads where a sentence will not do: a table, kept off the page. ON A WRAPPER AND NEVER
      ON THE TABLE ITSELF: a table grows to fit its cells whatever its inline size, and its own `overflow` clips
      nothing, so a hidden table was as wide as its widest row and reached past the page. A block clips it at 1px. */
