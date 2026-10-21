@@ -204,6 +204,22 @@ test("a page's own keys are the record's, and an expanded page wears the colour 
   assert.deepEqual(out.page.page.identity, { register: 'projects', seq: 4 });
 });
 
+test('A PAGE ABOUT A ROW SAYS WHICH ROW TO WHOEVER ASKED (`about`), with its title, once its blocks are read', async () => {
+  const answered = { ...ANSWER, param: { register: 'projects', seq: 4, title: 'Kiln' } };
+  const { io } = host((method) => (method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const told: unknown[] = [];
+  const out = await pageReader(BASE, io, () => AT).read('kiln', undefined, { about: (row) => told.push(row) });
+  assert.equal(out.from, 'live');
+  assert.deepEqual(told, [{ register: 'projects', seq: 4, title: 'Kiln' }]);
+  /* A HOOK THAT THROWS COSTS THE PAGE NOTHING, and a page about no row tells nobody. */
+  const thrown = await pageReader(BASE, io, () => AT).read('kiln', undefined, { about: () => { throw new Error('no'); } });
+  assert.equal(thrown.from, 'live');
+  const { io: bare } = host((method) => (method === 'page' ? json(200, { ok: true, value: ANSWER }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const none: unknown[] = [];
+  await pageReader(BASE, bare, () => AT).read('desk', undefined, { about: (row) => none.push(row) });
+  assert.deepEqual(none, []);
+});
+
 test('a declaration the record never checked is narrowed before it reaches the renderer', async () => {
   /* EVERY DECLARATION KEY HERE IS ONE `declare.ts` DOES NOT LOOK AT, so a pack may carry it in any
      shape and the record forwards it as a key a block may have. `blocks.ts` draws the strings with

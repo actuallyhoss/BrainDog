@@ -346,6 +346,14 @@
   const hosting = $derived(mode === 'page' && !arranging && !showSource);
   /** Whether the filter strip is drawn: on a hosted page the record says may be narrowed. */
   const strip = $derived(hosting && filters.length > 0);
+  /**
+   * WHAT FOLLOWS A PROJECT'S SHAPE WAITS FOR IT, on a page about a project's row, until the shape's reads are back. Which
+   * blocks are drawn hangs on what the shape says (`withoutRepeats`), and the shape's hold fills the screen under the
+   * head, so the blocks under it stood below the fold and then jumped up into view when a shorter shape landed (CLS 0.15
+   * on a project's first open, `loop/perf/r3-diag.mjs`). They are drawn with the shape, in one frame. Not while the page
+   * is arranged, which moves the blocks as they are declared.
+   */
+  const shapeWaits = $derived(projectPage && about !== null && !shapeKnown && !arranging && arrangement.slots === null);
 
   /** Blocks added in this session. They live beside the declared ones and index past them. */
   let extra = $state<PageBlock[]>([]);
@@ -770,22 +778,22 @@
       mode="page"
       opens={about ? shapeAt : null}
       page={bodyPage ?? live.page.page}
-      blocks={all}
+      blocks={shapeWaits ? [] : all}
       held={counted}
       now={live.now}
       {writes}
       {arrangement}
       headed={led}
       captured={headLine?.at ?? -1}
-      under={headLine && !wide.current ? lineInHead : null}
-      strip={strip && led ? narrow : null}
-      host={hosting ? host : null}
+      under={headLine && !wide.current && !shapeWaits ? lineInHead : null}
+      strip={strip && led && !shapeWaits ? narrow : null}
+      host={hosting && !shapeWaits ? host : null}
       pick={hosting ? picked : null}
       {onwalk}
     />
     </div>
     <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
-    {#if offer}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
+    {#if offer && !shapeWaits}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
   {/if}
   </div>

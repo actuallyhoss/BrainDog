@@ -64,6 +64,8 @@
   let lastReading = $state<string | null>(null);
   /** Whether the whole of setup is drawn, or only the one line it folds to. Per visit, never saved. */
   let open = $state(false);
+  /** Whether there is a list of readings to report to, known before the rest is read: the folded line's place is held. */
+  let held = $state(false);
 
   const spoken = $derived(`${register}#${seq}`);
   const line = $derived(curlLine(origin, minted, copy.reportPlaceholder));
@@ -72,6 +74,12 @@
   const lastUsed = $derived(keys.reduce<string | null>((a, k) => (k.last_used_at && (!a || k.last_used_at > a) ? k.last_used_at : a), null));
   const folded = $derived(foldedLine({ keys: keys.length, lastUsed, readings, lastReading }));
 
+  /*
+   * ONE ROUND TRIP AFTER THE DECLARATION, NOT FIVE: whether there is a list of readings is the one thing the rest waits
+   * on, and the declaration is usually in already (`schemas`). The row, the organisations, the readings and the keys
+   * are then asked together; one after another they landed a second after the page and pushed the blocks under them down.
+   * While they are out the folded line's place is held (`held`), as it is drawn on a lived row.
+   */
   async function load() {
     origin = location.origin;
     const client = createClient({ base: apiBase() });
@@ -83,35 +91,43 @@
       return;
     }
     field = bound.field;
-    /* THE ROW ITSELF, for the day it was made (whether setup folds) and, on a project, its id. */
-    const row = await client.get(register, seq);
+    held = true;
+    /* THE ROW ITSELF, for the day it was made (whether setup folds) and, on a project, its id; A PROJECT AN ORGANISATION
+       LISTS reports for that organisation too, so its numbers are on the organisation's page; and HOW MANY READINGS NAME
+       THIS ROW, and when the newest is dated: one row read, and its count. */
+    const listsOrgs = register === 'things' && bound.field !== 'organisation';
+    const [row, orgs, read, keyed] = await Promise.all([
+      client.get(register, seq),
+      listsOrgs ? client.list({ register: 'organisations', limit: 200 }) : Promise.resolve(null),
+      client.list({ register: READINGS, where: { field: bound.field, is: spoken }, order: [{ field: 'at', dir: 'desc' }], limit: 1 }),
+      client.reportKeys(),
+    ]);
     const made = row.ok ? (row.value as { created_at?: unknown } | null)?.created_at : null;
-    /* A PROJECT AN ORGANISATION LISTS reports for that organisation too, so its numbers are on the organisation's page. */
     let organisation: string | null = null;
-    if (register === 'things' && bound.field !== 'organisation') {
-      const orgs = await client.list({ register: 'organisations', limit: 200 });
+    if (listsOrgs) {
       const id = row.ok ? (row.value as { id?: unknown } | null)?.id : null;
-      if (typeof id === 'string' && orgs.ok) organisation = organisationOf(orgs.value.rows as never, id);
+      if (typeof id === 'string' && orgs?.ok) organisation = organisationOf(orgs.value.rows as never, id);
     }
     listedBy = bound.links.includes('organisation') ? organisation : null;
     binding = bindingOf(bound.field, spoken, { source: bound.source, organisation, links: bound.links });
-    /* HOW MANY READINGS NAME THIS ROW, and when the newest is dated: one row read, and its count. */
-    const read = await client.list({ register: READINGS, where: { field: bound.field, is: spoken }, order: [{ field: 'at', dir: 'desc' }], limit: 1 });
     readings = read.ok ? read.value.matched : 0;
     const newest = read.ok ? (read.value.rows[0] as { fields?: { at?: unknown } } | undefined)?.fields?.at : null;
     lastReading = typeof newest === 'string' ? newest : null;
-    await list(client);
+    keysFrom(keyed);
     /* OPEN OR SHUT IS DECIDED ONCE A VISIT, here, and never saved: a key read again later does not fold it under the reader. */
     open = !setupFolded({ keys: keys.length, readings, madeDay: dayOf(typeof made === 'string' ? made : null), today: dayOf(Date.now())! });
     from = 'ready';
   }
 
-  async function list(client = createClient({ base: apiBase() })) {
-    const out = await client.reportKeys();
+  function keysFrom(out: Awaited<ReturnType<ReturnType<typeof createClient>['reportKeys']>>) {
     if (out.ok) {
       keys = out.value.filter((k) => !k.revoked_at && keyFor(k.fixed, field, spoken));
       cannot = '';
     } else cannot = 'refusal' in out ? out.refusal.fix : copy.reportUnread;
+  }
+
+  async function list(client = createClient({ base: apiBase() })) {
+    keysFrom(await client.reportKeys());
   }
 
   $effect(() => {
@@ -215,6 +231,14 @@
       {#if pollBindsTo(register, field)}<PollForm {register} {seq} {title} organisation={listedBy} />{/if}
     </div>
   </section>
+{:else if held}
+  <!-- THE FOLDED LINE'S PLACE, while what it says is read: its words and its button as they are drawn, and nothing in it to press. -->
+  <section class="report" aria-hidden="true" inert data-held-line>
+    <div class="report-fold">
+      <p class="report-folded">&nbsp;</p>
+      <Button weight="quiet" disabled>{FOLD_WORDS.show}</Button>
+    </div>
+  </section>
 {/if}
 
 <style>
@@ -223,6 +247,10 @@
     gap: var(--sp-2);
     max-inline-size: var(--measure);
     margin-block-start: var(--sp-3);
+  }
+
+  .report[data-held-line] {
+    visibility: hidden;
   }
 
   .report-fold {

@@ -2178,10 +2178,17 @@ function staleSaid(b: Answered): string[] {
  * chosen next; an empty choice is no choice, and the page is asked for by its slug alone.
  */
 export type PageReader = {
-  read(slug: string, filter?: Readonly<Record<string, string>>, opts?: { walk?: Walked }): Promise<Opened>;
+  read(slug: string, filter?: Readonly<Record<string, string>>, opts?: ReadOpts): Promise<Opened>;
   /** The last live answer this tab drew of the page as this choice narrowed it, else `null`: drawn while `read` is out. */
   kept(slug: string, filter?: Readonly<Record<string, string>>): Opened | null;
 };
+
+/**
+ * WHAT A READ IS ASKED BESIDE THE PAGE: a length picked past the walk's reach (`walk`), and who to tell the row a page is
+ * about, with the title the record expanded it under, once its blocks' reads are back (`about`), so a read of that row
+ * of its own (a project's shape, `shape-read.ts`) goes out while the page is drawn and not after.
+ */
+export type ReadOpts = { walk?: Walked; about?: (row: { register: string; seq: number; title: string }) => void };
 
 /** A length a reader picked on a forecast's horizon knob: whole days, or `last`, to the last dated movement. */
 export type Walked = number | 'last';
@@ -2249,7 +2256,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   }
 
   const answer = {
-    async read(slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: Walked } = {}): Promise<Opened> {
+    async read(slug: string, filter?: Readonly<Record<string, string>>, opts: ReadOpts = {}): Promise<Opened> {
       /* `client.page` drops an empty choice, so the page is asked for by its slug alone. A record that does not read
          `filter` answers the whole page.
 
@@ -2367,6 +2374,17 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       );
       /* The walks, the bars' links, the runs and who is reading are all out at once, and the page waits for the slowest. */
       const [mapped, booted] = await Promise.all([mapping, booting, linking, naming]);
+      /* THE ROW IT IS ABOUT, said once the page's own reads are back and before it is drawn, so a read of that row goes out
+         while the page draws and never takes the page's place where the browser holds few connections to the record. A
+         hook that throws costs the page nothing. */
+      const param = page.param;
+      if (opts.about && param && typeof param.register === 'string' && Number.isInteger(param.seq)) {
+        try {
+          opts.about({ register: param.register, seq: param.seq, title: typeof param.title === 'string' ? param.title : '' });
+        } catch {
+          /* The page is drawn as it would have been. */
+        }
+      }
       const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
       const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
       const refs = new Map<string, RefMap>();

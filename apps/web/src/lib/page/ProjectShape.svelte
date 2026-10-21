@@ -17,32 +17,28 @@
   LIVE (proj F9): read again when the record moves (`live.version`), the old read kept on screen until the new one answers,
   and each figure whose value changed washes in the neutral `--arrived` for a moment (`data-arrived`), as every other row does.
 
-  READ FOR THE ROW IT IS GIVEN, in parallel and outside the page's own read. It draws nothing for a row that is not a
-  project's, so a page about any other row is unchanged. While the first read is out, a little height is held.
+  READ FOR THE ROW IT IS GIVEN (`shape-read.ts`), outside the page's own read: the page asks for it the moment it knows the
+  row and the shape takes that read when it mounts. It draws nothing for a row that is not a project's, so a page about
+  any other row is unchanged. While the first read is out, a little height is held.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { createClient } from '@braindog/client';
   import { apiBase, at } from '$lib/at.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { decl as fieldDecl, homeCurrency, labelOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
-  import { figureReader, openWhere, openWorkOf, viaOf, WORK_READ, type FigureReader, type OpenWork, type Via } from '../../routes/r/[register]/[seq]/figures.ts';
+  import { openWhere } from '../../routes/r/[register]/[seq]/figures.ts';
   import { localDay } from '../../routes/r/[register]/[seq]/said.ts';
-  import { readHistory } from '$lib/record/history-live.ts';
-  import { linkReader } from '$lib/record/links-live.ts';
-  import { handFor } from '$lib/record/hand.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { rowScreen } from '$lib/record/row-href.ts';
   import { registerHref } from '$lib/record/where.ts';
   import { actor } from '$lib/record/names.ts';
-  import { midnightOf, sessionsOf, type SessionRow } from '$lib/record/today-live.ts';
-  import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block, type Figure } from '$lib/record/project.ts';
-  import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle, type KpiAnswered } from '$lib/home/project-cards.ts';
-  import { pathOf, trendOf, type Months } from '$lib/record/visuals.ts';
-  import { rowReader } from '$lib/record/row-live.ts';
-  import { recordNow } from '$lib/record/boot-live.ts';
+  import { midnightOf, type SessionRow } from '$lib/record/today-live.ts';
+  import { readShape, takeShape, type ShapeRead, type WorkRow } from './shape-read.ts';
+  import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
+  import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
+  import { pathOf, trendOf } from '$lib/record/visuals.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { money, monthShort } from 'braindog-render';
   import ProjectVisuals from './ProjectVisuals.svelte';
@@ -69,32 +65,10 @@
     onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null, known: boolean) => void;
   } = $props();
 
-  type WorkRow = { seq: number; fields: Readonly<Record<string, unknown>> };
-  type Read = {
-    key: string;
-    fields: Readonly<Record<string, unknown>>;
-    incoming: Parameters<typeof shapeOf>[0]['incoming'];
-    history: Parameters<typeof shapeOf>[0]['history'];
-    money: { in: Figure | null; out: Figure | null; owed: Figure | null };
-    inByMonth: Months | null;
-    outByMonth: Months | null;
-    /** The work list that points here, how it points, and every row of it on this project. */
-    work: string | null;
-    via: Via | null;
-    rows: WorkRow[];
-    open: OpenWork | null;
-    /** What the open work is called, in the plural and lower case. */
-    noun: string;
-    /** The runs on this project heard from today. */
-    sessions: SessionRow[];
-    /** The key number its card leads with, as the `kpis` source answered it, where it keeps one. */
-    kpi: KpiAnswered | null;
-    now: number;
-  };
+  type Read = ShapeRead;
   let read = $state.raw<Read | null>(null);
   /* THE KEY WHOSE READ HAS ENDED, however it ended: the hold lasts only while its own read is out, never past it. */
   let settled = $state('');
-  let figures: FigureReader | null = null;
 
   $effect(() => {
     const r = register;
@@ -122,68 +96,12 @@
     });
   });
 
-  /* A read that fails is a read that said nothing: the blocks it feeds go without it and the others still draw. */
-  const quiet = <T,>(p: Promise<T>, none: T): Promise<T> => p.catch(() => none);
-
+  /* THE FIRST READ IS THE ONE THE PAGE ASKED AHEAD (`shape-read.ts`), where it did; every later one is the shape's own. */
   async function load(r: string, n: number, key: string) {
     try {
       const base = apiBase();
-      const client = createClient({ base });
-      const linked = linkReader(base);
-      const [row, told, links] = await Promise.all([
-        rowReader(base).read(r, n),
-        quiet<Awaited<ReturnType<typeof readHistory>> | null>(readHistory(base, r, n), null),
-        quiet<Awaited<ReturnType<ReturnType<typeof linkReader>['read']>> | null>(linked.read(r, n), null),
-      ]);
-      if (key !== `${register}#${seq}` || row.from !== 'live' || !row.entry || !isProject(REGISTERS[r])) return;
-      const decl = REGISTERS[r]!;
-      const name = String(row.entry.fields[decl.title] ?? '').trim();
-      const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], name: g.name, rows: g.rows })) : [];
-      /* AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
-      const history = (told?.from === 'live' ? told.lines : []).map((l) => ({ note: l.note, by: /^p_/u.test(l.by) ? '' : l.by, at: l.at }));
-      figures ??= figureReader(base);
-      const f = figures;
-      /* THE WORK LIST IS THE ONE THAT SAYS WHO HOLDS ITS ROWS AND POINTS AT THIS LIST, found by what it declares. */
-      const work = Object.keys(REGISTERS).find((id) => handFor(REGISTERS[id]) !== null && viaOf(REGISTERS[id], r) !== null) ?? null;
-      const via = work ? viaOf(REGISTERS[work], r) : null;
-      const spoken = `${r}#${n}`;
-      /* THE RUNS ON IT: the list whose rows are runs (`seq_prefix`) heard from (`last_seen`), by the field that names the project:
-         a ref to this list, or its `project`, which holds the spoken id (`things#1`). */
-      const runs = Object.keys(REGISTERS).find((id) => (REGISTERS[id] as { seq_prefix?: unknown }).seq_prefix !== undefined && REGISTERS[id]!.fields.some((x) => x.id === 'last_seen'));
-      const runsVia = runs ? (REGISTERS[runs]!.fields.find((x) => x.type === 'ref' && (x as { to?: string }).to === r) ?? REGISTERS[runs]!.fields.find((x) => x.id === 'project'))?.id : undefined;
-      const now = recordNow();
-      const today = localDay(now);
-      const asWhere = (w: string) => ({ toJSON: () => w });
-      const [i, o, w, listed, runRows, inByMonth, outByMonth, kpi] = await Promise.all([
-        ...(['project-in-month', 'project-out-month', 'project-owed'] as const).map((m) => (name === '' ? Promise.resolve(null) : quiet(f.scalar(m, name), null))),
-        work && via ? quiet(client.list({ register: work, where: asWhere(`${via.field} is ${spoken}`) as never, limit: WORK_READ }), null) : Promise.resolve(null),
-        runs && runsVia ? quiet(client.list({ register: runs, where: asWhere(`${runsVia} is ${spoken}`) as never, limit: 40, order: [{ field: 'last_seen', dir: 'desc' }] }), null) : Promise.resolve(null),
-        name === '' ? Promise.resolve(null) : quiet(f.moneyIn(name), null),
-        name === '' ? Promise.resolve(null) : quiet(f.moneyOut(name), null),
-        quiet(import('$lib/home/card-kpis.ts').then((m) => m.readLead(base, spoken)), null),
-      ] as const);
-      const got = listed && (listed as { ok?: boolean }).ok ? (listed as { value: { rows: { seq: number; fields: Record<string, unknown> }[]; cursor: unknown } }).value : null;
-      const rows: WorkRow[] = (got?.rows ?? []).filter((x) => typeof x.seq === 'number').map((x) => ({ seq: x.seq, fields: x.fields }));
-      const open = via ? openWorkOf(rows, via, today, got?.cursor != null) : null;
-      const runGot = runRows && (runRows as { ok?: boolean }).ok ? ((runRows as { value: { rows: unknown[] } }).value.rows as Parameters<typeof sessionsOf>[0]) : [];
-      if (key !== `${register}#${seq}`) return;
-      const next: Read = {
-        key,
-        fields: row.entry.fields,
-        incoming,
-        history,
-        money: { in: (i as Figure | null) ?? null, out: (o as Figure | null) ?? null, owed: (w as Figure | null) ?? null },
-        inByMonth: (inByMonth as Months | null) ?? null,
-        outByMonth: (outByMonth as Months | null) ?? null,
-        work,
-        via,
-        rows,
-        open,
-        noun: (work ? (REGISTERS[work]?.name ?? '') : '').toLowerCase(),
-        sessions: sessionsOf(runGot, midnightOf(now), now),
-        kpi: (kpi as KpiAnswered | null | undefined) ?? null,
-        now,
-      };
+      const next = await (takeShape(base, r, n) ?? readShape(base, r, n));
+      if (next === null || key !== `${register}#${seq}`) return;
       if (read && read.key === key) mark(read, next);
       read = next;
     } catch {

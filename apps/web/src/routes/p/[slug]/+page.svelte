@@ -46,6 +46,7 @@
   import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
+  import { shapeAhead } from '$lib/page/shape-read.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import Told from '$lib/home/Told.svelte';
   import type { LessonsTile } from '$lib/home/told.ts';
@@ -174,7 +175,12 @@
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
     reading = true;
     const mine = ++started;
-    const out = await reader.read(asked, filtered).finally(() => {
+    /* A PAGE ABOUT A PROJECT'S ROW ASKS FOR ITS SHAPE ONCE ITS OWN READS ARE BACK (`about`, `shape-read.ts`), as it draws
+       and not after, where nothing of it is drawn yet: the shape mounting over a kept page reads for itself. */
+    const about = (row: { register: string; seq: number; title: string }) => {
+      if (got === null && (route.params.slug ?? '') === asked) void shapeAhead(apiBase(), row.register, row.seq, row.title);
+    };
+    const out = await reader.read(asked, filtered, { about }).finally(() => {
       if (remembered === asked) remembered = null;
     });
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made

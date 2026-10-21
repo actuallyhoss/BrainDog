@@ -56,11 +56,12 @@ const SCREENS = [
   '../../routes/r/[register]/[seq]/+page.svelte',
   '../../routes/v/[view]/+page.svelte',
   '../../routes/usage/+page.svelte',
-  '../page/ProjectShape.svelte',
+  '../page/shape-read.ts',
 ];
 /* AND THE SCREENS HANDED THEIR DAY BY ONE THAT READS IT: the Path and Money of a project are drawn from the shape's read,
-   on its day (`ProjectShape.svelte`), since the UI pass of 20 October (proj F3), and read no clock of their own. */
-const HANDED = ['../page/ProjectVisuals.svelte'];
+   on its day (`ProjectShape.svelte`), since the UI pass of 20 October (proj F3), and read no clock of their own. The
+   shape itself is drawn from that read (`shape-read.ts`), which the page asks for ahead of it since round 3. */
+const HANDED = ['../page/ProjectVisuals.svelte', '../page/ProjectShape.svelte'];
 
 test('THE ROW PAGE, THE SAVED VIEW, USAGE AND A PROJECT READ THE RECORD’S CLOCK, never the browser’s', () => {
   for (const file of SCREENS) {
