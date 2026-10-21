@@ -174,7 +174,7 @@ test('EVERY LIST A USE CASE HOLDS CAN BE RENAMED, and starts from the words the 
   /* A MODULE'S LIST SAYS THE MODULE'S WORDS, and one renamed with no singular says one of the new name. */
   assert.equal(labels.transactions, 'Ledger');
   assert.equal(labels['transactions:one'], 'transaction');
-  assert.equal(labels['obligations:one'], 'item');
+  assert.equal(labels['obligations:one'], 'bill or invoice');
   assert.equal(labels.tasks, 'Tickets');
   assert.equal(labels['tasks:one'], 'ticket');
   /* WHAT MONEY KEEPS FOR ITS OWN SUMS HAS NO BOX. */

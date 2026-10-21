@@ -1602,9 +1602,10 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
-    declares: '0507ca88190ea60f',
+    declares: '09904ef1a119de83',
     history: [
       "`register.datapoints` is handed to Portfolio 1.19.0 (`hands.register.datapoints.portfolio`), which declares it under the same id, and its organisation and service, links to People's and Estate's lists, stay this pack's, laid on it (`extends.register.datapoints.organisation`, `extends.register.datapoints.about_service`); `setting.label_datapoints` and `setting.one_datapoints` go with the list and the example number leaves the pack's own seeds for the module examples; every figure, page and addition over Numbers stays -> 0507ca88190ea60f",
+      "Inside the unreleased 3.0.0 (the UI pass of 20 October, P25): `setting.one_obligations` starts from `bill or invoice`, Money's own word for one of Bills and invoices now, where it started from `item` -> 09904ef1a119de83",
     ],
   },
   'team@2.19.0': {

@@ -832,8 +832,10 @@ const withoutUiPass = (doc: Body): Body => {
  */
 const STALE_LINE = "The oldest balance in Cash now was last confirmed on {{cash-as-of}}. Say what an account holds today and this page starts from today's money.";
 const ACTS = / \[(?:See them|Update balances)\]\([^)]*\)$/u;
+/* And Bills and invoices said one of it as `item`, before P25 named it `bill or invoice`. */
+const itemAgain = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).map((d) => (d.one === 'bill or invoice' ? { ...d, one: 'item' } : d)) });
 const withoutUiPassR3 = (doc: Body): Body =>
-  withPage(doc, 'money', (now) =>
+  withPage(itemAgain(doc), 'money', (now) =>
     now
       .filter((b) => b.heading !== 'Runs out')
       .flatMap((b): Body[] => {
@@ -1257,6 +1259,9 @@ const FOUNDER_2_7 = (() => {
 const handedBefore = (doc: Body, id: string): Body =>
   id !== 'founder' ? doc : (({ extends: _laid, ...rest }) => ({ ...rest, declarations: FOUNDER_2_7.declarations, config: FOUNDER_2_7.config, hands: FOUNDER_2_7.hands }))(doc);
 
+/* AND ONE OF BILLS AND INVOICES WAS AN `item` (P25, the UI pass of 20 October), which a use case's label setting starts from. */
+const oneBefore = (doc: Body): Body => JSON.parse(JSON.stringify(doc).replaceAll('"default":"bill or invoice"', '"default":"item"')) as Body;
+
 const projectBefore = (doc: Body, id: string): Body =>
   withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(doc, id), id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
@@ -1412,7 +1417,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const u = useCase(id)!;
     const was = USECASE_BEFORE[id]!;
     assert.notEqual(u.version, was.version);
-    assert.equal(fingerprintOf(projectBefore(useCaseDocument(id, TODAY) as Body, id)), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.equal(fingerprintOf(oneBefore(projectBefore(useCaseDocument(id, TODAY) as Body, id))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
 
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));

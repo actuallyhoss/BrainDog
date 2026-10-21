@@ -18,9 +18,10 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
    */
   name: 'Bills and invoices',
   icon: 'obligation',
-  /* `item`, because half of these are owed to you and half by you: `bill` is wrong for an invoice
-     you sent and `invoice` is wrong for a tax payment. */
-  one: 'item',
+  /* `bill or invoice`, because half of these are owed to you and half by you: `bill` is wrong for an invoice you sent
+     and `invoice` is wrong for a tax payment. It was `item` until the UI pass of 20 October (P25), and the button said
+     "Add an item" on a list whose name says what it holds. */
+  one: 'bill or invoice',
   holds: 'the bills you are to pay and the invoices you are to be paid, each with a day and a currency',
   title: 'what',
   /* THE DAY IT FALLS DUE, on the one screen that had no room for it. A card shows three

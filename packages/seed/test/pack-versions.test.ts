@@ -1474,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: '8b74fe451270a7dc',
+    declares: 'b9c49eb41364b180',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1513,6 +1513,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 3.17.0 (the UI pass of 20 October, money F3 and F5): `page.money`'s Lasts tile says two cells, With what is due over `runs-out-on` and If nothing comes in over `lasts-no-income`, and the three lead notes no longer end on how long the cash lasts with no income; Heads up's two late lines say `{{bad:late}}` where they said past their due date, and drop still; no id added or taken away -> 66a1947e5a2f77ab",
       "Inside the unreleased 3.17.0 (the UI pass of 20 October, money F5): Instalments says what is next under each bar, 'Next £1,875 on 3 Sep', from three figures by plan after its two counts, `metric.installments-next-due-by-plan`, `metric.installments-left-by-plan` and `metric.installments-after-next-by-plan`; and Coming and going's calendar of what falls due names a third column, `amount`, so each line says its figure; three ids added and none taken away -> 7b5fd9f2a5b81a29",
       "Inside the unreleased 3.17.0 (the UI pass of 20 October, its last round): `page.money`'s Heads up stands in the side column, its lines ending on See them and Update balances, and the box that took today's balance is off the page, so Runs out is placed beside Lasts; the line says `{{cash-now.moved}}`, and the calendar's amount is signed by `direction`; no id added or taken away -> 8b74fe451270a7dc",
+      "Inside the unreleased 3.17.0 (the UI pass of 20 October, P25): `register.obligations` says one of it as `bill or invoice`, where it said `item`, so its button says Add a bill or invoice; no id added or taken away -> b9c49eb41364b180",
     ],
   },
   'work@1.17.0': {

@@ -139,7 +139,7 @@ export const MODULE_WORDS: Readonly<Record<string, { name: string; one: string }
   books: { name: 'Books', one: 'book' },
   categories: { name: 'Categories', one: 'category' },
   installments: { name: 'Instalments', one: 'instalment' },
-  obligations: { name: 'Bills and invoices', one: 'item' },
+  obligations: { name: 'Bills and invoices', one: 'bill or invoice' },
   recurring: { name: 'Repeating', one: 'repeating item' },
   transactions: { name: 'Ledger', one: 'transaction' },
   services: { name: 'Services', one: 'service' },
