@@ -616,9 +616,10 @@
   /* ON A WIDE TILE THE ROWS STAND SIDE BY SIDE, a column each and a hairline between, so four numbers read as one strip
      and not as four lines across the whole board. */
   @container (min-width: 720px) {
+    /* FOUR COLUMNS WHATEVER IS IN THEM, Today's most (`KPIS_TODAY`), so one number takes a quarter and its line sits
+       beside it, not across the board. */
     .kpis[data-form='today'] .kpi-rows {
-      grid-auto-columns: minmax(0, 1fr);
-      grid-auto-flow: column;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     /* EACH COLUMN READS FROM ITS TOP, so the names stand on one line across the strip, and a name too long for its
