@@ -592,11 +592,12 @@
   }
 
   .h-health[data-tone='off'] {
-    color: var(--red);
+    color: var(--warn);
+    font-weight: 600;
   }
 
   .h-health[data-tone='off'] .dot {
-    background: var(--red);
+    background: var(--warn);
   }
 
   .h-say {
