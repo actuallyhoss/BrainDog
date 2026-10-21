@@ -40,7 +40,22 @@ export function handoffAlert(e: { id: string; kind: string; to?: unknown; actor?
   };
 }
 
-export type Ring = { on: () => boolean; focused: () => boolean; send: (title: string, body: string, goto: string) => void };
+/**
+ * An instruction he gave that reached Done or Needs you, as the record's `instructions` list has it. Any other state is
+ * not one. The id carries the state, so each state rings once and a return to a state already heard rings nothing.
+ * The words are fixed: what he told the agent and what it answered stay on the screen and out of a notification.
+ */
+export function instructionAlert(i: { id: string; state: string }): Alert | null {
+  if (i.state !== 'done' && i.state !== 'needs_you') return null;
+  return {
+    id: `i:${i.id}:${i.state}`,
+    title: i.state === 'done' ? 'Done' : 'Needs you',
+    body: i.state === 'done' ? 'An agent finished what you told it' : 'An agent needs you on something you told it',
+    goto: i.state === 'done' ? '/app/p/agents' : '/app/decide',
+  };
+}
+
+export type Ring ={ on: () => boolean; focused: () => boolean; send: (title: string, body: string, goto: string) => void };
 
 /** Ring once per new item, and not at all while the window is in front or the switch is off. Returns the seen set to keep. */
 export function ring(seen: ReadonlySet<string> | null, items: readonly Alert[], door: Ring): Set<string> {

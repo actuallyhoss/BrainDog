@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handoffAlert, questionAlert, ring, sift } from './alerts.ts';
+import { handoffAlert, instructionAlert, questionAlert, ring, sift } from './alerts.ts';
+
+test('an instruction rings at Done and Needs you only, once per state, with fixed words', () => {
+  assert.equal(instructionAlert({ id: 'IN4', state: 'working' }), null);
+  assert.equal(instructionAlert({ id: 'IN4', state: 'declined' }), null);
+  const done = instructionAlert({ id: 'IN4', state: 'done' })!;
+  const need = instructionAlert({ id: 'IN4', state: 'needs_you' })!;
+  assert.notEqual(done.id, need.id);
+  assert.equal(need.title, 'Needs you');
+  assert.doesNotMatch(done.body + need.body, /IN4/u);
+});
 
 const q = (id: string) => questionAlert({ id, question: `Q ${id}` });
 
