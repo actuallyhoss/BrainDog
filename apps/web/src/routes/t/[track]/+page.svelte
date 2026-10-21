@@ -89,6 +89,9 @@
 
   const seq = $derived(Number(route.params.track ?? 0));
   const track = $derived((rows.tracks ?? []).find((t) => t.seq === seq));
+  /* THE LIST'S NAME OVER THE THREAD'S, "Threads" (P19): read from the shell's lists where the declaration has not been
+     learnt yet, as a tile's door does, since `REGISTERS` is filled as the record answers and drew no kicker here. */
+  const listName = $derived(REGISTERS.tracks?.name ?? ((route.data as { lists?: { id: string; name: string }[] }).lists ?? []).find((l) => l.id === 'tracks')?.name ?? '');
 
   const health = $derived(healthOf(track, rows.updates ?? [], seq, clock));
   const updates = $derived(updatesIn(rows.updates ?? [], seq));
@@ -295,7 +298,7 @@
   </div>
 {:else}
   <PageHead
-    kicker={REGISTERS.tracks?.name ?? ''}
+    kicker={listName}
     back="/r/tracks"
     title={String(track.fields.name)}
     icon="activity"
