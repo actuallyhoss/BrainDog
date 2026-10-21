@@ -21,9 +21,9 @@
   import { live as liveRecord } from '$lib/data/live.svelte.ts';
   import { apiBase, at as inApp } from '../at.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
-  import { Block, Degraded, Kpis, Markdown, Table, Text } from 'braindog-render/svelte';
+  import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { EMPTY_KEEP, KPIS_KIND, inline, text } from 'braindog-render';
-  import { kpiHref, kpisIn, type KpiAnswered as KpiDrawn } from './kpis-in.ts';
+  import { kpiHref, kpisIn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
   import { compactOf, queueWords } from './queue-answer.ts';
   import { alikeOf, type QueueEntry } from './alike.ts';
@@ -69,6 +69,7 @@
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
+  import KpisBlock from '$lib/kpis/KpisBlock.svelte';
   import { agentsOn, cardFactsOf, cardsOf, trendsOf, withKpis, type CardDecl, type KpiAnswered } from '$lib/home/project-cards.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { valueSaid } from '$lib/voice.ts';
@@ -631,6 +632,15 @@
   <p class="block-cannot">{block.cannot}</p>
 {:else if block.actions?.length && !block.refusals.length}
   <ActionRows rows={block.actions} {now} />
+{:else if block.kind === KPIS_KIND && !block.refusals.length && (kpis.length > 0 || (writes !== null && param !== undefined && (block as { for?: unknown }).for === 'project'))}
+  <!-- THE KEY NUMBERS ARE DRAWN FROM THE BLOCK'S `kpis`, not from rows (`kpis-in.ts`), and pressed to change one
+       (`lib/kpis/KpisBlock.svelte`): Today's few as rows, a project's own as its tiles. A reader who may not write is
+       taken to the number's project instead. A project's page that may add one draws its foot with none kept yet;
+       anywhere else none kept is the empty state below. -->
+  <KpisBlock {block} {kpis} {writes} {param} {now} href={(k) => {
+    const to = kpiHref(k);
+    return to === null ? null : inApp(to);
+  }} />
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
   <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>
@@ -638,13 +648,6 @@
       {#if act}<Button href={act.href}>{act.label}</Button>{/if}
     {/snippet}
   </Empty>
-{:else if block.kind === KPIS_KIND && kpis.length > 0}
-  <!-- THE KEY NUMBERS ARE DRAWN FROM THE BLOCK'S `kpis`, not from rows (`kpis-in.ts`): Today's few as rows that open their
-       project, a project's own as its lead and grid. -->
-  <Kpis {kpis} form={(block as { for?: unknown }).for === 'today' ? 'today' : 'project'} home={homeCurrency()} {now} href={(k) => {
-    const to = kpiHref(k as KpiDrawn);
-    return to === null ? null : inApp(to);
-  }} />
 {:else if homeRows}
   <HomeRows rows={homeRows} shown={homeFold?.shown ?? Infinity} done={homeDone} ontick={writes && block.kind === 'todo' ? tickAt : undefined} />
   {#if homeFold}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, homeFold?.shown ?? 0)}>{words.more(homeFold.more)}</button>{/if}

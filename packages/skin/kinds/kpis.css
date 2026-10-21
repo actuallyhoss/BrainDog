@@ -651,6 +651,78 @@
     }
   }
 
+  /* ── a KPI the host opens itself, and its own menu ── */
+
+  /* THE NAME IS THE BUTTON AND READS AS THE NAME, and its press covers the KPI: a tile or a row is pressed anywhere. What
+     acts on its own, the fix and the menu, sits over that press: raised as high, and later in the KPI, so drawn above. */
+  .kpi:has(.kpi-press) {
+    position: relative;
+  }
+
+  .kpi-press {
+    display: block;
+    max-inline-size: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .kpi-press::after {
+    position: absolute;
+    z-index: var(--z-raise);
+    inset: 0;
+    border-radius: var(--r-xs);
+    content: '';
+  }
+
+  .kpi-press:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .kpi-who .kpi-press {
+    display: inline;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kpi:has(.kpi-press) .kpi-fix,
+  .kpi-menu {
+    position: relative;
+    z-index: var(--z-raise);
+  }
+
+  .kpi-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .kpi-title .kpi-name {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .kpi-menu {
+    flex: none;
+    margin-inline-start: auto;
+  }
+
+  .kpi-row:has(> .kpi-menu) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .kpi-row:has(> .kpi-menu):not(:has(> .kpi-row-chart)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .kpis-foot {
     display: flex;
   }

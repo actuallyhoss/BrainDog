@@ -18,6 +18,10 @@
   A TODAY ROW OPENS WHERE ITS NUMBER LIVES when the host says where (`href`): the row's words are one link, grown over the
   row, so the whole row is the target and a fix button on it still takes its own press. A row whose KPI stopped arriving
   says so in the warn colour, under its figure, whatever line it was ranked for.
+
+  A HOST THAT OPENS A KPI ITSELF hands `onopen`, which wins over `href`: the name is then a button whose press covers
+  the tile or the row, and opens whatever the host opens (the app's sheet). `menu` is drawn at the end of the name's
+  line, a KPI's own few verbs. With neither the markup is as it was, a name in a paragraph.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -32,6 +36,8 @@
     onfix,
     add,
     href,
+    onopen,
+    menu,
   }: {
     kpis: readonly KpiInput[];
     form?: 'project' | 'today';
@@ -39,9 +45,13 @@
     now?: KpisOptions['now'];
     fix?: Snippet<[KpiView]>;
     onfix?: (kpi: KpiInput) => void;
-    add?: Snippet;
+    add?: Snippet | undefined;
     /** Where a Today row opens: the KPI's project page, or `null` for a row that opens nothing. */
-    href?: (kpi: KpiInput) => string | null | undefined;
+    href?: ((kpi: KpiInput) => string | null | undefined) | undefined;
+    /** Opens the KPI where the host keeps it (the app's sheet); a row then opens this and not `href`. */
+    onopen?: ((kpi: KpiInput) => void) | undefined;
+    /** A KPI's own verbs, drawn at the end of its name's line. */
+    menu?: Snippet<[KpiView]> | undefined;
   } = $props();
 
   const plan = $derived(kpisPlan(kpis, { home, ...(now !== undefined ? { now } : {}) }));
@@ -57,6 +67,20 @@
     return { x1: x1!, y1: y1!, x2: x2!, y2: y2! };
   };
 </script>
+
+{#snippet named(k: KpiView)}
+  {#if onopen}<button type="button" class="kpi-name kpi-press" onclick={() => onopen(k.input)}>{k.name}</button>{:else}<span class="kpi-name">{k.name}</span>{/if}
+{/snippet}
+
+{#snippet title(k: KpiView)}
+  {#if menu}
+    <div class="kpi-title">{@render named(k)}<span class="kpi-menu">{@render menu(k)}</span></div>
+  {:else if onopen}
+    <p class="kpi-title">{@render named(k)}</p>
+  {:else}
+    <p class="kpi-name">{k.name}</p>
+  {/if}
+{/snippet}
 
 {#snippet figure(k: KpiView)}
   {#if k.figure}
@@ -147,13 +171,13 @@
   <div class="kpis" data-form="today">
     <ul class="kpi-rows">
       {#each plan.rows as k (k.key)}
-        {@const to = href?.(k.input) ?? null}
+        {@const to = onopen ? null : (href?.(k.input) ?? null)}
         <li class="kpi kpi-row" style={hue(k)} data-state={state(k)} data-kind={k.kind}>
           <div class="kpi-row-text">
             <p class="kpi-who">
               {#if to}<a class="kpi-open" href={to}
                   >{#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}<span class="kpi-name">{k.name}</span></a
-                >{:else}{#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}<span class="kpi-name">{k.name}</span>{/if}
+                >{:else}{#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}{@render named(k)}{/if}
             </p>
             {@render figure(k)}
             {#if k.why}
@@ -173,6 +197,7 @@
             {/if}
           </div>
           {#if k.chart}<div class="kpi-row-chart">{@render chart(k, 'row')}</div>{/if}
+          {#if menu}<span class="kpi-menu">{@render menu(k)}</span>{/if}
         </li>
       {/each}
     </ul>
@@ -184,7 +209,7 @@
       {@const k = plan.lead}
       <div class="kpi kpi-lead" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
         <div class="kpi-head">
-          <p class="kpi-name">{k.name}</p>
+          {@render title(k)}
           {@render figure(k)}
           {@render change(k)}
           {@render foot(k)}
@@ -196,7 +221,7 @@
       <ul class="kpi-grid">
         {#each plan.rest as k (k.key)}
           <li class="kpi kpi-tile" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
-            <p class="kpi-name">{k.name}</p>
+            {@render title(k)}
             <div class="kpi-tile-figure">
               {@render figure(k)}
               {#if k.chart?.form === 'ring'}{@render chart(k, 'tile')}{/if}
