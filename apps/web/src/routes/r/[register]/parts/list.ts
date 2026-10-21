@@ -131,8 +131,10 @@ export const deadlineOf = (decl: RegisterDecl | undefined): string | undefined =
  * calm one: a list draws a row late or close, and a finished row says it is
  * finished in its own word. The rows keep every other field as they came.
  */
+/* AND A ROW THAT IS ONLY CLOSE CARRIES NONE EITHER (P24, money F2): amber is off lists, so a Due cell said "⚠︎ watch this"
+   beside the ring and the words "Due in 4 days" that already say it. Late keeps its red. */
 export function withoutGood<R extends { tone?: Tone | undefined }>(rows: readonly R[]): R[] {
-  return rows.map((r) => (r.tone === 'good' ? { ...r, tone: undefined } : r));
+  return rows.map((r) => (r.tone === 'good' || r.tone === 'warn' ? { ...r, tone: undefined } : r));
 }
 
 /**

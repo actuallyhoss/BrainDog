@@ -36,7 +36,7 @@ test('the tone is about the day the list declares its deadline, and not the firs
 
 type Row = { key: string; tone?: 'good' | 'warn' | 'bad' | undefined };
 
-test('a finished row loses its colour, and a late or close one keeps it', () => {
+test('a finished or close row loses its colour, and a late one keeps it', () => {
   const late: Row = { key: 'bills#2', tone: 'bad' };
   const plain: Row = { key: 'bills#3' };
   const rows: Row[] = [{ key: 'bills#1', tone: 'good' }, late, { key: 'bills#4', tone: 'warn' }, plain];
@@ -46,7 +46,8 @@ test('a finished row loses its colour, and a late or close one keeps it', () => 
     [
       ['bills#1', undefined],
       ['bills#2', 'bad'],
-      ['bills#4', 'warn'],
+      /* A close row is calm on a list: its ring and its words say how close (P24). */
+      ['bills#4', undefined],
       ['bills#3', undefined],
     ],
   );
