@@ -67,7 +67,9 @@ export function sqlGuard(text: string, params: readonly Param[]): void {
 export function openSqlite(path = ':memory:', options?: OpenOptions): NodeSql {
   /* The type asks for a reason; an empty one is no reason, and is refused before the file is opened. */
   if (options?.raw === true && !options.why?.trim()) throw new Error('openSqlite: { raw: true } needs a why that says what the test measures');
-  const db = new DatabaseSync(path);
+  /* DEFENSIVE OFF, as `apps/selfhost` opens: Node 26 turns it on by default and 24.13 does not, and under it the
+     kernel cannot rebuild a damaged search index (`migrate.ts`, `rebuildIndex`). */
+  const db = new DatabaseSync(path, { defensive: false } as never);
   const check = options?.raw === true ? () => {} : sqlGuard;
   /* Foreign keys OFF is SQLite's default and the schema does not declare any: the record's integrity
      is the write path's, in one transaction, where a refusal can carry a sentence. */

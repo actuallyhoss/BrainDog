@@ -142,8 +142,10 @@ function openDriver(path: string): Sql & { close(): void } {
   /* FOREIGN KEYS OFF, and it is not a preference. `node:sqlite` defaults this ON and a Durable
      Object leaves SQLite's default OFF — so `decision.supersedes REFERENCES decision(id)` is
      enforced here and nowhere else, which is a behavioural fork between the two hosts on the write
-     path. The DDL's own comment beside that column says "documentary; not enforced". */
-  const db = new DatabaseSync(path, { enableForeignKeyConstraints: false });
+     path. The DDL's own comment beside that column says "documentary; not enforced".
+     DEFENSIVE OFF, pinned for the same reason: Node 26 turns it on by default and 24.13 does not, and under it the
+     kernel's rebuild of a damaged search index is refused, so a record with one would not open (`migrate.ts`). */
+  const db = new DatabaseSync(path, { enableForeignKeyConstraints: false, defensive: false } as never);
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
   db.exec('PRAGMA busy_timeout = 5000');
