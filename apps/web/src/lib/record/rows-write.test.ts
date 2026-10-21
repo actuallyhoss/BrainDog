@@ -139,7 +139,7 @@ test('a conflict hands back the row as it now stands, and says so', async () => 
   assert.equal(out.entry?.fields.party, 3);
 });
 
-test('A WRITE SENTENCE NAMES THE ROW AS A PERSON READS IT: its title now, the name last walked, else "This item", never its id', () => {
+test('A WRITE SENTENCE NAMES THE ROW AS A PERSON READS IT: its title now, the name last walked, else "This bill or invoice", never its id', () => {
   assert.equal(rowSaid('obligations', 2, row({ fields: { what: '  Rent  ' } })), '“Rent”');
   /* NO ROW IN HAND: the name this tab walked for that number. */
   const had = TITLES.get('obligations');
@@ -147,8 +147,8 @@ test('A WRITE SENTENCE NAMES THE ROW AS A PERSON READS IT: its title now, the na
   try {
     assert.equal(rowSaid('obligations', 5), '“Insurance”');
     /* A ROW NOBODY NAMED is "This" and the list's own singular. */
-    assert.equal(rowSaid('obligations', 2, row({ fields: { what: '' } })), 'This item');
-    assert.equal(rowSaid('obligations', 9), 'This item');
+    assert.equal(rowSaid('obligations', 2, row({ fields: { what: '' } })), 'This bill or invoice');
+    assert.equal(rowSaid('obligations', 9), 'This bill or invoice');
   } finally {
     if (had === undefined) TITLES.delete('obligations');
     else TITLES.set('obligations', had);
