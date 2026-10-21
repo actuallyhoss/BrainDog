@@ -118,14 +118,16 @@
 {/if}
 
 <style>
-  /* AN ARCHIVED CARD DIMS WHILE ITS RECEIPT SHOWS, as the grid's row does: the card goes to 0.45 and "Archived" and "Put
-     back" under it stay at full ink. It leaves with the list's motion when the way back runs out. */
-  .list-cards :global(.card-line:has([data-archived]) > .card) {
-    opacity: 0.45;
+  /* AN ARCHIVED CARD DIMS WHILE ITS RECEIPT SHOWS, as the grid's row does: its words go to the quiet ink and "Archived"
+     and "Put back" under it stay at full ink. It leaves with the list's motion when the way back runs out. The quiet ink
+     and not an opacity, for the grid's reason: at 0.45 its words read under 3 to 1. */
+  .list-cards :global(.card-line:has([data-archived]) > .card),
+  .list-cards :global(.card-line:has([data-archived]) > .card *) {
+    color: var(--ink-3);
   }
 
   .list-cards :global(.card-line > .card) {
-    transition: opacity var(--d-swap) var(--ease-standard);
+    transition: color var(--d-swap) var(--ease-standard);
   }
 
   /**

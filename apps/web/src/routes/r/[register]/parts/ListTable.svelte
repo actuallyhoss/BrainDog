@@ -1044,16 +1044,21 @@
   }
 
   /**
-   * AN ARCHIVED ROW DIMS, AND ITS RECEIPT DOES NOT (motion F7.2): the cells go to 0.45 over `--d-swap` while "Archived"
-   * and "Put back" stay at full ink, so the press visibly did something. The page takes the row away when its undo runs
-   * out, and it leaves with `rowOut`.
+   * AN ARCHIVED ROW DIMS, AND ITS RECEIPT DOES NOT (motion F7.2): the cells' words go to the quiet ink over `--d-swap`
+   * while "Archived" and "Put back" stay at full ink, so the press visibly did something. The page takes the row away
+   * when its undo runs out, and it leaves with `rowOut`.
+   *
+   * THE QUIET INK AND NOT AN OPACITY. At 0.45 every word in the row read under 3 to 1 in both schemes, and the row is
+   * still read (its figures, its date) until it goes; `--ink-3` is solved to clear 4.5 on the tile and on every tint
+   * a cell draws on.
    */
-  .table-slot :global(.tr:has(.said[data-archived]) > .td:not(:last-child)) {
-    opacity: 0.45;
+  .table-slot :global(.tr:has(.said[data-archived]) > .td:not(:last-child)),
+  .table-slot :global(.tr:has(.said[data-archived]) > .td:not(:last-child) *) {
+    color: var(--ink-3);
   }
 
   .table-slot :global(.rowgroup .tr > .td) {
-    transition: opacity var(--d-swap) var(--ease-standard);
+    transition: color var(--d-swap) var(--ease-standard);
   }
 
   @media (width < 640px) {
