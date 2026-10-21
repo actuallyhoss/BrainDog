@@ -39,7 +39,7 @@ import { rowsCell, timelineCell, timelineDays, timelineDetails, timelineTitle } 
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
-import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from './split.ts';
+import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
@@ -951,7 +951,7 @@ function split(b: Block, o: RenderOptions): string {
     ? numbersFold(
         'split',
         [SPLIT_PART, SPLIT_AMOUNT, SPLIT_SHARE],
-        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || MISSING, plan.parts.find((p) => p.at === i && !r.hole)?.share ?? MISSING]),
+        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || SPLIT_NONE, plan.parts.find((p) => p.at === i && !r.hole)?.share ?? SPLIT_NONE]),
       )
     : '';
   return `<div class="prop split">${track}${legend}${hole}${numbers}</div>`;

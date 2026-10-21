@@ -98,3 +98,5 @@ export const SPLIT_PART = 'Part';
 /** The heads of the fold's table after `SPLIT_PART`: each row's figure, then its share of the whole. */
 export const SPLIT_AMOUNT = 'Amount';
 export const SPLIT_SHARE = 'Share';
+/** What the numbers under a split say for a part with no amount or no share: a word read aloud, never a dash (P12). */
+export const SPLIT_NONE = 'none';

@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -101,8 +101,9 @@
           {#each [...rows, ...holes] as row, i}
             <tr>
               <th scope="row">{said(row) || SPLIT_PART}</th>
-              <td class="num">{text(inline(row.cells[1] ?? '', opts)) || MISSING}</td>
-              <td class="num">{(!row.hole && plan.parts.find((p) => p.at === i)?.share) || MISSING}</td>
+              <!-- AN EMPTY CELL IS READ AS "none", never a dash (P12): this table is for a screen reader. -->
+              <td class="num">{text(inline(row.cells[1] ?? '', opts)) || SPLIT_NONE}</td>
+              <td class="num">{(!row.hole && plan.parts.find((p) => p.at === i)?.share) || SPLIT_NONE}</td>
             </tr>
           {/each}
         </tbody>

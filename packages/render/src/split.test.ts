@@ -63,8 +63,8 @@ test('A SPLIT PUTS ITS NUMBERS IN A FOLD: each part, its figure and its share, a
   assert.match(fold, /<div class="split-numbers"><table class="split-table"><thead><tr><th scope="col">Part<\/th><th scope="col">Amount<\/th><th scope="col">Share<\/th><\/tr><\/thead>/u);
   assert.match(fold, /<tr><th scope="row">Rent<\/th><td class="num">300<\/td><td class="num">75%<\/td><\/tr>/u);
   assert.match(fold, /<tr><th scope="row">Part<\/th><td class="num">100<\/td><td class="num">25%<\/td><\/tr>/u, 'an unnamed part is still a row head');
-  assert.match(fold, /<tr><th scope="row">Tools<\/th><td class="num">pending<\/td><td class="num">—<\/td><\/tr>/u);
-  assert.match(fold, /<tr><th scope="row">Uncategorised<\/th><td class="num">50<\/td><td class="num">—<\/td><\/tr><\/tbody>/u, 'the hole comes last and is not a part');
+  assert.match(fold, /<tr><th scope="row">Tools<\/th><td class="num">pending<\/td><td class="num">none<\/td><\/tr>/u);
+  assert.match(fold, /<tr><th scope="row">Uncategorised<\/th><td class="num">50<\/td><td class="num">none<\/td><\/tr><\/tbody>/u, 'the hole comes last and is not a part');
 });
 
 test('A LATE PART IS STRIPED AS WELL AS RED (DIRECTION §42): it is filled with a pattern of its own, and the rest are not', () => {
