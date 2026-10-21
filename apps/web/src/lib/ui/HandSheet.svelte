@@ -11,6 +11,15 @@
   waits for. Neither is drawn for somebody who may not change the row, or on a list that does not say who holds its rows.
 
   UNDER A THUMB IT IS A BOTTOM SHEET (`Sheet.svelte`), with one 44px row per person or agent and their face.
+
+  WITH A NOTE (agents and MCP plan §7.2): under the agents, a line for what the agent should know first. Handed to an
+  agent with something in it, the note goes to that agent as an instruction on the row (`noteFor`), which its next run
+  on it is told before anything else.
+
+  START ONE NOW (path E): beside Claude, only while a runner on one of his machines took a run within the day and an
+  approved kind takes an instruction or a row (`startFor`). It hands the row, tells Claude the note (or to work on the
+  row), and starts a run of that kind with the instruction as its argument. Otherwise it is not drawn, and the row
+  waits for Claude's next session as it always did. Nothing starts by itself.
 -->
 <script lang="ts">
   import { page } from '$app/state';
@@ -24,13 +33,16 @@
     handPatch,
     heldBy,
     putBackPatch,
+    noteFor,
     readHolders,
     readRunFor,
     startFor,
+    startNow,
+    startsOnARunner,
     type Holder,
     type Offered,
   } from '$lib/record/hand.ts';
-  import type { JobRow } from '$lib/record/jobs.ts';
+  import type { JobKind, JobRow } from '$lib/record/jobs.ts';
   import { may } from '$lib/record/may.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
@@ -73,12 +85,19 @@
 
   let offered = $state<Offered | null>(null);
   let asking = false;
+  /* THE KIND "START ONE NOW" WOULD START, read as the sheet opens; `null` draws no press. */
+  let startKind = $state.raw<JobKind | null>(null);
+  /* WHAT HE TYPED FOR THE AGENT, kept until the sheet hands the row. */
+  let note = $state('');
 
   async function ask() {
     if (!hand || asking) return;
     asking = true;
     offered = null;
-    offered = await readHolders(apiBase(), hand, me, shell.names ?? {}, peopleList);
+    startKind = null;
+    const [holders, kind] = await Promise.all([readHolders(apiBase(), hand, me, shell.names ?? {}, peopleList), hand.agent ? startFor(apiBase(), Date.now()) : Promise.resolve(null)]);
+    offered = holders;
+    startKind = kind;
     asking = false;
   }
 
@@ -97,7 +116,7 @@
   /* THE LAST HAND THIS TAB MADE, which the head's Put back undoes for as long as the row is the one it wrote. */
   let last = $state<{ before: Entry; patch: Fields; after: Entry } | null>(null);
 
-  async function give(holder: Holder) {
+  async function give(holder: Holder, start = false) {
     if (!hand || writing) return;
     const patch = handPatch(hand, decl, holder);
     if (!patch) return;
@@ -118,9 +137,23 @@
     last = { before, patch, after: out.entry };
     toasts.push(copy.handedToast(name), { undo: () => void putBack() });
     onhanded?.(out.entry);
-    if (holder.kind === 'agent') {
-      const started = await startFor(apiBase(), register, row.seq, holder, Date.now());
-      if (started !== null) void readRun();
+    if (holder.kind !== 'agent') return;
+    /* THE NOTE, AND FOR "START ONE NOW" THE INSTRUCTION THE RUN IS STARTED WITH: his words, or to work on the row. */
+    const said = note.trim() || (start ? copy.handStartSaid(String(row.fields[decl.title] ?? '')) : '');
+    note = '';
+    if (said === '') return;
+    const told = await noteFor(apiBase(), register, row.seq, said);
+    if (!told.ok) {
+      toasts.push(told.fix, { intent: 'warn' });
+      return;
+    }
+    const kind = startKind;
+    if (!start || kind === null) return;
+    const started = await startNow(apiBase(), kind, told.id, register, row.seq);
+    if (started === null) toasts.push(copy.handStartFailed, { intent: 'warn' });
+    else {
+      toasts.push(copy.handStarted(holder.name));
+      void readRun();
     }
   }
 
@@ -198,14 +231,21 @@
       {/if}
       {#if agents.length > 0}
         <h3 class="hand-head">{copy.handAgents}</h3>
+        <label class="hand-with">
+          <span class="hand-with-label">{copy.handNote}</span>
+          <textarea class="hand-with-field" rows="2" maxlength="2000" placeholder={copy.handNoteHint} bind:value={note}></textarea>
+        </label>
         <ul class="hand-list">
           {#each agents as h (h.key)}
-            <li>
+            <li class="hand-agent">
               <button type="button" class="hand-one" disabled={writing} onclick={() => void give(h)}>
                 <Face name={h.name} kind="agent" />
                 <span class="hand-name">{h.name}</span>
                 {#if holding.agent === h.key}<span class="hand-holds">{copy.handHolding}</span>{/if}
               </button>
+              {#if startKind !== null && startsOnARunner(h)}
+                <Button weight="quiet" disabled={writing} onclick={() => void give(h, true)}>{copy.handStartNow}</Button>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -284,6 +324,44 @@
 
   .hand-name {
     flex: 1;
+  }
+
+  /* AN AGENT'S ROW: the hand itself, and "Start one now" at its end where a runner can start one. */
+  .hand-agent {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .hand-agent > .hand-one {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  /* THE NOTE: a label at meta size over a two-line field. */
+  .hand-with {
+    display: grid;
+    gap: var(--sp-1);
+    margin-block-end: var(--sp-2);
+  }
+
+  .hand-with-label {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+  }
+
+  .hand-with-field {
+    inline-size: 100%;
+    min-block-size: 64px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--tile-2);
+    border: 0;
+    border-radius: var(--r-pop);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+    resize: vertical;
   }
 
   .hand-holds {

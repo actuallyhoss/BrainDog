@@ -25,6 +25,15 @@ export const hand = {
   handWaiting: (agent: string): string => `Waiting for ${agent}'s next run`,
   handRunning: (agent: string): string => `${agent} is on it`,
   handReadFailed: 'BrainDog could not reach this record.',
+  /* "WITH A NOTE" (agents and MCP plan §7.2): what he types goes to the agent as an instruction on the row. */
+  handNote: 'With a note for the agent',
+  handNoteHint: 'What it should know first, if anything',
+  handNoteFailed: 'The note could not be sent. It was handed all the same.',
+  /* "START ONE NOW" (path E): offered only while a runner took a run within the day, and only for Claude. */
+  handStartNow: 'Start one now',
+  handStartSaid: (title: string): string => (title ? `Work on "${title}".` : 'Work on this.'),
+  handStarted: (agent: string): string => `${agent} is starting on it`,
+  handStartFailed: 'The run could not be started. It waits for the agent’s next run.',
   handRetry: 'Retry',
   /* MERGE WITH, from a person's own menu: the item, the sheet's title, its search and its two empty lines. */
   mergeWith: 'Merge with another person',

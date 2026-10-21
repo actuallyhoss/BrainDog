@@ -195,20 +195,59 @@ export const liveRunOf = (runs: readonly JobRow[], spoken: string): JobRow | nul
  * A RUNNER ON YOUR MACHINE RUNS CLAUDE CODE (`apps/cli` `runner run`), so a job is started only for a row handed to
  * Claude. Any other agent takes the row in its next session, which the briefing tells it about first.
  */
-const RUNS_ON_A_RUNNER = 'claude';
+export const RUNS_ON_A_RUNNER = 'claude';
+
+/** The argument an approved job kind takes what he told it by: `args: [{ id: 'instruction' }]`, filled with `IN4`. */
+export const INSTRUCTION_ARG = 'instruction';
 
 /**
- * Start the row's run when a row was handed to Claude, an approved kind takes a row, and a runner took a run within the
- * day; otherwise the row waits for the agent's next session. Answers the run's id when one was started.
+ * The kind "Start one now" starts (agents and MCP plan §2.3 path E): the first approved kind that takes an instruction,
+ * else the first that takes a row, or `null` when none takes either.
  */
-export async function startFor(base: string, register: string, seq: number, holder: Holder, now: number, io?: Fetch): Promise<string | null> {
-  if (holder.kind !== 'agent' || holder.agent !== RUNS_ON_A_RUNNER) return null;
+export const startKindOf = (kinds: readonly JobKind[]): JobKind | null => kinds.find((k) => k.args.some((a) => a.id === INSTRUCTION_ARG)) ?? rowKindOf(kinds);
+
+/** What the job is started with: the instruction, and the row, each where the kind takes it. */
+export function startArgs(kind: JobKind, instruction: string, spoken: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const a of kind.args) {
+    if (a.id === INSTRUCTION_ARG) out[a.id] = instruction;
+    else if (a.id === ROW_ARG) out[a.id] = spoken;
+  }
+  return out;
+}
+
+/**
+ * WHETHER "START ONE NOW" IS OFFERED, and with which kind: only to Claude, only while a runner took a run within the
+ * day (`runnerConnected`), and only where an approved kind takes the instruction or the row. Otherwise `null`, and the
+ * sheet does not draw the press: the row waits for the agent's next session, which the briefing tells it about first.
+ */
+export async function startFor(base: string, now: number, io?: Fetch): Promise<JobKind | null> {
   const runs = await readJobs(base, null, io).catch(() => null);
   if (!runs?.ok || !runnerConnected(runs.value.jobs, now)) return null;
   const kinds = await readKinds(base, runs.value.jobs, io).catch(() => null);
-  const kind = kinds?.ok ? rowKindOf(kinds.value) : null;
-  if (!kind) return null;
-  const started = await startJob(base, kind.id, { [ROW_ARG]: spokenOf(register, seq) }, io).catch(() => null);
+  return kinds?.ok ? startKindOf(kinds.value) : null;
+}
+
+/** Whether a holder is one "Start one now" can start: an agent a runner runs. */
+export const startsOnARunner = (holder: Holder): boolean => holder.kind === 'agent' && holder.agent === RUNS_ON_A_RUNNER;
+
+/**
+ * "WITH A NOTE": what he typed, as an instruction to the task for the agent it was handed to (`instruct` with
+ * `to: task`), which the agent's next run on it is told first. Answers the instruction's name (`IN4`), or the record's
+ * reason it was not made.
+ */
+export async function noteFor(base: string, register: string, seq: number, said: string, io?: Fetch): Promise<{ ok: true; id: string } | { ok: false; fix: string }> {
+  /* NO `to_agent`: the row now names its agent in its lane, and the record reads the agent off the task (`instruct`). */
+  const got = (await clientOf(base, io)
+    .instruct({ said: said.trim(), to: 'task', task: spokenOf(register, seq), when: 'next' })
+    .catch(() => null)) as { ok: boolean; value?: { id?: unknown }; refusal?: { fix?: string } } | null;
+  if (got?.ok && typeof got.value?.id === 'string') return { ok: true, id: got.value.id };
+  return { ok: false, fix: got?.refusal?.fix ?? copy.handNoteFailed };
+}
+
+/** Start the run "Start one now" asks for: the kind, with the instruction and the row. Answers the run's id, or `null`. */
+export async function startNow(base: string, kind: JobKind, instruction: string, register: string, seq: number, io?: Fetch): Promise<string | null> {
+  const started = await startJob(base, kind.id, startArgs(kind, instruction, spokenOf(register, seq)), io).catch(() => null);
   return started?.ok ? started.value.id : null;
 }
 
