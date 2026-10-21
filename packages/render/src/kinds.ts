@@ -351,6 +351,9 @@ const TABLE = {
 
 export type Kind = keyof typeof TABLE;
 
+/** The key numbers' kind, drawn from the record's own answer and not from rows, by name for a host that branches on it. */
+export const KPIS_KIND: Kind = 'kpis';
+
 export const KINDS: Record<Kind, KindSpec> = TABLE;
 
 export const isKind = (s: string): s is Kind => Object.hasOwn(TABLE, s);

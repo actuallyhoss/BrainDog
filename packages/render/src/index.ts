@@ -222,6 +222,7 @@ export {
   SECTION_TONES,
   sectionTone,
   isKind,
+  KPIS_KIND,
   type DegradeCode,
   type Kind,
   type KindSpec,

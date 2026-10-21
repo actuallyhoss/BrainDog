@@ -40,7 +40,7 @@
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
-import { KINDS, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
+import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
@@ -1848,6 +1848,13 @@ export function draw(
     return {
       segments: [],
       refusal: block.rows.length ? null : nothing(),
+    };
+  /* A `kpis` block is drawn from its key numbers (`kpis`, the kernel's `sources/kpis.ts`) and not from rows, so having
+     none is its nothing. */
+  if (block.kind === KPIS_KIND)
+    return {
+      segments: [],
+      refusal: ((block as { kpis?: readonly unknown[] }).kpis?.length ?? 0) > 0 ? null : nothing(),
     };
 
   /* A FIGURE IN A LABEL-AND-VALUE ROW READS AS MONEY, the way the table beside it does. The

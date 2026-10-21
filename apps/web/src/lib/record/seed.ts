@@ -479,6 +479,7 @@ export const NOT_OFFERED: Readonly<Record<string, string>> = {
   queue: 'The questions waiting on you are the record’s, and they wait in Needs you.',
   capture: 'A form adds to this list from the page, with a question for each of its fields.',
   inputs: 'Boxes to type into change one item, so they belong on that item’s own page.',
+  kpis: 'Key numbers are each project’s own, drawn on its page and on Today, not fields of one list.',
 };
 
 /** What a hard slot wants, said as the thing a list lacks. */
