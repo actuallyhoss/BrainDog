@@ -1,9 +1,10 @@
 /**
  * The words of a project's key numbers: the sheet that adds one or changes one (`lib/kpis/KpiSheet.svelte`), what it
- * says when something typed will not do, and the toasts its writes leave.
+ * says when something typed will not do, the toasts its writes leave, the block's own foot and its suggested numbers
+ * (`lib/kpis/KpisBlock.svelte`), and the rows of a number's menu (`lib/page/block-menu.ts`).
  *
- * AN AREA FILE OF THE COPY AGGREGATE, read directly by the sheet until the wiring spreads it into `copy` (one import and
- * one spread line in `lib/copy.ts`, the integrator's). Plain Node loads it, so it imports nothing.
+ * AN AREA FILE OF THE COPY AGGREGATE, spread into `copy` by `lib/copy.ts`, so every use is written `copy.<key>`.
+ * Plain Node loads it, so it imports nothing.
  *
  * PLAIN WORDS FOR A PHONE. A key number is "a number", where it comes from is said as a person says it ("I type it"),
  * and nothing here names the list, a field id or an enum spelling.
@@ -108,4 +109,28 @@ export const kpis = {
   kpiLongUnit: 'Keep the unit short, like USD, players or %.',
   kpiBadDay: 'Pick a day.',
   kpiDayNoTarget: 'Say the target too, or clear the day.',
+
+  /* THE BLOCK ON A PROJECT'S PAGE: its foot, and what it says with nothing kept yet. */
+  kpiAddNumber: 'Add a number',
+  kpiNoneYet: 'No key numbers yet.',
+  kpiNotRead: 'The key numbers could not be read just now.',
+
+  /* WHAT BRAINDOG OR AN AGENT SUGGESTED, on the project's page only, each kept or turned down with one press. */
+  kpiSuggested: 'Suggested',
+  kpiKeepOne: 'Keep',
+  kpiNotThis: 'Not this',
+  kpiKept: (name: string): string => `Kept “${name}”.`,
+  kpiTurnedDown: (name: string): string => `Turned down “${name}”.`,
+
+  /* A NUMBER'S OWN MENU, one press each, with a line over Undo. */
+  kpiMenu: (name: string): string => `More for ${name}`,
+  kpiMenuPin: 'Show on Today',
+  kpiMenuHide: 'Hide from Today',
+  kpiMenuAuto: 'Let Today choose',
+  kpiMenuLead: 'Lead the card with this',
+  kpiPinnedSaid: (name: string): string => `${name} is on Today.`,
+  kpiHiddenSaid: (name: string): string => `${name} is off Today.`,
+  kpiAutoSaid: (name: string): string => `Today shows ${name} when it needs a look.`,
+  kpiLeadSaid: (name: string): string => `${name} leads the card.`,
+  kpiUnnamed: 'This number',
 } as const;

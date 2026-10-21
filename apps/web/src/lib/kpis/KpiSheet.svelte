@@ -24,7 +24,7 @@
   import { page } from '$app/state';
   import { tick } from 'svelte';
   import { apiBase } from '$lib/at.ts';
-  import { kpis as words } from '$lib/copy/kpis.ts';
+  import { copy } from '$lib/copy.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -130,21 +130,21 @@
   const pickFigure = (f: string) => (draft = withFigure(draft, f, touched, at));
 
   const SOURCE_SAID: Record<KpiSource, { title: string; line: () => string }> = {
-    typed: { title: words.kpiSourceTyped, line: () => words.kpiSourceTypedLine },
-    agent: { title: words.kpiSourceAgent, line: () => words.kpiSourceAgentLine(project.name) },
-    feed: { title: words.kpiSourceFeed, line: () => words.kpiSourceFeedLine },
-    figure: { title: words.kpiSourceFigure, line: () => words.kpiSourceFigureLine },
-    numbers: { title: words.kpiSourceNumbers, line: () => words.kpiSourceNumbersLine },
+    typed: { title: copy.kpiSourceTyped, line: () => copy.kpiSourceTypedLine },
+    agent: { title: copy.kpiSourceAgent, line: () => copy.kpiSourceAgentLine(project.name) },
+    feed: { title: copy.kpiSourceFeed, line: () => copy.kpiSourceFeedLine },
+    figure: { title: copy.kpiSourceFigure, line: () => copy.kpiSourceFigureLine },
+    numbers: { title: copy.kpiSourceNumbers, line: () => copy.kpiSourceNumbersLine },
   };
-  const EVERY_SAID: Record<KpiEvery, string> = { '1h': words.kpiEveryHour, '1d': words.kpiEveryDay, '1w': words.kpiEveryWeek, '1m': words.kpiEveryMonth };
+  const EVERY_SAID: Record<KpiEvery, string> = { '1h': copy.kpiEveryHour, '1d': copy.kpiEveryDay, '1w': copy.kpiEveryWeek, '1m': copy.kpiEveryMonth };
   const TODAY_SAID: Record<KpiToday, { label: string; line: string }> = {
-    auto: { label: words.kpiTodayAuto, line: words.kpiTodayAutoLine },
-    pinned: { label: words.kpiTodayPinned, line: words.kpiTodayPinnedLine },
-    hidden: { label: words.kpiTodayHidden, line: words.kpiTodayHiddenLine },
+    auto: { label: copy.kpiTodayAuto, line: copy.kpiTodayAutoLine },
+    pinned: { label: copy.kpiTodayPinned, line: copy.kpiTodayPinnedLine },
+    hidden: { label: copy.kpiTodayHidden, line: copy.kpiTodayHiddenLine },
   };
   const GOOD: readonly { value: KpiGood; label: string }[] = [
-    { value: 'up', label: words.kpiGoodUp },
-    { value: 'down', label: words.kpiGoodDown },
+    { value: 'up', label: copy.kpiGoodUp },
+    { value: 'down', label: copy.kpiGoodDown },
   ];
 
   let own: RowWriter | undefined;
@@ -182,7 +182,7 @@
       if (!out.ok) return void (refused = out.fix);
       open = false;
       const made = out.entry;
-      toasts.push(words.kpiAdded(name, project.name), { undo: () => void back(w.archive(list, made.seq, made.version)) });
+      toasts.push(copy.kpiAdded(name, project.name), { undo: () => void back(w.archive(list, made.seq, made.version)) });
       onsaved?.(made);
       return;
     }
@@ -198,7 +198,7 @@
     if (!out.ok) return void (refused = out.fix);
     open = false;
     const after = out.entry;
-    toasts.push(words.kpiSaved(name), { undo: () => void back(w.update(list, before.seq, undoOf(before.fields, patch), after.version)) });
+    toasts.push(copy.kpiSaved(name), { undo: () => void back(w.update(list, before.seq, undoOf(before.fields, patch), after.version)) });
     onsaved?.(after);
   }
 
@@ -214,7 +214,7 @@
     if (!out.ok) return void (refused = out.fix);
     open = false;
     const after = out.entry;
-    toasts.push(words.kpiStopped(String(before.fields.name ?? '')), { undo: () => void back(w.update(list, before.seq, { state: before.fields.state ?? 'live' }, after.version)) });
+    toasts.push(copy.kpiStopped(String(before.fields.name ?? '')), { undo: () => void back(w.update(list, before.seq, { state: before.fields.state ?? 'live' }, after.version)) });
     onsaved?.(after);
   }
 
@@ -222,7 +222,7 @@
   async function back(write: Promise<Awaited<ReturnType<RowWriter['update']>>>) {
     const out = await write;
     if (!out.ok) return void toasts.push(out.fix, { intent: 'bad' });
-    toasts.push(words.kpiUndone);
+    toasts.push(copy.kpiUndone);
     onsaved?.(out.entry);
   }
 
@@ -256,13 +256,13 @@
         >
       {/each}
     </Segmented>
-    {#if line}<p class="kpi-line" id={id(`${key}-line`)}>{line}</p>{/if}
+    {#if line}<p class="kpi-say" id={id(`${key}-line`)}>{line}</p>{/if}
   </div>
 {/snippet}
 
-<Sheet bind:open title={kept ? words.kpiEditTitle(String(kpi?.fields.name ?? '')) : words.kpiNewTitle} subtitle={suggested ? words.kpiOnDraft(project.name) : words.kpiOn(project.name)}>
+<Sheet bind:open title={kept ? copy.kpiEditTitle(String(kpi?.fields.name ?? '')) : copy.kpiNewTitle} subtitle={suggested ? copy.kpiOnDraft(project.name) : copy.kpiOn(project.name)}>
   <form class="kpi-form" id={id('form')} novalidate onsubmit={save}>
-    <Field id={id('name')} label={words.kpiName} error={faults.name}>
+    <Field id={id('name')} label={copy.kpiName} error={faults.name}>
       {#snippet children(c)}
         <div class="field">
           <input
@@ -272,7 +272,7 @@
             autocomplete="off"
             enterkeyhint="done"
             maxlength="120"
-            placeholder={words.kpiNamePlaceholder}
+            placeholder={copy.kpiNamePlaceholder}
             aria-describedby={c.describedBy}
             aria-invalid={c.invalid ? 'true' : undefined}
             bind:value={draft.name}
@@ -282,8 +282,8 @@
     </Field>
 
     <fieldset class="kpi-sources">
-      <legend class="field-label">{words.kpiSource}</legend>
-      <div class="kpi-track">
+      <legend class="field-label">{copy.kpiSource}</legend>
+      <div class="kpi-choices">
         {#each sourcesFor(draft) as s (s)}
           <label class="kpi-source" data-on={draft.source === s ? '' : undefined}>
             <input type="radio" name={id('source')} value={s} checked={draft.source === s} onchange={() => pickSource(s)} />
@@ -297,7 +297,7 @@
     </fieldset>
 
     {#if figure}
-      <Field id={id('figure')} label={words.kpiFigure} error={faults.figure}>
+      <Field id={id('figure')} label={copy.kpiFigure} error={faults.figure}>
         {#snippet children(c)}
           <select
             id={id('figure')}
@@ -307,7 +307,7 @@
             value={draft.figure}
             onchange={(e) => pickFigure(e.currentTarget.value)}
           >
-            <option value="" disabled>{words.kpiFigurePick}</option>
+            <option value="" disabled>{copy.kpiFigurePick}</option>
             {#each FIGURES as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
           </select>
         {/snippet}
@@ -315,8 +315,8 @@
     {/if}
 
     <!-- WHAT GOOD LOOKS LIKE: the figure and what it counts in side by side, the day beside them where there is room. -->
-    <div class="kpi-target">
-      <Field id={id('target')} label={words.kpiTarget} error={faults.target}>
+    <div class="kpi-goal">
+      <Field id={id('target')} label={copy.kpiTarget} error={faults.target}>
         {#snippet children(c)}
           <div class="field">
             <input
@@ -325,7 +325,7 @@
               type="text"
               inputmode="decimal"
               autocomplete="off"
-              placeholder={words.kpiTargetPlaceholder}
+              placeholder={copy.kpiTargetPlaceholder}
               aria-describedby={c.describedBy}
               aria-invalid={c.invalid ? 'true' : undefined}
               bind:value={draft.target}
@@ -333,7 +333,7 @@
           </div>
         {/snippet}
       </Field>
-      <Field id={id('unit')} label={words.kpiUnit} error={faults.unit}>
+      <Field id={id('unit')} label={copy.kpiUnit} error={faults.unit}>
         {#snippet children(c)}
           <div class="field">
             <input
@@ -343,7 +343,7 @@
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
-              placeholder={words.kpiUnitPlaceholder}
+              placeholder={copy.kpiUnitPlaceholder}
               aria-describedby={c.describedBy}
               aria-invalid={c.invalid ? 'true' : undefined}
               value={draft.unit}
@@ -355,8 +355,8 @@
           </div>
         {/snippet}
       </Field>
-      <div class="kpi-by">
-        <Field id={id('target_by')} label={words.kpiBy} error={faults.target_by}>
+      <div class="kpi-day">
+        <Field id={id('target_by')} label={copy.kpiBy} error={faults.target_by}>
           {#snippet children(c)}
             <div class="field">
               <input
@@ -375,30 +375,30 @@
 
     <button type="button" class="kpi-more" aria-expanded={more} aria-controls={id('more')} onclick={() => (more = !more)}>
       <Icon name="chevronDown" size="s" />
-      <span>{more ? words.kpiFewer : words.kpiMore}</span>
+      <span>{more ? copy.kpiFewer : copy.kpiMore}</span>
     </button>
 
     {#if more}
       <div class="kpi-rest" id={id('more')}>
-        <Field id={id('measures')} label={words.kpiMeasures}>
+        <Field id={id('measures')} label={copy.kpiMeasures}>
           {#snippet children(c)}
             <div class="field">
-              <input id={id('measures')} class="field-input" type="text" autocomplete="off" maxlength="200" placeholder={words.kpiMeasuresPlaceholder} aria-describedby={c.describedBy} bind:value={draft.measures} />
+              <input id={id('measures')} class="field-input" type="text" autocomplete="off" maxlength="200" placeholder={copy.kpiMeasuresPlaceholder} aria-describedby={c.describedBy} bind:value={draft.measures} />
             </div>
           {/snippet}
         </Field>
 
         {#if !figure}
-          <Field id={id('measure')} label={words.kpiMeasure} help={words.kpiMeasureHelp}>
+          <Field id={id('measure')} label={copy.kpiMeasure} help={copy.kpiMeasureHelp}>
             {#snippet children(c)}
               <div class="field">
-                <input id={id('measure')} class="field-input" type="text" autocomplete="off" maxlength="120" placeholder={draft.name.trim() || words.kpiNamePlaceholder} aria-describedby={c.describedBy} bind:value={draft.measure} />
+                <input id={id('measure')} class="field-input" type="text" autocomplete="off" maxlength="120" placeholder={draft.name.trim() || copy.kpiNamePlaceholder} aria-describedby={c.describedBy} bind:value={draft.measure} />
               </div>
             {/snippet}
           </Field>
         {/if}
 
-        {@render choose('good', words.kpiGood, GOOD, draft.good, (v) => {
+        {@render choose('good', copy.kpiGood, GOOD, draft.good, (v) => {
           draft.good = v as KpiGood;
           touch('good');
         })}
@@ -406,17 +406,17 @@
         {#if !figure}
           {@render choose(
             'every',
-            words.kpiEvery,
+            copy.kpiEvery,
             everyFor(draft).map((v) => ({ value: v, label: EVERY_SAID[v] })),
             draft.every,
             (v) => {
               draft.every = v as KpiEvery;
               touch('every');
             },
-            words.kpiEveryHelp,
+            copy.kpiEveryHelp,
           )}
 
-          <Field id={id('owner')} label={words.kpiOwner}>
+          <Field id={id('owner')} label={copy.kpiOwner}>
             {#snippet children(c)}
               <div class="field">
                 <input
@@ -425,7 +425,7 @@
                   type="text"
                   autocomplete="off"
                   maxlength="80"
-                  placeholder={words.kpiOwnerPlaceholder}
+                  placeholder={copy.kpiOwnerPlaceholder}
                   aria-describedby={c.describedBy}
                   value={draft.owner}
                   oninput={(e) => {
@@ -440,7 +440,7 @@
 
         {@render choose(
           'today',
-          words.kpiToday,
+          copy.kpiToday,
           TODAY.map((v) => ({ value: v, label: TODAY_SAID[v].label })),
           draft.today,
           (v) => (draft.today = v as KpiToday),
@@ -449,8 +449,8 @@
 
         <div class="kpi-switch">
           <span class="kpi-switch-words">
-            <span class="kpi-switch-title" id={id('headline-label')}>{words.kpiHeadline}</span>
-            <span class="kpi-line" id={id('headline-line')}>{words.kpiHeadlineLine(project.name)}</span>
+            <span class="kpi-switch-title" id={id('headline-label')}>{copy.kpiHeadline}</span>
+            <span class="kpi-say" id={id('headline-line')}>{copy.kpiHeadlineLine(project.name)}</span>
           </span>
           <button
             type="button"
@@ -467,20 +467,23 @@
 
     {#if kept && kpi?.fields.state !== 'retired'}
       <div class="kpi-stop">
-        <Button weight="quiet" disabled={busy} onclick={() => void stop()}>{words.kpiStop}</Button>
-        <p class="kpi-line">{words.kpiStopLine}</p>
+        <Button weight="quiet" disabled={busy} onclick={() => void stop()}>{copy.kpiStop}</Button>
+        <p class="kpi-say">{copy.kpiStopLine}</p>
       </div>
     {/if}
   </form>
 
   {#snippet footer()}
     {#if refused}<p class="kpi-refused" role="alert"><Icon name="alert" size="s" /><span>{refused}</span></p>{/if}
-    <Button weight="quiet" disabled={busy} onclick={() => (open = false)}>{words.kpiCancel}</Button>
-    <Button weight="primary" type="submit" form={id('form')} disabled={busy}>{suggested ? words.kpiKeep : kept ? words.kpiSave : words.kpiAdd}</Button>
+    <Button weight="quiet" disabled={busy} onclick={() => (open = false)}>{copy.kpiCancel}</Button>
+    <Button weight="primary" type="submit" form={id('form')} disabled={busy}>{suggested ? copy.kpiKeep : kept ? copy.kpiSave : copy.kpiAdd}</Button>
   {/snippet}
 </Sheet>
 
 <style>
+  /* NO CLASS HERE SHARES A NAME WITH THE BLOCK'S (`packages/skin/kinds/kpis.css`), which every page of blocks loads: the
+     block's `.kpi-track` is its progress bar, 8 high, and the sheet's track of four choices took its height. */
+
   /* ONE COLUMN, 20 BETWEEN FIELDS, the sheet's own 16 round it. */
   .kpi-form {
     display: flex;
@@ -509,7 +512,7 @@
 
   /* THE SEGMENTED IDIOM STOOD ON END: the `--tile-2` track at the control's corner, 2 of padding, the chosen choice
      raised in `--segment-on` at the inner corner. */
-  .kpi-track {
+  .kpi-choices {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -580,7 +583,7 @@
   }
 
   /* THE TARGET, ITS UNIT AND ITS DAY: three columns where the sheet is wide, the day on its own row on a phone. */
-  .kpi-target {
+  .kpi-goal {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
     gap: var(--sp-3);
@@ -588,11 +591,11 @@
   }
 
   @media (width < 640px) {
-    .kpi-target {
+    .kpi-goal {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 
-    .kpi-by {
+    .kpi-day {
       grid-column: 1 / -1;
     }
   }
@@ -664,7 +667,7 @@
     align-self: flex-start;
   }
 
-  .kpi-line {
+  .kpi-say {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -672,7 +675,7 @@
   }
 
   /* THE LINE UNDER A TRACK IS A FIELD'S HELP LINE, in its size and ink. */
-  .kpi-pick .kpi-line {
+  .kpi-pick .kpi-say {
     color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 1.45;

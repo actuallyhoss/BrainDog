@@ -38,6 +38,7 @@ import { data } from './copy/data.ts';
 import { decide } from './copy/decide.ts';
 import { design } from './copy/design.ts';
 import { home } from './copy/home.ts';
+import { kpis } from './copy/kpis.ts';
 import { lists } from './copy/lists.ts';
 import { packs } from './copy/packs.ts';
 import { pages } from './copy/pages.ts';
@@ -68,6 +69,7 @@ export const copy = {
   ...query,
   ...theme,
   ...hand,
+  ...kpis,
 } as const;
 
 export type Copy = typeof copy;

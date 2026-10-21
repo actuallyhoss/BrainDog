@@ -17,7 +17,7 @@
 
 import { exponentOf } from 'braindog-render';
 
-import { kpis as words } from '../copy/kpis.ts';
+import { copy } from '../copy.ts';
 import { OFFERED_CURRENCIES } from '../record/currencies.ts';
 import { isMoney, type Fields } from '../record/schema.ts';
 
@@ -41,14 +41,14 @@ export const UNIT_MOST = 24;
  */
 export type FigureChoice = { id: string; label: string; unit: 'money' | 'days' | ''; good: KpiGood };
 export const FIGURES: readonly FigureChoice[] = [
-  { id: 'project-in-month', label: words.kpiFigureInMonth, unit: 'money', good: 'up' },
-  { id: 'project-in-by-month', label: words.kpiFigureInByMonth, unit: 'money', good: 'up' },
-  { id: 'project-kept-month', label: words.kpiFigureKeptMonth, unit: 'money', good: 'up' },
-  { id: 'project-owed', label: words.kpiFigureOwed, unit: 'money', good: 'down' },
-  { id: 'project-cost', label: words.kpiFigureCost, unit: 'money', good: 'down' },
-  { id: 'project-open', label: words.kpiFigureOpen, unit: '', good: 'down' },
-  { id: 'project-done-7d', label: words.kpiFigureDone, unit: '', good: 'up' },
-  { id: 'project-last-worked', label: words.kpiFigureQuiet, unit: 'days', good: 'down' },
+  { id: 'project-in-month', label: copy.kpiFigureInMonth, unit: 'money', good: 'up' },
+  { id: 'project-in-by-month', label: copy.kpiFigureInByMonth, unit: 'money', good: 'up' },
+  { id: 'project-kept-month', label: copy.kpiFigureKeptMonth, unit: 'money', good: 'up' },
+  { id: 'project-owed', label: copy.kpiFigureOwed, unit: 'money', good: 'down' },
+  { id: 'project-cost', label: copy.kpiFigureCost, unit: 'money', good: 'down' },
+  { id: 'project-open', label: copy.kpiFigureOpen, unit: '', good: 'down' },
+  { id: 'project-done-7d', label: copy.kpiFigureDone, unit: '', good: 'up' },
+  { id: 'project-last-worked', label: copy.kpiFigureQuiet, unit: 'days', good: 'down' },
 ];
 
 /** The figure's id as a KPI names it: `project-owed`, or `project-owed:{{it}}` as the plan writes it, read alike. */
@@ -198,17 +198,17 @@ export type Faults = Partial<Record<'name' | 'figure' | 'target' | 'unit' | 'tar
 export function faultsOf(draft: KpiDraft): Faults {
   const out: Faults = {};
   const name = draft.name.trim();
-  if (name === '') out.name = words.kpiNoName;
-  else if (name.length > NAME_MOST) out.name = words.kpiLongName;
-  if (draft.source === 'figure' && !figureOf(draft.figure)) out.figure = words.kpiNoFigure;
+  if (name === '') out.name = copy.kpiNoName;
+  else if (name.length > NAME_MOST) out.name = copy.kpiLongName;
+  if (draft.source === 'figure' && !figureOf(draft.figure)) out.figure = copy.kpiNoFigure;
   const typed = draft.target.trim();
   const target = targetOf(typed);
-  if (typed !== '' && target === null) out.target = words.kpiNotDigits(typed);
-  else if (target !== null && draft.unit.trim() === '%' && (target < 0 || target > 100)) out.target = words.kpiShareOver;
-  if (draft.unit.trim().length > UNIT_MOST) out.unit = words.kpiLongUnit;
+  if (typed !== '' && target === null) out.target = copy.kpiNotDigits(typed);
+  else if (target !== null && draft.unit.trim() === '%' && (target < 0 || target > 100)) out.target = copy.kpiShareOver;
+  if (draft.unit.trim().length > UNIT_MOST) out.unit = copy.kpiLongUnit;
   const by = draft.target_by.trim();
-  if (by !== '' && !realDay(by)) out.target_by = words.kpiBadDay;
-  else if (by !== '' && typed === '') out.target_by = words.kpiDayNoTarget;
+  if (by !== '' && !realDay(by)) out.target_by = copy.kpiBadDay;
+  else if (by !== '' && typed === '') out.target_by = copy.kpiDayNoTarget;
   return out;
 }
 
