@@ -396,6 +396,11 @@
       display: none;
     }
 
+    /* NOW'S WORD GIVES WAY ON A NARROW BLOCK, its line kept: an hour named a sixteenth of the width before it ran into it. */
+    .lanes-now {
+      color: transparent;
+    }
+
     /* A RUN'S LANE ON A PHONE: who and what on the first line, its time under them, its bar under both, the width. */
     .lanes-item[data-who] {
       grid-template-columns: auto minmax(0, 1fr);
