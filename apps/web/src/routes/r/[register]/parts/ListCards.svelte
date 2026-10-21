@@ -88,7 +88,7 @@
          is two lines like any other and a saved view's cards wear it too. -->
     {#if said}
       {@const name = display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow}
-      <Chip label={said.mark} tone={said.intent} />
+      <span class="card-said" data-archived={said.mark === copy.markArchived ? '' : undefined}><Chip label={said.mark} tone={said.intent} /></span>
       {#if said.undo}
         <button
           type="button"
@@ -115,6 +115,16 @@
 {/if}
 
 <style>
+  /* AN ARCHIVED CARD DIMS WHILE ITS RECEIPT SHOWS, as the grid's row does: the card goes to 0.45 and "Archived" and "Put
+     back" under it stay at full ink. It leaves with the list's motion when the way back runs out. */
+  .list-cards :global(.card-line:has([data-archived]) > .card) {
+    opacity: 0.45;
+  }
+
+  .list-cards :global(.card-line > .card) {
+    transition: opacity var(--d-swap) var(--ease-standard);
+  }
+
   /**
    * THE CARD'S TRAILING CONTROL, which exists only where the cards do.
    *

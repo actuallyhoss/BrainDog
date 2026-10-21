@@ -2644,8 +2644,13 @@
       if (list !== id) return;
       const leaving = new Set(gone.filter((seq) => receipts.get(seq)?.mark === copy.markArchived));
       if (leaving.size === 0) return;
+      /* THE HOLD GOES WITH THE RECEIPT, in the same tick. `holdInPlace` brings back a held row the answer has dropped,
+         so a row taken out of `pages` while still held came straight back, as it was read: "Open", until a reload. */
       pages = pages.map((p) => p.filter((e) => !leaving.has(e.seq)));
       matched = Math.max(0, matched - leaving.size);
+      const kept = new Map(held);
+      for (const seq of leaving) kept.delete(seq);
+      held = kept;
       for (const seq of leaving) clearReceipt(seq);
     }, UNDO_MS);
   }
