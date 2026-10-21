@@ -103,6 +103,7 @@
   import { addedByHand, showTell, tellLists, wantMore } from '$lib/home/first-today.ts';
   import TellOne from '$lib/home/TellOne.svelte';
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
+  import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
   import WorkingNow from '$lib/home/WorkingNow.svelte';
   import { workingRows } from '$lib/home/desk.ts';
   import WantMore from '$lib/home/WantMore.svelte';
@@ -139,6 +140,22 @@
   import type { Near } from '$lib/data/local.ts';
 
   let { data }: { data: Shell } = $props();
+
+  /* WHAT HE HAS SHARED OUT, for the one line in Needs you's foot (`shared-line.ts`): asked once the screen is idle, an
+     owner's alone, and never a part of `boot`, which an owner is answered as before sharing. */
+  let sharedNow = $state<SharedOut | undefined>(undefined);
+  $effect(() => {
+    if (!data.me?.owner || data.refused || data.stale) return;
+    void data.version;
+    untrack(
+      () =>
+        void idle()
+          .then(() => import('@braindog/client'))
+          .then(({ createClient }) => createClient({ base: apiBase() }).call<unknown>('sharedOut'))
+          .then((out) => (sharedNow = out.ok ? sharedFrom(out.value) : undefined))
+          .catch(() => undefined),
+    );
+  });
 
   /**
    * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday at two in the morning of Thursday,
@@ -1112,7 +1129,7 @@
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
 {#snippet needsFoot()}
   {#if shaped}
-    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} calm={words.nothingNeedsYou} />
+    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} shared={sharedNow} calm={words.nothingNeedsYou} />
   {/if}
 {/snippet}
 

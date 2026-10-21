@@ -7,6 +7,10 @@
   - What an agent asked him back, of what he told it (agents and MCP plan §7.2): "Claude needs you on “Merge wave 1”",
     its question under it, and Answer, which opens the agents and the run's thread; these count in Needs you's number.
   - What agents finished of what he told them today: "Claude finished what you told it. Review", opening Handled.
+  - What he has shared out, as one quiet line opening People & sharing (sharing plan §3.5, T12): a share made today
+    by its own words, "You shared Kiln with priya@studio.co. Not you? Stop it", and otherwise how many it is with,
+    "Shared with Priya and Accountants. See who". In red only when it needs him: a wide share made today on an account with no
+    passkey to have confirmed it (`Boot.shared.needs`).
 
   DRAWN AS THE TILE'S LOWER PART, under the queue the page's reader draws (Home lays the two together on the board), so
   the tile reads as one. WITH NOTHING TO ASK (`alone`) it is the whole tile: the heading, a calm mark, "Nothing needs
@@ -18,6 +22,7 @@
   import { at } from '$lib/at.ts';
   import { WORK } from '$lib/nav.ts';
   import type { ToldNeed } from '$lib/record/told-live.ts';
+  import { sharedLine, type SharedOut } from './shared-line.ts';
 
   let {
     alone = false,
@@ -26,6 +31,7 @@
     handled = 0,
     told = [],
     finished = [],
+    shared,
     calm,
   }: {
     /** Nothing waits: the foot is the whole tile. */
@@ -40,6 +46,8 @@
     told?: readonly ToldNeed[];
     /** Who finished what he told them today, by agent name, one per instruction. */
     finished?: readonly string[];
+    /** What he has shared out, as `boot` says it: an owner's alone. */
+    shared?: SharedOut | undefined;
     /** The calm line drawn alone ("Nothing needs you"). */
     calm: string;
   } = $props();
@@ -53,7 +61,8 @@
       who.length === 1 ? `${who[0]!} finished what you told it.` : `Agents finished ${who.length.toLocaleString('en-GB')} of your instructions today.`,
   } as const;
 
-  const any = $derived((late !== null && late.count > 0) || handled > 0 || told.length > 0 || finished.length > 0);
+  const sharedSaid = $derived(shared === undefined ? null : sharedLine(shared));
+  const any = $derived((late !== null && late.count > 0) || handled > 0 || told.length > 0 || finished.length > 0 || sharedSaid !== null);
   /* WHAT WAITS ON HIM IS NOT CALM: with only an agent's question, the tile holds that and not "Nothing needs you". */
   const calmNow = $derived(alone && told.length === 0);
 </script>
@@ -89,6 +98,13 @@
           <li>
             <a class="nf-line nf-handled" href={at('/decide?show=handled')} data-finished>
               <Icon name="session" size="s" /><span class="nf-words">{words.finished(finished)}</span><span class="nf-go">{words.review}</span>
+            </a>
+          </li>
+        {/if}
+        {#if sharedSaid}
+          <li>
+            <a class="nf-line nf-shared" href={at('/settings/sharing')} data-shared data-needs={sharedSaid.needs ? '' : undefined}>
+              <Icon name="user-plus" size="s" /><span class="nf-words">{sharedSaid.words}</span><span class="nf-go">{sharedSaid.go}</span>
             </a>
           </li>
         {/if}
@@ -178,8 +194,19 @@
   }
 
   .nf-handled > :global(.icon),
-  .nf-told > :global(.icon) {
+  .nf-told > :global(.icon),
+  .nf-shared > :global(.icon) {
     color: var(--ink-3);
+  }
+
+  /* A SHARE THAT NEEDS HIM IS THE ONE RED LINE OF ITS KIND: the words in red at 600, as a late bill's are. */
+  .nf-shared[data-needs] {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .nf-shared[data-needs] > :global(.icon) {
+    color: var(--red);
   }
 
   /* AN AGENT'S QUESTION: what it is on in the ink, its question under it in the second ink, two lines at most. */
@@ -228,7 +255,8 @@
   @media (hover: hover) and (pointer: fine) {
     .nf-line:hover .nf-words,
     .nf-handled:hover .nf-go,
-    .nf-told:hover .nf-go {
+    .nf-told:hover .nf-go,
+    .nf-shared:hover .nf-go {
       text-decoration: underline;
       text-underline-offset: 3px;
     }

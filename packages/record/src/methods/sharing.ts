@@ -177,6 +177,46 @@ export function sharedSaid(sql: Pick<Sql, 'one'>, catalog: LensCatalog, waiting:
   return text === '' ? null : text;
 }
 
+/**
+ * WHAT THE OWNER HAS SHARED OUT, as Today says it in one line (sharing plan §3.5, T12, §6 default 1): how many live
+ * shares, who they are with by name (three, then how many more), and the shares made in the last day, each as "You shared Kiln with
+ * priya@studio.co." `needs` is true when one of those is wide (an address at Edit or Manage, or no end) and the owner
+ * has no passkey to have confirmed it with, which is the one case the record could not ask "Confirm it's you" and so
+ * the one that needs him: "Not you? Stop it."
+ *
+ * `null` WHEN NOTHING IS SHARED. ITS OWN READ AND NOT A PART OF `boot`, which an owner is answered byte for byte as he
+ * was before sharing (the owner's non-interference, `lens-live.test.ts`): Today asks for it after it has drawn.
+ */
+export type SharedOut = { live: number; names: string[]; more: number; fresh: { id: string; said: string }[]; needs: boolean };
+
+/** How many of the people and groups a share is with Today names before "and 2 more". */
+export const SHARED_NAMED = 3;
+
+/** How long a share counts as just made, for Today's line: a day. */
+export const SHARED_FRESH_MS = DAY_MS;
+
+export function sharedOut(sql: Pick<Sql, 'one'>, catalog: LensCatalog, live: readonly ShareKept[], me: string | null, confirmable: boolean, now: number): SharedOut | null {
+  const allows = live.filter((s) => s.effect === 'allow' && !s.revoked_at);
+  if (allows.length === 0) return null;
+  const n = namesOf(sql, catalog);
+  const whoOf = (s: ShareKept): string =>
+    s.who.kind === 'person' ? (n.person?.(s.who.id) ?? 'somebody') : s.who.kind === 'group' ? (n.group?.(s.who.id)?.name ?? 'a group') : s.who.id;
+  const fresh = allows.filter((s) => now - Date.parse(s.made_at) < SHARED_FRESH_MS).slice(0, 3);
+  const wide = (s: ShareKept): boolean => (s.who.kind === 'email' && (s.can === 'edit' || s.can === 'manage')) || s.when?.until === undefined;
+  /* WHO IT IS WITH, each once, newest share first, by name and never by id. */
+  const named = [...new Map(allows.map((s) => [`${s.who.kind}:${s.who.id}`, whoOf(s)] as const)).values()];
+  return {
+    live: allows.length,
+    names: named.slice(0, SHARED_NAMED),
+    more: Math.max(0, named.length - SHARED_NAMED),
+    fresh: fresh.map((s) => ({
+      id: s.id,
+      said: `${s.made_by === me ? 'You' : (personName(sql, s.made_by) ?? 'Somebody')} shared ${shareSubjectOf(s.what, n)} with ${whoOf(s)}.`,
+    })),
+    needs: !confirmable && fresh.some(wide),
+  };
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, clock } = deps;
   const team = deps.team ?? ((ctx: CallContext, reads?: string) => deps.admin(ctx, reads));
@@ -529,6 +569,16 @@ export function methods(deps: RecordDeps) {
       });
       if (!out.ok) return out;
       return deps.tail(ok({ ...out.value, sentence: sentence(s, catalog) }));
+    },
+
+    /**
+     * What is shared out, for Today's one line (`sharedOut`): an owner's or an Admin's, never while seeing as, and `null`
+     * when nothing is shared.
+     */
+    async sharedOut(_args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<SharedOut | null>> {
+      const stop = team(ctx);
+      if (stop) return { ok: false, refusal: stop };
+      return ok(sharedOut(sql, kernel.catalog(), kernel.sharesKept(), ctx.principal.id, ctx.confirmable === true, clock.now()));
     },
 
     /** Stop one share at once, and every share made onward from it (§2.2, `parent_id`). Revoking never asks to confirm. */

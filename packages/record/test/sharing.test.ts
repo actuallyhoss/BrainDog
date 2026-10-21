@@ -92,7 +92,7 @@ test('a token is refused NEEDS_BROWSER_SESSION on every share route, whatever it
   const { api } = await record();
   const token: CallContext = { principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' } };
   const args = { share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'view' }, id: 'sh_x', from: 'sh_x', who: 'p_lee', can: 'view' };
-  assert.deepEqual(SHARING.map((r) => r.name).sort(), ['groupMember', 'groupPut', 'groups', 'myShares', 'share', 'shareActivity', 'shareOnward', 'sharePreview', 'sharing', 'unshare']);
+  assert.deepEqual(SHARING.map((r) => r.name).sort(), ['groupMember', 'groupPut', 'groups', 'myShares', 'share', 'shareActivity', 'shareOnward', 'sharePreview', 'sharedOut', 'sharing', 'unshare']);
   for (const r of SHARING) refused(await call(api, r.name)(args, token), 'NEEDS_BROWSER_SESSION');
   /* AND A GRANTEE'S OWN AGENT, holding a share through its person. */
   value(await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'manage', when: { until } } }, owner));
@@ -251,4 +251,27 @@ test('a list installed under a whole-record share is an access.grant per grantee
   assert.ok((await api.kernel.install([reg('payroll', 'Payroll', 'who', [{ id: 'who', type: 'text', required: true }])])).ok);
   const ev = sql.all<{ field: string; note: string; actor: string }>("SELECT field, note, actor FROM event WHERE kind = 'access.grant' AND target_kind = 'share' AND note LIKE '%is new'");
   assert.deepEqual(ev.map((e) => ({ ...e })), [{ field: 'person:p_lee', note: 'Payroll is new', actor: 'system' }]);
+});
+
+test('sharedOut tells Today what is shared out, by name, and needs him only for a wide share no passkey confirmed', async () => {
+  const { api, clock } = await record();
+  type Out = { live: number; names: string[]; more: number; fresh: { id: string; said: string }[]; needs: boolean } | null;
+  const noKey: CallContext = { ...owner, confirmable: false };
+  /* NOTHING SHARED IS NO LINE, and nobody but an owner or an Admin is answered. */
+  assert.equal(value<Out>(await call(api, 'sharedOut')(undefined, noKey)), null);
+  refused(await call(api, 'sharedOut')(undefined, { principal: { kind: 'person', id: 'p_pri', level: 'write' }, credentialed: true }), 'LEVEL_REQUIRED');
+  /* A SHARE WITH AN END, MADE TODAY: said by its own words, and quiet. */
+  value(await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'view', when: { until } } }, noKey));
+  const one = value<NonNullable<Out>>(await call(api, 'sharedOut')(undefined, noKey));
+  assert.deepEqual({ ...one, fresh: one.fresh.map((f) => f.said) }, { live: 1, names: ['Lee'], more: 0, fresh: ['You shared tasks with Lee.'], needs: false });
+  /* AN ADDRESS AT EDIT WITH NO END, MADE TODAY ON AN ACCOUNT WITH NO PASSKEY: the one that needs him. With a passkey the
+     record asked "Confirm it's you" before it kept it, so it does not. */
+  value(await api.share({ share: { who: { kind: 'email', id: 'new@example.test' }, what: { lists: ['tasks'] }, can: 'edit' } }, noKey));
+  assert.equal(value<NonNullable<Out>>(await call(api, 'sharedOut')(undefined, noKey)).needs, true);
+  assert.equal(value<NonNullable<Out>>(await call(api, 'sharedOut')(undefined, { ...owner, confirmable: true })).needs, false);
+  /* TWO DAYS LATER NOTHING IS FRESH: who it is with, by name, and never an id. */
+  clock.set(NOW + 2 * DAY);
+  const later = value<NonNullable<Out>>(await call(api, 'sharedOut')(undefined, noKey));
+  assert.deepEqual(later, { live: 2, names: ['new@example.test', 'Lee'], more: 0, fresh: [], needs: false });
+  assert.doesNotMatch(JSON.stringify(later), /p_lee|sh_/u);
 });

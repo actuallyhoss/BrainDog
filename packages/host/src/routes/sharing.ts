@@ -21,6 +21,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'sharePreview', group: 'ADMIN', writes: true, postRead: true, what: 'A share said as one sentence, with how many rows of each list it reaches now. It keeps nothing.' },
   { name: 'groupPut', group: 'ADMIN', writes: true, what: 'Make a group of people to share with, rename one, or retire one, which ends every share it holds.' },
   { name: 'shareActivity', group: 'ADMIN', writes: false, what: 'What people who are not owners saw and changed lately, and through which share, in plain words.' },
+  { name: 'sharedOut', group: 'ADMIN', writes: false, what: "What is shared out, for Today's one line: how many shares, with how many people, and those made today." },
   { name: 'groups', group: 'ADMIN', writes: false, what: 'Every live group on this record: its name, its people, and how many shares it holds.' },
   { name: 'groupMember', group: 'ADMIN', writes: true, what: "Put somebody on the record in a group, or take them out, which ends the group's shares for them." },
   { name: 'myShares', group: 'DATA', writes: false, what: 'What has been shared with you here, each as one sentence. A person only.' },
