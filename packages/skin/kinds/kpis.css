@@ -575,6 +575,80 @@
     display: none;
   }
 
+  .kpi-row .kpi-stale-said {
+    margin-block-start: 2px;
+  }
+
+  /* A ROW THAT OPENS ITS PROJECT IS ONE TARGET: the link is the row's words, grown over the whole row, and a fix on the
+     row sits above it and takes its own press. Its name underlines on hover, as a link says it is one; the focus ring is
+     the house's, round the words. */
+  .kpi-row:has(.kpi-open) {
+    position: relative;
+  }
+
+  .kpi-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .kpi-open::after {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-xs);
+    content: '';
+  }
+
+  .kpi-row:has(.kpi-open:hover) .kpi-name {
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* POSITIONED AND LATER IN THE ROW, so a fix paints over the link's box and takes its own press. */
+  .kpi-row .kpi-stale {
+    position: relative;
+  }
+
+  /* ON A WIDE TILE THE ROWS STAND SIDE BY SIDE, a column each and a hairline between, so four numbers read as one strip
+     and not as four lines across the whole board. */
+  @container (min-width: 720px) {
+    .kpis[data-form='today'] .kpi-rows {
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-flow: column;
+    }
+
+    /* EACH COLUMN READS FROM ITS TOP, so the names stand on one line across the strip, and a name too long for its
+       column takes a second line rather than losing its end. */
+    .kpis[data-form='today'] .kpi-row {
+      align-items: start;
+      padding-block: 0;
+    }
+
+    .kpis[data-form='today'] :is(.kpi-who, .kpi-open) {
+      flex-wrap: wrap;
+      white-space: normal;
+    }
+
+    .kpis[data-form='today'] .kpi-row + .kpi-row {
+      padding-inline-start: var(--sp-5);
+      border-block-start: 0;
+      border-inline-start: 1px solid var(--rule);
+    }
+
+    .kpis[data-form='today'] .kpi-row:not(:last-child) {
+      padding-inline-end: var(--sp-5);
+    }
+
+    .kpis[data-form='today'] .kpi-row-chart {
+      inline-size: clamp(56px, 7cqi, 96px);
+      margin-block-start: var(--sp-4);
+    }
+  }
+
   .kpis-foot {
     display: flex;
   }

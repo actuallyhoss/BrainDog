@@ -47,6 +47,9 @@ export { default as Embed } from './Embed.svelte';
 export { default as Path } from './Path.svelte';
 export { default as Filters } from './Filters.svelte';
 export { default as Actions } from './Actions.svelte';
+/* A project's key numbers and Today's few (`src/kpis.ts` plans them): drawn from the block's `kpis`, not its rows. */
+export { default as Kpis } from './Kpis.svelte';
+export type { KpiInput, KpiPoint, KpiView } from './types.ts';
 
 /* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
    host chooses between this component and its own card list. Two subscriptions could disagree for a

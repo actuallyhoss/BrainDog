@@ -9,6 +9,10 @@
 import { type Column, type TableRow } from '../src/table.ts';
 import { MISSING } from '../src/format.ts';
 
+/* WHAT A `kpis` BLOCK IS HANDED AND WHAT IT DRAWS, from the plan that decides every figure and word (`../src/kpis.ts`),
+   so a host builds the input `Kpis.svelte` takes without reaching into `src/`. */
+export type { KpiInput, KpiPoint, KpiView } from '../src/kpis.ts';
+
 /*
  * `Column`, `TableRow`, `chunkRows` and `ariaSort` MOVED TO `../src/table.ts` AND ARE RE-EXPORTED
  * HERE. None of them was ever markup, and while they lived under `svelte/` the HTML renderer could

@@ -14,6 +14,10 @@
 
   The fix a stale KPI offers is the `fix` snippet, or a plain button calling `onfix` when no snippet is given; with
   neither, the stale line is said and nothing is pressed. `add` is the foot ("Add a number").
+
+  A TODAY ROW OPENS WHERE ITS NUMBER LIVES when the host says where (`href`): the row's words are one link, grown over the
+  row, so the whole row is the target and a fix button on it still takes its own press. A row whose KPI stopped arriving
+  says so in the warn colour, under its figure, whatever line it was ranked for.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -27,6 +31,7 @@
     fix,
     onfix,
     add,
+    href,
   }: {
     kpis: readonly KpiInput[];
     form?: 'project' | 'today';
@@ -35,6 +40,8 @@
     fix?: Snippet<[KpiView]>;
     onfix?: (kpi: KpiInput) => void;
     add?: Snippet;
+    /** Where a Today row opens: the KPI's project page, or `null` for a row that opens nothing. */
+    href?: (kpi: KpiInput) => string | null | undefined;
   } = $props();
 
   const plan = $derived(kpisPlan(kpis, { home, ...(now !== undefined ? { now } : {}) }));
@@ -140,16 +147,24 @@
   <div class="kpis" data-form="today">
     <ul class="kpi-rows">
       {#each plan.rows as k (k.key)}
+        {@const to = href?.(k.input) ?? null}
         <li class="kpi kpi-row" style={hue(k)} data-state={state(k)} data-kind={k.kind}>
           <div class="kpi-row-text">
             <p class="kpi-who">
-              {#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}<span class="kpi-name">{k.name}</span>
+              {#if to}<a class="kpi-open" href={to}
+                  >{#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}<span class="kpi-name">{k.name}</span></a
+                >{:else}{#if k.project}<span class="kpi-swatch" aria-hidden="true"></span><span class="kpi-project">{k.project}</span>{/if}<span class="kpi-name">{k.name}</span>{/if}
             </p>
             {@render figure(k)}
             {#if k.why}
               <p class="kpi-why" data-state={state(k)}>{k.why}</p>
             {:else}
               {@render change(k)}
+            {/if}
+            {#if k.stale && !(k.why && state(k) === 'stale')}
+              <p class="kpi-stale-said">
+                <svg class="kpi-clock" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 4.75V8l2.25 1.5"></path></svg>{k.stale.said}
+              </p>
             {/if}
             {#if k.stale && (fix || onfix)}
               <div class="kpi-stale">
