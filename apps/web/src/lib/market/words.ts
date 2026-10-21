@@ -67,9 +67,9 @@ export const words = {
   ruleScheduled: 'Runs on a schedule',
   ruleOther: 'Runs when something happens in the record',
   examples: (n: number): string => (n === 0 ? 'No examples' : n === 1 ? '1 example' : `${n} examples`),
-  /* A VERSION'S TAG, OR NONE: "Adds something" on every row said nothing (agents F25). A major is still said, since it
-     takes something away. */
-  bump: { major: 'Takes something away', minor: 'New', patch: 'Fixes' },
+  /* A VERSION'S TAG, OR NONE: "Adds something" on every row said nothing (agents F25), and "New" on every minor from 1.4
+     to 1.13 said nothing either (UI pass of 21 October, P46). A major is still said, since it takes something away. */
+  bump: { major: 'Takes something away', minor: '', patch: 'Fixes' },
   first: 'First version',
   /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it. A version is dated to the day, so a
      time inside the week is not worth the relative form. */

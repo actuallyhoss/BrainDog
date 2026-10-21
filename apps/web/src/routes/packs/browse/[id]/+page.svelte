@@ -569,7 +569,7 @@
             {#each listing.versions as v (v.version)}
               <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
                 <!-- THE VERSION AND ITS TAG ON ONE LINE: "1.13.0  New · Published 2 Sep". -->
-                <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span></span>
+                <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{[v.bump ? words.bump[v.bump] : words.first, v.published_at ? words.published(v.published_at) : ''].filter(Boolean).join(' · ')}</span></span>
                 {#if v.notes}<span class="notes">{v.notes}</span>{/if}
                 {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
                 {#if listing.source === 'kennel'}<span class="quiet">{signedWords(v.signature)}</span>{/if}
