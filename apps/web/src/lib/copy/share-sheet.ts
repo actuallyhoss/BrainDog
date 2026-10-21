@@ -21,6 +21,9 @@ export const shareSheet = {
   shareSheetChange: 'Change this share',
   shareSave: 'Save',
   shareThisView: 'Share this view',
+  /* THE PHONE'S FOLD: With, Can and Until, and the rest behind one row. */
+  shareMoreChoices: 'More choices',
+  shareMoreChoicesSaid: 'What, hide, hours and their agents',
   shareTemplatesLabel: 'Start from',
   shareTemplateNames: { accountant: 'Accountant', contractor: 'Contractor', assistant: 'Assistant', reviewer: 'Reviewer' } as Record<string, string>,
 

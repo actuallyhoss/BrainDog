@@ -4,7 +4,10 @@
   edge from 900 up, as every `Sheet.svelte` is.
 
   SIX FIELDS AND A SENTENCE. With, Can, What, Hide, Until and More, then the share said back as one sentence and how
-  much they would see now. The sentence is drawn from what the browser holds as the choices change, and the record's
+  much they would see now. ON A PHONE IT FOLDS TO THREE: With, Can and Until, and one "More choices" row under them that
+  opens the templates, What, Hide and More in place. It opens by itself when one of them already holds a choice (a
+  template, a view's rows, a hidden field, or a share being changed), so a choice is never folded out of sight; the
+  sentence under them always says the whole share. The sentence is drawn from what the browser holds as the choices change, and the record's
   `sharePreview` replaces it and counts what it reaches when it lands (`share-state.ts`). Chips at the top fill the
   fields from the kernel's templates (`templates.ts`).
 
@@ -23,6 +26,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { untrack } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { apiBase } from '$lib/at.ts';
   import { confirmInline } from '$lib/auth.ts';
   import { put } from '$lib/clipboard.ts';
@@ -105,6 +109,13 @@
   let confirming = $state(false);
   let link = $state<{ email: string; href: string } | null>(null);
 
+  /* ── the fold: three choices on a phone ── */
+  const phone = new MediaQuery('(width < 640px)');
+  let unfolded = $state(false);
+  /* A CHOICE ALREADY MADE IN A FOLDED FIELD keeps the fold open, so nothing chosen is hidden. */
+  const chosen = $derived(s.template !== null || s.what.kind !== 'all' || s.hide.amounts || Object.values(s.hide.fields).some((f) => f.length > 0) || change !== undefined);
+  const folded = $derived(phone.current && !unfolded && !chosen);
+
   /* EVERY OPENING STARTS AFRESH, and reads who is here then, since that changes between two presses. */
   async function opened() {
     now = Date.now();
@@ -115,6 +126,7 @@
     problem = null;
     confirming = false;
     link = null;
+    unfolded = false;
     const me = String(shell.me?.person ?? '');
     const asked = who;
     void ask()
@@ -328,7 +340,7 @@
       </div>
     {:else}
       <div class="share">
-        {#if chips.length > 0}
+        {#if chips.length > 0 && !folded}
           <div class="share-chips" role="group" aria-label={copy.shareTemplatesLabel}>
             {#each chips as t (t.id)}
               <button
@@ -414,6 +426,7 @@
         </div>
 
         <!-- WHAT: all of it, one list of a project, the rows a view shows, or a condition. One row is itself. -->
+        {#if !folded}
         <div class="share-row">
           <label class="share-label" for="{uid}-what">{copy.shareWhatLabel}</label>
           <div class="share-control">
@@ -446,8 +459,10 @@
           </div>
         </div>
 
+        {/if}
+
         <!-- HIDE: every amount, or named fields. A title is never hidden. -->
-        {#if amountsOffered(s, reached, decls) || hideable.length > 0}
+        {#if !folded && (amountsOffered(s, reached, decls) || hideable.length > 0)}
           <div class="share-row">
             <span class="share-label" id="{uid}-hide">{copy.shareHideLabel}</span>
             <div class="share-control share-wrap" role="group" aria-labelledby="{uid}-hide">
@@ -515,7 +530,16 @@
           </div>
         </div>
 
+        <!-- THE FOLD'S ONE ROW, on a phone: the rest of the choices, opened in place. -->
+        {#if folded}
+          <button type="button" class="share-unfold tap" aria-expanded="false" data-share-unfold onclick={() => (unfolded = true)}>
+            <span class="share-unfold-words"><span class="share-unfold-name">{copy.shareMoreChoices}</span><span class="share-unfold-said">{copy.shareMoreChoicesSaid}</span></span>
+            <Icon name="chevronDown" size="s" />
+          </button>
+        {/if}
+
         <!-- MORE: hours, once, their agents, and delete where they can change things. -->
+        {#if !folded}
         <div class="share-row">
           <span class="share-label" id="{uid}-more">{copy.shareMoreLabel}</span>
           <ul class="share-control share-switches" aria-labelledby="{uid}-more">
@@ -534,6 +558,7 @@
             {/each}
           </ul>
         </div>
+        {/if}
 
         <!-- THE SHARE SAID BACK, and how much they would see now. -->
         <div class="share-preview" aria-live="polite">
@@ -582,8 +607,8 @@
 
   .share-label {
     padding-block-start: 10px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -623,18 +648,19 @@
     gap: var(--sp-1);
     min-block-size: 36px;
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-ctl);
     cursor: pointer;
   }
 
   .share-chip[data-on] {
     background: var(--tile);
-    box-shadow: 0 0 0 1px var(--rule);
+    outline: 1px solid var(--rule-strong);
+    outline-offset: -1px;
     color: var(--ink);
   }
 
@@ -661,7 +687,7 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: pointer;
   }
 
@@ -680,10 +706,10 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-ctl);
     text-align: start;
     cursor: pointer;
   }
@@ -693,15 +719,15 @@
   .share-x:hover,
   .share-x:focus-visible,
   .share-chip:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .share-none,
   .share-fixed {
     margin: 0;
     padding-block: 10px;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
   }
 
   .share-select {
@@ -731,7 +757,47 @@
     gap: var(--sp-3);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-ctl);
+  }
+
+  /* THE FOLD'S ROW: a 48px row the width of the sheet, its name in the ink and what it holds in the quiet ink under it,
+     a chevron at the end. */
+  .share-unfold {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: 48px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--tile-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .share-unfold:hover {
+    background: var(--hover);
+  }
+
+  .share-unfold-words {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .share-unfold-name {
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    font-weight: 500;
+  }
+
+  .share-unfold-said {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE SENTENCE IS THE SHEET'S ANSWER, so it sits on a rule of its own above Share, in the body's own ink. */
@@ -739,31 +805,31 @@
     display: grid;
     gap: var(--sp-1);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .share-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: var(--lh-body);
   }
 
   .share-refused {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .share-count,
   .share-copy {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
     line-height: var(--lh-body);
   }
 
   .share-copy {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .share-confirm {
