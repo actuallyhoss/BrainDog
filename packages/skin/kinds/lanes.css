@@ -291,19 +291,27 @@
     white-space: nowrap;
   }
 
-  /* NOW IS THE ONE HAIRLINE, in the ink, down the lanes and no further. Its word is not drawn: the line is where the
-     hours stop, and the bars that reach it are the ones still going. A WINDOW ENDS AT NOW AS A RULE, which puts the
-     line at 100%: it is held one pixel inside, or the axis would clip it away on every block. */
+  /* NOW IS THE ONE HAIRLINE, in the ink, down the lanes and no further, and its word in the hours' row, ending a step
+     before the line (UI pass of 21 October, P32): the axis says where it stops, so 15:00 is not read as an hour still to
+     come. A WINDOW ENDS AT NOW AS A RULE, which puts the line at 100%: it is held one pixel inside, or the axis would
+     clip it away on every block. The box ends on the line and is as wide as its word; the line is its end edge's
+     background, from under the hours down. */
   .lanes-now {
     position: absolute;
-    inset-block: var(--lanes-head) 0;
-    inset-inline-start: min(var(--at), calc(100% - 1px));
+    inset-block: 0;
+    inset-inline-end: calc(100% - min(var(--at), calc(100% - 1px)) - 1px);
     z-index: var(--z-raise);
-    inline-size: 1px;
-    overflow: hidden;
-    background: var(--ink-2);
-    text-indent: 100%;
+    padding-inline-end: var(--sp-2);
+    background: linear-gradient(var(--ink-2), var(--ink-2)) right var(--lanes-head) / 1px 100% no-repeat;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    line-height: var(--lanes-head);
     white-space: nowrap;
+  }
+
+  .lanes-now:dir(rtl) {
+    background-position: left var(--lanes-head);
   }
 
   /* ── arriving ──────────────────────────────────────────────────────────── */

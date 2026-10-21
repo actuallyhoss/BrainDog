@@ -116,9 +116,11 @@ export function windowRow(result: unknown, fallback: number): string | null {
   if (a === null || b === null || b <= a) return null;
   const at = instant(now) ?? (writable(fallback) ? fallback : null);
   /* A DAY'S WINDOW IS TODAY WHEN EVERY LANE IN IT IS TODAY'S (agents F7): the window opens at the record's midnight, so
-     yesterday's hours are not drawn empty inside "Today's runs" and its axis names no date. Midnight is the record's,
-     the offset the window was written in. A lane that ended before midnight keeps the whole window. */
-  const zone = typeof from === 'string' ? (lanesInstant(from)?.offset ?? 0) : 0;
+     yesterday's hours are not drawn empty inside "Today's runs" and its axis names no date. MIDNIGHT IS THE READER'S
+     SINCE THE UI PASS OF 21 OCTOBER (P32), the clock every instant here is written on and the hours are named in, so the
+     axis runs from 00:00 to now with 00, 06, 12 and 18 along it; the record's midnight on another clock started it at
+     02:00. A lane that ended before midnight keeps the whole window. */
+  const zone = -new Date(b).getTimezoneOffset();
   const midnight = Math.floor((b + zone * 60_000) / 86_400_000) * 86_400_000 - zone * 60_000;
   if (midnight > a && midnight < b && endsOf(result).every((e) => e >= midnight)) a = midnight;
   return `${LANES_WINDOW} | ${written(a)} | ${written(b)} | ${at === null ? '' : written(at)}`;
