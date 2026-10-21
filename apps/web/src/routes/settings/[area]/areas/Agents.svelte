@@ -1,6 +1,12 @@
 <!--
-  Settings > Agents: one button that connects an agent, approving a machine, everything that is connected, and what
-  Slash may do on its own.
+  Settings > Agents: each agent he works with and how far it may go, one button that connects an agent, approving a
+  machine, everything that is connected, and what Slash may do on its own.
+
+  ONE ROW PER AGENT, DEFAULTS LAST (agents and MCP plan §5.3): Claude Code, Codex, Cursor, other apps, any row he made
+  for one key or machine, then Defaults for new agents. Each says in plain words how far it may go (Read, Suggest or
+  Write), when it was last heard and where, and opens one sheet (`lib/agents/ProfileSheet.svelte`) with everything that
+  agent works under. What it decides is `lib/agents/profile.ts`. Only he changes these: `setAgentProfile` is ADMIN and
+  refuses every token, so a colleague is not shown the rows.
 
   ONE BUTTON, CONNECT AN AGENT (AGT-A07), where three boxes of text stood. It opens the connect sheet
   (`lib/agents/ConnectSheet.svelte`), loaded with `import()` on the first press so the entry carries none of it: six
@@ -25,13 +31,15 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    RUNS_READ, connectLines, connected, heardFrom, nameOf, reachKey, reachOf, reportKeyOf,
+    RUNS_READ, connectLines, connected, heardFrom, keyScopeOf, nameOf, reachKey, reachOf, reportKeyOf,
     runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Heard, type HeardScope, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { agentKey, agentName } from '$lib/record/hand.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
-  import { placesIn } from '$lib/record/scope-move.ts';
+  import { movable, placesIn, scopeFieldOf, type Place } from '$lib/record/scope-move.ts';
+  import { agentRows, argsOf, followers, heardLine, keepersOf, LEVEL_WORDS, machinesLine, type AgentRow, type ProfileView } from '$lib/agents/profile.ts';
+  import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf, partsOf } from '$lib/record/apps.ts';
@@ -88,7 +96,18 @@
    * each of those runs is at work now, gone quiet or stopped (`RunLive`), which the faces draw as their ring, and the one
    * word each reads as beside it (`RunPresence`): a run that finished reads Ended, not Stopped.
    */
-  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; heard: Heard[]; live: Map<number, RunLive>; presence: Map<number, RunPresence> };
+  type Held = {
+    machines: DeviceRow[];
+    tokens: TokenRow[];
+    runs: Run[];
+    heard: Heard[];
+    live: Map<number, RunLive>;
+    presence: Map<number, RunPresence>;
+    /** His settings rows (`agentProfiles`), Defaults first; `null` from a host older than them. */
+    profiles: ProfileView[] | null;
+    /** Every project an agent may be held to, or `null` when they could not be read. */
+    places: Place[] | null;
+  };
 
   /**
    * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
@@ -133,11 +152,20 @@
       const said = (r as { fields?: { project?: unknown } }).fields?.project;
       if (typeof said === 'string' && said.includes('#')) lists.add(said.slice(0, said.indexOf('#')));
     }
-    for (const list of lists)
-      for (const p of (await placesIn(apiBase(), list).catch(() => null)) ?? []) {
+    /* THE PROJECTS AN AGENT MAY BE HELD TO are the same list's, or the one Tasks are placed in when no run was placed. */
+    const tasksTo = scopeFieldOf('tasks');
+    if (lists.size === 0 && movable(tasksTo)) lists.add(tasksTo.to);
+    let places: Place[] | null = null;
+    for (const list of lists) {
+      const got = await placesIn(apiBase(), list).catch(() => null);
+      if (got !== null) places = [...(places ?? []), ...got];
+      for (const p of got ?? []) {
         projects.set(p.ref, p);
         projects.set(p.spoken, p);
       }
+    }
+    /* HIS SETTINGS ROWS. A host older than them answers no such method, and the screen draws what it drew before. */
+    const profiles = await c.agentProfiles().catch(() => null);
     const presence = new Map<number, RunPresence>();
     /* THE RECORD'S CLOCK (`recordNow`), so "3 min ago" is the record's and not this browser's. */
     const now = recordNow();
@@ -148,6 +176,8 @@
       heard: runs.ok ? heardFrom(runs.value.rows, now, projects) : [],
       live: runs.ok ? livenessOf(runs.value.rows, now, presence) : new Map(),
       presence,
+      profiles: profiles !== null && profiles.ok ? (profiles.value as unknown as ProfileView[]) : null,
+      places,
     };
     /* THE OFFER IS ASKED INSIDE THE READ, so the screen is not drawn while it is still out (below). */
     if (!offerAsked && connected(value.machines, value.tokens, value.runs).some((r) => r.live && r.machine?.status !== 'pending')) {
@@ -174,6 +204,57 @@
     return (held.value?.heard ?? []).filter((h) => !named.has(h.agent));
   });
   const count = $derived(rows.length + heard.length);
+  /** A host older than the settings rows: the agents heard from stay in the connected list, as they were. */
+  const legacy = $derived(held.state === 'ready' && held.value?.profiles === null);
+
+  /* ── his agents and the settings each works under ─────────────────── */
+
+  /** A list or a project by what a settings row holds: its name. */
+  const listNames = $derived(new Map(shell.index.registers.map((r) => [r.id, r.name])));
+  const nameOfSaid = (said: string): string =>
+    listNames.get(said) ?? held.value?.places?.find((p) => p.spoken === said || p.id === said)?.name ?? said;
+
+  /** One row per agent, Defaults last (`profile.ts`); none from a host that keeps no settings rows. */
+  const agents = $derived.by((): AgentRow[] => {
+    const v = held.value;
+    if (!v || v.profiles === null) return [];
+    return agentRows({ profiles: v.profiles, heard: v.heard, keyScope: (kind) => keyScopeOf(kind, v.runs, v.tokens), nameOf: nameOfSaid });
+  });
+
+  /** Whether an agent's newest run is at work now, which its face and its line say. */
+  const workingOf = (a: AgentRow): boolean => a.heard?.seq != null && held.value?.live.get(a.heard.seq) === 'working';
+  const atWorkNow = $derived(agents.filter(workingOf).length);
+
+  /** The lists a row may be held to: every list he has, but the record's own two for runs and instructions. */
+  const sheetLists = $derived(shell.index.registers.filter((r) => r.id !== 'session' && r.id !== 'instructions').map((r) => ({ id: r.id, name: r.name })));
+
+  let picked = $state<AgentRow | null>(null);
+  let profileOpen = $state(false);
+  const openProfile = (a: AgentRow) => {
+    picked = a;
+    profileOpen = true;
+  };
+
+  /** Save one row: `setAgentProfile`, his browser only. The list is read again so every row says what now applies. */
+  async function saveProfile(args: Record<string, unknown>): Promise<{ ok: true } | { ok: false; fix: string }> {
+    const busy = opened();
+    /* THE FIRST SAVE OF DEFAULTS KEEPS HIS CURRENT AGENTS AS THEY ARE: each one heard from with nothing stored gets its
+       own row first, at what its key allows, so only new agents take the Defaults (`keepersOf`). */
+    if (args.id === 'default')
+      for (const k of keepersOf(agents)) {
+        const kept = wrote(await clientOf().setAgentProfile(argsOf(k, k.draft)));
+        if (!kept.ok) {
+          closed(true, busy);
+          return { ok: false, fix: kept.fix };
+        }
+      }
+    const out = wrote(await clientOf().setAgentProfile(args));
+    closed(true, busy);
+    if (!out.ok) return { ok: false, fix: out.fix };
+    toasts.push(picked?.key === 'default' ? 'Saved the defaults for new agents.' : `Saved the settings for ${picked?.name ?? 'this agent'}.`, { intent: 'good' });
+    await held.reread();
+    return { ok: true };
+  }
 
   /* ONE APPROVAL OF THE SIX DIGITS over this screen's own client, made when first asked; a refusal keeps the code
      typed, and an approval reads the list again (`CodeForm.svelte`). */
@@ -193,6 +274,12 @@
    */
   const words = {
     workHere: 'Agents that work here',
+    yours: 'Your agents',
+    connections: 'Connections',
+    noKeys: 'No machine or key is connected yet',
+    noKeysWhy: 'Connect an agent to give it a key of its own. Its settings then hold for that key alone.',
+    atWorkNow: (n: number) => `${n} at work now.`,
+    seeThem: 'See them on Agents',
     /* "yesterday", not "1d ago" (UI pass of 21 October, P38). */
     lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
     on: ', on ',
@@ -432,11 +519,60 @@
   {#snippet connectButton()}
     <Button weight="primary" size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
   {/snippet}
-  <Tile icon="session" title={words.workHere} count={held.state === 'ready' ? count : undefined} actions={connectButton}>
+  <!--
+    HIS AGENTS, ONE ROW EACH, DEFAULTS LAST: the face (with the live dot while its run is at work), the name, what it may
+    do in one sentence, when it was last heard and where, and how far it may go in one word at the row's end. A row is
+    one button that opens its sheet. A host that keeps no settings rows draws the agents heard from in the list below,
+    as it did before.
+  -->
+  {#if !legacy}
+    <Tile icon="session" title={words.yours} actions={connectButton} data-part="agents">
+      {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+        <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+      {:else}
+        {@const nowMs = recordNow()}
+        <ul class="agents">
+          {#each agents as a (a.key)}
+            {@const working = workingOf(a)}
+            {@const line = heardLine(a, working, (at) => since(at, nowMs))}
+            <li data-default={a.key === 'default' ? '' : undefined}>
+              <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
+                {#if a.kind === null}
+                  <IconWell name={a.key === 'default' ? 'plus' : 'key'} size="l" />
+                {:else}
+                  <AgentFace agent={a.kind} run={a.heard?.seq != null ? `S${a.heard.seq}` : ''} live={working ? 'working' : 'stopped'} size="m" />
+                {/if}
+                <span class="who-words">
+                  <span class="who-name" dir="auto">{a.name}</span>
+                  <span class="agent-says">{a.says}</span>
+                  {#if line}
+                    {@const machine = machinesLine(a.machines)}
+                    <span class="who-detail who-heard"
+                      >{line}{#if a.heard?.scope}{words.on}<ScopeChip scope={a.heard.scope} inline />{/if}{#if machine}<span class="sep">{' · '}</span>{machine}{/if}</span
+                    >
+                  {/if}
+                </span>
+                <span class="who-scope agent-may">{a.may ? LEVEL_WORDS[a.may] : ''}</span>
+                <Icon name="chevron" size="s" />
+              </button>
+            </li>
+          {/each}
+        </ul>
+        {#if atWorkNow > 0}
+          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run" href={at('/p/agents')}>{words.seeThem}</a></p>
+        {/if}
+      {/if}
+    </Tile>
+  {/if}
+
+  <!-- WHAT CAN ACT ON THE RECORD: every machine, key and connected app, with Revoke. Drawn once the list is read, since
+       the tile above says the screen is still reading. -->
+  {#if legacy || held.state === 'ready'}
+  <Tile icon={legacy ? 'session' : 'key'} title={legacy ? words.workHere : words.connections} count={held.state === 'ready' ? (legacy ? count : rows.length) : undefined} actions={legacy ? connectButton : undefined}>
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-    {:else if count === 0}
-      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy} />
+    {:else if (legacy ? count : rows.length) === 0}
+      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : words.noKeys} body={legacy ? copy.connectedNoneWhy : words.noKeysWhy} />
     {:else}
       {@const nowMs = recordNow()}
       <ul class="whos">
@@ -476,7 +612,7 @@
             </span>
           </li>
         {/each}
-        {#each heard as h (h.agent)}
+        {#each legacy ? heard : [] as h (h.agent)}
           <li class="who" data-heard="">
             <AgentFace agent={h.agent} run={`S${h.seq}`} live={held.value?.live.get(h.seq) ?? 'stopped'} size="m" />
             <span class="who-words">
@@ -491,6 +627,18 @@
       {#if reading}<p class="reading">{reading}</p>{/if}
     {/if}
   </Tile>
+  {/if}
+
+  <!-- ONE SHEET FOR EVERY AGENT, Defaults included. -->
+  <ProfileSheet
+    bind:open={profileOpen}
+    row={picked}
+    places={held.value?.places ?? null}
+    lists={sheetLists}
+    followers={picked?.key === 'default' ? followers(agents) : []}
+    keepers={picked?.key === 'default' ? keepersOf(agents).map((k) => k.name) : []}
+    onsave={saveProfile}
+  />
   <TrustRows />
 
   <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, on the ground under the list it follows from. -->
@@ -641,6 +789,88 @@
     display: flex;
     flex: none;
     gap: var(--sp-2);
+  }
+
+  /* HIS AGENTS: one button a row, the face, the words, the level in one word, and a chevron, a hairline between. */
+  .agents {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agents > li + li {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .agent {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: var(--row-h-2);
+    margin: 0;
+    padding: var(--sp-3) var(--sp-2);
+    margin-inline: calc(-1 * var(--sp-2));
+    box-sizing: content-box;
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .agent:hover {
+    background: var(--hover);
+  }
+
+  .agent:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  .agent > :global(.agent-face) {
+    justify-self: center;
+  }
+
+  .agent > :global(svg) {
+    color: var(--ink-3);
+  }
+
+  /* WHAT IT MAY DO, in the second ink: the sentence the row is about. */
+  .agent-says {
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 20px;
+  }
+
+  .agent-may {
+    color: var(--ink);
+  }
+
+  /* DEFAULTS IS NOT AN AGENT: it sits after them, a step apart. */
+  .agents > li[data-default] {
+    margin-block-start: var(--sp-2);
+  }
+
+  @media (width < 640px) {
+    .agent {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      align-items: start;
+    }
+
+    .agent-may {
+      display: none;
+    }
+
+    .agent > :global(svg) {
+      align-self: center;
+    }
   }
 
   /* THE ONE WRITTEN LINE under the list, in ink. */
