@@ -361,7 +361,9 @@ test('A SECOND RUN UPDATES THE BANDS IN PLACE: an unchanged band is left alone, 
 
 /**
  * A pack of somebody else's that declares `datapoints`, invented for this file: readings typed in by hand, with no
- * use case, no organisations and no dashboard. It is what "whichever pack declares it" means, measured.
+ * use case, no organisations and no dashboard. It is what "whichever pack declares it" means, measured. SINCE
+ * PORTFOLIO 1.19.0 NUMBERS IS PORTFOLIO'S OWN, so this pack installs only beside a Portfolio from before then, and
+ * beside today's it is refused, since two packs cannot own one list.
  */
 const DIARY = {
   pack: 'numbers-diary',
@@ -389,6 +391,16 @@ const DIARY = {
   ],
 };
 
+/**
+ * PORTFOLIO FROM BEFORE IT HELD NUMBERS: 1.16.0 as brain.dog last served it (`packages/seed/test/fixtures/released`),
+ * without its example rows, the way a record still on that version holds it. The bands require `portfolio ^1.0.0`, so a
+ * record on it is one the bands can be offered to, and there the readings come from another pack or from nowhere.
+ */
+const BEFORE_NUMBERS = {
+  ...(JSON.parse(readFileSync(new URL('../../packages/seed/test/fixtures/released/portfolio-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>),
+  seeds: [],
+};
+
 type Planned = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
 
 type Diff = { planHash: string; approve: string[]; config: { key: string; type: string; value: Json; from: string }[] };
@@ -413,7 +425,19 @@ async function recordWith(...docs: unknown[]): Promise<{ plan: (doc: unknown) =>
 test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, and names no use case', async () => {
   assert.deepEqual((template() as PackDoc).requires.packs, { portfolio: '^1.0.0' });
 
-  const diary = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY);
+  /* PORTFOLIO'S OWN NUMBERS, SINCE 1.19.0: Portfolio alone is a record the bands install on. */
+  const own = await recordWith(firstPartyDocument('portfolio', { seeds: [] }));
+  const mine = await own.put(installable());
+  assert.ok(mine.ok, JSON.stringify(mine.refusal));
+  /* AND NOBODY ELSE'S BESIDE IT: two packs cannot own one list. */
+  const second = await own.put(DIARY);
+  assert.equal(second.ok, false, 'a second pack declared Portfolio\'s Numbers');
+  assert.equal(second.refusal?.code, 'PROVIDES_CONFLICT');
+  assert.equal(second.refusal?.at, 'register.datapoints');
+  own.close();
+
+  /* ANOTHER PACK'S READINGS, beside a Portfolio from before it held Numbers. */
+  const diary = await recordWith(BEFORE_NUMBERS, DIARY);
   const r = await diary.put(installable());
   assert.ok(r.ok, JSON.stringify(r.refusal));
   diary.close();
@@ -422,7 +446,7 @@ test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, a
      (`pointsAt` in `packages/declare/src/index.ts` reads fields, pages and figures), so the page's `requires` is what
      says it: with `register.datapoints` taken off the page, this install went through on a record that has nowhere
      for a reading to be, and the bands ran every day over nothing. */
-  const bare = await recordWith(firstPartyDocument('portfolio', { seeds: [] }));
+  const bare = await recordWith(BEFORE_NUMBERS);
   const refused = await bare.put(installable());
   assert.equal(refused.ok, false);
   assert.equal(refused.refusal?.code, 'REGISTER_UNRESOLVED');
@@ -433,7 +457,7 @@ test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, a
 test('AN UPDATE FROM 1.0.0 NAMES BOTH SETTINGS AS DEFAULT, so the owner sets his own names before he presses update', async () => {
   /* 1.0.0 AS THE CATALOGUE PUBLISHED IT, its measures written into the script by a fill and no settings declared. */
   const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/1.0.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
-  const r = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY, was);
+  const r = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), was);
   const planned = await r.plan(installable());
   assert.ok(planned.ok, JSON.stringify(planned.refusal));
   assert.deepEqual(
@@ -625,12 +649,12 @@ test('THE MONTH GOES ON THE IN PLAY CARDS AND THE BANDS UNDER HOW THEY ARE GOING
 
 type PageRead = { blocks: { kind: string; heading?: string; added?: string; columns?: { field?: string; metric?: string; label?: string }[] }[] };
 
-/** A record holding Portfolio, a diary of readings and the bands as they install today, and its Projects page read. */
+/** A record holding Portfolio, whose Numbers the bands read, and the bands as they install today, and its Projects page read. */
 async function projectsWithBands(): Promise<{ read: () => Promise<PageRead>; uninstall: () => Promise<void>; close: () => void; portfolioBody: () => string }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
   const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
-  for (const doc of [firstPartyDocument('portfolio', { seeds: [] }), DIARY, installable()]) {
+  for (const doc of [firstPartyDocument('portfolio', { seeds: [] }), installable()]) {
     const planned = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned & { value?: { diff: Diff } };
     assert.ok(planned.ok, JSON.stringify(planned.refusal));
     const put = (await api.installPack({ doc, source: { kind: 'local' }, planHash: planned.value!.diff.planHash, approve: planned.value!.diff.approve } as never, owner)) as Planned;

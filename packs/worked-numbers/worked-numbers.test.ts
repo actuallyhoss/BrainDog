@@ -372,22 +372,35 @@ test('IT NEEDS THE NUMBERS LIST, from whichever pack declares it, and is refused
   assert.deepEqual(template().requires.packs, { portfolio: '^1.0.0' }, 'it names a use case, and Numbers may come from any pack');
 
   type Planned = { ok: boolean; value?: { diff: { planHash: string; approve: string[] } }; refusal?: { code: string; fix: string } };
-  const sql = openSqlite();
-  try {
-    const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
-    const owner = { principal: { kind: 'person' as const, id: 'p_1', level: 'owner' as const } };
-    const put = async (doc: unknown): Promise<Planned> => {
-      const p = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned;
-      if (!p.ok) return p;
-      return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Planned;
-    };
-    assert.ok((await put(firstPartyDocument('portfolio', { seeds: [] }))).ok);
-    const refused = await put(template());
-    assert.equal(refused.ok, false, 'it installed on a record with nowhere for a number to be');
-    assert.match(refused.refusal?.fix ?? '', /datapoints/);
-  } finally {
-    sql.close();
-  }
+  /** The pack planned and installed on a record holding `portfolio` and nothing else, and what the install answered. */
+  const installedBeside = async (portfolio: unknown): Promise<Planned> => {
+    const sql = openSqlite();
+    try {
+      const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
+      const owner = { principal: { kind: 'person' as const, id: 'p_1', level: 'owner' as const } };
+      const put = async (doc: unknown): Promise<Planned> => {
+        const p = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned;
+        if (!p.ok) return p;
+        return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Planned;
+      };
+      const base = await put(portfolio);
+      assert.ok(base.ok, JSON.stringify(base.refusal));
+      return await put(template());
+    } finally {
+      sql.close();
+    }
+  };
+
+  /* PORTFOLIO'S OWN NUMBERS, SINCE 1.19.0: a record holding Portfolio alone has the list, and the pack installs. */
+  const installed = await installedBeside(firstPartyDocument('portfolio', { seeds: [] }));
+  assert.ok(installed.ok, JSON.stringify(installed.refusal));
+
+  /* A PORTFOLIO FROM BEFORE IT HELD NUMBERS, 1.16.0 as brain.dog last served it, is a record `^1.0.0` lets the pack be
+     offered to, and it has nowhere for a number to be. */
+  const before = JSON.parse(readFileSync(new URL('../../packages/seed/test/fixtures/released/portfolio-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+  const refused = await installedBeside({ ...before, seeds: [] });
+  assert.equal(refused.ok, false, 'it installed on a record with nowhere for a number to be');
+  assert.match(refused.refusal?.fix ?? '', /datapoints/);
 });
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */

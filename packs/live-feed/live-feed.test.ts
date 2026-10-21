@@ -233,7 +233,8 @@ test('AND THE MOST IT FILLS IS THE RECORD’S NUMBER, asked of the record rather
 
 /**
  * A pack of somebody else's that declares `datapoints`: readings about each project, with no use case around them.
- * Invented here, so the feed is shown landing in a list it did not bring and does not name.
+ * Invented here, so the feed is shown landing in a list it did not bring and does not name. SINCE PORTFOLIO 1.19.0
+ * NUMBERS IS PORTFOLIO'S OWN, so this pack installs only beside a Portfolio from before then (`BEFORE_NUMBERS`).
  */
 const DIARY = {
   pack: 'numbers-diary',
@@ -262,21 +263,14 @@ const DIARY = {
 };
 
 /**
- * The same list as it is once a reading may be money (REC-C03): an optional `amount`, and a `value` no longer required,
- * so a reading that is money carries no decimal beside it.
+ * PORTFOLIO FROM BEFORE IT HELD NUMBERS: 1.16.0 as brain.dog last served it (`packages/seed/test/fixtures/released`),
+ * without its example rows, the way a record still on that version holds it. Today's Portfolio declares Numbers
+ * itself, with a reading that may be money (REC-C03), so a record with Portfolio and no readings list, or with another
+ * pack's, is a record on this version.
  */
-const MONEY_DIARY = {
-  ...DIARY,
-  pack: 'numbers-diary-money',
-  declarations: [
-    {
-      ...DIARY.declarations[0]!,
-      fields: [
-        ...DIARY.declarations[0]!.fields.map((f) => (f.id === 'value' ? { id: 'value', label: 'Value', type: 'decimal' } : f)),
-        { id: 'amount', label: 'Amount', type: 'money' },
-      ],
-    },
-  ],
+const BEFORE_NUMBERS = {
+  ...(JSON.parse(readFileSync(new URL('../../packages/seed/test/fixtures/released/portfolio-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>),
+  seeds: [],
 };
 
 const KEY = 'feed-key-5b1e';
@@ -298,8 +292,12 @@ function address(body = '{"data":{"mrr":4310.5,"users":128}}') {
   return { send, seen };
 }
 
-/** A record holding Portfolio, one project, and the invented readings list, with the vault holding `LABEL` when asked. */
-async function recordWith(o: { vault: boolean; readings?: boolean; money?: boolean }) {
+/**
+ * A record holding Portfolio and one project, with the vault holding `LABEL` when asked. Its readings list is
+ * Portfolio's own Numbers (`numbers: 'portfolio'`, the default), the invented diary beside a Portfolio from before
+ * Numbers (`'diary'`), or none at all, on that older Portfolio alone (`'none'`).
+ */
+async function recordWith(o: { vault: boolean; numbers?: 'portfolio' | 'diary' | 'none' }) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const plan = async (doc: unknown) => said<{ diff: { planHash: string; approve: string[] } }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;
@@ -308,8 +306,9 @@ async function recordWith(o: { vault: boolean; readings?: boolean; money?: boole
     if (!p.ok) return p;
     return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Out;
   };
-  said(await put(firstPartyDocument('portfolio', { seeds: [] })));
-  if (o.readings !== false) said(await put(o.money === true ? MONEY_DIARY : DIARY));
+  const numbers = o.numbers ?? 'portfolio';
+  said(await put(numbers === 'portfolio' ? firstPartyDocument('portfolio', { seeds: [] }) : BEFORE_NUMBERS));
+  if (numbers === 'diary') said(await put(DIARY));
   said(api.kernel.create('things', { name: 'Kiln', lane: 'earning' }, { actor: 'p_1' }));
   if (o.vault)
     assert.ok(
@@ -353,36 +352,38 @@ test('WITHOUT THE KEY THE ADDRESS ANSWERS 401, the feed pauses and says so, and 
   r.sql.close();
 });
 
-test('WITH THE KEY NAMED AND IN THE VAULT THE ADDRESS ANSWERS 200, and each measure is a reading on the project', async () => {
-  const r = await recordWith({ vault: true });
-  const doc = fillFeed(template(), { ...EXAMPLE, ...PROJECT });
-  /* THE OWNER APPROVES THE HOST, THE INTERVAL AND THE KEY BY ITS LABEL, and the project it runs for. */
-  const approve = (await r.plan(doc)).approve;
-  assert.equal(approve[0], `CALLS OUT stats.example.com · every 1h · grant "${LABEL}"`);
-  assert.match(approve[1] ?? '', new RegExp(`feed_example runs for the project .+ and sends the key "${LABEL.replace(/[()]/gu, '\\$&')}"`, 'u'));
-  said(await r.put(doc));
+/* IN WHICHEVER LIST DECLARES `datapoints`: Portfolio's own Numbers, and another pack's beside an older Portfolio. */
+for (const numbers of ['portfolio', 'diary'] as const)
+  test(`WITH THE KEY NAMED AND IN THE VAULT THE ADDRESS ANSWERS 200, and each measure is a reading on the project (${numbers})`, async () => {
+    const r = await recordWith({ vault: true, numbers });
+    const doc = fillFeed(template(), { ...EXAMPLE, ...PROJECT });
+    /* THE OWNER APPROVES THE HOST, THE INTERVAL AND THE KEY BY ITS LABEL, and the project it runs for. */
+    const approve = (await r.plan(doc)).approve;
+    assert.equal(approve[0], `CALLS OUT stats.example.com · every 1h · grant "${LABEL}"`);
+    assert.match(approve[1] ?? '', new RegExp(`feed_example runs for the project .+ and sends the key "${LABEL.replace(/[()]/gu, '\\$&')}"`, 'u'));
+    said(await r.put(doc));
 
-  const net = address();
-  const opened: string[] = [];
-  const out = await r.run(net.send, async (g) => (opened.push(g.label), KEY));
-  assert.deepEqual(opened, [LABEL], 'the key is opened by its label and by nothing else');
-  assert.deepEqual(net.seen, [`Bearer ${KEY}`]);
-  assert.deepEqual({ ran: out.ran, ok: out.ok, paused: out.paused }, { ran: 1, ok: 1, paused: 0 });
-  assert.deepEqual(r.readings(), [
-    ['Active users', 128, 'users', 'polled'],
-    ['Monthly recurring revenue', 4310.5, 'USD', 'polled'],
-  ]);
-  const kiln = r.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things'")!.id;
-  assert.deepEqual(
-    r.sql.all<{ thing: string }>("SELECT json_extract(fields, '$.thing') AS thing FROM entry WHERE register = 'datapoints'").map((x) => x.thing),
-    [kiln, kiln],
-    'the readings are on the project the fill named',
-  );
-  /* THE KEY IS IN NO ROW THE RECORD KEPT: not the readings, not the run's events, not the raw answer. */
-  const kept = r.sql.all<{ t: string }>("SELECT fields AS t FROM entry UNION ALL SELECT COALESCE(note, '') || COALESCE(to_v, '') FROM event");
-  assert.equal(kept.some((x) => String(x.t).includes(KEY)), false);
-  r.sql.close();
-});
+    const net = address();
+    const opened: string[] = [];
+    const out = await r.run(net.send, async (g) => (opened.push(g.label), KEY));
+    assert.deepEqual(opened, [LABEL], 'the key is opened by its label and by nothing else');
+    assert.deepEqual(net.seen, [`Bearer ${KEY}`]);
+    assert.deepEqual({ ran: out.ran, ok: out.ok, paused: out.paused }, { ran: 1, ok: 1, paused: 0 });
+    assert.deepEqual(r.readings(), [
+      ['Active users', 128, 'users', 'polled'],
+      ['Monthly recurring revenue', 4310.5, 'USD', 'polled'],
+    ]);
+    const kiln = r.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things'")!.id;
+    assert.deepEqual(
+      r.sql.all<{ thing: string }>("SELECT json_extract(fields, '$.thing') AS thing FROM entry WHERE register = 'datapoints'").map((x) => x.thing),
+      [kiln, kiln],
+      'the readings are on the project the fill named',
+    );
+    /* THE KEY IS IN NO ROW THE RECORD KEPT: not the readings, not the run's events, not the raw answer. */
+    const kept = r.sql.all<{ t: string }>("SELECT fields AS t FROM entry UNION ALL SELECT COALESCE(note, '') || COALESCE(to_v, '') FROM event");
+    assert.equal(kept.some((x) => String(x.t).includes(KEY)), false);
+    r.sql.close();
+  });
 
 test('A KEY NAMED BUT NOT IN THE VAULT IS REFUSED AT INSTALL, so nothing is ever sent without it', async () => {
   /* WRITTEN EXPECTING A PAUSE AT THE FIRST RUN, AND MEASURED EARLIER THAN THAT: the install itself is refused, in a
@@ -404,7 +405,7 @@ test('ON A RECORD WITH NO DATAPOINTS LIST THE FEED IS REFUSED, NAMING THE LIST',
      while every answer went to review with the suggestion "There is no register called datapoints". So the owner
      approved a call out that ran every hour, read as working, and filed nothing. The repair is in the shell, for every
      ingest: `pointsAt` in `packages/declare` counts `writes.register` among the lists a declaration points at. */
-  const r = await recordWith({ vault: true, readings: false });
+  const r = await recordWith({ vault: true, numbers: 'none' });
   const put = await r.put(fillFeed(template(), EXAMPLE));
   assert.equal(put.ok, false, 'a feed installed on a record with nowhere for a reading to go');
   assert.equal(put.refusal?.code, 'REGISTER_UNRESOLVED');
@@ -445,7 +446,7 @@ test('ON A RECORD, A DATED MEASURE CARRIES THE ANSWER’S DAY and an undated one
 });
 
 test('ON A RECORD, A MONEY MEASURE IS WRITTEN AS AN AMOUNT IN MINOR UNITS, from cents or from whole units', async () => {
-  const r = await recordWith({ vault: true, money: true });
+  const r = await recordWith({ vault: true });
   const doc = fillFeed(template(), {
     ...EXAMPLE,
     ...PROJECT,
