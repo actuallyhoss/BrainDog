@@ -56,8 +56,8 @@
   {#if icon}<span class="result-glyph"><IconWell name={icon} /></span>{/if}
   <span class="result-words">
     <span class="result-head">
-      <span class="result-title">{title}</span>
-      {#if folded && folded > 1}<span class="result-folded num">{folded}</span>{/if}
+      <!-- THE TITLE AND ITS COUNT ARE ONE LINE at every width (VERIFY P9): on a phone the count dropped to a line of its own. -->
+      <span class="result-name"><span class="result-title">{title}</span>{#if folded && folded > 1}<span class="result-folded num">{folded}</span>{/if}</span>
       {#if line}<span class="result-line">{line}</span>{/if}
     </span>
     {#if status}<span class="result-status" data-tone={tone}>{status.charAt(0).toUpperCase()}{status.slice(1)}</span>{/if}
@@ -116,6 +116,15 @@
     font-size: var(--fs-body);
     font-weight: var(--fw-regular);
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-name {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-inline-size: 0;
     white-space: nowrap;
   }
 
