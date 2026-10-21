@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { describeHeat, heatgrid, heatLevel } from './heatgrid.ts';
+import { describeHeat, fitLabel, heatgrid, heatLevel } from './heatgrid.ts';
+import { textWidth } from './shared.ts';
 
 const DAYS = ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'];
 const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
@@ -66,4 +67,24 @@ test('it reads as the busiest and quietest cells', () => {
   const values = grid((r, c) => (r === 6 && c === 9 ? 14 : c === 3 ? 0 : 2));
   assert.equal(describeHeat(DAYS, HOURS, values, 'Changes by hour'), 'Changes by hour: busiest Tue 09 (14), quietest Wed 03 (0)');
   assert.equal(describeHeat(DAYS, HOURS, []), 'Nothing yet');
+});
+
+test('long row names give way so the squares stay inside a phone tile', () => {
+  const names = ['Weekly digest to the whole team', 'Chase late invoices every morning', 'Sync'];
+  const days = Array.from({ length: 14 }, (_, i) => String(i + 1));
+  const g = heatgrid(names, days, names.map(() => days.map(() => 1)), 256);
+  assert.ok(g.gridW <= 256, `the grid is ${g.gridW} wide`);
+  assert.ok(g.size >= 6);
+  for (const l of g.rowLabels) assert.ok(textWidth(l.text) + 8 <= g.cells[0]!.x, `${l.text} reaches the squares`);
+  assert.equal(g.rowLabels[2]?.text, 'Sync');
+  assert.match(g.rowLabels[0]?.text ?? '', /^Weekly .*…$/u);
+});
+
+test('a name is cut at a word, and inside one only when its first word is too long', () => {
+  assert.equal(fitLabel('Sync', 100), 'Sync');
+  const cut = fitLabel('Weekly digest to the whole team', 80);
+  assert.match(cut, /^Weekly( [a-z]+)*…$/u);
+  assert.ok(textWidth(cut) <= 80);
+  assert.ok(fitLabel('Supercalifragilistic', 40).endsWith('…'));
+  assert.ok(textWidth(fitLabel('Supercalifragilistic', 40)) <= 40);
 });

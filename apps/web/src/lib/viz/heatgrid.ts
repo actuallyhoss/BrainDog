@@ -52,9 +52,41 @@ export function heatLevel(v: number, max: number): HeatLevel {
 /** The tone each level is drawn in. */
 export const HEAT_TONES = ['track', 'h1', 'g3', 'g2', 'ink'] as const;
 
+/**
+ * A row name cut to `room` px: whole words while they fit, then an ellipsis, and only a first word too long on its own
+ * is cut inside. The estimate errs wide, so a cut name never reaches the squares.
+ */
+export function fitLabel(text: string, room: number): string {
+  if (textWidth(text) <= room) return text;
+  const words = text.split(/\s+/u);
+  let kept = '';
+  for (const w of words) {
+    const next = kept ? `${kept} ${w}` : w;
+    if (textWidth(`${next}…`) > room) break;
+    kept = next;
+  }
+  if (kept) return `${kept}…`;
+  let cut = '';
+  for (const ch of text) {
+    if (textWidth(`${cut}${ch}…`) > room) break;
+    cut += ch;
+  }
+  return `${cut}…`;
+}
+
+/** The narrowest gutter a long row name is cut to, and the most of the chart's width it may take when cut. */
+const GUTTER_MIN = 40;
+const GUTTER_SHARE = 0.4;
+
 export function heatgrid(rows: readonly string[], cols: readonly string[], values: readonly (readonly number[])[], width: number): HeatGeometry {
-  const gutter = Math.max(0, ...rows.map((r) => textWidth(r))) + 8;
   const n = Math.max(1, cols.length);
+  /* THE NAMES GIVE WAY BEFORE THE SQUARES LEAVE THE CHART (layout gate, 21 October): an automation's name is long, and
+     at 320 a 198px gutter pushed fourteen days of squares 97px past a 256px tile. The gutter is the widest name where
+     the squares still fit at their smallest beside it; past that it is the room they leave, at most 40 in a hundred of
+     the width, and each name is cut to it. The full names are in the table kept off the page. */
+  const natural = Math.max(0, ...rows.map((r) => textWidth(r))) + 8;
+  const room = width - (n * (6 + GAP) - GAP);
+  const gutter = natural <= room ? natural : Math.min(natural, Math.max(GUTTER_MIN, Math.min(room, Math.floor(width * GUTTER_SHARE))));
   const size = clamp(Math.floor((width - gutter + GAP) / n - GAP), 6, 18);
   const pitch = size + GAP;
   const tall = Math.max(size, 11);
@@ -73,7 +105,7 @@ export function heatgrid(rows: readonly string[], cols: readonly string[], value
   const widest = Math.max(0, ...cols.map((c) => textWidth(c)));
   const step = STEPS.find((s) => s * pitch >= widest + 6) ?? n;
   const colLabels = cols.flatMap((text, c) => (c % step === 0 ? [{ x: r2(gutter + c * pitch + size / 2), text }] : []));
-  const rowLabels = rows.map((text, r) => ({ y: r2(TOP + r * rowPitch + tall / 2 + 4), text }));
+  const rowLabels = rows.map((text, r) => ({ y: r2(TOP + r * rowPitch + tall / 2 + 4), text: fitLabel(text, gutter - 8) }));
 
   return {
     cells,
