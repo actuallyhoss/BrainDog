@@ -110,7 +110,7 @@
 
   {#if choices.length > 0}
     <div class="tried-pick">
-      <Segmented class="tried-segments" role="group" aria-label={editWords.tryFrom}>
+      <Segmented class="tried-segments" role="group" aria-label={editWords.tryFrom} full>
         {#each choices as from (from)}
           <button type="button" class="segment" aria-pressed={pick.from === from} data-on={pick.from === from ? '' : undefined} onclick={() => (pick = { ...pick, from })}>
             {wordFor(from)}
