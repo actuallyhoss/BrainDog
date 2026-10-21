@@ -529,14 +529,14 @@ function waitingIn(value: Record<string, unknown>): Waiting | null {
 
 /** A promise's answer if it comes within `ms`, else `null`; the timer never outlives it. */
 async function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const late = new Promise<null>((done) => {
     timer = setTimeout(() => done(null), ms);
   });
   try {
     return await Promise.race([p, late]);
   } finally {
-    clearTimeout(timer);
+    if (timer !== null) clearTimeout(timer);
   }
 }
 
