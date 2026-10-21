@@ -10,6 +10,9 @@
   READ BY ANYONE WHO READS THE RUNS (`level: read`); the presses are drawn for the owner alone, since only a person
   signed in as the owner can instruct. With nothing open the tile is left out, heading and all, so it never stands over
   nothing: the page's line says nobody is working.
+
+  SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2): `run` draws that one run (Today's run sheet), `project` the runs on
+  that project (a project's "Working here now"), and `oncount` tells the host how many it draws, for its heading.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -18,9 +21,22 @@
   import { apiBase, at } from '$lib/at.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { listen } from '../listen.svelte.ts';
-  import { aim, control, leadsOf, presenceOf, told, type LiveRun, type Project, type Thread } from '$lib/record/instruct.ts';
+  import { aim, control, presenceOf, scopedLeads, told, type LiveRun, type Project, type Thread } from '$lib/record/instruct.ts';
 
-  let { owner = false }: { owner?: boolean } = $props();
+  let {
+    owner = false,
+    run = null,
+    project = null,
+    oncount,
+  }: {
+    owner?: boolean;
+    /** Draw this run alone, by handle (`S883`). */
+    run?: string | null;
+    /** Draw the runs on this project alone, by handle (`things#1`). */
+    project?: string | null;
+    /** How many runs it draws, each time that changes. */
+    oncount?: ((n: number) => void) | undefined;
+  } = $props();
 
   const io = control(apiBase());
   let rows = $state.raw<LiveRun[]>([]);
@@ -31,7 +47,7 @@
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
 
   async function load(): Promise<void> {
-    const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20) : Promise.resolve({ ok: false as const, fix: '' })]);
+    const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20, run ?? undefined) : Promise.resolve({ ok: false as const, fix: '' })]);
     if (p.ok) rows = p.value;
     if (t.ok) threads = t.value;
     if (projects.size === 0 || rows.some((r) => r.project !== null && !projects.has(r.project))) projects = await io.projects(rows);
@@ -51,11 +67,13 @@
   listen(load, () => pressing.size > 0);
 
   const views = $derived(
-    leadsOf(rows).map((r): PresenceView => {
+    scopedLeads(rows, { run, project }).map((r): PresenceView => {
       const v = presenceOf(r, rows, projects, threads);
       return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
     }),
   );
+
+  $effect(() => oncount?.(views.length));
 
   async function hold(run: string, kind: 'stop' | 'pause' | 'resume', why: string): Promise<void> {
     pressing = new Set([...pressing, run]);

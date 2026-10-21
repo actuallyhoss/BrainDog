@@ -12,6 +12,11 @@
   Take back is the thread's own undo while no run has taken it.
 
   HIS ALONE (`level: owner`): the record refuses `instruct` to anyone but a person, and lists the threads to the owner.
+
+  SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2). `run` opens the composer aimed at that run and lists what went to it
+  (Today's run sheet); `project` fixes "On" to that project, offers only the runs working there and lists what he told
+  agents on it (a project's page). `projectName` names the project before the projects are read, so the composer is
+  whole at its first paint.
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
@@ -28,6 +33,7 @@
     controlWords,
     instructArgs,
     runsOf,
+    scopedThreads,
     sendingOf,
     threadOf,
     threadOrder,
@@ -41,25 +47,44 @@
     type Thread,
   } from '$lib/record/instruct.ts';
 
-  let { owner = false }: { owner?: boolean } = $props();
+  let {
+    owner = false,
+    run = null,
+    project = null,
+    projectName = null,
+    first = 6,
+  }: {
+    owner?: boolean;
+    /** Aim at this run, by handle (`S883`), and list what went to it. */
+    run?: string | null;
+    /** Tell agents on this project alone, by handle (`things#1`). */
+    project?: string | null;
+    /** The project's name, for "On" before the projects are read. */
+    projectName?: string | null;
+    /** How many threads are drawn before "Show earlier". */
+    first?: number;
+  } = $props();
 
-  /** How many threads are drawn before "Show earlier", and how many more each press shows. */
-  const FIRST = 6;
+  /** How many more threads each "Show earlier" press shows. */
   const STEP = 20;
 
   const io = control(apiBase());
   let rows = $state.raw<LiveRun[]>([]);
   let threads = $state.raw<Thread[]>([]);
-  let projects = $state.raw<Map<string, Project>>(new Map());
+  /* THE PROJECT THIS PANEL IS ON, known before the read, so "On Kiln" is drawn at once. */
+  const seeded = (): Map<string, Project> => (project && projectName ? new Map([[project, { key: project, name: projectName, hue: null }]]) : new Map());
+  let projects = $state.raw<Map<string, Project>>(seeded());
   let known = $state.raw<Map<string, RunKnown>>(new Map());
-  let pick = $state<Chosen>({ ...PICK_FIRST });
+  const firstPick = (): Chosen => (run ? { ...PICK_FIRST, to: `run:${run}` } : project ? { ...PICK_FIRST, on: project } : { ...PICK_FIRST });
+  let pick = $state<Chosen>(firstPick());
   let said = $state('');
   let busy = $state(false);
   let fault = $state<string | null>(null);
   let sending = $state.raw<ThreadView | null>(null);
   let undone = $state.raw<Map<string, string>>(new Map());
   let pressing = $state.raw<Set<string>>(new Set());
-  let shown = $state(FIRST);
+  const firstShown = (): number => first;
+  let shown = $state(firstShown());
   let now = $state(recordNow());
   let box = $state<{ focus(): void } | undefined>(undefined);
   let here = $state<HTMLElement | undefined>(undefined);
@@ -67,14 +92,14 @@
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
 
   async function read(): Promise<void> {
-    const [p, t] = await Promise.all([io.presence(), io.threads()]);
+    const [p, t] = await Promise.all([io.presence(), io.threads(50, run ?? undefined, project ?? undefined)]);
     now = recordNow();
     if (p.ok) rows = p.value;
     if (t.ok) threads = t.value;
     const seen = new Map([...known, ...runsOf(rows)]);
     const missing = unknownRuns(threads, seen);
     known = missing.length === 0 ? seen : new Map([...seen, ...(await io.runs(missing))]);
-    if (projects.size === 0 || rows.some((r) => r.project !== null && !projects.has(r.project))) projects = await io.projects(rows);
+    if (projects.size <= (project ? 1 : 0) || rows.some((r) => r.project !== null && !projects.has(r.project))) projects = new Map([...seeded(), ...(await io.projects(rows))]);
   }
 
   onMount(() => {
@@ -99,7 +124,7 @@
     box?.focus();
   }
 
-  const composer = $derived(composerOf(pick, rows, projects));
+  const composer = $derived(composerOf(pick, rows, projects, project));
   const view = $derived({ ...composer, busy, fault });
 
   async function send(): Promise<void> {
@@ -166,7 +191,7 @@
     told.say();
   }
 
-  const ordered = $derived(threadOrder(threads));
+  const ordered = $derived(threadOrder(scopedThreads(threads, { run, project })));
   const drawn = $derived.by(() => {
     const ctx = { now, runs: known, projects, undone, busy: pressing };
     const list = ordered.slice(0, shown).map((t) => threadOf(t, ctx));

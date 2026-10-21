@@ -195,16 +195,24 @@ function runChoice(r: LiveRun, all: readonly LiveRun[], projects: ReadonlyMap<st
 /**
  * The composer as it stands for `pick`: its choices, the one each is at, and what happens once it is sent, said from
  * the runs open now. "Now" is offered only while a run it would reach is live (§2.1), and is then the first choice.
+ *
+ * ON ONE PROJECT'S PAGE (`project`, plan §7.2: "Tell agents on Kiln") "On" is that project and nothing else, and "To"
+ * offers only the runs working there, so nothing typed on Kiln's page goes to a run on another project.
  */
-export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: ReadonlyMap<string, Project>): Omit<InstructView, 'busy' | 'fault'> {
-  const leads = leadsOf(rows);
+export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: ReadonlyMap<string, Project>, project?: string | null): Omit<InstructView, 'busy' | 'fault'> {
+  const scoped = project ?? null;
+  const leads = leadsOf(rows).filter((r) => scoped === null || r.project === scoped);
   const to: InstructChoice[] = [
     { key: 'anyone', label: controlWords.anyone },
     ...AGENT_KINDS.map((k) => ({ key: `agent:${k}`, label: AGENT_NAMES[k] ?? k })),
     ...leads.map((r) => runChoice(r, leads, projects)),
   ];
   const toKey = to.some((c) => c.key === pick.to) ? pick.to : 'anyone';
-  const on: InstructChoice[] = [{ key: '', label: controlWords.anywhere }, ...[...projects.values()].map((p) => ({ key: p.key, label: p.name }))];
+  const named = scoped === null ? undefined : projects.get(scoped);
+  const on: InstructChoice[] =
+    scoped === null
+      ? [{ key: '', label: controlWords.anywhere }, ...[...projects.values()].map((p) => ({ key: p.key, label: p.name }))]
+      : [{ key: scoped, label: named?.name ?? controlWords.anywhere }];
 
   if (toKey.startsWith('run:')) {
     const r = leads.find((x) => `run:${x.run}` === toKey)!;
@@ -224,7 +232,7 @@ export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: Rea
   }
 
   const kind = toKey.startsWith('agent:') ? toKey.slice('agent:'.length) : null;
-  const onKey = on.some((c) => c.key === pick.on) ? pick.on : '';
+  const onKey = scoped ?? (on.some((c) => c.key === pick.on) ? pick.on : '');
   const place = projectName(onKey || null, projects);
   const live = leads.filter((r) => r.stopped === null && (kind === null || r.agent === kind) && (onKey === '' || r.project === onKey));
   const when: ('now' | 'next')[] = live.length > 0 ? ['now', 'next'] : ['next'];
@@ -240,8 +248,20 @@ export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: Rea
   } else {
     next = `The next ${kindName ? `${kindName} run` : 'agent'} ${there} gets this when it starts or next checks in. It waits up to ${String(WAIT_DAYS)} days.`;
   }
-  return { to, toKey, on, onKey, onFixed: false, when, whenKey, next, agent: kind };
+  return { to, toKey, on, onKey, onFixed: scoped !== null, when, whenKey, next, agent: kind };
 }
+
+/** The runs a panel scoped to one run or one project draws: that run, or the lead runs on that project, else all. */
+export const scopedLeads = (rows: readonly LiveRun[], scope: { run?: string | null; project?: string | null } = {}): LiveRun[] =>
+  leadsOf(rows).filter((r) => (scope.run == null || r.run === scope.run) && (scope.project == null || r.project === scope.project));
+
+/** What he told agents on one project, or about one run: the threads such a panel lists. */
+export const scopedThreads = (threads: readonly Thread[], scope: { run?: string | null; project?: string | null } = {}): Thread[] =>
+  threads.filter(
+    (t) =>
+      (scope.project == null || t.project === scope.project) &&
+      (scope.run == null || t.to_run === scope.run || t.taken_by === scope.run || t.seen_by === scope.run || (t.seen ?? []).some((s) => s.run === scope.run)),
+  );
 
 /** What `instruct` is sent for the composer as it stood and the words he typed. */
 export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenKey'>, said: string): Record<string, string> {
@@ -464,8 +484,8 @@ export function control(base: string, io?: Fetch) {
       return outOf<LiveRun[]>(await c.presence(), 'The agents working now could not be read.');
     },
     /** What he told agents, newest first; `run` narrows to what went to, was seen by or was taken by one run. */
-    async threads(limit = 50, run?: string): Promise<Out<Thread[]>> {
-      const out = outOf<{ rows: Thread[] }>(await c.instructionList({ limit, ...(run ? { run } : {}) }), 'What you told agents could not be read.');
+    async threads(limit = 50, run?: string, project?: string): Promise<Out<Thread[]>> {
+      const out = outOf<{ rows: Thread[] }>(await c.instructionList({ limit, ...(run ? { run } : {}), ...(project ? { project } : {}) }), 'What you told agents could not be read.');
       return out.ok ? { ok: true, value: out.value.rows } : out;
     },
     async send(args: Record<string, string>): Promise<Out<Thread>> {
