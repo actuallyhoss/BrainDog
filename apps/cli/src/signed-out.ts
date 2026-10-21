@@ -67,6 +67,7 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     metric: no,
     digestToday: no,
     context: no,
+    instructionsMine: no,
     handoff: no,
     meet: no,
     sessionsLive: no,

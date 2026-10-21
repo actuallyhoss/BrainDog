@@ -90,6 +90,10 @@ const LATER = [
   'stale',
   'about',
   'learnings',
+  /* `instructionsMine` JOINED WITH ITS TOOL (`instructions`, agents and MCP plan §2, §6.1), for `recentHistory`'s lesson:
+     left off, a stdio agent would be told it cannot read what he told it when its host can. It is also what tells the
+     door this record knows instructions, so the door reads the caller's settings and what waits beside each call. */
+  'instructionsMine',
 ] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
@@ -149,5 +153,7 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
     metric: (args, ctx) => ask(ctx, 'metric', args),
     digestToday: (args, ctx) => ask(ctx, 'digestToday', args),
     ...later,
+    /* THE TOOLS RUN HERE, so the handshake and the tool list answer with the host down: not cut by his settings. */
+    onMachine: true,
   };
 }

@@ -369,11 +369,10 @@ test('initialize and tools/list answer without touching the host, and the list i
 const CALLS: Record<string, Record<string, unknown>> = {
   record_index: {},
   context: {},
-  schema: { register: 'obligations' },
+  instructions: {},
   get: { spoken: 'obligations#1' },
   list: { register: 'obligations' },
   search: { q: 'rent' },
-  history: { spoken: 'obligations#1' },
   activity: { limit: 5 },
   governance: {},
   propose: {
@@ -424,6 +423,7 @@ const ANSWERS: Record<string, unknown> = {
   learnings: { rows: [], truncated: false, faded: 0 },
   understandPlan: { dry: true, kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true },
   previewPage: { page: 'handoffs', title: 'Next steps left', blocks: [] },
+  instructionsMine: { run: 'S1', stamp: 's1', pending: [], stop: null, lines: ['Nothing new for you.'] },
 };
 
 /**
