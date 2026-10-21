@@ -82,7 +82,7 @@ test('THE WHOLE STACK ANSWERS OVER A SOCKET', async () => {
   try {
     const boot = await s.call('boot');
     assert.equal(boot.status, 200);
-    assert.deepEqual((boot.body.value as { registers: { id: string }[] }).registers.map((r) => r.id), ['session', 'obligations']);
+    assert.deepEqual((boot.body.value as { registers: { id: string }[] }).registers.map((r) => r.id), ['session', 'instructions', 'obligations']);
     /* THE HOST SAYS WHAT IT IS, so Billing reads it rather than inferring it from the mail door's 404. */
     assert.equal((boot.body.value as { host?: string }).host, 'self-host');
 
