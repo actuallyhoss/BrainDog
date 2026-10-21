@@ -635,7 +635,8 @@
   }
 
   /* THE INDEX'S DIVIDERS START AT THE TEXT (agents F28), past the row's well, where the link list's own padding puts the
-     title; a rule through the well column reads as a table's. */
+     title; a rule through the well column reads as a table's. AND THEY END AT THE CHEVRON (VERIFY P37), the row's own
+     end padding, where they ran on through the row's bleed to the tile's edge. */
   .settings-index :global(.list[data-kind='link'] > .item) {
     border-block-end: 0;
   }
@@ -644,7 +645,7 @@
     content: '';
     position: absolute;
     inset-block-start: 0;
-    inset-inline: 56px 0;
+    inset-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
     block-size: 1px;
     background: var(--rule);
     pointer-events: none;
