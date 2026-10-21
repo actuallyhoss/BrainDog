@@ -512,7 +512,9 @@ export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
+export { ownersPushSubs } from './push.ts';
 export type { PushJob, PushSettled, PushTarget } from './push.ts';
+export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
@@ -586,6 +588,7 @@ export {
   localParts,
   mutedFor,
   nextOccurrence,
+  quietOf,
   render,
   runDigest,
   sectionsOf,
