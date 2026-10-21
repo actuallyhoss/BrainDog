@@ -16,6 +16,7 @@
   the pointer on a wide screen with a fine pointer (SF10), and is always there on a phone.
 -->
 <script lang="ts">
+  import { monthShort } from 'braindog-render';
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '$lib/at.ts';
@@ -29,6 +30,7 @@
     inByMonth = null,
     outByMonth = null,
     trend = null,
+    earnedSaid = false,
     format,
     money = [],
     moneyRows = [],
@@ -43,6 +45,8 @@
     outByMonth?: Months | null;
     /** What it earned this period against the period before, where the project says both. */
     trend?: Trend | null;
+    /** Whether the hero above already says what it earned, so this tile does not say the same figure again (P18). */
+    earnedSaid?: boolean;
     format: (minor: number, currency: string) => string;
     /** The project's money this month, as the shape reads it (`moneyLines`). */
     money?: readonly MoneyLine[];
@@ -58,7 +62,13 @@
   const LINE: Record<MoneyLine['key'], string> = { in: 'In this month', out: 'Out this month', owed: 'Still to come in' };
   const FIGURE: Record<MoneyLine['key'], string> = { in: 'came in this month', out: 'went out this month', owed: 'still to come in' };
   /* THE FIGURE: what it earned this period where the project says so, else the first line of this month's money. */
+  /* NOT WHAT IT EARNED WHEN THE HERO SAYS IT (P18): Kiln read "£18,400" in its hero and again here, so the tile leads
+     with what is still to come in, and says how the earning moved in its line under it. */
   const lead = $derived.by(() => {
+    if (earnedSaid) {
+      const m = money.find((x) => x.key === 'owed') ?? money.find((x) => x.key === 'in') ?? money[0];
+      if (m) return { key: m.key, value: m.value, currency: m.currency, label: FIGURE[m.key] };
+    }
     if (trend && trend.now > 0) return { key: 'earned', value: trend.now, currency: trend.currency, label: 'earned this period' };
     const m = money.find((x) => x.key === 'in') ?? money[0];
     return m ? { key: m.key, value: m.value, currency: m.currency, label: FIGURE[m.key] } : null;
@@ -67,13 +77,15 @@
   const change = $derived.by(() => {
     if (!trend || trend.before <= 0) return null;
     const share = Math.round((Math.abs(trend.now - trend.before) / trend.before) * 100);
-    if (share === 0) return { text: 'The same as the period before', tone: 'same' };
-    return trend.now > trend.before ? { text: `${share}% above the period before`, tone: 'good' } : { text: `${share}% below the period before`, tone: 'bad' };
+    /* WHAT IT EARNED, NAMED, when the figure over it is another one. */
+    const what = lead?.key === 'earned' ? '' : 'Earned ';
+    if (share === 0) return { text: what ? 'Earned the same as the period before' : 'The same as the period before', tone: 'same' };
+    return trend.now > trend.before ? { text: `${what}${share}% above the period before`, tone: 'good' } : { text: `${what}${share}% below the period before`, tone: 'bad' };
   });
   const scale = $derived(trend ? Math.max(trend.now, trend.before, 1) : 1);
   /* THE MONTHS: what came in where that is a shape, else what went out; otherwise one line saying the total. */
   const months = $derived(monthsDrawn(inByMonth) ? { m: inByMonth, title: 'Money in by month' } : monthsDrawn(outByMonth) ? { m: outByMonth, title: 'Money out by month' } : null);
-  const monthName = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  const monthName = (key: string): string => monthShort(+key.slice(5, 7) - 1);
   const monthLong = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
   const since = $derived.by(() => {
     if (months) return null;
@@ -304,12 +316,20 @@
   .t {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-ctl);
     font-weight: 600;
-    line-height: 18px;
+    line-height: 20px;
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* THE WHOLE STOP IS THE LINK'S TARGET (P17): the title alone was 20px tall on a phone. The stop is the containing
+     block and the title is not, so its clipped words do not clip this. */
+  a.t::after {
+    content: '';
+    position: absolute;
+    inset: 0;
   }
 
   a.t:hover {
@@ -324,8 +344,8 @@
   .s {
     overflow: hidden;
     color: var(--ink-3);
-    font-size: var(--fs-cap);
-    line-height: 16px;
+    font-size: var(--fs-meta);
+    line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

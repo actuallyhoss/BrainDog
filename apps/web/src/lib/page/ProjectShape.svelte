@@ -43,7 +43,7 @@
   import { rowReader } from '$lib/record/row-live.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { money } from 'braindog-render';
+  import { money, monthShort } from 'braindog-render';
   import ProjectVisuals from './ProjectVisuals.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
@@ -233,7 +233,7 @@
     const lane = fd && typeof v === 'string' && v !== '' ? valueSaid(fd as Parameters<typeof valueSaid>[0], v) : '';
     const h = typeof read.fields.health === 'string' ? (HEALTH[read.fields.health] ?? null) : null;
     const s = read.fields.since;
-    const since = typeof s === 'string' && /^\d{4}-\d{2}/u.test(s) ? new Date(`${s.slice(0, 7)}-01T00:00:00Z`).toLocaleString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : '';
+    const since = typeof s === 'string' && /^\d{4}-\d{2}/u.test(s) ? `${monthShort(+s.slice(5, 7) - 1)} ${s.slice(0, 4)}` : '';
     return { lane, health: h, since };
   });
   const name = $derived(read && decl ? String(read.fields[decl.title] ?? '').trim() : '');
@@ -406,6 +406,7 @@
       inByMonth={read.inByMonth}
       outByMonth={read.outByMonth}
       {trend}
+      earnedSaid={hero?.figures.some((f) => f.key === 'money') ?? false}
       format={said}
       money={shape?.facts.money ?? []}
       moneyRows={shape?.data.money ?? []}
@@ -665,8 +666,8 @@
   .k {
     overflow: hidden;
     color: var(--ink-3);
-    font-size: var(--fs-cap);
-    line-height: 16px;
+    font-size: var(--fs-meta);
+    line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
