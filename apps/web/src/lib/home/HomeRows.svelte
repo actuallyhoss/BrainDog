@@ -347,7 +347,7 @@
   /* ABOUT 11 BESIDE THE DATE AT 15, as a share of it, so the block keeps its proportion at every text size. */
   .hd-week {
     color: var(--ink-3);
-    font-size: 0.75em;
+    font-size: var(--fs-cap, 12px);
     font-weight: var(--fw-medium);
     line-height: 12px;
   }
