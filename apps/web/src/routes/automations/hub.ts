@@ -509,14 +509,31 @@ export function runHeat(lines: readonly RunLine[], now: number, days = 14): Heat
   return { rows: top.map((t) => t.name), cols: keys.map((k) => String(Number(k.slice(8)))), values: top.map((t) => t.counts), days: keys };
 }
 
-/** The line under "Recent runs": what ran most in the window, and what failed in it. */
+/**
+ * The line under "Recent runs": what ran most in the window, and what failed in it.
+ *
+ * NO "RAN MOST" THE GRID CANNOT BACK (UI pass of 21 October, H28): where the first two ran as often, or a line stands
+ * for a count the record keeps without its runs ("Ran 17 times"), naming one as running most, once, contradicted the
+ * list under it. Then the line says how many ran, and when: "4 automations ran today, and none failed."
+ */
 export function heatReading(lines: readonly RunLine[], heat: Heat): string {
   const top = heat.rows[0];
-  const most = heat.values[0]?.reduce((a, b) => a + b, 0) ?? 0;
+  const total = (row: readonly number[] | undefined): number => row?.reduce((a, b) => a + b, 0) ?? 0;
+  const most = total(heat.values[0]);
   if (top === undefined) return '';
   const inWindow = new Set(heat.days);
-  const bad = lines.filter((l) => l.bad && Number.isFinite(Date.parse(l.at)) && inWindow.has(dayKey(l.at)));
-  const lead = `${top} ran most, ${times(most)} in the last ${heat.days.length} days`;
+  const within = lines.filter((l) => Number.isFinite(Date.parse(l.at)) && inWindow.has(dayKey(l.at)));
+  const bad = within.filter((l) => l.bad);
+  const tied = heat.rows.length > 1 && total(heat.values[1]) === most;
+  let lead = `${top} ran most, ${times(most)} in the last ${heat.days.length} days`;
+  if (tied || within.some((l) => l.counted)) {
+    const today = heat.days.at(-1);
+    const n = heat.rows.length;
+    const kinds = new Set(within.map((l) => l.kind));
+    const noun = kinds.size === 1 && kinds.has('automation') ? (n === 1 ? 'automation' : 'automations') : n === 1 ? 'thing' : 'things';
+    lead = `${spell(n, true)} ${noun} ran ${within.every((l) => dayKey(l.at) === today) ? 'today' : `in the last ${heat.days.length} days`}`;
+    if (bad.length === 0) return `${lead}, and none failed.`;
+  }
   if (bad.length === 0) return `${lead}, and none of these runs failed.`;
   const names = [...new Set(bad.map((l) => l.name))];
   return `${lead}; ${spell(bad.length)} failed, on ${names.length <= 2 ? andList(names) : `${spell(names.length)} things`}.`;
@@ -622,6 +639,8 @@ export type RunLine = {
   bad: boolean;
   /** The screen of the thing that ran, or `null` for a scheduled action, which has none of its own. */
   path: string | null;
+  /** A line standing for a count the record keeps without its runs, so it is one line for many runs. */
+  counted?: boolean;
 };
 
 const BAD = new Set(['failed', 'refused']);
@@ -665,7 +684,7 @@ export function runLines(
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
       const c = a as Counted;
       if (typeof c.fired === 'number' && c.fired > 0 && typeof c.last_at === 'string' && Number.isFinite(Date.parse(c.last_at)))
-        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path });
+        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true });
     }
   }
   for (const s of actions) {

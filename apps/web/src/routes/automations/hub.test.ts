@@ -273,6 +273,9 @@ test('THE HEAT GRID IS FOURTEEN DAYS, OLDEST FIRST, AND THE SIX THAT RAN MOST', 
   assert.equal(heat.values[1]?.at(-2), 1);
   assert.equal(heatReading(lines, heat), 'Standup ran most, twice in the last 14 days; one failed, on Chase.');
   assert.equal(runHeat([run('Too old', at(2026, 9, 1))], NOW), null, 'nothing in the window, no chart');
+  /* A TIE NAMES NONE AS RUNNING MOST (UI pass of 21 October, H28). */
+  const tie = [run('Standup', at(2026, 9, 29, 8)), run('Chase', at(2026, 9, 29, 9))];
+  assert.equal(heatReading(tie, runHeat(tie, NOW)!), 'Two automations ran today, and none failed.');
 });
 
 test('NEXT UP PUTS A DOT ON EACH DAY AN ACTION IS DUE, ON ITS OWN CLOCK, AND NONE FOR A PAUSED ONE', () => {
