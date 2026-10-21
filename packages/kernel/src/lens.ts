@@ -81,6 +81,11 @@ export type CatalogList = {
    * lists, a project). Only a share or a member row that names it reaches it.
    */
   kernel?: boolean;
+  /**
+   * A list declared `personal: true`: the owner's alone. No role, share, legacy grant, child key or key's narrowing
+   * reaches it, even one naming it, so only the owner's own session and his own plain key read it (`42 §4.4`).
+   */
+  personal?: boolean;
   /** The field the record mirrors onto the `state` column, as `Schema.state` says. */
   state?: string;
 };
@@ -112,8 +117,9 @@ export type LensSources = {
   /**
    * Present when an agent is calling: its narrowing, or `null` for a root token with none. `narrows` is a child key's
    * chain (its parent's narrowing, then its own, as `verifyToken` reads them), every link ANDed in beside `narrow`.
+   * `child` says the key was minted under another, which reaches no personal list.
    */
-  token?: { narrow: Narrow | null; narrows?: readonly Narrow[] } | null;
+  token?: { narrow: Narrow | null; narrows?: readonly Narrow[]; child?: boolean } | null;
   /** The access epoch, the `access` counter. */
   epoch?: number;
 };
@@ -183,7 +189,7 @@ const RANK: Record<Level, number> = { read: 1, append: 0, write: 3, decide: 4, o
  * a record-wide "Adds only" stops at the owner's lists (Keys, People and any `owner_only` list), as the record's
  * `ownersListStop` says. A share still reaches Keys and People only by naming them (`coverOf`).
  */
-const roleReaches = (role: Level, l: CatalogList): boolean => l.kernel !== true && (role !== 'append' || !isGated(l));
+const roleReaches = (role: Level, l: CatalogList): boolean => l.kernel !== true && l.personal !== true && (role !== 'append' || !isGated(l));
 
 /** A legacy rule as the lens carries it: TRUE for none, the rule itself as one leaf, or FALSE when it cannot be read. */
 const legacyCond = (where: Json | null | undefined): Expr =>
@@ -509,7 +515,7 @@ export function shareFault(s: unknown): { at: string; fix: string } | null {
 
 /* ------------------------------------------------------------------------------------------------- reading a target */
 
-const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.kernel === true || l.role === 'keys' || l.role === 'meets';
+const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.kernel === true || l.personal === true || l.role === 'keys' || l.role === 'meets';
 const hasMoney = (l: CatalogList): boolean => l.fields.some((f) => !f.retired && f.type === 'money');
 const scopeField = (l: CatalogList): CatalogField | undefined => l.fields.find((f) => f.scope !== undefined && !f.retired);
 
@@ -566,6 +572,8 @@ type Cover = { cond: Expr; only?: readonly Cap[] };
  * view. Broad targets (the record, money lists) never reach Keys, People or an owner-only list; naming one does.
  */
 function coverOf(t: Target, l: CatalogList, me: readonly string[]): Cover {
+  /* A PERSONAL LIST IS COVERED BY NOTHING, a target naming it included: a share, a project and a key's narrowing alike. */
+  if (l.personal === true) return { cond: false };
   if ('record' in t) return { cond: !isGated(l) };
   if ('project' in t) {
     if (l.role === 'projects') return { cond: { field: 'id', is: t.project }, only: RUNG_CAPS.view };
@@ -682,7 +690,9 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
     }
     return compiles(n, l) ? coverOf(n, l, me).cond : false;
   };
-  const narrowOn = (l: CatalogList): Expr => (chain.length === 0 ? true : chain.length === 1 ? narrowOne(chain[0]!, l) : { all: chain.map((n) => narrowOne(n, l)) });
+  /* A CHILD KEY REACHES NO PERSONAL LIST, narrowed or not: a narrowing never covers one (`coverOf`), and nor does none. */
+  const unnarrowed = (l: CatalogList): Expr => token?.child !== true || l.personal !== true;
+  const narrowOn = (l: CatalogList): Expr => (chain.length === 0 ? unnarrowed(l) : chain.length === 1 ? narrowOne(chain[0]!, l) : { all: chain.map((n) => narrowOne(n, l)) });
 
   const pred = Object.fromEntries(CAPS.map((c) => [c, {} as Record<string, Pred>])) as Record<Cap, Record<string, Pred>>;
   const hides: Record<string, string[]> = {};
@@ -700,7 +710,8 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
       for (const c of CAPS) pred[c][l.id] = fold(narrow);
       continue;
     }
-    const legacy = (sources.lists ?? []).find((r) => r.register === l.id);
+    /* A MEMBER ROW NAMING A PERSONAL LIST IS READ AS NO ROW: `invite` refuses one, and one written by hand opens nothing. */
+    const legacy = l.personal === true ? undefined : (sources.lists ?? []).find((r) => r.register === l.id);
     const base: { level: Level; cond: Expr } | null = legacy
       ? { level: legacy.level, cond: legacyCond(legacy.where) }
       : role !== null && roleReaches(role, l)
@@ -892,6 +903,9 @@ export function checkShare(share: Share, catalog: Catalog, opts: CheckOpts = {})
   const lists = new Map(catalog.lists.map((l) => [l.id, l]));
   const listOf = (id: string, at: string): CatalogList | Refusal => lists.get(id) ?? refuse('REGISTER_UNKNOWN', `There is no list called ${id}.`, at);
   const isRefusal = (x: unknown): x is Refusal => isObj(x) && typeof x.code === 'string' && typeof x.fix === 'string';
+  /* A SHARE NEVER NAMES A PERSONAL LIST: it would reach nothing there, and saving it would tell its maker it did. */
+  const personal = (l: CatalogList, at: string): Refusal | null =>
+    l.personal === true ? refuse('FORBIDDEN', `${l.name} is personal: only the owner reads it, so it can't be shared.`, at) : null;
 
   if (share.who.kind === 'person' && (opts.owners ?? []).includes(share.who.id))
     return refuse('FORBIDDEN', 'An owner already sees everything. Share with someone else.', 'who');
@@ -907,18 +921,24 @@ export function checkShare(share: Share, catalog: Catalog, opts: CheckOpts = {})
     for (const [i, id] of t.lists.entries()) {
       const l = listOf(id, `what.lists.${i}`);
       if (isRefusal(l)) return l;
+      const kept = personal(l, `what.lists.${i}`);
+      if (kept) return kept;
     }
   if ('project' in t) {
     if (!catalog.lists.some((l) => l.role === 'projects')) return refuse('REGISTER_UNKNOWN', 'This record has no projects list.', 'what.project');
     for (const [i, id] of (t.lists ?? []).entries()) {
       const l = listOf(id, `what.lists.${i}`);
       if (isRefusal(l)) return l;
+      const kept = personal(l, `what.lists.${i}`);
+      if (kept) return kept;
       if (!scopeField(l)) return refuse('VALUE_MALFORMED', `${l.name} has no project field, so it can't be shared by project.`, `what.lists.${i}`);
     }
   }
   if ('list' in t) {
     const l = listOf(t.list, 'what.list');
     if (isRefusal(l)) return l;
+    const kept = personal(l, 'what.list');
+    if (kept) return kept;
     if ('where' in t) {
       const schema = schemaOf(l);
       for (const leaf of leavesOf(t.where)) {

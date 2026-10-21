@@ -81,9 +81,12 @@ export function methods(deps: RecordDeps) {
     return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*');
   };
 
+  /** Whether the caller reads every personal list, which only the owner himself does (`personalStop` in `index.ts`). */
+  const readsPersonal = (ctx: CallContext): boolean => kernel.personalLists().every((list) => readable(ctx, list) === null);
+
   /** Whether the caller reads every list, and all of each, which a body that may touch any list needs (`readsEveryList` in `index.ts`). */
   const readsEveryList = (ctx: CallContext): boolean =>
-    wholeRecord(ctx) && Object.keys(ctx.wheres ?? {}).length === 0 && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+    wholeRecord(ctx) && Object.keys(ctx.wheres ?? {}).length === 0 && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null) && readsPersonal(ctx);
 
   /** The live copy of a declaration, parsed, or `undefined`. */
   const liveBody = (id: string): unknown => {

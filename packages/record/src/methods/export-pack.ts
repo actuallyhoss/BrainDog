@@ -313,6 +313,9 @@ export function methods(deps: RecordDeps) {
         if (seqs.length > EXAMPLES_MOST) return no('OUT_OF_BOUNDS', `An add-on carries at most ${EXAMPLES_MOST} example rows a list.`, { at: `rows.${list}` });
         const denied = readable(ctx, list);
         if (denied) return { ok: false, refusal: denied };
+        /* NOR A ROW OF A PERSONAL LIST: it is the owner's alone, and this file is for somebody else. */
+        if (kernel.personalLists().includes(list))
+          return no('FORBIDDEN', `${titleOf(`register.${list}`, decl.body)} is personal, so none of its rows go out as examples. The list goes without them.`, { at: `rows.${list}` });
         for (const seq of new Set(seqs)) {
           /* BY ITS OWN NUMBER, as other reads find one row, so a list of thousands finds its first and its last. */
           /* UNDER HER GRANT, so a row kept private from her or outside her rule is a row this list does not have. */

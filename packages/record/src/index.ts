@@ -2463,6 +2463,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { code: 'FORBIDDEN', fix: `${name} is kept for the owner. Ask the owner to share ${name} by name.`, at: 'register' };
   };
 
+  /**
+   * The refusal anybody but the owner himself meets on a personal list (`personal: true`, `42 §4.4`), or `null`. Unlike
+   * `kernelStop`, a grant naming the list does not reach it, nor "See as", a link or a runner; an owner's narrowed or
+   * child key is held off by its ceiling, which the lens never widens to such a list (`coverOf`).
+   */
+  const personalStop = (ctx: CallContext, list: string): Refusal | null => {
+    const p = ctx.principal;
+    if (p.kind === 'system') return null;
+    if ((p.kind === 'person' || p.kind === 'token') && p.level === 'owner' && ctx.preview === undefined) return null;
+    if (!kernel.personalLists().includes(list)) return null;
+    const name = listName(list);
+    return { code: 'FORBIDDEN', fix: `${name} is personal: only the owner reads or changes it, and nobody can be given it.`, at: 'register' };
+  };
+
+  /** Whether this caller reads every personal list there is, which only the owner himself does (`personalStop`). */
+  const readsPersonal = (ctx: CallContext): boolean => kernel.personalLists().every((list) => guard(ctx, 'read', list) === null);
+
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
     /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
@@ -2491,7 +2508,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       register !== undefined && Object.hasOwn(ctx.levels ?? {}, register) ? ctx.levels?.[register] : undefined;
     /* A RECORD-WIDE "ADDS ONLY" STOPS AT THE OWNER'S LISTS, in one sentence naming the list, before the ladder is asked:
        `append` reaches every other list, and a grant naming this one is the owner saying so (`ownersListStop`). */
-    const kept = register === undefined ? null : (ownersListStop(ctx, register) ?? kernelStop(ctx, register));
+    const kept = register === undefined ? null : (personalStop(ctx, register) ?? ownersListStop(ctx, register) ?? kernelStop(ctx, register));
     if (kept) return kept;
     const at: CallContext =
       held === undefined || ctx.principal.kind === 'system' || ctx.principal.kind === 'runner' || ctx.principal.kind === 'share'
@@ -5516,7 +5533,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
        whoever reads every list, and so are the questions put off and the ones answered, which name the same rowsets. */
     /* AND WHAT WENT QUIET NAMES EVERY LIST, so it too is for whoever reads every one of them. */
-    const whole = typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsEveryList(ctx) : wholeRecord(ctx);
+    /* AND A PERSONAL LIST'S ROWS ARE IN EACH OF THEM, so they are the owner's while the record keeps one (`personalStop`). */
+    const whole =
+      (typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsEveryList(ctx) : wholeRecord(ctx)) && readsPersonal(ctx);
     /* NOR DOES A GRANT NARROWED TO SOME OF A LIST'S ROWS (`wheres`) READ ALL OF IT: the kernel's feed names every row
        written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
     const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
@@ -7264,7 +7283,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND NO FIELD HIDDEN ANYWHERE (sharing plan §2.7): reading every list is reading all of each row of each, so a share
        that hides one field switches on every conservative path already built for a narrowed caller. */
     Object.values(ctx.hides ?? {}).every((fields) => fields.length === 0) &&
-    Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+    Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null) &&
+    /* AND EVERY PERSONAL LIST, which nobody but the owner himself reads, an Admin included (`personalStop`). */
+    readsPersonal(ctx);
 
   /**
    * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.

@@ -4386,6 +4386,9 @@ function createFault(
  *   `owner_only`  `true`, or left out: a colleague who adds across the whole record does not add here, and a grant
  *             naming the list still does (`guard` in `packages/record/src/index.ts`, `20 §1`). Keys and People are
  *             owner-only by their role, so neither declares it.
+ *   `personal`  `true`, or left out: only the owner reads and writes its rows, in his own session or through his own
+ *             key. No grant, share, link, child key or "See as" reaches it, even one naming it (`personalStop` in
+ *             `packages/record/src/index.ts`, `coverOf` in `lens.ts`).
  *   `hand`    `{ person?, agent?, taken? }`: who holds a row, a person by a `ref` field and an agent by the `text` field
  *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
@@ -4410,6 +4413,7 @@ const REGISTER_KEYS = [
   'order',
   'delete',
   'owner_only',
+  'personal',
   'hand',
   'once',
   'same',
@@ -5908,6 +5912,14 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   const ownerOnly = decl.body.owner_only;
   if (ownerOnly !== undefined && ownerOnly !== true)
     return bad('DECLARATION_INVALID', `${id}'s owner_only is true, or left out. ${JSON.stringify(ownerOnly)} is not.`, 'owner_only', ['true']);
+
+  /* `personal:` IS `true` OR LEFT OUT, as `owner_only:` is, and the two are never said together: a personal list is
+     closed to every grant, so `owner_only` beside it would promise a grant naming the list reaches it. */
+  const personal = decl.body.personal;
+  if (personal !== undefined && personal !== true)
+    return bad('DECLARATION_INVALID', `${id}'s personal is true, or left out. ${JSON.stringify(personal)} is not.`, 'personal', ['true']);
+  if (personal === true && ownerOnly !== undefined)
+    return bad('DECLARATION_INVALID', `${id} is personal, so no grant reaches it and owner_only says nothing. Leave owner_only out.`, 'owner_only');
 
   /* `role:` IS ONE PART A LIST PLAYS FOR THE RECORD'S AGENTS, and `fade:` the live day field its rows fade by and how
      many days after it (`packages/record` `agent-lists.ts`). Checked here, at install, so a misspelt one is never inert. */

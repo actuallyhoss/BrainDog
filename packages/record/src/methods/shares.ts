@@ -449,6 +449,17 @@ export function methods(deps: RecordDeps) {
     sql.one<{ ts: string }>("SELECT ts FROM event WHERE target = ? AND kind = 'share.close' ORDER BY ts LIMIT 1", `share:${id}`)?.ts ?? null;
 
   /**
+   * Whether a page draws from a personal list (`personal: true`, `42 §4.4`), or is a page of one of its rows. A link is
+   * read by whoever holds it, and such a list is the owner's alone, so no link opens on it.
+   */
+  const personalPage = (slug: string): boolean => {
+    const personal = kernel.personalLists();
+    if (personal.length === 0) return false;
+    const page = kernel.pages().find((p) => p.slug === slug);
+    return page !== undefined && (page.registers.some((r) => personal.includes(r)) || (page.about !== null && personal.includes(page.about.register)));
+  };
+
+  /**
    * Whether this person is an owner of the whole record now, and not suspended: the one person a link reads the page as.
    * The query `kernel/src/index.ts` asks for the owners it writes to, held to one person.
    */
@@ -500,6 +511,7 @@ export function methods(deps: RecordDeps) {
       if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > SHARE_DAYS_MOST)
         return no('OUT_OF_BOUNDS', `A link opens for a whole number of days from 1 to ${SHARE_DAYS_MOST}, and ${SHARE_DAYS} unless you say.`, { at: 'days' });
       if (!kernel.pages().some((p) => p.slug === slug)) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
+      if (personalPage(slug)) return no('FORBIDDEN', 'This page shows a personal list, which only the owner reads, so no link can open it.', { at: 'slug' });
       const now = clock.now();
       const id = mint();
       const expires_at = instant(now + days * DAY_MS);
@@ -600,6 +612,8 @@ export function methods(deps: RecordDeps) {
       if (!Number.isFinite(ends) || clock.now() >= ends) return { ok: false, refusal: SHUT };
       if (closedAt(link.id) !== null || !ownsNow(opened.actor)) return { ok: false, refusal: SHUT };
       if (!kernel.pages().some((p) => p.slug === link.slug)) return { ok: false, refusal: SHUT };
+      /* AND A PAGE THAT CAME TO SHOW A PERSONAL LIST AFTER ITS LINK WAS OPENED NO LONGER OPENS. */
+      if (personalPage(link.slug)) return { ok: false, refusal: SHUT };
       /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
       const out = kernel.page(link.slug, undefined, { viewer: NOBODY });
       if (!out.ok) return { ok: false, refusal: SHUT };

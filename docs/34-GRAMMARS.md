@@ -517,6 +517,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | `derive:` combinators | 7 | `sum diff product ratio band via normalise` | 02 §5 |
 | A register's `delete:` values | 1 | `refuse_while_referenced` | 42 §4.4 |
 | A register's `owner_only:` values | 1 | `true` | 42 §4.4 |
+| A register's `personal:` values | 1 | `true` | 42 §4.4 |
 | Rule actions | 11 | `set untag move schedule suggest link notify tag create run stop` | 07 §6 |
 | Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §3 |
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |

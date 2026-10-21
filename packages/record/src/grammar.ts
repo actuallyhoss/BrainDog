@@ -232,6 +232,7 @@ const REGISTER = {
     mobile: 'the few fields the phone view keeps, such as [what, amount, due]',
     delete: 'refuse_while_referenced: a row another row points at is not deleted',
     owner_only: 'true: somebody who may add to the whole record does not add here unless the list is named to them',
+    personal: 'true: only the owner reads or changes it. No grant, share, link, child key or See as reaches it, even one that names it',
   },
   rare: {
     pack: 'the pack that ships the list; a list Slash builds leaves it off',

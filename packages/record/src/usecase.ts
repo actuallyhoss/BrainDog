@@ -191,6 +191,9 @@ export function useCases(d: UseCaseDeps) {
         return refuse('VALUE_MALFORMED', `examples.${register} is a list of row numbers.`, `examples.${register}`);
       if (seqs.length > SEEDS_PER_REGISTER)
         return refuse('OUT_OF_BOUNDS', `A use case shares at most ${SEEDS_PER_REGISTER} example rows a list.`, `examples.${register}`);
+      /* NOR A ROW OF A PERSONAL LIST: it is the owner's alone, and a use case is for somebody else. */
+      if (decl.personal === true)
+        return refuse('FORBIDDEN', `${String(decl.name ?? register)} is personal, so none of its rows go out as examples. The list goes without them.`, `examples.${register}`);
       const read = rows(register);
       if (!read.ok) return read as Result<Body>;
       for (const seq of seqs) {

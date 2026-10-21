@@ -1006,6 +1006,8 @@ export type RegisterDecl = {
   order?: { field: string; dir?: 'asc' | 'desc' };
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
+  /** A list only the owner reads and writes: no grant, share, link, child key or "See as" reaches it (`42 §4.4`). */
+  personal?: true;
   /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
    * to when an agent takes it (checked at install by `declare.ts`'s `handFault`). */
   hand?: { person?: string; agent?: string; taken?: string };
@@ -1658,6 +1660,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   let catalogMemo: Catalog | null = null;
   /** The lists the kernel declares itself (`pack_id` kernel), read once a declaration revision. */
   let kernelMemo: string[] | null = null;
+  /** The lists declared `personal: true`, read once a declaration revision. */
+  let personalMemo: string[] | null = null;
   const lensCache = new LensCache<Held | null>(256);
 
   function reload(opts: { copied?: true } = {}): void {
@@ -1669,6 +1673,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     revision++;
     catalogMemo = null;
     kernelMemo = null;
+    personalMemo = null;
     lensCache.clear();
     /* THE SET OF LISTS IS PART OF WHO HOLDS WHAT: a list installed falls under somebody's whole-record share. So the epoch
        moves when it changes, as it does for a share, and an open tab re-boots onto the lists it now has. Never on the
@@ -1689,6 +1694,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     (kernelMemo ??= sql
       .all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0")
       .map((r) => r.id.slice('register.'.length)));
+
+  /** The lists declared `personal: true`, the owner's alone, for this declaration revision. */
+  const personalListsNow = (): readonly string[] => (personalMemo ??= [...registers.values()].filter((d) => d.personal === true).map((d) => d.id));
 
   /** The record's lists as the lens reads them (`lens.ts`'s `Catalog`), for this declaration revision. */
   const catalogNow = (): Catalog =>
@@ -8181,6 +8189,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     mint,
     hasRegister: (r) => registers.has(r),
     readsRule: (r, where) => ruleOf(where, schemaOf(r), evalContext()).bad[0] ?? null,
+    personal: (r) => (registers.get(r)?.personal === true ? registers.get(r)!.name : null),
   });
 
   /**
@@ -11333,6 +11342,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * and no person's or pack's, so a screen that tells him what he filed leaves them out by this and not by a name.
      */
     kernelLists: (): string[] => [...kernelListsNow()],
+    /**
+     * The lists declared `personal: true`, by id: the owner's alone, which no grant, share, link, child key or "See as"
+     * reaches. The record's `guard` refuses anybody else on them, and the lens never covers one.
+     */
+    personalLists: (): string[] => [...personalListsNow()],
     /**
      * A live list as `@braindog/where` reads it, or `null` for a list this record does not hold.
      *

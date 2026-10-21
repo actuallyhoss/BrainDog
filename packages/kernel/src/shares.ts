@@ -166,6 +166,7 @@ export type ListLike = {
   state?: string;
   scopes?: unknown;
   owner_only?: true;
+  personal?: true;
   fields: readonly (Record<string, unknown> & { id: string; type: string; retired?: boolean; scope?: ScopeDecl })[];
 };
 
@@ -185,6 +186,7 @@ export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; peop
       fields,
       ...(role === undefined ? {} : { role }),
       ...(l.owner_only === true ? { ownerOnly: true } : {}),
+      ...(l.personal === true ? { personal: true } : {}),
       ...(roles.kernel?.includes(l.id) === true ? { kernel: true } : {}),
       ...(l.state === undefined ? {} : { state: l.state }),
     });

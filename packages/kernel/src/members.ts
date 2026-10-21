@@ -74,6 +74,8 @@ export type MemberDeps = {
    * answer nothing for rather than storing it. Absent, only the rule's shape is checked.
    */
   readsRule?: (register: string, where: Json) => Refusal | null;
+  /** The name of a list declared `personal: true`, which no invitation reaches, or `null` for any other list. */
+  personal?: (register: string) => string | null;
 };
 
 /**
@@ -231,10 +233,13 @@ function merged(sql: Sql, person: string, rows: readonly MemberRow[], token: str
   if (narrows === undefined) return { held: null, until: forever };
   const whole = rows.find((r) => r.register === RECORD);
   const owner = whole?.level === 'owner';
-  if (owner && narrows.length === 0) return { held: memberAccess(rows), until: forever };
+  /* A CHILD KEY REACHES NO PERSONAL LIST (`42 §4.4`), so while the record keeps one, a child with nothing narrowing it
+     is read through the lens as well, which leaves those lists out of its ceiling. */
+  const child = token !== null && lens.catalog().lists.some((l) => l.personal === true) && childKey(sql, token);
+  if (owner && narrows.length === 0 && !child) return { held: memberAccess(rows), until: forever };
   const shares = owner ? [] : sharesFor(sql, person);
   if (shares === null) return { held: null, until: forever };
-  if (shares.length === 0 && narrows.length === 0) return { held: memberAccess(rows), until: forever };
+  if (shares.length === 0 && narrows.length === 0 && !child) return { held: memberAccess(rows), until: forever };
   if (rows.length === 0) {
     /* A GUEST HOLDS ONLY SHARES, and a suspended one holds nothing, as a suspended member does. */
     if (shares.length === 0) return { held: null, until: forever };
@@ -249,7 +254,7 @@ function merged(sql: Sql, person: string, rows: readonly MemberRow[], token: str
       .map((r) => ({ register: r.register, level: r.level, ...(r.row_where === null ? {} : { where: parsed(r.row_where) }) })),
     shares,
     ...(saysMe(shares) ? { me: meOf(sql, person, lens.people?.() ?? null) } : {}),
-    ...(token === null ? {} : { token: { narrow: null, narrows } }),
+    ...(token === null ? {} : { token: { narrow: null, narrows, ...(child ? { child: true } : {}) } }),
     epoch,
   };
   const got = lensOf(sources, lens.catalog(), lens.nowMs, lens.tz?.() ?? 'UTC');
@@ -273,6 +278,10 @@ function merged(sql: Sql, person: string, rows: readonly MemberRow[], token: str
     until,
   };
 }
+
+/** Whether a key was minted under another (`mintChild`), as its `token_lens` row says. */
+const childKey = (sql: Sql, token: string): boolean =>
+  sql.one<{ y: number }>('SELECT 1 AS y FROM token_lens WHERE token_id = ? AND parent_id IS NOT NULL', token) !== undefined;
 
 /**
  * The rules on a person's list grants, by list id, from the stored text of each.
@@ -492,6 +501,8 @@ export function invite(
   for (const [register, level] of Object.entries(args.registers ?? {})) {
     const at = `registers.${register}`;
     if (!deps.hasRegister(register)) return no<Member>('REGISTER_UNKNOWN', `There is no register called ${register}.`, { at });
+    const personal = deps.personal?.(register) ?? null;
+    if (personal !== null) return no<Member>('FORBIDDEN', `${personal} is personal: only the owner reads it, so nobody is invited to it.`, { at });
     if (!(LEVELS as readonly string[]).includes(level))
       return no<Member>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at, allowed: LEVELS });
   }
