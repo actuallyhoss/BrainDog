@@ -153,6 +153,13 @@
     content-visibility: visible;
   }
 
+  /* And a cell wraps rather than cutting its words off: the reading column is too narrow for three whole lines. */
+  .doc-text :global(.rowgroup .td) {
+    padding-block: 8px;
+    line-height: 1.45;
+    white-space: normal;
+  }
+
   /* CODE SITS IN A WELL OF THE TILE'S FILL ON THE PAPER, and a long line scrolls inside it, never the page. */
   .doc-text :global(pre) {
     max-inline-size: 100%;
