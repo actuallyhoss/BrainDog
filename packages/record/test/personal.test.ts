@@ -62,13 +62,19 @@ async function record() {
   return { sql, api, clock, as };
 }
 
-test('`personal` IS `true` OR LEFT OUT, AND NEVER BESIDE `owner_only`', async () => {
+test('`personal` IS `true` OR LEFT OUT, NEVER BESIDE `owner_only`, and a list playing profiles or carry says it', async () => {
   const { sql, api } = await record();
   const wrong = refusal(await api.kernel.install([list('ledger', 'Ledger', { personal: false })]));
   assert.equal(wrong.code, 'DECLARATION_INVALID');
   assert.equal(wrong.at, 'personal');
   assert.equal(refusal(await api.kernel.install([list('ledger', 'Ledger', { personal: true, owner_only: true })])).at, 'owner_only');
-  assert.deepEqual(api.kernel.personalLists(), ['setups']);
+  for (const role of ['profiles', 'carry']) {
+    const said = refusal(await api.kernel.install([list('kits', 'Kits', { role })]));
+    assert.equal(said.code, 'DECLARATION_INVALID', `${role}: ${said.fix}`);
+    assert.ok(said.fix.includes('Add personal: true'), said.fix);
+  }
+  value(await api.kernel.install([list('kits', 'Kits', { role: 'carry', personal: true })]));
+  assert.deepEqual([...api.kernel.personalLists()].sort(), ['kits', 'setups']);
   sql.close();
 });
 

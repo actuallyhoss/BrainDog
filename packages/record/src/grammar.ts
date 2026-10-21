@@ -247,7 +247,7 @@ const REGISTER = {
     once: 'the fields an add-on plants and never changes after, by id: [name]. Its own update leaves each as the row holds it; a person still edits them',
     order: '{field, dir?: asc|desc}: the order a read with none of its own comes back in, by a number, day, time or text field of this list',
     same: "{fields: [<text field>], within?: <scope or ref field>, fold: text|exact, keep?: oldest|latest|sealed}: what makes two rows one thing, such as two skills of one name in one project. text reads 'Ponytail (copy)' and 'ponytail.md' as 'ponytail'; exact reads them as written",
-    role: "one of skills, tools, learnings, keys-index: the part the list plays for the record's agents, so a list under any id is read as that part",
+    role: "one of skills, tools, learnings, keys-index, profiles, carry: the part the list plays for the record's agents, so a list under any id is read as that part. A list playing profiles or carry is personal",
     fade: '{field: <day field>, after: <days, such as 90d>}: the day a row fades by and how long after it, as learnings fade unconfirmed',
   },
   field: {

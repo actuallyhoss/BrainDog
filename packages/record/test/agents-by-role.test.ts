@@ -72,14 +72,21 @@ test('THE FADE: a declared rule, else the old day field for ninety days, else no
   assert.equal(fadeDays('0d'), null);
 });
 
-test('FOUR SENTENCES FOR A RECORD THAT KEEPS NONE: plain, named, no id and no em dash', () => {
+test('A SENTENCE FOR EACH PART A RECORD KEEPS NONE OF: plain, named, no id and no em dash', () => {
   assert.deepEqual(AGENT_ROLES.map(noListSaid), [
     'This record keeps no skills.',
     'This record keeps no tools.',
     'This record keeps no learnings.',
     'This record keeps no keys by name.',
+    'This record keeps no profiles.',
+    'This record keeps nothing to carry between machines.',
   ]);
-  for (const role of AGENT_ROLES) assert.ok(!noListSaid(role).includes('—') && !noListSaid(role).includes(AGENT_LIST_FALLBACK['keys-index']));
+  for (const role of AGENT_ROLES) assert.ok(!noListSaid(role).includes('—') && !noListSaid(role).includes(AGENT_LIST_FALLBACK['keys-index']!));
+});
+
+test('THE TWO PERSONAL PARTS: played only by a list that declares them, never by an old id', () => {
+  assert.equal(listFor('profiles', [list('profiles'), list('carry')]), null, 'a list under the part\'s name plays nothing until it says so');
+  assert.deepEqual(agentLists([list('setups', { role: 'profiles' }), list('bags', { role: 'carry' })]), { profiles: 'setups', carry: 'bags' });
 });
 
 /* ── the card ─────────────────────────────────────────────────────────────────────────────────────────────────── */

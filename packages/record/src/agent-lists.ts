@@ -1,6 +1,7 @@
 /**
- * Which list plays a part the record reads for its agents: the skills, the tools, the learnings and the index of keys
- * by name (SHL-A16, "with nothing in the core that a module could own", D9.20).
+ * Which list plays a part the record reads for its agents: the skills, the tools, the learnings, the index of keys
+ * by name, the profiles its agents run under and what carries between machines (SHL-A16, "with nothing in the core
+ * that a module could own", D9.20).
  *
  * BEFORE THIS THE RECORD READ THEM BY THEIR IDS. The card, `skillsBehind`, `offered` and `toolsSeen` each spelled
  * `skills`, `tools`, `learnings` or `credentials`, so the agents add-on could not be renamed, replaced or left out:
@@ -24,12 +25,15 @@
  * lists `context` sends, and it answers an id or `null`.
  */
 
-/** Every part a list can play for the record's agents. */
-export const AGENT_ROLES = ['skills', 'tools', 'learnings', 'keys-index'] as const;
+/** Every part a list can play for the record's agents. `profiles` and `carry` are only ever played by a personal list. */
+export const AGENT_ROLES = ['skills', 'tools', 'learnings', 'keys-index', 'profiles', 'carry'] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
-/** The id each part was read by before a list declared it: the agents add-on's own four, held in this one place. */
-export const AGENT_LIST_FALLBACK: Readonly<Record<AgentRole, string>> = {
+/**
+ * The id each part was read by before a list declared it: the agents add-on's own four, held in this one place. The
+ * two parts that came after the keys were never read by an id, so a list plays them only by declaring them.
+ */
+export const AGENT_LIST_FALLBACK: Readonly<Partial<Record<AgentRole, string>>> = {
   skills: 'skills',
   tools: 'tools',
   learnings: 'learnings',
@@ -70,7 +74,8 @@ export function listFor(role: AgentRole, registers: Registers): string | null {
     }
   }
   if (claiming.length > 0) return claiming[0]!.id;
-  const old = lists.find((r) => r.id === AGENT_LIST_FALLBACK[role]);
+  const fallback = AGENT_LIST_FALLBACK[role];
+  const old = fallback === undefined ? undefined : lists.find((r) => r.id === fallback);
   return old !== undefined && !isRole(old.role) ? old.id : null;
 }
 
@@ -112,6 +117,8 @@ const NO_LIST: Readonly<Record<AgentRole, string>> = {
   tools: 'This record keeps no tools.',
   learnings: 'This record keeps no learnings.',
   'keys-index': 'This record keeps no keys by name.',
+  profiles: 'This record keeps no profiles.',
+  carry: 'This record keeps nothing to carry between machines.',
 };
 
 /** The one sentence a read answers when the record keeps no list that plays `role`. */

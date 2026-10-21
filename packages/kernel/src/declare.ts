@@ -4388,7 +4388,7 @@ function createFault(
  *             owner-only by their role, so neither declares it.
  *   `personal`  `true`, or left out: only the owner reads and writes its rows, in his own session or through his own
  *             key. No grant, share, link, child key or "See as" reaches it, even one naming it (`personalStop` in
- *             `packages/record/src/index.ts`, `coverOf` in `lens.ts`).
+ *             `packages/record/src/index.ts`, `coverOf` in `lens.ts`). A list playing `profiles` or `carry` declares it.
  *   `hand`    `{ person?, agent?, taken? }`: who holds a row, a person by a `ref` field and an agent by the `text` field
  *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
@@ -4452,6 +4452,9 @@ const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday', 'bymonthda
  * (`LINKS` in `packages/seed/src/packs/first-party.ts`), and a list that hands only to agents is still handed.
  */
 const HAND_PARTS = ['person', 'agent', 'taken'] as const;
+
+/** The parts of `AGENT_ROLES` only a personal list may play: one person's profiles, and what carries between his machines. */
+const PERSONAL_ROLES = ['profiles', 'carry'] as const;
 
 /** The parts of a list's `same:`, the two ways it compares a text (`identity-keys.ts`'s `sameFold`), and which row stays. */
 const SAME_PARTS = ['fields', 'within', 'fold', 'keep'] as const;
@@ -5926,6 +5929,9 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   const role = decl.body.role;
   if (role !== undefined && (typeof role !== 'string' || !(AGENT_ROLES as readonly string[]).includes(role)))
     return bad('DECLARATION_INVALID', `${id}'s role is one of ${AGENT_ROLES.join(', ')}. ${JSON.stringify(role)} is not.`, 'role', [...AGENT_ROLES]);
+  /* A LIST OF PROFILES OR OF WHAT CARRIES BETWEEN MACHINES IS ONE PERSON'S SET-UP, so it is personal or not installed. */
+  if (typeof role === 'string' && (PERSONAL_ROLES as readonly string[]).includes(role) && personal !== true)
+    return bad('DECLARATION_INVALID', `${id} plays ${role}, which is the owner's alone. Add personal: true to ${id}.`, 'personal', ['true']);
   const fade = decl.body.fade;
   if (fade !== undefined) {
     const f = fade !== null && typeof fade === 'object' && !Array.isArray(fade) ? (fade as Record<string, unknown>) : null;
