@@ -80,6 +80,8 @@ function end(said: string): void {
   void forget().catch(() => undefined);
   void wipeLocal();
   void import('$lib/record/boot-live.ts').then((m) => m.forget(), () => undefined);
+  /* AND NOTHING KEPT BY THE VERSION IS HANDED TO THEM AGAIN: the reads kept for the tab go, and none is kept from now. */
+  void import('@braindog/client').then((c) => c.keepReads(false), () => undefined);
   live.ended = { said };
   following?.stop();
   following = null;
@@ -194,6 +196,25 @@ export function follow(base: string | null): void {
       },
     }),
   };
+}
+
+/**
+ * WHO READS THROUGH THIS TAB, as a live boot named them (`readAs` in the client): the person, what their role and shares
+ * reach and who the record is seen as. Every read kept by the version is kept for that reader alone, so a reader who
+ * changes (a sign-in, a grant that moved, See as) is never handed an answer read for the one before.
+ */
+export function readingAs(me: {
+  person: string;
+  level: string | null;
+  owner: boolean;
+  lists: readonly string[] | null;
+  levels?: Readonly<Record<string, string>> | undefined;
+  grant?: { epoch: number } | undefined;
+  lens?: string | undefined;
+}, seen: string | null): void {
+  const levels = me.levels ? Object.entries(me.levels).sort(([x], [y]) => x.localeCompare(y)) : null;
+  const reader = JSON.stringify([me.person, me.level, me.owner, me.lists ? [...me.lists].sort() : null, levels, me.grant?.epoch ?? null, me.lens ?? null, seen]);
+  void import('@braindog/client').then((c) => c.readAs(reader), () => undefined);
 }
 
 /** Whether the worker's "answered from the copy" is listened for. Once per tab: it names no record. */

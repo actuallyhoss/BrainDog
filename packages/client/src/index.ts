@@ -1347,6 +1347,7 @@ export function forgetSchemas(): void {
   OUT = new Map();
   HEARD = new Map();
   FIRST = new Map();
+  GRANTS = new Map();
 }
 
 /**
@@ -1403,6 +1404,20 @@ let HEARD = new Map<string, number>();
  * answer is the baseline every screen is drawn against (`live.ts`), and a read sent before it was asked is not kept on.
  */
 let FIRST = new Map<string, { asked: number; version: number }>();
+/**
+ * THE ACCESS EPOCH THIS TAB LAST HEARD, by host and token, as `version` answers it for somebody a share let in: what a
+ * person holds moved (a share narrowed, stopped or widened, a group left) without the record's version having to, so
+ * every read kept before it goes at once, before the app has booted again onto the new grant.
+ */
+let GRANTS = new Map<string, number | null>();
+/** How many times a grant or the reader moved: a read out across a move is never kept, since it was asked before it. */
+let REGRANTS = 0;
+/**
+ * WHO IS READING, as the app names them (`readAs`): the person, what their role and shares reach, and who the record is
+ * seen as. Every kept read, every read out now and every kept schema is keyed by it, so an answer read for one reader is
+ * never handed to another in the same tab, and naming somebody else drops what was kept for the last.
+ */
+let READER = '';
 type KeptRead = { version: number | null; sent: number; marks: number; at: number; marked: boolean; answer: Result<unknown> };
 
 /** Whether a read kept at `kept`, asked at `at`, is the record's at the version the tab has heard now. */
@@ -1417,7 +1432,7 @@ function sameVersion(heard: string, kept: number | null, at: number): boolean {
  * own in many places, and a read kept for one of them is the record's answer for all. Beside them, the reads out now.
  */
 let READS = new Map<string, KeptRead>();
-let OUT = new Map<string, { version: number | null; sent: number; marks: number; at: number; flight: Promise<Result<unknown>> }>();
+let OUT = new Map<string, { version: number | null; sent: number; marks: number; at: number; regrants: number; flight: Promise<Result<unknown>> }>();
 /** Every write this tab sent but a read sent as one, once answered; and the reader's marks it moved. */
 let SENT = 0;
 let MARKS = 0;
@@ -1426,7 +1441,10 @@ let MARKS = 0;
  * The kept answer for `key` on the record `heard` names, or `ask`ed and kept once it lands if nothing moved while it was
  * out. `marked`: the answer may carry the reader's mark (`carriesMark`).
  */
-function keptOr<T>(heard: string, key: string, marked: boolean, ask: () => Promise<Result<T>>): Promise<Result<T>> {
+function keptOr<T>(heard: string, asked: string, marked: boolean, ask: () => Promise<Result<T>>): Promise<Result<T>> {
+  const reader = READER;
+  const regrants = REGRANTS;
+  const key = `${JSON.stringify(reader)} ${asked}`;
   const version = HEARD.get(heard) ?? null;
   const now = Date.now();
   const was = READS.get(key);
@@ -1442,16 +1460,16 @@ function keptOr<T>(heard: string, key: string, marked: boolean, ask: () => Promi
     return Promise.resolve(structuredClone(was.answer) as Result<T>);
   /* THE SAME READ OUT NOW, ASKED AT THIS VERSION, is shared, a POST read among them, whichever client sent it. */
   const flying = OUT.get(key);
-  if (flying !== undefined && sameVersion(heard, flying.version, flying.at) && flying.sent === SENT && flying.marks === MARKS)
+  if (flying !== undefined && flying.regrants === REGRANTS && sameVersion(heard, flying.version, flying.at) && flying.sent === SENT && flying.marks === MARKS)
     /* ONE THAT FAILED IS ASKED AGAIN BY THIS CALLER: the sender's own fetch may have been called off as it left. */
     return flying.flight.then((r) => (r.ok ? (structuredClone(r) as Result<T>) : ask()));
   const at = { version, sent: SENT, marks: MARKS, at: now };
   const flight = ask();
-  const mine = { ...at, flight: flight as Promise<Result<unknown>> };
+  const mine = { ...at, regrants, flight: flight as Promise<Result<unknown>> };
   OUT.set(key, mine);
   void flight.then((got) => {
     if (OUT.get(key) === mine) OUT.delete(key);
-    if (!got.ok || !KEEPING || !sameVersion(heard, at.version, at.at) || SENT !== at.sent) return;
+    if (!got.ok || !KEEPING || READER !== reader || REGRANTS !== regrants || !sameVersion(heard, at.version, at.at) || SENT !== at.sent) return;
     const carries = marked && carriesMark(got.value);
     if (carries && MARKS !== at.marks) return;
     READS.delete(key);
@@ -1480,6 +1498,21 @@ export function keepReads(on: boolean): void {
   OUT = new Map();
   HEARD = new Map();
   FIRST = new Map();
+  GRANTS = new Map();
+}
+
+/**
+ * Name who reads through this tab from now on: an app keeping reads names the person a live boot answered for, with
+ * their role, their shares' epoch and who the record is seen as. Somebody else drops every kept read and schema.
+ */
+export function readAs(reader: string): void {
+  if (reader === READER) return;
+  READER = reader;
+  REGRANTS += 1;
+  READS = new Map();
+  OUT = new Map();
+  SCHEMAS = new WeakMap();
+  FLYING = new WeakMap();
 }
 
 /** Drop every kept read, so each is asked again: what a pull on a phone asks for. */
@@ -1507,7 +1540,7 @@ export function createClient(options: ClientOptions) {
     const by = KEEPING ? TAB : doFetch;
     let byHost = SCHEMAS.get(by);
     if (byHost === undefined) SCHEMAS.set(by, (byHost = new Map()));
-    const key = `${base} ${options.token ?? ''}`;
+    const key = `${JSON.stringify(READER)} ${base} ${options.token ?? ''}`;
     let store = byHost.get(key);
     if (store === undefined) byHost.set(key, (store = { version: null, lists: new Map() }));
     return store;
@@ -1585,7 +1618,7 @@ export function createClient(options: ClientOptions) {
   function shared<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
     let byFetch = FLYING.get(doFetch);
     if (byFetch === undefined) FLYING.set(doFetch, (byFetch = new Map()));
-    const key = `${url.toString()} ${options.token ?? ''}`;
+    const key = `${JSON.stringify(READER)} ${url.toString()} ${options.token ?? ''}`;
     const out = byFetch.get(key);
     if (out !== undefined) return out.then((r) => structuredClone(r) as Result<T>);
     const flight = send<T>(name, url, writes, sent, outlives);
@@ -1793,6 +1826,15 @@ export function createClient(options: ClientOptions) {
         const heard = `${base} ${options.token ?? ''}`;
         if (!HEARD.has(heard)) FIRST.set(heard, { asked, version: out.value.version });
         HEARD.set(heard, out.value.version);
+        /* A GRANT THAT MOVED DROPS EVERY KEPT READ, whatever the version says: they were held to what was held before. */
+        const said = (out.value as { grant?: { epoch?: unknown } | null }).grant?.epoch;
+        const epoch = typeof said === 'number' ? said : null;
+        if (GRANTS.has(heard) && GRANTS.get(heard) !== epoch) {
+          REGRANTS += 1;
+          READS = new Map();
+          OUT = new Map();
+        }
+        GRANTS.set(heard, epoch);
       }
       return out;
     },

@@ -7,16 +7,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createClient, forgetReads, keepReads, keptRead, wroteOutside } from '../src/index.ts';
+import { createClient, forgetReads, keepReads, keptRead, readAs, wroteOutside } from '../src/index.ts';
 
 function host() {
-  const state = { version: 4, refuse: false };
+  const state = { version: 4, refuse: false, epoch: undefined as number | undefined };
   const asked: string[] = [];
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     const name = url.pathname.replace(/^\/api\//, '');
     asked.push(name);
-    if (name === 'version') return Response.json({ ok: true, value: { version: state.version } });
+    if (name === 'version') return Response.json({ ok: true, value: { version: state.version, ...(state.epoch === undefined ? {} : { grant: { epoch: state.epoch } }) } });
     if (state.refuse) return Response.json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } }, { status: 403 });
     if (name === 'page') return Response.json({ ok: true, value: { slug: url.searchParams.get('slug'), blocks: [{ kind: 'table', rows: [] }] } });
     if (name === 'previewPage') return Response.json({ ok: true, value: { blocks: [{ kind: 'feed', source: 'activity', seen: 'x' }], body: JSON.parse(String(init?.body ?? '{}')) } });
@@ -147,6 +147,57 @@ test('A READ PAST THE CLIENT IS KEPT THE SAME WAY, and one at a relative address
     assert.equal((await keptRead('https://a.example', 'actions', ask)).value, 2);
     assert.equal((await keptRead('', 'actions', ask)).value, 3);
     assert.equal((await keptRead('', 'actions', ask)).value, 4);
+  } finally {
+    keepReads(false);
+  }
+});
+
+test('KEPT FOR ONE READER ALONE: an answer read for one person, grant or See as is never handed to another in the tab', async () => {
+  const h = host();
+  const c = createClient({ base: 'https://a.example', fetch: h.fetch });
+  keepReads(true);
+  try {
+    readAs('owner');
+    await c.version();
+    await c.page('money');
+    await c.page('money');
+    await keptRead('https://a.example', 'actions', async () => ({ ok: true as const, value: 1 }));
+    assert.equal(h.count('page'), 1);
+    readAs('guest');
+    await c.page('money');
+    assert.equal(h.count('page'), 2, 'somebody else reading asks again');
+    let outside = 0;
+    await keptRead('https://a.example', 'actions', async () => ({ ok: true as const, value: (outside += 1) }));
+    assert.equal(outside, 1, 'a read past the client is asked again for them too');
+    readAs('owner');
+    await c.page('money');
+    assert.equal(h.count('page'), 3, "the first reader's answers went when the second was named");
+  } finally {
+    readAs('');
+    keepReads(false);
+  }
+});
+
+test("A GRANT THAT MOVED DROPS EVERY KEPT READ at the same version, and a read out across the move is not kept", async () => {
+  const h = host();
+  const c = createClient({ base: 'https://a.example', fetch: h.fetch });
+  keepReads(true);
+  try {
+    h.state.epoch = 1;
+    await c.version();
+    await c.list({ register: 'tasks' });
+    await c.list({ register: 'tasks' });
+    assert.equal(h.count('list'), 1);
+    h.state.epoch = 2;
+    const out = c.list({ register: 'other' });
+    await c.version();
+    await out;
+    await c.list({ register: 'tasks' });
+    assert.equal(h.count('list'), 3, 'the grant moved, the version did not');
+    await c.list({ register: 'other' });
+    assert.equal(h.count('list'), 4, 'the read out while the grant moved was not kept');
+    await c.list({ register: 'other' });
+    assert.equal(h.count('list'), 4);
   } finally {
     keepReads(false);
   }

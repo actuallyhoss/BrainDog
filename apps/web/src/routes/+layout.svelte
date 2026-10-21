@@ -52,7 +52,7 @@
   import TabBar from '$lib/shell/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { follow, followGrant, live } from '$lib/data/live.svelte.ts';
+  import { follow, followGrant, live, readingAs } from '$lib/data/live.svelte.ts';
   import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
@@ -877,6 +877,8 @@
       void import('$lib/data/local-tab.ts').then((m) => m.claimLocal(base, me));
       /* AND THE ACCESS EPOCH IT BOOTED WITH, which the version poll compares: a move boots the tab again (§2.8). */
       followGrant(me.grant?.epoch ?? null, () => invalidate('braindog:boot'));
+      /* AND THE READS KEPT BY THE VERSION ARE THIS READER'S ALONE: anybody else, or a new grant, keeps none of them. */
+      readingAs(me, seeingAs()?.id ?? null);
     });
   });
 
