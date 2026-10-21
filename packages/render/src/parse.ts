@@ -58,7 +58,7 @@ export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean
 
 export type Block = {
   type: 'block';
-  /** One of the forty, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
+  /** One of the forty-one, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
   kind: BlockKind;
   /** The word after the kind in the fence, one of `KINDS[kind].forms`: ` ```stat lead ` is `lead`. */
   form?: string;
@@ -306,7 +306,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         fix: isPackKind(kind)
           ? `"${written}" is a block kind no installed pack declares. Install the pack that declares it. The block is shown as you wrote it.`
           : written
-          ? `"${written}" is not one of the forty kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the forty-one kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -491,7 +491,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
 
     out.push({
       type: 'block',
-      /* `kindSpec` answered, so the name is one of the forty or an installed `block.<id>`. */
+      /* `kindSpec` answered, so the name is one of the forty-one or an installed `block.<id>`. */
       kind: kind as BlockKind,
       ...(form ? { form } : {}),
       ...(heading ? { heading } : {}),

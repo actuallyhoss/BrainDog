@@ -16,7 +16,7 @@ import { KINDS, isKind, type Kind, type KindSpec } from './kinds.ts';
 /** A kind a pack declares, as a page and a fence name it: `block.` and the declaration's own id. */
 export type PackKind = `block.${string}`;
 
-/** A drawn block's kind: one of the forty, or one a pack declared. */
+/** A drawn block's kind: one of the forty-one, or one a pack declared. */
 export type BlockKind = Kind | PackKind;
 
 /** The prefix every pack kind carries, and the pattern the kernel admits under it (`declare.ts` `PACK_KIND`). */

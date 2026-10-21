@@ -273,9 +273,9 @@ export default function closedLists(
    * a parser of English, and it does not try to catch every phrasing (`kinds.ts`'s own "Twenty-five,
    * counted." names no word "kind" at all and this gate cannot see it either).
    *
-   * NUMBER WORDS ONLY GO TO FORTY. Twenty-nine is today's count with room to grow, and the largest
-   * spelled-out count of anything called "kinds" anywhere in the corpus is `event-kinds`' own
-   * thirty-nine, a different list entirely. Forty covers every real sentence without this table
+   * NUMBER WORDS ONLY GO TO FORTY-NINE. The block kinds passed forty with `kpis` (forty-one), and the largest
+   * spelled-out count of anything else called "kinds" anywhere in the corpus is `event-kinds`' own
+   * thirty-nine, a different list entirely. The forties cover every real sentence without this table
    * pretending to parse English numbers in general.
    */
   const ONES = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
@@ -284,12 +284,12 @@ export default function closedLists(
   const NUMBER_WORDS = new Map();
   ONES.forEach((w, i) => NUMBER_WORDS.set(w, i + 1));
   TEENS.forEach((w, i) => NUMBER_WORDS.set(w, i + 10));
-  NUMBER_WORDS.set('forty', 40);
   /* Both the hyphenated form this corpus actually writes (`twenty-nine`) and the spaced one nobody has
      yet, because the day somebody does, this should already read it rather than go quietly blind. */
   for (const [base, tens] of [
     [20, 'twenty'],
     [30, 'thirty'],
+    [40, 'forty'],
   ]) {
     NUMBER_WORDS.set(tens, base);
     ONES.forEach((w, i) => {
