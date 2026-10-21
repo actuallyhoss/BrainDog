@@ -396,9 +396,11 @@
       display: none;
     }
 
-    /* NOW'S WORD GIVES WAY ON A NARROW BLOCK, its line kept: an hour named a sixteenth of the width before it ran into it. */
+    /* NOW'S WORD GIVES WAY ON A NARROW BLOCK, its line kept: an hour named a sixteenth of the width before it ran into it.
+       The word is drawn at no size, not in a clear ink: a clear word still stood over 12:00 at 390 (the look's "text
+       crosses text"), and the line is the box's end edge, so it stays where it was. */
     .lanes-now {
-      color: transparent;
+      font-size: 0em;
     }
 
     /* A RUN'S LANE ON A PHONE: who and what on the first line, its time under them, its bar under both, the width. */
