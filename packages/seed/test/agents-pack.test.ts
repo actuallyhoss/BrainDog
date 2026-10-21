@@ -741,7 +741,9 @@ const before13 = (declarations: Record<string, unknown>[]): Record<string, unkno
     .map((d) =>
       d.page === 'agents'
         ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(d.blocks as Loose[])) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
-        : listBefore13(d),
+        : d.metric === 'keys-nowhere'
+          ? { ...d, where: 'state is live, value is empty, where is empty' }
+          : listBefore13(d),
     );
 
 test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figures put back, the add-on declares what 1.11.0 did, to the letter', () => {
@@ -786,7 +788,12 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
   assert.equal(mark(Object.entries(AGENTS_PAGES).filter(([slug]) => slug !== 'agents' && slug !== 'brain')), 'c0ba8121ad6e909f', 'a skill’s page or a run’s is changed');
   assert.equal(mark(listsBefore13(AGENTS_REGISTERS)), 'dd24d88e551ccf5d', 'a list or a field is changed');
   /* WITHOUT 1.13.0'S FOUR, which came last of the figures this add-on writes itself and before the door's. */
-  const figures12 = Object.fromEntries(Object.entries(AGENTS_MODULE.AGENTS_METRICS).filter(([id]) => !FIGURES_13.includes(id)));
+  const figures12 = Object.fromEntries(
+    Object.entries(AGENTS_MODULE.AGENTS_METRICS)
+      .filter(([id]) => !FIGURES_13.includes(id))
+      /* THE UI PASS OF 21 OCTOBER (H25) COUNTS EVERY KEY NOT RETIRED, as the Vault does; put the live-only clause back. */
+      .map(([id, f]) => [id, id === 'keys-nowhere' ? { ...f, where: 'state is live, value is empty, where is empty' } : f]),
+  );
   assert.equal(mark({ ...figures12, ...FIGURES_11 }), 'f59d74ab2bdc01ce', 'a figure went or is changed');
   assert.equal(Object.keys(AGENTS_MODULE.AGENTS_METRICS).length, 25, 'a figure went or came');
   /* `runs-left-next` STAYS DECLARED, for an agent that reads it, though no block draws on it. */
@@ -848,7 +855,7 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), 'e346e74a0007c783', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), 'c616a819e2f84bb8', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
 });
@@ -1013,8 +1020,8 @@ test('THE KEYS, TOOLS AND RUNS FIGURES COUNT WHAT EACH CLAUSE SAYS, over the see
   const keys = ROWS.credentials ?? [];
   const live = keys.filter((r) => r.state === 'live');
   assert.equal(reading(k, 'keys-sealed'), 0, 'the seed seals nothing');
-  const nowhere = live.filter((r) => r.where === undefined).length;
-  assert.ok(nowhere > 0, 'the seed has no live key kept nowhere');
+  const nowhere = keys.filter((r) => r.state !== 'retired' && r.where === undefined).length;
+  assert.ok(nowhere > 0, 'the seed has no key kept nowhere');
   assert.equal(reading(k, 'keys-nowhere'), nowhere);
   assert.equal(reading(k, 'keys-expired'), live.filter((r) => typeof r.expires === 'string' && r.expires < dayOf(0)).length);
   const unseen = (ROWS.tools ?? []).filter((r) => r.state === 'active' && Date.parse(String(r.seen)) < NOW - 30 * DAY_MS).length;
@@ -1032,7 +1039,7 @@ test('THE KEYS, TOOLS AND RUNS FIGURES COUNT WHAT EACH CLAUSE SAYS, over the see
   const retired = value<{ id: string }>(k.create('credentials', { label: 'Retired sealed', opens: 'Nothing', kind: 'api_token', state: 'retired' }, AS));
   seal(retired.id);
   assert.equal(reading(k, 'keys-sealed'), 2, 'a retired key sealed was counted, which the Vault does not');
-  assert.equal(reading(k, 'keys-nowhere'), nowhere - 1, 'a sealed key is still counted as kept nowhere');
+  assert.equal(reading(k, 'keys-nowhere'), nowhere - 2, 'a sealed key is still counted as kept nowhere');
 
   /* PAST ITS DAY: live and expired counts; retired and expired does not. */
   value(k.create('credentials', { label: 'Old token', opens: 'Nothing now', kind: 'api_token', where: 'The studio safe', expires: dayOf(-3) }, AS));

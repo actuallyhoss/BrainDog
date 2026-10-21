@@ -378,7 +378,9 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      and do not say where they are kept, so nobody could find them again; and how many are past their day. A sealed
      field answers only `is set` and `is empty` (`packages/where/src/sentence.ts`), never what it holds. */
   'keys-sealed': { metric: 'keys-sealed', name: 'Keys sealed in the vault', source: 'register.credentials', where: 'state is not retired, value is set', ...COUNT },
-  'keys-nowhere': { metric: 'keys-nowhere', name: 'Keys with no value and nowhere they are kept', source: 'register.credentials', where: 'state is live, value is empty, where is empty', ...FIX },
+  /* EVERY KEY NOT RETIRED SINCE THE UI PASS OF 21 OCTOBER (H25), as the Vault's "have no value yet" counts (`missing`
+     in `apps/web/src/routes/vault/tiles.ts`): a stale or broken key with no value is as lost as a live one. */
+  'keys-nowhere': { metric: 'keys-nowhere', name: 'Keys with no value and nowhere they are kept', source: 'register.credentials', where: 'state is not retired, value is empty, where is empty', ...FIX },
   'keys-expired': { metric: 'keys-expired', name: 'Keys past their day', source: 'register.credentials', where: 'state is live, expires before today', ...FIX },
   /**
    * THE TOOLS NOT SEEN IN A MONTH, SINCE 1.10.0: active, and last seen more than thirty days ago, or never seen and
