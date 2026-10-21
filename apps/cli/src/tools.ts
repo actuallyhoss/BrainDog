@@ -205,7 +205,7 @@ function toolsLock(file: string): ToolsLock | null {
 }
 
 /** JSON with its keys in order, so the same entry always hashes the same. */
-const canonical = (x: unknown): string =>
+export const canonical = (x: unknown): string =>
   Array.isArray(x)
     ? `[${x.map(canonical).join(',')}]`
     : isObject(x)
