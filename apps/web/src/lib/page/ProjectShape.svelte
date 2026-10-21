@@ -541,10 +541,15 @@
          project, so a stop or a tell from here says what it says there. With nobody on it the composer stands alone, and
          the next run to start here gets what he types; for a reader who may not tell, nobody on it draws nothing. -->
     {#key read.key}
-      <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here hidden={!owner && here === 0}>
-        <PresencePanel {owner} project={read.key} oncount={(n) => (here = n)} />
-        <TellPanel {owner} project={read.key} projectName={name} first={3} />
-      </Tile>
+      {#if owner || here > 0}
+        <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here>
+          <PresencePanel {owner} project={read.key} oncount={(n) => (here = n)} />
+          <TellPanel {owner} project={read.key} projectName={name} first={3} />
+        </Tile>
+      {:else}
+        <!-- NOBODY ON IT YET, for a reader who may not tell: the runs are read unseen, and the tile comes once one is. -->
+        <div hidden><PresencePanel project={read.key} oncount={(n) => (here = n)} /></div>
+      {/if}
     {/key}
   </div>
 {/if}
