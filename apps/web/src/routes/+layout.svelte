@@ -84,6 +84,7 @@
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
+  import { holdIn, presses } from '$lib/data/held.svelte.ts';
   import { untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
@@ -1160,7 +1161,9 @@
       that carried meaning by moving would have to say it another way as well.
     -->
     {#key page.url.pathname}
-    <main id="main" class="body" data-screen={shape === 'rail' && Sidebar === null ? undefined : settled()}>
+    <!-- NOTHING THAT WRITES IS PRESSED WHILE THE SCREEN IS A SAVED COPY (`held.svelte.ts`): the quiet mark is up, a screen
+         draws what it kept and asks again, or the shell is the last copy. Links still go. -->
+    <main id="main" class="body" data-screen={shape === 'rail' && Sidebar === null ? undefined : settled()} {@attach holdIn(() => presses.held || data.stale === true)}>
       <!-- THE QUIET MARK, over the work while something drawn from the local copy is asked again (`CopyMark.svelte`). -->
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
@@ -1902,5 +1905,14 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* A PRESS HELD WHILE THE SAVED COPY IS DRAWN (`held.svelte.ts`): the same box, quiet, and nothing presses it. Quiet
+     only once it has been held a moment, so a page this tab kept, whose answer lands at once, does not flicker; and
+     back at once when the answer lands, since the transition is only the held state's. */
+  :global(#main[data-held] [data-held-press]) {
+    cursor: default;
+    opacity: 0.6;
+    transition: opacity 0s 0.3s;
   }
 </style>

@@ -45,6 +45,7 @@
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { holdPresses } from '$lib/data/held.svelte.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import Told from '$lib/home/Told.svelte';
   import type { LessonsTile } from '$lib/home/told.ts';
@@ -132,6 +133,12 @@
     if (copied === null) return;
     return untrack(() => holdCopyMark());
   });
+  /* AND A PAGE DRAWN FROM WHAT THIS TAB KEPT OF IT holds its presses until the read behind it answers (`held.svelte.ts`). */
+  let remembered = $state<string | null>(null);
+  $effect(() => {
+    if (remembered === null) return;
+    return untrack(() => holdPresses());
+  });
   function fromLocal(asked: string, choice: Record<string, string>) {
     /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
     const draw = (near: Near<Opened> | null) => {
@@ -159,6 +166,7 @@
     const mark = localTicket();
     if (keptCopy) {
       answered(asked, keptCopy);
+      remembered = asked;
       painted('page', 'memory');
     } else fromLocal(asked, choice);
     waited = 0;
@@ -166,7 +174,9 @@
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
     reading = true;
     const mine = ++started;
-    const out = await reader.read(asked, filtered);
+    const out = await reader.read(asked, filtered).finally(() => {
+      if (remembered === asked) remembered = null;
+    });
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
        while this was out, has already drawn over. */
     if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);

@@ -49,6 +49,7 @@
   import { heldOut, holdsWhole, type Reader } from './held.ts';
   import NextStep from './NextStep.svelte';
   import { frameResizeObserver } from '$lib/ui/resize.ts';
+  import { presses } from '$lib/data/held.svelte.ts';
 
   let {
     mode,
@@ -865,6 +866,8 @@
      stays after the click. Only `j` and `k` turn it on. */
   let keyed = false;
   let goAt = 0;
+  /** The page's keys that write, held while the screen is a saved copy. */
+  const HELD_KEYS = new Set(['x', 'e', 'm', 'd', 'Delete', 'Backspace']);
   const ROW = '[data-row], .block .list > li.item';
 
   /** Every row the page draws now, in reading order, each with the key the cursor holds it by. */
@@ -938,6 +941,9 @@
    */
   function homeKey(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey || covered() || typing() || arranging) return;
+    /* WHILE THE SCREEN IS A SAVED COPY (`held.svelte.ts`) THE KEYS THAT WRITE ARE HELD, as a press is: the tick, the
+       move, the day, the delete and the row's own action. The cursor still walks, and o and y still go. */
+    if (presses.held && HELD_KEYS.has(e.key)) return;
     if (host?.menuOpen) return;
     if (silenced(e)) return;
     /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g 1` goes to the first place in the nav. */

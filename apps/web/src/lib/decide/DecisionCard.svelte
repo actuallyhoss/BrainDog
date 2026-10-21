@@ -84,6 +84,7 @@
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
+  import { presses } from '$lib/data/held.svelte.ts';
 
   let {
     question,
@@ -385,8 +386,9 @@
   }
 
   /** An answer given. With the reason line open it changes the choice and keeps the words already typed. */
+  /* NOR WHILE THE SCREEN IS A SAVED COPY OR WHAT THIS TAB KEPT (`held.svelte.ts`): a key reaches this as a press does. */
   function press(way: Way) {
-    if (kept || busy || holding !== null) return;
+    if (kept || presses.held || busy || holding !== null) return;
     if (onpress) return onpress(way.key);
     if (phase === 'asking') {
       chosen = way;
@@ -397,7 +399,7 @@
 
   /** A choice chosen, and nothing sent: the form's Decide sends it. With the reason line open it is the answer's change. */
   function selectWay(way: Way) {
-    if (kept || busy || holding !== null) return;
+    if (kept || presses.held || busy || holding !== null) return;
     if (phase === 'asking') return press(way);
     picked = way.key;
   }

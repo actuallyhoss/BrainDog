@@ -422,7 +422,10 @@
     {/snippet}
   </PageHead>
 
-  <div class="page" inert={fromCopy} data-selecting={selecting ? '' : undefined}>
+  <!-- THE COPY'S QUEUE IS NOT INERT, ONLY HELD: its cards keep their boxes, quiet, and no press or key answers one until
+       the record's own answer replaces it (`held.svelte.ts`, which the quiet mark holds), while a question's link still
+       opens it. -->
+  <div class="page" data-selecting={selecting ? '' : undefined}>
     <!-- NOT WHILE THE SHELL IS THE KEPT COPY (VERIFY H45): a copy reads every reader as `read` (`boot-copy.ts`
          `drawnFrom`), so on a cold open this line drew for a frame for an owner and went when the live shell landed,
          and the page jumped 58px and back. Only the live shell says who may answer. -->

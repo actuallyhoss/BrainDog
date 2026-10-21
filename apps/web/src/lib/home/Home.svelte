@@ -136,6 +136,7 @@
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
   import { keepPart, keptPart, tileOnce, TODAY_KEPT_MS } from '$lib/home/today-kept.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { holdPresses } from '$lib/data/held.svelte.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
 
@@ -366,6 +367,13 @@
     if (!fromCopy) return;
     return untrack(() => holdCopyMark());
   });
+  /* AND DRAWN FROM WHAT THIS TAB KEPT OF IT (`today-kept.ts`), its presses wait for the read behind it (`held.svelte.ts`):
+     what it kept may be a question somebody has answered since. */
+  let fromMemory = $state(false);
+  $effect(() => {
+    if (!fromMemory) return;
+    return untrack(() => holdPresses());
+  });
   /**
    * WHETHER THE PAGE UNDER THE HEAD IS DRAWN: once there is a page to draw, from memory, the copy or the record, or once
    * `PAGE_WAIT_MS` has gone without one, when its bars are drawn as before. A copy slower than its wait lands inside it.
@@ -520,6 +528,7 @@
       news = was.news;
       newLines = was.news?.lines ?? [];
       settled = true;
+      fromMemory = true;
       untrack(() => drew('ready'));
       /* WHAT THIS TAB DREW IS THE SCREEN: it is not held as reading for the quiet read behind it. UNTRACKED, as `drew`
          is: closing reads the pending count it writes, and the effect would run again on every call that closes. */
@@ -555,6 +564,7 @@
         reading = false;
         settled = true;
         bodyAsked = true;
+        fromMemory = false;
         if (at !== null) closed(ok, at);
         firstClosed(true);
       });
@@ -1122,7 +1132,7 @@
 <!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
 {#snippet moreLine()}
   {#if folds > 0 && desked}
-    <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+    <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
       <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
       {#if !moreOpen}<span class="more-count num" style:visibility={tilesHeard ? null : 'hidden'}>{folds}</span>{/if}
       <Icon name="chevronDown" size="s" />

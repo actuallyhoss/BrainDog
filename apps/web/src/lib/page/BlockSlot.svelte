@@ -693,7 +693,7 @@
     <div class="lane-bar">
       <Segmented role="group" aria-label={headingText ?? 'Lanes'} full>
         {#each lanes as l (l.id)}
-          <button type="button" class="segment" data-on={shownLane === l.id ? '' : undefined} aria-pressed={shownLane === l.id} onclick={() => (lane = l.id)}
+          <button type="button" class="segment" data-free data-on={shownLane === l.id ? '' : undefined} aria-pressed={shownLane === l.id} onclick={() => (lane = l.id)}
             >{l.label} <span class="num">{l.count}</span></button
           >
         {/each}

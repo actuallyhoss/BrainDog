@@ -120,7 +120,7 @@
       {#if lanes.length > 2}
         <Segmented role="group" aria-label={name} class="p-lanes">
           {#each lanes as l (l.id)}
-            <button type="button" class="segment" data-on={lane === l.id ? '' : undefined} aria-pressed={lane === l.id} onclick={() => (lane = l.id)}
+            <button type="button" class="segment" data-free data-on={lane === l.id ? '' : undefined} aria-pressed={lane === l.id} onclick={() => (lane = l.id)}
               >{l.label} <span class="num">{l.count}</span></button
             >
           {/each}
