@@ -80,11 +80,11 @@ test('every option’s own button is off for a reader who may not answer, and sa
 
 test('the third verb is off too, and points at the same sentence', () => {
   /* A GATE WITH ITS TWO ANSWERS OFF AND ITS DEFER LIVE IS STILL A DEAD END: a defer is a decision
-     about when, it takes a reason and a wake date, and `decide` is what the record wants for it. It is Not now, words
-     only, beside the answers (DIRECTION §39). */
+     about when, it takes a reason and a wake date, and `decide` is what the record wants for it. It is Ask me later, a
+     clock beside the answers as on every card (VERIFY H8). */
   assert.match(
     page,
-    /<button type="button" class="dc-btn" data-weight="bare" disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} onclick=\{defer\}>\{gate\.notNow\}<\/button>/u,
+    /<button type="button" class="dc-btn dc-later" data-weight="bare" disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} aria-label=\{queueWords\.notNow\} title=\{queueWords\.notNow\} onclick=\{defer\}\n\s+><Icon name="clock" size="s" \/><\/button/u,
     'Not now is still offered to a reader who may not answer',
   );
 });
@@ -212,8 +212,8 @@ test('nothing a reader was invited to read is hidden from them', () => {
       .filter((line) => line.includes('answerable'))
       .map((line) => line.trim()),
     [
-      /* NOT NOW, the third verb, off with the same sentence. */
-      "<button type=\"button\" class=\"dc-btn\" data-weight=\"bare\" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{gate.notNow}</button>",
+      /* ASK ME LATER, the third verb, off with the same sentence. */
+      "<button type=\"button\" class=\"dc-btn dc-later\" data-weight=\"bare\" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} aria-label={queueWords.notNow} title={queueWords.notNow} onclick={defer}",
       '{#if !answerable}',
       /* THE RECORD'S TWO ANSWERS. */
       'disabled={!answerable || holding !== null}',

@@ -88,6 +88,7 @@
   import { WORDS as whoWords } from './decider.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
@@ -905,7 +906,10 @@
      It opens the step that asks why not yet and until when. -->
 {#snippet later()}
   {#if !deferring}
-    <button type="button" class="dc-btn" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{gate.notNow}</button>
+    <!-- A CLOCK, as on every card (VERIFY H8): 32 square, 44 under a thumb, named "Ask me later". -->
+    <button type="button" class="dc-btn dc-later" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} aria-label={queueWords.notNow} title={queueWords.notNow} onclick={defer}
+      ><Icon name="clock" size="s" /></button
+    >
   {/if}
 {/snippet}
 
@@ -1353,6 +1357,21 @@
     flex-direction: column;
     gap: var(--tile-gap);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* ASK ME LATER: the card's clock, 32 square (44 under a thumb), after the answers. */
+  .dc-actions > .dc-later {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--btn-h);
+    padding: 0;
+    color: var(--ink-3);
+  }
+
+  @media (pointer: coarse) {
+    .dc-actions > .dc-later {
+      inline-size: var(--tap);
+    }
   }
 
   /* THE FIRST TILE IS THE ANSWERS: who asked, the option cards, Not now, and a receipt once it is answered. */
