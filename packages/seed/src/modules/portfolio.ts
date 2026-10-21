@@ -145,15 +145,18 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
 ];
 
 /**
- * KILN'S KEY NUMBERS, THE SAMPLE'S ONLY ONES (the KPI plan of 21 October, K3): what it earns a month, which leads its
- * card and its page, how many studios hold a licence, and the specimen downloads nobody has reported for three weeks,
- * so a stale number is on the sample too. `thing` is the project's place in `THINGS`, from 1. A sample's and not
- * Portfolio's: the add-on ships the list and no row of it.
+ * THE SAMPLE'S KEY NUMBERS (the KPI plan of 21 October, K3). Kiln's: what it earns a month, which leads its card and
+ * its page, how many studios hold a licence, and the specimen downloads nobody has reported for three weeks, so a stale
+ * number is on the sample too. Marlow & Co's hours billed, which he pinned to Today, and Portage's subscribers, whose
+ * day went by short of its target, so Today shows a pin, a miss and a stale number side by side. `thing` is the
+ * project's place in `THINGS`, from 1. A sample's and not Portfolio's: the add-on ships the list and no row of it.
  */
 export const SAMPLE_KPIS: Fields[] = [
   { name: 'Revenue a month', thing: 1, measures: 'What the licences, studio deals and prints brought in each month', source: 'numbers', measure: 'Revenue a month', unit: 'GBP', kind: 'flow', every: '1m', target_amount: gbp(200_000), headline: true, owner: 'claude', order: 1 },
   { name: 'Studios licensed', thing: 1, measures: 'Studios holding a current licence', source: 'agent', measure: 'Studios licensed', unit: 'studios', kind: 'level', every: '1w', target: 60, target_by: day(90), owner: 'claude', order: 2 },
   { name: 'Specimen downloads', thing: 1, measures: 'Specimen PDFs downloaded in a week', source: 'typed', measure: 'Specimen downloads', unit: 'downloads', kind: 'level', every: '1w', order: 3 },
+  { name: 'Hours billed', thing: 2, measures: 'Hours billed to Marlow & Co each week', source: 'typed', measure: 'Hours billed', unit: 'hours', kind: 'flow', every: '1w', today: 'pinned', order: 1 },
+  { name: 'Subscribers', thing: 3, measures: 'People signed up to the Portage newsletter', source: 'agent', measure: 'Subscribers', unit: 'people', kind: 'level', every: '1w', target: 500, target_by: day(-6), headline: true, owner: 'claude', order: 1 },
 ];
 
 /** The 28th of the month this many months before the sample's own, at noon. */
@@ -166,12 +169,16 @@ const monthBack = (n: number): string => {
 const KILN_MONTHS = [125_000, 130_000, 120_000, 140_000, 135_000, 150_000, 145_000, 160_000, 155_000, 170_000, 180_000, 230_000];
 const KILN_STUDIOS = [38, 39, 39, 41, 42, 42, 44, 45, 47, 48, 50, 52];
 const KILN_DOWNLOADS = [212, 240, 198, 260, 275, 251];
+const MARLOW_HOURS = [22, 18, 26, 24, 30, 21, 28, 32];
+const PORTAGE_PEOPLE = [140, 168, 190, 214, 236, 251, 270, 284, 301, 318];
 
 /** The readings behind them, in Numbers: a month's revenue on its 28th, the studios each week, the downloads until three weeks ago. */
 export const SAMPLE_READINGS: Fields[] = [
   ...KILN_MONTHS.map((minor, i) => ({ name: 'Revenue a month', thing: 1, amount: gbp(minor), at: monthBack(KILN_MONTHS.length - i), source: 'reported' })),
   ...KILN_STUDIOS.map((n, i) => ({ name: 'Studios licensed', thing: 1, value: n, unit: 'studios', at: `${day(-1 - 7 * (KILN_STUDIOS.length - 1 - i))}T09:00:00.000Z`, source: 'reported' })),
   ...KILN_DOWNLOADS.map((n, i) => ({ name: 'Specimen downloads', thing: 1, value: n, unit: 'downloads', at: `${day(-21 - 7 * (KILN_DOWNLOADS.length - 1 - i))}T09:00:00.000Z`, source: 'typed' })),
+  ...MARLOW_HOURS.map((n, i) => ({ name: 'Hours billed', thing: 2, value: n, unit: 'hours', at: `${day(-2 - 7 * (MARLOW_HOURS.length - 1 - i))}T17:00:00.000Z`, source: 'typed' })),
+  ...PORTAGE_PEOPLE.map((n, i) => ({ name: 'Subscribers', thing: 3, value: n, unit: 'people', at: `${day(-1 - 7 * (PORTAGE_PEOPLE.length - 1 - i))}T09:00:00.000Z`, source: 'reported' })),
 ];
 
 /** The kinds of project, since portfolio 1.19.0: what each one is, which picks the key numbers offered for it. */
