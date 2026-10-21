@@ -661,7 +661,7 @@ test('the MCP server sends the run and client from the session file, and a hook 
 
   const stray = await run(['hook', 'begin'], envFor(folder('config'), {}), '');
   assert.equal(stray.code, 0);
-  assert.match(stray.stderr, /^braindog hook takes start, end or beat/);
+  assert.match(stray.stderr, /^braindog hook takes start, end, beat, prompt, tool, stop or watch/);
 });
 
 /* ── which run a command is ────────────────────────────────────────────── */
@@ -1156,6 +1156,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
   const scripts = join(APP, 'hooks');
   const start = hookCommand('start', scripts);
   const end = hookCommand('end', scripts);
+  const stop = hookCommand('stop', scripts);
 
   const lines = installInto(dir, { apply: true, replace: REPLACE, scripts, home });
   const text = lines.join('\n');
@@ -1171,7 +1172,8 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
   assert.deepEqual(now.hooks.SessionStart!.map((g) => g.hooks.map((h) => h.command)), [[OLD_SHIM], [start]]);
   assert.equal(now.hooks.SessionStart![0]!.matcher, 'startup');
   assert.deepEqual(now.hooks.SessionEnd!.map((g) => g.hooks.map((h) => h.command)), [[LOOKALIKE], [end]]);
-  assert.deepEqual(now.hooks.Stop!.map((g) => g.hooks.map((h) => h.command)), [['echo stop']]);
+  /* Somebody else's Stop hook is kept, and BrainDog's own (inbox-file.ts) goes in beside it. */
+  assert.deepEqual(now.hooks.Stop!.map((g) => g.hooks.map((h) => h.command)), [['echo stop'], [stop]]);
 
   const mcp = JSON.parse(readFileSync(claudeJson, 'utf8')) as { numStartups: number; mcpServers: Record<string, unknown>; projects: Record<string, { allowedTools: unknown[]; mcpServers: Record<string, unknown> }> };
   assert.equal(mcp.numStartups, 41);

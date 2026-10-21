@@ -35,7 +35,8 @@ import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
-import { budgetOf, clientFor, hostsPath, runnerTarget, target, type Target } from './http.ts';
+import { runHook, watchHook } from './inbox-file.ts';
+import { agentOf, budgetOf, clientFor, hostsPath, runnerTarget, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
@@ -95,8 +96,24 @@ function hookScripts(): string {
     '$OutputEncoding = New-Object System.Text.UTF8Encoding($false)',
     '[Console]::OutputEncoding = $OutputEncoding',
     "$cli = Join-Path $PSScriptRoot '..\\braindog.mjs'",
+    "$env:BRAINDOG_AGENT = 'claude'",
     'try {',
     '  $raw = [Console]::In.ReadToEnd()',
+    "  if (@('prompt', 'tool', 'stop') -contains $Which) {",
+    "    $m = [regex]::Match($raw, '\"session_id\"\\s*:\\s*\"([A-Za-z0-9._:-]+)\"')",
+    '    if (-not $m.Success) { exit 0 }',
+    "    $id = $m.Groups[1].Value -replace '[^A-Za-z0-9_-]', '_'",
+    "    $base = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } elseif ($env:APPDATA) { $env:APPDATA } else { Join-Path $env:USERPROFILE '.config' }",
+    '    $flags = Join-Path $base "braindog\\sessions\\$id.inbox.flags"',
+    '    if (-not (Test-Path -LiteralPath $flags)) { exit 0 }',
+    "    if ((([System.IO.File]::ReadAllText($flags)) -split '\\s+') -notcontains $Which) { exit 0 }",
+    '    try { $raw | & node $cli hook $Which } catch { }',
+    '    exit 0',
+    '  }',
+    "  if ($Which -eq 'watch') {",
+    '    $raw | & node $cli hook watch',
+    '    exit $LASTEXITCODE',
+    '  }',
     "  if ($Which -eq 'beat') {",
     "    $id = '-'",
     "    $m = [regex]::Match($raw, '\"session_id\"\\s*:\\s*\"([A-Za-z0-9._:-]+)\"')",
@@ -118,6 +135,23 @@ function hookScripts(): string {
     '#!/bin/sh',
     'which="${1:-start}"',
     'dir=$(dirname "$0")',
+    'BRAINDOG_AGENT=claude',
+    'export BRAINDOG_AGENT',
+    'case "$which" in',
+    '  prompt | tool | stop)',
+    '    raw=$(cat)',
+    `    id=$(printf '%s' "$raw" | grep -o '"session_id" *: *"[A-Za-z0-9._:-]*"' | head -n 1 | sed 's/.*"\\([^"]*\\)"$/\\1/; s/[^A-Za-z0-9_-]/_/g')`,
+    '    [ -n "$id" ] || exit 0',
+    '    flags="${XDG_CONFIG_HOME:-$HOME/.config}/braindog/sessions/${id}.inbox.flags"',
+    '    grep -qw "$which" "$flags" 2>/dev/null || exit 0',
+    `    printf '%s' "$raw" | node "$dir/../braindog.mjs" hook "$which" 2>/dev/null`,
+    '    exit 0',
+    '    ;;',
+    '  watch)',
+    '    node "$dir/../braindog.mjs" hook watch',
+    '    exit $?',
+    '    ;;',
+    'esac',
     'if [ "$which" = beat ]; then',
     '  raw=$(cat)',
     `  id=$(printf '%s' "$raw" | grep -o '"session_id" *: *"[A-Za-z0-9._:-]*"' | head -n 1 | sed 's/.*"\\([^"]*\\)"$/\\1/; s/[^A-Za-z0-9_-]/_/g')`,
@@ -173,7 +207,7 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 const usage = () =>
   [
     'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>]',
-    "  Set this machine up from one record, in order: sign in unless it already is, add the two hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, and sync its skills. One line per step, and it stops at the first that fails.",
+    "  Set this machine up from one record, in order: sign in unless it already is, add the hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, sync its skills, and make one token for each agent it wired, each approved in the app. One line per step, and it stops at the first that fails.",
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
     '  With --vault it asks for a grant that opens the keys of one project, or with * the keys of no project.',
@@ -289,10 +323,10 @@ const usage = () =>
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
     "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
-    'braindog hook start|end|beat',
-    '  What Claude Code runs when a session starts and ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself.',
-    'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
-    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
+    'braindog hook start|end|beat|prompt|tool|stop|watch',
+    '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh.',
+    'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>] [--rewake]',
+    "  Show the hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. --rewake also adds the watcher that wakes an idle session when you tell it something, which is off unless typed. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]',
     "  Read this machine and list, by file and entry, what still names a tool BrainDog replaced, what holds something shaped like a key, and each profile missing BrainDog's server or a hook. It changes nothing and shows no value, and exits 1 when anything is listed.",
     'braindog verify <file> [--key <pubkey|url>]',
@@ -336,7 +370,8 @@ async function mcp(args: string[]): Promise<void> {
 
   let to: Target;
   try {
-    to = target(values.host, process.env, hostsPath(process.env));
+    /* AS THE AGENT IT WAS REGISTERED FOR, so the token setup made for that agent is the one sent when there is one. */
+    to = target(values.host, process.env, hostsPath(process.env), Date.now(), agent ?? agentOf(process.env));
   } catch (e) {
     /*
      * NOT SIGNED IN IS A SERVER THAT REFUSES, NOT ONE THAT IS MISSING (`signed-out.ts`). Exiting here was `/mcp`'s
@@ -647,6 +682,31 @@ function selfhost(command: 'init' | 'serve', args: string[]): void {
  */
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
+  /*
+   * THE PROMPT, TOOL AND STOP HOOKS (`inbox-file.ts`) READ ONE FILE AND SAY AT MOST ONE JSON LINE: no host, no git, no
+   * budget to wait out, and nothing above it, because Claude Code reads that line as JSON. The watcher waits on the
+   * same file and exits 2 with what he said, which is how an async hook wakes a session.
+   */
+  if ((which === 'prompt' || which === 'tool' || which === 'stop' || which === 'watch') && more.length === 0) {
+    let stdin = '';
+    try {
+      if (!process.stdin.isTTY) stdin = readFileSync(0, 'utf8');
+    } catch {
+      /* No stdin at all is an event naming no session. */
+    }
+    process.exitCode = 0;
+    if (which === 'watch') {
+      const said = await watchHook(stdin, process.env).catch(() => null);
+      if (said !== null) {
+        writeFileSync(2, `${said}\n`);
+        process.exitCode = 2;
+      }
+      return;
+    }
+    const said = runHook(which, stdin, process.env);
+    if (said !== '') writeFileSync(1, `${said}\n`);
+    return;
+  }
   /* NINE SECONDS AT MOST, whatever the network does (AGT-B10): the hook ends at HOOK_MS counted from the process's own
      start (`performance.now()`), inside Claude Code's ten-second timeout. The start hook's own deadline starts later,
      so on a hung network this fires first and says the one line itself, unless a line was already written. */
@@ -656,7 +716,7 @@ async function hook(args: string[]): Promise<void> {
     process.exit(0);
   }, Math.max(0, HOOK_MS - performance.now())).unref();
   if ((which !== 'start' && which !== 'end' && which !== 'beat') || more.length > 0) {
-    say('braindog hook takes start, end or beat, and nothing else. Claude Code runs it, with the event on standard input.');
+    say('braindog hook takes start, end, beat, prompt, tool, stop or watch, and nothing else. Claude Code runs it, with the event on standard input.');
     return process.exit(0);
   }
   /*
@@ -715,15 +775,22 @@ function doctorCommand(args: string[]): void {
 }
 
 function install(args: string[]): void {
-  let values: { apply?: boolean | undefined; replace?: string | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined };
+  let values: { apply?: boolean | undefined; replace?: string | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined; rewake?: boolean | undefined };
   try {
     ({ values } = parseArgs({
       args,
-      options: { apply: { type: 'boolean' }, replace: { type: 'string' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true }, 'mcp-json': { type: 'string', multiple: true } },
+      options: {
+        apply: { type: 'boolean' },
+        replace: { type: 'string' },
+        'config-dir': { type: 'string', multiple: true },
+        settings: { type: 'string', multiple: true },
+        'mcp-json': { type: 'string', multiple: true },
+        rewake: { type: 'boolean' },
+      },
       strict: true,
     }));
   } catch {
-    return stop('braindog install takes --apply, --replace <replace.json>, --config-dir <folder>, --settings <file> and --mcp-json <file>, and nothing else.');
+    return stop('braindog install takes --apply, --replace <replace.json>, --config-dir <folder>, --settings <file>, --mcp-json <file> and --rewake, and nothing else.');
   }
   const scripts = hookScripts();
   /* THE FILE IS READ BEFORE ANYTHING ELSE IS, so a replace file that does not read changes nothing anywhere. */
@@ -735,7 +802,8 @@ function install(args: string[]): void {
       return stop(e instanceof Error ? e.message : String(e));
     }
   }
-  const options = { apply: values.apply === true, replace, scripts };
+  /* THE WATCHER ONLY WHEN TYPED (`--rewake`): it is off by default until it is tried on a signed-in session. */
+  const options = { apply: values.apply === true, replace, scripts, rewake: values.rewake === true };
   const dirs = values['config-dir'] ?? [];
   const files = values.settings ?? [];
   const mcpFiles = values['mcp-json'] ?? [];
