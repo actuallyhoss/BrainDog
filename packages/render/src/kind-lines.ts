@@ -26,7 +26,7 @@ export const KIND_LINES: Readonly<Record<Kind, KindLine>> = {
   gauge: { for: 'one figure against its target', cells: 'label | value | target' },
   chips: { for: 'a few short counts or states as pills', cells: 'label | value | note' },
   sparkline: { for: 'a small line and the figure it ends at', cells: 'label | 18 20 19 24 | figure' },
-  split: { for: 'parts of a whole on one track, with a legend', cells: 'label | value | note' },
+  split: { for: 'parts of a whole on one track, with a legend', cells: 'label | value | note | colour' },
   bridge: { for: 'from a first figure to a last, the steps between moving it', cells: 'label | +amount or -amount | note' },
   series: { for: 'money in and out over time, as bars above and below zero', cells: 'a header, then bucket | in | out' },
   lines: { for: 'a measure over time as a line, the period before dashed', cells: 'a header, then day | value | was' },

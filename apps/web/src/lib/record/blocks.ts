@@ -161,6 +161,11 @@ const convertedNote = (from: readonly string[]): string =>
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
   const of = block.columns[1]?.field ?? 'amount';
+  /* A SPLIT'S THIRD COLUMN IS EACH PART'S COLOUR (VERIFY H11): a project's stored hue, handed on as the row's fourth
+     cell, after its note, and snapped to the project's slot by the renderer (`splitSlot`). The first row of a part
+     says it. */
+  const tint = block.kind === 'split' ? block.columns[2]?.field : undefined;
+  const tints = new Map<string, string>();
   /* A LIST OF LINKS ADDS UP WHAT IT LINKS TO, each linked row's money handed on by the page reader, and the sum is
      written as that money field writes it. */
   const link = block.linked ? linkOf(block.register ?? null, of) : null;
@@ -193,6 +198,8 @@ function barRows(block: BlockResult): string[] {
       continue;
     }
     const key = said ?? 'Nobody in particular';
+    const hue = tint ? e.fields[tint] : undefined;
+    if (!tints.has(key) && typeof hue === 'number' && Number.isFinite(hue)) tints.set(key, String(hue));
     const list = grouped.get(key) ?? [];
     list.push(...valuesOf(e.fields[of]));
     grouped.set(key, list);
@@ -222,7 +229,8 @@ function barRows(block: BlockResult): string[] {
     const shown = sum.mixed.length
       ? mixedFix(sum.mixed)
       : (written(sum) ?? String(sum.amount));
-    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(from(key, kept))}`;
+    const colour = tints.get(key);
+    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(from(key, kept))}${colour ? ` | ${colour}` : ''}`;
   });
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);

@@ -198,9 +198,9 @@ const TABLE = {
   chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
   /* `label | 18 20 19 24 | figure`: a small line and the figure it ends at (`src/cards.ts`'s `trendOf`). */
   sparkline: { primitive: 'proportional', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
-  /* `label | value | note`: one track cut into parts, with a legend, and a `hole` row after it as
-     `bar` has (`src/split.ts`). */
-  split: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
+  /* `label | value | note | colour`: one track cut into parts, with a legend, and a `hole` row after it as
+     `bar` has (`src/split.ts`). The colour is optional: a slot's name or a stored hue (`splitSlot`). */
+  split: { primitive: 'proportional', cells: 4, optional: 1, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
   /* `label | ±amount | note`: from the first row to the last, the rows between moving it
      (`src/bridge.ts`). */
   bridge: { primitive: 'proportional', cells: 3, tone: false, minSpan: 4, purpose: 'figure' },

@@ -966,7 +966,10 @@ const EARNS = {
   span: 12,
   source: 'register.things',
   where: `${LIVE}, revenue is set`,
-  columns: [{ field: 'name' }, { field: 'revenue' }],
+  /* EACH PART IN ITS PROJECT'S COLOUR, SINCE the UI pass of 20 October (VERIFY H11): the third column is the stored hue,
+     which the split snaps to the slot the project's card and well wear, where Kiln was drawn in ink and Marlow & Co in
+     Kiln's blue. It is a colour, so it says no word of its own. */
+  columns: [{ field: 'name' }, { field: 'revenue' }, { field: 'hue' }],
   order: [{ field: 'revenue', dir: 'desc' }],
   limit: 8,
   /* ONLY WHILE TWO OR MORE EARN, SINCE the UI pass of 20 October (proj F5): a split of one part says nothing a card

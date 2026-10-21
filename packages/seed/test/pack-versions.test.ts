@@ -1616,9 +1616,10 @@ const DECLARED: Record<string, Version> = {
       register.datapoints register.kpis register.things
       rule.project-past-aim
     `,
-    declares: '8e3129d32576b52b',
+    declares: '06415195032898ca',
     history: [
       "`register.datapoints` is Portfolio's, Numbers taken over from the founder use case under the same id, less the organisation and the service a reading is about, which the founder lays on it; `register.kpis` is added, a project's key numbers (`KPI_LIST`); `register.things` gains `kind`, business, client work, product or content; `kpis-held` and `kpi-stale` are added -> 8e3129d32576b52b",
+      "Inside the unreleased 1.19.0 (VERIFY H11): `page.portfolio`'s What each one earns reads `hue` as a third column, so each part is drawn in its project's slot; no id added or taken away -> 06415195032898ca",
     ],
   },
   /* A PROJECT THE RECORD FORMED ITSELF is marked a draft until its owner keeps it (the first project formed from a first session). 1.17.0 IS RELEASED. The same ids: a field of `things`. */

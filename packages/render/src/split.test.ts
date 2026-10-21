@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
+import { SPLIT_ZERO, splitPlan, splitSentence, splitSlot } from './split.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -88,4 +88,17 @@ test('TWO LATE SPLITS ON ONE PAGE PAINT FROM TWO PATTERNS, even when they say th
   assert.equal(new Set(ids).size, 3, `one id painted two tracks: ${ids.join(', ')}`);
   assert.deepEqual(refs, ids, 'each part paints from its own track\'s pattern');
   assert.equal(toHTML(parse(src)), toHTML(parse(src)), 'the same input draws the same page');
+});
+
+test('A PART TAKES ITS COLOUR FROM A FOURTH CELL: a slot by name, or a stored hue snapped to its slot (VERIFY H11)', () => {
+  assert.equal(splitSlot('pink'), 'pink');
+  assert.equal(splitSlot('265'), 'blue');
+  assert.equal(splitSlot('352'), 'pink');
+  assert.equal(splitSlot('185'), 'teal');
+  assert.equal(splitSlot('Late'), undefined);
+  assert.equal(splitSlot(undefined), undefined);
+  const html = toHTML(parse('```split\nKiln | £18,400 | | 265\nMarlow & Co | £4,200 | | 352\n```'));
+  assert.match(html, /class="split-seg"[^>]*data-slot="blue"/u);
+  assert.match(html, /class="split-dot"[^>]*data-slot="pink"/u);
+  assert.doesNotMatch(html, /degraded/u);
 });

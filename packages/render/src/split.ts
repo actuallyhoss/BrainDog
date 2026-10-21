@@ -6,6 +6,8 @@
  * test can check them without a DOM.
  */
 
+import { slotOf } from './slot.ts';
+
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 
@@ -86,9 +88,16 @@ export type SplitSlot = (typeof SPLIT_SLOTS)[number];
 /**
  * A PART THAT IS A PROJECT, AN AGENT OR A PERSON WEARS ITS OWN COLOUR (proj F6): a row's fourth cell, when it names one
  * of the slots, is drawn as that slot's hue on the track and its dot. Any other part takes the chart's series in order.
+ *
+ * A STORED HUE SNAPS TO ITS SLOT (VERIFY H11): a list that keeps each project's hue as a whole number hands the number
+ * on, and the part is drawn in the slot the project's card and well wear (`slotOf`), so Kiln is Kiln's blue here too.
  */
 export const splitSlot = (cell: string | undefined): SplitSlot | undefined => {
   const word = (cell ?? '').trim().toLowerCase();
+  if (/^-?\d+(?:\.\d+)?$/u.test(word)) {
+    const slot = slotOf(Number(word));
+    return slot === 'slate' ? undefined : slot;
+  }
   return (SPLIT_SLOTS as readonly string[]).includes(word) ? (word as SplitSlot) : undefined;
 };
 
