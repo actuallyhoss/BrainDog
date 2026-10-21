@@ -17,6 +17,11 @@ test('A QUEUE OPENS DECIDE, AND WHAT CHANGED OPENS ACTIVITY', () => {
   assert.equal(doorOf({ source: 'activity' }), '/audit');
 });
 
+test('WHAT FALLS DUE ACROSS THE LISTS OPENS WORK, never a list named after the source', () => {
+  assert.equal(doorOf({ source: 'deadlines', where: 'day after -1d' }), '/?work');
+  assert.equal(doorOf({ register: 'deadlines', source: 'deadlines' }), '/?work');
+});
+
 test('A SOURCE WITH NO SCREEN OF ITS OWN HAS NO DOOR', () => {
   assert.equal(doorOf({ source: 'forecast.runway' }), null);
   assert.equal(doorOf({}), null);

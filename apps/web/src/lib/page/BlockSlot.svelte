@@ -773,7 +773,7 @@
      three-month label. -->
 {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
-  {@const door = to && source ? to : block.register ? null : doorOf(block)}
+  {@const door = to && source ? to : block.register && block.register !== 'deadlines' ? null : doorOf(block)}
   {#if lateSlice}
     <!-- THE LATE LIST'S OWN DOORS, the half that was cut and both where both were. -->
     <div class="block-doors">

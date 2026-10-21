@@ -12,10 +12,11 @@
 import { registerHref } from '../record/where.ts';
 
 export function doorOf(b: { register?: string | undefined; where?: string | undefined; source?: string | undefined }): string | null {
+  /* WHAT FALLS DUE ACROSS THE LISTS (Today's Coming up) opens Work, where the rest of it is (VERIFY P1). Its live
+     block names `deadlines` as its list, which is no list: `/r/deadlines` opened nothing. */
+  if (b.source === 'deadlines' || b.register === 'deadlines') return '/?work';
   if (b.register) return registerHref(b.register, b.where);
   if (b.source?.startsWith('governance.')) return '/decide';
   if (b.source === 'activity') return '/audit';
-  /* WHAT FALLS DUE ACROSS THE LISTS (Today's Coming up) opens Work, where the rest of it is (VERIFY P1). */
-  if (b.source === 'deadlines') return '/?work';
   return null;
 }
