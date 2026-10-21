@@ -1132,8 +1132,9 @@
 <svelte:window onkeydowncapture={walkOn} />
 
 <!-- NOT DRAWN UNTIL TODAY HAS SOMETHING TO DRAW (`shown`), a moment at most: a page of bars drawn first and then pushed
-     down by the copy's desk and sentence was a jump on every warm open. Drawn at once, they arrive together. -->
-<div class="page" style:display={shown || data.refused ? null : 'none'}>
+     down by the copy's desk and sentence was a jump on every warm open. Drawn at once, they arrive together. The wait is
+     a mark at the page's end, so the page keeps its bare tag and the head's rules still reach it. -->
+<div class="page">
   {#if data.refused}
     <!--
       THE RECORD WOULD NOT ANSWER THIS READER, WHICH IS NOT THE SAME THING AS AN EMPTY RECORD. A colleague invited with
@@ -1236,6 +1237,7 @@
     <!-- AND UNDER TODAY, THE NEXT STEPS, until they are hidden. -->
     {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
   {/if}
+  {#if !shown && !data.refused}<span class="page-wait" hidden></span>{/if}
 </div>
 
 <style>
@@ -1318,6 +1320,10 @@
   /* ── the page ─────────────────────────────────────────────────────────── */
 
   /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it. */
+  .page:has(> .page-wait) {
+    display: none;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
