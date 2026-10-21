@@ -555,6 +555,20 @@
         const el = scroller();
         if (!el) return;
         el.scrollTop = y;
+        /* A SCREEN THAT DRAWS AGAIN WHEN ITS FRESH ANSWER LANDS (Needs you's queue) is short for a frame and drops the
+           place to the top (VERIFY H4). So for 1.5s a drop below `y` is put back, until the reader scrolls themselves. */
+        let own = false;
+        const mine = (): void => void (own = true);
+        const hands = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+        for (const h of hands) addEventListener(h, mine, { capture: true, passive: true, once: true });
+        void waitFor(() => {
+          const now = scroller();
+          if (own || now === null) return true;
+          if (now.scrollTop < y - 1 && now.scrollHeight - now.clientHeight >= y) now.scrollTop = y;
+          return false;
+        }, 1500).then(() => {
+          for (const h of hands) removeEventListener(h, mine, { capture: true });
+        });
         /* THE LINK THAT LEFT, by where it went, if it is on screen. */
         const back = link ? [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].find((a) => placeKey(new URL(a.href)) === link) : undefined;
         const r = back?.getBoundingClientRect();
@@ -565,21 +579,35 @@
     if (!moved || nav.to.url.hash || fromPalette) return;
     /* A SCREEN THAT DRAWS ITS HEAD AGAIN WHEN ITS FRESH ANSWER LANDS takes the focused `h1` away with the old one, so for
        a moment after the move a focus dropped on the body goes back to the `h1` there now. Never once the reader has
-       pressed or typed anything, and never off something they moved to. */
+       pressed or typed anything, and never off something they moved to.
+
+       AFTER THE CROSS-FADE, NOT DURING IT: focus given inside a running view transition did not hold, so a press on a
+       list item left focus on the body with motion on (VERIFY H3). The 1.5s is counted from when the fade ends.
+
+       EVERY PAGE NAME TAKES IT, not only `PageHead`'s: an `h1` with no `tabindex` (a project's hero) is made focusable
+       by script here, with no ring for a pointer (the rule at the foot of this file). */
     let touched = false;
     const touch = (): void => void (touched = true);
     addEventListener('pointerdown', touch, { capture: true, once: true });
     addEventListener('keydown', touch, { capture: true, once: true });
-    void waitFor(() => {
-      if (touched) return true;
-      const h1 = scroller()?.querySelector<HTMLElement>('h1');
-      const now = document.activeElement;
-      if (h1 && (now === null || now === document.body)) h1.focus({ preventScroll: true });
-      return false;
-    }, 1500).then(() => {
-      removeEventListener('pointerdown', touch, { capture: true });
-      removeEventListener('keydown', touch, { capture: true });
-    });
+    const fade = crossing;
+    void (fade ? fade.finished.catch(() => undefined) : Promise.resolve())
+      .then(() =>
+        waitFor(() => {
+          if (touched) return true;
+          const h1 = scroller()?.querySelector<HTMLElement>('h1');
+          const now = document.activeElement;
+          if (h1 && (now === null || now === document.body)) {
+            if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
+            h1.focus({ preventScroll: true });
+          }
+          return false;
+        }, 1500),
+      )
+      .then(() => {
+        removeEventListener('pointerdown', touch, { capture: true });
+        removeEventListener('keydown', touch, { capture: true });
+      });
   });
 
   /**
@@ -1481,6 +1509,11 @@
    */
   :global(html[data-moving]) .body {
     view-transition-name: page;
+  }
+
+  /* A page's name given focus by script after a move shows no ring to a pointer (`afterNavigate` above). */
+  :global(main h1[tabindex='-1']:focus:not(:focus-visible)) {
+    outline: none;
   }
 
   /* The offline line: the page's gutter, muted words, the measure of a sentence. */
