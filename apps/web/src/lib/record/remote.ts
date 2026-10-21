@@ -120,6 +120,26 @@ export function targetsOf(register: string): string[] {
 }
 
 /**
+ * The fields of a list that point at a list this reader holds no names for, because the record refused it (a guest
+ * shared Kiln's tasks may not read People). Their values arrive as row ids, and an id is never drawn, so the entry
+ * leaves them out (`withoutUnread`).
+ */
+export function unreadRefs(register: string, refs: Refs): string[] {
+  return (REGISTERS[register]?.fields ?? []).flatMap((f) => {
+    const to = refTargetOf(f);
+    return to !== undefined && !refs.has(to) ? [f.id] : [];
+  });
+}
+
+/** An entry without the fields `unreadRefs` names. */
+export function withoutUnread(entry: Entry, unread: readonly string[]): Entry {
+  if (unread.length === 0 || !unread.some((k) => Object.hasOwn(entry.fields, k))) return entry;
+  const fields: Fields = { ...entry.fields };
+  for (const k of unread) delete fields[k];
+  return { ...entry, fields };
+}
+
+/**
  * A register's rows as a `RefMap`. A row with no sequence has no number to be called by.
  *
  * AND THE NAME EACH NUMBER GOES BY, because that is what a ref is drawn as. `display` renders a ref

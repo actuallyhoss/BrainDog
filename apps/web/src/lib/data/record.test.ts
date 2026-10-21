@@ -400,6 +400,25 @@ test('A SORTED LIST PAGES WITH THE RECORD’S CURSOR, and a later page keeps the
   );
 });
 
+test('A LIST THE READER MAY NOT READ IS NO NAMES AND NOT NO LIST: its refs are left out, never drawn as ids', async () => {
+  /* A GUEST SHARED THE OBLIGATIONS IS REFUSED PEOPLE, which `party` points at. */
+  tab((name, params) => (name === 'list' && params.get('register') === 'people' ? json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Not shared with you.' } }) : record(name, params)));
+  const source = await open();
+  const answer = value(await source.page('obligations', EMPTY, null), 'the page');
+  assert.equal(answer.entries.length, 1);
+  assert.ok(!('party' in answer.entries[0]!.fields), 'a ref into a list the reader may not read was kept as its id');
+  assert.equal(answer.entries[0]?.fields.thing, 4);
+  assert.doesNotMatch(JSON.stringify(answer.entries), new RegExp(AMARA));
+  assert.equal(value(await source.count('obligations', EMPTY), 'the count'), 38);
+});
+
+test('AND ANY OTHER REFUSAL OF A LINKED LIST IS STILL THE SCREEN\'S', async () => {
+  tab((name, params) => (name === 'list' && params.get('register') === 'people' ? json(503, { ok: false, refusal: { code: 'UNAVAILABLE', fix: 'Try again.' } }) : record(name, params)));
+  const source = await open();
+  const out = await source.page('obligations', EMPTY, null);
+  assert.equal(out.ok, false);
+});
+
 test("a list this build does not ship draws a link by the linked row's name, and asks the record what the linked list is", async () => {
   const declared: Record<string, unknown> = {
     rs_meetings: { id: 'rs_meetings', name: 'Meetings', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'book', type: 'ref', to: 'rs_books' }] },

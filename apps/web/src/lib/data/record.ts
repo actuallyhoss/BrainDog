@@ -15,7 +15,7 @@ import { createClient, type Boot } from '@braindog/client';
 
 import { PAGE, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
-import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, whereFor, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
+import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, unreadRefs, whereFor, withoutUnread, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 import { labels, relabel } from '../voice.ts';
@@ -249,6 +249,10 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     const out = new Map<string, RefMap>();
     for (const target of targetsOf(register)) {
       const map = await refMap(target);
+      /* A LIST THIS PERSON MAY NOT READ IS NO NAMES, NOT NO LIST. A guest shared Kiln's tasks is refused People, which
+         a task's owner points at, and that refusal drew "This screen did not load" over the tasks she was shared. Its
+         refs are left out of the entry (`withoutUnread`), never drawn as the ids they arrive as. */
+      if (!map.ok && map.refusal.code === 'FORBIDDEN') continue;
       if (!map.ok) return map;
       out.set(target, map.value);
     }
@@ -272,7 +276,8 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     );
     if (!out.ok) return out;
     const rows = out.value.rows as RecordRow[];
-    let entries = rows.map((r) => entryOf(register, r, refs.value));
+    const unread = unreadRefs(register, refs.value);
+    let entries = rows.map((r) => withoutUnread(entryOf(register, r, refs.value), unread));
     const names = namesOf(refs.value);
     if (a.sort && out.value.cursor === null && entries.length === out.value.matched)
       entries = sortRows(register, entries, a.sort.field, a.sort.dir, names);
