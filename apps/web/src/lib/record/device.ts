@@ -303,6 +303,24 @@ export function connected(machines: readonly DeviceRow[], tokens: readonly Token
 }
 
 /**
+ * How far the key behind a kind of agent's newest run reaches (`read`, `propose` or `write`), or `null` when no run of
+ * that kind was opened by a standing key among those read. `kind` is the agent as `agentKey` folds it (`claude`), and a
+ * run that named no agent counts as `other`, as the record matches it.
+ *
+ * SETTINGS ONLY NARROW (agents and MCP plan §10.4). While an agent has no settings row of its own its key decides, and
+ * Settings › Agents says so with this word, never a guess.
+ */
+export function keyScopeOf(kind: string, runs: readonly Run[], tokens: readonly TokenRow[]): TokenRow['scope'] | null {
+  for (const run of runs) {
+    const agent = run.agent === null ? 'other' : run.agent.trim().toLowerCase().replace(/^agent:/u, '');
+    if (agent !== kind) continue;
+    const token = tokens.find((t) => t.id === run.token);
+    if (token) return token.scope;
+  }
+  return null;
+}
+
+/**
  * What a connection is called, in one string, for the screens that name it in a sentence: the app and where it runs,
  * "Claude on STUDIO-PC", from `partsOf` in `apps.ts`, which the Connected list draws as its three parts.
  *
