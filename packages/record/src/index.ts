@@ -1690,6 +1690,8 @@ export type Context = {
   brief?: string | null;
   /** The context size his settings give this agent, in tokens (400, 700 or 1,200), for the plan that ranks the rest. */
   budget?: number;
+  /** Whether his stop switch (Claude Code's hooks) and the channel are on for this agent, so the start hook seeds them. */
+  enforce?: { hooks: boolean; channel: boolean } | null;
   /** How much was asked for (`depth`): the card, the brief default, the task, or the full answer. */
   depth?: ContextDepth;
   /** The task `context { task }` asked for, whole, so an update needs no `get` (§3.1, §4.3). */
@@ -8595,6 +8597,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       told.may = effective?.says ?? null;
       told.brief = effective?.brief ?? null;
       told.budget = effective?.context.budget ?? 700;
+      told.enforce = effective?.enforce ?? null;
     }
     return carded(ctx, told, {
       agent: text(run?.fields.agent) ?? hints.agent ?? null,

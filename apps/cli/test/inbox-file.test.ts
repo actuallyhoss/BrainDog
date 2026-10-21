@@ -134,6 +134,12 @@ test('THE START HOOK SEEDS THE FILE from the attach, the stop first, and marks w
   assert.equal(state.said_stop, 'IN2');
   /* THE PAUSE WAS SAID AT THE START, so only the tool hook has work. */
   assert.equal(readFileSync(flagsPath(env, 'sess-1'), 'utf8').trim(), 'tool');
+  assert.equal(seeded.hooks, true, 'the stop switch is on while the record does not say');
+
+  /* HIS STOP SWITCH OFF FOR THIS AGENT, as the attach says it: the file says so, and no hook has work. */
+  seedInbox(env, 'sess-2', HOST, 'S884', { ...context, enforce: { hooks: false, channel: false } }, ['IN3', 'IN2'], NOW);
+  assert.equal(readInbox(inboxPath(env, 'sess-2'))!.hooks, false);
+  assert.equal(readFileSync(flagsPath(env, 'sess-2'), 'utf8').trim(), '');
 });
 
 test('FILES OF SESSIONS QUIET FOR TWELVE HOURS ARE REMOVED, and nothing else in the folder', () => {

@@ -400,6 +400,8 @@ export type Context = {
   brief?: string | null;
   /** The context size his settings give this agent, in tokens. Absent from an older host. */
   budget?: number;
+  /** Whether his stop switch (the hooks) and the channel are on for this agent. Absent from an older host. */
+  enforce?: { hooks: boolean; channel: boolean } | null;
   depth?: 'card' | 'brief' | 'task' | 'full';
   /** The task `context({ task })` asked for, whole. */
   task?: { spoken: string; register: string; list: string; version: number; fields: Record<string, unknown>; project: string | null; history: string[] } | null;

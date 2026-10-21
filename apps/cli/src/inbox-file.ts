@@ -325,13 +325,15 @@ export function pruneInboxes(env: Env, now: number = Date.now()): void {
  * the stop or pause first, then every open instruction, never cut. Empty for a host older than instructions, whose
  * context has no `told` and no `stop`.
  */
-export function toldAtStart(context: unknown): { lines: string[]; told: Told[]; stop: Held | null; stopLine: string | null; stamp: string | null } {
+export function toldAtStart(context: unknown): { lines: string[]; told: Told[]; stop: Held | null; stopLine: string | null; stamp: string | null; hooks: boolean | null } {
   const c = isObject(context) ? context : {};
   const told = (Array.isArray(c.told) ? c.told : []).map(toldOf).filter((t): t is Told => t !== null);
   const stop = heldOf(c.stop);
   const stopLine = isObject(c.stop) ? text(c.stop.line) : null;
   const lines = [...(stopLine === null ? [] : [stopLine]), ...told.filter((t) => t.id !== stop?.id).map((t) => t.line)];
-  return { lines, told, stop, stopLine, stamp: text(c.stamp, 64) };
+  /* HIS STOP SWITCH FOR THIS AGENT, when the record says it (`null` from a host older than the setting). */
+  const hooks = isObject(c.enforce) && typeof c.enforce.hooks === 'boolean' ? c.enforce.hooks : null;
+  return { lines, told, stop, stopLine, stamp: text(c.stamp, 64), hooks };
 }
 
 /**
@@ -352,7 +354,7 @@ export function seedInbox(env: Env, id: string, host: string, run: string, conte
       pending: at.told,
       stop: at.stop,
       stop_line: at.stopLine,
-      hooks: before?.hooks ?? true,
+      hooks: at.hooks ?? before?.hooks ?? true,
       reported: before !== null && before.run === run && before.host === host ? before.reported : [],
     };
     writeInbox(inboxPath(env, id), inbox);

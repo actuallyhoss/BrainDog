@@ -136,6 +136,8 @@ test('SETTINGS ONLY NARROW: Read refuses, Suggest asks, lists and projects ask w
   assert.deepEqual(await enforce(), { hooks: true, channel: false });
   value(await api.setAgentProfile({ id: row.id, enforce: { hooks: false, channel: true } }, owner));
   assert.deepEqual(await enforce(), { hooks: false, channel: true });
+  /* AND CONTEXT CARRIES IT, so the start hook seeds the hooks' file with it before the bridge's first pulse. */
+  assert.deepEqual(value<{ enforce?: unknown }>(await api.context({}, ctx)).enforce, { hooks: false, channel: true });
   assert.equal(refusal(await api.setAgentProfile({ id: row.id, ceiling: 'write' }, ctx)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.agentProfiles({}, ctx)).code, 'FORBIDDEN');
   const rows = value<{ id: string }[]>(await api.agentProfiles({}, owner));
