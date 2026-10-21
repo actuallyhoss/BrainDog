@@ -65,8 +65,7 @@ test('every question has its own id, and the desk and the chores band ask differ
   assert.deepEqual(ASKED.map((n) => n.id), ['sam', 'key']);
 });
 
-test("the greeting's figures and every need open evidence that exists, and the late one says it's late", () => {
-  assert.equal(BRIEF.hello, 'Good morning, Maya');
+test("Today's figures and every need open evidence that exists, and the late one says it's late", () => {
   assert.ok('key' in BRIEF.cash && Object.hasOwn(EVIDENCE, BRIEF.cash.key), 'the cash figure opens its evidence');
   assert.ok('go' in BRIEF.agents && BRIEF.agents.go === 'agents', 'the agents figure opens the Agents place');
   for (const n of NEEDS) assert.ok(Object.hasOwn(EVIDENCE, n.evidence), `${n.id} opens nothing`);

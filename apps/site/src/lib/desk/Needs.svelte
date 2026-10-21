@@ -2,7 +2,7 @@
   The desk's Needs you: the two things Maya's Today names, each as its question with what it comes from, and its two
   answers; beside them, what she has answered today, each with an undo.
 
-  THE ASKS ARE THE DESK'S (`needs.svelte.ts`), shared with Today's tile, the tab's count and the greeting. Yes moves an
+  THE ASKS ARE THE DESK'S (`needs.svelte.ts`), shared with Today's tile, the tab's count and Today's line. Yes moves an
   ask across with its done line and an Undo; Not now drops it with none; Undo puts it back in its first place. The
   answer buttons work only with scripting, so they are left out of the page a reader gets without it.
 -->

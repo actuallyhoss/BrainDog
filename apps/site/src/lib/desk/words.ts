@@ -12,8 +12,8 @@ export const DESK = {
   icons: { today: 'today', needs: 'inbox', projects: 'projects', money: 'money', agents: 'agent' } as Record<string, IconName>,
   ask: { bar: 'Ask or change anything', key: '/', open: 'Ask BrainDog', close: 'Close' },
   working: (n: number): string => `${n} working`,
-  /** The greeting line's first phrase, in red while something waits (SF14: digits). */
-  needYou: (n: number): string => (n === 0 ? 'Nothing needs you' : n === 1 ? '1 thing needs you' : `${n} things need you`),
+  /** The line's first phrase, in red while something waits, in the app's words (SF14: digits). */
+  needYou: (n: number): string => (n === 0 ? 'Nothing needs you' : n === 1 ? '1 needs you' : `${n} need you`),
   areWorking: ' are working, and cash lasts about ',
   behind: 'Where it comes from',
   needs: {

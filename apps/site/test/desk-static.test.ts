@@ -3,7 +3,7 @@
  *
  * ALL FIVE PLACES ARE IN THE HTML (site F5, 20 October). The desk is a real tablist over five panels, and only the
  * chosen one shows once the script runs; with scripting off a <noscript> rule lays all five out one under another. So
- * the served page must hold the tablist with its five names, five panels, the greeting's line as plain words, and
+ * the served page must hold the tablist with its five names, five panels, Today's line as plain words, and
  * that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).
  *
  * THE SAME CHECKS RUN TWICE. Once over the desk rendered on the server here, which needs no build, and once over the
@@ -77,8 +77,8 @@ const words = (html: string): string =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
-/** The greeting's line as it reads on load, with both of the desk's asks open. */
-const SENTENCE = '2 things need you, 2 agents are working, and cash lasts about 14 months.';
+/** Today's line as it reads on load, with both of the desk's asks open. */
+const SENTENCE = '2 need you, 2 agents are working, and cash lasts about 14 months.';
 
 /** The desk's promises over one page of HTML, whichever way it was made. */
 function holdsTheDesk(html: string, where: string): void {
@@ -96,7 +96,7 @@ function holdsTheDesk(html: string, where: string): void {
   assert.equal(panels.length, 5, `${where} holds five panels`);
   for (const t of TABS) assert.match(html, new RegExp(`id="desk-pane-${t}"`), `${where} has the ${t} panel`);
   assert.ok(html.indexOf('id="desk-pane-today"') < html.indexOf('id="desk-pane-needs"'), 'Today comes first');
-  assert.ok(words(html).includes(SENTENCE), `${where}: the greeting's line is plain words: "${SENTENCE}"`);
+  assert.ok(words(html).includes(SENTENCE), `${where}: Today's line is plain words: "${SENTENCE}"`);
 
   const rule = html.match(/<noscript>\s*<style[^>]*>([\s\S]*?)<\/style>\s*<\/noscript>/);
   assert.ok(rule, `${where} has no <noscript><style> rule`);
@@ -108,7 +108,7 @@ function holdsTheDesk(html: string, where: string): void {
   assert.ok(!words(html).includes(EM_DASH), `${where} has an em dash a person reads`);
 }
 
-test('the desk rendered on the server holds every place, the greeting in plain words and the noscript rule', () => {
+test('the desk rendered on the server holds every place, the line under Today in plain words and the noscript rule', () => {
   const { body, head } = render(Desk, { props: {} });
   const html = head + body;
   holdsTheDesk(html, 'the server-rendered desk');

@@ -84,20 +84,18 @@ export type EvidenceKey = 'cash' | 'inv' | 'dana';
 /** A figure in a sentence. With a `key` it opens its evidence; `late` draws it in the deeper red, beside its words. */
 export type Figure = { text: string; key?: EvidenceKey; late?: boolean };
 
-/** A press in the greeting's line: it opens one of the desk's places, or the evidence under the line. */
+/** A press in Today's line: it opens one of the desk's places, or the evidence under the line. */
 export type Lead = { text: string; go: 'needs' | 'agents' } | { text: string; key: EvidenceKey };
 
 /** A sentence with figures in it, in reading order. */
 export type Parts = (string | Figure)[];
 
 /**
- * THE GREETING AND ITS ONE LINE, as the app's Today says them (the 19 October Today): the date, "Good morning, Maya",
- * and one sentence whose first phrase is what needs her, in red. The count is the desk's own (`needs.svelte.ts`), so
+ * TODAY'S ONE LINE, as the app's Today says it: the date over the page's name, and one sentence whose first phrase is what needs her, in red. The count is the desk's own (`needs.svelte.ts`), so
  * `NEEDS` here is what it starts at; the other two figures open the Agents place and the cash's evidence.
  */
-export const BRIEF: { date: string; hello: string; agents: Lead; cash: Lead } = {
+export const BRIEF: { date: string; agents: Lead; cash: Lead } = {
   date: 'Thursday 19 March',
-  hello: 'Good morning, Maya',
   agents: { text: '2 agents', go: 'agents' },
   cash: { text: '14 months', key: 'cash' },
 };

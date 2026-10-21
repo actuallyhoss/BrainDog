@@ -145,7 +145,7 @@ test('the only solid red button in the served page is the start button', when(NO
 test('with scripting off, every band says what it draws', when(NO_BUILD), async () => {
   const { ASKED, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS } = await import('../src/lib/demo/maya.ts');
   const said = text(page());
-  assert.ok(said.includes('2 things need you, 2 agents are working, and cash lasts about 14 months.'), "the greeting's line, in plain text");
+  assert.ok(said.includes('2 need you, 2 agents are working, and cash lasts about 14 months.'), "Today's line, in plain text");
   for (const n of NEEDS) assert.ok(said.includes(n.ask), `the desk's ask "${n.ask}"`);
   assert.ok(said.includes(EVIDENCE.inv.head), "the first need's facts are there");
   for (const n of NOTES) assert.ok(said.includes(n.text), `the note "${n.text}"`);

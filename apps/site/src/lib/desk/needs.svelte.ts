@@ -1,6 +1,6 @@
 /**
  * What waits for Maya, as two stores with one set of moves: `needs`, the desk's (its Today tile, its Needs you place,
- * the count on the tab and the greeting's "2 things need you"), and `asked`, the chores band's questions, which are
+ * the count on the tab and the line's "2 need you"), and `asked`, the chores band's questions, which are
  * things the desk does not show (site F1: each thing is said once).
  *
  * THE MOVES ARE A PURE REDUCER (`step`), and a store only holds its result in a rune. Answer yes and the ask leaves

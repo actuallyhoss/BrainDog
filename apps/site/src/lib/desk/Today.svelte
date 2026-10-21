@@ -1,8 +1,8 @@
 <!--
-  The desk's Today, as the app's 19 October Today draws it: the date, "Good morning, Maya" with one line beside it, then
+  The desk's Today, as the app's Today draws it: the date, the sun and "Today", the one line under it, then
   three tiles (Needs you, Working now, Cash ahead) and the four project cards.
 
-  THE LINE'S FIGURES PRESS. "2 things need you" opens Needs you, "2 agents" opens Agents, and "14 months" opens where
+  THE LINE'S FIGURES PRESS. "2 need you" opens Needs you, "2 agents" opens Agents, and "14 months" opens where
   it comes from, attached under the line (the job the old Brief card did). Answering on the Needs you tile moves the
   ask out with an Undo, and the count on the tab and the line's first phrase follow, because all three read one store.
 
@@ -29,7 +29,7 @@
 
 <p class="date">{BRIEF.date}</p>
 <div class="hello">
-  <h3 class="greet">{BRIEF.hello}</h3>
+  <h3 class="greet"><Icon name="today" />{DESK.tabs.today}</h3>
   <p class="line">
     <button type="button" class="lead needs" class:clear={open.length === 0} onclick={() => ongo('needs')}
       >{DESK.needYou(open.length)}</button
@@ -141,18 +141,26 @@
     font-size: var(--t-site-13);
   }
 
+  /* THE PAGE'S NAME, THEN ITS SENTENCE UNDER IT, as the app's head draws them: the sun at 24 and "Today" in Lexend 28. */
   .hello {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 16px;
+    display: grid;
+    gap: 4px;
     margin-block: 4px 16px;
   }
 
   .greet {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 0;
     font: 600 28px/1.15 var(--head);
     letter-spacing: -0.035em;
+  }
+
+  .greet :global(.icon) {
+    inline-size: 24px;
+    block-size: 24px;
+    color: var(--ink2);
   }
 
   .line {
