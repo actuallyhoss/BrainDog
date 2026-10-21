@@ -1000,9 +1000,12 @@ export function instructionsBrief(v: Record<string, unknown>, did: 'read' | 'tak
     const r = isObject(v.receipts) ? v.receipts : null;
     const changes = r !== null && typeof r.changes === 'number' ? r.changes : 0;
     const batches = r !== null && Array.isArray(r.batches) ? r.batches.filter(isObject) : [];
+    /* EACH ROW BY ITS NAME: the record's own beside the handle, or the one the tool read when it has none. */
+    const titled = new Map<string, string>();
+    for (const b of batches) if (Array.isArray(b.rows)) b.rows.forEach((x, n) => typeof x === 'string' && Array.isArray(b.names) && typeof b.names[n] === 'string' && b.names[n] !== x && titled.set(x, b.names[n] as string));
     const touched = [...new Set(batches.flatMap((b) => (Array.isArray(b.rows) ? b.rows.filter((x): x is string => typeof x === 'string') : [])))]
       .slice(0, 5)
-      .map((h) => (look === undefined ? h : namedIn(look.title(h) ?? '', h, look, 60)));
+      .map((h) => (look === undefined ? (titled.has(h) ? named(titled.get(h)!, h, 60) : h) : namedIn(look.title(h) ?? titled.get(h) ?? '', h, look, 60)));
     const wrote = changes === 0 ? 'No changes while you held it.' : `${counted(changes, 'change')} in ${counted(batches.length, 'batch', 'batches')} while you held it${touched.length > 0 ? `: ${touched.join(', ')}` : ''}.`;
     return [`Answered ${id}: ${state}. ${wrote} It shows in BrainDog.`, ...rest].join('\n');
   }

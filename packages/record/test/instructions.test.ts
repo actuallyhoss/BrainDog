@@ -100,13 +100,15 @@ test('TAKEN BY ONE RUN: of two runs here the first takes it, the second is told 
   clock.advance(MIN);
   value(await api.create({ register: 'tasks', fields: { what: 'Write the bounce report' } }, a));
   clock.advance(MIN);
-  const replied = value<{ instruction: { state: string; reply: string | null }; receipts: { batches: { rows: string[] }[]; changes: number } | null }>(
+  const replied = value<{ instruction: { state: string; reply: string | null }; receipts: { batches: { rows: string[]; names: string[] }[]; changes: number } | null }>(
     await api.instructionsMine({ reply: told.id, said: 'Added it.', state: 'done' }, a),
   );
   assert.equal(replied.instruction.state, 'done');
   assert.equal(replied.instruction.reply, 'Added it.');
   assert.ok(replied.receipts !== null && replied.receipts.changes >= 1, 'no receipt for the task it made');
   assert.ok(replied.receipts!.batches.some((x) => x.rows.some((r) => r.startsWith('tasks#'))), JSON.stringify(replied.receipts));
+  /* AND EACH ROW BY ITS NAME, beside the handle. */
+  assert.ok(replied.receipts!.batches.some((x) => x.names.includes('Write the bounce report')), JSON.stringify(replied.receipts));
   /* ONLY THE RUN THAT TOOK IT ANSWERS IT. */
   assert.equal(refusal(await api.instructionsMine({ reply: told.id, said: 'Me too.' }, b)).code, 'FORBIDDEN');
   sql.close();

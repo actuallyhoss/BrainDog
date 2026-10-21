@@ -84,8 +84,11 @@ export function stopLine(sql: Sql, kernel: Kernel, stop: Stop | null): string | 
     : `${by} paused this run in BrainDog${stop.id === '' ? '' : ` (${stop.id})`}${why}. Wait until it is resumed.`;
 }
 
-/** One batch the run wrote while it held an instruction: when, how many changes, and the rows it touched by name. */
-export type ReceiptBatch = { batch: string; at: string; changes: number; rows: string[] };
+/**
+ * One batch the run wrote while it held an instruction: when, how many changes, the rows it touched as said (`S42`),
+ * and each one's name in its title field beside it (`names`, the handle again for a row with no title).
+ */
+export type ReceiptBatch = { batch: string; at: string; changes: number; rows: string[]; names: string[] };
 
 /**
  * What a run did while it held an instruction: its batches between `taken_at` and `replied_at` (or now), and its head
@@ -116,11 +119,15 @@ export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string): 
   const byBatch = new Map<string, ReceiptBatch>();
   for (const r of rows) {
     const key = r.batch ?? r.id;
-    const was = byBatch.get(key) ?? { batch: key, at: r.ts, changes: 0, rows: [] };
+    const was = byBatch.get(key) ?? { batch: key, at: r.ts, changes: 0, rows: [], names: [] };
     was.changes += 1;
     if (r.ts > was.at) was.at = r.ts;
-    const target = typeof r.target === 'string' && r.target.startsWith('entry:') ? kernel.nameOf(r.target.slice('entry:'.length)) : null;
-    if (target !== null && !was.rows.includes(target) && was.rows.length < 10) was.rows.push(target);
+    const id = typeof r.target === 'string' && r.target.startsWith('entry:') ? r.target.slice('entry:'.length) : null;
+    const target = id === null ? null : kernel.nameOf(id);
+    if (id !== null && target !== null && !was.rows.includes(target) && was.rows.length < 10) {
+      was.rows.push(target);
+      was.names.push(kernel.titleOfRow(id) ?? target);
+    }
     byBatch.set(key, was);
   }
   const headAt = (before: boolean): string | null => {
