@@ -10,11 +10,11 @@
   policy, so the rule needs no hash.
 
   ON A PHONE IT IS THE APP'S PHONE LAYOUT: the date and the search on top, the places as the five-icon bar pinned at
-  the foot of a 600px frame that clips. The window draws on the app's own surfaces (`--desk-*` in Look B), so its dark
+  the foot of a 540px frame that clips. The window draws on the app's own surfaces (`--desk-*` in Look B), so its dark
   board and tiles are the app's.
 
   THE COUNT ON NEEDS YOU reads the desk's asks (`needs.svelte.ts`), so answering one on Today or in Needs you moves it,
-  and the greeting's "2 things need you" with it.
+  and the line's "2 need you" with it.
 -->
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
@@ -605,10 +605,10 @@
     }
   }
 
-  /* THE PHONE: the app's phone layout in a 600px frame that clips, the places pinned as its bottom bar. */
+  /* THE PHONE: the app's phone layout in a 540px frame that clips, the places pinned as its bottom bar. */
   @media (max-width: 760px) {
     .win {
-      block-size: 600px;
+      block-size: 540px;
     }
 
     .app-top {
@@ -635,7 +635,7 @@
     .places {
       position: absolute;
       inset-inline: 0;
-      inset-block-start: 536px;
+      inset-block-start: 476px;
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0;

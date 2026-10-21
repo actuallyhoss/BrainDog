@@ -101,7 +101,7 @@
 
   .copy {
     position: relative;
-    padding-block: 64px 56px;
+    padding-block: 56px 48px;
   }
 
   /* Two lines at 1440, three at 390 (site F8). */
@@ -187,7 +187,7 @@
      mark's line behind the desk's top edge rather than the buttons. */
   @media (max-width: 760px) {
     .copy {
-      padding-block: 40px 40px;
+      padding-block: 32px;
     }
 
     .lead {
