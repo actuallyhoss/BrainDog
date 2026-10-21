@@ -1447,6 +1447,12 @@ export function frameOf(seed: Seed, profile: Profile, scheme: Scheme, p: Palette
     }
   }
 
+  /* 1b · THE INK STARTS WHERE THE PROFILE AIMS IT, where that is further from the tile than the frame's. High contrast
+     aims light's ink darker than the house's (`HIGH_CONTRAST_PROFILE.aim`), because the house ink already clears its
+     floor and a floor alone never moves it: the frame started from the house ink and drew the light high-contrast page's
+     words in exactly the house ink, the one colour a reader turns the palette on for. */
+  if (profile.aim[scheme].ink !== HOUSE_PROFILE.aim[scheme].ink && contrast(rgb(p.ink), rgb(f.tile)) > contrast(rgb(f.ink), rgb(f.tile))) f.ink = p.ink;
+
   /* 2 · THE FILL FAMILY, from the seed's own working accent where it is not the house's. */
   if (!pinned) {
     f['red-fill'] = p.action;
