@@ -62,10 +62,15 @@
  * revision with no unsolicited notification path", in its own source), so with the channel on the bridge asks for
  * `2025-11-25` at the handshake and declines `server/discover`. Only lines from `pulse` are ever sent, which are his.
  *
+ * THE FIRST PULSE THAT FINDS A RUN KEEPS THIS PROFILE'S PLACE (`profile-place.ts`): where the Profiles add-on is on, its
+ * Places row for this profile on this machine is written once a day at most, with the build, the hooks and when it was
+ * heard. Without the add-on it costs one read a day, and nothing is said.
+ *
  * STDOUT CARRIES THE PROTOCOL AND NOTHING ELSE, and no line written anywhere holds the bearer.
  */
 
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
@@ -73,6 +78,7 @@ import { TOOLS, type McpSurface } from '@braindog/mcp';
 import { agreed, handle, VERSIONS, type Reply } from '@braindog/mcp/rpc';
 
 import { readDoorCache, writeDoorCache, type DoorCache } from './bridge-cache.ts';
+import { hooksThere } from './doctor.ts';
 import { BUDGET_MS, type Target } from './http.ts';
 import { readSession, sessionPath } from './hooks.ts';
 import {
@@ -93,6 +99,7 @@ import {
 } from './inbox-file.ts';
 import { loginCommand } from './login.ts';
 import { cliBuild, positionOf, type ClientInfo } from './position.ts';
+import { keepPlace } from './profile-place.ts';
 import { signedOutSurface } from './signed-out.ts';
 import { helloOf } from './stdio.ts';
 import { UNREACHABLE_FIX, type Ctx } from './surface.ts';
@@ -479,6 +486,8 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   let closing = false;
   /* WHAT HIS SETTINGS SAY FOR THIS AGENT, read once when the first pulse finds a run: the stop switch, and the channel. */
   let settings: { hooks: boolean; channel: boolean | null } | null = null;
+  /* WHETHER THIS PROCESS HAS KEPT ITS PROFILE'S PLACE, once, when the first pulse finds a run. */
+  let placed = false;
   /* THE INSTRUCTIONS SENT BY CHANNEL, and those still to report as seen that way, by id. */
   const pushed = new Set<string>();
   const byChannel = new Set<string>();
@@ -534,6 +543,23 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     }
     if (typeof value.run !== 'string') return every;
     settings ??= await readSettings(session);
+    /* THIS PROFILE'S PLACE ON THIS MACHINE (`profile-place.ts`), at most once a day, as the run just found. Awaited here,
+       so the close waits for it before it ends the run, and only where the session says its profile and its machine. */
+    const profile = session['x-braindog-profile'];
+    const machine = session['x-braindog-host'];
+    if (!placed && profile !== undefined && machine !== undefined) {
+      placed = true;
+      await keepPlace({
+        ask: (method, body) => apiCall(target, method, body, session, go, ms),
+        home,
+        host: target.key,
+        profile,
+        machine,
+        build: cliBuild(),
+        hooks: hooksThere(env.CLAUDE_CONFIG_DIR || join(home, '.claude')),
+        stopped: () => closing,
+      });
+    }
     const sent = [first, ...ways].flatMap((w) => w?.list ?? []);
     for (const s of sent) byChannel.delete(s);
     const pending = (Array.isArray(value.pending) ? value.pending : []).map(toldOf).filter((t): t is Told => t !== null);

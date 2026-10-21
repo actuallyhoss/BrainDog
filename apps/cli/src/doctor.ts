@@ -205,6 +205,12 @@ function hooksOf(file: string): { event: string; command: string }[] {
 /** BrainDog's own hook for an event, by its script's name and its last word, as `install` tells one (`isOurs`). */
 const isOurHook = (command: string, which: 'start' | 'end'): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
 
+/** Whether a profile's settings hold both of BrainDog's hooks, read as `profileOf` reads them. */
+export function hooksThere(dir: string): boolean {
+  const commands = hooksOf(join(dir, 'settings.json')).map((hook) => hook.command);
+  return commands.some((c) => isOurHook(c, 'start')) && commands.some((c) => isOurHook(c, 'end'));
+}
+
 function hookPlaces(file: string, r: Replace | undefined): Place[] {
   const places: Place[] = [];
   for (const { event, command } of hooksOf(file)) {
