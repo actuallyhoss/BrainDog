@@ -1860,6 +1860,14 @@
     column-gap: var(--sp-2);
   }
 
+  /* AND ONE MORE UNDER A THUMB FOR THE HAIRLINE, as the skin's own list of names (`cards.css`): the target is the line
+     inside its border, so a 44px line was a 43px target. */
+  @media (pointer: coarse) {
+    .body[data-board] :global(.block-slot[data-key='faces'] .cards-item) {
+      min-block-size: calc(var(--tap) + 1px);
+    }
+  }
+
   .body[data-board] :global(.block-slot[data-key='faces'] .cards-head) {
     display: flex;
     align-items: center;

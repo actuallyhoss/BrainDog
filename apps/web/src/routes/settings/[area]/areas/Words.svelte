@@ -478,7 +478,7 @@
           <li><Icon name={r.icon} size="s" /><span dir="auto">{r.name}</span></li>
         {/each}
       </ul>
-      <p class="hint">{words.renameWith} <a class="link" href={at('/packs/browse')}>{words.browse}</a></p>
+      <p class="hint">{words.renameWith} <a class="link tap" href={at('/packs/browse')}>{words.browse}</a></p>
     </Tile>
   {/if}
 

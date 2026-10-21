@@ -128,6 +128,20 @@
     text-underline-offset: 3px;
   }
 
+  /* THE ROW'S LINK IS 44 TALL UNDER A THUMB ("Update balances" on Money was 114x19), grown by a `::before` as `.tap`
+     grows one (`a11y.css`). A mouse sees no change. */
+  @media (pointer: coarse) {
+    .box .block[data-kind='note']:not([data-form='lead']) .panel a {
+      position: relative;
+    }
+
+    .box .block[data-kind='note']:not([data-form='lead']) .panel a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   /* A ONE-LINE TILE IS NOT MOSTLY EMPTY (the agents home's Needs a look was 136 tall around one line of 23): the first
      row under a boxed section's heading sits 8 under it, as a tile's line sits under its head, not the 24 that parts two
      blocks; and the row that ends the tile ends at its words, with the tile's own padding under it. */

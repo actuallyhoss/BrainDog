@@ -64,7 +64,7 @@
     {#if e.private}<span class="card-lock" title={copy.rowPrivateLock} role="img" aria-label={copy.rowPrivateLock}><Icon name="lock" size="s" /></span>{/if}
     <button
       type="button"
-      class="card-more"
+      class="card-more tap"
       aria-label={copy.moreOn(display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow)}
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >

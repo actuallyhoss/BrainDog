@@ -239,6 +239,25 @@
     line-height: 18px;
   }
 
+  /* UNDER A THUMB EVERY PRESS IS 44 BY 44. The select is the chip's control, so it takes the chip's height: at its words'
+     height it was a 20px target in a 44px chip. A segment is 40 inside its track's 2px, and a `::before` takes its press
+     out over the track's edge, as `.tap` grows one (`a11y.css`). A mouse sees no change. */
+  @media (pointer: coarse) {
+    .ins-pick > .ins-select {
+      align-self: stretch;
+    }
+
+    .ins-when-one {
+      position: relative;
+    }
+
+    .ins-when-one::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap, 44px)) / 2));
+    }
+  }
+
   /* ON A PHONE the choices take the width, each a 44px chip, and Send is a full row under them. */
   @container (width < 560px) {
     .ins-bar {

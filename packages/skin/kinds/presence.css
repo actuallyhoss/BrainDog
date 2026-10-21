@@ -107,6 +107,22 @@
     outline-offset: 2px;
   }
 
+  /* THE AGENT'S NAME AND THE ROW'S PRESSES ARE 44 BY 44 UNDER A THUMB, grown by a `::before` as `.tap` grows one
+     (`a11y.css`): "Codex" alone was 45x22, and on a tablet's wide row "Tell" was 39x40. A mouse sees no change. */
+  @media (pointer: coarse) {
+    a.pres-name,
+    .pres-btn {
+      position: relative;
+    }
+
+    a.pres-name::before,
+    .pres-btn::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   .pres-doing {
     min-inline-size: 0;
     color: var(--ink-2);

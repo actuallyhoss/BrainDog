@@ -228,7 +228,7 @@
               {/each}
             </div>
           {/if}
-          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link" href={at('/vault')}>{words.keysNoneAdd}</a></p>{/if}
+          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link tap" href={at('/vault')}>{words.keysNoneAdd}</a></p>{/if}
         </fieldset>
         </div>
 

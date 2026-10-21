@@ -1928,6 +1928,20 @@
     background: transparent;
   }
 
+  /* AND 44 UNDER A THUMB, grown by a `::before` as `.tap` grows one (`a11y.css`), so the head's 28px row keeps its
+     32px tools and a phone still gets the skin's target. */
+  @media (pointer: coarse) {
+    .block-slot:has(> .block-bar) .forecast-tool:not(.forecast-chip, .forecast-reset) {
+      position: relative;
+    }
+
+    .block-slot:has(> .block-bar) .forecast-tool:not(.forecast-chip, .forecast-reset)::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   .block-slot:has(> .block-bar) .forecast-tool[data-full] {
     inline-size: 32px;
   }

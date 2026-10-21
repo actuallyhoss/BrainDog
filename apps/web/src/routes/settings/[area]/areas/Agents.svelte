@@ -573,7 +573,7 @@
           {/each}
         </ul>
         {#if atWorkNow > 0}
-          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run" href={at('/r/session')}>{words.seeThem}</a></p>
+          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run tap" href={at('/r/session')}>{words.seeThem}</a></p>
         {/if}
       {/if}
     </Tile>

@@ -328,8 +328,9 @@
   }
 
   /* THE WHOLE STOP IS THE LINK'S TARGET (P17): the title alone was 20px tall on a phone. The stop is the containing
-     block and the title is not, so its clipped words do not clip this. */
-  a.t::after {
+     block and the title is not, so its clipped words do not clip this. On `::before`, because a touch target is
+     measured as the element and its `::before` (`a11y.css`'s `.tap`). */
+  a.t::before {
     content: '';
     position: absolute;
     inset: 0;

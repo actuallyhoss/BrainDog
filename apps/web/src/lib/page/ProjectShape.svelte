@@ -990,6 +990,14 @@
     white-space: nowrap;
   }
 
+  /* A ROW'S LINK IS THE ROW'S HEIGHT, its words in the middle (layout gate, 21 October): at its words' own height it was
+     a 38px target in a 52px row. */
+  a.w-words,
+  a.p-words {
+    align-self: stretch;
+    align-content: center;
+  }
+
   a.w-words:hover .w-title,
   a.p-words:hover .p-name {
     text-decoration: underline;
@@ -1023,6 +1031,19 @@
 
   .w-more:hover {
     color: var(--ink);
+  }
+
+  /* "3 MORE" IS 44 BY 44 UNDER A THUMB, grown by a `::before` as `.tap` grows one (`a11y.css`); it was 42x20. */
+  @media (pointer: coarse) {
+    .w-more {
+      position: relative;
+    }
+
+    .w-more::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
   }
 
   /* ── people ── */
