@@ -147,6 +147,25 @@
   ink, and one line saying which limit the month turns on. Drawn only where the ledger answered with this record's
   allowance: a plan with no limit has no meters, and a number tile without a chart is the one thing a tile may not be.
 -->
+<!-- THE TWO WAYS ON, AT THE TILE'S FOOT (UI pass of 21 October, H36): they were loose on the board under it. -->
+{#snippet foot()}
+<div class="row-actions">
+  <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
+  <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
+       `owner`, so offering a colleague *Export the record* here is an invitation to a screen
+       where all four buttons refuse. Usage is the account's rather than the record's and
+       stays.
+
+       NOTHING IS SAID IN ITS PLACE HERE, AND THAT IS THE ONE EXCEPTION ON THIS SCREEN. The
+       act lives on `/settings/export`, which is still in the rail and now says in its own
+       words who may do it: a second copy of that sentence under a row holding an unrelated
+       link would be a sentence with no clear subject. -->
+  {#if anOwner}
+    <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
+  {/if}
+</div>
+{/snippet}
+
 {#if meters.length > 0 && allowed}
   <Tile icon="money" title={tileWords.planTitle} meta={tileWords.monthMeta(month.day, month.of, allowed.resets)} lead>
     {#if figure}<p class="figure num">{figure}</p>{/if}
@@ -239,6 +258,7 @@
       {:else if bill.state !== 'ready'}
         <ReadState state={bill.state} refusal={bill.refusal} onretry={() => void bill.reread()} />
       {/if}
+      {@render foot()}
     </div>
   </Tile>
 {:else}
@@ -249,25 +269,12 @@
            machine." `billing.ts` says what is asked instead. -->
       <!-- AS A ROW, NOT A PARAGRAPH: the state in its title, the host's sentence as its line. -->
       <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
+      {@render foot()}
     </div>
   </Tile>
 {/if}
 
-<div class="row-actions">
-  <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
-  <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
-       `owner`, so offering a colleague *Export the record* here is an invitation to a screen
-       where all four buttons refuse. Usage is the account's rather than the record's and
-       stays.
 
-       NOTHING IS SAID IN ITS PLACE HERE, AND THAT IS THE ONE EXCEPTION ON THIS SCREEN. The
-       act lives on `/settings/export`, which is still in the rail and now says in its own
-       words who may do it: a second copy of that sentence under a row holding an unrelated
-       link would be a sentence with no clear subject. -->
-  {#if anOwner}
-    <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
-  {/if}
-</div>
 
 <style>
   /* THE FIGURE IN A TILE (`t-figure`): the plan, which is what the meters under it are measured against. */
