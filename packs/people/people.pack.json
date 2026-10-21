@@ -158,13 +158,12 @@
           "kind": "table",
           "heading": "Everyone",
           "icon": "people",
-          "span": 12,
+          "span": 6,
           "source": "register.people",
           "where": "merged_into is empty",
           "columns": [
             { "field": "name", "label": "Name", "width": "minmax(14ch,2fr)" },
             { "field": "role", "label": "Role", "width": "12ch" },
-            { "field": "org", "label": "With", "width": "minmax(14ch,2fr)" },
             { "field": "in_touch", "label": "Last spoke", "width": "14ch", "align": "end" }
           ],
           "order": [ { "field": "in_touch", "dir": "desc" }, { "field": "seq", "dir": "desc" } ],
@@ -175,14 +174,13 @@
           "kind": "table",
           "heading": "Organisations",
           "icon": "building",
-          "span": 12,
+          "span": 6,
           "source": "register.organisations",
           "where": "merged_into is empty",
           "when": { "metric": "organisations-count", "gt": 0 },
           "columns": [
             { "field": "name", "label": "Organisation", "width": "minmax(14ch,2fr)" },
-            { "field": "kind", "label": "Kind", "width": "12ch" },
-            { "field": "domain", "label": "Website", "width": "minmax(14ch,2fr)" }
+            { "field": "kind", "label": "Kind", "width": "10ch" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ]
         },
