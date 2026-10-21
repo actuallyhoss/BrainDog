@@ -181,7 +181,13 @@
         if (!held) continue;
         /* A NAME THAT REPEATS SAYS WHERE IT IS (agents F14): Work the screen and Work the page read "Work", then
            "Work" with "In Work" under it, rather than the same word twice. */
-        for (const p of held.list) out.push(same(p.own, held.section) && !out.some((o) => same(o.own, p.own)) ? p : { ...p, section: held.section });
+        for (const p of held.list) {
+          const twin = out.some((o) => same(o.own, p.own));
+          /* A PAGE NAMED AS ITS SECTION, WHEN THE APP'S SCREEN OF THAT NAME IS ALREADY LISTED, IS NOT LISTED AGAIN (UI pass
+             of 21 October, H34): "Work" then "Work, in Work" was one place said twice. */
+          if (twin && same(p.own, held.section)) continue;
+          out.push(same(p.own, held.section) && !twin ? p : { ...p, section: held.section });
+        }
       }
     }
     return out;
@@ -227,8 +233,11 @@
     const drawn = new Set(inNav.map((e) => e.href));
     const known = new Map(shell.nav.map((e) => [e.id, e] as const));
     const all = titled ?? shell.pages.map((slug) => ({ slug, title: '', row: known.get(slug)?.row === true }));
+    /* NOR IS A PAGE LISTED HERE UNDER A NAME THE NAV ALREADY SHOWS (H34): Activity was in both lists. */
+    const shown = new Set(ordered.map((o) => o.own.trim().toLocaleLowerCase()));
     const listed = all
       .filter((p) => !drawn.has(`/p/${p.slug}`))
+      .filter((p) => !shown.has((p.title || known.get(p.slug)?.title || wordsOf(p.slug)).trim().toLocaleLowerCase()))
       .map((p) => ({
         href: `/p/${p.slug}`,
         slug: p.slug,
