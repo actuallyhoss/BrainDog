@@ -1291,7 +1291,47 @@ export const SCHEMA_KEPT_MS = 300_000;
 
 /** What a kept schema was kept at: the record's version, or the app's declarations token (`followDeclarations`). */
 type Stamp = number | string | null;
-type SchemaStore = { version: number | null; lists: Map<string, { version: Stamp; at: number; answer: Promise<Result<unknown>> }> };
+type SchemaStore = {
+  version: number | null;
+  lists: Map<string, { version: Stamp; at: number; answer: Promise<Result<unknown>> }>;
+  /** The lists asked in this turn and not sent yet, each with whoever waits on it (`batchSchemas`). */
+  wave?: Map<string, ((r: Result<unknown>) => void)[]> | undefined;
+  /** The host has no `schemas`: a host older than it, asked `schema` once a list from then on. */
+  single?: boolean;
+};
+
+/**
+ * SCHEMAS ASKED IN ONE TURN GO AS ONE READ, for an app that turns it on (`batchSchemas`). Today learns every list's
+ * declaration before it asks its page, and a desk and a page reader ask theirs beside it: twenty-five `schema` asks on
+ * the seed, which a browser sends six at a time, five round trips before the page could be asked (`loop/perf`). Each
+ * `schema` asked while one is waiting to go joins it, and the wave goes as `schemas` (`packages/record/src/methods/
+ * schemas.ts`), which holds each list to the reader exactly as `schema` holds it.
+ *
+ * EACH ASKER IS ANSWERED AS `schema` WOULD HAVE ANSWERED IT: the list's declaration with the installed kinds beside it,
+ * or the refusal `schema` gives. A wave of one is sent as `schema`, as before. A host older than `schemas` is asked once
+ * a list from then on; a whole wave refused is asked once a list too, so each list hears its own refusal; and a host
+ * nobody reached is that answer for every list in the wave.
+ *
+ * OFF UNLESS AN APP TURNS IT ON. A command, a test and an agent's client ask once a list, as they always have.
+ */
+let BATCHING = false;
+/** Send the schemas asked in one turn as one read from now on, or once a list again (`false`). */
+export function batchSchemas(on: boolean): void {
+  BATCHING = on;
+}
+/**
+ * EVERY LIST'S DECLARATION, ASKED ONCE BESIDE `boot` (`schemas`), by host and token: a first screen's lists are
+ * then learnt from it as they are asked, and none waits for `boot` to say which lists there are and then for their
+ * declarations in turn. Each kept store takes it once, at the version it stands at then, as long as this tab has sent
+ * no write since it was asked and it is younger than `SCHEMA_KEPT_MS`; a list it does not hold is asked as before.
+ */
+type Every = { wrote: number; at: number; done: Promise<{ lists: Record<string, unknown>; blocks: Record<string, unknown> } | null>; taken: WeakMap<SchemaStore, Promise<void>> };
+let EVERY = new Map<string, Every>();
+
+/** The most lists one `schemas` names, as the record takes them (`SCHEMAS_MOST`). */
+const SCHEMAS_WAVE_MOST = 100;
+/** Refusals that say the host has no `schemas` at all. */
+const NO_SCHEMAS = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
 
 /**
  * The app's word on the record's declarations, or `null` where it has none to give.
@@ -1342,6 +1382,7 @@ let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
 /** Drop every kept schema, as the app's `forget` does on a record switch and a sign-out, so the next ask goes out. */
 export function forgetSchemas(): void {
   SCHEMAS = new WeakMap();
+  EVERY = new Map();
   FLYING = new WeakMap();
   READS = new Map();
   OUT = new Map();
@@ -1545,6 +1586,108 @@ export function createClient(options: ClientOptions) {
     if (store === undefined) byHost.set(key, (store = { version: null, lists: new Map() }));
     return store;
   };
+
+  /** Every list's declaration asked beside `boot` (`EVERY`), taken into `store` once; whether there was one to wait for. */
+  async function takeEvery(store: SchemaStore): Promise<boolean> {
+    const every = EVERY.get(`${base} ${options.token ?? ''}`);
+    if (every === undefined) return false;
+    let taking = every.taken.get(store);
+    if (taking === undefined) {
+      taking = every.done.then((got) => {
+        if (got === null || every.wrote !== WROTE || Date.now() - every.at >= SCHEMA_KEPT_MS) return;
+        for (const [id, decl] of Object.entries(got.lists)) {
+          if (store.lists.has(id) || decl === null || typeof decl !== 'object') continue;
+          store.lists.set(id, { version: store.version, at: every.at, answer: Promise.resolve({ ok: true, value: { ...decl, blocks: got.blocks } }) });
+        }
+      });
+      every.taken.set(store, taking);
+    }
+    await taking;
+    return true;
+  }
+
+  /** An answer the page asked for before the app arrived (`app.html`), read as `send` reads one. */
+  async function fromEarly<T>(early: Promise<Response>): Promise<Result<T>> {
+    let res: Response;
+    try {
+      res = await early;
+    } catch (e) {
+      return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+    }
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+    }
+    return answered<T>(res.status, body);
+  }
+
+  /** One list's schema, sent with every other asked in this turn (`batchSchemas`). */
+  function inWave(store: SchemaStore, register: string): Promise<Result<unknown>> {
+    return new Promise((done) => {
+      let wave = store.wave;
+      if (wave === undefined) {
+        wave = store.wave = new Map();
+        /* A TURN AND NOT A MICROTASK: each asker waits on the declarations token first (`FOLLOW`), so the askers of one
+           read reach here on microtasks of their own. */
+        setTimeout(() => void sendWave(store), 0);
+      }
+      const waiting = wave.get(register);
+      if (waiting) waiting.push(done);
+      else wave.set(register, [done]);
+    });
+  }
+
+  /** The wave waiting on `store`, sent: as `schema` for one list or a host without `schemas`, else as `schemas`. */
+  async function sendWave(store: SchemaStore): Promise<void> {
+    const wave = store.wave;
+    store.wave = undefined;
+    if (wave === undefined) return;
+    const tell = (register: string, r: Result<unknown>) => {
+      for (const done of wave.get(register) ?? []) done(r);
+    };
+    const alone = (register: string) =>
+      call<unknown>('schema', { register }).then(
+        (r) => tell(register, r),
+        (e) => tell(register, { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }),
+      );
+    const lists = [...wave.keys()];
+    if (lists.length === 1 || store.single === true) {
+      await Promise.all(lists.map(alone));
+      return;
+    }
+    const parts: string[][] = [];
+    for (let i = 0; i < lists.length; i += SCHEMAS_WAVE_MOST) parts.push(lists.slice(i, i + SCHEMAS_WAVE_MOST));
+    await Promise.all(
+      parts.map(async (part) => {
+        const out = await call<{ lists?: Record<string, unknown>; refused?: Record<string, Refusal>; blocks?: Record<string, unknown> }>('schemas', { registers: part }).catch(
+          (e: unknown): Result<never> => ({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }),
+        );
+        if (!out.ok) {
+          const refusal = 'refusal' in out ? out.refusal : undefined;
+          if (refusal?.code === 'UNREACHABLE') {
+            for (const register of part) tell(register, out);
+            return;
+          }
+          if (refusal && NO_SCHEMAS.has(refusal.code)) store.single = true;
+          await Promise.all(part.map(alone));
+          return;
+        }
+        const said = out.value ?? {};
+        const blocks = said.blocks ?? {};
+        await Promise.all(
+          part.map((register) => {
+            const decl = said.lists?.[register];
+            if (decl !== undefined && decl !== null && typeof decl === 'object') return tell(register, { ok: true, value: { ...(decl as object), blocks } });
+            const refusal = said.refused?.[register];
+            if (refusal !== undefined) return tell(register, { ok: false, refusal });
+            return alone(register);
+          }),
+        );
+      }),
+    );
+  }
 
   /** Past this many encoded bytes of arguments a read is sent as a POST body, well under any server's header ceiling. */
   const READ_URL_CEILING = 6000;
@@ -1838,19 +1981,53 @@ export function createClient(options: ClientOptions) {
       }
       return out;
     },
+    /**
+     * Every list the caller reads, its declaration asked once now (`schemas` with `every`), for the lists a first screen
+     * learns: each `schema` asked for one of them from then on is answered from it (`EVERY`). `early` is that answer when
+     * the page asked for it before the app arrived (`app.html`). Whether the record answered.
+     */
+    schemas: (early?: Promise<Response> | null): Promise<boolean> => {
+      type Said = { lists?: Record<string, unknown>; blocks?: Record<string, unknown> };
+      const asked = early ? fromEarly<Said>(early) : call<Said>('schemas', { every: true });
+      const done = asked.then(
+        (out) => (out.ok && out.value !== null && typeof out.value === 'object' ? { lists: out.value.lists ?? {}, blocks: out.value.blocks ?? {} } : null),
+        () => null,
+      );
+      EVERY.set(`${base} ${options.token ?? ''}`, { wrote: WROTE, at: Date.now(), done, taken: new WeakMap() });
+      return done.then((got) => got !== null);
+    },
     /** A list's schema, asked once a version for the whole tab (`SCHEMAS`). A refusal is not kept. */
     schema: async (register: string) => {
+      /* KEPT AT THE VERSION THE RECORD IS AT NOW, it is answered at once: the token is only what keeps a schema past a
+         move of the version, so a first screen does not wait for the copy's first catch-up to learn a list it holds. */
+      const byVersion = (): Promise<Result<unknown>> | null => {
+        const at = Date.now();
+        const s = schemas();
+        const was = s.lists.get(register);
+        return was !== undefined && was.version === s.version && at - was.at < SCHEMA_KEPT_MS && at >= was.at ? was.answer : null;
+      };
+      const first = byVersion();
+      if (first !== null) return first;
+      /* AND EVERY LIST'S DECLARATION ASKED BESIDE `boot` (`schemas`), taken into this store once it lands. */
+      if (await takeEvery(schemas())) {
+        const taken = byVersion();
+        if (taken !== null) return taken;
+      }
       /* THE APP'S DECLARATIONS TOKEN FIRST (`FOLLOW`), which may wait for its follow of the log to catch up. */
       const token = FOLLOW ? await FOLLOW().catch(() => null) : null;
       const store = schemas();
-      const now = Date.now();
-      const was = store.lists.get(register);
       /* KEPT AT THE TOKEN, or at the version the record is at now, which a token then carries on past its moves. */
-      if (was !== undefined && (was.version === store.version || (token !== null && was.version === token)) && now - was.at < SCHEMA_KEPT_MS && now >= was.at) {
+      const kept = (): Promise<Result<unknown>> | null => {
+        const at = Date.now();
+        const was = store.lists.get(register);
+        if (was === undefined || !(was.version === store.version || (token !== null && was.version === token)) || at - was.at >= SCHEMA_KEPT_MS || at < was.at) return null;
         if (token !== null) was.version = token;
         return was.answer;
-      }
-      const answer = call<unknown>('schema', { register });
+      };
+      const hit = kept();
+      if (hit !== null) return hit;
+      const now = Date.now();
+      const answer = BATCHING ? inWave(store, register) : call<unknown>('schema', { register });
       const entry: { version: Stamp; at: number; answer: Promise<Result<unknown>> } = { version: token ?? store.version, at: now, answer };
       store.lists.set(register, entry);
       void answer.then((r) => {
