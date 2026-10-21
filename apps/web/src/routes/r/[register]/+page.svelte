@@ -1082,6 +1082,12 @@
     });
   });
 
+  /* THE PHONE'S CARDS WEAR THE SAME WASH AS THE TABLE'S ROWS (VERIFY H24): a row typed here (`fresh`) and a row that
+     landed from elsewhere (`arrived`), by `seq`. */
+  const cardsArrived = $derived(
+    new Set([...fresh.keys(), ...[...arrived].flatMap((k) => (k.startsWith(`${id}#`) ? [Number(k.slice(id.length + 1))] : []))]),
+  );
+
   /**
    * THE ROWS IN HAND, WHICH IS NOT THE ROWS FETCHED.
    *
@@ -3126,6 +3132,7 @@
         {now}
         names={result.names ?? undefined}
         {selected}
+        arrived={cardsArrived}
         {decl}
         more={cursor !== null && loaded < DOM_CAP}
         {receiptFor}

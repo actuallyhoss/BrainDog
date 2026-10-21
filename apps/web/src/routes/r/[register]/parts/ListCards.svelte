@@ -27,11 +27,14 @@
     now,
     names,
     selected,
+    arrived,
     decl,
     more,
     receiptFor,
     openCardMenu,
   }: {
+    /** The rows that just arrived, typed here or landed from elsewhere, by `seq`: each card wears the wash. */
+    arrived: ReadonlySet<number>;
     register: string;
     /** The rows to draw, already cut to `DOM_CAP` by the page. */
     entries: readonly Entry[];
@@ -47,7 +50,7 @@
 </script>
 
 <div class="list-cards">
-<RowCards {register} {entries} {now} {names} picked={selected}>
+<RowCards {register} {entries} {now} {names} picked={selected} {arrived}>
   {#snippet action(e)}
     <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
          key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
