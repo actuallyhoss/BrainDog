@@ -397,10 +397,10 @@
     }
 
     /* NOW'S WORD GIVES WAY ON A NARROW BLOCK, its line kept: an hour named a sixteenth of the width before it ran into it.
-       The word is drawn at no size, not in a clear ink: a clear word still stood over 12:00 at 390 (the look's "text
-       crosses text"), and the line is the box's end edge, so it stays where it was. */
-    .lanes-now {
-      font-size: 0em;
+       The word is its own span and is left out, not drawn in a clear ink: a clear word still stood over 12:00 at 390
+       (the look's "text crosses text"). The line is the box's end edge, so it stays where it was. */
+    .lanes-now-word {
+      display: none;
     }
 
     /* A RUN'S LANE ON A PHONE: who and what on the first line, its time under them, its bar under both, the width. */

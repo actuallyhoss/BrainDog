@@ -140,7 +140,7 @@ test('a lanes fence draws an axis, a lane a row with its tone, and the rows it c
   const html = toHTML(parse(src), { link: () => null });
   assert.match(html, /<figure class="block block-list" data-kind="lanes" data-primitive="list">/u);
   assert.match(html, /<div class="lanes" style="--rows:2"><ol class="lanes-axis" aria-hidden="true"><li class="lanes-tick" style="--at:10%">09:00<\/li>/u);
-  assert.match(html, /<li class="lanes-now" style="--at:50%">Now<\/li><\/ol>/u);
+  assert.match(html, /<li class="lanes-now" style="--at:50%"><span class="lanes-now-word">Now<\/span><\/li><\/ol>/u);
   assert.match(html, /<ol class="lanes-list" aria-label="2 on the timeline, 7 Oct 2026, 08:00 – 18:00">/u);
   assert.match(html, /<li class="lanes-item" style="--at:10%;--span:15%"><span class="lanes-title"><a [^>]*href="\/r\/things\/2"[^>]*>Sync<\/a><\/span><span class="lanes-when num">09:00 to 10:30<\/span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"><\/span><\/span><\/li>/u);
   assert.match(html, /<li class="lanes-item" data-intent="bad" data-open="" style="--at:40%;--span:10%"><span class="lanes-title">Export<\/span><span class="glyph" role="img" aria-label="wrong">[^<]+<\/span><span class="lanes-when num">Since 12:00<\/span>/u);

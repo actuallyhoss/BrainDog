@@ -39,7 +39,7 @@
 {:else}
   <div class="lanes" style="--rows:{plan.lanes.length}">
     <ol class="lanes-axis" aria-hidden="true">
-      {#each plan.ticks as t}<li class="lanes-tick" style="--at:{t.at}">{t.label}</li>{/each}{#if plan.now !== null}<li class="lanes-now" style="--at:{plan.now}">{LANES_NOW}</li>{/if}
+      {#each plan.ticks as t}<li class="lanes-tick" style="--at:{t.at}">{t.label}</li>{/each}{#if plan.now !== null}<li class="lanes-now" style="--at:{plan.now}"><span class="lanes-now-word">{LANES_NOW}</span></li>{/if}
     </ol>
     <ol class="lanes-list" aria-label={lanesSentence(plan)}>
       {#each plan.lanes as l}

@@ -1889,7 +1889,7 @@ function lanes(b: Block, o: RenderOptions): string {
     (plan.skipped.length ? `<p class="lanes-skipped">${escape(lanesSkipped(plan.skipped.map((i) => said(b.rows[i]!))))}</p>` : '');
   if (plan.empty) return `<div class="lanes"><p class="lanes-empty">${escape(LANES_NONE)}</p>${under}</div>`;
   const axis = `<ol class="lanes-axis" aria-hidden="true">${plan.ticks.map((t) => `<li class="lanes-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}${
-    plan.now === null ? '' : `<li class="lanes-now" style="--at:${plan.now}">${LANES_NOW}</li>`
+    plan.now === null ? '' : `<li class="lanes-now" style="--at:${plan.now}"><span class="lanes-now-word">${LANES_NOW}</span></li>`
   }</ol>`;
   const list = `<ol class="lanes-list" aria-label="${escape(lanesSentence(plan))}">${plan.lanes
     .map(
