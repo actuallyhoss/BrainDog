@@ -39,6 +39,11 @@
 </section>
 
 <style>
+  /* The pair shares one height, each way on at its foot. */
+  .cols {
+    align-items: stretch;
+  }
+
   .ftile {
     display: flex;
     flex-direction: column;
