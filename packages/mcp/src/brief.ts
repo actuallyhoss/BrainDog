@@ -947,6 +947,68 @@ export function handoffBrief(run: Shaped): string {
     .join(' · ');
 }
 
+/**
+ * One instruction as every answer and `_meta.braindog` hand it on (plan §8.3, the inbox file's shape): its id, kind,
+ * his words, when, to whom, who said it by name, who took it, and the line in his voice. Nothing else of the row.
+ */
+export type Pending = { id: string; kind: string; said: string; at: string; to: string; by: string | null; taken_by: string | null; line: string };
+
+/** The instructions in a record's answer (`Told[]`, or `Pending[]` again), as `Pending`; anything that is not one is passed over. */
+export function pendingOf(told: unknown): Pending[] {
+  return (Array.isArray(told) ? told : []).filter(isObject).flatMap((t) => {
+    if (typeof t.id !== 'string' || typeof t.said !== 'string') return [];
+    const by = typeof t.by_name === 'string' ? t.by_name : typeof t.by === 'string' && !t.by.startsWith('p_') ? t.by : null;
+    return [
+      {
+        id: t.id,
+        kind: typeof t.kind === 'string' ? t.kind : 'tell',
+        said: t.said,
+        at: typeof t.at === 'string' ? t.at : '',
+        to: typeof t.to === 'string' ? t.to : 'run',
+        by,
+        taken_by: typeof t.taken_by === 'string' ? t.taken_by : null,
+        line: typeof t.line === 'string' ? t.line : t.said,
+      },
+    ];
+  });
+}
+
+/** What `handoff { task }` or `{ done }` did to the task, said after the run's line: the task and its state now. */
+export function handedBrief(task: Record<string, unknown>, done: boolean): string {
+  const spoken = typeof task.spoken === 'string' ? task.spoken : 'The task';
+  const state = typeof task.state === 'string' && task.state !== '' ? task.state.replace(/_/gu, ' ') : null;
+  if (isObject(task.asked)) return `${spoken} was not ${done ? 'closed' : 'started'}: it is asked of the owner first.`;
+  return done ? `Closed ${spoken}${state ? `, now ${state}` : ''}.` : `${spoken} is in hand${state ? `, now ${state}` : ''}. Close it with handoff {done:"${spoken}", note:"..."}.`;
+}
+
+/**
+ * What `instructions` says (plan §2.3 F, §6.1): what waits in his voice, the record's own lines; after a take, the one
+ * in hand and the reply that closes it; after a reply, how it stands and what the run changed while it held it.
+ */
+export function instructionsBrief(v: Record<string, unknown>, did: 'read' | 'take' | 'reply', look?: Look): string {
+  const lines = (Array.isArray(v.lines) ? v.lines : []).filter((l): l is string => typeof l === 'string');
+  const one = isObject(v.instruction) ? v.instruction : null;
+  const id = one !== null && typeof one.id === 'string' ? one.id : null;
+  /* THE REST OF WHAT WAITS, without the one this call took or answered, and without "Nothing new" after a take or reply. */
+  const rest = lines.filter((l) => (id === null || !l.includes(`(${id})`)) && !(did !== 'read' && /^Nothing new/u.test(l)));
+  if (did === 'take' && one !== null && id !== null) {
+    const said = typeof one.said === 'string' ? clip(oneLine(one.said), 200) : '';
+    return [`You have ${id}: "${said}". When it is done: instructions {reply:"${id}", said:"what you did", state:"done"}.`, ...rest].join('\n');
+  }
+  if (did === 'reply' && one !== null && id !== null) {
+    const state = typeof one.state === 'string' ? one.state.replace(/_/gu, ' ') : 'answered';
+    const r = isObject(v.receipts) ? v.receipts : null;
+    const changes = r !== null && typeof r.changes === 'number' ? r.changes : 0;
+    const batches = r !== null && Array.isArray(r.batches) ? r.batches.filter(isObject) : [];
+    const touched = [...new Set(batches.flatMap((b) => (Array.isArray(b.rows) ? b.rows.filter((x): x is string => typeof x === 'string') : [])))]
+      .slice(0, 5)
+      .map((h) => (look === undefined ? h : namedIn(look.title(h) ?? '', h, look, 60)));
+    const wrote = changes === 0 ? 'No changes while you held it.' : `${counted(changes, 'change')} in ${counted(batches.length, 'batch', 'batches')} while you held it${touched.length > 0 ? `: ${touched.join(', ')}` : ''}.`;
+    return [`Answered ${id}: ${state}. ${wrote} It shows in BrainDog.`, ...rest].join('\n');
+  }
+  return (lines.length > 0 ? lines : ['Nothing new for you.']).join('\n');
+}
+
 /** What `meet` answered, as the tool shaped it, and what the answer is said with beside it. */
 export type MetSaid = {
   /** The kept row's handle, `P6`, when somebody was matched or added. */

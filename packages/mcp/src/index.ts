@@ -105,8 +105,12 @@ import {
   figureBrief,
   governanceBrief,
   GROUPS_SHOWN,
+  handedBrief,
   handoffBrief,
   historyBrief,
+  instructionsBrief,
+  pendingOf,
+  type Pending,
   inboxDigestLines,
   inboxStateLines,
   indexBrief,
@@ -174,7 +178,20 @@ export type McpSurface<C> = {
   page(args: { slug: string }, ctx: C): Answer;
   metric(args: { metric: string }, ctx: C): Answer;
   digestToday(args: { digest?: string }, ctx: C): Answer;
-  context?(args: Record<string, never>, ctx: C): Answer;
+  /** Where an agent stands; `task`, `project`, `depth` and `since` as the record's `context` takes them (plan §3.1). */
+  context?(args: never, ctx: C): Answer;
+  /**
+   * What he told the caller's own run, and its take or reply (the record's `instructionsMine`, DATA, plan §2, §8.2). It
+   * backs the `instructions` tool. Optional for the command line's reason above: a surface without it answers that
+   * `NOT_IN_THIS_BUILD`.
+   */
+  instructionsMine?(args: never, ctx: C): Answer;
+  /**
+   * TRUE FOR A SURFACE WHOSE TOOLS RUN ON THE MACHINE over a client (the command line's `--local`, `apps/cli/src/surface.ts`):
+   * its handshake and tool list must answer with the host down, so `tools/list` is not cut by his settings there and
+   * asks the host nothing. A call to a tool he switched off is still refused `TOOL_OFF`, by the call's own read.
+   */
+  onMachine?: true;
   handoff?(args: Args, ctx: C): Answer;
   meet?(args: Args, ctx: C): Answer;
   /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
@@ -393,6 +410,11 @@ export type Tool = {
   destructive?: true;
   /** A write that, sent again with the same arguments, leaves the record as the first call did (the spec's `idempotentHint`). */
   idempotent?: true;
+  /**
+   * Arguments the tool takes and does not list: a bridge's or a hook's, which every turn would pay for and no agent
+   * needs to choose (`context`'s `since`, `instructions`' `seen`). Taken as a listed one is; never refused as stray.
+   */
+  quiet?: readonly string[];
 };
 
 const str = (description: string) => ({ type: 'string', description });
@@ -432,28 +454,42 @@ export const TOOLS: readonly Tool[] = [
     /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
-    description: 'Registers with entry counts, and figures.',
-    input: obj({}),
+    /* AND ONE LIST'S FIELDS, WHICH WAS `schema` (agents and MCP plan §6.1, 12a): a tool of its own for one argument, folded
+       here and still callable by its old name until `FOLDED_UNTIL`. */
+    description: 'Registers with entry counts, and figures; register: its fields.',
+    input: obj({ register: { type: 'string' } }),
     writes: false,
   },
   {
     name: 'context',
     title: 'Get your briefing',
-    /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE, which a client shows in the same payload. What is left
-       is what comes back, and since the card it is the card's five slots, in the order the card says them. */
-    description:
-      'Run, project, next step, what waits, what was learned.',
-    input: obj({}),
+    /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE. What comes back is said in the order it is ranked
+       (plan §3.2): what he told you first, then where you are, your rules, who else is here and your lane. The four
+       arguments are what saves a second call: a task whole with its version, a project by name, how much, and since a
+       stamp, which answers only what moved. */
+    description: 'Start here: what you were told, where you are, who else is here, your lane.',
+    /* `depth` AND `since` ARE TAKEN AND NOT LISTED (`quiet`): a task asks the task's depth and `format: "full"` the full
+       one, and `since` is a bridge's or a hook's, which hold the stamp `_meta.braindog` carries; an agent is handed what
+       moved on its next answer without asking. */
+    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' } }),
+    quiet: ['depth', 'since'],
     writes: false,
   },
   {
-    name: 'schema',
-    title: 'See the fields',
-    description: 'One register\'s fields and types.',
-    /* `register` IS SAID BY NAME, as on `list` and `create`: where the ids are is `record_index`'s own description, and
-       the twelve tokens went to `handoff`'s take and drop (AGT-C05). */
-    input: obj({ register: { type: 'string' } }, ['register']),
-    writes: false,
+    name: 'instructions',
+    title: 'Answer what you were told',
+    /* WHAT HE TELLS AN AGENT FROM THE APP (plan §2, §6.1), the one new tool, paid for by folding `history` and `schema`.
+       The three calls are the examples, because an agent copies an example before it reads a sentence. */
+    description: 'What the person told you: {} reads, {take:"IN4"} takes, {reply:"IN4",said,state} answers.',
+    input: obj({
+      take: { type: 'string' },
+      reply: { type: 'string' },
+      said: { type: 'string' },
+      state: { enum: ['done', 'needs_you', 'declined'] },
+    }),
+    /* WHAT A CLIENT SHOWED IT AND HOW, which the bridge says for its hooks; an agent reading with `{}` marks them itself. */
+    quiet: ['seen', 'how'],
+    writes: true,
   },
   {
     name: 'get',
@@ -466,11 +502,14 @@ export const TOOLS: readonly Tool[] = [
        the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
     /* AND "NEVER ADD TWO CURRENCIES" MOVED HERE FROM THE INSTRUCTIONS, beside the one read that answers a figure, when
        the instructions were cut to the three rules every call needs. */
-    description: 'One entry or figure, by its spoken id. Two currencies are never added.',
+    /* AND BY ITS NAME, AND WITH ITS HISTORY (plan §4.3, §6.1): "Kiln" answers the one thing called that, and several are
+       refused `NAME_AMBIGUOUS` with their handles; `history: true` folds in what was `history`, still callable by its old
+       name until `FOLDED_UNTIL`. */
+    description: 'One entry or figure. Two currencies are never added.',
     input: obj(
       /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop (AGT-C05): "from record_index" is what that tool's own
          description says of its figures, and a ref field's value is a row id by what it is. */
-      { spoken: str('register#number, such as S42, or a figure.') },
+      { spoken: str('tasks#41, S42, a name, or a figure.'), history: { type: 'boolean' } },
       ['spoken'],
     ),
     writes: false,
@@ -512,20 +551,13 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     title: 'Search everything',
-    description: 'Rows matching your words in every register. Each word is a prefix.',
+    description: 'Rows matching your words, each a prefix, in every register.',
     /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
     /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
     input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.') }, ['q']),
-    writes: false,
-  },
-  {
-    name: 'history',
-    title: 'See its history',
-    description: 'Every write to one entry, with who and when.',
-    input: obj({ spoken: str('As get takes it.') }, ['spoken']),
     writes: false,
   },
   {
@@ -538,7 +570,10 @@ export const TOOLS: readonly Tool[] = [
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
     /* ITS LIMIT IS `list`'s, 1 to 100 and 20 by default, and no longer said here: the eight tokens went to `handoff`'s take
        and drop (AGT-C05), and an answer at the cap still says what is left and the call that reads it. */
-    input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' }, everything: { type: 'boolean' } }),
+    /* `everything` ASKS FOR THE RECORD'S OWN BOOKKEEPING BACK (the sweep, a run's seen stamps), which no agent picks a
+       call for: taken and not listed (`quiet`), and its tokens went to `instructions`. */
+    input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' } }),
+    quiet: ['everything'],
     writes: false,
   },
   {
@@ -548,7 +583,8 @@ export const TOOLS: readonly Tool[] = [
       'Open questions, decisions with reasons, and predictions.',
     input: obj({
       register: { enum: ['suggestion', 'decision', 'prediction'] },
-      id: str('An SG or D number.'),
+      /* "AN SG OR D NUMBER" WENT, for `instructions`: every question and decision an answer names is said with it. */
+      id: { type: 'string' },
       status: { enum: ['open', 'resolved', 'all'] },
       /* `list`'s limit, said there and not again here, as `activity`'s: its tokens went to `handoff`'s take and drop. */
       limit: { type: 'integer' },
@@ -585,10 +621,10 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'options: {"options":[...]}, two or more, each with id, label, because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with the from_version you read. automation: a change with {"sentence":"..."}. Others: braindog:grammar/proposals.',
+            'options: {"options":[{id,label,because}]}, two or more. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with its from_version. Others, automations too: braindog:grammar/proposals.',
         },
         cause: str('A short key, so it is asked once.'),
-        again: str('What changed since the person declined or chose.'),
+        again: str('What changed since they answered.'),
         withdraw: str('Alone, takes back an SG you asked.'),
       },
     ),
@@ -626,7 +662,7 @@ export const TOOLS: readonly Tool[] = [
        AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
        delete tool; here it is `deleted_at` through the same verb and the same permission, and an
        agent had no way to find that out. */
-    description: 'Change an entry. On VERSION_STALE, re-apply your change to current.',
+    description: 'Change an entry. On VERSION_STALE, re-apply it to current.',
     input: obj(
       {
         spoken: str('As get takes it.'),
@@ -644,7 +680,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     title: 'Add a note',
-    description: 'Append one note to an entry, changing nothing else.',
+    description: 'One note on an entry, changing nothing else.',
     /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
@@ -662,22 +698,26 @@ export const TOOLS: readonly Tool[] = [
        read on every call of every tool. Each field's own rule stays beside the field. */
     /* TAKE AND DROP ARE A CALL OF THEIR OWN (AGT-C05), on a step another run left: `take` picks it up, and the second of
        two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
-    description: "Keep your run's handoff true: doing once you know the task, next before you stop, each dead end in tried. take or drop a run's step alone, drop with why.",
+    description: "Keep your run's step true: doing once you know it, next before you stop, dead ends in tried. task starts one, done closes it. take or drop a run's step alone, drop with why.",
     input: obj({
       next: str('One step.'),
       tried: { type: 'string' },
       note: { type: 'string' },
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
-      doing: str('A few words, verb first.'),
+      doing: str('Verb first.'),
       /* AN ENUM ALONE, as every other in this list: its `type` paid for `meet`'s `keys` saying its items are text, which
          a client that checks arrays (Gemini's) refuses a tool list without. The states are the kernel's (`HANDOFF_STATES`). */
       state: {
         enum: [...HANDOFF_STATES],
-        description: 'handoff passes it on; done clears next.',
+        description: 'handoff passes it on.',
       },
       take: { type: 'string' },
       drop: { type: 'string' },
       why: { type: 'string' },
+      /* ONE CALL WHERE A FINISHED TASK TOOK THREE (plan §4.3): `task` puts it in hand and sets it doing, `done` closes it
+         with `note` and moves the next step. The record's `handoff` takes both and says what the task is now. */
+      task: { type: 'string' },
+      done: { type: 'string' },
     }),
     writes: true,
   },
@@ -697,7 +737,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
+      'A person or organisation; a name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -729,7 +769,8 @@ export const TOOLS: readonly Tool[] = [
       {
         arrival: str('Its id in braindog:inbox.'),
         register: { type: 'string' },
-        fields: { type: 'object', description: 'Omit to title it from the arrival.' },
+        /* "OMIT TO TITLE IT FROM THE ARRIVAL" WENT, for `instructions` (plan §6.1): the record titles it so, and says it. */
+        fields: { type: 'object' },
         ignore: { type: 'boolean' },
         note: { type: 'string' },
         back: { type: 'boolean' },
@@ -752,6 +793,43 @@ export const TOOLS: readonly Tool[] = [
     idempotent: true,
   },
 ];
+
+/**
+ * The last day a folded tool answers by its old name: sixty days after it was folded (plan §6.6, 12a).
+ */
+export const FOLDED_UNTIL = '2026-12-20';
+
+/**
+ * TOOLS FOLDED INTO OTHERS, NEVER LISTED AND STILL CALLABLE UNTIL `FOLDED_UNTIL` (agents and MCP plan §6.1, 12a): a
+ * session that cached the older list keeps working, and its answer says where the call lives now. Folding them paid for
+ * `instructions` and the new arguments, so the list's ceiling stayed at 2,760 (`budget.test.ts`).
+ */
+export const FOLDED: readonly (Tool & { into: string })[] = [
+  {
+    name: 'schema',
+    title: 'See the fields',
+    description: 'One register\'s fields and types.',
+    input: obj({ register: { type: 'string' } }, ['register']),
+    writes: false,
+    into: 'record_index {register}',
+  },
+  {
+    name: 'history',
+    title: 'See its history',
+    description: 'Every write to one entry, with who and when.',
+    input: obj({ spoken: str('As get takes it.') }, ['spoken']),
+    writes: false,
+    into: 'get {spoken, history: true}',
+  },
+];
+
+/** A tool by its name, listed or folded: what `answer`, `strayIn` and `rpc.ts` read a call's arguments against. */
+export const toolNamed = (name: string): Tool | undefined => TOOLS.find((t) => t.name === name) ?? FOLDED.find((t) => t.name === name);
+
+/** The arguments a tool lists, by name. */
+export const takesOf = (name: string): string[] => Object.keys((toolNamed(name)?.input as { properties?: Record<string, unknown> } | undefined)?.properties ?? {});
+
+export { pendingOf, type Pending };
 
 /** The most merges `get` and `meet` follow from a folded row to the one kept. */
 const MERGE_HOPS = 4;
@@ -2044,7 +2122,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (!arranged) return homes[0]!;
     let about = project;
     if (about === undefined) {
-      const c = surface.context ? await surface.context({}, ctx) : null;
+      const c = surface.context ? await surface.context({} as never, ctx) : null;
       about = c?.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.spoken === 'string' ? c.value.project.spoken : null;
     }
     let among = homes;
@@ -2246,6 +2324,68 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return out;
   };
 
+  /**
+   * `get` BY A NAME (plan §4.3, §6.1): "Crumb.gg" or "Send Jennifer the Crumb Pass refund email" was refused, because `get`
+   * took a handle alone, and an agent searched and read again. Now the one thing whose title is that name, case and
+   * spacing aside, answers as its handle does; a search with one hit answers too. Several are refused `NAME_AMBIGUOUS`
+   * with each by its handle and list, and the call for the first as `try`. `null` when nothing is called that, so the
+   * caller says the row forms as before.
+   */
+  const byName = async (said: string, args: Args, ctx: C, turn: Turn): Promise<Done | null> => {
+    if (said === '' || said.length > 200) return null;
+    const found = await surface.search({ q: said, limit: 20 }, ctx);
+    if (!found.ok) return null;
+    const all = (Array.isArray(found.value) ? found.value : isObject(found.value) && Array.isArray(found.value.hits) ? found.value.hits : [])
+      .filter(isObject)
+      .filter((h): h is { register: string; seq: number; title?: unknown } => typeof h.register === 'string' && typeof h.seq === 'number');
+    const norm = (s: unknown): string => (typeof s === 'string' ? s.toLowerCase().replace(/\s+/gu, ' ').trim() : '');
+    const exact = all.filter((h) => norm(h.title) === norm(said));
+    const picked = exact.length > 0 ? exact : all.length === 1 ? all : [];
+    if (picked.length === 0) return null;
+    if (picked.length === 1) return run.get!({ ...args, spoken: `${picked[0]!.register}#${String(picked[0]!.seq)}` }, ctx, turn);
+    const handles = await Promise.all(picked.slice(0, 5).map((h) => addressOf(h.register, h.seq, ctx)));
+    const boot = await bootOf(ctx, turn);
+    const lists = new Map(
+      (boot.ok && isObject(boot.value) && Array.isArray(boot.value.registers) ? boot.value.registers : []).filter(isObject).map((r) => [String(r.id), String(r.name ?? r.id)]),
+    );
+    const each = picked.slice(0, 5).map((h, i) => `${handles[i]!} in ${lists.get(h.register) ?? h.register}`);
+    const more = picked.length > 5 ? ` and ${String(picked.length - 5)} more` : '';
+    return {
+      result: {
+        ok: false,
+        refusal: {
+          code: 'NAME_AMBIGUOUS',
+          fix: `${String(picked.length)} things are called ${clip(said, 60)}: ${each.join(', ')}${more}. Say which by its handle.`,
+          at: 'spoken',
+          allowed: handles,
+          try: callOf('get', { ...args, spoken: handles[0]! }),
+        } as Refusal,
+      },
+    };
+  };
+
+  /**
+   * `get` WITH ITS HISTORY (`history: true`), which was the tool `history` (plan §6.1, 12a): the row as `get` answers it,
+   * then every write to it as `history` answers them, in one call and one answer.
+   */
+  const withHistory = async (args: Args, ctx: C, turn: Turn): Promise<Done> => {
+    const { history: _asked, ...rest } = args;
+    const one = await run.get!(rest, ctx, turn);
+    const value = one.result.ok && isObject(one.result.value) ? one.result.value : null;
+    if (value === null || typeof value.spoken !== 'string') return one;
+    const lines = await run.history!({ spoken: value.spoken }, ctx, turn);
+    if (!lines.result.ok) return one;
+    const events = isObject(lines.result.value) && Array.isArray(lines.result.value.rows) ? lines.result.value.rows : [];
+    return {
+      result: { ok: true, value: { ...value, history: events } },
+      say: (look) => [one.say?.(look) ?? '', lines.say?.(look) ?? ''].filter((s) => s !== '').join('\n'),
+      names: {
+        people: one.names?.people === true || lines.names?.people === true,
+        runs: [...(one.names?.runs ?? []), ...(lines.names?.runs ?? [])],
+      },
+    };
+  };
+
   const run: Record<string, (args: Args, ctx: C, turn: Turn) => Promise<Done>> = {
     /**
      * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
@@ -2253,7 +2393,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * seeded record. The description promised "the cheap way to learn register names", and `context` is
      * where the rest is for an agent.
      */
-    record_index: async (_args, ctx, turn) => {
+    record_index: async (args, ctx, turn) => {
+      /* ONE LIST'S FIELDS, AS `schema` ANSWERED THEM, which it now is (plan §6.1). */
+      if (args.register !== undefined && args.register !== null) return run.schema!(args, ctx, turn);
       const boot = await bootOf(ctx, turn);
       if (!boot.ok) return { result: boot };
       const shell = boot.value as { registers?: unknown; record?: unknown };
@@ -2287,12 +2429,59 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * THE CARD IS THE RECORD'S (`c.card`, AGT-B07), printed as it came, then the open work and the habits: the start hook
      * and `braindog context` print the same card, so a session is never told two things by two builds.
      */
-    context: async (_args, ctx, turn) => {
+    /**
+     * AND WHAT IT ASKED FOR (plan §3.1): `task` whole with its version, `project` by name, `depth`, and `since` a stamp,
+     * which answers only what moved for its run, "Nothing new." when nothing did. A full answer asks the full depth.
+     */
+    context: async (args, ctx, turn) => {
       if (!surface.context) return { result: unbuilt('context', 'Call record_index for the registers, then list what is open.') };
-      const raw = await surface.context({}, ctx);
+      const full = (ctx as { session?: { format?: unknown } }).session?.format === 'full';
+      const sent = Object.fromEntries(
+        (['task', 'project', 'depth', 'since'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
+      ) as { task?: string; project?: string; depth?: string; since?: string };
+      if (full && sent.depth === undefined && sent.since === undefined) sent.depth = 'full';
+      const raw = await surface.context(sent as never, ctx);
       if (!raw.ok || !isObject(raw.value)) return { result: raw };
+      if (isObject(raw.value.since)) {
+        const s = raw.value.since;
+        const lines = Array.isArray(s.lines) ? s.lines.filter((l): l is string => typeof l === 'string') : [];
+        const value = bare({ stamp: s.stamp, changed: s.changed === true, pending: pendingOf(s.pending), stop: s.stop ?? null }) as Record<string, unknown>;
+        return { result: { ok: true, value }, say: () => (lines.length > 0 ? lines.join('\n') : 'Nothing new.') };
+      }
       const briefing = await briefOf(raw.value, ctx, turn);
       return { result: { ok: true, value: briefing.value }, say: () => briefing.text };
+    },
+
+    /**
+     * WHAT HE TOLD THIS RUN, AND ITS ANSWER (plan §2, §6.1), the record's `instructionsMine`: nothing reads what waits and
+     * marks it seen; `take` takes one, the first of two runs winning and the second told who has it; `reply` answers one
+     * with `said` and Done, Needs you or Declined, and is answered with the receipts. A stopped run still reaches it.
+     */
+    instructions: async (args, ctx, turn) => {
+      if (!surface.instructionsMine) return { result: unbuilt('instructions', 'Call context: what you were told is its first line.') };
+      const sent = Object.fromEntries(
+        (['take', 'reply', 'said', 'state', 'seen', 'how'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
+      );
+      const out = await surface.instructionsMine(sent as never, ctx);
+      /* THE KERNEL SAYS `id`, the instruction, and this tool calls it `take` or `reply`. */
+      if (refused(out) && out.refusal.at === 'id' && (sent.take !== undefined || sent.reply !== undefined))
+        return { result: await failed({ ...out, refusal: { ...out.refusal, at: sent.take !== undefined ? 'take' : 'reply' } }, ctx, turn) };
+      if (!out.ok || !isObject(out.value)) return { result: await failed(out, ctx, turn) };
+      const v = out.value;
+      const one = isObject(v.instruction) ? v.instruction : null;
+      const receipts = isObject(v.receipts) ? v.receipts : null;
+      const value = bare({
+        run: v.run,
+        stamp: v.stamp,
+        pending: pendingOf(v.pending),
+        stop: v.stop ?? null,
+        ...(one === null ? {} : { instruction: { id: one.id, state: one.state, said: one.said, ...(one.reply ? { reply: one.reply } : {}) } }),
+        ...(receipts === null ? {} : { receipts }),
+      }) as Record<string, unknown>;
+      /* THE ROWS THE RUN CHANGED ARE SAID BY THEIR WORDS, read in one go per list. */
+      const touched = receipts !== null && Array.isArray(receipts.batches) ? receipts.batches.filter(isObject).flatMap((b) => (Array.isArray(b.rows) ? b.rows.filter((r): r is string => typeof r === 'string') : [])) : [];
+      if (turn.text && touched.length > 0) await handlesNamed(touched.slice(0, 5), ctx, turn);
+      return { result: { ok: true, value }, say: (look) => instructionsBrief(v, typeof sent.take === 'string' ? 'take' : typeof sent.reply === 'string' ? 'reply' : 'read', look) };
     },
 
     schema: async (args, ctx) => {
@@ -2314,6 +2503,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * may read", and a tool answered the four bytes `null` to an agent, with no `isError` and nothing to do next.
      */
     get: async (args, ctx, turn) => {
+      if (args.history === true) return withHistory(args, ctx, turn);
       const at = parse(args.spoken);
       const said = typeof args.spoken === 'string' ? args.spoken.trim() : '';
       /* A ROW ID TOO, because a ref field holds one: `thing: 01M2...` was a value no tool could follow. */
@@ -2340,7 +2530,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
             ].join('\n'),
         };
       }
-      if (!FIGURE.test(said)) return { result: badSpoken(ROW_OR_ID) };
+      /* A NAME, WHICH IS NO HANDLE AND NO FIGURE'S SHAPE: the one thing called that, else the row forms as before. */
+      if (!FIGURE.test(said)) return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(said === '' ? ROW_OR_ID : `${ROW_OR_ID} Nothing you can read is called ${clip(said, 60)}; search finds it by its words.`) };
       /**
        * A FIGURE IS READ AS `braindog:metric/<id>` READS IT, through the record's `metric`, so its answer is the record's
        * whole reading and its permission is the record's. Two currencies with no rate between them are one amount each
@@ -2354,7 +2545,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const figure = await surface.metric({ metric: said }, ctx);
       if (!figure.ok) {
         if (codeOf(figure) !== 'METRIC_UNKNOWN') return { result: figure };
-        return { result: badSpoken(`${ROW_OR_ID} A figure is named by its id, and record_index lists them; ${said} is not one you can read.`) };
+        /* A LOWERCASE WORD THAT IS NO FIGURE MAY BE A NAME ("kiln"): the one thing called that answers. */
+        return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(`${ROW_OR_ID} A figure is named by its id, and record_index lists them; ${said} is not one you can read.`) };
       }
       const reading = isObject(figure.value) ? figure.value : {};
       const value = bare(figure.value);
@@ -2703,6 +2895,23 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     update: async (args, ctx, turn) => {
       const at = await locate(args.spoken, ctx);
       if (!at.ok) return { result: at };
+      /* AN EMPTY PATCH IS REFUSED BEFORE THE LADDER (plan §1.4, §6.1): on the seed it wrote a version and a receipt for a
+         change of nothing, and on his record the ladder filed it as a question and refused it in the question's terms. A
+         note with nothing to change is `log`, which is what this sends it to. */
+      if (isObject(args.patch) && Object.keys(args.patch).length === 0) {
+        const note = typeof args.note === 'string' && args.note.trim() !== '' ? args.note : null;
+        return {
+          result: {
+            ok: false,
+            refusal: {
+              code: 'PATCH_EMPTY',
+              fix: note === null ? 'patch is empty, so nothing would change. Put the fields to change in it, as {"state":"done"}.' : 'patch is empty; a note alone is log, which changes nothing else.',
+              at: 'patch',
+              ...(note === null ? {} : { try: callOf('log', { ...(args.spoken === undefined ? {} : { spoken: args.spoken }), note }) }),
+            } as Refusal,
+          },
+        };
+      }
       const changed = await surface.update(
         {
           ...at.value,
@@ -2789,8 +2998,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return { result: { ok: true, value }, say: () => stepSaid(step, args.take !== undefined) };
       }
       if (!isEntry(out.value)) return { result: { ok: true, value: bare(out.value) } };
+      /* THE TASK IT STARTED OR CLOSED (plan §4.3), said after the run's line, so a finished task is one call. */
+      const task = isObject((out.value as { task?: unknown }).task) ? ((out.value as { task?: unknown }).task as Record<string, unknown>) : null;
       const row = await entryOut(out.value, ctx, turn);
-      return { result: { ok: true, value: row }, say: () => handoffBrief(row as Shaped) };
+      const value = task === null ? row : { ...row, task: bare(task) };
+      return {
+        result: { ok: true, value },
+        say: () => [handoffBrief(row as Shaped), ...(task === null ? [] : [handedBrief(task, args.done !== undefined)])].join('\n'),
+      };
     },
 
     /**
@@ -2856,7 +3071,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         if (questionWords !== null) await handlesNamed(handlesIn(questionWords), ctx, turn);
         /* A NAME ALONE IS NOTED ON THE CALLER'S PROJECT, which is said by name: "Noted Wren on Lanternfish". */
         if (mention && surface.context) {
-          const c = await surface.context({}, ctx);
+          const c = await surface.context({} as never, ctx);
           on = c.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.name === 'string' ? c.value.project.name : null;
         }
       }
@@ -3472,7 +3687,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'learnings' && !rest) return learningsRead(ctx, lean);
     if (head === 'context' && !rest) {
       if (!surface.context) return unbuilt('context', 'Read braindog:boot instead.');
-      const raw = await surface.context({}, ctx);
+      const raw = await surface.context({} as never, ctx);
       if (!lean || !raw.ok || !isObject(raw.value)) return raw;
       return { ok: true, value: (await briefOf(raw.value, ctx, { text: true, titles: new Map() })).value };
     }
@@ -3730,8 +3945,9 @@ const MEANT: Readonly<Record<string, string>> = { fields: 'patch', patch: 'field
  */
 function strayIn(name: string, sent: Args): { ok: false; refusal: Refusal } | null {
   if (PASSED_WHOLE.has(name)) return null;
-  const takes = Object.keys((TOOLS.find((t) => t.name === name)?.input as { properties?: Record<string, unknown> } | undefined)?.properties ?? {});
-  const stray = Object.keys(sent).find((k) => !takes.includes(k));
+  const takes = takesOf(name);
+  const quiet = toolNamed(name)?.quiet ?? [];
+  const stray = Object.keys(sent).find((k) => !takes.includes(k) && !quiet.includes(k));
   if (stray === undefined) return null;
   const alias = Object.hasOwn(MEANT, stray) ? MEANT[stray]! : '';
   const meant = closest(stray, takes.map((id) => ({ id }))) ?? (takes.includes(alias) ? alias : null);

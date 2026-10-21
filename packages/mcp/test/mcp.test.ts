@@ -76,7 +76,7 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
   /* The eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
@@ -87,13 +87,16 @@ test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => 
      §38) and is the resource `braindog:understand` now (AGT-B05, "keep the 16" of §37): it takes nothing and writes
      nothing, and its words paid for `op_id` on `create` and `update`.
 
+     `instructions` CAME AND `schema` AND `history` WENT INTO `record_index` AND `get` (agents and MCP plan §6.1, 12a): what
+     he tells an agent from the app is a tool of its own, and the two it folded are still callable until FOLDED_UNTIL.
+
      `money` WAS ONCE THE SIXTEENTH, and it read seven of money-core's figure ids by name, so the
      core knew one use case. A pack's figures are named
      by `record_index` and read by `get`, whatever pack declared them, and its pages through the resources, like any
      other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
+    ['record_index', 'context', 'instructions', 'get', 'list', 'search', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -107,7 +110,7 @@ test('AND NO TOOL READS A CREDENTIAL, because there is no vault tool', () => {
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
+    ['instructions', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
   );
 });
 

@@ -78,14 +78,15 @@ async function fixture(): Promise<Fixture> {
 const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   record_index: () => [{}],
   context: () => [{}],
-  schema: () => [{ register: 'tasks' }],
-  get: (fx) => [fx.onDoomed, fx.onKiln, fx.second].map((r) => ({ spoken: r.spoken })).concat([{ spoken: 'skills#5' }]),
+  /* NOTHING TO ASK: `instructions` answers what he told a run, and the owner here is no run. */
+  instructions: () => [],
+  /* AND `history` IS ASKED THROUGH `get`, which it was folded into (plan §6.1). */
+  get: (fx) => [fx.onDoomed, fx.onKiln, fx.second].map((r) => ({ spoken: r.spoken })).concat([{ spoken: 'skills#5' }, { spoken: fx.onDoomed.spoken, history: true }]),
   list: (fx) => [
     { register: 'tasks', where: { field: 'what', is: fx.onDoomed.fields.what } },
     { register: 'learnings', where: { field: 'supersedes', is: fx.first.spoken } },
   ],
   search: () => [{ q: 'project that goes' }],
-  history: (fx) => [{ spoken: fx.onDoomed.spoken }],
   activity: () => [{ limit: 20 }],
   governance: () => [{}],
   propose: () => [{ question: 'Is this a question?', body_kind: 'options', body: { options: [{ id: 'a', label: 'A', because: 'a' }, { id: 'b', label: 'B', because: 'b' }] } }],

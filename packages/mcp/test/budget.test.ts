@@ -43,6 +43,14 @@
  * list and the instructions from 2,759 to 3,097. The owner's rule is that a budget is never raised, so the difference was
  * cut out of descriptions, schema property descriptions, the `format` argument listed on nine reads (the instructions
  * name it once), and the instructions' own words. No rule an agent follows went with them. The figure is measured below.
+ *
+ * `instructions` AND `context`'s ARGUMENTS WERE PAID FOR BY FOLDING, AND THE CEILING STAYED AT 2,760 (21 October, agents
+ * and MCP plan §6.1, 12a). What he tells an agent from the app is a tool of its own (149 tokens as first drawn), and
+ * `context` took `task` and `project`, `get` a name and `history`, `record_index` a register, `handoff` a task to
+ * start and one to close: 2,880 with all of it. `schema` and `history` went into `record_index` and `get`, unlisted and
+ * callable until `FOLDED_UNTIL`; arguments a bridge sends and no agent chooses (`context`'s `since` and `depth`,
+ * `activity`'s `everything`, `instructions`' `seen` and `how`) are taken and not listed (`quiet`); and eleven
+ * descriptions and two lines of the instructions said what they said in fewer words. It measured 2,739 after.
  */
 
 import { test } from 'node:test';
@@ -50,7 +58,7 @@ import assert from 'node:assert/strict';
 
 import { handle, type Reply } from '../src/rpc.ts';
 import { INSTRUCTIONS } from '../src/instructions.ts';
-import { TEMPLATES, TOOLS, tools } from '../src/index.ts';
+import { FOLDED, TEMPLATES, TOOLS, tools } from '../src/index.ts';
 import { stub } from './stub.ts';
 /* `44-SPEC-MCP` §5.8, verbatim: a run heuristic, biased above o200k_base, never below it on its calibration set. */
 import { tokenBudget } from './tokens.ts';
@@ -81,6 +89,15 @@ test(`tools/list and the instructions together are at or under ${CEILING} tokens
   const tokens = tokenBudget(text) + tokenBudget(INSTRUCTIONS);
   t.diagnostic(`tools/list: ${tokenBudget(text)} tokens, ${text.length} bytes; instructions ${tokenBudget(INSTRUCTIONS)}; together ${tokens}`);
   assert.ok(tokens <= CEILING, `the tool list and the instructions are ${tokens} tokens, over the ${CEILING} every turn pays`);
+});
+
+test('THE FOLDED TOOLS ARE NOT LISTED, so they cost nothing, and every quiet argument is one no listed schema names', async () => {
+  const names = ((await listed()) as { tools: { name: string }[] }).tools.map((t) => t.name);
+  for (const folded of FOLDED) assert.ok(!names.includes(folded.name), `${folded.name} is listed again`);
+  for (const tool of TOOLS) {
+    const props = Object.keys((tool.input as { properties?: object }).properties ?? {});
+    for (const q of tool.quiet ?? []) assert.ok(!props.includes(q), `${tool.name} lists ${q} and calls it quiet`);
+  }
 });
 
 test('THE INSTRUCTIONS GO OUT ONCE A CONNECTION, in initialize, and not again with every tools/list', async () => {

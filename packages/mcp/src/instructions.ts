@@ -28,8 +28,59 @@ export const INSTRUCTIONS = [
   '2. Suggest, and let the person decide in BrainDog. Never decide for them: ask with propose.',
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
   'Reads answer in short lines; format "full" gives JSON.',
-  'Meet everyone you work with or hear of, with an email or handle if you have one.',
+  'Meet everyone you work with or hear of, with an email or handle.',
   'A credential never goes in a row, note or call. Deposit a key with braindog keys put <label>, which reads standard input.',
-  'Record a learning only if a future session would get it wrong otherwise; say the failure in because.',
+  'Record a learning only if a future session would otherwise get it wrong; say how in because.',
   'A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.',
 ].join('\n');
+
+/**
+ * THE PROMPTS, which a client shows a person as commands (`/braindog:start` in Claude Code) and which cost the tool list
+ * nothing (agents and MCP plan §6.3): the start of a session, its end, and a decision laid out for him. Each is the
+ * calls in order, said as an agent follows them, with the exact arguments, because a prompt is read once and acted on.
+ */
+export type Prompt = { name: string; title: string; description: string; arguments?: { name: string; description: string; required?: boolean }[] };
+
+export const PROMPTS: readonly Prompt[] = [
+  { name: 'start', title: 'Start with BrainDog', description: 'Read your briefing and what you were told, then say your plan.' },
+  { name: 'wrap', title: 'Wrap up with BrainDog', description: 'Answer what you were told, leave the next step, keep a lesson only if it is needed.' },
+  {
+    name: 'ask',
+    title: 'Ask the owner to decide',
+    description: 'Lay out a decision with options for the person to make in BrainDog.',
+    arguments: [{ name: 'about', description: 'What needs deciding, in a few words.' }],
+  },
+];
+
+/** What each prompt says, as one message from the person: the calls in order. */
+const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => string>> = {
+  start: () =>
+    [
+      'Start this session with BrainDog:',
+      '1. Call context. Its first lines are what the person told you, if anything.',
+      '2. If something was told to you, call instructions with {take:"<its id>"} before you start on it.',
+      '3. Say your plan in one line with handoff {doing:"<verb first>"}, then work.',
+    ].join('\n'),
+  wrap: () =>
+    [
+      'Wrap up this session with BrainDog:',
+      '1. If you took an instruction, answer it: instructions {reply:"<its id>", said:"<what you did, one line>", state:"done"}, or needs_you or declined with why.',
+      '2. Call handoff with {next:"<the one next step>"}, and tried for each dead end. If you finished a task, handoff {done:"<task>", note:"<how>"}.',
+      '3. Add a learning only if a future session would otherwise get it wrong, with the failure in because.',
+    ].join('\n'),
+  ask: (a) =>
+    [
+      `Ask the person to decide${a.about ? `: ${a.about}` : ''}.`,
+      'Call propose with question (one answerable sentence), body_kind "options" and body {"options":[{"id":"a","label":"...","because":"..."},{"id":"b","label":"...","because":"..."}]}, putting the one you would pick first.',
+      'Do not act on it until they decide in BrainDog.',
+    ].join('\n'),
+};
+
+/** One prompt as `prompts/get` answers it, or `null` for a name there is none of. */
+export function promptOf(name: string, args: Record<string, unknown>): { description: string; messages: { role: 'user'; content: { type: 'text'; text: string } }[] } | null {
+  const prompt = PROMPTS.find((p) => p.name === name);
+  const say = Object.hasOwn(PROMPT_TEXT, name) ? PROMPT_TEXT[name] : undefined;
+  if (prompt === undefined || say === undefined) return null;
+  const given = Object.fromEntries(Object.entries(args).flatMap(([k, v]) => (typeof v === 'string' && v.trim() !== '' ? [[k, v.trim().slice(0, 200)]] : [])));
+  return { description: prompt.description, messages: [{ role: 'user', content: { type: 'text', text: say(given) } }] };
+}

@@ -59,11 +59,10 @@ async function record() {
 const CALLS: Record<string, Record<string, unknown>> = {
   record_index: {},
   context: {},
-  schema: { register: 'obligations' },
+  instructions: {},
   get: { spoken: 'obligations#1' },
   list: { register: 'obligations' },
   search: { q: 'invoice' },
-  history: { spoken: 'obligations#1' },
   activity: { limit: 5 },
   governance: {},
   propose: {
@@ -126,7 +125,7 @@ const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<
   digestToday: (args, ctx) => api.digestToday(args, ctx),
 });
 
-test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SIX OF THEM, which is the list a transport has to route', async () => {
+test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SEVEN OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
      missing from it is a tool that refuses for ever. */
   const { sql, api } = await record();
@@ -134,7 +133,7 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SIX OF THEM, which is th
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
-  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet', 'triage', 'undo']);
+  assert.deepEqual(dark, ['context', 'instructions', 'activity', 'handoff', 'meet', 'triage', 'undo']);
   sql.close();
 });
 

@@ -144,14 +144,15 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   assert.match(waiting, /^\d+ on [^,]+, first: Update Kiln’s note and move Portage to earning\?$/u);
   /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
      `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */
-  assert.match(slots.get('Learned') ?? '', /^Lesson \d+ of the card test\.$/u);
+  /* AND THE PLAN'S CARD LEADS WITH A LESSON THAT HELD (`lessonsHeld`, plan §3.2 row 8): a method before a fact. */
+  assert.match(slots.get('Learned') ?? '', /^Run the mastering pass before signing off an axis instance\.$/u);
 
   /* A KEPT LIST IS A COUNT AND THIS PROJECT'S ROWS: the forty keys that apply everywhere are a number, not forty lines,
      and the number says it is a floor where the record stopped counting them. */
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
-  /* MORE IS THE ONE CALL FOR THE REST: the stale count, the keys and the skills are in the full context. */
-  assert.equal(slots.get('More'), 'call context for the full picture');
+  /* NO MORE LINE: this is context, and every cut section of the plan ends with the call that reads the rest (plan §3.2). */
+  assert.equal(slots.get('More'), undefined, 'context told the agent to call context');
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
   sql.close();

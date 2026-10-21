@@ -77,6 +77,9 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   /* THE RUN FIRST, so the briefing has a handoff of this session's to leave out and another's to show. */
   await call('handoff', { doing: 'Reading every brief answer', next: 'Report what each one says.' });
   await call('context', {});
+  /* WHAT HE TOLD THE RUN, which on the seed is nothing yet, and a take of one that is not there. */
+  await call('instructions', {});
+  await call('instructions', { take: 'IN999' });
   const index = await call('record_index', {});
   const registers = (index.value.registers as { id: string }[]).map((r) => r.id);
   assert.ok(registers.length > 10, `the seed has ${String(registers.length)} lists`);
@@ -94,6 +97,7 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
     if (row?.spoken === undefined) continue;
     await call('get', { spoken: row.spoken });
     await call('history', { spoken: row.spoken });
+    await call('get', { spoken: row.spoken, history: true });
   }
 
   /* EVERY FIGURE THAT READS WITHOUT A PARAMETER, and a grouped one's groups are named, never keyed by a row id. */

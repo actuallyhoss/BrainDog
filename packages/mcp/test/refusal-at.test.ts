@@ -128,7 +128,8 @@ test('A WRITE THE LADDER TURNED INTO A PROPOSAL IS REFUSED AT update\'s OWN FIEL
   const proposal = (at: string) => async (): Promise<Result<unknown>> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'A patch changes at least one field.', at } });
   const { surface } = stub({ update: proposal('body.rows[0].patch'), propose: proposal('body.rows[0].patch') });
 
-  const update = await call(surface, { who: 'agent' }, 'update', { spoken: 'tasks#346', patch: {} });
+  /* A PATCH WITH A FIELD IN IT: an empty one is refused at the door now, before the ladder (`PATCH_EMPTY`). */
+  const update = await call(surface, { who: 'agent' }, 'update', { spoken: 'tasks#346', patch: { state: 'done' } });
   assert.equal(update.structuredContent.at, 'patch');
   assert.match(update.content[0]!.text, /^Refused, VALUE_MALFORMED at patch: A patch changes at least one field\.$/mu);
   assert.doesNotMatch(JSON.stringify(update), /body\.rows/u);
@@ -138,7 +139,7 @@ test('A WRITE THE LADDER TURNED INTO A PROPOSAL IS REFUSED AT update\'s OWN FIEL
   assert.equal(propose.structuredContent.at, 'body.rows[0].patch', 'a field propose does take was renamed');
 
   /* AND IN THE FULL ANSWER, whose text is the JSON. */
-  const full = await call(surface, { who: 'agent' }, 'update', { spoken: 'tasks#346', patch: {}, format: 'full' });
+  const full = await call(surface, { who: 'agent' }, 'update', { spoken: 'tasks#346', patch: { state: 'done' }, format: 'full' });
   assert.equal((JSON.parse(full.content[0]!.text) as { at?: string }).at, 'patch');
 
   /* A PLACE NONE OF THE TOOL'S FIELDS REACHES IS LEFT OUT, and the sentence still says what to do. */

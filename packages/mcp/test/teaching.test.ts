@@ -91,13 +91,13 @@ test('context teaches where a note about nothing goes, what a lane is, and how t
   assert.ok(onIt.every((r) => r.fields.thing === id));
   assert.equal(onIt.length, all.filter((r) => r.fields.thing === id).length);
 
-  /* AND ONCE A WRITE HAS OPENED THE RUN, the sentence names the run's own id, and `log` on it is taken. */
+  /* AND ONCE A WRITE HAS OPENED THE RUN, THE TEACHING IS NOT SAID AGAIN (agents and MCP plan §3.2): it was half of every
+     context on the owner's record. `log` with no spoken still goes on the run, as the first answer taught. */
   const handed = await mcp.call('handoff', { next: 'Read the teaching back.' }, agent);
   assert.ok(handed.ok, JSON.stringify(handed));
   const after = (await mcp.call('context', {}, agent)) as { ok: true; value: Briefing };
   const spoken = after.value.session!.spoken;
-  const named = after.value.teach!.find((l) => /\blog\b/.test(l) && /session/.test(l))!;
-  assert.ok(named.includes(spoken), `the note sentence does not name ${spoken}: ${named}`);
+  assert.deepEqual(after.value.teach, [], 'the teaching was said a second time');
   const logged = await mcp.call('log', { spoken, note: 'Nothing in particular, and it has a home.' }, agent);
   assert.ok(logged.ok, JSON.stringify(logged));
 });

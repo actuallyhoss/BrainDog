@@ -14,7 +14,7 @@
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
-import { alikeKey, handlesIn, namedIn, plainOf, rowLine, unaddressed, type Decl, type Look, type Shaped } from './brief.ts';
+import { alikeKey, handlesIn, namedIn, pendingOf, plainOf, rowLine, unaddressed, type Decl, type Look, type Shaped } from './brief.ts';
 import { agentOf, ago, callOf, clip, grouped, runnerOf, ULID } from './words.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -323,5 +323,27 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     ...(text(c.next) ? { next: c.next } : {}),
     teach: taught,
   };
-  return { value, text: [said, ...lines, ...taught].join('\n'), card: said };
+  /**
+   * THE PLAN, WHEN THE RECORD DREW ONE (`packages/record/src/context-plan.ts`, agents and MCP plan §3): what he told the
+   * agent first, then the card, what it may do, its rules, who else is here, its lane, decisions and lessons, cut to its
+   * budget, each cut section ending with the call that reads the rest. It takes the place of the open work after the
+   * card, which is its lane now, and of the Home page line. The teaching lines are said once a run: on a call before the
+   * run has written anything, which is its first. A host too old to draw one is answered as before.
+   */
+  const plan = text(c.plan);
+  if (plan === null) return { value, text: [said, ...lines, ...taught].join('\n'), card: said };
+  const toldNow = pendingOf(c.told);
+  const stop = isObject(c.stop) ? c.stop : null;
+  const planned: Record<string, unknown> = {
+    ...value,
+    ...(typeof c.stamp === 'string' ? { stamp: c.stamp } : {}),
+    ...(toldNow.length > 0 ? { told: toldNow } : {}),
+    ...(stop === null ? {} : { stop: { kind: stop.kind, id: stop.id, said: stop.said } }),
+    ...(text(c.may) ? { may: c.may } : {}),
+    ...(Array.isArray(c.retire) && c.retire.length > 0 ? { retire: c.retire } : {}),
+  };
+  const first = session === null ? taught : [];
+  /* THE CARD IN THE ANSWER IS THE PLAN'S, the one its text prints, with no More line: this is context. */
+  const planCard = text(c.plan_card) ?? said;
+  return { value: { ...planned, card: planCard, teach: first }, text: [plan, ...lines.filter((l) => l.startsWith('Which project')), ...first].join('\n'), card: planCard };
 }
