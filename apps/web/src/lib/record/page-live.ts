@@ -20,7 +20,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
-import { MISSING, UNNAMED, integer, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import { KPIS_KIND, MISSING, UNNAMED, integer, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { stopped } from '../shell/headline.ts';
@@ -1699,6 +1699,13 @@ export function blockOf(
       };
     });
     return { ...shell, register: 'deadlines', entries, matched: entries, rows, shown: entries.length, total: matched };
+  }
+  /* KEY NUMBERS ARE NOT ROWS OF A LIST: the record answers them as the block's `kpis`, which ride on it whole and are
+     narrowed where they are drawn (`lib/page/kpis-in.ts`). Shown and total are both how many came: the record ranked
+     the rest out on purpose, so no "N more" is said under them. */
+  if (kind === KPIS_KIND) {
+    const kpis = Array.isArray((b as { kpis?: unknown }).kpis) ? (b as { kpis: unknown[] }).kpis : [];
+    return { ...shell, shown: kpis.length, total: kpis.length };
   }
   if (b.source === 'actions') {
     const actions = got.map((r) => actionOf(r.fields));

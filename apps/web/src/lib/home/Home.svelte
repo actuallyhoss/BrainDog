@@ -1166,7 +1166,8 @@
   /* ── the desk ─────────────────────────────────────────────────────────────
      ONE BOARD OF TWELVE COLUMNS that the desk's own parts and the page's blocks share (the 19 October desk). The page's
      reader and its body give up their boxes (`display: contents`), so each block's tile is a tile of this board, and
-     each is put in its row by `order`: what needs you, who is working and cash; the record's week where it keeps one;
+     each is put in its row by `order`: what needs you, who is working and cash; the few key numbers where the record
+     keeps any; the record's week where it keeps one;
      the projects; Arrivals, what is coming up and people; then More, and what More opens. Not while the page is being
      arranged, where the body's own layout is what is moved.
 
@@ -1296,30 +1297,35 @@
     order: 3;
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
+  /* THE FEW KEY NUMBERS THAT LEAD ARE A WHOLE ROW under the first, at every width (`numbersTile`). */
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='numbers']) {
     order: 4;
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
     order: 5;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+    order: 6;
   }
 
   .body[data-board] > :global(:is(.projects, .desk-held)),
   .body[data-board] :global(.home-page > .page > :is(.projects, .desk-held)) {
-    order: 6;
+    order: 7;
   }
 
   .body[data-board] > :global([data-landed]),
   .body[data-board] :global(.home-page > .page > [data-landed]) {
-    order: 7;
-  }
-
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
     order: 8;
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
     order: 9;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
+    order: 10;
   }
 
   .body[data-board] .more {

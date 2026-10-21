@@ -21,8 +21,9 @@
   import { live as liveRecord } from '$lib/data/live.svelte.ts';
   import { apiBase, at as inApp } from '../at.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
-  import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
-  import { EMPTY_KEEP, inline, text } from 'braindog-render';
+  import { Block, Degraded, Kpis, Markdown, Table, Text } from 'braindog-render/svelte';
+  import { EMPTY_KEEP, KPIS_KIND, inline, text } from 'braindog-render';
+  import { kpiHref, kpisIn, type KpiAnswered as KpiDrawn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
   import { compactOf, queueWords } from './queue-answer.ts';
   import { alikeOf, type QueueEntry } from './alike.ts';
@@ -420,6 +421,8 @@
 
   /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE (DIRECTION §39): its glyph, or its kind's where it names none, and
      how many it holds where it is a list a person counts (`tile-head.ts`). */
+  /* A `kpis` BLOCK'S KEY NUMBERS, as the drawer takes them. */
+  const kpis = $derived(block.kind === KPIS_KIND ? kpisIn(block as { kpis?: unknown }) : []);
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
   const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
 
@@ -635,6 +638,13 @@
       {#if act}<Button href={act.href}>{act.label}</Button>{/if}
     {/snippet}
   </Empty>
+{:else if block.kind === KPIS_KIND && kpis.length > 0}
+  <!-- THE KEY NUMBERS ARE DRAWN FROM THE BLOCK'S `kpis`, not from rows (`kpis-in.ts`): Today's few as rows that open their
+       project, a project's own as its lead and grid. -->
+  <Kpis {kpis} form={(block as { for?: unknown }).for === 'today' ? 'today' : 'project'} home={homeCurrency()} {now} href={(k) => {
+    const to = kpiHref(k as KpiDrawn);
+    return to === null ? null : inApp(to);
+  }} />
 {:else if homeRows}
   <HomeRows rows={homeRows} shown={homeFold?.shown ?? Infinity} done={homeDone} ontick={writes && block.kind === 'todo' ? tickAt : undefined} />
   {#if homeFold}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, homeFold?.shown ?? 0)}>{words.more(homeFold.more)}</button>{/if}

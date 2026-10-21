@@ -117,7 +117,7 @@ test("TODAY'S FIRST BLOCKS ON A SHOP are what is due this week and the money in;
   const order = body.blocks.map((b) => b.heading ?? b.kind);
   assert.deepEqual(order.slice(0, 3), ['note', 'Orders due this week', MONEY_WEEK]);
   const rest = body.blocks.slice(3).map((b) => b.source);
-  assert.deepEqual(rest, ['governance.open', 'deadlines', 'deadlines', 'activity']);
+  assert.deepEqual(rest, ['governance.open', 'deadlines', 'kpis', 'deadlines', 'activity']);
   /* THEIR OWN WORDS name their own things, never an id or a list's place. */
   for (const b of body.blocks.slice(1, 3)) {
     assert.doesNotMatch(`${b.heading} ${b.empty ?? ''}`, /\brow\b|—|#/u);

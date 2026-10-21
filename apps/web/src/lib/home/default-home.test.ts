@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, deskFolded, homeDrawn, onDesk, peopleOf, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, deskFolded, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -42,9 +42,9 @@ const shown = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) =
 test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks, no line to add without the right, no cash without Money', () => {
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
   /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY (today F1): Home draws it from `boot`, once. */
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'kpis', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'kpis', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'kpis', 'deadlines', 'activity']);
   /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
   const due = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines') as unknown as { where?: string; limit?: number }[];
   assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['day after -1d', COMING_UP_LIMIT]]);
@@ -57,7 +57,41 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   assert.equal(raw.find((b) => b.kind === 'queue')?.tiles, true);
   assert.equal(DEFAULT_HOME.layout, undefined);
   assert.deepEqual(raw.filter((b) => b.area !== undefined), []);
-  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['cash', 3], ['coming-up', 3]]);
+  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['cash', 3], ['numbers', 12], ['coming-up', 3]]);
+});
+
+test('TODAY CARRIES THE FEW KEY NUMBERS THAT LEAD, as the record ranks them, a whole row under cash and named Numbers', () => {
+  const numbers = DEFAULT_HOME.blocks.find((b) => b.kind === 'kpis') as unknown as Record<string, unknown> & { key: string };
+  assert.deepEqual(numbers, numbersTile() as unknown);
+  /* THE RECORD PICKS AND ORDERS THEM (`kpisForToday`): the block asks for Today's form and names no order, no limit and no list. */
+  assert.deepEqual(
+    { kind: numbers.kind, source: numbers.source, for: numbers.for, key: numbers.key, heading: numbers.heading, icon: numbers.icon, span: numbers.span },
+    { kind: 'kpis', source: NUMBERS, for: 'today', key: 'numbers', heading: 'Numbers', icon: 'gauge', span: 12 },
+  );
+  for (const key of ['order', 'limit', 'where', 'register', 'columns']) assert.equal(numbers[key], undefined, key);
+  assert.ok(onDesk(numbers), 'shown at rest, never folded behind More');
+  /* ON EVERY RECORD, under cash where there is cash and before what is coming up. */
+  for (const holds of [{ tasks: true, adds: true, money: true }, { tasks: false, adds: false, money: false }] as Holds[]) {
+    const at = todayHome(holds).blocks.map((b) => (b as unknown as { key?: string }).key ?? b.kind);
+    assert.ok(at.indexOf('numbers') < at.indexOf('coming-up'));
+    if (holds.money) assert.equal(at.indexOf('numbers'), at.indexOf('cash') + 1);
+  }
+});
+
+test('NO KEY NUMBER, NO TILE: a record that keeps none answers none and Today draws nothing, and a host that cannot read them is not drawn a refusal', () => {
+  /* AS THE RECORD ANSWERS IT: its key numbers, and how many it ranked (`matched`), with no rows. */
+  const tile = (kpis: unknown, refusals: unknown[] = []) =>
+    block({ kind: 'kpis', source: 'kpis', key: 'numbers', heading: 'Numbers', kpis, matched: Array.isArray(kpis) ? kpis.length : 0, refusals } as never);
+  const sales = { kpi: 'k1', name: 'Sales a month', project: 'Kiln', hue: 265, unit: 'GBP', kind: 'flow', points: [{ at: '2026-09-01', amount: 'GBP 4,350.00' }], rank: 'money' };
+  const drawnOf = (b: LiveBlock) => homeDrawn([b], NOW).blocks[0]!.drawn;
+  assert.equal(drawnOf(tile([])), false, 'none answered: no empty box');
+  assert.equal(drawnOf(tile(undefined)), false, 'nothing answered at all');
+  assert.equal(drawnOf(tile([sales])), true);
+  /* A REFUSED ONE IS NEVER HIDDEN BY BEING EMPTY, but Today's own body holds it, as it holds what went quiet. */
+  const refused = tile(undefined, [{ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its key numbers onto a page yet.' }]);
+  assert.equal(drawnOf(refused), true);
+  assert.equal(quietHeld([refused])[0]!.drawn, false);
+  assert.equal(quietHeld([tile([sales])])[0]!.drawn, true);
 });
 
 test('THE DESK FOLDS WHAT IT DOES NOT SHOW AT REST, at its place, and More opens it', () => {

@@ -1,7 +1,8 @@
 /**
  * THE ORDER TODAY'S DESK IS SEEN IN IS THE ORDER IT IS TABBED IN. The desk's rows are laid on one board (Home's CSS puts
  * each tile in its row), and a keyboard walks the document and not the picture, so the document holds the tiles in the
- * order the picture shows them: what needs you, who is working, cash; the record's week; the projects; what landed,
+ * order the picture shows them: what needs you, who is working, cash; the few key numbers; the record's week; the
+ * projects; what landed,
  * what is coming up and a few people; then More, and what More opens.
  *
  * The page's tiles are the reader's, and the desk's own parts (who is working, the projects, what landed) and the More
@@ -16,10 +17,13 @@ const RANKS: Readonly<Record<string, number>> = {
   'needs-you': 1,
   working: 2,
   cash: 3,
-  'week-due': 4,
-  'week-money': 5,
-  'coming-up': 8,
-  faces: 9,
+  /* THE FEW KEY NUMBERS THAT LEAD, a row of their own under the first: after cash, before the record's week and the
+     projects (loop/plans/kpis-2026-10-21, 2.8). */
+  numbers: 4,
+  'week-due': 5,
+  'week-money': 6,
+  'coming-up': 9,
+  faces: 10,
 };
 
 /** What a block the desk folds is ranked: after More's own line, in the order it was declared. */
@@ -31,8 +35,8 @@ const PLACES: readonly (readonly [Placed, number])[] = [
   /* THE FOOT OF NEEDS YOU, right under its questions (or the whole tile with none to ask). */
   ['needs', 1],
   ['working', 2],
-  ['projects', 6],
-  ['landed', 7],
+  ['projects', 7],
+  ['landed', 8],
   ['more', 20],
 ];
 

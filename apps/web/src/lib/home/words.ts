@@ -31,6 +31,8 @@ export const words = {
   /** The weekday on today's date block in Coming up. */
   today: 'Today',
   goingOut: 'Going out, 30 days',
+  /** The tile of the few key numbers that lead Today (`numbersTile`). */
+  numbers: 'Numbers',
 
   /* EACH BLOCK'S OWN EMPTY LINE, for the blocks that stay drawn when they hold nothing. */
   nothingWaiting: 'Nothing is waiting on you.',
@@ -40,6 +42,8 @@ export const words = {
   nothingToCheck: 'Nothing is waiting for you to check.',
   nothingUrgent: 'Nothing is marked urgent.',
   noneWorking: 'No agent is working.',
+  /** Never drawn on Today, where a tile with no key number is not drawn; said where the block is drawn elsewhere. */
+  noNumbers: 'No key numbers yet.',
 
   /** A burst in what changed that the record put no words to: how many changes it was, never a bare number. */
   changes: (n: number) => (n === 1 ? 'One change' : `${n.toLocaleString('en-GB')} changes`),

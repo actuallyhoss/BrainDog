@@ -21,7 +21,7 @@
  */
 
 import { clausesOf, resolveDay } from '@braindog/where';
-import { MISSING, exponentOf, money, writeAmount } from 'braindog-render';
+import { KPIS_KIND, MISSING, exponentOf, money, writeAmount } from 'braindog-render';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
@@ -162,11 +162,12 @@ const keyed = (key: DeskKey) => ({ key }) as const;
 
 /**
  * THE BLOCKS TODAY'S DESK SHOWS AT REST, by the key each is declared under (the 19 October desk, roadmap slice 1a): what
- * needs you, who is working and the cash in the first row, the record's week where it keeps one, then (after the
+ * needs you, who is working and the cash in the first row, the few key numbers that lead under it (`numbersTile`), the
+ * record's week where it keeps one, then (after the
  * projects, which are the desk's own) what is coming up and a few people beside Arrivals. Every other block of Today's
  * own body folds behind one More (`deskFolded`), and so does every tile Home draws around the page.
  */
-export const DESK_KEYS = ['needs-you', 'working', 'cash', 'week-due', 'week-money', 'coming-up', 'faces'] as const;
+export const DESK_KEYS = ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'coming-up', 'faces'] as const;
 export type DeskKey = (typeof DESK_KEYS)[number];
 const ON_DESK: ReadonlySet<string> = new Set(DESK_KEYS);
 
@@ -383,14 +384,30 @@ export function quietTile(): PageBlock {
 }
 
 /**
- * THE TILE ON A RECORD THAT DOES NOT READ IT IS NOT DRAWN. A host built before the source answers the block as a
- * refusal ("exceptions is not a source this record reads"), and so does a record that will not show it to this reader;
+ * THE TILE ON A RECORD THAT DOES NOT READ IT IS NOT DRAWN, what went quiet and the key numbers alike. A host built
+ * before the source answers the block as a refusal ("exceptions is not a source this record reads"), and so does a
+ * record that will not show it to this reader;
  * neither is anything a person can act on from Today, so the block is marked not drawn and left at its place, as every
  * block a page hides is, and each write still finds its block by index. Every other block is handed back as it came.
  */
 export function quietHeld<B extends { source?: string | undefined; refusals: readonly unknown[]; drawn: boolean }>(blocks: readonly B[]): B[] {
-  return blocks.map((b) => (b.source === QUIET && b.drawn && b.refusals.length > 0 ? { ...b, drawn: false } : b));
+  return blocks.map((b) => ((b.source === QUIET || b.source === NUMBERS) && b.drawn && b.refusals.length > 0 ? { ...b, drawn: false } : b));
 }
+
+/** The source the few key numbers that lead Today are read from (the kernel's `sources/kpis.ts`), named as its kind is. */
+export const NUMBERS: string = KPIS_KIND;
+
+/**
+ * THE FEW KEY NUMBERS THAT LEAD TODAY (loop/plans/kpis-2026-10-21, 2.5, decided 21 Oct): his pins first, then one a
+ * project in play, off target before stale, stale before late, late before a big change, money before the rest, four at
+ * most. THE RECORD RANKS THEM (`kpisForToday` in the kernel's `kpi-rank.ts`), and nothing here orders them again.
+ *
+ * DECLARED ON EVERY RECORD AND DRAWN ONLY WHERE A NUMBER IS: a record that keeps no key numbers answers none, and Home
+ * does not draw a tile that holds nothing (`hollow`), so there is no empty box and no line asking for one. A whole row
+ * of the board, under the first one and over the record's week.
+ */
+export const numbersTile = (): PageBlock =>
+  ({ kind: KPIS_KIND, ...keyed('numbers'), span: 12, heading: words.numbers, icon: 'gauge', source: NUMBERS, for: 'today', empty: words.noNumbers }) as PageBlock;
 
 /** The two blocks a record's week opens Today on: its own words, naming its list ("Orders due this week"). */
 function weekBlocks(w: Week): PageBlock[] {
@@ -522,6 +539,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
             } as PageBlock,
           ]
         : []),
+      /* THE FEW KEY NUMBERS THAT LEAD, under cash: drawn only where the record keeps one. */
+      numbersTile(),
       /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
          takes their place; a task already drawn in a block above is not drawn again. */
       {
@@ -645,7 +664,16 @@ const asked = (b: LiveBlock): number => Math.max(b.total, b.queue?.length ?? 0);
  * limit.
  */
 const hollow = (b: LiveBlock): boolean =>
-  bare(b) || (!says(b) && (b.kind === 'todo' || b.kind === 'timeline' || b.kind === 'table' || b.kind === 'spec') && b.entries.length === 0);
+  bare(b) ||
+  (!says(b) && (b.kind === 'todo' || b.kind === 'timeline' || b.kind === 'table' || b.kind === 'spec') && b.entries.length === 0) ||
+  /* KEY NUMBERS ARE THE BLOCK'S `kpis` AND NOT ITS ROWS, so a record that keeps none draws no tile. */
+  (b.kind === KPIS_KIND && b.refusals.length === 0 && !hasKpis(b));
+
+/** Whether a `kpis` block answered any key number. */
+const hasKpis = (b: LiveBlock): boolean => {
+  const kpis = (b as { kpis?: unknown }).kpis;
+  return Array.isArray(kpis) && kpis.length > 0;
+};
 
 /** The first day one of a block's own columns holds for a row, `YYYY-MM-DD`, or `null`. */
 function dayIn(b: LiveBlock, fields: Record<string, unknown>): string | null {

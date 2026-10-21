@@ -13,8 +13,8 @@ const b = (key?: string, drawn = true) => ({ key, drawn });
 const keysOf = (list: readonly { key?: string | undefined }[]) => list.map((x) => x.key ?? '-');
 
 test("THE PAGE'S TILES ARE PUT IN THE PICTURE'S ORDER, and what the desk folds keeps the order it was declared in", () => {
-  const declared = [b('week-due'), b('week-money'), b('needs-you'), b(), b('working'), b('cash'), b('coming-up'), b('faces'), b()];
-  assert.deepEqual(keysOf(inPicture(declared)), ['needs-you', 'working', 'cash', 'week-due', 'week-money', 'coming-up', 'faces', '-', '-']);
+  const declared = [b('week-due'), b('week-money'), b('numbers'), b('needs-you'), b(), b('working'), b('cash'), b('coming-up'), b('faces'), b()];
+  assert.deepEqual(keysOf(inPicture(declared)), ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'coming-up', 'faces', '-', '-']);
   assert.deepEqual(keysOf(inPicture([b('x1'), b('needs-you'), b('x2')])), ['needs-you', 'x1', 'x2']);
 });
 
@@ -45,4 +45,22 @@ test('A PART WITH NOTHING AFTER IT FOLLOWS THE READER, and an undrawn block is n
 
 test("WITHOUT A READER EVERY PART FOLLOWS IT, in the picture's order", () => {
   assert.deepEqual(anchorsFor([b('needs-you')], false).tail, ['needs', 'working', 'projects', 'landed', 'more']);
+});
+
+test('THE FEW KEY NUMBERS ARE A ROW OF THEIR OWN AFTER CASH: who is working and the foot of Needs you stand before them, the projects after', () => {
+  assert.ok(rankOf({ key: 'cash' }) < rankOf({ key: 'numbers' }) && rankOf({ key: 'numbers' }) < rankOf({ key: 'week-due' }));
+  const blocks = inPicture([b('coming-up'), b('numbers'), b('needs-you'), b('cash')]);
+  assert.deepEqual(keysOf(blocks), ['needs-you', 'cash', 'numbers', 'coming-up']);
+  const { at, tail } = anchorsFor(blocks, true);
+  assert.deepEqual(
+    [...at],
+    [
+      [1, ['needs', 'working']],
+      [3, ['projects', 'landed']],
+    ],
+  );
+  assert.deepEqual(tail, ['more']);
+  /* WITH NO KEY NUMBER DRAWN, the projects still stand after cash and before what is coming up. */
+  const none = anchorsFor(inPicture([b('needs-you'), b('cash'), b('numbers', false), b('coming-up')]), true);
+  assert.deepEqual([...none.at], [[1, ['needs', 'working']], [3, ['projects', 'landed']]]);
 });
