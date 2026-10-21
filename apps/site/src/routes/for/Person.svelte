@@ -140,7 +140,7 @@
   /* ── The pages written for someone else ──────────────────────────────── */
 
   .others {
-    padding-block-start: 52px;
+    padding-block-start: 32px;
   }
 
   .others ul {
