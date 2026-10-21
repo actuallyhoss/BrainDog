@@ -16,6 +16,7 @@ export { default as Degraded } from './Degraded.svelte';
 export { default as Text } from './Text.svelte';
 
 export type { Column, OnCapture, TableRow } from './types.ts';
+export type { ControlMark, InstructChoice, InstructView, PresenceView, ThreadReceipts, ThreadStep, ThreadView } from './types.ts';
 export type { Action, ActionAs, OnAct } from '../src/actions.ts';
 
 export { default as Panel } from './p/Panel.svelte';
@@ -50,6 +51,11 @@ export { default as Actions } from './Actions.svelte';
 /* A project's key numbers and Today's few (`src/kpis.ts` plans them): drawn from the block's `kpis`, not its rows. */
 export { default as Kpis } from './Kpis.svelte';
 export type { KpiInput, KpiPoint, KpiView } from './types.ts';
+/* THE CONTROL ROOM (agents and MCP plan §7.1): the composer, the runs open now and what each was told. Drawn from the
+   view shapes in `types.ts`, which the host words; none of the three reads the record. */
+export { default as Instruct } from './Instruct.svelte';
+export { default as Presence } from './Presence.svelte';
+export { default as Instructions } from './Instructions.svelte';
 
 /* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
    host chooses between this component and its own card list. Two subscriptions could disagree for a

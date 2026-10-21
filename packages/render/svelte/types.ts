@@ -177,3 +177,118 @@ export function moveCell(from: Cell, key: string, rows: number, cols: number): C
       return null;
   }
 }
+
+/* ── the control room: telling agents, who is working, what each was told (agents and MCP plan §7.1) ─────────── */
+
+/*
+ * THE PARTS OF THE AGENTS PAGE A PERSON DRIVES, AS WHAT THEY DRAW AND NOTHING THEY READ. The host reads the record
+ * (`presence`, `instructionList`) and words every line (`apps/web/src/lib/record/instruct.ts`); these shapes are what it
+ * hands `Instruct`, `Presence` and `Instructions`, so a renderer holds no clock, no route and no run's handle as a word.
+ * Every string here is ready to read; an id is only ever a `key` a callback is handed back.
+ */
+
+/** An agent's maker mark, as `RenderOptions.agentMark` answers one: the path, its fill rule and its tone. */
+export type ControlMark = { d: string; rule: 'evenodd' | 'nonzero'; tone: string };
+
+/** One choice in the composer's "To" or "On": what it is handed back as, and what it says. */
+export type InstructChoice = { key: string; label: string };
+
+/** The composer as the host worked it out: who it goes to, where, when, and what happens next in plain words. */
+export type InstructView = {
+  /** "Whoever's next", each kind of agent, then each live run by name. */
+  to: readonly InstructChoice[];
+  toKey: string;
+  /** "Any project", then each project by name. */
+  on: readonly InstructChoice[];
+  onKey: string;
+  /** Whether "On" can be changed: a live run is on its own project. */
+  onFixed: boolean;
+  /** Both when a matching run is live; only the one it can be otherwise. */
+  when: readonly ('now' | 'next')[];
+  whenKey: 'now' | 'next';
+  /** What happens once it is sent, said as a sentence. */
+  next: string;
+  /** The agent kind it is for, for its mark beside "To"; `null` for whoever's next. */
+  agent: string | null;
+  /** Sending now. */
+  busy: boolean;
+  /** What the record refused, in its words, under the field. */
+  fault: string | null;
+};
+
+/** One stretch of an instruction's bar: reached, the one it is at, or not yet. */
+export type ThreadStep = 'done' | 'at' | 'ahead';
+
+/** What an instruction's run changed while it held it, said by name, with the way back while there is one. */
+export type ThreadReceipts = {
+  /** "4 changes", or "1 change". */
+  said: string;
+  /** The changed things by name, at most a few. */
+  names: readonly string[];
+  /** "and 3 more", or nothing. */
+  more: string | null;
+  /** Whether Undo all is offered. */
+  undo: boolean;
+  /** What putting them back did, once it has. */
+  undone: string | null;
+  /** "New commits on axis-qa", when the run's head moved. */
+  commits: string | null;
+};
+
+/** One instruction as a thread: what he said, to whom, how far it got, the agent's reply and what it changed. */
+export type ThreadView = {
+  key: string;
+  said: string;
+  /** "Claude · Kiln · now". */
+  to: string;
+  /** The agent kind it went to or was taken by, for its mark and the hue of its bar; `null` for nobody yet. */
+  agent: string | null;
+  /** Sent, Seen, Working, Done: the four stretches of the bar. */
+  steps: readonly ThreadStep[];
+  /** The state in a word or two: "Working 9 min", "Needs you", "Done". */
+  word: string;
+  /** `needs` is red and counts in Needs you; `ended` went nowhere (declined, expired, taken back). */
+  tone: 'open' | 'done' | 'needs' | 'ended';
+  /** "Sent 21:02 · Seen by Claude at 21:02, on its next prompt". */
+  trail: string;
+  /** The agent's answer in its words, and who said it when ("Claude at 21:14"). */
+  reply: { by: string; text: string } | null;
+  receipts: ThreadReceipts | null;
+  /** Whether it can still be taken back: no run has taken it. */
+  takeBack: boolean;
+  /** Written here and not yet answered by the record. */
+  sending: boolean;
+  /** Pressing Take back or Undo all now. */
+  busy: boolean;
+};
+
+/** One run open now, as the run row draws it, and what may be done to it. */
+export type PresenceView = {
+  key: string;
+  /** The agent kind, for its mark and its hue. */
+  agent: string | null;
+  /** "Claude". */
+  name: string;
+  /** What it said it is doing, or nothing. */
+  doing: string | null;
+  /** The project's name and its slot (`blue`, `violet`…), for the dot; `null` on none. */
+  project: { name: string; slot: string } | null;
+  /** "axis-qa · working, heard 3 min ago". */
+  meta: string;
+  /** Working, thinking or waiting, which the face's dot says too. */
+  live: 'working' | 'thinking' | 'waiting';
+  /** What it holds from him, in his words. */
+  holds: string | null;
+  /** "+2 helpers on axis-qa-2 and axis-qa-3". */
+  helpers: string | null;
+  /** Whether he paused or stopped it. */
+  stopped: 'stop' | 'pause' | null;
+  /** The honest line about what reaches it: hooks at its next tool call, or only its next BrainDog call. */
+  reach: string;
+  /** What Stop and Pause each say before they are pressed, in the agent's own terms. */
+  confirm: { stop: string; pause: string };
+  /** The run's own page. */
+  href: string | null;
+  /** Pressing now. */
+  busy: boolean;
+};
