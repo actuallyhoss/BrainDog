@@ -12,7 +12,6 @@
   import { swapCode, takeVerifier } from '$lib/desktop-signin.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Empty from '$lib/ui/Empty.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import Entry from '../Entry.svelte';
   import { words } from '../words.ts';
@@ -41,10 +40,13 @@
 
 <Entry>
   {#if failed}
+    <!-- THE ANSWER THIS SCREEN EXISTS TO GIVE, drawn in the entry frame's own words as the working line is, and not an
+         `Empty` error: that card says the record refused a read, and no read was refused here. A code that did not
+         finish is this screen's designed answer, so it settles `ready` and is measured as the screen it is. -->
     <div class="said">
-      <Empty kind="error" heading title={words.desktopFailed} body={words.desktopFailedWhy}>
-        {#snippet actions()}<Button weight="primary" href="/signin">{words.desktopBack}</Button>{/snippet}
-      </Empty>
+      <h1 class="entry-title">{words.desktopFailed}</h1>
+      <p class="entry-lede">{words.desktopFailedWhy}</p>
+      <Button weight="primary" href="/signin">{words.desktopBack}</Button>
     </div>
   {:else}
     <div class="working">
@@ -68,18 +70,15 @@
     line-height: 22px;
   }
 
-  /* `Empty` stands in the sheet with no tile of its own, and the sheet's padding is its padding. */
-  .said :global(.empty) {
-    padding: 0;
-    background: none;
-  }
-
-  .said :global(.empty-actions) {
-    align-self: stretch;
+  .said {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
   }
 
   .said :global(.btn) {
     inline-size: 100%;
     min-block-size: max(40px, var(--ctl-h));
+    margin-block-start: var(--sp-3);
   }
 </style>
