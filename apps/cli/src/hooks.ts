@@ -25,6 +25,7 @@ import { allowedPrograms, owedCommands, readAllowed, sentOf, usedTools, type Sen
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
+import { seedInbox, toldAtStart } from './inbox-file.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
 import { startWork } from './session-start.ts';
@@ -460,7 +461,8 @@ export function eventOf(stdin: string, cwd: string): Event {
 function reach(env: Env): Target | string {
   const hosts = hostsPath(env);
   try {
-    const to = target(undefined, env, hosts);
+    /* AS CLAUDE CODE, whatever the environment says, so its own token is sent when setup made one (`target`). */
+    const to = target(undefined, env, hosts, Date.now(), 'claude');
     return to.token ? to : notSignedIn(hosts);
   } catch (e) {
     const said = e instanceof Error ? e.message : '';
@@ -505,7 +507,11 @@ export async function aheadCard(c: Context | undefined, moved: Moved, read: () =
  * BY CLAUDE CODE'S `source`, because each one leaves the model holding something different:
  *
  *   - `startup`, and `clear`, which empties the conversation: the whole card.
- *   - `compact`: only the Next line. The summary kept the rest, and the step is what a compaction loses.
+ *   - `compact`: what he told the run that is still open, the stop first, then the Next line. The summary kept the
+ *     rest, and the step and his words are what a compaction loses (plan §3.4).
+ *
+ * WHAT HE TOLD THE RUN GOES FIRST in every card it prints (plan §2.3 A), each line the record's own card does not
+ * already carry, and seeds the inbox file the prompt and tool hooks read until the bridge's first pulse.
  *   - `resume` within the hour of the same session last being heard from: nothing, because its card is still in the
  *     conversation. A resume after longer gets the whole card.
  *
@@ -595,9 +601,17 @@ export async function hookStart(io: Io): Promise<void> {
     } catch {
       /* A folder that cannot be written costs the MCP server its attribution, not the session its card. */
     }
+  /*
+   * WHAT HE TOLD THE RUN, FOR THE HOOKS THAT COME AFTER (plan §2.3 A and C): the inbox file seeded from the attach, so the
+   * prompt and tool hooks have it before the bridge's first pulse, with each instruction this hook printed marked shown
+   * at the start. Only for a session that says its id, which the file is named by.
+   */
+  const seed = (printed: readonly string[]) => {
+    if (event.client_id !== undefined) seedInbox(io.env, event.client_id, to.key, run.spoken, run.context, printed);
+  };
   try {
     /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
-    if (soon && before.host === to.key && before.spoken === run.spoken) return;
+    if (soon && before.host === to.key && before.spoken === run.spoken) return seed([]);
 
     const moved = await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head);
     const named = { spoken: run.spoken, ...mine };
@@ -606,9 +620,15 @@ export async function hookStart(io: Io): Promise<void> {
       clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env, parent, ahead: moved }), AbortSignal.timeout(left())).context(),
     );
     const shown = told === undefined || told === run.context ? run : { ...run, context: told };
+    /* THE STOP, THEN EVERY OPEN INSTRUCTION, NEVER CUT, each in his voice (`toldAtStart`), and the ids they name. */
+    const heard = toldAtStart(run.context);
+    const ids = [...heard.told.map((t) => t.id), ...(heard.stop === null ? [] : [heard.stop.id || heard.stop.kind])];
+    /* AFTER A COMPACTION, the open instructions again and then Next (plan §3.4): the two things a summary loses. */
     if (event.source === 'compact') {
       const line = nextLine(shown, moved);
-      if (line !== null) io.write(line);
+      const said = [...heard.lines, ...(line === null ? [] : [line])];
+      seed(ids);
+      if (said.length > 0) io.write(said.join('\n'));
       return;
     }
     /* Only a session that begins syncs: a compaction or a clear is the same session going on (plan §4.3 step 6). */
@@ -623,7 +643,14 @@ export async function hookStart(io: Io): Promise<void> {
     const home = io.home ?? homedir();
     const build = io.build ?? cliBuild();
     const stale = staleLine(build, shown.context, hostBuildOf(home, to.key), hostName(to.key), behindSaysIt(home, to.key, build));
-    io.write(`${stale === null ? '' : `${stale}\n`}${briefing(shown, where, moved, { more, ...decides })}`);
+    const card = briefing(shown, where, moved, { more, ...decides });
+    /* ABOVE THE CARD, each line the record's own card does not already carry (by its instruction's name). */
+    const above = heard.lines.filter((l) => {
+      const named = /\((IN\d+)\)/u.exec(l)?.[1];
+      return named === undefined || !card.includes(`(${named})`);
+    });
+    seed(ids);
+    io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}`);
   } finally {
     /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
        beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */
