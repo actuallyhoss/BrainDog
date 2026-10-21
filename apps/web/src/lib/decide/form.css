@@ -470,7 +470,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     flex: 1 1 0;
     min-inline-size: 0;
     min-block-size: var(--tap);
-    padding: 6px 12px;
+    padding: 6px 8px;
     line-height: 18px;
     text-align: center;
   }
@@ -481,5 +481,21 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
   .dc-actions[data-inline]:has(> .dc-btn:not([data-weight='bare']):nth-of-type(3)) > .dc-btn:not([data-weight='bare']) {
     flex: 1 1 100%;
+  }
+}
+
+/* ON THE NARROWEST PHONES THE TWO ANSWERS TAKE THE WHOLE LINE, half each, so "It went through" and "Chase £2,400" each
+   stay on one line, and Ask me later goes under them where the answers start (VERIFY P6). */
+@media (width < 400px) {
+  .dc-actions[data-inline] {
+    flex-wrap: wrap;
+  }
+
+  .dc-actions[data-inline] > .dc-btn:not([data-weight='bare']) {
+    flex: 1 1 calc(50% - var(--sp-2));
+  }
+
+  .dc-actions[data-inline] > .dc-btn.dc-later {
+    margin-inline-start: 0;
   }
 }

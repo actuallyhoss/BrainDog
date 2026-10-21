@@ -606,9 +606,10 @@
   {/if}
 {:else if row}
   <!-- A MONEY ROW (today F4): the well, what it is and the amount, how late in red, the answers, and who asked at the
-       foot. The question in full is on its own page, which the title opens. -->
+       foot. The question in full is on its own page, which the title opens. THE WELL IS NEUTRAL here as on Today
+       (polish 8, VERIFY P7): the late word carries the red, once. -->
   <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl}>
-    <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" tone="late" /></span>
+    <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" /></span>
     <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}>{row.title}</a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
     <span class="dr-amount num">{row.amount}</span>
     <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
@@ -668,7 +669,7 @@
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
       <h3 class="queue-question" dir="auto">
-        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>
@@ -737,7 +738,8 @@
       {#if answerable && (!card.merge || compact)}
         <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
              key may press carries `data-enter`: nothing hard to undo, nothing that moves money. Where the choices
-             themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). -->
+             themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). DECIDE NEVER
+             LOOKS SWITCHED OFF (VERIFY H9): pressed with nothing chosen, it puts the focus on the first answer. -->
         <div class="dc-actions" data-inline={inline ? '' : undefined}>
           {#if inline}
             <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
@@ -753,7 +755,6 @@
               data-weight="primary"
               data-decide
               data-enter={card.enter !== null && selected !== null ? '' : undefined}
-              aria-disabled={selected === null}
               onclick={commit}>{pressSaid(card, queueWords.decide, card.ways.find((w) => w.key === selected))}</button
             >
           {/if}
@@ -1142,7 +1143,8 @@
     box-shadow: inset 0 0 0 1.5px var(--ink-2);
   }
 
-  /* HOW MANY THINGS A JOINED QUESTION CHANGES, quiet beside its words. */
+  /* HOW MANY THINGS A JOINED QUESTION CHANGES, quiet beside its words. Held to the question's last word by a no-break
+     space, so "· 2 changes" never wraps onto a line of its own (VERIFY P5). */
   .qa-joined {
     color: var(--ink-2);
     font-size: var(--fs-meta);
