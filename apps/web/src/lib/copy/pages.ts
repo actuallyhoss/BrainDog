@@ -215,6 +215,8 @@ export const pages = {
   pageSource: 'How this is built',
   pageBack: 'Back to the page',
   openTheRest: (register: string) => `Open ${register} for the rest`,
+  /** A list's door at a tile's foot, with how many it holds: "All 36 in Ledger" said what "30 more" left to sums. */
+  allIn: (n: number, register: string) => `All ${n.toLocaleString('en-GB')} in ${register}`,
   /**
    * THE CASH WALK COUNTS MOVEMENTS, AND THERE IS NOWHERE TO OPEN.
    *

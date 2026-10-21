@@ -790,6 +790,9 @@
   {:else if door && block.key === 'faces' && headingText}
     <!-- TODAY'S PEOPLE END ON THEIR LIST'S DOOR, "All people →", at the tile's foot. -->
     <a class="block-more block-all tap" href={inApp(door)}>{copy.allOf(headingText)}<Icon name="arrow" size="s" /></a>
+  {:else if door && source && block.register}
+    <!-- A LIST'S DOOR SAYS HOW MANY THE LIST HOLDS AND WHERE (P21): "All 36 in Ledger →", where "30 more" left a sum. -->
+    <a class="block-more block-all tap" href={inApp(door)}>{copy.allIn(block.total, source)}<Icon name="arrow" size="s" /></a>
   {:else if door}
     <a class="block-more tap" href={inApp(door)}>{words.more(block.total - block.shown)}</a>
   {:else}
