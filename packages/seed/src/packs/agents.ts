@@ -497,6 +497,22 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 3,
         when: { metric: 'questions-open', gt: 0 },
       },
+      /* THE CONTROL ROOM'S BOX, UNDER WHAT ASKED YOU (agents and MCP plan §2.1, §7.1): one field to tell an agent, to a
+         named run, a kind of agent or whoever is next, on a project, now or at its next start, with what happens next
+         said in words; and under it what he told agents, each with its live state, the agent's reply and Undo all on
+         what its run changed. The host's own part (`panel: instruct`), drawn for the owner alone, since only a person
+         signed in may tell an agent.
+
+         UNDER NEEDS YOU AND NOT OVER IT, because a section heads the blocks after it up to the next one, and its well
+         takes their tone (`sectionWell` in `apps/web/src/lib/record/blocks.ts`): over the questions, the box to tell an
+         agent wore Needs you's red. Here the next block is Working, a section of its own, so it heads nothing. */
+      {
+        kind: 'section',
+        heading: 'Tell an agent',
+        icon: 'edit',
+        span: 12,
+        panel: 'instruct',
+      },
       /* ONLY THE RUNS WORKING NOW, THE KERNEL'S SINCE 1.9.0 (`sessions.working`): active and heard from inside fifteen
          minutes, a helper folded under the run that started it. The end hook leaves a run idle and a handoff waits for
          a pickup, and neither is working. The source takes no `where:` and no `order:`, so no page can count working its
@@ -508,21 +524,23 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          fifth printed file paths. `doing_said` is the record's own column on a run: what the agent said it is doing,
          and nothing when the name is the record's or reads as a path, a host or a handle. NO NEXT STEP: a working
          run's step is its own note, and a step left is said under Left for the next run. How many helpers a run has
-         comes with the answer, for the host to say. */
+         comes with the answer, for the host to say.
+
+         THE RUNS OPEN NOW, LIVE, SINCE THE CONTROL ROOM (agents and MCP plan §4.4, §7.1): the cards over
+         `sessions.working` became the host's `panel: presence`, which reads the record's `presence` (the bridge's pulse
+         and each call, so a run that is open and quiet is still here) and draws the UI pass's one run row: the agent,
+         what it said it is doing, its project and branch, how long it has run and when it was last heard, what it holds
+         from him and its helpers folded under it. For the owner each row has Tell, Pause and Stop, and says what can
+         stop that agent: its hooks at its next tool call, or only its next BrainDog call.
+
+         NO `when:`, BECAUSE A SECTION'S HIDES WHAT IT HOLDS: the steps under it would go with it on a record where
+         nobody is working. The panel leaves the tile out itself while no run is open, as `panel: seen` does. */
       {
-        kind: 'cards',
+        kind: 'section',
         heading: 'Working',
         icon: 'session',
         span: 12,
-        source: 'sessions.working',
-        columns: [
-          { field: 'agent', as: 'who' },
-          { field: 'doing_said', as: 'reply' },
-          { field: 'project', as: 'scope' },
-          { field: 'last_seen', as: 'when' },
-        ],
-        limit: 12,
-        when: { metric: 'runs-working', gt: 0 },
+        panel: 'presence',
       },
       /* WHAT WAS LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12, "Agents page with no dead runs"): the steps runs left and
          nobody has taken, from the record's own `handoffs.open`, the read a new run is handed its step from, so the

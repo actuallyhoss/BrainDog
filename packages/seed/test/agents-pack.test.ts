@@ -299,7 +299,10 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   const seen = (a: (typeof RUNS)[number], z: (typeof RUNS)[number]) => String(z.last_seen).localeCompare(String(a.last_seen));
   const today = (r: (typeof RUNS)[number]) => String(r.last_seen).slice(0, 10) === new Date(NOW).toISOString().slice(0, 10);
   const working = RUNS.filter((r) => r.state === 'active' && today(r)).sort(seen);
-  assert.deepEqual(headed(blocks, 'Working').rows.map((r) => r.fields.doing), working.map((r) => r.doing), 'a stopped run is listed as working, or the order is not by last seen');
+  /* WORKING IS THE HOST'S LIVE PART SINCE THE CONTROL ROOM (`panel: presence`, agents and MCP plan §7.1): the runs open
+     now are read from the record's `presence`, not drawn as rows of the page, and the line counts the runs working. */
+  assert.equal((headed(blocks, 'Working') as Drawn & { panel?: string }).panel, 'presence', 'Working is not the runs open now');
+  assert.equal(reading(k, 'runs-working'), working.length, 'a stopped run is counted as working');
   const stopped = RUNS.filter((r) => r.state !== 'active' && today(r)).sort(seen);
   assert.ok(stopped.length > 0, 'the seed has no run that stopped today');
   /* THE RUNS THAT STOPPED TODAY ARE LANES, SINCE THE UI PASS OF 20 OCTOBER (agents F7): the day's tile holds the lanes
@@ -317,7 +320,7 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   assert.deepEqual([fold.kind, fold.matched, earlier.kind, earlier.heading], ['section', 2 + before.length, 'cards', undefined], 'Earlier is not a counted heading over its cards');
   assert.deepEqual([...earlier.rows.map((r) => String(r.fields.doing))].sort(), ['Left open since yesterday', 'Stopped yesterday', ...before].sort(), 'a run last heard from yesterday is not under Earlier');
   /* EVERY RUN UNDER EXACTLY ONE HEADING, the finished ones too. */
-  const drawn = [headed(blocks, 'Working'), earlier].flatMap((b) => b.rows.map((r) => String(r.fields.doing)));
+  const drawn = [earlier].flatMap((b) => b.rows.map((r) => String(r.fields.doing)));
   assert.equal(new Set(drawn).size, drawn.length, `a run is under two headings: ${drawn.join(', ')}`);
   /* THE NEXT STEP A RUN LEFT IS SAID ONCE, under Left for the next run, and on no run's card since 1.12.0. */
   const declared = AGENTS_PAGES.agents!.blocks as { kind: string; source?: string; columns?: { field: string }[] }[];
@@ -405,24 +408,22 @@ test('WORKING NOW IS THE RUNS HEARD FROM IN THE LAST FIFTEEN MINUTES, and the li
   value(k.create('session', { doing: 'Quiet for twenty minutes', agent: 'codex', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: ago(20) } }));
   value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: ago(26 * 60) } }));
 
-  const doing = headed(opened(k, 'agents'), 'Working').rows.map((r) => String(r.fields.doing));
-  for (const quiet of ['Quiet for twenty minutes', 'Left open since yesterday']) assert.ok(!doing.includes(quiet), `${quiet} is working now: ${doing.join(', ')}`);
-  /* THE SEED'S TWO ACTIVE RUNS WERE HEARD FROM THREE AND TWELVE MINUTES AGO. */
-  assert.deepEqual([...doing].sort(), RUNS.filter((r) => r.state === 'active').map((r) => String(r.doing)).sort(), 'a run heard from inside fifteen minutes is not working now');
+  /* THE SEED'S TWO ACTIVE RUNS WERE HEARD FROM THREE AND TWELVE MINUTES AGO, and the two planted here are not working.
+     The runs themselves are the host's live part since the control room (`panel: presence`), read from `presence`. */
   const read = k.metric(k.metricDecl('runs-working')!);
   assert.ok(read.ok, JSON.stringify(read));
-  assert.equal(read.value.value, doing.length, 'the line counts a run the cards do not draw');
+  assert.equal(read.value.value, RUNS.filter((r) => r.state === 'active').length, 'a run quiet for twenty minutes or left since yesterday is counted working');
   sql.close();
 });
 
-test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: the cards read `sessions.working` and the line `runs-working`', () => {
+test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: Working is the record\'s `presence` and the line `runs-working`', () => {
   assert.deepEqual(Object.keys(AGENTS_MODULE).filter((name) => /WORKING/u.test(name)), [], 'the pack still exports its own clause for working');
   assert.equal(JSON.stringify(agentsPackDocument()).includes('agents-working'), false, 'the pack still declares or reads its own working figure');
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; when?: { metric?: string }; lead?: boolean; body?: string }[];
-  const working = blocks.find((b) => b.heading === 'Working');
-  assert.equal(working?.source, 'sessions.working');
+  const working = blocks.find((b) => b.heading === 'Working') as { kind: string; panel?: string; source?: string; where?: unknown; when?: unknown } | undefined;
+  assert.deepEqual([working?.kind, working?.panel, working?.source], ['section', 'presence', undefined], 'Working is not the runs open now');
   assert.equal(working?.where, undefined, 'the working source takes no clause');
-  assert.equal(working?.when?.metric, 'runs-working');
+  assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
   const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
   assert.equal(lines.length, 2);
   for (const line of lines) assert.equal(line.when?.metric, 'runs-working', `${line.body} is not held to the record's count`);
@@ -572,15 +573,11 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   const cards = page.filter((b) => b.kind === 'cards');
   const group = (heading: string) => cards.find((b) => b.heading === heading)!;
   const role = (b: Card, as: string) => (b.columns ?? []).filter((c) => c.as === as).map((c) => c.field);
-  const said = (b: Card) => b.rows.map((r) => [r.fields.agent, r.fields.doing_said]);
 
-  /* WORKING: the agent is the title, what it said is under it, and a name the record gave, or words that are a path,
-     are no sentence at all. No next step: a working run's step is its own note. */
-  const working = group('Working');
-  assert.deepEqual(role(working, 'who'), ['agent']);
-  assert.deepEqual(role(working, 'reply'), ['doing_said']);
-  assert.deepEqual(said(working), [['claude', ''], ['codex', 'Fixing the invoice totals'], ['claude', '']]);
-  assert.ok(!(working.columns ?? []).some((c) => c.field === 'next' || c.field === 'doing'), 'a Working card carries a next step, or the name the record gave');
+  /* WORKING IS NO CARD SINCE THE CONTROL ROOM: the runs open now are the host's live part (`panel: presence`), which
+     words each run from the record's `presence` (`apps/web/src/lib/record/instruct.ts`). */
+  assert.equal(group('Working'), undefined, 'Working is still drawn as cards');
+  assert.equal((page.find((b) => b.heading === 'Working') as Card & { panel?: string }).panel, 'presence');
 
   /* TODAY IS THE LANES SINCE THE UI PASS OF 20 OCTOBER: no card of a run that stopped today, and the figure still
      counts the run that ended today and wrote, not the one that wrote nothing, nor the helper, nor a working run. */
@@ -709,6 +706,28 @@ const uiPassBack = (blocks: Loose[]): Loose[] => {
   }
   return out;
 };
+/**
+ * AND THE PAGE AS IT STOOD BEFORE THE CONTROL ROOM (agents and MCP plan §7.1): no box to tell an agent in, and Working
+ * the cards over `sessions.working` where it is now the host's `panel: presence`. Put back first of all, so `uiPassBack`
+ * reads the page the UI pass left.
+ */
+const WORKING_CARDS = {
+  kind: 'cards',
+  heading: 'Working',
+  icon: 'session',
+  span: 12,
+  source: 'sessions.working',
+  columns: [
+    { field: 'agent', as: 'who' },
+    { field: 'doing_said', as: 'reply' },
+    { field: 'project', as: 'scope' },
+    { field: 'last_seen', as: 'when' },
+  ],
+  limit: 12,
+  when: { metric: 'runs-working', gt: 0 },
+};
+const controlRoomBack = (blocks: Loose[]): Loose[] =>
+  blocks.filter((b) => b.panel !== 'instruct').map((b) => (b.panel === 'presence' ? WORKING_CARDS : b));
 const columnsBefore6 = (columns: Loose[]): Loose[] =>
   columns.map((c) => (c.field === 'agent' && c.as === 'who' && c.label === undefined ? { ...c, as: 'title' } : c.field === 'project' && c.label === 'on' ? { ...c, label: 'Project' } : c));
 const batch6Back = (blocks: Loose[]): Loose[] => {
@@ -740,7 +759,7 @@ const before13 = (declarations: Record<string, unknown>[]): Record<string, unkno
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
     .map((d) =>
       d.page === 'agents'
-        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(d.blocks as Loose[])) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
+        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(controlRoomBack(d.blocks as Loose[]))) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
         : d.metric === 'keys-nowhere'
           ? { ...d, where: 'state is live, value is empty, where is empty' }
           : listBefore13(d),
@@ -851,11 +870,12 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    stopped today, the agent as the card's mark and the project said "on", and keys with no value said plainly, which
    `batch6Back` puts back, and again for the UI pass of 20 October (agents F7, SF12; it was 37af65a2925448e1): the lanes
    today's alone with no cards under them, the scope with no label, and the key lines one for one and one for many,
-   which `uiPassBack` puts back. */
+   which `uiPassBack` puts back, and again for the control room (agents and MCP plan §7.1; it was c616a819e2f84bb8): the
+   box to tell an agent in and Working as the host's live runs, which `controlRoomBack` puts back. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), 'c616a819e2f84bb8', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), 'e051523f0cd521af', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
 });
