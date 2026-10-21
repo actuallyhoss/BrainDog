@@ -442,6 +442,7 @@ export {
   SEEN_HOW,
   WAIT_MS as INSTRUCTION_WAIT_MS,
   instructionOf,
+  instructionsTakenBy,
   openInstructions,
   type Delta,
   type InstrKind,

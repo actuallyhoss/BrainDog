@@ -18,7 +18,9 @@
 import type { Result, Sql } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import {
+  INSTRUCTIONS,
   INSTRUCTION_KINDS,
+  INSTRUCTION_PREFIX,
   INSTRUCTION_STATES,
   INSTRUCTION_TO,
   INSTRUCTION_WHEN,
@@ -26,6 +28,7 @@ import {
   REPLY_STATES,
   SEEN_HOW,
   agentOf as kindOf,
+  instructionsTakenBy,
   type Instr,
   type InstructInput,
   type Kernel,
@@ -93,8 +96,12 @@ export type ReceiptBatch = { batch: string; at: string; changes: number; rows: s
 
 /**
  * What a run did while it held an instruction: its batches between `taken_at` and `replied_at` (or now), and its head
- * as it stood before and after. Read from the log, never stored (§8.1). The run's own row and the instruction itself
+ * as it stood before and after. Read from the log, never stored (§8.1). The run's own row and every instruction's row
  * are its bookkeeping and are left out. `null` before a run took it.
+ *
+ * ONE WRITE IS ONE INSTRUCTION'S. A run that holds two at once works the one it took last, as its `instruction` in
+ * hand says (`takeFor`), so a write made while a later one was open is that one's, never also the earlier one's: of
+ * the run's instructions open at the write, the newest taken has it (`inHandAt`).
  */
 export type Receipts = { run: string; batches: ReceiptBatch[]; changes: number; head_before: string | null; head_after: string | null };
 
@@ -105,20 +112,22 @@ export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string): 
   if (i.taken_by === null || i.taken_at === null) return null;
   const run = kernel.get(i.taken_by, { includeDeleted: true });
   const until = i.replied_at ?? nowIso;
-  const own = [run === null ? '' : `entry:${run.id}`, `entry:${i.row}`];
   const rows = sql.all<{ batch: string | null; id: string; ts: string; target: string | null }>(
     `SELECT batch, id, ts, target FROM event
-      WHERE actor = ? AND ts >= ? AND ts <= ? AND (target IS NULL OR target NOT IN (?, ?))
+      WHERE actor = ? AND ts >= ? AND ts <= ?
+        AND (target IS NULL OR (target <> ? AND target NOT IN (SELECT 'entry:' || id FROM entry WHERE register = ?)))
         AND kind NOT IN ('note', 'read', 'grant.read')
       ORDER BY ts DESC, rowid DESC LIMIT 2000`,
     i.taken_by,
     i.taken_at,
     until,
-    own[0]!,
-    own[1]!,
+    run === null ? '' : `entry:${run.id}`,
+    INSTRUCTIONS,
   );
+  const held = instructionsTakenBy(sql, i.taken_by).filter((x) => x.kind !== 'resume' && x.taken_at !== null);
   const byBatch = new Map<string, ReceiptBatch>();
   for (const r of rows) {
+    if (inHandAt(held, r.ts, nowIso)?.row !== i.row) continue;
     const key = r.batch ?? r.id;
     const was = byBatch.get(key) ?? { batch: key, at: r.ts, changes: 0, rows: [], names: [] };
     was.changes += 1;
@@ -154,6 +163,22 @@ export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string): 
     head_before: headAt(true),
     head_after: headAt(false),
   };
+}
+
+/** A number for an instruction's spoken name (`IN4` is 4), so two taken at one instant are told apart. */
+const seqOf = (x: Instr): number => Number(x.id.slice(INSTRUCTION_PREFIX.length)) || 0;
+
+/**
+ * The instruction a run was working at `ts`: of those it took, open then (taken by `ts`, not answered before it), the
+ * one taken last, the later one when two were taken at once. `null` when none was open.
+ */
+export function inHandAt(held: readonly Instr[], ts: string, nowIso: string): Instr | null {
+  let best: Instr | null = null;
+  for (const x of held) {
+    if (x.taken_at === null || x.taken_at > ts || (x.replied_at ?? nowIso) < ts) continue;
+    if (best === null || x.taken_at > best.taken_at! || (x.taken_at === best.taken_at && seqOf(x) > seqOf(best))) best = x;
+  }
+  return best;
 }
 
 /* ── the doors ──────────────────────────────────────────────────────────── */

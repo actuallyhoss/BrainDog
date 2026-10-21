@@ -250,6 +250,20 @@ export function openInstructions(sql: Sql): Instr[] {
     .map(instrOf);
 }
 
+/**
+ * Every instruction one run took, by its spoken name (`S883`), oldest first, answered or not: the windows its receipts
+ * are cut by, since a run holding two at once did each one's work in turn.
+ */
+export function instructionsTakenBy(sql: Sql, run: string): Instr[] {
+  return sql
+    .all<Row>(
+      `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND json_extract(e.fields, '$.taken_by') = ? ORDER BY e.seq`,
+      INSTRUCTIONS,
+      run,
+    )
+    .map(instrOf);
+}
+
 /** A run as the predicates read it. */
 export type RunOf = { id: string; spoken: string; seq: number; state: string | null; fields: Record<string, Json>; created_at: string };
 
@@ -655,7 +669,11 @@ export function replyInstruction(d: InstructionDeps, ref: string, runRef: string
     const answered = d.write(i.row, { patch: i.state === state ? {} : { state }, stamp, note: null, actor: run.spoken });
     if (!answered.ok) return answered;
     if (state !== 'needs_you' && run.fields.instruction === i.id) {
-      const cleared = d.runWrite(run.id, { instruction: null }, run.spoken, null);
+      /* THE ONE IT HELD BEFORE IS IN HAND AGAIN: answering the newer of two leaves the run working the older. */
+      const before = instructionsTakenBy(d.sql, run.spoken)
+        .filter((x) => x.row !== i!.row && x.kind !== 'resume' && x.state === 'working')
+        .pop();
+      const cleared = d.runWrite(run.id, { instruction: before?.id ?? null }, run.spoken, null);
       if (!cleared.ok) return cleared as Result<never>;
     }
     return ok(instructionOf(d.sql, i.row)!);

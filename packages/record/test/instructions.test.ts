@@ -114,6 +114,38 @@ test('TAKEN BY ONE RUN: of two runs here the first takes it, the second is told 
   sql.close();
 });
 
+test('EACH RECEIPT IS ITS OWN: a run holding two names under each only the writes it made working that one', async () => {
+  const { api, sql, clock } = await record();
+  const a = agent('c-two');
+  const run = await opened(api, a);
+  const price = value<{ id: string }>(await api.instruct({ said: 'Put the licence price on the page', to_run: run }, owner));
+  const intro = value<{ id: string }>(await api.instruct({ said: 'Rewrite the specimen intro', to_run: run }, owner));
+  clock.advance(MIN);
+  /* SHOWN BOTH, IT TAKES BOTH, and works the later one first, as its instruction in hand says. */
+  assert.deepEqual(value<{ pending: { id: string }[] }>(await api.instructionsMine({}, a)).pending.map((i) => i.id), [price.id, intro.id]);
+  clock.advance(MIN);
+  value(await api.create({ register: 'tasks', fields: { what: 'Draft the new intro' } }, a));
+  clock.advance(MIN);
+  type Answer = { receipts: { batches: { names: string[] }[]; changes: number } | null };
+  const forIntro = value<Answer>(await api.instructionsMine({ reply: intro.id, said: 'Rewrote it.', state: 'done' }, a));
+  /* ANSWERED, THE OLDER ONE IS IN HAND AGAIN. */
+  assert.equal(api.kernel.get(run)?.fields.instruction, price.id);
+  clock.advance(MIN);
+  value(await api.create({ register: 'tasks', fields: { what: 'Add the price line' } }, a));
+  clock.advance(MIN);
+  const forPrice = value<Answer>(await api.instructionsMine({ reply: price.id, said: 'Put it there.', state: 'done' }, a));
+  const names = (x: Answer) => x.receipts!.batches.flatMap((b) => b.names);
+  /* NEITHER COUNTS THE OTHER'S WORK, NOR THE OTHER INSTRUCTION'S OWN ROW. */
+  assert.deepEqual(names(forIntro), ['Draft the new intro'], JSON.stringify(forIntro.receipts));
+  assert.deepEqual(names(forPrice), ['Add the price line'], JSON.stringify(forPrice.receipts));
+  assert.deepEqual([forIntro.receipts!.changes, forPrice.receipts!.changes], [1, 1]);
+  /* AND HIS THREADS SAY THE SAME. */
+  const threads = value<{ rows: { id: string; receipts: Answer['receipts'] }[] }>(await api.instructionList({}, owner)).rows;
+  const of = (id: string) => names({ receipts: threads.find((t) => t.id === id)!.receipts });
+  assert.deepEqual([of(price.id), of(intro.id)], [['Add the price line'], ['Draft the new intro']]);
+  sql.close();
+});
+
 test('A TASK SAYS WHO IT REACHES: its lane and project fill the instruction when he names neither', async () => {
   const { api, sql } = await record();
   const thing = sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things' AND json_extract(fields, '$.name') = 'Portage'");
