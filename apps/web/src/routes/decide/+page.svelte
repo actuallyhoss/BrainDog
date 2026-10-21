@@ -416,7 +416,10 @@
   </PageHead>
 
   <div class="page" inert={fromCopy} data-selecting={selecting ? '' : undefined}>
-    {#if !answerable && (shaped?.open ?? 0) > 0}
+    <!-- NOT WHILE THE SHELL IS THE KEPT COPY (VERIFY H45): a copy reads every reader as `read` (`boot-copy.ts`
+         `drawnFrom`), so on a cold open this line drew for a frame for an owner and went when the live shell landed,
+         and the page jumped 58px and back. Only the live shell says who may answer. -->
+    {#if !answerable && !shell.stale && (shaped?.open ?? 0) > 0}
       <!-- WHY THE CARDS OFFER THEIR OPTIONS AS WORDS, above them and not after a press. -->
       <p class="cannot" id="cannot-decide">{whyNot}</p>
     {/if}
