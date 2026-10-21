@@ -220,10 +220,10 @@ test('NEEDS YOU COMES FIRST, THEN WHAT IS OPEN, THEN THE REST, each newest first
   assert.deepEqual(order.map((t) => t.id), ['IN3', 'IN4', 'IN2', 'IN1']);
 });
 
-test('THE ROW APPEARS AT ONCE, as Sending, said as the composer said it', () => {
+test('THE ROW APPEARS AT ONCE, on its way, said as the composer said it', () => {
   const c = composerOf({ to: 'agent:claude', on: 'things#1', when: null }, ROWS, PROJECTS);
-  const s = sendingOf('sending:1', ' Merge wave 1 ', c);
-  assert.deepEqual([s.said, s.to, s.word, s.sending, s.takeBack], ['Merge wave 1', 'Claude · Kiln · now', 'Sending', true, false]);
+  const s = sendingOf('outgoing:1', ' Merge wave 1 ', c);
+  assert.deepEqual([s.said, s.to, s.word, s.sending, s.takeBack], ['Merge wave 1', 'Claude · Kiln · now', 'On its way', true, false]);
 });
 
 test('A RUN A THREAD NAMES THAT IS NOT OPEN NOW IS READ ONCE, by handle', () => {

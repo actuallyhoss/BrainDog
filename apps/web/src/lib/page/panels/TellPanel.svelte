@@ -7,7 +7,7 @@
   version poll) and when the other panel says something changed (`told`), and is aimed at a run by a run row's Tell
   (`aim`).
 
-  THE ROW APPEARS AT ONCE (§2.1). Send draws the thread as Sending before the record answers; the answer replaces it
+  THE ROW APPEARS AT ONCE (§2.1). Send draws the thread as On its way before the record answers; the answer replaces it
   with the record's own, or takes it away and puts his words back in the field with the record's reason under it.
   Take back is the thread's own undo while no run has taken it.
 
@@ -113,7 +113,7 @@
     busy = true;
     fault = null;
     const was = composer;
-    sending = sendingOf(`sending:${String(Date.now())}`, words, was);
+    sending = sendingOf(`outgoing:${String(Date.now())}`, words, was);
     said = '';
     try {
       const out = await io.send(instructArgs(was, words));

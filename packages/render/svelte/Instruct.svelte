@@ -107,7 +107,7 @@
     </div>
     <button class="ins-send" type="submit" aria-busy={view.busy ? 'true' : undefined}>
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h10M9 4.5L12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
-      <span>{view.busy ? 'Sending' : 'Send'}</span>
+      <span>{view.busy ? 'On its way' : 'Send'}</span>
     </button>
   </div>
   {#if view.fault}<p class="ins-fault" role="alert">{view.fault}</p>{/if}

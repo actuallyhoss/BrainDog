@@ -20,6 +20,7 @@ import { createClient } from '@braindog/client';
 import type { InstructChoice, InstructView, PresenceView, ThreadReceipts, ThreadStep, ThreadView } from 'braindog-render/svelte';
 
 import { AGENT_NAMES } from './names.ts';
+import { REGISTERS } from './held.ts';
 import { slotOf } from '../ui/face.ts';
 import { undoChange } from './undo-write.ts';
 import type { Fetch } from './boot-live.ts';
@@ -395,7 +396,7 @@ export function threadOrder(threads: readonly Thread[]): Thread[] {
   return [...threads].sort((a, b) => rank(a) - rank(b) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 
-/** A thread drawn the moment Send is pressed, before the record answers: what he said, to whom, Sending. */
+/** A thread drawn the moment Send is pressed, before the record answers: what he said, to whom, on its way. */
 export function sendingOf(key: string, said: string, view: Omit<InstructView, 'busy' | 'fault'>): ThreadView {
   const label = (list: readonly InstructChoice[], k: string) => list.find((c) => c.key === k)?.label ?? '';
   const who = label(view.to, view.toKey).replace(/ \(working now\)$/u, '');
@@ -406,7 +407,7 @@ export function sendingOf(key: string, said: string, view: Omit<InstructView, 'b
     to: [who, on, controlWords[view.whenKey]].filter((x): x is string => !!x).join(' · '),
     agent: view.agent,
     steps: ['at', 'ahead', 'ahead', 'ahead'],
-    word: 'Sending',
+    word: 'On its way',
     tone: 'open',
     trail: '',
     reply: null,
@@ -494,12 +495,15 @@ export function control(base: string, io?: Fetch) {
       return out;
     },
     /**
-     * The projects "On" offers, by the handle runs hold them by (`things#1`): the list the runs name, or `things`, read
-     * whole, its name field said and its hue kept for the dot.
+     * The projects "On" offers, by the handle runs hold them by (`<list>#1`): the list the runs name and every list the
+     * tab has learnt declares `scopes`, never one named here, read whole, its title field said and its hue kept for the
+     * dot.
      */
-    async projects(rows: readonly LiveRun[], lists: readonly string[] = []): Promise<Map<string, Project>> {
-      const registers = [...new Set([...rows.map((r) => r.project?.split('#')[0] ?? null), ...lists].filter((x): x is string => !!x))];
-      if (registers.length === 0) registers.push('things');
+    async projects(rows: readonly LiveRun[]): Promise<Map<string, Project>> {
+      const declared = Object.values(REGISTERS)
+        .filter((d) => (d as { scopes?: unknown }).scopes !== undefined)
+        .map((d) => d.id);
+      const registers = [...new Set([...rows.map((r) => r.project?.split('#')[0] ?? null), ...declared].filter((x): x is string => !!x))];
       const out = new Map<string, Project>();
       for (const register of registers) {
         const got = await c.list({ register, limit: 100 });
@@ -507,7 +511,8 @@ export function control(base: string, io?: Fetch) {
         const listed = (got.value as { rows?: { seq: number | null; fields: Record<string, unknown>; state?: string | null }[] }).rows ?? [];
         for (const row of listed) {
           if (row.seq === null || row.fields.draft === true) continue;
-          const name = [row.fields.name, row.fields.title].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+          const titled = REGISTERS[register]?.title;
+          const name = [titled ? row.fields[titled] : undefined, row.fields.name, row.fields.title].find((v): v is string => typeof v === 'string' && v.trim() !== '');
           if (!name) continue;
           out.set(`${register}#${String(row.seq)}`, { key: `${register}#${String(row.seq)}`, name, hue: typeof row.fields.hue === 'number' ? row.fields.hue : null });
         }
