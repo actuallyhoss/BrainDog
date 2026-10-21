@@ -62,6 +62,7 @@ import { ROUTES as HUES } from './hues.ts';
 import { ROUTES as DECIDER } from './decider.ts';
 import { ROUTES as actionRun } from './action-run.ts';
 import { ROUTES as SHARING } from './sharing.ts';
+import { ROUTES as SCHEMAS } from './schemas.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -115,5 +116,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...DECIDER,
   ...actionRun,
   ...SHARING,
+  ...SCHEMAS,
   /* END ROUTES */
 ];

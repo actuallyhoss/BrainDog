@@ -82,6 +82,7 @@ import { methods as actionRun } from './action-run.ts';
 import { methods as instructions } from './instructions.ts';
 import { methods as agentProfile } from './agent-profile.ts';
 import { methods as sharing } from './sharing.ts';
+import { methods as schemasMethods } from './schemas.ts';
 /* END METHODS */
 
 /**
@@ -249,6 +250,7 @@ export function methods(deps: RecordDeps) {
     ...instructions(deps),
     ...agentProfile(deps),
     ...sharing(deps),
+    ...schemasMethods(deps),
     /* END METHODS */
   };
 }
