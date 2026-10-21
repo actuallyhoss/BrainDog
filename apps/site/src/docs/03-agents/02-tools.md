@@ -6,23 +6,33 @@ Each example below is the tool's name and the arguments it is sent. A row is nam
 
 ## Finding your way
 
-`record_index` says what the record holds: its lists, how many rows each has, its figures and its version. It is the cheap way to learn list names. `context` is the briefing for where the agent is: its session and project, open work, questions waiting on you, people, the keys and servers it may use (by name, never a value), skills and learnings. `schema` gives one list's fields, their types and what each may take, and is worth reading before a write.
+`context` is the first call and the briefing for where the agent is: what you told it, its session and project, open work, questions waiting on you, who else is working, the keys and servers it may use (by name, never a value), skills and learnings. `record_index` says what the record holds: its lists, how many rows each has, its figures and its version. It is the cheap way to learn list names. Given a list, it answers that list's fields, their types and what each may take, which is worth reading before a write.
 
 ```code | text
-record_index {}
 context {}
-schema {"register": "tasks"}
+record_index {}
+record_index {"register": "tasks"}
+```
+
+## What you told it
+
+`instructions` is how an agent answers what you tell it from the app. With nothing sent it reads what is waiting for it; `take` claims one so no other agent starts on it; `reply` answers it with what was said and how it ended: done, needs you, or declined. `context` puts what you told it first, so an agent sees it before anything else.
+
+```code | text
+instructions {}
+instructions {"take": "IN4"}
+instructions {"reply": "IN4", "said": "Sent the March invoices.", "state": "done"}
 ```
 
 ## Reading rows
 
-`get` reads one row or one figure. `list` reads the rows of one list, newest first, 20 unless `limit` asks for up to 500, narrowed by a predicate and paged with the `cursor` the last answer gave. Long text is cut at 280 characters and the row says so; name the field in `fields` to have it whole. `search` finds rows whose words match across every list the agent can see, up to 100. `history` gives the writes that made one row, in order, each with who and when.
+`get` reads one row or one figure. `list` reads the rows of one list, newest first, 20 unless `limit` asks for up to 500, narrowed by a predicate and paged with the `cursor` the last answer gave. Long text is cut at 280 characters and the row says so; name the field in `fields` to have it whole. `search` finds rows whose words match across every list the agent can see, up to 100. `get` with `history` also gives the writes that made the row, in order, each with who and when.
 
 ```code | text
 get {"spoken": "tasks#41"}
 list {"register": "tasks", "where": {"field": "state", "is": "open"}, "limit": 50}
 search {"q": "invoice march"}
-history {"spoken": "tasks#41"}
+get {"spoken": "tasks#41", "history": true}
 ```
 
 ## Catching up
