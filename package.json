@@ -7,7 +7,7 @@
     "node": ">=24.13"
   },
   "scripts": {
-    "test": "pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs && node --test tools/people/test/*.test.mjs && node --test tools/people/expect/*.test.mjs",
+    "test": "pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs && node --test tools/people/test/*.test.mjs && node --test tools/people/expect/*.test.mjs && node --test tools/agent-bench/test/*.test.mjs",
     "typecheck": "pnpm -r run typecheck",
     "gates": "node tools/gates/run.mjs",
     "release": "node tools/release.mjs",
