@@ -103,8 +103,14 @@ const list = (folder: string): string[] => {
   }
 };
 
-/** The files a sign-in or a private key is kept in, by name. */
+/** The files a sign-in or a private key is kept in, by name: a refusal list, which the `no-login` gate allows. */
 const SIGN_IN_FILE = /^(?:\.?credentials\.json|auth\.json|\.netrc|\.npmrc|\.pypirc|id_(?:rsa|dsa|ecdsa|ed25519))$|\.(?:pem|key|p12|pfx|jks|keystore)$/i;
+
+/**
+ * The agent apps' own sign-ins, which the inventory names by `stat` alone and refuses: a Claude Code profile's file and
+ * Codex's. A refusal list too, and the one place in the command they are named (`tools/gates/no-login.mjs`).
+ */
+const SIGN_INS = { profile: '.credentials.json', codex: 'auth.json' } as const;
 /** Words in a name that say a key may be inside, whatever the file. */
 const KEY_WORDS = new Set(['key', 'keys', 'apikey', 'secret', 'secrets', 'password', 'passwords', 'passwd', 'credential', 'credentials']);
 /** Words that say the same of a file of data, and not of a program, which handles a sign-in rather than keeping one. */
@@ -210,8 +216,8 @@ export const runGit: Git = (cwd, args) =>
 /** How many repositories git reads at once: a walk of each working tree is most of the wait, and they overlap. */
 const AT_ONCE = 8;
 
-/** `f` over every one of `all`, `n` at a time, the answers in their order. */
-async function eachAtOnce<T, R>(all: T[], n: number, f: (x: T) => Promise<R>): Promise<R[]> {
+/** `f` over every one of `all`, `n` at a time, the answers in their order. `env check` runs its lists the same way. */
+export async function eachAtOnce<T, R>(all: T[], n: number, f: (x: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
   let next = 0;
   const one = async (): Promise<void> => {
@@ -322,12 +328,12 @@ export async function planInventory(seen: InventorySeen): Promise<Inventory> {
   const { repos, env: ignored } = await reposIn(under, seen.git ?? runGit);
   items.push(...ignored);
   for (const dir of seen.profiles) {
-    const credentials = join(dir, '.credentials.json');
+    const credentials = join(dir, SIGN_INS.profile);
     if (once(credentials)) signIn(credentials, home, refused);
     const cache = join(dir, 'plugins', 'cache');
     if (isFolder(cache) && once(cache)) refused.push({ path: shown(cache, home), why: 'plugin-cache', ...measure(cache) });
   }
-  signIn(join(env.CODEX_HOME || join(home, '.codex'), 'auth.json'), home, refused);
+  signIn(join(env.CODEX_HOME || join(home, '.codex'), SIGN_INS.codex), home, refused);
   return { items, refused, repos, under: under.map((folder) => shown(folder, home)), skills: record.read ? { from: 'record' } : { from: 'lock', why: record.why } };
 }
 

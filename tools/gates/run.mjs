@@ -213,6 +213,9 @@ const GATES = [
   ['board-yes', call(join(here, 'board-yes.mjs'))],
   /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10, his "transcripts never read"): a hook or package naming transcript_path or opening a client's session folder. */
   ['no-transcript', call(join(here, 'no-transcript.mjs'))],
+  /* AND NO AGENT APP'S LOGIN IS NAMED (docs/48 §8): Claude Code's keychain item or file, the claude.ai login, or Codex's
+     file, anywhere but a refusal list the gate names. */
+  ['no-login', call(join(here, 'no-login.mjs'))],
   /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO (PRF-B03): a budget never rises unless the owner is quoted, a debt
      only falls, a held list only shrinks, and a number written in a gate file is a debt. Beside the other source gates
      because it reads files and needs nothing built. */

@@ -1,0 +1,8 @@
+{
+  "gate": "no-login",
+  "rule": "a command source that names an agent app's login file outside a refusal list",
+  "expect": "names Claude Code's login file",
+  "findings": 1,
+  "total": 1,
+  "why": "An agent app's own login is never held, read or moved. One line of code joins a profile's .credentials.json to open it and is the one finding. The same names in comments, in a test, and in the two refusal lists sync.ts keeps are no finding, so the gate is shown to read code, to allow a refusal list it names and nothing else."
+}

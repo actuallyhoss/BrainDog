@@ -478,6 +478,7 @@
     "tools/gates/commits.mjs": { "owes": "proof", "file": "tools/gates/commits.mjs", "lines": [ { "at": 4, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; and the five fields of one commit as git log prints them, said three times." } ] },
     "tools/gates/hygiene.mjs": { "owes": "proof", "file": "tools/gates/hygiene.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/sight.mjs": { "owes": "sharing", "file": "tools/gates/sight.mjs", "lines": [ { "at": 1, "on": "2026-10-20", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
+    "tools/gates/no-login.mjs": { "owes": "agents", "file": "tools/gates/no-login.mjs", "lines": [ { "at": 1, "on": "2026-10-22", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/catalogue-immutable.mjs": { "owes": "proof", "file": "tools/gates/catalogue-immutable.mjs", "lines": [ { "at": 1, "on": "2026-10-13", "why": "The twelve characters of a checksum a finding says, enough to tell the released one from the one in the tree. No budget holds it." } ] },
     "tools/gates/first-screen.mjs": { "owes": "proof", "file": "tools/gates/first-screen.mjs", "lines": [ { "at": 2, "on": "2026-10-14", "why": "The 1000 that says the walk's wait in seconds in a finding, and exit 3 for a tree that holds no people, as no-transcript.mjs writes it." } ] },
     "tools/gates/no-shape-files.mjs": { "owes": "proof", "file": "tools/gates/no-shape-files.mjs", "lines": [ { "at": 7, "on": "2026-10-09", "why": "The 4096 bytes of a file's head the mark is looked for in, the 8000 bytes read to tell a binary file, the four lines the mark may sit on, git's 64 MiB listing buffer, and exit 3 for a gate that read nothing." } ] },
@@ -552,6 +553,11 @@
     "sight.ALLOWED": {
       "lines": [
         { "count": 46, "on": "2026-10-20", "why": "The record's reads of rows that sit behind no sight check, each with its reason by file and function: the sight module itself, the record's own nightly and Slash paths read as NOBODY, the owner's and the decider's, reads that answer no row, and two write paths not yet held to the row. Sharing slice 3 completed the list and turned the gate on; an entry goes when its site is gated." }
+      ]
+    },
+    "no-login.ALLOWED": {
+      "lines": [
+        { "count": 2, "on": "2026-10-22", "why": "The refusal lists that may name an agent app's login, each a const of data by file and name: sync.ts's SIGN_IN_FILE, the file names sync inventory refuses to carry, and SIGN_INS, the two sign-ins it sizes by stat and refuses. A list goes when its file stops naming one." }
       ]
     }
   },
