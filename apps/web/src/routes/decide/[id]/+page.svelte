@@ -945,7 +945,9 @@
        it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
        the trivia the reset took out (DIRECTION §39). -->
   <div class="q-head">
-    <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} actions={!settled && me.owner ? whoMore : undefined} />
+    <!-- NO SENTENCE, SO NONE IS HELD: the head's empty line held while the page read and then went, moving the question up
+         56px on a phone. -->
+    <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} sentence="" actions={!settled && me.owner ? whoMore : undefined} />
   </div>
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>

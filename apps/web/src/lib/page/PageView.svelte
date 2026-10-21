@@ -662,6 +662,7 @@
     count={declared?.count?.value}
     title={live.page.page.title}
     headless={projectPage && !arranging && !showSource}
+    sentence={projectPage ? '' : undefined}
     define={headlined ? undefined : 'page'}
     below={headBelow ? declaredBelow : undefined}
   >
