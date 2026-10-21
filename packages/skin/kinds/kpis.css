@@ -31,14 +31,20 @@
 
   /* ── words ── */
 
+  /* A NAME IS THE PERSON'S OWN AND TAKES TWO LINES before it loses its end: on a phone "Revenue a month" was cut to
+     "Revenue a ...", which says nothing. Past two it ends in an ellipsis. */
   .kpi-name {
+    display: -webkit-box;
     overflow: hidden;
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     line-height: 20px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .kpi-figure {
@@ -550,10 +556,25 @@
   }
 
   .kpi-who .kpi-name {
+    flex: 0 1 auto;
+    min-inline-size: 0;
     color: var(--ink-3);
     font-size: inherit;
     font-weight: inherit;
     line-height: inherit;
+  }
+
+  /* A NAME ON TWO LINES KEEPS THE DOT AND THE PROJECT ON ITS FIRST. */
+  :is(.kpi-who, .kpi-open):has(> .kpi-name) {
+    align-items: flex-start;
+  }
+
+  :is(.kpi-who, .kpi-open):has(> .kpi-name) > .kpi-swatch {
+    margin-block-start: 5px;
+  }
+
+  :is(.kpi-who, .kpi-open) > .kpi-project {
+    flex: none;
   }
 
   .kpi-row .kpi-figure {

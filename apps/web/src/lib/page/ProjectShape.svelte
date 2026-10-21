@@ -372,7 +372,7 @@
         {#each figs as f (f.key)}
           <li class="h-fig" data-arrived={arrived.has(`hero:${f.key === 'open' ? 'along' : f.key}`) ? '' : undefined}>
             {#if f.key === 'kpi'}
-              <span class="k" dir="auto">{f.kpi.name}</span>
+              <span class="k k-kpi" dir="auto">{f.kpi.name}</span>
               <span class="v num" aria-label={f.kpi.sentence}>{f.kpi.figure}</span>
               {#if f.kpi.line}
                 <svg class="trace" data-stale={f.kpi.stale ? '' : undefined} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"
@@ -692,6 +692,21 @@
     white-space: nowrap;
   }
 
+  /* A KEY NUMBER'S NAME IS THE PERSON'S OWN AND HAS NO SHORT FORM, so on a phone it wraps to two lines where it was cut
+     to "Revenue a ...". Every label in the row then holds two lines, so the figures under them still share a baseline. */
+  .k-kpi {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .h-figs:has(.k-kpi) .k {
+    min-block-size: 36px;
+  }
+
   .k .long {
     display: none;
   }
@@ -833,6 +848,11 @@
     .h-fig {
       min-block-size: 112px;
       padding: 14px 16px;
+    }
+
+    /* WIDE, A NAME HAS ITS LINE: no second one is held under the labels. */
+    .h-figs:has(.k-kpi) .k {
+      min-block-size: 0;
     }
 
     .k .long {
