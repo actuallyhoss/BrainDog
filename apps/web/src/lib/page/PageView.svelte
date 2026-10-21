@@ -48,7 +48,8 @@
   import ShareMenu from '$lib/ui/ShareMenu.svelte';
   import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import type { Subject } from '$lib/sharing/share-state.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
+  import { canShare } from '$lib/sharing/may-share.ts';
+  import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
@@ -216,6 +217,9 @@
   });
   /* WHAT THE PAGE IS ABOUT, SHARED WITH PEOPLE (sharing plan §3.1): a project's page shares the project, everything
      that names it; a page about any other row shares that row. */
+  /* WHO MAY SHARE, as `ShareLazy` asks it: an owner or an Admin, and never while the record is seen as somebody. */
+  const sharable = $derived(seeingAs() === null && canShare((route.data as { me?: Parameters<typeof canShare>[0] }).me));
+  let sharingOpen = $state(false);
   const sharing = $derived.by((): Subject | null => {
     if (!about) return null;
     const projects = (REGISTERS[about.register] as { scopes?: unknown } | undefined)?.scopes !== undefined;
@@ -690,7 +694,9 @@
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <!-- EDIT DETAILS IS THE ⋯ MENU'S FIRST ROW ON A PROJECT (proj F7, VERIFY H13): a button of its own made the phone
              head three controls wide, beside Share and the menu. -->
-        <ShareMenu {slug} />
+        <!-- SHARE WITH PEOPLE IS SHARE'S FIRST CHOICE, for an owner or an Admin (sharing plan §3.1), so the head stays two. -->
+        <ShareMenu {slug} people={sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={copy.shareWithPeopleOpen} />
+        {#if sharing && sharable}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         <ChangePage
           {slug}
           title={live.page.page.title}

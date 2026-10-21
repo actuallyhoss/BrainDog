@@ -3,8 +3,9 @@
   thing about the whole record and not one screen of it. Billing lapsed (`LapseLine`) and offline (`Pull`) are the two.
 
   ONE SHAPE: 48 tall at least, 12 by 16 in, radius 12, inset by the gutter, filled by what it means: `late` is
-  `--red-tint` with a `--red` glyph (it needs him), `warn` is `--warn-tint` with a `--warn` glyph. The words are 15 in
-  ink, the actions at the end edge, a primary first. No shadow and no tile: it is a fill on the board.
+  `--red-tint` with a `--red` glyph (it needs him), `warn` is `--warn-tint` with a `--warn` glyph, and `note` is the
+  tile's own fill with a `--ink-2` glyph, for a line that tells and asks nothing (a share's first open). The words are 15
+  in ink, the actions at the end edge, a primary first. No shadow and no tile: it is a fill on the board.
 
   IT ENTERS WITH THE PAGE and never animates on its own, so nothing moves under a reader's eye after the screen has
   settled. On a phone the actions go under the words, full width, at the thumb's height.
@@ -20,7 +21,7 @@
     children,
     actions,
   }: {
-    tone: 'late' | 'warn';
+    tone: 'late' | 'warn' | 'note';
     icon: IconName;
     children: Snippet;
     actions?: Snippet | undefined;
@@ -62,6 +63,12 @@
     background: var(--warn-tint);
   }
 
+  .banner[data-tone='note'] {
+    --banner-glyph: var(--ink-2);
+
+    background: var(--tile);
+  }
+
   .banner-text {
     display: flex;
     flex: 1 1 30ch;
@@ -95,6 +102,11 @@
   /* A BUTTON ON THE TINT IS THE TILE'S COLOUR, so the quiet one still reads as a control on red or amber. */
   .banner .banner-actions :global(.btn[data-weight='quiet']) {
     --btn-fill: var(--tile);
+  }
+
+  /* ON THE TILE'S OWN FILL, a step under it, as on any tile. */
+  .banner[data-tone='note'] .banner-actions :global(.btn[data-weight='quiet']) {
+    --btn-fill: var(--tile-2);
   }
 
   /* ON A PHONE THE ACTIONS ARE FULL-WIDTH ROWS UNDER THE WORDS, at the touch height, so neither is a narrow button

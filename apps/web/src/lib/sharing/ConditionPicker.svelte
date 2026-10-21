@@ -164,8 +164,8 @@
   }
 
   .cond-is {
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
   }
 
   .cond-out {
@@ -177,20 +177,20 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: pointer;
   }
 
   .cond-out:hover,
   .cond-out:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
   .cond-need {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   @media (pointer: coarse) {

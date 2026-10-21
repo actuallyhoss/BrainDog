@@ -13,6 +13,10 @@
   reads the record's own sentence for that (`shareable` is ADMIN, as `openShare` is), rather than this guessing at a
   level it does not read. "Share as a template" is offered either way.
 
+  "SHARE WITH PEOPLE" IS THE SAME CONTROL'S FIRST CHOICE when the page can be shared with somebody (sharing plan §3.1):
+  the button becomes a menu of three, With people, A read-only link and As a template, so the page head stays Share and
+  "⋯" (2.A.20) and never grows a third control. `people` is the page's way to the Share sheet; absent, it is the button.
+
   "SHARE AS A TEMPLATE" LIVES IN THE SAME SHEET, so the page head keeps its one line. It reads the page as the
   record stores it, makes a pack of that page alone (`lib/market/template.ts`), and says what the pack adds, what it
   reads, what it calls out to and the page as drawn now, before Download or Publish. Publishing sends the file to the
@@ -32,11 +36,12 @@
   import { linkOf, openLink, daysSaid, readShareable, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import Menu from './Menu.svelte';
   import Segmented from './Segmented.svelte';
   import Sheet from './Sheet.svelte';
   import { toasts } from './toast.svelte.ts';
 
-  let { slug }: { slug: string } = $props();
+  let { slug, people, peopleLabel }: { slug: string; people?: (() => void) | undefined; peopleLabel?: string | undefined } = $props();
 
   let open = $state(false);
   let days = $state<number>(SHARE_DAYS_DEFAULT);
@@ -154,10 +159,19 @@
   }
 </script>
 
-<Button onclick={show}>
-  <Icon name="link" size="s" />
-  {words.shareOpen}
-</Button>
+{#if people}
+  <Menu label={words.shareOpen} align="end">
+    {#snippet trigger()}<span class="share-trigger"><Icon name="link" size="s" />{words.shareOpen}</span>{/snippet}
+    <button type="button" role="menuitem" data-share-people onclick={() => people?.()}><Icon name="user-plus" size="s" />{peopleLabel ?? words.shareOpen}</button>
+    <button type="button" role="menuitem" onclick={show}><Icon name="link" size="s" />{words.shareTitle}</button>
+    <button type="button" role="menuitem" onclick={() => { show(); void asTemplate(); }}><Icon name="doc" size="s" />{templateWords.open}</button>
+  </Menu>
+{:else}
+  <Button onclick={show}>
+    <Icon name="link" size="s" />
+    {words.shareOpen}
+  </Button>
+{/if}
 
 <Sheet bind:open title={mode === 'template' ? templateWords.title : can.state === 'yes' ? words.shareTitle : words.shareOpen} onclose={forget}>
   <div class="share">
@@ -249,6 +263,49 @@
 </Sheet>
 
 <style>
+  /* THE MENU'S TRIGGER DRAWN AS THE QUIET BUTTON IT REPLACES: the tile's fill, radius 8, the glyph and the word at 14
+     medium. Under 900px the page head draws it as the glyph alone in a 44px square, as it does every glyph button, and
+     the word stays in it at no size as its name. */
+  .share-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+    white-space: nowrap;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger:hover > .share-trigger) {
+      background: var(--hover);
+    }
+  }
+
+  @media (width < 900px) {
+    .share-trigger {
+      inline-size: var(--tap);
+      min-block-size: var(--tap);
+      padding: 0;
+      gap: 0;
+      background: none;
+      font-size: 0em;
+    }
+
+    .share-trigger :global(.icon[data-size]) {
+      inline-size: var(--icon-l);
+      block-size: var(--icon-l);
+    }
+  }
+
   .share {
     display: grid;
     gap: var(--sp-3);

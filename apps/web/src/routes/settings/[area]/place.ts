@@ -108,7 +108,8 @@ export const MOVED: ReadonlyMap<string, string> = new Map([
   ['recovery', 'signing-in'],
   ['sessions', 'signing-in'],
   ['pages', 'navigation'],
-  ['sharing', 'people'],
+  /* BY ITS ADDRESS, as every area here is (`area` above): the area's id is the address less `/settings/`. */
+  ['sharing', '/settings/people'.slice(AREA_AT.length)],
 ]);
 
 /** The area an id names, a moved one by where it lives now. */

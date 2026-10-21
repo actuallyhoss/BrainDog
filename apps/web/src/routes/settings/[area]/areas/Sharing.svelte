@@ -23,7 +23,7 @@
   import { may } from '$lib/record/may.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -202,7 +202,7 @@
 {#snippet bunchOf(b: Bunch, ended: boolean)}
   <li class="bunch">
     <h3 class="bunch-name" dir="auto">
-      <Icon name={b.kind === 'group' ? 'users' : 'user'} size="s" />
+      <Icon name={b.kind === 'group' ? 'user-plus' : 'user-check'} size="s" />
       <span>{b.name}</span>
     </h3>
     <ul class="shares">
@@ -216,7 +216,7 @@
             <!-- THE ONE QUESTION, IN PLACE OF THE SENTENCE IT IS ABOUT: Stop ends it at once, Keep leaves it. -->
             <p class="share-ask" role="alert">{said.ask}</p>
             <div class="share-do">
-              <Button tone="bad" disabled={busy} aria-busy={busy} onclick={() => void stop(r)}>{copy.sharingStop}</Button>
+              <Button weight="primary" tone="bad" disabled={busy} aria-busy={busy} onclick={() => void stop(r)}>{copy.sharingStop}</Button>
               <Button weight="quiet" disabled={busy} onclick={() => (asking = null)}>{copy.sharingKeep}</Button>
             </div>
           {:else}
@@ -271,19 +271,19 @@
   <!-- A host with no sharing: People is the whole of it. -->
 {:else if !team}
   {#if refused !== null}
-    <Section title={copy.sharingYouCanSee}><Empty kind="error" title={refused} /></Section>
+    <Tile icon="eye" title={copy.sharingYouCanSee}><Empty kind="error" title={refused} /></Tile>
   {:else if mine !== null && mine.length > 0}
-    <Section title={copy.sharingYouCanSee} count={mine.length}>
+    <Tile icon="eye" title={copy.sharingYouCanSee} count={mine.length}>
       <ul class="shares">
         {#each mine as m (m.id)}<li class="share"><p class="share-said">{m.sentence}</p></li>{/each}
       </ul>
-    </Section>
+    </Tile>
   {/if}
 {:else if refused !== null}
-  <Section title={copy.sharingShared}><Empty kind="error" title={refused} /></Section>
+  <Tile icon="link" title={copy.sharingShared}><Empty kind="error" title={refused} /></Tile>
 {:else if rows !== null}
-  <Section title={copy.sharingShared} count={liveCount}>
-    {#snippet aside()}
+  <Tile icon="link" title={copy.sharingShared} count={liveCount || undefined}>
+    {#snippet actions()}
       <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
     {#if sections.shared.length === 0}
@@ -291,25 +291,25 @@
     {:else}
       <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
-  </Section>
+  </Tile>
 
-  <Section title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0)}>
+  <Tile icon="clock" title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0) || undefined}>
     <p class="hint">{copy.sharingWaitingLead}</p>
     {#if sections.waiting.length === 0}
       <p class="none">{copy.sharingNoneWaiting}</p>
     {:else}
       <ul class="bunches">{#each sections.waiting as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
-  </Section>
+  </Tile>
 
-  <Section title={copy.sharingGroups} count={groups?.length ?? 0}>
+  <Tile icon="user-plus" title={copy.sharingGroups} count={groups?.length || undefined}>
     {#if (groups ?? []).length === 0}
       <Empty kind="no-data-yet" title={copy.sharingNoGroups} body={copy.sharingNoGroupsBody} />
     {:else}
       <ul class="bunches">
         {#each groups ?? [] as g (g.id)}
           <li class="bunch group">
-            <h3 class="bunch-name" dir="auto"><Icon name="users" size="s" /><span>{g.name}</span></h3>
+            <h3 class="bunch-name" dir="auto"><Icon name="user-plus" size="s" /><span>{g.name}</span></h3>
             <p class="share-when">{copy.sharingGroupSize(g.people.length)} · {copy.sharingGroupHolds(g.shares)}</p>
             {#if g.people.length > 0}
               <ul class="shares">
@@ -335,7 +335,7 @@
             {#if retiring === g.id}
               <p class="share-ask" role="alert">{copy.sharingGroupRetireAsk(g.name)}</p>
               <div class="share-do">
-                <Button tone="bad" disabled={busy} aria-busy={busy} onclick={() => void retire(g)}>{copy.sharingGroupRetire}</Button>
+                <Button weight="primary" tone="bad" disabled={busy} aria-busy={busy} onclick={() => void retire(g)}>{copy.sharingGroupRetire}</Button>
                 <Button weight="quiet" disabled={busy} onclick={() => (retiring = null)}>{copy.sharingKeep}</Button>
               </div>
             {:else}
@@ -352,16 +352,16 @@
         <Button type="submit" weight="quiet" disabled={busy || !groupName.trim()}>{copy.sharingGroupMake}</Button>
       </div>
     </form>
-  </Section>
+  </Tile>
 
-  <Section title={copy.sharingEnded} count={sections.ended.reduce((n, b) => n + b.rows.length, 0)}>
+  <Tile icon="history" title={copy.sharingEnded} count={sections.ended.reduce((n, b) => n + b.rows.length, 0) || undefined}>
     <p class="hint">{copy.sharingEndedLead}</p>
     {#if sections.ended.length === 0}
       <p class="none">{copy.sharingNoneEnded}</p>
     {:else}
       <ul class="bunches">{#each sections.ended as b (b.key)}{@render bunchOf(b, true)}{/each}</ul>
     {/if}
-  </Section>
+  </Tile>
 
   {#if seenOf}
     <Sheet bind:open={seenOpen} title={copy.sharingSeenTitle(seenOf.name)} subtitle={copy.sharingSeenLead}>
@@ -398,7 +398,7 @@
 
   .see-as-label {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -411,8 +411,8 @@
   .none {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .see-as .hint {
@@ -424,7 +424,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    font-weight: var(--fw-semi);
+    font-weight: 600;
   }
 
   .bunches,
@@ -445,7 +445,7 @@
     gap: var(--sp-2);
     margin: 0 0 var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     overflow-wrap: anywhere;
   }
@@ -468,7 +468,7 @@
     inset-block-start: 0;
     inset-inline: 0;
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .share-open {
@@ -487,7 +487,7 @@
   .share-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 20px;
     overflow-wrap: anywhere;
   }
@@ -503,20 +503,20 @@
   }
 
   .share[data-ended] .share-said {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .share-when {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .share-ask {
     flex: 1 1 100%;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 

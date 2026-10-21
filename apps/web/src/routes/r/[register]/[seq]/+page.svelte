@@ -112,6 +112,8 @@
   import HandSheet from '$lib/ui/HandSheet.svelte';
   import MergeSheet from '$lib/ui/MergeSheet.svelte';
   import ShareLazy from '$lib/sharing/ShareLazy.svelte';
+  import { canShare } from '$lib/sharing/may-share.ts';
+  import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
   import { may } from '$lib/record/may.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
@@ -627,6 +629,9 @@
   /* "MERGE WITH ANOTHER PERSON", in the menu of a row of the list that keeps people: the other one is picked in a sheet and
      the record puts the question to Decide. Only where the caller may change the row, as Archive is. */
   let mergeOpen = $state(false);
+  /* SHARING THIS ROW, an owner's or an Admin's, and never while the record is seen as somebody (sharing plan §3.1). */
+  let sharingOpen = $state(false);
+  const sharable = $derived(seeingAs() === null && canShare((page.data as { me?: Parameters<typeof canShare>[0] }).me));
   const mergeable = $derived(changes && !archived && decl?.meets !== undefined);
   let people = $state<ReadonlyMap<string, string>>(new Map());
   let namesAsked = false;
@@ -1246,9 +1251,10 @@
       {#if live && !archived}
         <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
       {/if}
-      <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin (sharing plan §3.1). -->
+      <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin (sharing plan §3.1), from the
+           head's "⋯", so the head keeps its primary and its "⋯" (2.A.20). -->
       {#if live && !archived}
-        <ShareLazy subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} trigger={copy.shareOpen} />
+        <ShareLazy bind:open={sharingOpen} subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} />
       {/if}
       <!-- THE HEAD'S "…", LAST: the row's link, Archive, and Edit where the primary is the finishing verb. A 36px square in the buttons' shape, named for a screen reader by the
            hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->
@@ -1263,6 +1269,7 @@
           {/snippet}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
+          {#if live && !archived && sharable}<button type="button" class="mi" role="menuitem" data-share-row onclick={() => (sharingOpen = true)}>{copy.shareOpen}</button>{/if}
           <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
           {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
           {#if mergeable}<button type="button" class="mi" role="menuitem" data-merge onclick={() => (mergeOpen = true)}>{copy.mergeWith}</button>{/if}

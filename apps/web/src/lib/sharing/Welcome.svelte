@@ -5,15 +5,16 @@
   ONLY FOR A GUEST: a person whose access shares made (`me.grant`) and who holds no role on the whole record. An owner, a
   member and an agent are never asked. The sentence is the record's (`myShares`, `welcome`), said to them by name.
 
-  IN THE FLOW, AS THE LAPSE BANNER IS: it sits over the screen and pushes it down, so it never covers the tab bar.
+  THE ONE BANNER (`Banner.svelte`, 2.A.17) on its quiet note fill, in the flow as the lapse line is: it pushes the screen
+  down and never covers the tab bar.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { untrack } from 'svelte';
+  import Banner from '$lib/ui/Banner.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
   import { markWelcomed, readMine, welcomed, welcomeOf, type MyShare } from './sharing.ts';
 
   let { shell }: { shell: Shell } = $props();
@@ -43,48 +44,8 @@
 </script>
 
 {#if shown}
-  <div class="welcome" role="status">
-    <p class="welcome-text">
-      <span class="welcome-glyph"><Icon name="link" size="s" /></span>
-      <span>{shown.welcome}</span>
-    </p>
-    <Button weight="quiet" onclick={close}>{copy.sharingWelcomeClose}</Button>
-  </div>
+  <Banner tone="note" icon="link">
+    {shown.welcome}
+    {#snippet actions()}<Button weight="quiet" onclick={close}>{copy.sharingWelcomeClose}</Button>{/snippet}
+  </Banner>
 {/if}
-
-<style>
-  /* A TILE ON THE GROUND, over whatever screen is open, inside the work's own gutter, as the lapse line is. */
-  .welcome {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2) var(--sp-3);
-    margin: var(--inset) var(--gutter) 0;
-    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e1);
-    color: var(--ink);
-  }
-
-  .welcome-text {
-    display: flex;
-    flex: 1 1 30ch;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    margin: 0;
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-  }
-
-  .welcome-glyph {
-    flex: none;
-    color: var(--dim);
-  }
-
-  .welcome :global(.btn) {
-    min-block-size: var(--tap);
-  }
-</style>

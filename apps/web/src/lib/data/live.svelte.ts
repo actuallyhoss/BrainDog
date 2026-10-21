@@ -22,6 +22,8 @@ import { endedBy, poller, regranted, Wait, type LiveState, type Visibility } fro
 /* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
    predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
 const localTab = () => import('./local-tab.ts');
+/** The local copy wiped, through the reader that arrives after the shell. */
+const wipeLocal = (): Promise<void> => localTab().then((m) => m.wipeLocal());
 import { forget, hear, keep } from './offline.ts';
 
 /**
@@ -76,7 +78,7 @@ async function reboot(): Promise<void> {
  */
 function end(said: string): void {
   void forget().catch(() => undefined);
-  void localTab().then((m) => m.wipeLocal());
+  void wipeLocal();
   void import('$lib/record/boot-live.ts').then((m) => m.forget(), () => undefined);
   live.ended = { said };
   following?.stop();
@@ -124,7 +126,7 @@ function asker(base: string): () => Promise<number> {
          page the worker does not control yet (the first visit, before it claims the tab). */
       if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') {
         void forget().catch(() => undefined);
-        void localTab().then((m) => m.wipeLocal());
+        void wipeLocal();
       }
       /* A PERSON WHOSE ACCESS ENDED IS TOLD SO, within one poll of the share stopping: 1.5 s on a focused tab. */
       if ('refusal' in out && endedBy(out.refusal)) end(out.refusal.fix);
