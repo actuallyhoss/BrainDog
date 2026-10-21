@@ -60,7 +60,7 @@ export function extension(parts: KernelParts) {
     async changeVaultWrapping(to: 'passphrase' | 'kek', rewrap: PassphraseRewrap, actor: string): Promise<Result<VaultPassphrase>> {
       const held = recordWrapping(sql);
       if (held === null)
-        return no('NOT_IN_THIS_BUILD', 'This record has no key of its own yet, so there is nothing to put a passphrase on.', { at: 'passphrase' });
+        return no('NOT_IN_THIS_BUILD', 'Keys here have no stored value yet, so there is nothing to lock.', { at: 'passphrase' });
       if (to === 'passphrase' && held.wrapped_by === 'passphrase')
         return no('ALREADY_KNOWN', 'This vault already has a passphrase. Take it off with that passphrase, then set the new one.', { at: 'passphrase' });
       if (to === 'kek' && held.wrapped_by === 'kek')

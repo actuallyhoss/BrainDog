@@ -209,7 +209,7 @@ export const words = {
   slotLabel: (id: string) => `Words for %${id}%`,
   repo: 'Repository',
   repoHelp: 'The name your machine gives the folder it works in. Leave it empty to work in an empty folder.',
-  recordTools: 'Tools on your record',
+  recordTools: 'Connected tools',
   fileTools: 'File tools',
   commands: 'Commands',
   commandsHelp: 'One a line, like git log. A run may use only the commands named here.',
