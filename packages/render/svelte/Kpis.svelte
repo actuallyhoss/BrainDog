@@ -69,6 +69,18 @@
   const hue = (k: KpiView): string | undefined => (k.slot ? `--chart-1:var(--cat-${k.slot})` : undefined);
   const state = (k: KpiView): string | undefined => (k.target?.state === 'off' ? 'off' : k.stale ? 'stale' : undefined);
 
+  /* A CHART DRAWS IN ONLY WHEN IT ARRIVES AFTER THE BLOCK'S FIRST DRAW (the recompose step), and that is decided once,
+     as its element is made (`data-draw`, by an attachment that reads no state). The draw-in starts fully clipped, so a
+     chart drawn with the page and caught at the start of its draw-in was an empty band between the change line and the
+     target line. A chart already drawn never gains it, not even when a re-read hands the same numbers again. */
+  const drawn = { yet: false };
+  $effect(() => {
+    drawn.yet = true;
+  });
+  const drawIn = (el: Element): void => {
+    if (drawn.yet) el.setAttribute('data-draw', '');
+  };
+
   /** Where a share's target sits on its ring, as a short tick across the track. */
   const notch = (mark: string): { x1: string; y1: string; x2: string; y2: string } => {
     const a = (Number(mark) / 100) * 2 * Math.PI;
@@ -145,13 +157,13 @@
   {#if c && c.form === 'ring' && c.ring}
     <svg class="kpi-ring" viewBox="0 0 36 36" role="img" aria-label={k.sentence}>
       <circle class="kpi-ring-track" cx="18" cy="18" r="16" pathLength="100"></circle>
-      <circle class="kpi-ring-arc" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray={c.ring.dash}></circle>
+      <circle class="kpi-ring-arc" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray={c.ring.dash} {@attach drawIn}></circle>
       {#if c.ring.mark !== null}{@const n = notch(c.ring.mark)}<line class="kpi-ring-mark" x1={n.x1} y1={n.y1} x2={n.x2} y2={n.y2}></line>{/if}
     </svg>
   {:else if c && c.form === 'bar' && c.bar}
     <div class="kpi-bar">
       <span class="kpi-track" role="img" aria-label={k.sentence} style="--fill:{c.bar.fill}"
-        ><span class="kpi-fill"></span>{#if c.bar.mark !== null}<span class="kpi-mark" style="--at:{c.bar.mark}"></span>{/if}</span
+        ><span class="kpi-fill" {@attach drawIn}></span>{#if c.bar.mark !== null}<span class="kpi-mark" style="--at:{c.bar.mark}"></span>{/if}</span
       >
       {#if k.target}
         <p class="kpi-bar-said num">
@@ -161,7 +173,7 @@
     </div>
   {:else if c}
     <div class="kpi-plot" data-size={size}>
-      <svg class="kpi-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={k.sentence}>
+      <svg class="kpi-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={k.sentence} {@attach drawIn}>
         {#if c.area}<path class="kpi-area" d={c.area}></path>{/if}
         {#if c.target}<line class="kpi-target-line" x1="0" x2="1000" y1={c.target.y} y2={c.target.y} vector-effect="non-scaling-stroke"></line>{/if}
         <path class="kpi-line" d={c.line} vector-effect="non-scaling-stroke"></path>

@@ -761,15 +761,17 @@
     display: flex;
   }
 
-  /* ── motion: a chart draws in once, left to right, in the recompose step; a reader who asked for less sees it at once ── */
+  /* ── motion: a chart draws in once, left to right, in the recompose step; a reader who asked for less sees it at once ──
+     Only a chart that arrives after the block's first draw carries `data-draw`: a chart drawn with the page is there
+     from its first frame, never an empty band waiting on its draw-in. */
 
   @media (prefers-reduced-motion: no-preference) {
-    .kpi-chart,
-    .kpi-fill {
+    .kpi-chart[data-draw],
+    .kpi-fill[data-draw] {
       animation: kpi-draw var(--d-recompose) var(--ease-out) backwards;
     }
 
-    .kpi-ring-arc {
+    .kpi-ring-arc[data-draw] {
       animation: kpi-fade var(--d-recompose) var(--ease-out) backwards;
     }
   }
