@@ -35,6 +35,8 @@
 
   /** Whether Today has been drawn once in this tab: its tiles come in on the first load only. */
   let enteredOnce = false;
+  /** When this tab last drew Today from the record, so an open while that is kept draws it and not the local copy. */
+  let drewAt = 0;
   /** How long after the first read the tiles still come in, so the desk's late parts land the same way. */
   const ENTER_HELD_MS = 900;
 
@@ -131,7 +133,7 @@
   import Icon from '$lib/ui/Icon.svelte';
 
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
-  import { keepPart, keptPart, tileOnce } from '$lib/home/today-kept.ts';
+  import { keepPart, keptPart, tileOnce, TODAY_KEPT_MS } from '$lib/home/today-kept.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
@@ -347,8 +349,15 @@
   });
   /** The lists the copy put back, learnt again once the record's own Today has drawn. */
   let restored: string[] = [];
-  function drawCopy(slug: string | null, near: Near<KeptBody>): void {
+  /** What the copy holds: Today's page, and the desk and what was handled beside it, so nothing moves when they land. */
+  type CopyBody = KeptBody & { desk?: DeskCards | null; handled?: HandledFound | null };
+  async function drawCopy(slug: string | null, near: Near<CopyBody>): Promise<void> {
     if (got !== null || declares !== slug || near.value.got.from !== 'live') return;
+    /* THE DESK'S OWN PART FIRST, so the page and the desk above it are drawn in one frame. */
+    const part = near.value.desk !== undefined && desk === null ? await import('./Desk.svelte').catch(() => null) : null;
+    if (got !== null || declares !== slug) return;
+    if (part && desk === null) desk = { cards: near.value.desk ?? null, Part: part.default };
+    if (near.value.handled !== undefined && handled === null) handled = near.value.handled;
     got = near.value.got;
     news = near.value.news;
     newLines = near.value.news?.lines ?? [];
@@ -376,17 +385,18 @@
       const before = new Set(Object.keys(REGISTERS));
       /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
       if (data.lists.every((l) => REGISTERS[l.id] !== undefined)) looked = true;
-      if (got !== null) {
+      /* AND WHAT THIS TAB DREW IS NEWER THAN THE COPY: it is drawn from memory (`today-kept.ts`), and the copy is not looked in. */
+      if (got !== null || Date.now() - drewAt < TODAY_KEPT_MS) {
         looked = true;
         return;
       }
       void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/plain.ts')])
         .then(([m, p]) => {
-          const revive = (near: Near<unknown>): Near<KeptBody> => ({ ...near, value: p.revivedOf<KeptBody>(near.value) });
-          return m.nearLocal<unknown>(HOME_COPY, copyKey(slug), apiBase(), (late) => drawCopy(slug, revive(late))).then((near) => (near ? revive(near) : null));
+          const revive = (near: Near<unknown>): Near<CopyBody> => ({ ...near, value: p.revivedOf<CopyBody>(near.value) });
+          return m.nearLocal<unknown>(HOME_COPY, copyKey(slug), apiBase(), (late) => void drawCopy(slug, revive(late))).then((near) => (near ? revive(near) : null));
         })
-        .then((near) => {
-          if (near) drawCopy(slug, near);
+        .then(async (near) => {
+          if (near) await drawCopy(slug, near);
           restored = data.lists.map((l) => l.id).filter((id) => !before.has(id) && REGISTERS[id] !== undefined);
         })
         .catch(() => undefined)
@@ -409,7 +419,8 @@
         if (asOf() !== stamp || data.me.person !== reader || slug !== declares) return;
         ticket = tab.localTicket();
       }
-      tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf({ got: out, news: said }), ticket, {}, { always: true });
+      const kept: CopyBody = { got: out, news: said, desk: untrack(() => desk?.cards ?? null), handled: untrack(() => handled) };
+      tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf(kept), ticket, {}, { always: true });
     });
   }
   /* THE LISTS THE COPY PUT BACK ARE ASKED AGAIN once Today has drawn, off its path, and Today reads again if one moved. */
@@ -496,6 +507,7 @@
         if (ok && out) keepPart('body', key, { got: out, news: null } satisfies KeptBody);
         if (ok) keepNews(before, mine, key);
         if (ok && out) {
+          drewAt = Date.now();
           painted('Today', 'network');
           void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said, at, stamp));
         }
@@ -528,6 +540,7 @@
       if (slug === declares && out?.from === 'live') {
         got = out;
         fromCopy = false;
+        drewAt = Date.now();
         void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said ?? untrack(() => news), at, stamp));
         const key = bodyKey(slug, spoken, held);
         keepPart('body', key, { got: out, news: untrack(() => news) } satisfies KeptBody);
