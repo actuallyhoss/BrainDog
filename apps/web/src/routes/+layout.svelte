@@ -807,6 +807,22 @@
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
+  /* A SCREEN'S FIRST READ IS ASKED WHILE ITS LINK IS HOVERED, FOCUSED OR TOUCHED (`preload.ts`), on a live record only,
+     and loaded after the first paint, so the entry carries none of it. */
+  const readsAhead = $derived(data.live === true && !data.refused);
+  $effect(() => {
+    if (!readsAhead) return;
+    let stop: (() => void) | null = null;
+    let gone = false;
+    void import('$lib/data/preload.ts').then((m) => {
+      if (!gone) stop = m.watch(document);
+    });
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  });
+
   /* OFFLINE, THE SHELL ASKS AGAIN when the browser says it is back and every twenty seconds, since a boot nobody
      reached is never kept: the load that answers draws the record's own shell, and its screens read again. */
   $effect(() => {
