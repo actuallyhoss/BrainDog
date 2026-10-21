@@ -173,12 +173,12 @@ test('A SEALED NIGHT OPENS, VERIFIES AND RESTORES: every table matches the manif
 
 test('--key PINS THE SIGNATURE THROUGH braindog verify: the record’s own key passes, a stranger’s refuses and nothing is restored', async (t) => {
   const n = await night(t);
-  const pinned = await drill([n.copy, '--identity', n.key, '--key', n.publicKey], n.temp);
+  const pinned = await drill([n.copy, '--identity', n.key, `--key=${n.publicKey}`], n.temp);
   assert.equal(pinned.code, 0, `${pinned.stdout}\n${pinned.stderr}`);
   assert.match(pinned.stdout, /pinned/);
 
   const stranger = Buffer.from(await testSigner().publicKey).toString('base64url');
-  const refused = await drill([n.copy, '--identity', n.key, '--key', stranger], n.temp);
+  const refused = await drill([n.copy, '--identity', n.key, `--key=${stranger}`], n.temp);
   assert.equal(refused.code, 1);
   assert.match(refused.stdout, /FAIL/);
   assert.doesNotMatch(refused.stdout, /restored into/);
