@@ -11557,3 +11557,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (Object.hasOwn(kernel, name)) throw new TypeError(`${name} is a kernel method and an extension, and the extension would hide it. Rename the extension.`);
   return { ...kernel, ...added };
 }
+export { kpisSource, type KpiAnswer, type KpiEvery, type KpiPoint } from './sources/kpis.ts';
+export { KPIS_FOR, kpisFault, type KpisFor } from './block-keys.ts';
+export { KPI_BIG_CHANGE, KPI_CHART_POINTS, KPI_KINDS, KPI_LATE_PERIODS, KPI_SOURCES, KPI_STALE_DAYS, KPI_TODAY_MOST, KPI_TODAY_PHONE, KPI_TREND_POINTS } from './kpi-rank.ts';
+export { kpiChart, kpiFix, kpiHeadline, kpiIsMoney, kpiKind, kpiLive, kpiRanked, kpiScore, kpiStale, kpiVerdict, kpisForToday } from './kpi-rank.ts';
+export type { KpiCandidate, KpiChart, KpiChartKind, KpiFix, KpiGood, KpiKind, KpiMoney, KpiNow, KpiPick, KpiRow, KpiSource, KpiStale, KpiState, KpiTargetMark, KpiToday, KpiVerdict, KpiWhy } from './kpi-rank.ts';
