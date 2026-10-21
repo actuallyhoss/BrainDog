@@ -677,7 +677,7 @@
   {#if installed.length > 0}
     <!-- ONE ROW PER ADD-ON: its well, its name, its line and what it holds, its "…" holding Settings, What this adds and
          Uninstall, destructive last, and its switch. In one tile, a hairline between rows. -->
-    <Tile icon="packs" title={words.installedTitle} count={installed.length}>
+    <Tile icon="packs" title={words.installedTitle}>
       <ul class="ledger addons">
         {#each installed as state (state.id)}
           {@const pack = byId.get(state.id)}

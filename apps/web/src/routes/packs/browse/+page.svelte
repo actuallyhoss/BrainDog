@@ -85,6 +85,9 @@
     return u ? miniOf(u, voiced(u)) : null;
   };
   const asGlyph = (name: string | null | undefined): IconName | null => (name && isGlyph(name) ? name : null);
+  /* A USE CASE'S OWN GLYPH WHERE TWO WOULD WEAR ONE (UI pass of 21 October, P44): the guide took Personal's star from its
+     first list, and Solo founder took Small business's grid from its Home. */
+  const KNOWN_BY: Readonly<Record<string, IconName>> = { guide: 'check', founder: 'projects' };
 
   /* A BUILT-IN WEARS THE GLYPH OF THE PLACE IT BRINGS, as its row on /packs does (`glyph.ts`). */
   const modules = new Map(firstPartyModules().map((m) => [m.id, m]));
@@ -160,7 +163,7 @@
                 {@const mini = miniFor(l)}
                 {@const action = states ? actionOf(l, states) : null}
                 {#if mini && mini.tiles.length > 0}
-                  <ListingCard listing={l} {action} glyph={asGlyph(mini.glyph)}>
+                  <ListingCard listing={l} {action} glyph={KNOWN_BY[l.id] ?? asGlyph(mini.glyph)}>
                     {#snippet drawing()}<Mini tiles={mini.tiles} />{/snippet}
                   </ListingCard>
                 {:else}
