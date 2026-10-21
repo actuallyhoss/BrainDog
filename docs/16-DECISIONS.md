@@ -1014,6 +1014,9 @@ and doing the same for every hashed file would make this hygiene rather than loa
 
 ## ADR-044 · Live updates and tier-C dispatch ride a hibernatable WebSocket to the Durable Object
 
+> **Superseded in part (21 October 2026) by [ADR-075](16-DECISIONS.md).** The live-update WebSocket is not built, and
+> an agent hears the record through the pulse. The runner's transport below stands: the claim is the long-poll.
+
 **Decided.** Live updates are a **hibernatable WebSocket on the `Record` object** carrying
 `{ version, registers }`, with 15-second polling of `GET /api/version` as the fallback; the tier-C
 runner's socket terminates on `Slash`. Non-hibernating sockets and SSE are refused on cost — a held
@@ -1737,6 +1740,95 @@ letting Slash sign any look, because the body's `by:` is what stops it signing t
 
 **Would reverse it:** the owner's word. A new kind Slash may sign is one line in `SLASH_MAY`, this decision and
 the query in 30 §3, in the same change.
+
+---
+
+## ADR-073 · What the owner tells an agent is a record of its own, and an agent answers it
+
+**Decided.** An instruction is one row of a kernel register, `instructions`, spoken `IN4`. The owner writes it in the
+app, to a run, to an agent kind on a project or repository, to whoever is next, or on a task. It moves Sent, Seen (by
+which run, and how), Working, then Done, Needs you or Declined, or Expired or Withdrawn. One run takes it, by compare
+and set. The agent answers with the `instructions` tool, and the answer carries what it changed, with Undo.
+
+Delivery has four paths and says so honestly. Every client gets it in `context` and in one line on a tool answer. Claude
+Code also gets hooks that read a local file, and an opt-in channel. A client with no hooks is reached when it next calls
+BrainDog, and the app says which is which. Stop and pause are enforced by the record for every client, and by a hook in
+Claude Code.
+
+**Only a person writes an instruction.** `instruct` refuses a token, so no agent can instruct another, and text an agent
+read in a mail never becomes an order to a second agent.
+
+**Rejected:** a plain tool that returns a message (no states, no taking, no answer); a push-only design (most clients
+cannot receive one); letting agents instruct each other (it opens prompt injection from one agent to the next).
+
+**Would reverse it:** a client protocol with real push that every agent honours, which would make the polling paths
+spare.
+
+---
+
+## ADR-074 · Agent settings are one row per kind of agent, and only the owner changes them
+
+**Decided.** One row of `agent_profile` per kind of agent (`claude`, `codex`, `cursor`, `runner`, `script`), optionally
+bound to a token or machine, and a `default` row for agents no row matches. The nearest match wins. A row sets how far
+the agent may go (read, propose, write), the projects and lists it may change, the tools it has, its brief, quiet hours,
+limits, what to tell the owner on finish, and its context size, stop switch and channel.
+
+The effective level is the lowest of the token's scope, the row and the ladder rung, and the floors (money, keys,
+deletes, sharing) that no row lifts. A tool turned off is not listed, and a call to it is refused `TOOL_OFF` with the
+setting named. New agents start at Suggest. The migration gives each kind his runs have used a row at the scope its token
+holds, so nothing he has now gets narrower.
+
+Only the owner, signed in to a browser, changes a row. Every token is refused `NEEDS_BROWSER_SESSION`. An agent reads its
+own effective row in `whoami`, and never writes it.
+
+`braindog setup` makes one token per agent it wires, so a row bound to a token is a boundary. A row matched on the
+agent's own name is a claim the client makes, and the app labels it "applies by name".
+
+**Rejected:** settings in the agent's own config (the agent could change them); one global setting (Claude and a script
+do not deserve the same reach); a settings tool for agents (an agent would raise its own limits).
+
+**Would reverse it:** per-agent identity that is stronger than a token, which would make "applies by name" go away.
+
+---
+
+## ADR-075 · The pulse replaces the WebSocket for what an agent hears
+
+**Decided.** The bridge calls `pulse` on the record every 15 seconds, and every 5 seconds while a stop or a pause is
+pending. The answer is the run's stamp, what is pending for it and whether it is stopped. The bridge writes it to a local
+file, and the Claude Code hooks read only that file. A pulse writes no version, no event and no history line, so it costs
+about 10 ms in the record and does not wake the app.
+
+This supersedes the WebSocket of [ADR-044](16-DECISIONS.md) for live updates to agents. ADR-044's reasons stand: a held
+connection costs a Durable Object its hibernation, and the app already polls the version every 1.5 seconds. The runner's
+long-poll claim also stands.
+
+The honest latency is at most about 15 seconds plus the next prompt or tool call. The opt-in channel gives seconds, for
+a client that supports it, and is off by default.
+
+**Rejected:** a WebSocket per agent (the cost ADR-044 counted, for a latency no agent asks for); server-sent events (the
+same cost); pulling on every prompt (a network call in front of every prompt, about 400 ms).
+
+**Would reverse it:** the channel leaving research preview and being honoured by more clients, which would make push the
+default.
+
+---
+
+## ADR-076 · The kernel declares one more register, `instructions`
+
+**Decided.** `register.instructions` is the second register the kernel declares, beside `register.session`, with
+`pack_id = 'kernel'`, seated by migration 0042. The rule that the kernel contains no register declaration now has two
+named exceptions, and `no-declarations-in-kernel` reads both from one list. No pack or person may declare it:
+`validate` refuses it as `PROVIDES_CONFLICT` unless it is the kernel's own bytes. [02 §1](02-DATA-MODEL.md) says the same.
+
+**Why.** It is core for the reason `session` is. It is how the owner reaches the runs, so it cannot wait for a pack to be
+installed, and it has one writer. As a plain table it would have needed a tool and a route of its own, and as a register
+it gets spoken ids, lists, transitions and a log for free.
+
+**Rejected:** a pack (an uninstalled pack would leave the owner unable to stop a run); a plain table (no spoken id, no
+history, a second set of routes).
+
+**Would reverse it:** a third register wanting the same exception. A third needs this decision, the gate's list and 02 §1,
+in the same change.
 
 ---
 
