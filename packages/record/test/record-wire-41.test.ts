@@ -67,7 +67,8 @@ test('CONTEXT CARRIES THE CARD, and the ahead header reaches its Next line as co
   assert.equal(here.handoff?.from, left.spoken);
   assert.match(here.next_lines?.[0] ?? '', /, 3 commits since\. Check before acting\.$/u);
   const card = here.card ?? assert.fail('no card');
-  assert.match(card.split('\n')[0]!, /working on|no project yet/u, card);
+  /* AN AGENT'S KEY IS ANSWERED THE PLAN'S CARD (context-plan.ts), whose line one says "No project here." outside one. */
+  assert.match(card.split('\n')[0]!, /working on|No project here\./u, card);
   assert.match(here.card_next ?? '', /Kern the lowercase pairs\. Left by Claude \(S\d+\) 10 min ago, 3 commits since\. Check before acting\./u);
 
   const wild = await context({ ...second, session: { ...second.session, ahead: '12000' } as CallContext['session'] });

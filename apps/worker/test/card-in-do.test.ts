@@ -40,6 +40,11 @@
  * scope's "Done when" says. The sign is not this file's to judge, so no case pins it either way. And a task handed to the
  * agent never reached its Next line on a real record, until the briefing carried the field the list's hand.agent names.
  *
+ * THE AGENTS OVERHAUL (agents and MCP plan §3) GAVE AN AGENT'S KEY THE PLAN'S CARD: no More line (this is context), no
+ * Signs (the app shows them), and the two-sessions warning a line of the card. For a while the record still answered
+ * `card` from `card.ts` and only `plan_card` from the plan, so the start hook printed one card and `context` over `/mcp`
+ * said another, and the two-sessions warning reached the agent only if it called `context`. Now all three are the plan's.
+ *
  * EVERY ANSWER OF 500 OR MORE IS COUNTED, as there.
  */
 
@@ -50,7 +55,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createClient, type Attached, type Client, type Context } from '../../../packages/client/src/index.ts';
-import { wordCount } from '../../../packages/record/src/card.ts';
+import { TWO_SESSIONS, wordCount } from '../../../packages/record/src/card.ts';
+import { PLAN_CARD_LINES } from '../../../packages/record/src/context-plan.ts';
 import { briefing, nextLine } from '../../../apps/cli/src/brief.ts';
 import { sessionHeaders, type Position } from '../../../apps/cli/src/position.ts';
 
@@ -370,7 +376,15 @@ test('A LONG STEP AND THREE QUESTIONS STILL MAKE A BRIEF OF FIVE SHORT LINES, on
   assert.ok(next && next.length <= 100 && next.endsWith('Check before acting.') && next.includes('Go to the box by the door'), told.hook);
   const waiting = lines.find((line) => /^Waiting\s/u.test(line));
   assert.match(waiting ?? '', /^Waiting\s+\d+ on .+, first: /u, told.hook);
-  assert.ok(lines.at(-1)!.endsWith('call context for the full picture') || lines.some((l) => l.startsWith('Update ')), told.hook);
+  /* AN AGENT'S CARD IS THE PLAN'S: five lines at most, and no More line, since this is what context says. */
+  assert.ok(lines.length <= PLAN_CARD_LINES, told.hook);
+  assert.ok(!told.hook.includes('call context for the full picture'), told.hook);
+  /* THE TWO-SESSIONS WARNING REACHES THE AGENT AT START: a line of the card the hook prints, naming the other run (never
+     this one), and said once in what context says. */
+  const also = lines.find((line) => line.startsWith('Also ') && line.includes(TWO_SESSIONS)) ?? '';
+  const named = [...also.matchAll(/\b(S\d+)\b/gu)].map((m) => m[1]);
+  assert.ok(named.length > 0 && !named.includes(told.api.session?.spoken), `no two-sessions line naming the other run:\n${told.hook}`);
+  assert.equal(told.mcp.text.split(TWO_SESSIONS).length, 2, `the warning is not said once:\n${told.mcp.text}`);
 });
 
 /*

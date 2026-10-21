@@ -10,10 +10,11 @@
  *
  *   0 Stop or pause      the whole answer's first line when set; never cut
  *   1 Told you           open instructions, in his voice, with how to take or answer; never cut
- *   2 Card               who and where, Next, Waiting, Learned: five lines, 120 words
+ *   2 Card               who and where, Next, the two-sessions warning, Waiting, Learned: five lines, 120 words
  *   3 What you may do    one sentence from the effective settings
  *   4 Rules and brief    his brief for this agent, then rules here, then everywhere: 120 tokens
- *   5 Working here now   other live runs in this repo (worktrees are the same repo); a run on your branch is warned of
+ *   5 Working here now   other live runs in this repo (worktrees are the same repo); one in your tree or on your
+ *                        branch is warned of on the card, the one text the start hook prints
  *   6 Your lane here     open tasks handed to this kind of agent, then ones nobody holds: 5 rows
  *   6b Numbers           the key numbers this agent keeps on this project, stale first, each with when it last came
  *                        in, then how to report one: 4 rows
@@ -305,12 +306,32 @@ export function kpiLine(k: KpiFact, now: number): string {
 /* ── the card ──────────────────────────────────────────────────────────── */
 
 /**
- * The plan's card: line one (or "No project here." with the projects worked on last), then Next (the instruction in
- * hand, else the step left here, else the top of its lane), then Waiting and the one lesson that leads, and the line
- * saying the command is older when it is. At most five lines and 120 words. The other runs moved to "Working here
- * now", the red signs to the app, and "More" is gone. A builder in a worktree is not given the owner's queue.
+ * THE TWO-SESSIONS WARNING, when another live run shares this run's working tree or its branch. The record's own
+ * same-tree line (`also_here`) when it sent one: it knows the machine and the helpers, and says the warning word for
+ * word, then who by name and what each is doing. Else the runs here on this branch or in this tree, and the warning.
+ * `null` when nobody is. The card says it, so "Working here now" does not.
  */
-function planCard(f: ContextFacts, lesson: string | null, builder: boolean): string {
+function clashLine(f: ContextFacts): string | null {
+  if (f.who?.also) return f.who.also;
+  const mine = (f.branch ?? '').trim();
+  const branchOf = (o: OtherRun): boolean => mine !== '' && (o.branch ?? '').trim() === mine;
+  const clash = [...f.others].sort((a, z) => Number(z.role === 'lead') - Number(a.role === 'lead')).filter((o) => o.same_tree === true || branchOf(o));
+  if (clash.length === 0) return null;
+  const where = clash.every(branchOf) ? `on your branch ${words(mine, 40)}` : 'in your working tree';
+  return labeled('Also', `${and(clash.map((o) => o.spoken))} ${clash.length === 1 ? 'is' : 'are'} ${where}. ${TWO_SESSIONS}`);
+}
+
+/**
+ * The plan's card: line one (or "No project here." with the projects worked on last), then Next (the instruction in
+ * hand, else the step left here, else the top of its lane), the two-sessions warning when true, then Waiting and the one
+ * lesson that leads, and the line saying the command is older when it is. At most five lines and 120 words: the warning
+ * and the Update line, when true, are kept and Learned gives way. The other runs moved to "Working here now", the red
+ * signs to the app, and "More" is gone. A builder in a worktree is not given the owner's queue.
+ *
+ * THE START HOOK PRINTS THIS CARD AND NOTHING ELSE, so the warning is a line of it: an agent sharing a tree is told at
+ * start, not only when it calls `context`.
+ */
+function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clash: string | null): string {
   const who = f.who!;
   const recent = (f.recent ?? []).map((r) => words(r, 30)).filter(Boolean).slice(0, 3);
   const first = who.placed
@@ -321,9 +342,10 @@ function planCard(f: ContextFacts, lesson: string | null, builder: boolean): str
   const next = inHand
     ? labeled('Next', `${inHand.id}, in hand: do it, then reply with instructions.`)
     : (who.next ?? (top ? labeled('Next', `${words(top.name, 70)} (${top.spoken}, yours)`) : null));
-  const lines = [first, next, builder ? null : who.waiting, lesson === null ? null : labeled('Learned', words(lesson, 91)), who.update].filter((l): l is string => l !== null);
-  /* FIVE LINES AT MOST: the Update line, when true, is kept and Learned gives way. */
-  while (lines.length > PLAN_CARD_LINES) lines.splice(lines.length - (who.update ? 2 : 1), 1);
+  const learned = lesson === null ? null : labeled('Learned', words(lesson, 91));
+  const lines = [first, next, clash, builder ? null : who.waiting, learned, who.update].filter((l): l is string => l !== null);
+  /* FIVE LINES AT MOST: line one, Next, the warning, Waiting and Update are five, so Learned is the one that gives way. */
+  if (lines.length > PLAN_CARD_LINES && learned !== null) lines.splice(lines.indexOf(learned), 1);
   return cutTo(lines, PLAN_CARD_WORDS).join('\n');
 }
 
@@ -377,7 +399,7 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
   const held = lessonsHeld(f.learned, f.now);
   const lessons = held.rows.map((l) => oneLine(l.said)).filter(Boolean);
   const builder = f.others.some((o) => o.role === 'lead');
-  const cardText = planCard(f, lessons[0] ?? null, builder);
+  const cardText = planCard(f, lessons[0] ?? null, builder, clashLine(f));
   const plan = { card: cardText, sections };
   const done = (): Plan => ({ ...plan, tokens: said(plan), retire: held.retire, ...(f.stamp ? { stamp: f.stamp } : {}) });
   if (depth === 'card') return done();
@@ -439,14 +461,10 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
     if (needs.length > 0) fill('needs', 'Needs', needs, needs.length, `get({ spoken: "${t.spoken}" })`);
   }
 
-  /* 5 WORKING HERE NOW: the lead first for a builder, then the others; one on this run's branch is warned of, never cut. */
+  /* 5 WORKING HERE NOW: the lead first for a builder, then the others. A run in this tree or on this branch is warned of
+     on the card (`clashLine`), never cut, and only there, so the text says it once. */
   const others = [...f.others].sort((a, z) => Number(z.role === 'lead') - Number(a.role === 'lead'));
-  const mine = (f.branch ?? '').trim();
-  const branchOf = (o: OtherRun): boolean => mine !== '' && (o.branch ?? '').trim() === mine;
-  const clash = others.filter((o) => o.same_tree === true || branchOf(o));
-  const where = clash.every(branchOf) ? `on your branch ${words(mine, 40)}` : 'in your working tree';
-  const warn = clash.length > 0 ? [`${and(clash.map((o) => o.spoken))} ${clash.length === 1 ? 'is' : 'are'} ${where}. ${TWO_SESSIONS}`] : [];
-  if (others.length > 0) fill('here', 'Here now', others.map(otherLine), ROWS.here * times, calls.here ?? 'list({ register: "session", where: {"field":"state","is":"active"} })', { kept: warn, total: totals.here ?? 0 });
+  if (others.length > 0) fill('here', 'Here now', others.map(otherLine), ROWS.here * times, calls.here ?? 'list({ register: "session", where: {"field":"state","is":"active"} })', { total: totals.here ?? 0 });
 
   /* 6 YOUR LANE: handed to this kind of agent first, then free. */
   const lane = [...f.lane].sort((a, z) => Number(z.mine) - Number(a.mine));

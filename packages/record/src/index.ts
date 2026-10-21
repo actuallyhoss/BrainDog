@@ -8137,12 +8137,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const now = clock.now();
     const drawn = cardOf(told, cardAt, now);
     /* BEHIND IS THE UPDATE LINE ITSELF, never the sentence anywhere: a step or a sign a run wrote may quote it. */
-    const behind = drawn.card.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
-    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind } };
-    /* AN AGENT'S KEY IS ANSWERED THE PLAN TOO (`context-plan.ts`, plan §3), drawn from the facts this context already
-       holds: what stops it, what he told it, what it may do, his brief and its budget, at the depth it asked. The card
-       stays as it was, for the start hook and `braindog context`, which print it. */
+    const behindIn = (said: string): boolean => said.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
+    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card) } };
+    /* THE OWNER'S OWN `braindog context` KEEPS THE CARD `card.ts` DRAWS, with its More line and its signs. */
     if (key === null) return out;
+    /* AN AGENT'S KEY IS ANSWERED THE PLAN (`context-plan.ts`, plan §3), drawn from the facts this context already holds:
+       what stops it, what he told it, what it may do, his brief and its budget, at the depth it asked. ITS CARD IS THE
+       PLAN'S, ONE TEXT BYTE FOR BYTE: the start hook prints `card`, `context` over `/mcp` says `plan_card`, and
+       `/api/context` answers `card`, so all three are the plan's card and an agent is never told one card at start and
+       another by context. */
     const plan = planContext(
       factsFromContext(out, {
         ...cardAt,
@@ -8157,7 +8160,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }),
       { budget: told.budget, depth: where.depth },
     );
-    return { ...out, plan: planText(plan), plan_card: plan.card, plan_tokens: plan.tokens, ...(plan.retire.length > 0 ? { retire: plan.retire } : {}) };
+    return {
+      ...out,
+      card: plan.card,
+      build: { cli, behind: behindIn(plan.card) },
+      plan: planText(plan),
+      plan_card: plan.card,
+      plan_tokens: plan.tokens,
+      ...(plan.retire.length > 0 ? { retire: plan.retire } : {}),
+    };
   };
 
   /**

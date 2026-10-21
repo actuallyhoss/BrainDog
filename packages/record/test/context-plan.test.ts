@@ -157,6 +157,34 @@ test('ANOTHER RUN ON YOUR BRANCH IS WARNED OF, and the warning is never cut', ()
   const plan = planContext(his({ others }), { budget: 200 });
   const text = planText(plan);
   assert.ok(text.includes(`S887 is on your branch worktree-agent-a21c. ${TWO_SESSIONS}`), text);
+  /* ON THE CARD, which is all the start hook prints, and said once in the whole text. */
+  assert.ok(plan.card.includes(`Also     S887 is on your branch worktree-agent-a21c. ${TWO_SESSIONS}`), plan.card);
+  assert.equal(text.split(TWO_SESSIONS).length, 2, text);
+});
+
+test('A RUN IN YOUR WORKING TREE IS WARNED OF ON THE CARD: Learned gives way, Next and Update stay, five lines', () => {
+  const others = [...his().others, { spoken: 'S888', agent: 'claude', doing: 'Same folder', branch: 'other', same_tree: true, for_s: 60 }];
+  const update = 'Update   This command is older than the record. Run braindog update and restart this session.';
+  const plan = planContext(his({ others, told: [], who: who({ update }) }));
+  const card = lines(plan.card);
+  assert.equal(card.length, PLAN_CARD_LINES, plan.card);
+  assert.match(card[1]!, /^Next\s/u, plan.card);
+  assert.equal(card[2], `Also     S888 is in your working tree. ${TWO_SESSIONS}`);
+  assert.ok(card.at(-1)!.startsWith('Update'), plan.card);
+  assert.ok(!plan.card.includes('Learned'), 'Learned gave way');
+  assert.ok(wordCount(plan.card) <= PLAN_CARD_WORDS, plan.card);
+  assert.equal(planText(plan).split(TWO_SESSIONS).length, 2, planText(plan));
+  /* AND NOBODY ELSE IN THE TREE, NO WARNING: Learned is back. */
+  const alone = planContext(his({ told: [] }));
+  assert.ok(!alone.card.includes(TWO_SESSIONS) && alone.card.includes('Learned'), alone.card);
+});
+
+test('THE RECORD’S OWN SAME-TREE LINE IS THE CARD’S WARNING when it sent one, by name and what each is doing, said once', () => {
+  const also = `Also     ${TWO_SESSIONS} Also here: Claude (S9), Kerning the pairs.`;
+  const others = [...his().others, { spoken: 'S9', agent: 'claude', doing: 'Kerning the pairs', branch: 'other', same_tree: true, for_s: 60 }];
+  const plan = planContext(his({ others, who: who({ also }) }));
+  assert.ok(lines(plan.card).includes(also), plan.card);
+  assert.equal(planText(plan).split(TWO_SESSIONS).length, 2, planText(plan));
 });
 
 test('DECIDED LATELY: the last 14 days, the answer to this run’s own question first', () => {
