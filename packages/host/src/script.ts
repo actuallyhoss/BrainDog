@@ -26,7 +26,21 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, bankKey, cycleAfter, grantChosen, hostOpened, type ActionRequest, type CycleLine, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import {
+  ACTION_MAX_BYTES,
+  ACTION_TIMEOUT_MS,
+  bankKey,
+  cycleAfter,
+  grantChosen,
+  hostOpened,
+  PROPOSALS_PER_RUN,
+  PROPOSE_CALLS,
+  type ActionRequest,
+  type CycleLine,
+  type Entry,
+  type ScriptRunner,
+  type Scripted,
+} from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
@@ -66,6 +80,11 @@ export type ScriptRunnerOptions<P> = {
    * refuses `ctx.record` with the sentence it uses for a register outside `reads`, which is why every host passes it.
    */
   reads?: ((s: Scripted) => ScriptReads) | undefined;
+  /**
+   * The run's `ctx.propose`, built from what was leased (`scriptProposals`). ABSENT IS A HOST THAT FILES NOTHING, and the
+   * script is handed no `ctx.propose`: a trial by an agent (`script-try.ts`) is one, since it files nothing by design.
+   */
+  propose?: ((s: Scripted) => ScriptProposals) | undefined;
   /** The host clock, which `ctx.now()` reads. Absent is `Date.now`. */
   now?: (() => number) | undefined;
   /**
@@ -228,6 +247,53 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
   return (label) => {
     const found = grantChosen(grants(), label);
     return found === undefined ? null : { id: found.id, label: found.label, opens: found.opens };
+  };
+}
+
+/**
+ * `ctx.propose` for one run: `propose` answers the script, `queued` is what the run hands back to be filed with its
+ * writes when it is applied (`finishScript`).
+ */
+export type ScriptProposals = { propose(proposal: Json): Promise<Json>; queued(): Json[] };
+
+/**
+ * The proposals a script's `ctx.propose` is built from, on either host: each one tried against the record's own gate
+ * (`kernel.scriptProposal`), signed as the run, and queued to be filed with the run's writes.
+ *
+ * WHAT A SCRIPT MAY ASK IS WHAT IT MAY WRITE. A rowset over a list outside its `writes:`, or an option whose patches
+ * change one, is refused before the gate is asked (`proposalOf`), and so is any kind but `rowset` and `options`: a
+ * script keeps rows, and a change to the record's lists, automations or add-ons is a person's or an agent's to propose.
+ *
+ * NOTHING IS FILED HERE. The gate is asked inside a savepoint that is always taken back, so the script hears exactly
+ * what the gate says (the refusal in its usual shape, `joined` for a question already waiting, `answered` for one the
+ * person already answered) and the question goes in only when the run is applied, all or nothing with its writes.
+ *
+ * AND IT IS COUNTED. At most `PROPOSALS_PER_RUN` (20) questions a run files; a call that would file one more is
+ * refused `OUT_OF_BOUNDS` as a value the script reads, never a throw, so the next run files the rest once these are
+ * waiting. At most `PROPOSE_CALLS` (200) calls a run, filed or not, since each one is tried on the record's thread.
+ * One counter a run, so `scriptProposals` is called once for each.
+ */
+export function scriptProposals(api: Pick<RecordApi, 'kernel'>): (s: Scripted) => ScriptProposals {
+  return (s) => {
+    const { script, actor, decl } = s.scripted;
+    const queue: Json[] = [];
+    let calls = 0;
+    const refused = (fix: string): Json => ({ ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix, at: 'proposal' } });
+    return {
+      propose: async (proposal) => {
+        calls += 1;
+        if (calls > PROPOSE_CALLS) return refused(`${script} proposed more than ${PROPOSE_CALLS} times in one run, so this one was not tried.`);
+        const tried = api.kernel.scriptProposal({ script, actor, writes: decl.writes }, proposal);
+        if (!tried.ok) return JSON.parse(JSON.stringify(tried)) as Json;
+        if (tried.value.queued !== null) {
+          if (queue.length >= PROPOSALS_PER_RUN)
+            return refused(`${script} may file ${PROPOSALS_PER_RUN} questions in one run, and this would be one more. The next run files it once these are waiting.`);
+          queue.push(tried.value.queued as unknown as Json);
+        }
+        return { ok: true, value: tried.value.said as unknown as Json };
+      },
+      queued: () => [...queue],
+    };
   };
 }
 
@@ -444,12 +510,14 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const { decl } = scripted;
     const reads = options.reads?.(s);
+    const proposals = options.propose?.(s);
     /* `fold` AND `cycle` ARE HANDED BESIDE THE REST, to every script whatever it declares: one `scriptFold` and one
        `scriptCycle` a run, so the counts they keep are this run's. The Worker hands the same from its own turn
        (`apps/worker/src/script.ts`). */
     const host: CtxHost = {
       fetch,
       ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
+      ...(proposals === undefined ? {} : { propose: proposals.propose }),
       fold: scriptFold(scripted.script),
       cycle: scriptCycle(scripted.script),
       now: () => new Date(now()).toISOString(),
@@ -471,7 +539,10 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
       },
       host,
     );
-    return kept.stop === null ? answer : { refused: kept.stop, log: answer.log, usage: answer.usage };
+    if (kept.stop !== null) return { refused: kept.stop, log: answer.log, usage: answer.usage };
+    /* WHAT IT PROPOSED GOES BACK BESIDE ITS WRITES, for `finishScript` to file with them; a refused run files none. */
+    const queued = proposals?.queued() ?? [];
+    return 'refused' in answer || queued.length === 0 ? answer : { ...answer, proposals: queued };
   };
 }
 

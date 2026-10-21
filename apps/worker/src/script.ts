@@ -39,7 +39,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute } from '@braindog/host/actions';
-import { CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
+import { CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -107,6 +107,8 @@ export type ScriptCall =
   | { op: 'fold'; text: string }
   /** `ctx.cycle`: the next day a repeating line moves on after `day`, answered by the run's own `scriptCycle`. */
   | { op: 'cycle'; day: string; line: Json }
+  /** `ctx.propose`: a question with rows, tried against the gate and queued by the run's own `scriptProposals`. */
+  | { op: 'propose'; proposal: Json }
   /**
    * The CPU time the platform says a run spent, from `ScriptTail` and never from the sandbox: the two doors the script
    * can reach build their calls with an `op` of their own, so nothing the script writes can send this one.
@@ -206,6 +208,22 @@ export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
     if ('error' in reply) throw new Error(reply.error);
     return JSON.stringify(reply.ok);
   }
+
+  /**
+   * `ctx.propose`, answered in the record's object, where the run's queue and count are kept. A proposal that does not
+   * parse crosses as `null`, which the record refuses in its own words, as on the self-host.
+   */
+  async propose(run: string, proposal: string): Promise<string> {
+    let read: Json = null;
+    try {
+      read = typeof proposal === 'string' ? (JSON.parse(proposal) as Json) : null;
+    } catch {
+      read = null;
+    }
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'propose', proposal: read });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
 }
 
 /** What the tail is handed: the object, as the two doors are, and the one run its Worker was loaded for. */
@@ -249,6 +267,8 @@ type Turn = {
   fold: ScriptFold;
   /** `ctx.cycle` for this run and no other, counted as `fold` is. */
   cycle: ScriptCycle;
+  /** `ctx.propose` for this run and no other, its queue and count kept here; absent on a host that files nothing. */
+  propose?: ScriptProposals | undefined;
   fetches: number;
   bytes: number;
   stop: ScriptRefusal | null;
@@ -370,6 +390,12 @@ export class ScriptRuns {
         return { error: e instanceof Error ? e.message : String(e) };
       }
     }
+    if (call.op === 'propose') {
+      /* HELD TO `writes:` BY THE RECORD'S OWN CHECK (`proposalOf`), and a refusal is the gate's answer the script reads,
+         not a rule broken: a question the record would not take is the script's to say, as on the self-host. */
+      if (turn.propose === undefined) return { error: 'This host files no questions from a script.' };
+      return { ok: await turn.propose.propose(call.proposal) };
+    }
 
     let url: URL;
     try {
@@ -488,6 +514,7 @@ export default class extends WorkerEntrypoint {
       get: (spoken) => record.get(run, spoken),
       fold: (text) => record.fold(run, text),
       cycle: (day, line) => record.cycle(run, day, line),
+      ...(meta.proposes === true ? { propose: (proposal) => record.propose(run, proposal) } : {}),
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
     const ctx = withConfig(prelude(host)(meta), meta.config);
@@ -537,6 +564,8 @@ export type ScriptWiring = {
   grant: (label: string) => ScriptGrant | null;
   /** Live reads, scoped to a run's `reads` and signed as its actor. Absent: `ctx.record` refuses. */
   read?: ((scripted: Scripted) => ScriptReads) | ScriptReads | undefined;
+  /** `ctx.propose` for a run, its queue and count (`scriptProposals`). Absent: the script is handed no `ctx.propose`. */
+  propose?: ((scripted: Scripted) => ScriptProposals) | undefined;
   now: () => number;
 };
 
@@ -622,7 +651,8 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   if (isRefusal(limits)) return { refused: limits, log: '', usage: usage() };
 
   const read = typeof wiring.read === 'function' ? wiring.read(s) : wiring.read;
-  const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, read });
+  const propose = wiring.propose?.(s);
+  const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, read, propose });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     /* `load`, NOT `get`: A FRESH WORKER FOR EVERY RUN. `get` caches by id, and the id was `<record>:<script>:v<n>`, so
@@ -646,7 +676,8 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
        `withConfig` freezes it onto `ctx` with the self-host's own text. */
     /* THE DAY IS HANDED IN BESIDE THE INSTANT (`scriptMeta`), as the self-host hands it: `ctx.today()` is the record's
        own day on both hosts, worked out here because the sandbox has no zone table. */
-    const meta: Json = { ...scriptMeta({ input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz }), config: config ?? {} };
+    /* `proposes` SAYS WHETHER THE LOADED MODULE BUILDS A `ctx.propose`, as a self-host's `CtxHost` does by having one. */
+    const meta: Json = { ...scriptMeta({ input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz }), config: config ?? {}, proposes: propose !== undefined };
 
     /* THE DEADLINE IS RACED, NOT ASKED OF THE SANDBOX. A script awaiting a slow provider is not spending CPU, so
        `cpuMs` never ends it; this does, and the run is closed below so whatever it asks for afterwards is refused. */
@@ -686,7 +717,9 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     if (!Array.isArray(writes)) return { refused: writes, log, usage: spent };
     /* AND THE ONE QUESTION IT MAY END BY ASKING (N6), carried as it came and checked by `finishScript`, which files it. */
     const ask = askOf(handed.ask);
-    return ask === undefined ? { writes, log, usage: spent } : { writes, log, usage: spent, ask };
+    /* AND WHAT IT PROPOSED, queued in this object as it asked (`scriptProposals`), for `finishScript` to file. */
+    const queued = turn?.propose?.queued() ?? [];
+    return { writes, log, usage: spent, ...(ask === undefined ? {} : { ask }), ...(queued.length === 0 ? {} : { proposals: queued }) };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);

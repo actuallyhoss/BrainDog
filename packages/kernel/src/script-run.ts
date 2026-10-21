@@ -67,7 +67,7 @@ export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu
  * the sandbox started. `held` is the host's to say because the allowance is the Directory's, exactly as for a `call`.
  */
 export type ScriptAnswer =
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown }
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown }
   | { refused: { code: string | null; why: string }; log: string; usage: ScriptUsage }
   | { held: { until: number; say: string } };
 
@@ -121,7 +121,7 @@ export type ScriptRunDeps = Pick<ActionDeps, 'sql' | 'recordId' | 'nowMs' | 'min
    * OPTIONAL IN THE TYPE ONLY, so a host's own `ScriptRunDeps` (a trial, a test's double) still builds: a run that asks
    * with none here writes what it wrote and says on its line that nobody was asked.
    */
-  propose?: (p: { question: string; body_kind: 'options'; body: Record<string, unknown>; cause: string }, actor: string) => Result<{ id: string; joined?: true; answered?: unknown }>;
+  propose?: (p: { question: string; body_kind: ScriptProposalKind; body: Record<string, unknown>; cause?: string }, actor: string) => Result<{ id: string; joined?: true; widened?: number; answered?: unknown }>;
 };
 
 /** How many refused runs in a row pause a script. Design section 2, point 8. */
@@ -278,6 +278,130 @@ function askOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: string, writes: 
   const about = aboutOf(ask.about);
   const cause = typeof ask.cause === 'string' ? ask.cause : `script:${script}`;
   return { asked: { question: ask.question.trim(), body: { options, ...(about === undefined ? {} : { about }) }, cause } };
+}
+
+/* ── `ctx.propose`: questions with rows, filed as the run ─────────────────────────────────────────────── */
+
+/**
+ * The kinds of question a script may file through `ctx.propose`: rows to make or change (`rowset`), and answers to pick
+ * whose patches are the rows they change (`options`). The two bodies that are about the rows a script already writes.
+ *
+ * NOT A CHANGE, A PATTERN, A PACK, SETTINGS OR AN ARRANGEMENT. Those change what the record is (its lists, its
+ * automations, its add-ons and what they send out), and a script was approved to keep rows. A scheduled run that could
+ * file one every night would put "install this" in front of the owner with nobody behind it but code; a person or an
+ * agent proposes those.
+ */
+export const SCRIPT_PROPOSAL_KINDS = ['rowset', 'options'] as const;
+export type ScriptProposalKind = (typeof SCRIPT_PROPOSAL_KINDS)[number];
+
+/**
+ * The most questions one run may file through `ctx.propose`: twenty. A question that joins one already waiting, or
+ * that was answered before, files nothing and is not counted. Past it the call is refused, and the next run files the
+ * rest once the first twenty are waiting.
+ *
+ * TWENTY, BECAUSE A QUEUE IS READ BY A PERSON. One a project for his twenty-seven projects is about the most one night
+ * should add; a script that wants more is an import, and wants a different verb.
+ */
+export const PROPOSALS_PER_RUN = 20;
+
+/** The most times one run may call `ctx.propose`, filed or not: each call is tried against the record, on its thread. */
+export const PROPOSE_CALLS = 200;
+
+/** A question a script files, as `ctx.propose` takes it: the MCP `propose` shape, held to the two kinds above. */
+export type ScriptProposal = { question: string; body_kind: ScriptProposalKind; body: Record<string, unknown>; cause?: string };
+
+/**
+ * What `ctx.propose` answers a script, as the gate would answer it: `queued` for a question that will be filed when the
+ * run is applied, the open question's `id` and `joined` when one already asks it (`widened` when this one's further rows
+ * were added to it), or its `id` and `answered` when the person already answered this cause.
+ */
+export type ScriptProposed = { queued?: true; id?: string; joined?: true; widened?: number; answered?: unknown };
+
+/**
+ * A script's proposal, checked as its writes are: `{ ok, value }` with the proposal as the gate takes it, or the
+ * record's usual refusal. Asked when `ctx.propose` is called and again when the run is applied (`finishScript`).
+ *
+ * EVERY ROW IT NAMES IS A WRITE THE SCRIPT ASKS FOR, made later and by somebody else, for `askOf`'s reason: accepting a
+ * rowset writes its rows signed by the person deciding, so a rowset over a list outside the declaration's `writes:` would
+ * be the script reaching a list the owner never approved, with the owner's own hand. The list a rowset names, the list
+ * any of its rows names (a fold's moved links, AGT-C13), the list each row it updates is in, and the list each patch of
+ * an option changes are all held to `writes:`. What is left is the gate's to check, and it checks it when it is tried.
+ */
+export function proposalOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: string, writes: readonly string[], p: unknown): Result<ScriptProposal> {
+  const only = writes.length ? writes.join(', ') : 'nothing';
+  if (!isObject(p)) return no('VALUE_MALFORMED', `${script} proposed something that is not a question: it is { question, body_kind, body, cause }.`, { at: 'proposal' });
+  if (typeof p.question !== 'string' || p.question.trim() === '') return no('REQUIRED_MISSING', 'A proposal is a question somebody can answer.', { at: 'proposal' });
+  const kind = p.body_kind;
+  if (typeof kind !== 'string' || !(SCRIPT_PROPOSAL_KINDS as readonly string[]).includes(kind))
+    return no(
+      'ENUM_VALUE_UNKNOWN',
+      `A script asks about rows, with a rowset or options, and ${JSON.stringify(kind ?? null)} is neither. A change to the record's lists, automations or add-ons is a person's or an agent's to propose.`,
+      { at: 'body_kind', allowed: [...SCRIPT_PROPOSAL_KINDS] },
+    );
+  if (!isObject(p.body)) return no('REQUIRED_MISSING', `A ${kind} carries its body: ${kind === 'rowset' ? '{ register, rows }' : '{ options }'}.`, { at: 'body' });
+  if (p.cause !== undefined && typeof p.cause !== 'string') return no('VALUE_MALFORMED', 'cause is a short key, so the question is asked once, or leave it out.', { at: 'cause' });
+  const body = p.body;
+  const outside = (register: string | null, at: string, what: string): Result<ScriptProposal> | null =>
+    register !== null && !writes.includes(register) ? no('FORBIDDEN', `${script} proposed ${what} in ${register}, and it may write only to ${only}.`, { at }) : null;
+
+  if (kind === 'rowset') {
+    if (typeof body.register !== 'string') return no('REQUIRED_MISSING', 'A rowset names the list its rows are in.', { at: 'body.register' });
+    const bad = outside(body.register, 'body.register', 'rows');
+    if (bad) return bad;
+    for (const [i, r] of (Array.isArray(body.rows) ? body.rows : []).entries()) {
+      if (!isObject(r)) continue;
+      const theirs = typeof r.register === 'string' ? outside(r.register, `body.rows[${i}].register`, 'a row') : null;
+      if (theirs) return theirs;
+      const at = typeof r.at === 'string' ? outside(deps.registerOf(r.at), `body.rows[${i}].at`, `a change to ${r.at}`) : null;
+      if (at) return at;
+    }
+  } else {
+    for (const [i, o] of (Array.isArray(body.options) ? body.options : []).entries()) {
+      if (!isObject(o) || !Array.isArray(o.patches)) continue;
+      for (const [j, patch] of o.patches.entries()) {
+        if (!isObject(patch) || typeof patch.at !== 'string') continue;
+        const bad = outside(deps.registerOf(patch.at), `body.options[${i}].patches[${j}].at`, `a change to ${patch.at}`);
+        if (bad) return bad;
+      }
+    }
+  }
+  return ok({ question: p.question.trim(), body_kind: kind as ScriptProposalKind, body, ...(typeof p.cause === 'string' ? { cause: p.cause } : {}) });
+}
+
+/**
+ * One `ctx.propose`, tried: checked by `proposalOf`, then put to the gate's own `propose` in a savepoint that is always
+ * rolled back, so the script hears what the gate would say and nothing is filed yet. `queued` is the proposal to file
+ * when the run is applied, or `null` when the gate would file nothing (it joins an open question, or was answered).
+ *
+ * TRIED NOW AND FILED LATER, for the reason a run's writes are applied together: a run that filed three questions and
+ * then threw would leave three questions behind a run its history calls refused. So the answer is the gate's, word for
+ * word, refusal and all, and the filing goes in with the run's writes (`finishScript`), where a gate that has changed
+ * its mind since takes the whole run back.
+ */
+export function tryProposal(
+  deps: Pick<ScriptRunDeps, 'sql' | 'transaction' | 'registerOf' | 'propose'>,
+  run: { script: string; actor: string; writes: readonly string[] },
+  p: unknown,
+): Result<{ said: ScriptProposed; queued: ScriptProposal | null }> {
+  type Tried = { said: ScriptProposed; queued: ScriptProposal | null };
+  const checked = proposalOf(deps, run.script, run.writes, p);
+  if (!checked.ok) return checked as unknown as Result<Tried>;
+  if (!deps.propose) return no('NOT_IN_THIS_BUILD', 'This record files no questions from a script.', { at: 'proposal' });
+  const propose = deps.propose;
+  let tried: ReturnType<NonNullable<ScriptRunDeps['propose']>> | null = null;
+  /* THE SAVEPOINT IS TAKEN BACK WHATEVER THE GATE SAID, by answering it a refusal of our own. */
+  attempt<null>(deps.sql, deps.transaction, () => {
+    tried = propose(checked.value, run.actor);
+    return no('TRANSITION_ILLEGAL', 'Only tried.');
+  });
+  /* SET INSIDE THE SAVEPOINT, which runs at once and throws on, rather than returning, if the gate itself threw. */
+  const out = tried! as ReturnType<NonNullable<ScriptRunDeps['propose']>>;
+  if (!out.ok) return out as unknown as Result<Tried>;
+  const v = out.value;
+  if (v.answered !== undefined) return ok({ said: { id: v.id, answered: v.answered }, queued: null });
+  if (v.joined && !v.widened) return ok({ said: { id: v.id, joined: true }, queued: null });
+  /* A NEW QUESTION'S NUMBER IS NOT SAID: the one it was tried under was taken back with the savepoint. */
+  return ok({ said: v.widened ? { id: v.id, joined: true, widened: v.widened, queued: true } : { queued: true }, queued: checked.value });
 }
 
 /**
@@ -449,6 +573,30 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   let filed: { id: string; joined?: true; answered?: unknown } | null = null;
   let askRefused = false;
 
+  /* AND ITS PROPOSALS (`ctx.propose`), checked again here for the reason the writes are: the host tried each against
+     the gate as the script asked, and a host is code the record does not control, so the count and every list each
+     one names are held to the declaration before anything is written. */
+  const handed = answer.proposals === undefined || answer.proposals === null ? [] : answer.proposals;
+  if (!Array.isArray(handed)) {
+    done();
+    return refuse(`${script} wrote nothing and asked nothing: what it proposed is not a list of questions.`);
+  }
+  if (handed.length > PROPOSALS_PER_RUN) {
+    done();
+    return refuse(`${script} wrote nothing and asked nothing: it handed back ${handed.length} questions, and one run may file ${PROPOSALS_PER_RUN}.`);
+  }
+  const proposals: ScriptProposal[] = [];
+  for (const [i, p] of (handed as unknown[]).entries()) {
+    const one = proposalOf(deps, script, decl.writes, p);
+    if (!one.ok) {
+      done();
+      return refuse(`${script} wrote nothing and asked nothing: question ${i + 1} it proposed is not one it may file; its log says why.`, 'refusal' in one ? one.refusal.fix : undefined);
+    }
+    proposals.push(one.value);
+  }
+  const proposed = { asked: 0, waiting: 0, answered: 0 };
+  let proposeRefused = -1;
+
   /* ONE BATCH FOR THE RUN, so the history shows its rows as one change, and one note on each that says which run. */
   const batch = deps.mint();
   const note = `Written by ${actor}.`;
@@ -494,6 +642,22 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       }
       filed = out.value;
     }
+    /* AND EACH PROPOSAL, after the one question and in the same savepoint, signed as the run: a proposal the gate now
+       refuses takes the run's writes and its other questions back with it. A cause already waiting joins it. */
+    if (proposals.length > 0 && !deps.propose) {
+      proposeRefused = 0;
+      return no('NOT_IN_THIS_BUILD', 'This record files no questions from a script.', { at: 'proposals' });
+    }
+    for (const [i, p] of proposals.entries()) {
+      const out = deps.propose!(p, actor);
+      if (!out.ok) {
+        proposeRefused = i;
+        return out;
+      }
+      if (out.value.answered !== undefined) proposed.answered += 1;
+      else if (out.value.joined && !out.value.widened) proposed.waiting += 1;
+      else proposed.asked += 1;
+    }
     return ok(null);
   }));
 
@@ -509,6 +673,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     done();
     const why = 'refusal' in applied ? applied.refusal.fix : 'a row it updates was changed by somebody else first.';
     if (askRefused) return refuse(`${script} wrote nothing and asked nothing: the record refused its question; its log says why.`, why);
+    if (proposeRefused >= 0) return refuse(`${script} wrote nothing and asked nothing: the record refused question ${proposeRefused + 1} of ${proposals.length} it proposed; its log says why.`, why);
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
@@ -535,16 +700,23 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
           : put.joined
             ? ' Its question was already waiting on Decide, so it asked nothing new.'
             : ' It asked one question, which waits on Decide.';
+  /* WHAT IT PROPOSED, IN COUNTS: new questions first, since they are what the person has to answer. */
+  const plural = (k: number, one: string, many: string) => (k === 1 ? one : many.replace('#', String(k)));
+  const offered = [
+    proposed.asked > 0 ? ` ${plural(proposed.asked, 'One question it proposed waits', '# questions it proposed wait')} in Needs you.` : '',
+    proposed.waiting > 0 ? ` ${plural(proposed.waiting, 'One was', '# were')} already waiting.` : '',
+    proposed.answered > 0 ? ` ${plural(proposed.answered, 'One was', '# were')} answered before, so not asked again.` : '',
+  ].join('');
   /* A QUIET RUN IS STAMPED (last-day-48): one that wrote nothing, asked nothing and stopped nothing, so a feed leaves it
      out (`bookkeeping` in index.ts) and a script that runs every night adds no line to Activity on a night with nothing
      to say. The script's own history keeps it. Stamped as the line is written, never by rewriting it. */
-  const quiet = n === 0 && asked === null && stopped.length === 0;
+  const quiet = n === 0 && asked === null && stopped.length === 0 && proposed.asked === 0;
   const metered = keepLog(
     deps,
     meter(
       deps,
       { ...base, ...spent, outcome: 'ok', failures: 0, ...(quiet ? { quiet: true as const } : {}) },
-      `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${stop}`,
+      `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${offered}${stop}`,
     ),
     answer.log,
     decl,

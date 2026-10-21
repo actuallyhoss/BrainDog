@@ -217,7 +217,7 @@ import { analyse, observe, type Analysis, type Observation } from './observe.ts'
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
 import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
-import { finishScript, prepareScript, resumeScript, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
+import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
 import {
@@ -620,7 +620,24 @@ export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 /* `scriptBody` IS THE SHAPE CHECK A DRAFT MEETS BEFORE IT IS TRIED, the one install runs, so `scriptTry` in the record refuses
    what an install would and never runs a body the record could not hold. */
 export { egressChanged, scriptBody } from './script.ts';
-export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
+export {
+  finishScript,
+  prepareScript,
+  proposalOf,
+  PROPOSALS_PER_RUN,
+  PROPOSE_CALLS,
+  resumeScript,
+  REFUSED_IN_A_ROW,
+  SCRIPT_PROPOSAL_KINDS,
+  type ScriptAnswer,
+  type ScriptProposal,
+  type ScriptProposalKind,
+  type ScriptProposed,
+  type ScriptRunner,
+  type ScriptRunDeps,
+  type ScriptUnrun,
+  type Scripted,
+} from './script-run.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, type KeyOutOfScope } from './actions.ts';
 export { pinHost } from './vault.ts';
 /* RUN NOW (`nudge.ts`): an action's waiting run moved to now, at most once a minute an action and twenty an hour a record. */
@@ -9024,6 +9041,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Start a script paused by three refused runs again, now. Nothing else restarts it. */
     resumeScript: (script: string, actor: string) => transaction(() => resumeScript({ sql, mint, nowMs: clock.now() }, script, actor)),
+
+    /**
+     * One `ctx.propose` from a running script, tried against the gate and filed by nobody yet (`tryProposal` in
+     * `script-run.ts`): what the gate would answer, and the proposal to hand back with the run's answer, or `null` when
+     * it would file nothing. `run` is the leased run's script, actor and `writes:`, as `prepareScript` read them.
+     */
+    scriptProposal: (run: { script: string; actor: string; writes: readonly string[] }, p: unknown): Result<{ said: ScriptProposed; queued: ScriptProposal | null }> =>
+      tryProposal(scriptRunDeps(), run, p),
 
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),

@@ -52,7 +52,7 @@ import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocatio
 import { deliveryRun, holdAutomations, noticePass, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
 import { arrivalRun } from '@braindog/host/actions';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
-import { grantNamed, holdingScript, readOnlyExecute, scriptReads } from '@braindog/host/script';
+import { grantNamed, holdingScript, readOnlyExecute, scriptProposals, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { serveFirstRead } from '@braindog/host/first-read';
 import { pagedRunner } from '@braindog/host/connector';
@@ -1608,6 +1608,8 @@ export class Record$ extends DurableObject<Env> {
             send: (egress) => actionExecutor(() => egress, { openKey }),
             grant: grantNamed(() => api.kernel.grants()),
             read: scriptReads(api),
+            /* `ctx.propose`, as on the self-host: tried against the gate now, filed with the run's writes. */
+            propose: scriptProposals(api),
             now: () => Date.now(),
           },
           s,

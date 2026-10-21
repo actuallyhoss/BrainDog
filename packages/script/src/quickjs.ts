@@ -420,6 +420,26 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
             return deferred(async () => JSON.stringify(await cycle(on, read)));
           },
         }),
+
+    /* `ctx.propose`, ONLY FROM A HOST THAT HANDS ONE, as `fold`. The host holds it to `writes:`, counts it and tries it
+       against the record (`scriptProposals`), since the gate is the record's; a proposal that does not parse here
+       crosses as `null`, which the host refuses in the record's words. */
+    ...(host.propose === undefined
+      ? {}
+      : {
+          propose: (proposal: QuickJSHandle) => {
+            charge();
+            let read: Json = null;
+            try {
+              read = json(proposal);
+            } catch {
+              read = null;
+            }
+            charge();
+            const propose = host.propose!.bind(host);
+            return deferred(async () => JSON.stringify(await propose(read)));
+          },
+        }),
   };
 
   /** Json into the interpreter, through the interpreter's own `JSON.parse`, read before the script runs. */

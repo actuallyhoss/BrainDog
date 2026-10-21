@@ -30,6 +30,9 @@
  * zone's name into a local day: the host does (`dayIn` in `index.ts`) and hands it over as `meta.today`. It is a
  * string, `YYYY-MM-DD`, and never a `Date`. From a host that hands none, or anything that is not a day, it is the
  * first ten characters of the instant, the UTC day, which is what a script could read before this.
+ *
+ * `ctx.propose(proposal)` IS THERE ONLY FROM A HOST THAT HANDS ONE, as `fold` and `cycle` are. It answers the record's
+ * own words for the question, `{ ok, value }` or `{ ok: false, refusal }`, and files nothing until the run is applied.
  */
 export const PRELUDE = `(function (host) {
   'use strict';
@@ -84,6 +87,9 @@ export const PRELUDE = `(function (host) {
       ...(typeof host.fold === 'function' ? { fold: (text) => host.fold(String(text)).then(parse) } : {}),
       ...(typeof host.cycle === 'function'
         ? { cycle: (day, line) => host.cycle(String(day), stringify(line === undefined ? null : line)).then(parse) }
+        : {}),
+      ...(typeof host.propose === 'function'
+        ? { propose: (proposal) => host.propose(stringify(proposal === undefined ? null : proposal)).then(parse) }
         : {}),
       record: freeze({
         list: (register, where, options) =>

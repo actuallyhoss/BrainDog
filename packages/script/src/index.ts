@@ -142,6 +142,13 @@ export interface CtxHost {
    * as it wrote it, and the host reads it. Absent, the script is handed no `ctx.cycle`.
    */
   cycle?(day: string, line: Json): Promise<string | null>;
+  /**
+   * `ctx.propose`: one question with a body of rows or options, as the MCP `propose` files one, `proposal` as the script
+   * wrote it. The host checks it against the run's `writes:`, tries it against the record's gate and answers the gate's
+   * words, `{ ok, value }` or `{ ok: false, refusal }`; it is filed only when the run is applied, with its writes
+   * (`scriptProposals` in `@braindog/host/script`). Absent, the script is handed no `ctx.propose`.
+   */
+  propose?(proposal: Json): Promise<Json>;
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
   /**

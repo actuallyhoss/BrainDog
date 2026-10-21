@@ -39,10 +39,31 @@ ctx.update(id, patch, version) | change a row | with the version it was read at,
 ctx.fetch(url, { key }) | call out | only to an origin in egress, with a key named in keys
 ctx.fold(text) | match a payee | a payee as a bank wrote it, as the name under it, or null; 1,000 a run and no more
 ctx.cycle(day, line) | the next day a line is due | after day, as YYYY-MM-DD, worked out the way the forecast walks it, with line as { leg, fields, rest, anchorDay }, or null; 1,000 a run and no more
+ctx.propose(question) | ask the owner | rows to make or change, or answers to pick, only about lists in writes; never applied until the owner accepts it; 20 a run
 ctx.log(...) | say what happened | kept with the run, for the owner to read
 ```
 
 A script's writes are queued and applied when it finishes, through the same path every other writer uses, so a list's rules and checks hold for them too. A script that throws writes nothing, and its message is kept with the run.
+
+## Asking the owner: `ctx.propose`
+
+Some things a script works out are not its to write: a key number for a project, a payee it thinks two bills share. It asks instead. `ctx.propose` files the same question an agent's `propose` files, a `rowset` of rows to make or change or `options` to pick from, and it waits in Needs you until the owner answers it.
+
+```code | One question with the rows it would make
+const said = await ctx.propose({
+  question: 'Keep 2 key numbers for Kiln?',
+  body_kind: 'rowset',
+  body: { register: 'kpis', rows: [{ name: 'Revenue by month', thing: kiln.id, draft: true }] },
+  cause: 'kpi-backfill:' + kiln.id,
+});
+```
+
+- **Answered at once, in the record's words.** The question is tried against the record as it is asked, so the script reads `{ ok: true, value }` or the refusal it would get anywhere else, `{ ok: false, refusal: { code, fix, at } }`. `value.queued` is a new question, `value.joined` one already waiting with that cause, and `value.answered` one the owner answered before, which is not asked again.
+- **Filed when the run finishes**, with its writes. A run that throws files none of its questions.
+- **Only about what it may write.** Every list its rows name, and every row an answer would change, is one in `writes`. A script cannot propose a change to the record's lists, automations or add-ons: that is a person's or an agent's to ask.
+- **Never applied by itself.** Nothing a script proposes is written until the owner accepts it, and what accepting writes is signed by the owner.
+- **Twenty questions a run.** A question that joins one waiting is not counted, so the next run files the rest. A run may call it 200 times in all.
+- **Asked once.** Give a `cause`, a short key such as `kpi-backfill:<project>`, and a second run joins the open question rather than filing another.
 
 ```code | A script started by a rule, the first-party count-cash pack's pattern
 {

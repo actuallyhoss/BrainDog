@@ -18,7 +18,7 @@
 
 import type { ScriptRunner } from '@braindog/kernel';
 import type { Ledger } from '@braindog/host/actions';
-import { grantNamed, scriptReads, scriptRunner } from '@braindog/host/script';
+import { grantNamed, scriptProposals, scriptReads, scriptRunner } from '@braindog/host/script';
 import type { RecordApi } from '@braindog/record';
 import { runInQuickJs } from '@braindog/script/quickjs';
 
@@ -92,6 +92,8 @@ export function scriptSandbox(
       openKey: options.openKey,
       grantOf: grantNamed(() => api.kernel.grants()),
       reads: scriptReads(api),
+      /* `ctx.propose`: a question with rows, tried against the gate now and filed with the run's writes. */
+      propose: scriptProposals(api),
       now: options.now,
     });
   if (options.outbound !== 'off') return runner(sandboxed);
