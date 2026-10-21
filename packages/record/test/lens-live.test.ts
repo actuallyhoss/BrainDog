@@ -141,10 +141,11 @@ test('THE PLAN’S GRANT SHAPES, written as share rows, come out of access as th
   const ids = (who: string) => sql.all<{ id: string }>("SELECT id FROM share WHERE who = ? AND effect = 'allow' ORDER BY id", who).map((r) => r.id);
   const all = (who: string) => sql.all<{ id: string }>('SELECT id FROM share WHERE who = ? ORDER BY id', who).map((r) => r.id);
 
-  /* `session` is the kernel's own list of agent runs, which a whole-record share reaches as it reaches any list but Keys and People. */
-  assert.deepEqual(api.kernel.access('p_vic'), { level: 'read', registers: ['session', 'things', 'tasks', 'money', 'notes'], levels: {}, grant: grant(ids('p_vic')) }, 'G1');
+  /* `session` and `instructions` are the kernel's own lists of agent runs and of what he told them, which a whole-record
+     share reaches as it reaches any list but Keys and People, as a Viewer's role does. */
+  assert.deepEqual(api.kernel.access('p_vic'), { level: 'read', registers: ['session', 'instructions', 'things', 'tasks', 'money', 'notes'], levels: {}, grant: grant(ids('p_vic')) }, 'G1');
   /* Tasks holds a money rate, so "everything but money" keeps it from Lee too. Keys are denied though the record has none. */
-  assert.deepEqual(api.kernel.access('p_lee'), { level: 'write', registers: ['session', 'things', 'notes'], levels: {}, grant: grant(all('p_lee').filter((id) => id !== all('p_lee')[2])) }, 'G2');
+  assert.deepEqual(api.kernel.access('p_lee'), { level: 'write', registers: ['session', 'instructions', 'things', 'notes'], levels: {}, grant: grant(all('p_lee').filter((id) => id !== all('p_lee')[2])) }, 'G2');
   assert.deepEqual(
     api.kernel.access('p_pri'),
     { level: null, registers: ['tasks', 'money'], levels: { tasks: 'read', money: 'read' }, grant: grant([accountant], at(NOW + 90 * DAY)) },

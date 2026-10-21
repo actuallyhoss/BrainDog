@@ -1,6 +1,8 @@
 /**
- * The MCP read paths of the leak matrix (sharing plan §4.3): all 17 tools and the resources, through `serveMcp` in
- * process, so what is checked is the JSON-RPC reply a model is handed, its text and its structured half both.
+ * The MCP read paths of the leak matrix (sharing plan §4.3): every tool a model can call and the resources, through
+ * `serveMcp` in process, so what is checked is the JSON-RPC reply a model is handed, its text and its structured half
+ * both. EVERY ONE IT CAN CALL: the listed tools and the folded ones still answered by their old names until
+ * `FOLDED_UNTIL` (`schema`, `history`), since a tool nobody lists still reads rows.
  *
  * THE WRITE TOOLS ARE ASKED TOO, about rows outside the caller's sight, and only on a record built for them
  * (`WRITES`), so what they change never reaches the reads. A write tool's answer is held to the same canaries, less
@@ -8,14 +10,14 @@
  */
 
 import { serveMcp } from '../../../mcp/src/http.ts';
-import { TOOLS } from '../../../mcp/src/index.ts';
+import { FOLDED, TOOLS } from '../../../mcp/src/index.ts';
 import type { CallContext } from '../../src/index.ts';
 import { firewall } from '../../src/sight.ts';
 import type { Fixture } from './fixture.ts';
 import { FIREWALLED, type Args } from './routes.ts';
 
-export const TOOL_NAMES: readonly string[] = TOOLS.map((t) => t.name);
-export const WRITES: ReadonlySet<string> = new Set(TOOLS.filter((t) => t.writes).map((t) => t.name));
+export const TOOL_NAMES: readonly string[] = [...TOOLS, ...FOLDED].map((t) => t.name);
+export const WRITES: ReadonlySet<string> = new Set([...TOOLS, ...FOLDED].filter((t) => t.writes).map((t) => t.name));
 
 let n = 0;
 
