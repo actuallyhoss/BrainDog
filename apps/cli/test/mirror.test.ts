@@ -193,9 +193,11 @@ test('a second run changes no file; a change is one file; a list added later app
 
   /* ONE ROW CHANGED IS ONE FILE CHANGED. Not its title, which every link to it says too. */
   const m = freeMoney(h.kernel);
-  const row = (await h.kernel.list({ register: m.list, limit: 1 }));
-  assert.ok(row.ok);
-  const seq = row.value.rows[0]!.seq!;
+  /* THE SEED MAY LEAVE THIS LIST EMPTY (Key numbers starts with no rows): the row to change is one of the test's own. */
+  const made = await h.kernel.create(m.list, { [m.title]: 'Row to change', [m.field]: { amount: 100, currency: 'EUR' } }, { actor: ACTOR });
+  assert.ok(made.ok, JSON.stringify(made));
+  const seq = made.value.seq!;
+  assert.equal(await h.run(), 0);
   assert.ok((await h.kernel.update(m.list, `${m.list}#${String(seq)}`, { [m.field]: { amount: 4_242, currency: 'EUR' } }, { actor: ACTOR })).ok);
   assert.equal(await h.run(), 0);
   assert.match(h.out.at(-1)!, / 1 file changed since the folder was last written\.$/u);
