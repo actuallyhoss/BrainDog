@@ -822,7 +822,7 @@ function table(b: Block, o: RenderOptions): string {
           const { row } = line.row;
           const tds = columns
             .map((column, c) => {
-              const drawn = tableCellBody(row.cells[c] ?? null, o.home);
+              const drawn = tableCellBody(row.cells[c] ?? null, o.home, o.now);
               const inner =
                 drawn.body.kind === 'missing'
                   ? `<span class="missing">${MISSING}</span>`

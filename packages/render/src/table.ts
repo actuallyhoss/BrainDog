@@ -32,6 +32,7 @@ import type { Tone } from './kinds.ts';
 import { leadingCode, symbolFigure } from './format.ts';
 import { type WrittenAmount, writeFigure } from './money.ts';
 import { takeWorking } from './working.ts';
+import { dayThisYear } from './timeline.ts';
 
 export type Column = {
   field: string;
@@ -236,7 +237,7 @@ export type TableCellBody =
  * a drawer that sets the fraction or the code quieter. Only a cell that is the stored form and nothing else is
  * money: `E£1,299`, `EGP 1,299` and a sentence with an amount in it are left exactly as they were.
  */
-export function tableCellBody(value: string | null | undefined, home?: string | null): { working: boolean; body: TableCellBody } {
+export function tableCellBody(value: string | null | undefined, home?: string | null, now?: number): { working: boolean; body: TableCellBody } {
   const taken = takeWorking(value ?? null);
   if (taken.text === null) return { working: false, body: { kind: 'missing' } };
   /* ONE WHOLE FIGURE, HOWEVER IT REACHED THE CELL (`writeFigure`): the stored form, one stored ungrouped, and one a
@@ -253,5 +254,7 @@ export function tableCellBody(value: string | null | undefined, home?: string | 
   if (symbol) return { working: taken.working, body: { kind: 'symbol', text: symbol } };
   const coded = leadingCode(taken.text);
   if (coded) return { working: taken.working, body: { kind: 'coded', ...coded } };
-  return { working: taken.working, body: { kind: 'text', text: taken.text } };
+  /* A DAY IN THE READER'S YEAR WITHOUT THE YEAR (P22), "2 Sep" on People where it said "2 Sep 2026", where the host
+     hands its clock. */
+  return { working: taken.working, body: { kind: 'text', text: now === undefined ? taken.text : dayThisYear(taken.text, now) } };
 }

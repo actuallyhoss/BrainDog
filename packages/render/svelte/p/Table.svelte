@@ -66,6 +66,7 @@
     scope,
     icon,
     home,
+    now,
     rowActions,
     act,
     rowin,
@@ -109,6 +110,8 @@
     icon?: RenderOptions['icon'];
     /** The record's home currency (`RenderOptions.home`): a money cell is read once and written once against it. */
     home?: RenderOptions['home'];
+    /** The reader's clock (`RenderOptions.now`): a day in its year is said without the year. */
+    now?: number | undefined;
     /**
      * EACH ROW'S DECLARED ACTIONS (PGS-A12) and where a press goes, handed the `TableRow` it was on. Drawn in a last
      * column, and at a card's end on a phone, only when both are handed; with either absent the table is as it was.
@@ -334,7 +337,7 @@
   Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
   lines apart and the next change to a cell will be made in whichever one the author is reading.
 -->
-{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value, home)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount">{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span>{AMOUNT_SPACE}{drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else}{drawn.body.text}{/if}{/if}{/snippet}
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value, home, now)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount">{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span>{AMOUNT_SPACE}{drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>
@@ -461,7 +464,7 @@
               >{/if}
 {/snippet}
 
-{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {rowActions} {act} />{/await}{:else if rowsAsCards()}
+{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {now} {rowActions} {act} />{/await}{:else if rowsAsCards()}
 <ul class="table-cards">
   {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
     {#if line.kind === 'group'}
