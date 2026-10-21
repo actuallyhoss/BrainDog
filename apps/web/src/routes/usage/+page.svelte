@@ -205,7 +205,7 @@
   <!-- THE SWITCHER IS THE TOOLBAR'S GLASS SEGMENTED CONTROL: the month before, this one, the month after, each by its
        name, and neither past the year the ledger keeps or ahead of this month. Links, so Back is the month before. -->
   {#if view}
-    <Segmented tag="nav" class="months" aria-label={words.months}>
+    <Segmented tag="nav" class="months" aria-label={words.months} full>
       {#if beside.earlier}
         <a class="segment month" href={at(`/usage?month=${beside.earlier}`)} aria-label={words.monthIn(monthWords(beside.earlier))}>{monthWords(beside.earlier)}</a>
       {/if}
@@ -219,14 +219,15 @@
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's,
      not as a page of its own. -->
-<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} actions={months} />
+<!-- THE MONTHS UNDER THE SENTENCE (H22), the page's own switch, full width on a phone: on the name's row they pushed it. -->
+<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} below={months} />
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />
   {:else if fault !== null}
     <ReadState state="fault" screen={words.usage} refusal={fault} onretry={usage.reread} />
   {:else if !view}
-    <Empty kind="no-data-yet" title={words.noLedger} />
+    <Empty kind="no-data-yet" glyph="chart-bar" title={words.noLedger} />
   {:else}
     <!-- A THROW WHILE DRAWING THE BOARD IS THIS SCREEN'S FAULT, said as one with the reason under Details, and never the
          offline sentence: by this point the record has answered. -->
@@ -308,7 +309,7 @@
       <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
       {#if view.totals.runs === 0}
         <!-- WHAT WOULD BE COUNTED, AND WHERE IT RUNS FROM (money F14): the tile said a month was empty and stopped. -->
-        <Empty kind="no-data-yet" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} body={usageWords.emptyBody}>
+        <Empty kind="no-data-yet" glyph="chart-bar" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} body={usageWords.emptyBody}>
           {#snippet actions()}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/snippet}
         </Empty>
       {:else}
