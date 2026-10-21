@@ -32,6 +32,7 @@ import { figuresHome } from './figures-home.ts';
 import { forecastRunway } from './forecast-runway.ts';
 import { governanceDecided, governanceLater, governanceOpen } from './governance.ts';
 import { handoffsOpen } from './handoffs-open.ts';
+import { kpisSource } from './kpis.ts';
 import { runsOn } from './runs-on.ts';
 import { sessionsLive } from './sessions-live.ts';
 import { sessionsWorking } from './sessions-working.ts';
@@ -96,6 +97,7 @@ export const SOURCE_MODULES: Record<string, Source> = {
   'usage.days': usageDays,
   'usage.actions': usageActions,
   'usage.projects': usageProjects,
+  kpis: kpisSource,
 };
 
 /** The module that answers `name`, or `undefined` for a word that is no registered source: a list, a figure or nothing. */

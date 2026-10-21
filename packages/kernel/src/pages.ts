@@ -23,7 +23,9 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type WhenReader } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
+import * as kpiRank from './kpi-rank.ts';
+import type { KpiAnswer } from './sources/kpis.ts';
 import { cutActions, type OfferedAction } from './row-actions.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook, type LookBody } from './compose.ts';
 /* A PAGE'S HEAD OVER ITS TITLE (PGS-A16), read and resolved by the file that checks it at install. */
@@ -44,7 +46,7 @@ import { BODY_KINDS, type Shows } from './govern.ts';
 import { CARD_FOLD, CARD_FOLD_MOST } from './declare.ts';
 import { fill } from './fill.ts';
 import { isCurrencyCode, type Json } from './coerce.ts';
-import { exponentOf } from './ingest.ts';
+import { exponentOf, moneyText } from './ingest.ts';
 import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Part, type Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type MetricDecl, type Reading } from './metrics.ts';
@@ -53,7 +55,7 @@ import { beyondOf, figureLists, isRolled, pointedIn, type PointsAt, type Rolled 
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { factsOf, type CardFact } from './card-facts.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
-import { isBucket } from './buckets.ts';
+import { bucketStart, isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS, type Presence } from './presence.ts';
 import { SESSION_PREFIX, agentOf, recordNamed } from './session.ts';
 import { quietSign, type VitalSign } from './signs.ts';
@@ -289,9 +291,11 @@ export type PageBlock = {
   register?: string;
   /**
    * Over `runs_on`: the project whose keys, tools, skills and actions it reads, by its spoken id, `'{{spoken}}'` on the
-   * project's template.
+   * project's template. Over `kpis` for one project, that project.
    */
   about?: string;
+  /** A `kpis` block's: one project's key numbers, the few that lead Today, or the one each project's card leads with (`sources/kpis.ts`). */
+  for?: KpisFor;
   /**
    * A `section`'s on a page per row: the host panel drawn for that row under the section's heading, `actions`,
    * `reporting`, `run` or `seen` (`kinds/words.ts` `PANELS`). The record checks the word and hands it back; the panel is the host's.
@@ -471,6 +475,8 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `series` block's buckets and each line's value in them. */
   bars?: Bars;
+  /** A `kpis` block's key numbers, each with its points, shape, chart, verdict and why it is here (`sources/kpis.ts`). */
+  kpis?: KpiAnswer[];
   /**
    * A `stat` or `lines` over a register of readings: one series a measure (`measures.ts`). A `stat`'s are every measure,
    * the ones that moved most first; a `lines` block's are only the measures with two points or more in the period to join.
@@ -5985,6 +5991,15 @@ const SOURCE_KIT = {
   sellsOf,
   pastIn,
   fxOf,
+  /* the key numbers: their rules (`kpi-rank.ts`), every row of a list, a figure with its project filled, money said */
+  kpiRank,
+  kpisFault,
+  everyRow,
+  fill,
+  moneyText,
+  exponentOf,
+  isBucket,
+  bucketStart,
 };
 export type SourceKit = typeof SOURCE_KIT;
 
