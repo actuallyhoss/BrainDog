@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Working } from '../record/boot-live.ts';
-import { forSaid, workingRows } from './desk.ts';
+import type { LiveRun, Thread } from '../record/instruct.ts';
+import { LIVE_WORDS, forSaid, liveRows, workingRows } from './desk.ts';
 
 const NOW = Date.parse('2026-10-19T10:00:00Z');
 const run = (over: Partial<Working> = {}): Working => ({
@@ -53,4 +54,56 @@ test('a working run says how long, never the clock it began at', () => {
 
 test('nobody working is no rows', () => {
   assert.deepEqual(workingRows([], new Map(), NOW), []);
+});
+
+const presence = (over: Partial<LiveRun> = {}): LiveRun => ({
+  run: 'S82',
+  name: null,
+  agent: 'claude',
+  machine: null,
+  project: 'things#1',
+  repo: null,
+  worktree: null,
+  branch: null,
+  doing: 'Merging wave 1',
+  state: 'working',
+  instruction: null,
+  task: null,
+  stopped: null,
+  helpers: [],
+  parent: null,
+  for_s: 600,
+  heard_s: 10,
+  reach: 'hooks',
+  ...over,
+});
+
+const thread = (id: string, said: string) => ({ id, said }) as unknown as Thread;
+
+test('presence speaks over boot’s rows: what it is doing, for how long, and what he told it that it holds', () => {
+  const drawn = workingRows([run()], new Map([['Larkspur', 210]]), NOW);
+  const [r] = liveRows(drawn, [presence({ instruction: 'IN4' })], [thread('IN4', 'Merge wave 1,\n then stop')], NOW);
+  assert.equal(r?.run, 'S82');
+  assert.equal(r?.agent, 'Claude');
+  assert.equal(r?.project, 'Larkspur', 'the project by the name and colour Today draws its card in');
+  assert.equal(r?.slot, 'sky');
+  assert.equal(r?.doing, 'Merging wave 1');
+  assert.equal(r?.began, 'for 10 min');
+  assert.equal(r?.holds, 'Merge wave 1, then stop');
+  assert.equal(r?.word, null);
+});
+
+test('a paused or stopped run says so in the time’s place, a helper is no row, and a run gone is gone', () => {
+  const drawn = workingRows([run()], new Map(), NOW);
+  const rows = liveRows(
+    drawn,
+    [presence({ stopped: 'pause' }), presence({ run: 'S83', parent: 'S82' }), presence({ run: 'S84', state: 'gone' }), presence({ run: 'S85', state: 'waiting' })],
+    [],
+    NOW,
+  );
+  assert.deepEqual(rows.map((x) => x.run), ['S82'], 'a waiting run boot does not count is not working');
+  assert.equal(rows[0]?.word, LIVE_WORDS.pause);
+  assert.equal(rows[0]?.held, 'pause');
+  assert.equal(rows[0]?.live, 'quiet');
+  assert.equal(liveRows(drawn, [presence({ state: 'waiting' })], [], NOW)[0]?.word, LIVE_WORDS.waiting, 'one boot counts says it waits');
 });

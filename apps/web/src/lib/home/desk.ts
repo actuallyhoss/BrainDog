@@ -9,6 +9,7 @@
 import { since } from 'braindog-render';
 
 import type { Working } from '../record/boot-live.ts';
+import type { LiveRun, Thread } from '../record/instruct.ts';
 import { actor } from '../record/names.ts';
 import { slotOf, type Slot } from '../ui/face.ts';
 
@@ -28,7 +29,16 @@ export type WorkingRow = {
    * run gone quiet, when it was last heard ("12h ago"). Empty where the record did not say when it began.
    */
   began: string;
+  /** Paused or stopped by him, from `presence`; `null` while it runs as it likes. */
+  held?: 'stop' | 'pause' | null;
+  /** What it holds from him, in his words, from `presence` and what he told it: "Merge wave 1, then stop". */
+  holds?: string | null;
+  /** What the time's place says instead of how long, where `presence` says it is not working: "waiting", "Paused by you". */
+  word?: string | null;
 };
+
+/** The words a row from `presence` says in place of how long. */
+export const LIVE_WORDS = { waiting: 'waiting', pause: 'Paused by you', stop: 'Stopped by you' } as const;
 
 /** How many agents the desk names; the rest are counted. */
 export const WORKING_MOST = 4;
@@ -65,4 +75,37 @@ export function forSaid(iso: string, now: number): string {
   if (h < 24) return `for ${h} h`;
   const at = new Date(t);
   return `since ${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}`;
+}
+
+/**
+ * THE ROWS AS `presence` SAYS THEM (agents and MCP plan §4.4, §7.2), over the rows `boot` drew at the first paint: each
+ * lead run open now that is working or thinking, or that `boot` counts as working, with what it says it is doing, how
+ * long it has been at it, what he told it that it holds, and whether he paused or stopped it. A helper is folded under
+ * the run it works for and is not a row. The project's name and colour are the `boot` row's for the same run, since
+ * `presence` names a project by its handle and Today names it by its card.
+ */
+export function liveRows(rows: readonly WorkingRow[], live: readonly LiveRun[], threads: readonly Thread[], now: number): WorkingRow[] {
+  const drawn = new Map(rows.map((r) => [r.run, r] as const));
+  const leads = live.filter((r) => r.parent === null && r.state !== 'ended' && r.state !== 'gone' && (r.state === 'working' || r.state === 'thinking' || drawn.has(r.run)));
+  return leads.map((r) => {
+    const was = drawn.get(r.run);
+    const told = r.instruction === null ? null : (threads.find((t) => t.id === r.instruction) ?? null);
+    const working = r.state === 'working' || r.state === 'thinking';
+    const began = new Date(now - Math.max(0, r.for_s) * 1000).toISOString();
+    const doing = r.doing?.trim() || was?.doing || null;
+    return {
+      key: r.run,
+      agent: was?.agent ?? actor(r.agent ?? 'other').name,
+      run: r.run,
+      live: working && r.stopped === null ? 'working' : 'quiet',
+      project: was?.project ?? null,
+      hue: was?.hue ?? null,
+      slot: was?.slot ?? null,
+      doing,
+      began: forSaid(began, now),
+      held: r.stopped,
+      holds: told ? told.said.replace(/\s+/gu, ' ').trim() : null,
+      word: r.stopped ? LIVE_WORDS[r.stopped] : working ? null : LIVE_WORDS.waiting,
+    };
+  });
 }
