@@ -16,7 +16,7 @@
       <h2 id="faq-title" class="band-h2">{q.title}</h2>
       <p class="aside">{q.aside} <a href="mailto:{q.email}">{q.email}</a>.</p>
     </div>
-    <div class="c8 list">
+    <div class="c8 qs">
       {#each q.questions as item, i (item.q)}
         <details open={i === 0}>
           <summary>{item.q}<Icon name="chevron-down" /></summary>
@@ -42,7 +42,7 @@
     text-underline-offset: 3px;
   }
 
-  .list {
+  .qs {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
@@ -114,7 +114,7 @@
   }
 
   @media (max-width: 1059px) {
-    .list {
+    .qs {
       margin-block-start: 28px;
     }
   }
