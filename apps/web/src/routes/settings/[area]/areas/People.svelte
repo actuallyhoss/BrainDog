@@ -290,6 +290,10 @@
     { reach: 'lists', said: copy.inviteChosenLists },
   ];
   let inviting = $state(false);
+  /* WHAT THE FORM STILL NEEDS, said under the button when it is pressed (UI pass of 21 October, H35): the button is
+     never drawn grey for a field left empty, which read as broken; it says what is missing and goes to it. */
+  let inviteWhy = $state('');
+  const inviteNeeds = { email: 'Add their email so the link is bound to it.', lists: 'Give at least one list a level.' } as const;
   let madeLink = $state<{ email: string; link: string } | null>(null);
   let waitingInvites = $state<Waiting[]>([]);
 
@@ -321,7 +325,13 @@
     e.preventDefault();
     const email = inviteTo.trim();
     const reach = reachChosen;
-    if (!email || !reach || inviting) return;
+    if (inviting) return;
+    if (!email || !reach) {
+      inviteWhy = !email ? inviteNeeds.email : inviteNeeds.lists;
+      if (!email) document.getElementById('invite-email')?.focus();
+      return;
+    }
+    inviteWhy = '';
     if (peopleFrom !== 'live') {
       cannotWrite();
       return;
@@ -799,6 +809,7 @@
           autocapitalize="off"
           spellcheck="false"
           bind:value={inviteTo}
+          oninput={() => (inviteWhy = '')}
         />
       </div>
       <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
@@ -845,9 +856,10 @@
         </ul>
       {/if}
       <div class="invite-send">
-        <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim() || !reachChosen} aria-busy={inviting}>
+        <Button weight="primary" type="submit" disabled={inviting} aria-busy={inviting}>
           <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
         </Button>
+        {#if inviteWhy}<p class="invite-why" role="alert">{inviteWhy}</p>{/if}
       </div>
     </form>
 
@@ -1296,6 +1308,12 @@
 
   .invite-send {
     margin-block-start: var(--sp-1);
+  }
+
+  .invite-why {
+    margin: var(--sp-2) 0 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* New link and Withdraw stay together at the end of the row, and wrap under it on a phone. */
