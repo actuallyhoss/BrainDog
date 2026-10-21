@@ -131,6 +131,11 @@ test('SETTINGS ONLY NARROW: Read refuses, Suggest asks, lists and projects ask w
   /* WHOAMI READS IT, AND NO TOKEN WRITES IT. */
   const me = value<{ effective: { may: string; projects: string[] | null; profile: { name: string } | null } }>(await api.whoami(ctx));
   assert.deepEqual([me.effective.may, me.effective.projects, me.effective.profile?.name], ['write', [`things#${String(portage.seq)}`], 'Claude Code']);
+  /* THE STOP SWITCH AND THE CHANNEL, which the CLI's hooks and bridge read: on and off by default, then as he set them. */
+  const enforce = async () => value<{ effective: { enforce: { hooks: boolean; channel: boolean } } }>(await api.whoami(ctx)).effective.enforce;
+  assert.deepEqual(await enforce(), { hooks: true, channel: false });
+  value(await api.setAgentProfile({ id: row.id, enforce: { hooks: false, channel: true } }, owner));
+  assert.deepEqual(await enforce(), { hooks: false, channel: true });
   assert.equal(refusal(await api.setAgentProfile({ id: row.id, ceiling: 'write' }, ctx)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.agentProfiles({}, ctx)).code, 'FORBIDDEN');
   const rows = value<{ id: string }[]>(await api.agentProfiles({}, owner));

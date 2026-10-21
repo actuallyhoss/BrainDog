@@ -1539,7 +1539,8 @@ export type MergeCluster = {
  * What a token may do under his settings (plan §5.1), as `whoami` and `context` answer it, to read and never to write:
  * the row it works under and how that matched (`null` while the record holds no row that applies, when nothing
  * narrows), min(token scope, the row's ceiling), that as one sentence, the lists and projects it writes (`null` for
- * all), the tools switched off, his brief for it, its context size, and what stops it.
+ * all), the tools switched off, his brief for it, its context size, whether his stop switch (Claude Code's hooks) and
+ * the channel are on for it, and what stops it.
  */
 export type EffectiveSettings = {
   profile: { id: string; name: string; applies: 'token' | 'name' | 'default' } | null;
@@ -1550,6 +1551,7 @@ export type EffectiveSettings = {
   tools_off: string[];
   brief: string | null;
   context: { budget: number; lines: boolean };
+  enforce: { hooks: boolean; channel: boolean };
   stop: Stop | null;
 };
 
@@ -2488,6 +2490,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       tools_off: p === null ? [] : Object.entries(p.tools).flatMap(([tool, on]) => (on === false ? [tool] : [])),
       brief: p?.brief ?? null,
       context: p?.context ?? { budget: 700, lines: true },
+      enforce: p?.enforce ?? { hooks: true, channel: false },
       stop: held === null || run === null ? null : kernel.stopOf(run.id),
     };
   };
