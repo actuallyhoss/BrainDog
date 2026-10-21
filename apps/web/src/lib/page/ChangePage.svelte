@@ -28,7 +28,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { copy } from '$lib/copy.ts';
   import { changeWords as words } from '$lib/record/slash.ts';
-  import Icon from '$lib/ui/Icon.svelte';
+  import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -67,7 +67,10 @@
     look = null,
     keys = () => [],
     heads = () => [],
+    extra = [],
   }: {
+    /** Links the page offers first, above its own entries: a project's "Edit details" (proj F7, VERIFY H13). */
+    extra?: readonly { label: string; icon: IconName; href: string }[];
     /** The page's address, which the description is about. */
     slug: string;
     /** The page's title, which names the menu for a screen reader. */
@@ -211,7 +214,7 @@
   }
 
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(mayChange || mayPin || source !== null || (onarrange !== null && wide.current));
+  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -221,6 +224,7 @@
   {#snippet trigger()}
     <span class="change-more"><Icon name="more" size="s" /><span class="change-vh">{words.more(title)}</span></span>
   {/snippet}
+  {#each extra as x (x.href)}<a class="mi" role="menuitem" href={at(x.href)}><Icon name={x.icon} size="s" />{x.label}</a>{/each}
   {#if mayChange}<button type="button" class="mi" role="menuitem" onclick={() => (open = true)}><Icon name="ask" size="s" />{words.change}</button>{/if}
   {#if mayPin}
     <!-- THE PIN, NAMED BY HOW THE PAGE CAME TO LOOK AS IT DOES, which is drawn under it as a quiet line and said to a

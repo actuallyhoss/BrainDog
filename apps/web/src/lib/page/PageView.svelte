@@ -676,12 +676,20 @@
         <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
-        {#if projectPage && about}
-          <!-- EDIT DETAILS, where the hero's Details link was (proj F7); the ⋯ menu is `ChangePage`'s and offers no row. -->
-          <Button href={`/r/${about.register}/${about.seq}`}><Icon name="edit" size="s" />Edit details</Button>
-        {/if}
+        <!-- EDIT DETAILS IS THE ⋯ MENU'S FIRST ROW ON A PROJECT (proj F7, VERIFY H13): a button of its own made the phone
+             head three controls wide, beside Share and the menu. -->
         <ShareMenu {slug} />
-        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} heads={blockHeads} />
+        <ChangePage
+          {slug}
+          title={live.page.page.title}
+          {showSource}
+          {reread}
+          onarrange={arranger?.entry() ?? null}
+          {look}
+          keys={drawnKeys}
+          heads={blockHeads}
+          extra={projectPage && about ? [{ label: 'Edit details', icon: 'edit', href: `/r/${about.register}/${about.seq}` }] : []}
+        />
       {/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
