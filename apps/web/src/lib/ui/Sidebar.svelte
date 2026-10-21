@@ -169,7 +169,7 @@
   const ownerFirst = $derived(shell.me?.owner ? (nameOf(shell.me.person).split(/\s+/u)[0] ?? '') : '');
   const recordName = $derived(record.trim() || ownerFirst || words.unnamed);
   /* THE PERSON AT THE FOOT, by the name the record told this reader, else "You". */
-  const person = $derived(nameOf(shell.me?.person) || words.you);
+  const person = $derived(nameOf(shell.me?.person) || shell.me?.name?.trim() || words.you);
 
   /** Eight lists, then one row that shows the rest; the list you are in is drawn wherever it sits. */
   const LISTS_SHOWN = 8;

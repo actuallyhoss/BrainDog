@@ -131,6 +131,11 @@ type ShellBase = {
 export type Shell = ShellBase & {
   me: {
     person: string;
+    /**
+     * THE READER'S OWN NAME as `boot` says it (`me.name`), which a guest's `names` does not carry: her face on the bar is
+     * her own first letter, never the "Y" of "You". Absent where the record knows no name.
+     */
+    name?: string;
     level: string;
     owner: boolean;
     /* THE SWITCHER'S OWN ROW, so a record where somebody holds some lists arrives with `level: null` and `held`. */
@@ -1043,6 +1048,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
       owner: level === 'owner',
       records: record ? [{ slug: record.slug, name: record.name, level }] : [],
       lists: held,
+      ...(typeof b.me?.name === 'string' && b.me.name.trim() !== '' ? { name: b.me.name.trim() } : {}),
       ...((levels) => (levels === null ? {} : { levels }))(levelsFrom((b.me as Record<string, unknown> | undefined)?.levels)),
       ...(b.me?.prefs ? { prefs: b.me.prefs as Prefs } : {}),
       ...grantFrom(b.me),

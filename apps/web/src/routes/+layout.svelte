@@ -362,8 +362,9 @@
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
     if (names.length > 0) toasts.push(copy.placeArrived(names));
   });
-  /* THE PERSON READING, by the name the record told them, for the top bar's face. */
-  const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim());
+  /* THE PERSON READING, by the name the record told them, for the top bar's face: a guest's own name comes with `me`,
+     since `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */
+  const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim() || (data.me.name ?? '').trim());
 
   /* WHERE THE READER IS, for the sheet's rows: the Work screen is a place of its own, so Today is not marked on it too. */
   const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));

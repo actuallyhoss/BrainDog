@@ -86,7 +86,8 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
     'an empty list could not be filed into or given an exception on',
   );
   assert.deepEqual(shell.nav.map((n) => [n.href, n.section, n.icon]), [['/p/money', 'Work', 'doc']]);
-  assert.deepEqual(shell.me, { person: 'p_1', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }], lists: null });
+  /* HER OWN NAME AS boot SAID IT, so her face on the bar is her own letter. */
+  assert.deepEqual(shell.me, { person: 'p_1', name: 'Ada', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }], lists: null });
   assert.deepEqual(shell.questions.map((q) => [q.id, q.title]), [['SG4', 'Renew the domain?']]);
   assert.equal(shell.inbox, 0, 'a count the record withheld became a number');
   assert.equal(shell.open, 30, 'the rail counted the list boot caps, not the questions the record has open');

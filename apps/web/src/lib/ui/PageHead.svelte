@@ -176,12 +176,12 @@
   const wayBack = $derived(Boolean(kicker && back));
 
   /* THE SHELL'S WORDS FOR THE BAR: the record's name beside the mark, and the person's first letter on the face. */
-  const shell = $derived(page.data as { me?: { person?: string }; names?: Record<string, string>; index?: { name?: string } } | undefined);
+  const shell = $derived(page.data as { me?: { person?: string; name?: string }; names?: Record<string, string>; index?: { name?: string } } | undefined);
   const record = $derived(shell?.index?.name ?? '');
   const face = $derived.by(() => {
     const id = shell?.me?.person;
     const name = id && shell?.names && Object.hasOwn(shell.names, id) ? (shell.names[id] ?? '').trim() : '';
-    return (name || 'You').slice(0, 1).toUpperCase();
+    return (name || shell?.me?.name?.trim() || 'You').slice(0, 1).toUpperCase();
   });
 
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
