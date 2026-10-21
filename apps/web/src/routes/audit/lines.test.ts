@@ -218,6 +218,9 @@ test('the sentence under the title counts what changed while the reader was away
   assert.equal(awaySaid(['S4', 'slash'], null, NO_NAMES, false), '2 changes since you were last here. Agents made all of them.');
   assert.equal(awaySaid([...agents, 'you'], null, NO_NAMES, true), 'More than 23 changes since you were last here. Agents made 22 of the newest 23.');
   assert.equal(awaySaid([], null, NO_NAMES, false), 'Nothing changed since you last looked.');
+  /* A READ THAT STOPPED SHORT SAYS THE PAGE'S OWN COUNT, the one its tile says, where it has counted more (P29). */
+  assert.equal(awaySaid([...agents, 'you'], null, NO_NAMES, true, null, { total: 195, agents: 5 }), '195 changes since you were last here. Agents made 5.');
+  assert.equal(awaySaid([...agents, 'you'], null, NO_NAMES, true, null, { total: 10, agents: 5 }), 'More than 23 changes since you were last here. Agents made 22 of the newest 23.', 'a count under the read is not used');
 });
 
 test('the newest page read again adds what arrived on top, and a page that does not meet what is held stands alone', () => {

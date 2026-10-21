@@ -22,6 +22,7 @@
  */
 
 import { sessionDeclaration } from '@braindog/kernel';
+import { readable } from 'braindog-render';
 import { useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
@@ -247,7 +248,15 @@ export function awaySaid(
   names: ReadonlyMap<string, string>,
   capped: boolean,
   byWho: ByWho | null = null,
+  /* THE PAGE'S OWN COUNT, the one its What changed tile says, when the record's read stopped short of it (P29): the line
+     said "More than 60 changes … Agents made 5 of the newest 60" beside a tile saying 195 and "5 by agents". */
+  counted: { total: number; agents: number } | null = null,
 ): string {
+  if (capped && counted !== null && counted.total >= actors.length && counted.total > 0) {
+    const head = counted.total === 1 ? historyWords.oneAway : historyWords.manyAway(counted.total);
+    if (counted.agents === 0) return `${head}.`;
+    return counted.agents === counted.total ? `${head}. Agents made all of them.` : `${head}. Agents made ${counted.agents === 1 ? 'one' : count(counted.agents)}.`;
+  }
   const n = actors.length;
   if (n === 0) return historyWords.nothingNew;
   /* THE RECORD'S OWN COUNT WHEN IT SENT ONE, so this sentence and an agent asking `whatsNew` read the same number; a host
@@ -366,7 +375,8 @@ export const listOf = (target: string | undefined): string | null => (target ===
  * here and nowhere else.
  */
 export function thingOf(target: string, title: string | null, nameOf: (list: string) => string = listName): Thing | null {
-  const said = title !== null && title.trim() !== '' ? moneyInText(title) : null;
+  /* A BANK'S LINE IN CAPITALS READS AS WORDS (H21, `readable`): "Changed LEDGER POST" is "Changed Ledger Post". */
+  const said = title !== null && title.trim() !== '' ? moneyInText(readable(title)) : null;
   const row = ROW.exec(target);
   /* A ROW GOES TO ITS OWN PAGE rather than through the spoken-id resolver, which took `services#6` only once the `#`
      was escaped out of the fragment. */

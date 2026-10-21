@@ -287,7 +287,6 @@
       .catch(() => undefined)
       .finally(() => closed(true, at));
   });
-  const lead = $derived(unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho) : undefined);
 
   /**
    * THE MARK IS STAMPED WHEN THE READER LEAVES, as Home stamps it, and only when the sentence above said something was
@@ -529,6 +528,12 @@
   const more = $derived(live !== null && live.cursor !== null);
   const lanes = $derived(lanesOf(kept, clock, me, names));
   const tally = $derived(tallyOf(matched, me, names));
+  /* THE SAME COUNT OVER EVERYTHING READ, whatever the chips narrow, for the line under the title (`awaySaid`). */
+  const whole = $derived(tallyOf(kept, me, names));
+  /* The line under the title, below `whole`, which it reads. */
+  const lead = $derived(
+    unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : undefined,
+  );
   const busy = $derived(busyOf(kept, clock));
   const topKinds = $derived(
     tally.kinds.slice(0, 5).map((k) => ({

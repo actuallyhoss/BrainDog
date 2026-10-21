@@ -151,5 +151,6 @@ test('Activity draws the pass as its sentence, and what it did closed until pres
   assert.match(markup, /aria-expanded=\{open\}/u, 'the press says whether it is open');
   assert.match(markup, /\{#if open\}\s*<ul class="ledger steps">/u, 'the steps are drawn only once opened');
   assert.match(page, /let passesOpen = \$state<ReadonlySet<string>>\(new Set\(\)\);/u, 'and every pass starts closed');
-  assert.match(page, /awaySaid\(unseen\.actors, me, names, unseen\.capped, unseen\.byWho\)/u, "the sentence counts by the record's byWho");
+  /* AND BY THE PAGE'S OWN COUNT, the tile's, where the record's read stopped short of it (P29). */
+  assert.match(page, /awaySaid\(unseen\.actors, me, names, unseen\.capped, unseen\.byWho, \{ total: whole\.total/u, "the sentence counts by the record's byWho");
 });
