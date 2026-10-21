@@ -66,7 +66,8 @@ type Prefs = NonNullable<Answer<'boot'>['me']['prefs']>;
 /** `boot`, and `now` is the record's own instant. See `Boot` in `@braindog/record`. */
 export type Boot = {
   /** Each list the caller reads; `icon` is the glyph its declaration names, `null` for none, absent from an older host. */
-  registers: { id: string; name: string; count: number; icon?: string | null }[];
+  /** `kernel` marks a list the kernel declares itself (the runs, what he told them), never one he filed into. */
+  registers: { id: string; name: string; count: number; icon?: string | null; kernel?: true }[];
   /** ISO 8601, UTC. What day the record thinks it is, which is not always what day the reader does. */
   now: string;
   /* OPTIONAL, because a host older than the session register answers without them. */

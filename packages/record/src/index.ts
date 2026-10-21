@@ -1097,7 +1097,7 @@ export type Boot = {
    * The lists the caller reads, each with its row count and the glyph its declaration names (`icon`), so the rail draws
    * the list's own mark rather than one the web guesses from its id. `null` for a list that names none.
    */
-  registers: { id: string; name: string; count: number; icon: string | null }[];
+  registers: { id: string; name: string; count: number; icon: string | null; kernel?: true }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
   now: string;
   /** The runs that are live now, as `sessionsLive` answers. Empty for a caller who may not read them. */
@@ -9124,6 +9124,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          transaction held open across an `await` is a snapshot another connection's writes wait behind. */
       const [answer, look, looks] = kernel.transaction(() => {
         const out: Boot['registers'] = [];
+        /* THE KERNEL'S OWN LISTS SAY SO (`kernel: true`), by their declaration, so no screen leaves them out by a name. */
+        const own = new Set(kernel.kernelLists());
         for (const [id, decl] of kernel.registers()) {
           /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
              on is inside their ceiling by construction, so its name and its row count went out to the
@@ -9131,7 +9133,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (readable(ctx, id)) continue;
           /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
           const icon = (decl as { icon?: unknown }).icon;
-          out.push({ id, name: decl.name, count: countNow(ctx, id), icon: typeof icon === 'string' && icon !== '' ? icon : null });
+          out.push({ id, name: decl.name, count: countNow(ctx, id), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}) });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);

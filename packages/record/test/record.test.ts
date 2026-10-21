@@ -274,6 +274,21 @@ test('and boot shows only the registers the caller may touch, because a list of 
   sql.close();
 });
 
+test('boot marks the lists the kernel declares itself, by declaration, so no screen counts them as filed', async () => {
+  const { api, sql } = await record();
+  const all = value<{ registers: { id: string; kernel?: true }[] }>(await api.boot(owner));
+  const own = all.registers.filter((r) => r.kernel === true).map((r) => r.id).sort();
+  /* THE SAME AS THE DECLARATIONS SAY: the kernel's pack, and nothing a pack or a person declared. */
+  const declared = sql
+    .all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0")
+    .map((r) => r.id.slice('register.'.length))
+    .sort();
+  assert.deepEqual(own, declared);
+  assert.ok(own.length >= 2, JSON.stringify(own));
+  assert.ok(all.registers.some((r) => r.kernel === undefined), 'every list was marked the kernel\'s');
+  sql.close();
+});
+
 /* ── a page made of figures ─────────────────────────────────── */
 
 test('A PAGE MADE OF FIGURES NAMES THE REGISTERS BEHIND THEM, and it used to name none', async () => {

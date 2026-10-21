@@ -10845,6 +10845,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     registers: () => registers,
     register: (id: string) => registers.get(id),
     /**
+     * The lists the kernel declares itself (`pack_id` kernel: the runs, and what he told them), by id. On every record
+     * and no person's or pack's, so a screen that tells him what he filed leaves them out by this and not by a name.
+     */
+    kernelLists: (): string[] =>
+      sql
+        .all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0")
+        .map((r) => r.id.slice('register.'.length)),
+    /**
      * A live list as `@braindog/where` reads it, or `null` for a list this record does not hold.
      *
      * FOR A CALLER THAT PARSES A SENTENCE ITSELF. The record's `list` reads which fields a caller's sentence filters on,

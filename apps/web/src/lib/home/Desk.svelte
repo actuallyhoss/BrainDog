@@ -28,7 +28,7 @@
     cards: Cards | null;
     working: readonly Working[];
     lines: readonly Line[];
-    lists: readonly { id: string; name: string }[];
+    lists: readonly { id: string; name: string; kernel?: true }[];
     names: Readonly<Record<string, string>>;
     me: string | null;
     now: number;
@@ -43,7 +43,9 @@
   const rows = $derived(workingRows(working, hues, now));
   /* ENOUGH LINES TO GROUP (`arrivalsOf`), which then shows the newest few. */
   const LANDED_READ = 40;
-  const landed = $derived(landedOf(lines, new Map(lists.map((l) => [l.id, l.name])), me, now, new Map(Object.entries(names)), LANDED_READ));
+  /* THE KERNEL'S OWN LISTS (runs, what he told them) are nothing he filed, by their declaration (`kernel`). */
+  const own = $derived(new Set(lists.filter((l) => l.kernel === true).map((l) => l.id)));
+  const landed = $derived(landedOf(lines, new Map(lists.map((l) => [l.id, l.name])), me, now, new Map(Object.entries(names)), LANDED_READ, own));
 </script>
 
 {#if part === 'all' || part === 'working'}<WorkingNow {rows} />{/if}

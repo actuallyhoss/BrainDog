@@ -35,17 +35,32 @@ test('an arrival is drawn with who, what, when and where it was filed', () => {
   assert.match(r?.at ?? '', /12 min/u);
 });
 
+/** The lists the kernel declares itself, as boot marks them (`kernel: true`): invented ids, so no name decides it. */
+const OWN = new Set(['runs-list', 'told-list']);
+
 test('edits, heartbeats, nameless lines and minted ids are not arrivals', () => {
   const rows = landedOf(
-    [line('a', { kind: 'edit' }), line('b', { register: 'session' }), line('c', { title: null }), line('d', { title: '01HZX3Y4ABCDEFGHJKMNPQRSTV' }), line('e')],
+    [line('a', { kind: 'edit' }), line('b', { register: 'runs-list' }), line('c', { title: null }), line('d', { title: '01HZX3Y4ABCDEFGHJKMNPQRSTV' }), line('e')],
     lists,
     null,
     NOW,
+    new Map(),
+    undefined,
+    OWN,
   );
   assert.deepEqual(
     rows.map((r) => r.key),
     ['e'],
   );
+});
+
+test('what he told an agent is no arrival: a list the kernel declares is left out by its declaration, not its name', () => {
+  const told = [1, 2, 3].map((n) => line(`t${n}`, { actor: 'p_me', register: 'told-list', title: `Put the licence price on page ${n}` }));
+  const named = new Map([...lists, ['told-list', 'Instructions']]);
+  /* MARKED KERNEL, NONE IS DRAWN, so Today never says "You filed 3 into Instructions". */
+  assert.deepEqual(landedOf([...told, line('e')], named, 'p_me', NOW, new Map(), undefined, OWN).map((r) => r.key), ['e']);
+  /* AND THE SAME LIST UNMARKED IS AN ORDINARY ONE: the name alone decides nothing. */
+  assert.equal(landedOf(told, named, 'p_me', NOW).length, 3);
 });
 
 test('the reader is You and a list the record does not name is not said', () => {

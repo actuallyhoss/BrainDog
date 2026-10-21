@@ -3,7 +3,8 @@
  * them, each with who brought it, its name, when, and the list it was filed in.
  *
  * ARRIVALS ONLY. A row created, a thing that arrived, matched, extracted or pulled in: not every edit, which the page's
- * own feed already tells. A line with no name to say is left out (never an id), and so is the agents' own heartbeat.
+ * own feed already tells. A line with no name to say is left out (never an id), and so is a line in a list the kernel
+ * declares itself (the runs' heartbeat, what he told an agent), known by its declaration (`own`) and never by a name.
  * Pure, so `landed.test.ts` holds the rules.
  */
 
@@ -73,10 +74,12 @@ export function landedOf(
   now: number,
   names: ReadonlyMap<string, string> = new Map(),
   most = LANDED_MOST,
+  /** The lists the kernel declares itself (`kernel` on boot's lists): nothing he filed. */
+  own: ReadonlySet<string> = new Set(),
 ): Landed[] {
   const out: Landed[] = [];
   for (const l of lines) {
-    if (!ARRIVED.has(l.kind) || l.register === 'session') continue;
+    if (!ARRIVED.has(l.kind) || (l.register !== null && own.has(l.register))) continue;
     const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
     const who = actor(l.actor, me, names, l.run_by ?? null);

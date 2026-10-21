@@ -197,7 +197,7 @@ export type Shell = ShellBase & {
    * somebody an exception read that same list, so a record whose Clients list had no row yet could neither file its
    * first client nor give a bookkeeper access to it: the one way to fill a list was hidden until it was full.
    */
-  lists: { id: string; name: string }[];
+  lists: { id: string; name: string; kernel?: true }[];
   /**
    * THE SLUG OF EVERY PAGE THIS CALLER MAY OPEN, in the rail or not, from `boot`. Home asks for its use case's page only when
    * the record holds it, so a use case with no Home page is not asked for one on every load.
@@ -1023,7 +1023,8 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
         .filter((r) => r.count > 0 || views.has(r.id) || theirs.has(r.id))
         .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(iconSent(r) ?? REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
-    lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
+    /* A LIST THE KERNEL DECLARES SAYS SO, so Arrivals leaves the runs and his instructions out by declaration. */
+    lists: b.registers.map((r) => ({ id: r.id, name: r.name, ...(r.kernel === true ? { kernel: true as const } : {}) })),
     pages: (b.pages ?? []).map((p) => p.slug),
     names: { ...b.names },
     nav,
