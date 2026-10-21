@@ -76,7 +76,8 @@ async function record() {
   return { api, kiln: kiln.id, glaze };
 }
 
-const PRIYA = { kind: 'person', id: 'p_pri', name: 'Priya' } as const;
+/* PRIYA IS ON HIS TEAM HERE, a Viewer of the whole record (`record`), so her amounts are shown unless he hides them. */
+const PRIYA = { kind: 'person', id: 'p_pri', name: 'Priya', team: true } as const;
 
 test('THE SHEET BECOMES THE SHARE JSON: Priya can edit tasks in Kiln for 30 days, and only what was chosen is written', () => {
   const kiln: Subject = { kind: 'project', register: 'things', seq: 1, id: 'e_kiln', name: 'Kiln' };
@@ -113,8 +114,16 @@ test('AN EMAIL ENDS IN 90 DAYS, a condition is a list and its tree, a row is its
   s = { ...s, what: { kind: 'where', where: null } };
   assert.equal(ready(s, tasks), false, 'ready before the condition was said');
   s = { ...s, can: 'comment', what: { kind: 'where', where: { field: 'stage', is: 'Review' } } };
+  /* AN ADDRESS IS OUTSIDE HIS TEAM, so its amounts start hidden (the owner's call of 21 October). */
   assert.deepEqual(sharesOf(s, tasks, NOW, DECLS), [
-    { effect: 'allow', who: { kind: 'email', id: 'priya@studio.co' }, what: { list: 'tasks', where: { field: 'stage', is: 'Review' } }, can: 'comment', when: { until: '2027-01-18T23:59:59.000Z' } },
+    {
+      effect: 'allow',
+      who: { kind: 'email', id: 'priya@studio.co' },
+      what: { list: 'tasks', where: { field: 'stage', is: 'Review' } },
+      can: 'comment',
+      hide: { types: ['money'] },
+      when: { until: '2027-01-18T23:59:59.000Z' },
+    },
   ]);
   assert.equal(ready(withPicked(s, { kind: 'email', email: 'priya' }, NOW), tasks), false, 'ready with an address that is not one');
 

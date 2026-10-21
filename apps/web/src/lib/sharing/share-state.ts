@@ -46,9 +46,12 @@ export type Subject =
   | { kind: 'record'; name: string }
   | { kind: 'held'; id: string; target: ShareTarget; name: string };
 
-/** Who the share is with: somebody on the record, a group, or an address not on it yet. */
+/**
+ * Who the share is with: somebody on the record, a group, or an address not on it yet. `team` is somebody who holds a
+ * role on the whole record (Owner, Admin, Member, Viewer or Adds only); anybody else is outside his team.
+ */
 export type With =
-  | { kind: 'person'; id: string; name: string }
+  | { kind: 'person'; id: string; name: string; team?: boolean | undefined }
   | { kind: 'group'; id: string; name: string; people: number }
   | { kind: 'email'; email: string };
 
@@ -62,8 +65,11 @@ export type SheetState = {
   with: With | null;
   can: ShareRung;
   what: What;
-  /** "Amounts" hides every money field; `fields` hides named ones, by list. */
-  hide: { amounts: boolean; fields: Readonly<Record<string, readonly string[]>> };
+  /**
+   * "Amounts" hides every money field; `fields` hides named ones, by list. `chosen` is whether somebody pressed Amounts:
+   * until they do, it follows who the share is with (`amountsFor`), hidden from anybody outside his team.
+   */
+  hide: { amounts: boolean; fields: Readonly<Record<string, readonly string[]>>; chosen?: boolean | undefined };
   until: Until;
   weekdays: boolean;
   once: boolean;
@@ -83,6 +89,21 @@ export const isEmail = (s: string): boolean => EMAIL.test(s.trim());
 
 /** Somebody the record does not hold yet: their share ends in 90 days unless somebody says otherwise. */
 export const guest = (w: With | null): boolean => w?.kind === 'email';
+
+/** Whether somebody is on his own team: a person with a role on the whole record. A group or an address never is. */
+export const onTeam = (w: With | null): boolean => w?.kind === 'person' && w.team === true;
+
+/**
+ * AMOUNTS ARE HIDDEN FROM ANYBODY OUTSIDE HIS TEAM UNLESS HE SHOWS THEM (the owner's call of 21 October): a guest, a
+ * group or an address is shown a project's tasks and not its money until he turns Amounts off. Somebody on his team
+ * sees amounts, as their role already does. A press on Amounts is his, and who the share is with no longer moves it.
+ */
+export function amountsFor(s: SheetState, w: With | null): SheetState['hide'] {
+  return s.hide.chosen === true ? s.hide : { ...s.hide, amounts: w !== null && !onTeam(w), chosen: false };
+}
+
+/** Amounts pressed: hidden or shown as he says, from now on. */
+export const amountsPressed = (s: SheetState): SheetState => ({ ...s, hide: { ...s.hide, amounts: !s.hide.amounts, chosen: true } });
 
 /** Whether somebody may share at all: an owner, or an Admin over the whole record, as the record's `team` asks. */
 export { canShare } from './may-share.ts';
@@ -105,7 +126,7 @@ export function startOf(subject: Subject): SheetState {
 
 /** Somebody picked: an address starts at 90 days, anybody on the record at no end, unless a chip says its own. */
 export function withPicked(s: SheetState, w: With | null, now: number): SheetState {
-  return { ...s, with: w, until: lengthOf(templateOf(s.template)?.days ?? null, w, now) };
+  return { ...s, with: w, until: lengthOf(templateOf(s.template)?.days ?? null, w, now), hide: amountsFor(s, w) };
 }
 
 /** How long a share lasts unless somebody says otherwise: a chip's days, else 90 for an address, else no end. */
@@ -288,6 +309,38 @@ export function sentenceOf(shares: readonly Share[], s: SheetState, subject: Sub
 /** "a", "a and b", "a, b and c". */
 const joined = (xs: readonly string[]): string => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
+/** The money a share shows, as `sharePreview` answers it (`SharePreview.money` in the record's `sharing.ts`). */
+export type MoneyShown = { lists: readonly string[]; hidden: boolean; figures: readonly { label: string; said: string }[] } | null;
+
+/**
+ * WHAT THEY WILL SEE, MONEY INCLUDED, SAID PLAINLY (the owner's call of 21 October): "Priya will see Kiln's tasks,
+ * notes and money: £18,400 earned in a year." From `sharePreview`'s counts and money: each list it reaches rows of now
+ * by name (a project's own row is the project, not a list in it), then money with the project's own figures, or
+ * "amounts included", or "with every amount hidden", and why when it is hidden because they are outside his team.
+ * `drawn` writes the record's "GBP 18,400.00" as the screen draws money. `null` for a share of named rows.
+ */
+export function seenSaid(
+  w: With,
+  subject: Subject,
+  lists: readonly { list: string; name: string; rows: number }[],
+  money: MoneyShown,
+  hide: SheetState['hide'],
+  drawn: (said: string) => string = (x) => x,
+): string | null {
+  if (subject.kind === 'row' || (subject.kind === 'held' && 'rows' in subject.target)) return null;
+  const who = whoSaid(w);
+  const own = subject.kind === 'project' ? subject.register : null;
+  const named = lists.filter((l) => l.rows > 0 && l.list !== own).map((l) => l.name.toLowerCase());
+  if (named.length === 0 && money === null) return copy.shareSeesNone(who);
+  const of = subject.kind === 'project' ? `${subject.name}'s ` : '';
+  const said = (xs: readonly string[]): string => (xs.length > 0 ? `${of}${joined(xs)}` : subject.kind === 'project' ? subject.name : copy.shareSeenWhat);
+  if (money === null) return copy.shareSeen(who, said(named));
+  if (money.hidden) return hide.amounts && hide.chosen !== true && !onTeam(w) ? copy.shareSeenHiddenOutside(who, said(named)) : copy.shareSeenHidden(who, said(named));
+  const things = said([...named, copy.shareSeenMoney]);
+  if (money.figures.length === 0) return copy.shareSeenAmounts(who, things);
+  return copy.shareSeenFigures(who, things, joined(money.figures.map((f) => `${drawn(f.said)} ${f.label.toLowerCase()}`)));
+}
+
 /**
  * How much they will see now, from `sharePreview`'s counts: "Priya will see 14 tasks now, and new ones as they're
  * added." One of a list is said by the list's own word for one. `null` for a share of named rows, which gains no more.
@@ -337,7 +390,7 @@ export function stateOfShare(k: KeptShare, subject: Subject): SheetState {
     ...startOf(subject),
     with: w,
     can: k.can,
-    hide: { amounts, fields },
+    hide: { amounts, fields, chosen: true },
     until: typeof until === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(until) ? { kind: 'day', day: until.slice(0, 10) } : { kind: 'none' },
     weekdays: k.when?.hours !== undefined,
     once: k.when?.once === true,

@@ -50,7 +50,7 @@ export const shareSheet = {
   shareHideShown: (field: string): string => `Show ${field} again`,
 
   shareUntilLabel: 'Until',
-  shareUntil: { day1: '1 day', week: '1 week', days30: '30 days', day: 'Pick a day', none: 'No end' } as Record<string, string>,
+  shareUntil: { day1: '1 day', week: '1 week', days30: '30 days', day: 'Date', none: 'No end' } as Record<string, string>,
   shareUntilDay: 'The day it ends',
 
   shareMoreLabel: 'More',
@@ -69,6 +69,14 @@ export const shareSheet = {
 
   shareWillSee: (who: string, things: string): string => `${who} will see ${things} now, and new ones as they're added.`,
   shareSeesNone: (who: string): string => `${who} sees nothing here yet, and will see new ones as they're added.`,
+  /* WHAT THEY WILL SEE, MONEY INCLUDED (`seenSaid`): "Priya will see Kiln's tasks, notes and money: £18,400 earned in a year." */
+  shareSeen: (who: string, things: string): string => `${who} will see ${things}.`,
+  shareSeenMoney: 'money',
+  shareSeenWhat: 'what is shared',
+  shareSeenFigures: (who: string, things: string, figures: string): string => `${who} will see ${things}: ${figures}.`,
+  shareSeenAmounts: (who: string, things: string): string => `${who} will see ${things}, amounts included.`,
+  shareSeenHidden: (who: string, things: string): string => `${who} will see ${things}, with every amount hidden.`,
+  shareSeenHiddenOutside: (who: string, things: string): string => `${who} will see ${things}, with every amount hidden, since they're not on your team.`,
   shareCounting: 'Counting what they would see',
   shareCopyLine: 'They can copy what they can see.',
   shareSeeAs: (name: string): string => `See as ${name}`,

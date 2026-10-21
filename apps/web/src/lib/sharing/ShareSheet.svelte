@@ -43,15 +43,17 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import ConditionPicker from './ConditionPicker.svelte';
   import { enterSeeAs, seeingAs } from './see-as.svelte.ts';
+  import { moneyInText } from '$lib/record/money.ts';
   import {
     amountsOffered,
+    amountsPressed,
     canShare,
     chipPressed,
-    countSaid,
     isEmail,
     listsOf,
     offersOf,
     ready,
+    seenSaid,
     sentenceOf,
     sharesOf,
     startOf,
@@ -112,8 +114,9 @@
   /* ── the fold: three choices on a phone ── */
   const phone = new MediaQuery('(width < 640px)');
   let unfolded = $state(false);
-  /* A CHOICE ALREADY MADE IN A FOLDED FIELD keeps the fold open, so nothing chosen is hidden. */
-  const chosen = $derived(s.template !== null || s.what.kind !== 'all' || s.hide.amounts || Object.values(s.hide.fields).some((f) => f.length > 0) || change !== undefined);
+  /* A CHOICE ALREADY MADE IN A FOLDED FIELD keeps the fold open, so nothing chosen is hidden. Amounts is never folded
+     (it stands under Can wherever the share reaches money), so it is no reason to open the rest. */
+  const chosen = $derived(s.template !== null || s.what.kind !== 'all' || Object.values(s.hide.fields).some((f) => f.length > 0) || change !== undefined);
   const folded = $derived(phone.current && !unfolded && !chosen);
 
   /* EVERY OPENING STARTS AFRESH, and reads who is here then, since that changes between two presses. */
@@ -134,7 +137,7 @@
       .then((got) => {
         people = got;
         const p = asked?.kind === 'person' ? got.find((x) => x.id === asked.id) : undefined;
-        if (p && s.with === null) pick({ kind: 'person', id: p.id, name: p.name });
+        if (p && s.with === null) pick({ kind: 'person', id: p.id, name: p.name, team: p.team });
       });
     void ask()
       .groups()
@@ -232,7 +235,10 @@
   const key = $derived(JSON.stringify(shares));
   const landed = $derived(previewed !== null && previewed.key === key ? previewed.got : null);
   const sentence = $derived(landed?.ok && shares.length === 1 ? landed.value.sentence : sentenceOf(shares, s, held, now, decls));
-  const counted = $derived(landed?.ok && s.with ? countSaid(s.with, held, landed.value.lists, decls) : null);
+  /* WHAT THEY WILL SEE, MONEY INCLUDED: the lists it reaches, and the project's own figures or that amounts are hidden. */
+  const counted = $derived(landed?.ok && s.with ? seenSaid(s.with, held, landed.value.lists, landed.value.money ?? null, s.hide, (x) => moneyInText(x)) : null);
+  /* AMOUNTS IS OFFERED WHEREVER THE SHARE REACHES MONEY: what the browser knows of the lists, or what the record says it shows. */
+  const moneyHere = $derived(amountsOffered(s, reached, decls) || (landed?.ok === true && (landed.value.money ?? null) !== null));
   const refusedSaid = $derived(landed && !landed.ok ? landed.fix : null);
   const canSend = $derived(ready(s, held, now) && !busy && refusedSaid === null);
 
@@ -394,7 +400,7 @@
                   <li><button type="button" class="share-offer" onclick={() => pick({ kind: 'email', email: emailOffered ?? '' })}><Icon name="plus" size="s" /><span>{copy.shareWithInvite(emailOffered)}</span></button></li>
                 {/if}
                 {#each peopleOffered.slice(0, 6) as p (p.id)}
-                  <li><button type="button" class="share-offer" onclick={() => pick({ kind: 'person', id: p.id, name: p.name })}><Face name={p.name} size="s" kind="person" /><span>{p.name}</span></button></li>
+                  <li><button type="button" class="share-offer" onclick={() => pick({ kind: 'person', id: p.id, name: p.name, team: p.team })}><Face name={p.name} size="s" kind="person" /><span>{p.name}</span></button></li>
                 {/each}
                 {#each groupsOffered.slice(0, 4) as g (g.id)}
                   <li>
@@ -461,20 +467,23 @@
 
         {/if}
 
-        <!-- HIDE: every amount, or named fields. A title is never hidden. -->
-        {#if !folded && (amountsOffered(s, reached, decls) || hideable.length > 0)}
+        <!-- HIDE: every amount, or named fields. A title is never hidden. AMOUNTS IS NEVER FOLDED: wherever the share
+             reaches money it stands here on a phone too, on for anybody outside his team until he turns it off. -->
+        {#if moneyHere || (!folded && hideable.length > 0)}
           <div class="share-row">
             <span class="share-label" id="{uid}-hide">{copy.shareHideLabel}</span>
             <div class="share-control share-wrap" role="group" aria-labelledby="{uid}-hide">
-              {#if amountsOffered(s, reached, decls)}
+              {#if moneyHere}
                 <button
                   type="button"
                   class="share-chip tap"
                   aria-pressed={s.hide.amounts ? 'true' : 'false'}
                   data-on={s.hide.amounts ? '' : undefined}
-                  onclick={() => (s = { ...s, hide: { ...s.hide, amounts: !s.hide.amounts } })}>{copy.shareHideAmounts}</button
+                  data-share-amounts
+                  onclick={() => (s = amountsPressed(s))}>{copy.shareHideAmounts}</button
                 >
               {/if}
+              {#if !folded}
               {#each hidden as h (`${h.list}.${h.field}`)}
                 <button type="button" class="share-chip tap" data-on="" aria-label={copy.shareHideShown(h.label)} onclick={() => hideField(h.list, h.field, false)}
                   >{h.label}<Icon name="close" size="s" /></button
@@ -495,6 +504,7 @@
                   {#each hideMore as h (`${h.list}.${h.field}`)}<option value="{h.list}{'\u0000'}{h.field}">{h.label}</option>{/each}
                 </select>
               {/if}
+              {/if}
             </div>
           </div>
         {/if}
@@ -503,7 +513,7 @@
         <div class="share-row">
           <span class="share-label" id="{uid}-until">{copy.shareUntilLabel}</span>
           <div class="share-control">
-            <Segmented role="group" aria-labelledby="{uid}-until">
+            <Segmented role="group" aria-labelledby="{uid}-until" class="share-until">
               {#each UNTILS as u (u)}
                 <button
                   type="button"
@@ -742,6 +752,19 @@
 
   .share-day-label {
     margin: 0;
+  }
+
+  /* THE FIVE LENGTHS ON ONE LINE, at 390 and in the drawer: each takes what its words need, with a little less room
+     round them than a segment's own, and none wraps inside itself. */
+  .share-control :global(.share-until) {
+    flex-wrap: nowrap;
+  }
+
+  .share-control :global(.share-until > .segment) {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    padding-inline: var(--sp-2);
+    white-space: nowrap;
   }
 
   .share-switches {

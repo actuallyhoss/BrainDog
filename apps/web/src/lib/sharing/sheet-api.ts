@@ -18,12 +18,20 @@ import type { Share } from '@braindog/kernel';
 
 import type { Fetch } from '../record/boot-live.ts';
 
-export type Preview = { sentence: string; lists: { list: string; name: string; rows: number }[] };
+export type Preview = {
+  sentence: string;
+  lists: { list: string; name: string; rows: number }[];
+  /** The money it shows (`SharePreview.money`); absent from a host older than it, which is read as none. */
+  money?: { lists: string[]; hidden: boolean; figures: { label: string; said: string }[] } | null;
+};
 export type Refused = { ok: false; code: string; fix: string; at: string | undefined };
 export type Got<T> = { ok: true; value: T } | Refused;
 
-/** Somebody on the record the sheet offers, by name. An owner already sees everything and is never offered. */
-export type Here = { id: string; name: string; email: string | null };
+/**
+ * Somebody on the record the sheet offers, by name. An owner already sees everything and is never offered. `team` is
+ * whether they hold a role on the whole record; a guest who holds only shares is offered too, and is not on his team.
+ */
+export type Here = { id: string; name: string; email: string | null; team: boolean };
 export type Group = { id: string; name: string; people: number };
 
 const refused = (out: { ok: false } & ({ refusal: { code: string; fix: string; at?: string } } | object)): Refused =>
@@ -35,15 +43,21 @@ export const asksConfirm = (r: Refused): boolean => r.code === 'NEEDS_BROWSER_SE
 export function sheetApi(base: string, io?: Fetch) {
   const c = createClient({ base, ...(io ? { fetch: io } : {}) });
   return {
-    /** The people on the record, owners and the caller left out. */
+    /**
+     * The people on the record, owners and the caller left out: its members, each said to be on his team when they hold
+     * a role on the whole record, and the guests a live share is with, who are not.
+     */
     async people(me: string): Promise<Here[]> {
-      const out = await c.call<Member[]>('members');
+      const [out, shared] = await Promise.all([c.call<Member[]>('members'), c.call<{ who: { kind: string; id: string }; who_name: string | null; ended_at: string | null }[]>('sharing')]);
       if (!out.ok) return [];
-      return out.value
+      const members = out.value
         .filter((m) => m.level !== 'owner' && m.person_id !== me && m.suspended_at === null)
-        .map((m) => ({ id: m.person_id, name: m.name ?? m.email ?? '', email: m.email }))
-        .filter((p) => p.name !== '')
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .map((m) => ({ id: m.person_id, name: m.name ?? m.email ?? '', email: m.email, team: m.level !== null }));
+      const known = new Set([...out.value.map((m) => m.person_id), me]);
+      const guests = new Map<string, Here>();
+      for (const r of shared.ok ? shared.value : [])
+        if (r.who.kind === 'person' && r.ended_at === null && !known.has(r.who.id) && r.who_name) guests.set(r.who.id, { id: r.who.id, name: r.who_name, email: null, team: false });
+      return [...members, ...guests.values()].filter((p) => p.name !== '').sort((a, b) => a.name.localeCompare(b.name));
     },
 
     /** The record's groups, by name. None where the host is older than `groups`. */
