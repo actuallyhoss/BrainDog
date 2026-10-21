@@ -167,20 +167,21 @@
         </div>
         </div>
       </div>
+
+      {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
+      {#if filed !== null}
+        <p class="said" role="status">
+          {#if filed !== ''}<a class="link" href={at(`/decide/${filed}`)}>{words.sent}</a>{:else}{words.sent}.{/if}
+          {words.sentLine}
+        </p>
+      {/if}
+
+      <!-- AT THE TILE'S FOOT, ON THE START EDGE (UI pass of 21 October, H38), never loose on the board under it. -->
+      <div class="do form-submit">
+        <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
+      </div>
     </div>
   </Tile>
-
-  {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
-  {#if filed !== null}
-    <p class="said" role="status">
-      {#if filed !== ''}<a class="link" href={at(`/decide/${filed}`)}>{words.sent}</a>{:else}{words.sent}.{/if}
-      {words.sentLine}
-    </p>
-  {/if}
-
-  <div class="do form-submit">
-    <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
-  </div>
 </div>
 
 <style>
