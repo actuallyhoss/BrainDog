@@ -500,9 +500,18 @@
     }
   }
 
+  /* 44 BY 44 UNDER A THUMB: the padding grows the line's press and a `::before` takes it to the skin's target, as `.tap`
+     does (`a11y.css`); "2 need you" was 43 tall. */
   @media (pointer: coarse) {
     .lead {
+      position: relative;
       padding-block: 10px;
+    }
+
+    .lead::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
     }
   }
 

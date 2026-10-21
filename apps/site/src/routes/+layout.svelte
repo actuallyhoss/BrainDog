@@ -321,6 +321,31 @@
     }
   }
 
+  /* AND STILL 44 UNDER A THUMB, as every small button on the site (`app.css`): the rule above is later than the one that
+     gave it 44, and a phone got a 34px start button. */
+  @media (max-width: 760px) and (pointer: coarse) {
+    .go :global(.btn) {
+      block-size: var(--tap);
+    }
+  }
+
+  /* THE NARROWEST PHONES: the brand, "Get early access" and the menu came to 340 in a 320 window, and the menu went off
+     its edge. The brand's name steps down and the spaces close up, so all three stay on the one row. */
+  @media (max-width: 359px) {
+    .bar {
+      gap: 6px;
+    }
+
+    .brand {
+      gap: 6px;
+      font-size: 17px;
+    }
+
+    .go :global(.btn) {
+      padding-inline: 10px;
+    }
+  }
+
   /* ── The footer ─────────────────────────────────────────────────────────── */
 
   .site-foot {

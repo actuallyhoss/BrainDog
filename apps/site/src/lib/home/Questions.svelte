@@ -42,6 +42,19 @@
     text-underline-offset: 3px;
   }
 
+  /* 44 BY 44 UNDER A THUMB, grown by a `::before` as `.tap` grows one (`a11y.css`); the address alone was 21 tall. */
+  @media (pointer: coarse) {
+    .aside a {
+      position: relative;
+    }
+
+    .aside a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   .qs {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
