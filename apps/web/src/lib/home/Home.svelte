@@ -439,7 +439,10 @@
    */
   function keepCopy(slug: string | null, out: Opened, said: News | null, mark: number, stamp: string): void {
     if (out.from !== 'live') return;
-    const reader = data.me.person;
+    /* WHO IT WAS READ FOR, AND WHAT THEY HELD: a grant that moved while it waited (the tab booted again onto a narrower
+       share) keeps none of it, though the copy has been claimed again for the same person. */
+    const readerOf = (): string => JSON.stringify([data.me.person, data.me.grant?.epoch ?? null, data.me.lens ?? null]);
+    const reader = readerOf();
     void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/local.ts'), import('$lib/data/plain.ts')]).then(async ([tab, l, p]) => {
       /* EVERY LIST'S DECLARATION GOES WITH IT, but a list the copy never keeps and one that holds a secret. */
       const lists = data.lists.map((x) => x.id).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
@@ -449,9 +452,10 @@
       let ticket = mark;
       if (tab.localTicket() !== mark) {
         await tab.settledLocal();
-        if (asOf() !== stamp || data.me.person !== reader || slug !== declares) return;
+        if (asOf() !== stamp || readerOf() !== reader || slug !== declares) return;
         ticket = tab.localTicket();
       }
+      if (readerOf() !== reader) return;
       const kept: CopyBody = { got: out, news: said, desk: untrack(() => desk?.cards ?? null), handled: untrack(() => handled) };
       tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf(kept), ticket, {}, { always: true });
     });
