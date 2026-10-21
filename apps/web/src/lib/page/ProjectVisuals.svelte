@@ -290,9 +290,12 @@
     animation: fill-in var(--d-panel) var(--ease-emphasis) both;
   }
 
+  /* NO GLOW (SPEC 1, "Now" stop): the stop being worked on is the project's tint inside its colour's 2px ring, where a
+     5px halo of the hue stood round it. */
   .stop[data-kind='now'] .c {
-    border-color: var(--ph);
-    box-shadow: 0 0 0 5px color-mix(in oklab, var(--ph) 18%, transparent);
+    border: 2px solid var(--ph);
+    background: var(--ph-tint, var(--tile-2));
+    box-shadow: none;
   }
 
   .stop:is([data-kind='late'], [data-kind='waits']) .c {
