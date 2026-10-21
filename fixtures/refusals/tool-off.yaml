@@ -1,0 +1,4 @@
+code:   TOOL_OFF
+via:    rpc
+raises: packages/mcp/src/rpc.ts
+fix:    If you need it, ask with propose.

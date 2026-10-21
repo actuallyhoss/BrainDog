@@ -1,0 +1,5 @@
+code:   NAME_AMBIGUOUS
+via:    rpc
+raises: packages/mcp/src/index.ts
+at:     spoken
+fix:    Say which by its handle.

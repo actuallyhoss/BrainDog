@@ -1,0 +1,5 @@
+code:   PATCH_EMPTY
+via:    rpc
+raises: packages/mcp/src/index.ts
+at:     patch
+fix:    Put the fields to change in it.

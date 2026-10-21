@@ -172,8 +172,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-one, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 21 write path · 10 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-four, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 23 write path · 11 auth and vault · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -232,7 +232,7 @@ const GRAMMAR = [
   'REF_UNKNOWN',
 ] as const;
 
-/** Write path — 21. */
+/** Write path — 23. */
 const WRITE = [
   'REGISTER_UNKNOWN', 'ROW_UNKNOWN', 'FIELD_UNKNOWN', 'ROW_LOCKED', 'HUMAN_ONLY', 'TEXT_JSON_QUOTED',
   'TEXT_ESCAPED_NEWLINE', 'INT_OUT_OF_RANGE', 'VALUE_MALFORMED', 'REQUIRED_MISSING', 'ENUM_VALUE_UNKNOWN',
@@ -248,9 +248,13 @@ const WRITE = [
      was filed in, and its number stays free. Not `IMMUTABLE_FIELD`, which says the whole field is set once and would
      send a caller correcting an amount away from a write that is allowed; the repair here is delete and add again. */
   'CURRENCY_FIXED',
+  /* TWO AT THE AGENTS' DOOR, 2026-10-21 (agents and MCP plan §6.5): an `update` whose patch changes nothing, refused before
+     the ladder files it as a question for nothing; and a name `get` was handed that more than one thing is called, with
+     each by its handle. Not `VALUE_MALFORMED`: the shape is right, and the repair is a different call. */
+  'PATCH_EMPTY', 'NAME_AMBIGUOUS',
 ] as const;
 
-/** Auth and vault — 10. */
+/** Auth and vault — 11. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',
@@ -261,6 +265,9 @@ const AUTH = [
      every client, until he resumes it. Not `FORBIDDEN`, which says the credential is short and sends an agent looking
      for a bigger one; a stopped run is told to answer and end, and a paused one to wait. Both 403. */
   'RUN_STOPPED', 'RUN_PAUSED',
+  /* A TOOL HE SWITCHED OFF FOR THIS AGENT in Settings > Agents, 2026-10-21 (plan §6.2, §6.5), refused at the door before
+     it runs, for a client whose cached list still has it. Not `FORBIDDEN`: no bigger key turns it back on, only he does. */
+  'TOOL_OFF',
 ] as const;
 
 /** Format and lifecycle — 8. */
@@ -313,7 +320,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and thirty-one, in `30 §6`'s order. */
+/** The hundred and thirty-four, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
@@ -326,7 +333,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and thirty-one. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and thirty-four. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

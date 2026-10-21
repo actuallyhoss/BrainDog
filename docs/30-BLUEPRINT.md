@@ -648,7 +648,7 @@ in 41 §5.4 step 3 and its `ponytail:` note.
 
 ### The codes
 
-One hundred and thirty-one, counted, in nine families — 54 pack and declaration · 14 grammar · 21 write path · 10 auth and
+One hundred and thirty-four, counted, in nine families — 54 pack and declaration · 14 grammar · 23 write path · 11 auth and
 vault · 8 format and lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
@@ -830,6 +830,8 @@ any row is written".*
 | `VERSION_STALE` | step 4, the CAS — HTTP 409 | `version-stale` |
 | `LEVEL_REQUIRED` | step 5, a transition's `by:` level not held | `level-required` |
 | `CURRENCY_FIXED` | step 4, `currency_fixed:` on a money field whose stored code a write would change; the number stays free. Its own code and not `IMMUTABLE_FIELD`, because the repair is to delete the row and add it again in the other currency (REC-B04) | `currency-fixed` |
+| `PATCH_EMPTY` | MCP `update` with a patch that changes nothing, before the ladder: it would have written a version, or been filed as a question, for nothing. A note alone is `log`, which its `try` names (agents and MCP plan §6.5). Added October 21st 2026 | `patch-empty` |
+| `NAME_AMBIGUOUS` | MCP `get` by a name more than one thing the caller may read is called: `allowed` names each by its handle and `try` reads the first (plan §4.3, §6.5). Added October 21st 2026 | `name-ambiguous` |
 
 **Auth and vault** ([12-SECURITY](12-SECURITY.md) §3, §6):
 
@@ -845,6 +847,7 @@ any row is written".*
 | `RATE_LIMITED` | a credential past its budget for now: a report key's rows a minute (`REPORT_ROWS_PER_MINUTE`, `budgets.json` `report.rowsPerMinute`). 429, and the refusal carries `retry_after`, the whole seconds to wait, which the host also sends as `Retry-After`. Added September 17th 2026 | `rate-limited` |
 | `RUN_STOPPED` | a change by a run the owner stopped from the app (agents and MCP plan §2.4), for every client: the run may still answer with `instructionsMine`, hand off, log on itself and end, and every other change is refused in his words, "Reply with instructions, then end". 403, because retrying never works until he resumes it, and not `FORBIDDEN`, which sends an agent after a bigger token. Added October 21st 2026 | `run-stopped` |
 | `RUN_PAUSED` | the same for a run he paused: its changes wait until he resumes it, and the sentence says to wait. 403. Added October 21st 2026 | `run-paused` |
+| `TOOL_OFF` | an MCP tool he switched off for this kind of agent in Settings > Agents, refused at the door before it runs, for a client whose cached list still has it: the sentence names the settings row, and `allowed` the tools it has. Not `FORBIDDEN`, since no bigger key turns it on (plan §6.2, §6.5). Added October 21st 2026 | `tool-off` |
 
 **Format and lifecycle** ([03-DOG-FORMAT](03-DOG-FORMAT.md); [33-CONTRACTS](33-CONTRACTS.md) §9):
 
