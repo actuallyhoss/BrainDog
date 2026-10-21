@@ -570,6 +570,9 @@
   let hues = $state.raw<{ found: HuesFound; Part: HuesPart } | null>(null);
   /* IMPORTED AUTOMATIONS AS FILING RULES, an offer he presses. Kept once shown, so its Undo outlives the reread its press causes. */
   let imported = $state.raw<{ found: ImportedFound; Part: ImportedPart } | null>(null);
+  /* WHETHER EVERY TILE BEHIND MORE HAS ANSWERED, so More says one count and not the count of whichever landed first: it
+     read 4 at 1,512 and 5 at 390 for one record, a picture each side of the last tile landing (VERIFY P3). */
+  let tilesHeard = $state(false);
   /**
    * THE VERSION A TILE IS ASKED ONCE AT (`tileOnce`): the record's, as the poll heard it, and this tab's writes. Read in
    * each effect, so a move of the record still asks every tile again.
@@ -757,6 +760,7 @@
         /* A TILE THAT FAILS IS NOT DRAWN, and the next is still asked. */
         await tile().catch(() => undefined);
       }
+      if (here) tilesHeard = true;
       removeEventListener('beforeunload', leave);
     })();
     return () => {
@@ -932,7 +936,7 @@
   {#if folds > 0 && desked}
     <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
       <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
-      {#if !moreOpen}<span class="more-count num">{folds}</span>{/if}
+      {#if !moreOpen}<span class="more-count num" style:visibility={tilesHeard ? null : 'hidden'}>{folds}</span>{/if}
       <Icon name="chevronDown" size="s" />
     </button>
   {/if}
