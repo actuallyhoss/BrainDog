@@ -24,10 +24,22 @@ export const still = (): boolean => typeof matchMedia === 'function' && matchMed
 /** The fade that stands in for every move under reduced motion. */
 export const FADE = 120;
 
+/**
+ * A duration as CSS writes it, in milliseconds: `180ms` is 180 and `.18s` is 180. The build minifies the skin's tokens
+ * to seconds, so reading the number alone made every row move last 0.18ms (VERIFY H1). Anything unreadable is the
+ * fallback.
+ */
+export const msIn = (raw: string, fallback: number): number => {
+  const s = raw.trim();
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n)) return fallback;
+  return s.endsWith('ms') ? n : s.endsWith('s') ? n * 1000 : n;
+};
+
 /** A token's milliseconds from the skin, or the fallback where there is no document (a test, the server). */
 export const ms = (name: string, fallback: number): number => {
   if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return fallback;
-  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
+  return msIn(getComputedStyle(document.documentElement).getPropertyValue(name), fallback);
 };
 
 /** A row arriving: its height opens and it fades in. `quartOut` stands for `--ease-out`. */
