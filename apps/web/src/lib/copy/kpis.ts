@@ -90,7 +90,6 @@ export const kpis = {
   kpiSave: 'Save',
   kpiKeep: 'Keep it',
   kpiCancel: 'Cancel',
-  kpiSaving: 'Saving',
   kpiStop: 'Stop tracking it',
   kpiStopLine: 'Its values stay. It leaves the project and Today.',
 

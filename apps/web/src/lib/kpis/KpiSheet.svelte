@@ -63,6 +63,7 @@
 
   let {
     open = $bindable(false),
+    list,
     project,
     kpi = null,
     you,
@@ -70,6 +71,8 @@
     onsaved,
   }: {
     open?: boolean | undefined;
+    /** The list key numbers are kept in, as the page or the record names it (Portfolio's `KPI_LIST.list`). */
+    list: string;
     /** The project the number is on: its number and its name. */
     project: { seq: number; name: string };
     /** The number to change; none to add one. */
@@ -82,7 +85,6 @@
     onsaved?: ((entry: Entry) => void) | undefined;
   } = $props();
 
-  const LIST = 'kpis';
   const uid = $props.id();
   const id = (field: string): string => `${uid}-${field}`;
 
@@ -154,9 +156,9 @@
    * number went as typed and the record refused it ("thing takes a row id"). Once a tab, and only for the app's writer.
    */
   async function ready(): Promise<void> {
-    if (writer || REGISTERS[LIST]) return;
+    if (writer || REGISTERS[list]) return;
     const [{ createClient }, { learn }] = await Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')]);
-    await learn((list) => createClient({ base: apiBase() }).schema(list), LIST, new Map());
+    await learn((of) => createClient({ base: apiBase() }).schema(of), list, new Map());
   }
 
   async function save(e?: SubmitEvent) {
@@ -175,12 +177,12 @@
     const w = writes();
     const name = draft.name.trim();
     if (!kpi) {
-      const out = await w.create(LIST, rowOf(draft, project.seq));
+      const out = await w.create(list, rowOf(draft, project.seq));
       busy = false;
       if (!out.ok) return void (refused = out.fix);
       open = false;
       const made = out.entry;
-      toasts.push(words.kpiAdded(name, project.name), { undo: () => void back(w.archive(LIST, made.seq, made.version)) });
+      toasts.push(words.kpiAdded(name, project.name), { undo: () => void back(w.archive(list, made.seq, made.version)) });
       onsaved?.(made);
       return;
     }
@@ -191,12 +193,12 @@
       open = false;
       return;
     }
-    const out = await w.update(LIST, before.seq, patch, before.version);
+    const out = await w.update(list, before.seq, patch, before.version);
     busy = false;
     if (!out.ok) return void (refused = out.fix);
     open = false;
     const after = out.entry;
-    toasts.push(words.kpiSaved(name), { undo: () => void back(w.update(LIST, before.seq, undoOf(before.fields, patch), after.version)) });
+    toasts.push(words.kpiSaved(name), { undo: () => void back(w.update(list, before.seq, undoOf(before.fields, patch), after.version)) });
     onsaved?.(after);
   }
 
@@ -207,12 +209,12 @@
     refused = null;
     const w = writes();
     const before = kpi;
-    const out = await w.update(LIST, before.seq, { state: 'retired' } satisfies Fields, before.version);
+    const out = await w.update(list, before.seq, { state: 'retired' } satisfies Fields, before.version);
     busy = false;
     if (!out.ok) return void (refused = out.fix);
     open = false;
     const after = out.entry;
-    toasts.push(words.kpiStopped(String(before.fields.name ?? '')), { undo: () => void back(w.update(LIST, before.seq, { state: before.fields.state ?? 'live' }, after.version)) });
+    toasts.push(words.kpiStopped(String(before.fields.name ?? '')), { undo: () => void back(w.update(list, before.seq, { state: before.fields.state ?? 'live' }, after.version)) });
     onsaved?.(after);
   }
 
@@ -474,7 +476,7 @@
   {#snippet footer()}
     {#if refused}<p class="kpi-refused" role="alert"><Icon name="alert" size="s" /><span>{refused}</span></p>{/if}
     <Button weight="quiet" disabled={busy} onclick={() => (open = false)}>{words.kpiCancel}</Button>
-    <Button weight="primary" type="submit" form={id('form')} disabled={busy}>{busy ? words.kpiSaving : suggested ? words.kpiKeep : kept ? words.kpiSave : words.kpiAdd}</Button>
+    <Button weight="primary" type="submit" form={id('form')} disabled={busy}>{suggested ? words.kpiKeep : kept ? words.kpiSave : words.kpiAdd}</Button>
   {/snippet}
 </Sheet>
 
