@@ -509,8 +509,11 @@
 {/if}
 
 <style>
+  /* HELD TO THE FOOT OF THE WINDOW while the shape is read (VERIFY H4): the shape is taller than a screen at every width
+     (1,017px at 1,512), so what the page draws under it starts below the fold and stays there when it lands. 160px held
+     put the page's blocks on screen and then pushed them off it: Kiln's load shift of 0.085 at 1,512 and 0.161 at 390. */
   .held {
-    min-block-size: 160px;
+    min-block-size: max(160px, calc(100dvh - 120px));
   }
 
   /* ── the hero ── */
