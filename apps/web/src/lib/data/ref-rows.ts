@@ -19,7 +19,7 @@
 import { wrote, type Client } from '@braindog/client';
 
 import type { RecordRow } from '../record/remote.ts';
-import { keptToken } from './local-tab.ts';
+import { keptToken, versionKept } from './local-tab.ts';
 
 /** How long a walk is drawn from without asking again, whatever the log says. */
 export const ROWS_KEPT_MS = 300_000;
@@ -62,10 +62,20 @@ export async function walkRows(client: Pick<Client, 'list'>, register: string): 
  * The rows are shared between readers: read them, never change them.
  */
 export async function rowsSaid(client: Pick<Client, 'list'>, base: string, register: string): Promise<Walked> {
-  const token = `${await keptToken([register])} w${wrote()}`;
   const at = `${base} ${register}`;
-  const now = Date.now();
   const walks = walksNow();
+  const kept = walks.get(at);
+  const young = kept !== undefined && Date.now() >= kept.at && Date.now() - kept.at < ROWS_KEPT_MS;
+  /* A WALK KEPT BY THE VERSION is still true while the poll hears that version, and waits for nothing to say so. */
+  const byVersion = `${versionKept()} w${wrote()}`;
+  if (young && kept.token === byVersion) return kept.walked;
+  /* A WALK THE COPY VOUCHED FOR IS ASKED OF IT AGAIN once its catch-up has landed, as before. WITH NONE TO VOUCH FOR, the
+     walk goes now and is kept by the version (`keptToken`'s own fallback): Today's first open waited for the copy's
+     first catch-up before it walked the lists its page names, a round trip in front of the page (`loop/perf`). */
+  const vouched = young && kept.token.startsWith('log ');
+  const said = vouched ? await keptToken([register]) : await Promise.race([keptToken([register]), new Promise<null>((done) => setTimeout(() => done(null), 0))]);
+  const token = `${said ?? versionKept()} w${wrote()}`;
+  const now = Date.now();
   const was = walks.get(at);
   if (was !== undefined && was.token === token && now >= was.at && now - was.at < ROWS_KEPT_MS) return was.walked;
   const walked = walkSaid(client, register);

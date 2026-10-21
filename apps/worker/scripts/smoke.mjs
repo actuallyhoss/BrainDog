@@ -255,6 +255,7 @@ export function argsFor(read, said) {
   const registers = Array.isArray(said.boot?.registers) ? said.boot.registers.filter((r) => typeof r?.id === 'string' && r.id !== 'session') : [];
   const register = (registers.find((r) => Number(r.count) > 0) ?? registers[0])?.id ?? null;
   if (read.ask === 'bare') return { args: {} };
+  if (read.ask === 'every') return { args: { every: true } };
   if (read.ask === 'list' || read.ask === 'body') {
     if (!register) return { skip: 'the canary holds no list to name' };
     if (read.ask === 'body') return { args: { body: { page: 'smoke', title: 'Smoke', blocks: [{ kind: 'table', source: `register.${register}` }] } } };

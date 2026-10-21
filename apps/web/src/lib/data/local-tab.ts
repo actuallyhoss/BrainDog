@@ -146,6 +146,9 @@ export function heardLocal(at: number | null = null): void {
   if (copy) void copy.heard();
 }
 
+/** The token a read is kept under where the copy cannot vouch: the version the poll last heard move, as `keptToken` says it. */
+export const versionKept = (): string => `v ${version}`;
+
 /** When the copy has caught up to every move heard so far: a screen following the log reads it after this. */
 export const settledLocal = (): Promise<void> => (copy ? copy.settled() : Promise.resolve());
 

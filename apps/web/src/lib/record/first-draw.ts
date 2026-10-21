@@ -24,8 +24,9 @@
  *   - `page`: the first page `pages` answers.
  *   - `row`: the first row `list` answered, by its list and number.
  *   - `body`: a page body of one table over the list `list` would name, which `previewPage` draws and never installs.
+ *   - `every`: every list the reader may read at once (`{ every: true }`), which `schemas` answers.
  */
-export type FirstAsk = 'bare' | 'list' | 'pack' | 'page' | 'row' | 'body';
+export type FirstAsk = 'bare' | 'list' | 'pack' | 'page' | 'row' | 'body' | 'every';
 
 /** One read of the first screens. `post` is the verb the client sends it with, which the test holds to the client. */
 export interface FirstRead {
@@ -43,6 +44,7 @@ export const FIRST_DRAW: readonly FirstRead[] = [
   { method: 'packs', ask: 'bare', post: false, by: "the root layout, for a record's currency and voice on an older host" },
   { method: 'pages', ask: 'bare', post: false, by: "Home, finding the record's own home page" },
   { method: 'schema', ask: 'list', post: false, by: "the root layout, reading a list's money fields" },
+  { method: 'schemas', ask: 'every', post: false, by: "the root layout, every list's declaration asked beside boot" },
   { method: 'list', ask: 'list', post: false, by: "the root layout and Home, reading a list's rows" },
   { method: 'packConfig', ask: 'pack', post: false, by: "the root layout, reading an add-on's currency" },
   { method: 'page', ask: 'page', post: false, by: "Home, drawing the record's own home page" },

@@ -73,6 +73,7 @@
     well,
     headless = false,
     heldLines = 2,
+    heldText,
   }: {
     title: string;
     /** The glyph the register or page declares, drawn before the name. */
@@ -112,6 +113,11 @@
     headless?: boolean | undefined;
     /** How many lines a sentence on its way holds on a phone: Today's says three things, so it holds three. */
     heldLines?: number | undefined;
+    /**
+     * The words the sentence on its way is most like, where a page knows them before its read: set in the held line,
+     * unseen, so it holds the room those words take at this width, and never less than `heldLines`.
+     */
+    heldText?: string | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
     led?: boolean | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
@@ -274,7 +280,7 @@
     {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
   </p>
 {:else if held}
-  <p class="page-said" data-held aria-hidden="true" style:--held-lines={heldLines}></p>
+  <p class="page-said" data-held aria-hidden="true" style:--held-lines={heldLines}>{#if heldText}<span class="held-words">{heldText}</span>{/if}</p>
 {/if}
 <!--
   THE DEFINITION IS READ ONCE, SO IT DOES NOT RIDE IN THE STICKY HEAD: read where it is met, it scrolls away with the
@@ -585,6 +591,11 @@
     .page-said[data-held] {
       min-block-size: calc(var(--held-lines, 2) * 1lh);
     }
+  }
+
+  /* THE WORDS IT IS LIKELY TO SAY, set and unseen, so the room held is theirs. */
+  .held-words {
+    visibility: hidden;
   }
 
   .page-said :global(.fig) {

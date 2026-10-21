@@ -72,6 +72,10 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   const seen = seeingAs() !== null;
   if (first && depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
   const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
+  /* THE LISTS' DECLARATIONS ARE ASKED BESIDE `boot` AND IN ONE READ (`firstOpen`): Today, its desk and its page's reader
+     each learn every list, twenty-five asks on the seed that a browser sent six at a time, after `boot`, ahead of the
+     page. On before any screen draws, and for the tab. */
+  if (first) live.firstOpen(api);
   depends?.('braindog:boot');
   const copies = await import('$lib/record/boot-copy.ts');
   /* ON A COLD OPEN THE SHELL IS DRAWN FROM THE LAST COPY AT ONCE, then `boot` is read behind it and this load runs again
@@ -188,8 +192,9 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
      carries it once it has; only the screens that list the records wait for it. AT THE ROOT, UNDER NO SLUG: the list is
      the person's, not the record's in the address. */
   if (booted.from === 'live' && live.signsIn(booted.boot)) {
-    const asked = live.recordsReach(fetch, url.origin);
-    const listed = live.recordsReached() ?? (LISTS_RECORDS.test(inner) ? await asked : null);
+    const lists = LISTS_RECORDS.test(inner);
+    const asked = live.recordsReach(fetch, url.origin, lists ? null : (await import('$lib/data/first-drawn.ts')).afterFirst());
+    const listed = live.recordsReached() ?? (lists ? await asked : null);
     if (listed !== null) {
       if (!listed.ok) shell.recordsRefused = listed.refusal.fix;
       else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };

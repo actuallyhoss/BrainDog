@@ -85,6 +85,7 @@
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
   import { holdIn, presses } from '$lib/data/held.svelte.ts';
+  import { drewFirst } from '$lib/data/first-drawn.ts';
   import { untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
@@ -848,6 +849,11 @@
       removeEventListener('online', again);
       clearInterval(timer);
     };
+  });
+
+  /* THE FIRST SCREEN SETTLED IS THE FIRST SCREEN DRAWN (`first-drawn.ts`), for a screen that says so no sooner itself. */
+  $effect(() => {
+    if (settled() !== undefined) untrack(drewFirst);
   });
 
   /* A SHELL DRAWN FROM THE LAST COPY IS REPLACED ONCE `boot` ANSWERS, and from here, after the first navigation has drawn:

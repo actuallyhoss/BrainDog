@@ -481,6 +481,27 @@ async function liveOf(
 }
 
 /**
+ * The lists a page body's blocks read, from the body itself: what `liveOf` reads off the record's answer, known before
+ * it. A block the record then holds from the reader is walked for nothing, and the walk is held to the reader by `list`.
+ */
+export function bodyLists(body: Row): string[] {
+  const blocks = Array.isArray(body.blocks) ? (body.blocks as { source?: unknown }[]) : [];
+  return [...new Set(blocks.flatMap((b) => (typeof b?.source === 'string' && b.source.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
+}
+
+/** Walk the lists `body`'s refs name, beside the page's own read, so its answer finds them out already. */
+function walkAhead(client: Client, base: string, body: Row): void {
+  const asked = new Map<string, Promise<void>>();
+  const schema: SchemaCall = (register) => client.schema(register);
+  const lists = bodyLists(body);
+  void Promise.all(lists.map((list) => learn(schema, list, asked)))
+    .then(() => {
+      for (const target of new Set(lists.flatMap(targetsOf))) void learn(schema, target, asked).then(() => rowsOf(client, base, target));
+    })
+    .catch(() => undefined);
+}
+
+/**
  * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it.
  *
  * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
@@ -492,6 +513,10 @@ async function liveOf(
  */
 export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Drawn> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  /* THE LISTS THE PAGE'S REFS NAME ARE WALKED BESIDE IT, not after it (`walkAhead`): the body says which lists its
+     blocks read, so their targets are known before the record answers, and the walk the answer then needs is the tab's
+     walk already out (`ref-rows.ts`). Only through the browser's own fetch, where the walk is the tab's. */
+  if (io === undefined) walkAhead(client, base, body);
   const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
   if (!out.ok) {
     if (!('refusal' in out)) return { from: 'none' };

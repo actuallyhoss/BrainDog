@@ -80,3 +80,46 @@ test('readBoot takes the early answer once, and only at the address it was asked
     forget();
   }
 });
+
+/** Every address the template asks at, in order. */
+function everyAsked(pathname: string): string[] {
+  const seen: string[] = [];
+  const fetch = (url: string) => (seen.push(url), Promise.resolve(new Response('{}')));
+  new Function('location', 'window', 'fetch', SCRIPT)({ pathname, origin: 'https://brain.dog' }, {}, fetch);
+  return seen;
+}
+
+test('and beside boot it asks every list the reader may read, at the same address, boot first', () => {
+  for (const path of ['/app/acme', '/app/acme/p/kiln', '/app/', '/app/decide']) {
+    const base = apiBase(new URL(`https://brain.dog${path}`));
+    assert.deepEqual(everyAsked(path), [`${base}/api/boot`, `${base}/api/schemas?every=true`], path);
+  }
+});
+
+test('firstOpen hands the early declarations to the client once, and only at the address they were asked at', async () => {
+  const { firstOpen } = await import('./boot-live.ts');
+  const { batchSchemas, createClient, forgetSchemas } = await import('@braindog/client');
+  const BASE = 'https://brain.dog/app/acme';
+  const held = globalThis as { __bdSchemas?: unknown };
+  const lists = { tasks: { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text' }] } };
+  const early = () => Promise.resolve(new Response(JSON.stringify({ ok: true, value: { lists, refused: {}, blocks: {} } }), { status: 200 }));
+  const sent: string[] = [];
+  const io = (async (url: string | URL | Request) => (sent.push(String(url)), new Response(JSON.stringify({ ok: true, value: { ...lists.tasks, blocks: {} } })))) as typeof globalThis.fetch;
+  try {
+    forgetSchemas();
+    held.__bdSchemas = { url: 'https://brain.dog/app/kiln/api/schemas?every=true', at: early() };
+    firstOpen(BASE);
+    assert.notEqual(held.__bdSchemas, undefined, 'another address took it');
+    held.__bdSchemas = { url: `${BASE}/api/schemas?every=true`, at: early() };
+    firstOpen(BASE);
+    assert.equal(held.__bdSchemas, undefined, 'kept to be read twice');
+    /* A CLIENT WITH A FETCH OF ITS OWN KEEPS ITS OWN STORE and still takes them, so nothing goes out for tasks. */
+    const out = await createClient({ base: BASE, fetch: io }).schema('tasks');
+    assert.equal(out.ok, true);
+    assert.deepEqual(sent, []);
+  } finally {
+    held.__bdSchemas = undefined;
+    batchSchemas(false);
+    forgetSchemas();
+  }
+});

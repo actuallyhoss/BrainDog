@@ -24,6 +24,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { WORKING_MOST, liveRows, type WorkingRow } from './desk.ts';
+  import { afterFirst } from '$lib/data/first-drawn.ts';
 
   let { rows }: { rows: readonly WorkingRow[] } = $props();
 
@@ -55,7 +56,9 @@
   }
 
   onMount(() => {
-    void read();
+    /* ASKED AGAIN ONCE THE FIRST SCREEN HAS DRAWN (`first-drawn.ts`): the rows are `boot`'s until then, and the page is
+       asked first. */
+    void afterFirst().then(read);
     let off = (): void => {};
     void import('$lib/record/instruct.ts').then((m) => (off = m.told.on(() => void read())));
     const clock = setInterval(() => void (document.hidden || read()), 15_000);

@@ -137,6 +137,7 @@
   import { keepPart, keptPart, tileOnce, TODAY_KEPT_MS } from '$lib/home/today-kept.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
+  import { drewFirst } from '$lib/data/first-drawn.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
 
@@ -565,8 +566,17 @@
         settled = true;
         bodyAsked = true;
         fromMemory = false;
+        pageHeard();
+        drewFirst();
         if (at !== null) closed(ok, at);
         firstClosed(true);
+      });
+    /* WHAT LANDED IS DRAWN WITH THE DESK IT STANDS IN, not with the page under it: on a first open the desk's projects
+       were drawn, then the page, and the lines put in between them pushed the page down as it drew. The mark still goes
+       only with the page (`keepNews`). */
+    if (was === null && untrack(() => got) === null)
+      void before.then((now) => {
+        if (now !== null && mine === pageRead && untrack(() => got) === null && untrack(() => newLines).length === 0) newLines = now.lines;
       });
   });
 
@@ -770,8 +780,17 @@
    * TODAY'S PAGE IS ASKED BEFORE THE TILES BEHIND MORE. The record answers one call at a time, so the briefing, the
    * matches and what went stale, asked as the screen mounted, were answered ahead of the page they sit under. They are
    * asked the moment the page's own read has gone out, and are still part of the screen's first read.
+   *
+   * AND THEY ARE SENT ONCE THE PAGE HAS LANDED (`pageLanded`), since they are folded behind More and nothing over the
+   * fold waits on them: sent beside it, they and the reads they lead to took five of the six places a browser keeps for
+   * one host, and the page's own walks of the lists its rows name waited behind them (`loop/perf/r3-diag.mjs`). The
+   * screen's bracket still opens with the page's, so it is not measured settled with a tile on its way.
    */
   let bodyAsked = $state(false);
+  let pageHeard: () => void = () => {};
+  const pageLanded = new Promise<void>((done) => (pageHeard = done));
+  /** The longest the tiles wait for the page, should its read never come back. */
+  const TILES_WAIT_MS = 2_000;
   $effect(() => {
     if (data.refused || !bodyAsked) return;
     const ver = asOf();
@@ -790,15 +809,16 @@
     /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with a tile still on its way, and closed as
        fine whatever came back: none of the reads refuses the screen. */
     const at = wasBrief && wasMatched && wasStale ? null : untrack(opened);
-    const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
+    const after = Promise.race([pageLanded, new Promise<void>((done) => setTimeout(done, TILES_WAIT_MS))]);
+    const briefing = after.then(() => Promise.all([import('./briefing.ts'), import('./Briefing.svelte')])).then(async ([m, part]) => {
       const out = await tileOnce('briefing', base, ver, () => m.readBriefingSaid(base));
       if (here) keepPart('brief', base, (brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default }));
     });
-    const matches = Promise.all([import('./matched.ts'), import('./Matched.svelte')]).then(async ([m, part]) => {
+    const matches = after.then(() => Promise.all([import('./matched.ts'), import('./Matched.svelte')])).then(async ([m, part]) => {
       const out = await tileOnce('matched', base, ver, () => m.readMatched(base));
       if (here) keepPart('matched', base, (matched = { rows: out.value, Part: part.default }));
     });
-    const stales = Promise.all([import('./stale.ts'), import('./Stale.svelte')]).then(async ([m, part]) => {
+    const stales = after.then(() => Promise.all([import('./stale.ts'), import('./Stale.svelte')])).then(async ([m, part]) => {
       const out = await tileOnce('stale', base, ver, () => m.readStale(base));
       if (here) keepPart('stale', base, (stale = { rows: out.value, Part: part.default }));
     });
@@ -1071,7 +1091,8 @@
   icon="today"
   kicker={today}
   sentence={tell ? TELL_LINE : slashed ? slashSaid : lead ? leadSaid : undefined}
-  heldLines={3}
+  heldLines={board ? 3 : 1}
+  heldText={waitsLine?.text ?? nothing}
   actions={capture && wide.current && !board ? headCapture : undefined}
   below={capture && !wide.current && !board ? headCapture : undefined}
 />

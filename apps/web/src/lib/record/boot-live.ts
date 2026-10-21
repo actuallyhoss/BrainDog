@@ -14,7 +14,7 @@
  * state rather than about whether there is one. `forget` drops the answer after a write that changes it.
  */
 
-import { createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
+import { batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
@@ -307,6 +307,21 @@ function earlyBoot(url: string): Promise<Response> | null {
   return held.at as Promise<Response>;
 }
 
+/**
+ * THE TAB'S FIRST OPEN OF A RECORD, before any screen draws: the lists' declarations a screen asks in one turn go as one
+ * read from now on (`batchSchemas`), and every list's declaration the page asked for beside `boot` (`app.html`,
+ * `schemas` with `every`) is handed to the client, so Today and a project learn their lists from it and not from the
+ * network after `boot`. Taken once and only for the address it was asked at, as `earlyBoot` is.
+ */
+export function firstOpen(base: string): void {
+  batchSchemas(true);
+  const url = `${base}/api/schemas?every=true`;
+  const held = (globalThis as { __bdSchemas?: { url?: unknown; at?: unknown } }).__bdSchemas;
+  if (!held || held.url !== url || !(held.at instanceof Promise)) return;
+  (globalThis as { __bdSchemas?: unknown }).__bdSchemas = undefined;
+  void createClient({ base }).schemas(held.at as Promise<Response>);
+}
+
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   if (keptFor !== base) kept = null;
   keptFor = base;
@@ -529,8 +544,11 @@ let reached: Answer<SwitcherRow[]> | null = null;
  * Ask for the account's records once for the tab, and the answer. NEVER WAITED ON BEFORE THE FIRST PAINT (EXP-D03): the
  * rail reads it once it lands, and only a screen that lists the records waits for it.
  */
-export function recordsReach(io: Fetch, origin: string): Promise<Answer<SwitcherRow[]>> {
-  reach ??= import('./switcher.ts')
+export function recordsReach(io: Fetch, origin: string, after: Promise<void> | null = null): Promise<Answer<SwitcherRow[]>> {
+  /* `after`: SENT ONCE THE FIRST SCREEN HAS DRAWN (`first-drawn.ts`) where nothing on it waits for the list, and asked
+     for at once, so the rail reads it where it always did. */
+  reach ??= (after ?? Promise.resolve())
+    .then(() => import('./switcher.ts'))
     .then((m) => m.readRecordsForSwitcher(io, origin))
     .then((listed) => {
       if (listed.ok) reached = listed;
