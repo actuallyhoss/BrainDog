@@ -343,6 +343,10 @@ const TABLE = {
      its question and its box, then the button. On `rows`, for `inputs`'s reason: where the host cannot write, it is a
      spec of what the form asks. Page-only, because what it writes into is the record's. */
   form: { primitive: 'rows', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'list' },
+  /* A project's key numbers, or the few that lead Today (the kernel's `sources/kpis.ts`, drawn by `svelte/Kpis.svelte`
+     from `src/kpis.ts`): each its figure, its chart and why it is there. Page-only, because the numbers are the record's;
+     on `grid`, so a drawer that does not know the kind yet draws them as tiles. */
+  kpis: { primitive: 'grid', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'figure' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

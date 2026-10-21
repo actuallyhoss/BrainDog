@@ -105,8 +105,9 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   versions: ['diff'],
   field: ['diff'],
   row: ['diff', 'inputs'],
-  about: ['table', 'cards'],
+  about: ['table', 'cards', 'kpis'],
   of: ['ring', 'heat'],
+  for: ['kpis'],
   row_actions: ROW_KINDS,
 };
 
@@ -156,7 +157,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'presence', 'facts', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis',
 ];
 
 /**
@@ -252,6 +253,37 @@ export function forecastAxisFault(block: Readonly<Record<string, unknown>>, who:
     at: 'axis',
     allowed: [...FORECAST_AXES],
   };
+}
+
+/**
+ * What a `kpis` block is for (`sources/kpis.ts`): one project's key numbers (`project`), the few that lead Today
+ * (`today`), or the one number each project's card leads with (`cards`).
+ */
+export const KPIS_FOR = ['project', 'today', 'cards'] as const;
+export type KpisFor = (typeof KPIS_FOR)[number];
+
+/**
+ * Why a `kpis` block cannot be read, or `null`. `who` is what the sentence calls the block.
+ *
+ * IT SAYS WHAT IT IS FOR, AND ITS SOURCE IS THE KEY NUMBERS. A block with no `for:` would have to guess between a
+ * project's tile and Today's, and a `kpis` block over a list would draw that list's rows as numbers nobody declared.
+ * `about:` names one project, so only a block for one project takes it. The install and the read both ask here.
+ *
+ * A BARE `kind: kpis` IS LEFT BE, as every kind's bare block installs (`declare.test.ts`, the closure): it names no
+ * source, so it is a written block with nothing written, and draws nothing. One that says either half says both.
+ */
+export function kpisFault(block: Readonly<Record<string, unknown>>, who: string): { fix: string; at: string; allowed?: string[] } | null {
+  if (block.source === undefined && block.for === undefined && block.about === undefined) return null;
+  if (block.source !== 'kpis') return { fix: `${who} draws the key numbers, so its source is kpis.`, at: 'source', allowed: ['kpis'] };
+  if (!(KPIS_FOR as readonly unknown[]).includes(block.for))
+    return {
+      fix: `${who}'s for is ${JSON.stringify(block.for ?? null)}; a kpis block is for project, one project's numbers, today, the few that lead Today, or cards, the one each project's card leads with.`,
+      at: 'for',
+      allowed: [...KPIS_FOR],
+    };
+  if (block.about !== undefined && (block.for !== 'project' || typeof block.about !== 'string' || block.about.trim() === ''))
+    return { fix: `${who}'s about names the one project it is for, such as things#1, and only a block for: project takes it.`, at: 'about' };
+  return null;
 }
 
 /* ── a block's `actions` and `row_actions` (PGS-A12) ───────────────────────────────────────────────────── */

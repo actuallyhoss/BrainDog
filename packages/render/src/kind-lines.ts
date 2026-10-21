@@ -59,6 +59,7 @@ export const KIND_LINES: Readonly<Record<Kind, KindLine>> = {
   gallery: { for: 'pictures as tiles with captions', cells: 'caption | file' },
   embed: { for: 'one video, map or design from a known provider', cells: 'url | title | aspect, one entry written by hand' },
   form: { for: 'a few questions a person answers, then one button that adds the answers to a list', cells: 'its fields, each a question and its box, said in the page', reads: 'a list' },
+  kpis: { for: "a project's key numbers, or the few that lead Today", cells: 'for: project, today or cards', reads: 'kpis' },
 };
 
 /** The ten lines of what to reach for, in the order a page is usually built. */

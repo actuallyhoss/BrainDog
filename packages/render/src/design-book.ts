@@ -96,6 +96,7 @@ const EXAMPLES: Readonly<Record<Exclude<Kind, (typeof SHEET_KINDS)[number]>, str
   gallery: null,
   embed: null,
   form: null,
+  kpis: null,
 };
 
 const decomment = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//gu, '');

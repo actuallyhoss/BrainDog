@@ -56,7 +56,7 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, kpisFault, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, lookPlacesFault, withoutHoles } from './compose.ts';
 /* A GLYPH NAMED THAT THE RENDERER HAS NOT, refused with the nearest names it has (`glyph-names.ts`). */
 import { glyphFault } from './glyph-names.ts';
@@ -896,7 +896,7 @@ const BLOCK_KINDS: readonly string[] = [
     'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
     'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
     'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap', 'ring', 'heat',
-    'inputs',
+    'inputs', 'kpis',
     ...Object.keys(BLOCK_KIND_MODULES),
   ]),
 ];
@@ -1908,6 +1908,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     /* A FORECAST'S `axis` IS ONE OF TWO WORDS (`forecastAxisFault`): a stray one would draw as fitted and say nothing. */
     const axised = kind === 'forecast' ? forecastAxisFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (axised) return bad('DECLARATION_INVALID', axised.fix, `${at}.${axised.at}`, axised.allowed);
+    /* A `kpis` BLOCK SAYS WHAT IT IS FOR AND READS THE KEY NUMBERS (`kpisFault`), as the read checks it (`sources/kpis.ts`). */
+    const kpied = kind === 'kpis' ? kpisFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
+    if (kpied) return bad('DECLARATION_INVALID', kpied.fix, `${at}.${kpied.at}`, kpied.allowed);
     /* A NOTE'S says: IS CHECKED AS THE READ CHECKS IT (block-keys.ts noteSaysFault), each sentence's when with this file's leaf check. */
     const sayed = kind === 'note' ? noteSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`, whenLeafFault) : null;
     if (sayed) return bad('DECLARATION_INVALID', sayed.fix, `${at}.${sayed.at}`, sayed.allowed);
