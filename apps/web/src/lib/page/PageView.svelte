@@ -906,13 +906,6 @@
     white-space: nowrap;
   }
 
-  /* ON A PHONE THE BAR OVER THE PAGE IS ALREADY THE WAY BACK, so a project's head keeps only its actions. */
-  @media (width < 640px) {
-    .hosted:has(.body-wrap[data-project]) :global(.page-head[data-headless] .head-back) {
-      display: none;
-    }
-  }
-
   @media (width < 640px) {
     .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold)::after) {
       padding-inline-start: 0;

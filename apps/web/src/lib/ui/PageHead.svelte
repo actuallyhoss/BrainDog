@@ -34,7 +34,8 @@
   A NAME BREAKS BETWEEN ITS WORDS, never inside one: "Invoice 2026-041" broke after the hyphen, as "2026-" and "041".
 
   `well` DRAWS AN ICON WELL IN PLACE OF THE GLYPH (a project's page), and `headless` DRAWS NO NAME ROW at all, only the
-  back link and the actions, for a page whose own hero holds the `h1`.
+  back link and the actions, for a page whose own hero holds the `h1`. Below 900px a headless head is not drawn: the bar
+  holds the way back, and the actions sit in the bar before the search button.
 
   `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone, or a page-level switch, full width.
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
@@ -50,6 +51,7 @@
   import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
   import { page } from '$app/state';
+  import { MediaQuery } from 'svelte/reactivity';
   import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
   import type { Snippet } from 'svelte';
@@ -153,6 +155,12 @@
     return () => io.disconnect();
   });
 
+  /* A HEADLESS HEAD'S ACTIONS RIDE IN THE PHONE'S BAR. Below 900px the bar already holds the way back, so the head had
+     nothing left but Share and the "⋯", a row of their own over an empty start (Kiln at 390). They go in the bar
+     instead, before the search button, the same bare 44 squares, and the head is not drawn. */
+  const narrow = new MediaQuery('(width < 900px)', false);
+  const barred = $derived(headless && narrow.current);
+
   /* THE SEARCH BUTTON IS NOT DRAWN ON `/search`, which is the search: two ways to one place side by side read as two. */
   const searching = $derived(here(page.url.pathname) === '/search');
 
@@ -205,6 +213,7 @@
     </div>
   {/if}
   <span class="bar-end">
+    {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
     {#if !searching}
       <button type="button" class="find tap" data-palette-from aria-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
         <Icon name="search" size="l" />
@@ -223,6 +232,7 @@
     <p class="kicker">{crumb}</p>
   {/if}
 {/if}
+{#if !barred}
 <header class="page-head" data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined}>
   <div class="head-main">
     {#if headless}
@@ -258,6 +268,7 @@
     {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
   </div>
 </header>
+{/if}
 {#if sentence}
   <p class="page-said">
     {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
@@ -841,6 +852,30 @@
     .head-actions :global(:is(.capture-open, .head-more)) {
       inline-size: var(--tap);
       block-size: var(--tap);
+    }
+
+    /* A QUIET GLYPH AND THE PAGE'S "⋯" ARE ONE PAIR, drawn as the bar's search button is: a bare 44 square, a 20px
+       glyph in the ink, no fill. Share was a white tile with a 16px glyph beside a bare 32px "⋯" (Kiln at 390). */
+    .head-actions :global(.btn:has(.icon):is([data-weight='quiet'], [data-weight='glass'])),
+    .head-actions :global(.head-more) {
+      background: none;
+      color: var(--ink);
+    }
+
+    .head-actions :global(.change-more) {
+      inline-size: var(--tap);
+      min-block-size: var(--tap);
+      color: var(--ink);
+    }
+
+    .head-actions :global(:is(.btn[data-weight='quiet'], .btn[data-weight='glass'], .change-more, .head-more) .icon[data-size]) {
+      inline-size: var(--icon-l);
+      block-size: var(--icon-l);
+    }
+
+    /* IN THE BAR, 4 apart, as search and the face are. */
+    .bar-actions {
+      gap: var(--sp-1);
     }
 
     /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. */
