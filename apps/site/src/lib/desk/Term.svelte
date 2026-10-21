@@ -32,14 +32,14 @@
     let io: IntersectionObserver | undefined;
     if (autoplay === 'now' || typeof IntersectionObserver !== 'function') play();
     else {
-      shown = 0;
+      // The lines stay drawn until the box comes into view; play() then empties it at its first pixel and plays.
       io = new IntersectionObserver(
         (es) => {
           if (!es.some((e) => e.isIntersecting)) return;
           io?.disconnect();
           play();
         },
-        { threshold: 0.4 },
+        { threshold: 0 },
       );
       io.observe(box);
     }
