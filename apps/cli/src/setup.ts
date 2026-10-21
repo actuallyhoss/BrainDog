@@ -3,8 +3,10 @@
  * the record, in every app on it and every Claude Code profile he uses.
  *
  * THE STEPS IN ORDER, EACH ONE ALREADY A COMMAND OF ITS OWN: sign in unless a live login for the host is held,
- * `install --apply` into every profile, the `braindog` MCP server registered in every profile and every other app,
- * `tools write --scope user` with the record's global tools in every app, and `skills sync`. Each step prints one line
+ * `install --apply` into every profile (the session's start and end, the beat, and the prompt, tool and stop hooks
+ * that hear what he tells a run and deny its tools when he stops it), the `braindog` MCP server registered in every
+ * profile and every other app, `tools write --scope user` with the record's global tools in every app, `skills sync`,
+ * and one token for each kind of agent wired, each approved in the app (`agentTokens`). Each step prints one line
  * saying what it did or found, ONE LINE PER APP AND PROFILE where a step touches several, with the lines its command
  * would print indented under it, and the run stops at the first step that fails, with that step's sentence.
  *
@@ -43,9 +45,9 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { CLIENTS, type Client } from './clients/index.ts';
-import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target } from './http.ts';
+import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
 import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL, serversFileOf } from './install.ts';
-import { login } from './login.ts';
+import { approveOperation, login, machineName } from './login.ts';
 import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
 import { writeTools } from './tools.ts';
 
@@ -68,6 +70,8 @@ export type SetupIo = AgentIo & {
   signIn?: typeof login | undefined;
   /** Step 2's question: true for yes, false for anything else, null when no one is at a terminal. `askTerminal` unless a test holds it. */
   ask?: ((question: string) => Promise<boolean | null>) | undefined;
+  /** How step 6 makes an agent's token: `mintAgent` unless a test holds it. */
+  mint?: MintAgent | undefined;
 };
 
 /**
@@ -522,6 +526,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
   if (!held && dryRun) {
     io.out('4. Tools: not read, because this machine holds no login yet to read the record with.');
     io.out('5. Skills: not read, for the same reason.');
+    io.out(`6. Tokens: a token of its own would be made for each agent wired here, ${listOf([...new Set(here.map((c) => AGENT_TITLE[agentKindOf(c.id)] ?? c.title))])}, once signed in.`);
     io.out('That was a dry run, so nothing was signed in, written or registered.');
     return 0;
   }
@@ -595,11 +600,125 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
       detail(lines);
     }
 
+  /* ── 6. one token for each agent wired ───────────────────────────────── */
+  if (stoppedBefore(6)) return 1;
+  const tokens = await agentTokens(here, key, file, dryRun, io);
+  if (tokens.changed) changed = true;
+
   /* WHAT IS LEFT, IN THE WORDS TO TYPE, before the closing line, so the last thing read is whether anything changed. */
   for (const line of whatIsLeft(rows, tools, key, io)) io.out(line);
   if (dryRun) io.out('That was a dry run, so nothing was signed in, written, registered or proposed.');
   else if (!changed) io.out(`Nothing changed: this machine was already set up from ${key}.`);
   else io.out(`This machine is set up from ${key}. Every session started from now on in ${listOf(here.map((c) => c.title))} has it.`);
-  return 0;
+  return tokens.failed ? 1 : 0;
+}
+
+/* ── one token per agent (agents and MCP plan §5.1, §10.5) ─────────────── */
+
+/** The kind of agent each app's server says it is (`--agent`), which a settings row matches and a token is made for. */
+export const agentKindOf = (app: string): string => (app === 'claude' || app === 'codex' || app === 'cursor' ? app : 'other');
+
+/** What a token's label calls the agent, after the machine's name: "MacBook · Claude Code". */
+const AGENT_TITLE: Readonly<Record<string, string>> = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', other: 'other apps' };
+
+/** How long an agent's token lasts, as the machine's login does. */
+export const AGENT_TOKEN_DAYS = 90;
+
+/** One agent's token made: the bearer, kept in the hosts file and never printed, or the sentence saying why there is none. */
+export type MintAgent = (key: string, label: string, io: SetupIo) => Promise<Held | string>;
+
+/**
+ * The real mint: the owner approves one `createToken` in the app with six digits (`approveOperation`, the `token`
+ * reach, spent on its first use), and the record makes a `write` token with the agent's label for ninety days. His
+ * settings row for the agent narrows it from there, and only he changes that row, in the app.
+ */
+export const mintAgent: MintAgent = async (key, label, io) => {
+  const grant = await approveOperation(key, 'token', { say: io.say, signal: io.signal, label });
+  if (typeof grant === 'number') return 'the approval in the app did not finish';
+  let res: Response;
+  try {
+    /* A REDIRECT IS REFUSED, not followed, for `clientFor`'s reason, and the error is never quoted: it could hold the bearer. */
+    res = await fetch(`${new URL(key).origin}/api/createToken`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${grant.bearer}` },
+      body: JSON.stringify({ scope: 'write', label, days: AGENT_TOKEN_DAYS }),
+      redirect: 'error',
+      signal: io.signal ? AbortSignal.any([io.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return `${key} did not answer`;
+  }
+  const said = (await res.json().catch(() => null)) as { ok?: unknown; value?: { bearer?: unknown; expires_at?: unknown }; refusal?: { fix?: unknown } } | null;
+  if (said?.ok === true && typeof said.value?.bearer === 'string' && typeof said.value.expires_at === 'string') return { value: said.value.bearer, expires: said.value.expires_at, label };
+  return typeof said?.refusal?.fix === 'string' ? said.refusal.fix : `${key} answered in a way this command does not recognise`;
+};
+
+/** An agent's own token, kept under its host beside the login, read again just before the write as `keepRunner` does. */
+function keepAgent(file: string, key: string, agent: string, held: Held): void {
+  const hosts = readHosts(file);
+  const entry = hosts.hosts[key] ?? {};
+  hosts.hosts[key] = { ...entry, agents: { ...(entry.agents ?? {}), [agent]: held } };
+  saveHosts(file, hosts);
+}
+
+/**
+ * Step 6: a token of its own for each kind of agent this run wired that has none live, each approved in the app, so a
+ * settings row can bind to it and an agent is told apart by its key rather than by what it says it is. The hooks, the
+ * MCP server and the commands its shell runs send it (`target` in `http.ts`). Nothing is made under `BRAINDOG_TOKEN`,
+ * which every command sends before any agent's own, or on a dry run. The machine's own login is left as it is:
+ * rotating it is his to do in Settings.
+ */
+export async function agentTokens(apps: Client[], key: string, file: string, dryRun: boolean, io: SetupIo): Promise<{ changed: boolean; failed: boolean }> {
+  const kinds = [...new Set(apps.map((c) => agentKindOf(c.id)))];
+  const titles = (list: string[]) => listOf(list.map((k) => AGENT_TITLE[k] ?? k));
+  if (kinds.length === 0) {
+    io.out('6. Tokens: no agent was wired here, so no token was made.');
+    return { changed: false, failed: false };
+  }
+  if (io.env.BRAINDOG_TOKEN) {
+    io.out('6. Tokens: BRAINDOG_TOKEN is set, and every command sends it before an agent\'s own, so no token was made for each agent.');
+    return { changed: false, failed: false };
+  }
+  let held: Record<string, Held> = {};
+  try {
+    held = Object.entries(readHosts(file).hosts).find(([written]) => sameHost(written, key))?.[1]?.agents ?? {};
+  } catch {
+    /* A hosts file that does not read holds no token; making one below says what is wrong with it. */
+  }
+  /* LIVE FOR A WEEK MORE, so a token about to lapse is made again now rather than mid-session. */
+  const live = (k: string) => typeof held[k]?.value === 'string' && Date.parse(String(held[k]?.expires)) > Date.now() + 7 * 86_400_000;
+  const owed = kinds.filter((k) => !live(k));
+  if (owed.length === 0) {
+    io.out(`6. Tokens: ${titles(kinds)} already ${kinds.length === 1 ? 'has a token' : 'have a token each'} of ${kinds.length === 1 ? 'its' : 'their'} own.`);
+    return { changed: false, failed: false };
+  }
+  if (dryRun) {
+    io.out(`6. Tokens: a token of its own would be made for ${titles(owed)}, each approved in the app with six digits.`);
+    return { changed: false, failed: false };
+  }
+  const device = await machineName();
+  let changed = false;
+  let failed = false;
+  for (const kind of owed) {
+    const title = AGENT_TITLE[kind] ?? kind;
+    const label = `${device} · ${title}`;
+    const made = await (io.mint ?? mintAgent)(key, label, io);
+    if (typeof made === 'string') {
+      failed = true;
+      io.out(`6. Tokens, ${title}: no token was made, so it keeps this machine's login: ${made.replace(/\.$/u, '')}.`);
+      continue;
+    }
+    try {
+      keepAgent(file, key, kind, made);
+    } catch (e) {
+      failed = true;
+      io.say(e instanceof Error ? e.message : `${file} could not be written.`);
+      io.out(`6. Tokens, ${title}: the token was made and could not be kept, so it is not used. Revoke ${label} in Settings.`);
+      continue;
+    }
+    changed = true;
+    io.out(`6. Tokens, ${title}: it has a token of its own, ${label}, until ${made.expires.slice(0, 10)}. Sessions started from now on use it.`);
+  }
+  return { changed, failed };
 }
 

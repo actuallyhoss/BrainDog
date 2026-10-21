@@ -22,8 +22,19 @@ export type Held = { value: string; expires: string; label: string };
 /** `docs/48-SPEC-CLI.md` §4.1, with the vault grants of the plan's §2.3. */
 export type HostsFile = {
   default?: string;
-  hosts: Record<string, { token?: Held; runner?: Held; shape?: Held; vault?: Record<string, { value: string; expires: string }> }>;
+  hosts: Record<string, { token?: Held; runner?: Held; shape?: Held; vault?: Record<string, { value: string; expires: string }>; agents?: Record<string, Held> }>;
 };
+
+/**
+ * Which agent a process speaks for, for the token `braindog setup` made for it (agents and MCP plan §5.1, §10.5):
+ * `BRAINDOG_AGENT`, which the hook scripts set to `claude`, else `claude` inside Claude Code (`CLAUDECODE`), so the
+ * hooks, the MCP server and a command its shell runs all reach the record as one token and so as one run.
+ */
+export function agentOf(env: Env): string | undefined {
+  const named = env.BRAINDOG_AGENT;
+  if (typeof named === 'string' && /^[a-z][a-z-]{0,31}$/u.test(named)) return named;
+  return env.CLAUDECODE ? 'claude' : undefined;
+}
 
 /** The budget of one tool call. The plan's §1.7 sets twenty seconds. */
 export const BUDGET_MS = 20_000;
@@ -154,8 +165,12 @@ export type Target = { key: string; base: string; token?: string };
  * `BRAINDOG_TOKEN` beats the file. Throws one sentence when there is nothing to reach.
  *
  * NO TOKEN IS NOT AN ERROR. A self-host started without one answers its own machine unauthenticated.
+ *
+ * THE AGENT'S OWN TOKEN BEFORE THE MACHINE'S, when `braindog setup` made one for the agent this process speaks for
+ * (`agent`, else `agentOf`) and it has not expired. An expired one falls back to the machine's login, which still
+ * works, and the next `braindog setup` makes a new one.
  */
-export function target(flag: string | undefined, env: Env, file: string, now: number = Date.now()): Target {
+export function target(flag: string | undefined, env: Env, file: string, now: number = Date.now(), agent: string | undefined = agentOf(env)): Target {
   let hosts: HostsFile | undefined;
   const read = () => (hosts ??= readHosts(file));
 
@@ -167,6 +182,10 @@ export function target(flag: string | undefined, env: Env, file: string, now: nu
     throw new Error(`${key} is http, not https. BrainDog sends a token only over https, except to this machine.`);
 
   let token = env.BRAINDOG_TOKEN || undefined;
+  if (!token && agent !== undefined) {
+    const own = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.agents?.[agent];
+    if (isObject(own) && typeof own.value === 'string' && own.value && Date.parse(String(own.expires)) > now) token = own.value;
+  }
   if (!token) {
     const entry = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.token;
     if (isObject(entry) && typeof entry.value === 'string' && entry.value) {

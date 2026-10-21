@@ -127,9 +127,13 @@ export async function logout(args: string[], io: LogoutIo): Promise<number> {
     if (isObject(entry.token)) tokens++;
     if (isObject(entry.runner)) runners++;
     if (isObject(entry.vault)) grants += Object.keys(entry.vault).length;
+    /* THE AGENTS' OWN TOKENS GO WITH THE LOGIN (`braindog setup` made them): a logout that left them would leave a
+       live bearer on the disk under a sentence saying the machine is signed out. */
+    if (isObject(entry.agents)) tokens += Object.keys(entry.agents).length;
     delete entry.token;
     delete entry.runner;
     delete entry.vault;
+    delete entry.agents;
     /* The entry goes once it is empty. Anything else a later version keeps per host stays, and so does its key. */
     if (Object.keys(entry).length === 0) delete hosts.hosts[written];
   }

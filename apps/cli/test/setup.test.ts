@@ -21,9 +21,10 @@ import { join } from 'node:path';
 
 import { CLIENTS, type Client } from '../src/clients/index.ts';
 import { claudeDesktopFolder, vscodeUserFolder } from '../src/clients/others.ts';
-import { hostKey } from '../src/http.ts';
+import { hostKey, readHosts, saveHosts, target } from '../src/http.ts';
 import { HOOK_STATUS, keepCopy } from '../src/install.ts';
-import { profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
+import { logout } from '../src/logout.ts';
+import { agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-setup-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -67,7 +68,7 @@ test('the plan is printed, then asked about, before the settings file exists; a 
   assert.ok(asked.lines.slice(plan).some((l) => l.includes('+ hooks.PostToolUse:')), asked.lines.join('\n'));
 
   const hooks = (JSON.parse(readFileSync(m.settings, 'utf8')) as { hooks: Record<string, unknown> }).hooks;
-  assert.deepEqual(Object.keys(hooks), ['SessionStart', 'SessionEnd', 'PostToolUse']);
+  assert.deepEqual(Object.keys(hooks), ['SessionStart', 'SessionEnd', 'PostToolUse', 'UserPromptSubmit', 'PreToolUse', 'Stop']);
   assert.ok(m.out.includes("   Written: the BrainDog hooks and Agent Skill are in Claude Code's settings."), m.out.join('\n'));
   assert.ok(m.out.some((l) => l.startsWith('3. MCP server, Claude Code in ~/.claude: braindog is registered')), m.out.join('\n'));
 });
@@ -406,4 +407,77 @@ test('with Claude Desktop and VS Code on the machine, each gets the server in it
   for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
   assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
+});
+
+/* ── one token per agent (agents and MCP plan §5.1, §10.5; W2-D) ───────── */
+
+test('STEP 6 MAKES ONE TOKEN PER KIND OF AGENT WIRED, keeps it beside the login, never prints it, and asks nothing twice', async () => {
+  const m = machine();
+  const { BRAINDOG_TOKEN: _held, ...env } = m.io.env;
+  m.io.env = env;
+  const file = join(env.XDG_CONFIG_HOME!, 'braindog', 'hosts.json');
+  const key = hostKey('https://brain.example/app/acme');
+  saveHosts(file, { default: key, hosts: { [key]: { token: { value: 'bd_machine_login_never_printed', expires: '2099-01-01T00:00:00Z', label: 'MacBook · braindog-cli' } } } });
+  const asked: string[] = [];
+  m.io.mint = async (_key, label) => {
+    asked.push(label);
+    return label.endsWith('Codex') ? 'he did not approve it' : { value: `bd_agent_${String(asked.length)}_never_printed`, expires: '2027-01-19T00:00:00Z', label };
+  };
+  const apps = ['claude', 'codex', 'claude-desktop', 'vscode'].map((id) => CLIENTS.find((c) => c.id === id) ?? ({ id } as Client));
+  assert.deepEqual(apps.map((c) => agentKindOf(c.id)), ['claude', 'codex', 'other', 'other']);
+  const made = await agentTokens(apps, key, file, false, m.io);
+  assert.deepEqual(made, { changed: true, failed: true });
+  assert.equal(asked.length, 3, 'Claude Desktop and VS Code are one kind, so one token');
+  assert.ok(asked.every((l) => / · (?:Claude Code|Codex|other apps)$/u.test(l)), asked.join('\n'));
+  const agents = readHosts(file).hosts[key]!.agents!;
+  assert.deepEqual(Object.keys(agents).sort(), ['claude', 'other']);
+  assert.equal(readHosts(file).hosts[key]!.token!.value, 'bd_machine_login_never_printed', 'the machine login was touched');
+  assert.ok(m.out.some((l) => l.startsWith("6. Tokens, Codex: no token was made, so it keeps this machine's login: he did not approve it.")), m.out.join('\n'));
+  assert.ok(!m.out.join('\n').includes('never_printed'), 'a bearer was printed');
+
+  /* A SECOND RUN MAKES ONLY WHAT IS STILL MISSING. */
+  asked.length = 0;
+  m.io.mint = async (_key, label) => (asked.push(label), { value: 'bd_agent_codex_never_printed', expires: '2027-01-19T00:00:00Z', label });
+  assert.deepEqual(await agentTokens(apps, key, file, false, m.io), { changed: true, failed: false });
+  assert.equal(asked.length, 1);
+  m.out.length = 0;
+  assert.deepEqual(await agentTokens(apps, key, file, false, m.io), { changed: false, failed: false });
+  assert.match(m.out[0]!, /^6\. Tokens: Claude Code, Codex and other apps already have a token each of their own\.$/u);
+
+  /* UNDER BRAINDOG_TOKEN, AND ON A DRY RUN, NOTHING IS MADE. */
+  m.io.mint = async () => assert.fail('a token was made');
+  m.out.length = 0;
+  await agentTokens(apps, key, file, false, { ...m.io, env: { ...env, BRAINDOG_TOKEN: 'x' } });
+  assert.match(m.out[0]!, /^6\. Tokens: BRAINDOG_TOKEN is set/u);
+  rmSync(file);
+  m.out.length = 0;
+  await agentTokens(apps, key, file, true, m.io);
+  assert.match(m.out[0]!, /^6\. Tokens: a token of its own would be made for Claude Code, Codex and other apps/u);
+});
+
+test("THE AGENT'S OWN TOKEN IS SENT FOR THAT AGENT, the login for any other, the login again once it expired; logout takes them all", async () => {
+  const dir = mkdtempSync(join(scratch, 'agent-tokens-'));
+  const file = join(dir, 'hosts.json');
+  const key = 'https://brain.example/acme';
+  saveHosts(file, {
+    default: key,
+    hosts: {
+      [key]: {
+        token: { value: 'bd_login', expires: '2099-01-01T00:00:00Z', label: 'm' },
+        agents: { claude: { value: 'bd_claude', expires: '2099-01-01T00:00:00Z', label: 'm · Claude Code' }, codex: { value: 'bd_codex', expires: '2020-01-01T00:00:00Z', label: 'm · Codex' } },
+      },
+    },
+  });
+  assert.equal(target(undefined, {}, file).token, 'bd_login', 'no agent said, so the login');
+  assert.equal(target(undefined, { BRAINDOG_AGENT: 'claude' }, file).token, 'bd_claude');
+  assert.equal(target(undefined, { CLAUDECODE: '1' }, file).token, 'bd_claude', 'a command inside Claude Code');
+  assert.equal(target(undefined, {}, file, Date.now(), 'claude').token, 'bd_claude');
+  assert.equal(target(undefined, {}, file, Date.now(), 'codex').token, 'bd_login', 'an expired agent token was sent');
+  assert.equal(target(undefined, {}, file, Date.now(), 'cursor').token, 'bd_login');
+  assert.equal(target(undefined, { BRAINDOG_TOKEN: 'bd_env', CLAUDECODE: '1' }, file).token, 'bd_env', 'BRAINDOG_TOKEN still wins');
+  /* ANOTHER HOST NEVER GETS THIS HOST'S AGENT TOKEN. */
+  assert.equal(target('https://other.example/x', { CLAUDECODE: '1' }, file).token, undefined);
+
+  assert.equal(await logout([key], { file, env: {}, say: () => undefined }), 0);
+  assert.equal(readHosts(file).hosts[key], undefined, 'an agent token outlived the logout');
 });
