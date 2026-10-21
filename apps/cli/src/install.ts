@@ -1,7 +1,8 @@
 /**
- * `braindog install`: the three hook entries in Claude Code's settings (a session's start, its end, and the beat after
- * each tool call), shown first and written only when asked: the user profile by default, each `--config-dir` profile
- * folder, or each `--settings` file the person names.
+ * `braindog install`: the six hook entries in Claude Code's settings (a session's start, its end, the beat after each
+ * tool call, and the three that read the inbox file: a prompt, a tool call and the end of a turn), shown first and
+ * written only when asked: the user profile by default, each `--config-dir` profile folder, or each `--settings` file
+ * the person names.
  *
  * A DRY RUN BY DEFAULT. Settings belong to the person, and a hook runs in every session they start, so the
  * command prints exactly what it would add and changes nothing without `--apply`. With it, the file as it
@@ -69,7 +70,7 @@ import { refused, type Result } from '@braindog/ports';
 import { refuse, type Saying } from './json.ts';
 
 type Env = Record<string, string | undefined>;
-type Hook = { type: 'command'; command: string; timeout: number; statusMessage?: string };
+type Hook = { type: 'command'; command: string; timeout: number; statusMessage?: string; asyncRewake?: boolean };
 type Entry = { hooks: Hook[] };
 
 /**
@@ -89,12 +90,30 @@ export const HOOK_STATUS = 'Connecting to BrainDog...';
  * status line after every tool call would flash under the agent's own work, mostly for a hook that read one file's age
  * and stopped.
  */
+/*
+ * AND THE THREE THAT READ THE INBOX FILE (agents and MCP plan §2.3 C, `inbox-file.ts`): what he told the run on the
+ * next prompt, a stop that denies the next tool call, and a turn that may not end while the run owes him a reply. FIVE
+ * SECONDS EACH, and no status line: their script reads one flags file and stops there unless the hook has work, and
+ * then Node reads one more file, so a status line would only flash.
+ *
+ * AND THE WATCHER, ONLY WHEN ASKED (`rewake`, off by default): a Stop hook Claude Code runs in the background
+ * (`asyncRewake`, read from Claude Code 2.1.304's own hook settings schema: "runs in background and wakes the model on
+ * exit code 2"), which waits up to ten minutes for something he tells the run and wakes an idle session with it. Not
+ * yet tried on a signed-in session, which is why nothing turns it on but `braindog install --rewake`.
+ */
 const EVENTS = [
   { event: 'SessionStart', which: 'start', timeout: 10, status: true },
   { event: 'SessionEnd', which: 'end', timeout: 10, status: true },
   { event: 'PostToolUse', which: 'beat', timeout: 10, status: false },
+  { event: 'UserPromptSubmit', which: 'prompt', timeout: 5, status: false },
+  { event: 'PreToolUse', which: 'tool', timeout: 5, status: false },
+  { event: 'Stop', which: 'stop', timeout: 5, status: false },
 ] as const;
-type Which = (typeof EVENTS)[number]['which'];
+const WATCH = { event: 'Stop', which: 'watch', timeout: 610, status: false } as const;
+type Which = (typeof EVENTS)[number]['which'] | typeof WATCH.which;
+
+/** The hook entries a run writes: the six, and the watcher when `rewake` asks for it. */
+const eventsOf = (options: Options) => [...EVENTS, ...(options.rewake === true ? [WATCH] : [])];
 
 /** The words a settings file says when it already runs every hook below as written. */
 export const HOOKS_HELD = 'already runs every BrainDog hook';
@@ -325,7 +344,7 @@ export function keepCopy(file: string): string | null {
   return kept;
 }
 
-type Options = { apply: boolean; scripts: string; platform?: string; replace?: Replace | undefined; home?: string; checkout?: string };
+type Options = { apply: boolean; scripts: string; platform?: string; replace?: Replace | undefined; home?: string; checkout?: string; rewake?: boolean | undefined };
 
 /** One file's change, read and decided before anything is written: the lines to print, and what to write. */
 type Write = { file: string; had: boolean; value: unknown };
@@ -659,12 +678,18 @@ function planSettings(named: string, options: Options): Plan {
 
   const added: { event: string; entry: Entry }[] = [];
   const changed: { event: string; hook: Hook }[] = [];
-  for (const { event, which, timeout, status } of EVENTS) {
+  for (const { event, which, timeout, status } of eventsOf(options)) {
     const list = next[event] ?? [];
     if (!Array.isArray(list)) throw new Error(`hooks.${event} in ${file} is not a list, so braindog install leaves the file alone.`);
-    const hook: Hook = { type: 'command', command: hookCommand(which, options.scripts, options.platform), timeout, ...(status ? { statusMessage: HOOK_STATUS } : {}) };
+    const hook: Hook = {
+      type: 'command',
+      command: hookCommand(which, options.scripts, options.platform),
+      timeout,
+      ...(status ? { statusMessage: HOOK_STATUS } : {}),
+      ...(which === 'watch' ? { asyncRewake: true } : {}),
+    };
     const same = (h: unknown) =>
-      isObject(h) && h.type === hook.type && h.command === hook.command && h.timeout === hook.timeout && h.statusMessage === hook.statusMessage;
+      isObject(h) && h.type === hook.type && h.command === hook.command && h.timeout === hook.timeout && h.statusMessage === hook.statusMessage && h.asyncRewake === hook.asyncRewake;
     const ours = (h: unknown) => isObject(h) && typeof h.command === 'string' && (h.command === hook.command || isOurs(h.command, which));
     const hooksOf = (group: unknown): unknown[] => (isObject(group) && Array.isArray(group.hooks) ? group.hooks : []);
     if (list.some((group) => hooksOf(group).some(same))) continue;

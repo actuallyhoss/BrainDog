@@ -28,32 +28,37 @@ const settingsIn = (body?: unknown): string => {
 };
 const SCRIPTS = join(scratch, 'checkout', 'hooks');
 const options = (apply: boolean) => ({ apply, scripts: SCRIPTS, platform: 'darwin', home: scratch });
-const hook = (which: 'start' | 'end' | 'beat') => ({
+const hook = (which: 'start' | 'end' | 'beat' | 'prompt' | 'tool' | 'stop') => ({
   type: 'command',
   command: hookCommand(which, SCRIPTS, 'darwin'),
-  timeout: 10,
-  ...(which === 'beat' ? {} : { statusMessage: HOOK_STATUS }),
+  timeout: which === 'start' || which === 'end' || which === 'beat' ? 10 : 5,
+  ...(which === 'start' || which === 'end' ? { statusMessage: HOOK_STATUS } : {}),
 });
+
+/** The three that read the inbox file (inbox-file.ts), each its own event, added by every fresh install. */
+const INBOX = [['UserPromptSubmit', 'prompt'], ['PreToolUse', 'tool'], ['Stop', 'stop']] as const;
 
 type Settings = { hooks: Record<string, { matcher?: string; hooks: Record<string, unknown>[] }[]> };
 const read = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as Settings;
 
-test('a fresh install adds three hooks ending inside ten seconds, the start and end saying "Connecting to BrainDog..."', () => {
+test('a fresh install adds six hooks ending inside ten seconds, the start and end saying "Connecting to BrainDog..."', () => {
   const file = settingsIn({ model: 'opus' });
   const dry = installAt(file, options(false));
-  for (const [event, which] of [['SessionStart', 'start'], ['SessionEnd', 'end'], ['PostToolUse', 'beat']] as const)
+  for (const [event, which] of [['SessionStart', 'start'], ['SessionEnd', 'end'], ['PostToolUse', 'beat'], ...INBOX] as const)
     assert.ok(dry.includes(`  + hooks.${event}: ${JSON.stringify({ hooks: [hook(which)] })}`), `${event}:\n${dry.join('\n')}`);
   assert.equal(HOOK_STATUS, 'Connecting to BrainDog...');
   assert.deepEqual(read(file), { model: 'opus' }, 'the dry run wrote');
 
   installAt(file, options(true));
   const now = read(file);
-  assert.deepEqual(Object.keys(now.hooks), ['SessionStart', 'SessionEnd', 'PostToolUse']);
+  assert.deepEqual(Object.keys(now.hooks), ['SessionStart', 'SessionEnd', 'PostToolUse', 'UserPromptSubmit', 'PreToolUse', 'Stop']);
   for (const [event, groups] of Object.entries(now.hooks)) {
     assert.equal(groups.length, 1);
-    assert.equal(groups[0]!.hooks[0]!.timeout, 10);
-    /* The beat runs after every tool call, so a status line there would flash under the agent's own work. */
-    assert.equal(groups[0]!.hooks[0]!.statusMessage, event === 'PostToolUse' ? undefined : 'Connecting to BrainDog...', event);
+    assert.ok(groups[0]!.hooks[0]!.timeout! as number <= 10, event);
+    /* NO MATCHER: a PreToolUse group without one is every tool, which a stop has to reach. */
+    assert.equal(groups[0]!.matcher, undefined, event);
+    /* The beat and the inbox hooks run on every call and prompt, so a status line there would flash under the agent's own work. */
+    assert.equal(groups[0]!.hooks[0]!.statusMessage, event === 'SessionStart' || event === 'SessionEnd' ? 'Connecting to BrainDog...' : undefined, event);
   }
   assert.equal(now.hooks.PostToolUse![0]!.hooks[0]!.command, `sh "${join(SCRIPTS, 'braindog-hook.sh')}" beat`);
 
@@ -78,6 +83,7 @@ test('an older BrainDog entry is rewritten where it stands, as one ~ line, with 
       `  ~ hooks.SessionStart: ${JSON.stringify(hook('start'))}`,
       `  ~ hooks.SessionEnd: ${JSON.stringify(hook('end'))}`,
       `  + hooks.PostToolUse: ${JSON.stringify({ hooks: [hook('beat')] })}`,
+      ...INBOX.map(([event, which]) => `  + hooks.${event}: ${JSON.stringify({ hooks: [hook(which)] })}`),
     ],
     dry.join('\n'),
   );
@@ -107,4 +113,17 @@ test('a beat entry from an earlier install that showed a status line is rewritte
 test('on Windows the beat runs the PowerShell script with the word beat', () => {
   const command = hookCommand('beat', 'C:\\braindog\\apps\\cli\\hooks', 'win32');
   assert.match(command, /^powershell -NoProfile -ExecutionPolicy Bypass -File ".*braindog-hook\.ps1" beat$/u);
+});
+
+test('the watcher that wakes an idle session is written only with --rewake, as an async Stop hook beside the stop hook', () => {
+  const plain = settingsIn({});
+  installAt(plain, options(true));
+  assert.deepEqual(read(plain).hooks.Stop, [{ hooks: [hook('stop')] }], 'a plain install wrote the watcher');
+
+  const file = settingsIn({});
+  installAt(file, { ...options(true), rewake: true });
+  const stop = read(file).hooks.Stop!;
+  assert.deepEqual(stop[0], { hooks: [hook('stop')] });
+  assert.deepEqual(stop[1], { hooks: [{ type: 'command', command: hookCommand('watch', SCRIPTS, 'darwin'), timeout: 610, asyncRewake: true }] });
+  assert.ok(installAt(file, { ...options(false), rewake: true })[0]!.includes(HOOKS_HELD));
 });
