@@ -1522,6 +1522,20 @@
     text-align: end;
   }
 
+  /* COMING IN AND GOING OUT CARRY THEIR SIGNS (VERIFY H6): "+£11,490" in the good green and "−£43,047" in ink, so the
+     two figures are never read as the same kind of number. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(2) .cell-figure) {
+    color: var(--good);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(2) .cell-figure::before) {
+    content: '+';
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(3) .cell-figure::before) {
+    content: '\2212';
+  }
+
   .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child) {
     grid-template-areas:
       'label glyph'
