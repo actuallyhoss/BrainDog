@@ -48,7 +48,7 @@ test('THE OWNER IS READ AS A PERSON WRITES IT: a kind, a name or the app; a pers
   assert.equal(agentOf('Claude Code'), 'claude');
   assert.equal(agentOf('agent:codex'), 'codex');
   assert.equal(agentOf(' Cursor '), 'cursor');
-  assert.equal(agentOf('Sam'), null);
+  assert.equal(agentOf('Mara'), null);
   assert.equal(agentOf('live-feed'), null);
   assert.equal(agentOf(''), null);
   assert.equal(agentOf(undefined), null);
@@ -57,7 +57,7 @@ test('THE OWNER IS READ AS A PERSON WRITES IT: a kind, a name or the app; a pers
 test('NO AGENT KEEPS IT, OR THIS PERSON TELLS NO AGENT: "Add a reading"; neither, nothing to press', () => {
   const specimen: StaleKpi = { name: 'Specimen downloads', project: 'Kiln', spoken: 'things#1', points: [{ at: '2026-09-30T09:00:00.000Z' }] };
   assert.deepEqual(staleFixOf(specimen, OWNER, { now: NOW }), { kind: 'add', label: 'Add a reading' });
-  assert.deepEqual(staleFixOf({ ...specimen, owner: 'Sam' }, OWNER, { now: NOW }), { kind: 'add', label: 'Add a reading' });
+  assert.deepEqual(staleFixOf({ ...specimen, owner: 'Mara' }, OWNER, { now: NOW }), { kind: 'add', label: 'Add a reading' });
   assert.deepEqual(staleFixOf(studios, { tell: false, add: true }, { now: NOW }), { kind: 'add', label: 'Add a reading' });
   assert.equal(staleFixOf(specimen, { tell: true, add: false }, { now: NOW }), null);
 });
@@ -67,7 +67,7 @@ test('THE DAY AS A PERSON SAYS IT, the year only when it is not this one; the ne
   assert.equal(daySaid('2025-12-02', NOW), '2 Dec 2025');
   assert.equal(lastOf(studios.points), '2026-09-30T09:00:00.000Z');
   assert.equal(lastOf([]), null);
-  for (const said of [words.kpiAskSaid('Players', 'Crumb.gg', '2 Oct'), words.kpiAskAgent('Claude'), words.kpiAddReading]) assert.ok(!said.includes('—'), said);
+  for (const said of [words.kpiAskSaid('Players', 'Portage', '2 Oct'), words.kpiAskAgent('Claude'), words.kpiAddReading]) assert.ok(!said.includes(String.fromCharCode(0x2014)), said);
 });
 
 test('THE READINGS LIST IS FOUND BY ITS SHAPE on the seed, and its link to the projects', () => {
