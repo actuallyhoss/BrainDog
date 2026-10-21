@@ -13,7 +13,7 @@
   in dark: `--tile`, radius 16, padding `--tile-pad` (24 on the screen's lead tile, 16 on a phone).
 
   A TILE THAT HOLDS ONLY AN EMPTY STATE HUGS IT (frame F20): 640 wide at most, on the page's start edge, rather than a
-  sentence at the start of 1440px of white.
+  sentence at the start of 1440px of white. In a column of full tiles it keeps their width (`data-wide`).
 
   A GROUP OF ROWS IS `class="section"` WITH ITS ROWS IN ONE `.section-body` (what `Section` drew): the rows keep their own
   flow rather than the tile's 16 between children, `Empty` draws a section's empty state as the compact line, and
@@ -127,8 +127,9 @@
     }
   }
 
-  /* A TILE OF ONE EMPTY STATE, its heading aside, is as wide as the state and no wider. */
-  .tile:has(> :global(.empty)):not(:has(> :not(.tile-head, :global(.empty)))) {
+  /* A TILE OF ONE EMPTY STATE, its heading aside, is as wide as the state and no wider, unless it stands in a column of
+     full tiles (`data-wide`), where it is as wide as they are. */
+  .tile:not([data-wide]):has(> :global(.empty)):not(:has(> :not(.tile-head, :global(.empty)))) {
     max-inline-size: 640px;
   }
 

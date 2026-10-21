@@ -284,6 +284,7 @@
     yours: 'Your agents',
     connections: 'Connections',
     noKeys: 'No machine or key is connected yet',
+    noKeysWorking: (who: string, n: number) => `${who} ${n === 1 ? 'is' : 'are'} working without a machine or key listed here`,
     noKeysWhy: 'Connect an agent to give it a key of its own. Its settings then hold for that key alone.',
     atWorkNow: (n: number) => `${n} at work now.`,
     seeThem: 'See their runs',
@@ -350,6 +351,12 @@
    * change it would make to Decide, and saying so by name is what makes "can propose" a thing a person understands.
    */
   const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
+  /**
+   * WHO IS AT WORK WITH NOTHING LISTED UNDER CONNECTIONS, by name. The seed's runs, and a run carried in from elsewhere,
+   * came in through no machine or key this record lists, and the tile said "No machine or key is connected yet" under
+   * Claude and Codex working now: the contradiction the UI review flagged. It names who works instead.
+   */
+  const workingNames = $derived(LIST.format(agents.filter(workingOf).map((a) => a.name)));
   const reading = $derived.by(() => {
     const plain = (scope: string): string[] =>
       rows.filter((c) => c.live && c.token?.scope === scope && !reportKeyOf(c.token.label)).map((c) => nameOf(c));
@@ -575,11 +582,13 @@
   <!-- WHAT CAN ACT ON THE RECORD: every machine, key and connected app, with Revoke. Drawn once the list is read, since
        the tile above says the screen is still reading. -->
   {#if legacy || held.state === 'ready'}
-  <Tile icon={legacy ? 'session' : 'key'} title={legacy ? words.workHere : words.connections} count={held.state === 'ready' ? (legacy ? count : rows.length) : undefined} actions={legacy ? connectButton : undefined}>
+  <!-- A COLUMN OF FULL TILES, SO THIS ONE IS FULL TOO (`data-wide`): alone at 640 under Your agents it read as a
+       half-width card. No count over nothing: "Connections 0" over the sentence said the same fact twice. -->
+  <Tile icon={legacy ? 'session' : 'key'} title={legacy ? words.workHere : words.connections} count={held.state === 'ready' ? (legacy ? count : rows.length) || undefined : undefined} actions={legacy ? connectButton : undefined} data-wide>
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
     {:else if (legacy ? count : rows.length) === 0}
-      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : words.noKeys} body={legacy ? copy.connectedNoneWhy : words.noKeysWhy} />
+      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys} body={legacy ? copy.connectedNoneWhy : words.noKeysWhy} />
     {:else}
       {@const nowMs = recordNow()}
       <ul class="whos">
