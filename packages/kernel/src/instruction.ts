@@ -279,6 +279,7 @@ function placeOf(run: RunOf, hints: RunHints = {}) {
     task: pick(f.task, hints.task),
     parent: text(f.parent),
     started: Date.parse(text(f.started) ?? run.created_at),
+    called: Date.parse(text(f.last_seen) ?? ''),
   };
 }
 
@@ -300,8 +301,11 @@ function reaches(i: Instr, run: RunOf, at: ReturnType<typeof placeOf>, nowMs: nu
   if (i.to === 'run') return i.to_run === run.spoken;
   /* A HELPER IS NEVER TOLD A TELL: it works for its parent, which is told. It obeys its parent's stop (`stopOf`). */
   if (at.parent !== null) return false;
-  /* "NEXT START" IS A RUN THAT STARTED AFTER HE SAID IT; "NOW" IS ANY OPEN RUN THERE. */
-  const timely = i.when === 'now' || (Number.isFinite(at.started) && at.started >= Date.parse(i.at));
+  /* "NEXT START" IS A RUN THAT STARTED AFTER HE SAID IT, OR ONE ALREADY OPEN ONCE IT CALLS AGAIN: its own call moves
+     `last_seen` (the bridge's pulse moves `pulse_at`, which is not one), so a live run is told at its next call and not
+     pushed mid-work. "NOW" IS ANY OPEN RUN THERE. */
+  const said = Date.parse(i.at);
+  const timely = i.when === 'now' || (Number.isFinite(at.started) && at.started >= said) || (Number.isFinite(at.called) && at.called >= said);
   if (i.to === 'task') {
     if (i.task !== null && at.task === i.task) return true;
     if (holder !== null) return false;

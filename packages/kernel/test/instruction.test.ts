@@ -141,6 +141,14 @@ test('TO AN AGENT KIND: "next start" reaches a run of that kind that starts ther
   assert.deepEqual(ids(k.instructionFor({}, before)), ['IN2']);
   assert.deepEqual(ids(k.instructionFor({}, after)), ['IN1', 'IN2']);
   assert.deepEqual(ids(k.instructionFor({}, elsewhere)), []);
+
+  /* AND A RUN ALREADY OPEN IS TOLD "NEXT START" AT ITS NEXT CALL, which moves its last_seen; a pulse is not one. */
+  clock.advance(MIN);
+  k.pulseRun(before);
+  assert.deepEqual(ids(k.instructionFor({}, before)), ['IN2'], 'the bridge pulse alone told it');
+  work('before');
+  assert.deepEqual(ids(k.instructionFor({}, before)), ['IN1', 'IN2']);
+  assert.deepEqual(ids(k.instructionFor({}, codex)), [], 'another kind of agent was told');
   sql.close();
 });
 
