@@ -19,6 +19,9 @@
   row, so the whole row is the target and a fix button on it still takes its own press. A row whose KPI stopped arriving
   says so in the warn colour, under its figure, whatever line it was ranked for.
 
+  `lead={false}` DRAWS NO LEAD: every KPI is a tile, the one marked `headline` first with `leads` said under its name.
+  A project page whose hero already says the headline large hands it, so one place says that figure big.
+
   A HOST THAT OPENS A KPI ITSELF hands `onopen`, which wins over `href`: the name is then a button whose press covers
   the tile or the row, and opens whatever the host opens (the app's sheet). `menu` is drawn at the end of the name's
   line, a KPI's own few verbs. With neither the markup is as it was, a name in a paragraph.
@@ -38,6 +41,8 @@
     href,
     onopen,
     menu,
+    lead = true,
+    leads,
   }: {
     kpis: readonly KpiInput[];
     form?: 'project' | 'today';
@@ -52,9 +57,15 @@
     onopen?: ((kpi: KpiInput) => void) | undefined;
     /** A KPI's own verbs, drawn at the end of its name's line. */
     menu?: Snippet<[KpiView]> | undefined;
+    /** Whether the project form draws its lead KPI large; with `false` it is the first tile. */
+    lead?: boolean | undefined;
+    /** Said under the headline's name where no lead draws it large. */
+    leads?: string | undefined;
   } = $props();
 
   const plan = $derived(kpisPlan(kpis, { home, ...(now !== undefined ? { now } : {}) }));
+  /* WITH NO LEAD, the lead is the first tile. */
+  const tiles = $derived(lead || !plan.lead ? plan.rest : [plan.lead, ...plan.rest]);
   const hue = (k: KpiView): string | undefined => (k.slot ? `--chart-1:var(--cat-${k.slot})` : undefined);
   const state = (k: KpiView): string | undefined => (k.target?.state === 'off' ? 'off' : k.stale ? 'stale' : undefined);
 
@@ -204,8 +215,8 @@
     {#if add}<div class="kpis-foot">{@render add()}</div>{/if}
   </div>
 {:else}
-  <div class="kpis" data-form="project">
-    {#if plan.lead}
+  <div class="kpis" data-form="project" data-lead={lead ? undefined : 'none'}>
+    {#if lead && plan.lead}
       {@const k = plan.lead}
       <div class="kpi kpi-lead" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
         <div class="kpi-head">
@@ -217,11 +228,12 @@
         {#if k.chart}<div class="kpi-body">{@render chart(k, 'lead')}</div>{/if}
       </div>
     {/if}
-    {#if plan.rest.length}
+    {#if tiles.length}
       <ul class="kpi-grid">
-        {#each plan.rest as k (k.key)}
+        {#each tiles as k (k.key)}
           <li class="kpi kpi-tile" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
             {@render title(k)}
+            {#if !lead && leads && k.headline}<p class="kpi-leads">{leads}</p>{/if}
             <div class="kpi-tile-figure">
               {@render figure(k)}
               {#if k.chart?.form === 'ring'}{@render chart(k, 'tile')}{/if}

@@ -432,6 +432,19 @@
     list-style: none;
   }
 
+  /* WITH NO LEAD ABOVE IT the grid is the whole tile, with no hairline to sit under. */
+  .kpis[data-lead='none'] .kpi-grid {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  /* THE ONE THE CARD LEADS WITH, said under its name where no lead draws it large. */
+  .kpi-leads {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
   @container (min-width: 640px) {
     .kpi-grid {
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

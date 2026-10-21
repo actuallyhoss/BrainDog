@@ -6,7 +6,8 @@
   A NUMBER IS PRESSED TO CHANGE IT: its name is the button and the press covers the tile or the row, and it opens the
   sheet (`KpiSheet.svelte`) on that number, wherever it is drawn. Its menu says the two ways it is not on Today and
   "Lead the card with this" (`block-menu.ts` `kpiActionsFor`), each one press through the app's row writer at the
-  version each row was read at, with a line over Undo. On a project's page the foot adds one.
+  version each row was read at, with a line over Undo. On a project's page the foot adds one, and no number is drawn
+  large: the hero says the one the card leads with (`ProjectShape.svelte`), so here it is the first tile, marked.
 
   WHAT WAS SUGGESTED AND NOT KEPT is on the project's page only, under its numbers: each by name with Keep and Not this.
   Every form of the block leaves drafts out (`sources/kpis.ts`), so this is the one place they are seen; Keep is the
@@ -242,7 +243,7 @@
   {#if kpis.length === 0}
     <p class="kb-none">{unread ? copy.kpiNotRead : copy.kpiNoneYet}</p>
   {/if}
-  <Kpis {kpis} {form} home={homeCurrency()} {now} onopen={writable ? (k) => void openKpi(k) : undefined} href={href ? (k) => href(k as KpiAnswered) : undefined} menu={writable ? menu : undefined} add={adds ? foot : undefined} />
+  <Kpis {kpis} {form} lead={form !== 'project'} leads={copy.kpiLeads} home={homeCurrency()} {now} onopen={writable ? (k) => void openKpi(k) : undefined} href={href ? (k) => href(k as KpiAnswered) : undefined} menu={writable ? menu : undefined} add={adds ? foot : undefined} />
 
   {#if drafts.length && list}
     {@const at = list}

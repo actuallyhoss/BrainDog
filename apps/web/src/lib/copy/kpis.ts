@@ -114,6 +114,7 @@ export const kpis = {
   kpiAddNumber: 'Add a number',
   kpiNoneYet: 'No key numbers yet.',
   kpiNotRead: 'The key numbers could not be read just now.',
+  kpiLeads: 'Leads the card',
 
   /* WHAT BRAINDOG OR AN AGENT SUGGESTED, on the project's page only, each kept or turned down with one press. */
   kpiSuggested: 'Suggested',
