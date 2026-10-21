@@ -32,7 +32,7 @@
   }
 
   /* THE FACE (2.A.5): a 28px disc in the step-under fill, the maker's mark 16px in it, and the live dot at its end
-     corner with a cut-out ring in the tile's colour. No ring round the face. */
+     corner with a cut-out in the tile's colour. No ring round the face. */
   .pres-face {
     position: relative;
     display: inline-grid;
@@ -62,7 +62,8 @@
     block-size: 8px;
     border-radius: var(--r-round);
     background: var(--live);
-    box-shadow: 0 0 0 2px var(--tile);
+    /* THE CUT-OUT IN THE TILE'S COLOUR, an outline and not a shadow (SPEC 1.9). */
+    outline: 2px solid var(--tile);
   }
 
   .pres-dot[data-live='thinking'] {
