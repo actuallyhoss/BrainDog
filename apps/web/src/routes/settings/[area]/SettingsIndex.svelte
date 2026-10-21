@@ -93,7 +93,7 @@
     display: grid;
     grid-template-columns: var(--well) minmax(0, 1fr);
     align-items: center;
-    column-gap: 10px;
+    column-gap: var(--sp-3);
     min-block-size: var(--rail-item-h);
     padding-inline: var(--sp-1) var(--sp-2);
     border-radius: var(--r-pop);
