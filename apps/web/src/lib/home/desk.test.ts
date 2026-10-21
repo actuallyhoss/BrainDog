@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Working } from '../record/boot-live.ts';
-import { workingRows } from './desk.ts';
+import { forSaid, workingRows } from './desk.ts';
 
 const NOW = Date.parse('2026-10-19T10:00:00Z');
 const run = (over: Partial<Working> = {}): Working => ({
@@ -41,6 +41,14 @@ test('a run with no project, words or number says none of them, and a quiet one 
   assert.equal(r?.run, '');
   assert.equal(r?.began, '');
   assert.equal(r?.live, 'quiet');
+});
+
+test('a working run says how long, never the clock it began at', () => {
+  assert.equal(forSaid('2026-10-19T09:28:00Z', NOW), 'for 32 min');
+  assert.equal(forSaid('2026-10-19T07:55:00Z', NOW), 'for 2 h 5 min');
+  assert.equal(forSaid('2026-10-19T07:00:00Z', NOW), 'for 3 h');
+  assert.equal(forSaid('2026-10-18T20:00:00Z', NOW), 'for 14 h');
+  assert.match(forSaid('2026-10-17T08:00:00Z', NOW), /^since 17 Oct$/u);
 });
 
 test('nobody working is no rows', () => {

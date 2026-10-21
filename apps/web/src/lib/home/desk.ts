@@ -50,13 +50,19 @@ export function workingRows(working: readonly Working[], hues: ReadonlyMap<strin
   });
 }
 
-/** How long a working run has been at it: minutes within the hour, then the clock it began at, then its day. */
+/**
+ * How long a working run has been at it, as a length and never a clock (today F18, VERIFY P2: "since 03:05" read as a
+ * time to work out): "for 32 min", "for 2 h 5 min", "for 14 h", then the day it began.
+ */
 export function forSaid(iso: string, now: number): string {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '';
   const mins = Math.max(1, Math.round((now - t) / 60_000));
   if (mins < 60) return `for ${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h < 10) return m === 0 ? `for ${h} h` : `for ${h} h ${m} min`;
+  if (h < 24) return `for ${h} h`;
   const at = new Date(t);
-  if (now - t < 24 * 3_600_000) return `since ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
   return `since ${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}`;
 }
