@@ -166,7 +166,7 @@
         <fieldset class="item" aria-describedby={faultAt('starts') ? 'script-starts-fault' : undefined}>
           <legend class="label">{words.starts}</legend>
           <p class="sub" id="script-every">{words.every}</p>
-          <Segmented role="group" aria-labelledby="script-every">
+          <Segmented role="group" aria-labelledby="script-every" full>
             <button type="button" class="segment" aria-pressed={draft.every === ''} data-on={draft.every === '' ? '' : undefined} onclick={() => (draft.every = '')}>{words.everyNone}</button>
             {#each everyChoices as e (e)}
               <button type="button" class="segment" aria-pressed={draft.every === e} data-on={draft.every === e ? '' : undefined} onclick={() => (draft.every = e)}>
@@ -177,7 +177,7 @@
 
           {#if doorChoices !== null && doorChoices.length > 0}
             <p class="sub" id="script-door">{words.door}</p>
-            <Segmented role="group" aria-labelledby="script-door">
+            <Segmented role="group" aria-labelledby="script-door" full>
               <button type="button" class="segment" aria-pressed={draft.door === ''} data-on={draft.door === '' ? '' : undefined} onclick={() => (draft.door = '')}>{words.doorNone}</button>
               {#each doorChoices as d (d.id)}
                 <button type="button" class="segment" aria-pressed={draft.door === d.id} data-on={draft.door === d.id ? '' : undefined} title={d.description || undefined} onclick={() => (draft.door = d.id)}>
@@ -228,7 +228,7 @@
               {/each}
             </div>
           {/if}
-          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone}</p>{/if}
+          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link" href={at('/vault')}>{words.keysNoneAdd}</a></p>{/if}
         </fieldset>
         </div>
 
@@ -280,6 +280,21 @@
           <textarea id="script-input" class="code code-sm" autocomplete="off" autocapitalize="off" spellcheck="false" wrap="off" bind:value={input}></textarea>
           <p class="help">{words.inputHelp}</p>
         {/if}
+
+        {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
+        {#if filed}
+          <p class="said" role="status">
+            {filed.why ? words.notAccepted(filed.why) : words.filed(draft.title.trim())}
+            {#if filed.question}<a class="link" href={at(`/decide/${filed.question}`)}>{words.openDecide}</a>{/if}
+          </p>
+        {/if}
+
+        <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST (2.A.26), AT THE FOOT OF THE TILE IT SENDS (UI pass of
+             21 October, H38): under the code it saves and tries, never loose on the board under the tiles. -->
+        <div class="do form-submit">
+          <Button weight="primary" disabled={sending || (filed !== null && filed.why === null)} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
+          <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>
+        </div>
       </div>
     </Tile>
 
@@ -311,19 +326,6 @@
     </Tile>
   </div>
 
-  {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
-  {#if filed}
-    <p class="said" role="status">
-      {filed.why ? words.notAccepted(filed.why) : words.filed(draft.title.trim())}
-      {#if filed.question}<a class="link" href={at(`/decide/${filed.question}`)}>{words.openDecide}</a>{/if}
-    </p>
-  {/if}
-
-  <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST (2.A.26), the same on every editor. -->
-  <div class="do form-submit">
-    <Button weight="primary" disabled={sending || (filed !== null && filed.why === null)} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
-    <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>
-  </div>
 </div>
 
 <style>
@@ -512,7 +514,7 @@
   }
 
   .do {
-    margin-block-start: 0;
+    margin-block-start: var(--sp-3);
   }
 
   @media (pointer: coarse) {
