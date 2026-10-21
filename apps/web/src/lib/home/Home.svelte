@@ -484,8 +484,9 @@
       newLines = was.news?.lines ?? [];
       settled = true;
       untrack(() => drew('ready'));
-      /* WHAT THIS TAB DREW IS THE SCREEN: it is not held as reading for the quiet read behind it. */
-      firstClosed(true);
+      /* WHAT THIS TAB DREW IS THE SCREEN: it is not held as reading for the quiet read behind it. UNTRACKED, as `drew`
+         is: closing reads the pending count it writes, and the effect would run again on every call that closes. */
+      untrack(() => firstClosed(true));
     }
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = was ? null : untrack(opened);
