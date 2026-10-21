@@ -173,8 +173,8 @@ test('ONE QUESTION A PROJECT, each a rowset of rows for Key numbers, with its ow
       assert.ok((KPI_LIST.good as readonly string[]).includes(r.good as string));
       if (r.every !== undefined) assert.ok((KPI_LIST.every as readonly string[]).includes(r.every as string));
       assert.equal(r.thing, idOf(a.project));
-      /* NOTHING IS PROPOSED KEPT AS A DRAFT TO KEEP AGAIN: accepting the question is the keeping. */
-      assert.equal(r.draft, undefined);
+      /* EVERY ROW IS A DRAFT: accepting the question makes the suggestions, and Keep on the project page keeps each. */
+      assert.equal(r.draft, true);
     }
   }
 });
@@ -235,6 +235,7 @@ test('LANTERN: its outlook of 0 / 300 / 3,000 is put to him as the target of a r
       good: 'up',
       order: 1,
       headline: true,
+      draft: true,
       unit: 'USD',
       every: '1m',
       target_amount: { amount: 30_000, currency: 'USD' },
@@ -365,7 +366,7 @@ test('ON A RECORD LIKE HIS, the script files one question a project, writes no k
   value(k.decide(halfQ, { resolved_as: 'wont-fix', reason: 'Not yet.' }, OWNER.actor));
   assert.equal(k.count('kpis'), 6);
   const kept = value<{ rows: Entry[] }>(k.list({ register: 'kpis' })).rows;
-  assert.equal(kept.every((e) => e.fields.thing === kilnId && e.fields.draft === false && e.fields.state === 'live'), true);
+  assert.equal(kept.every((e) => e.fields.thing === kilnId && e.fields.draft === true && e.fields.state === 'live'), true);
   assert.deepEqual(kept.filter((e) => e.fields.headline === true).map((e) => e.fields.name), ['Revenue by month']);
 
   const third = (await mod.default(ctx)) as { asked: number; waiting: number; answered: number };
@@ -393,5 +394,5 @@ test('A HOST WITH NO PROPOSE files nothing and writes nothing, and says so in on
     log: (line: string) => void logs.push(line),
   };
   assert.equal(await mod.default(ctx), null);
-  assert.deepEqual(logs, ['6 projects have key numbers to offer, and this host cannot file a question with rows yet, so nothing was asked.']);
+  assert.deepEqual(logs, ['6 projects have key numbers to offer, and this run files no questions (a trial files none), so nothing was asked.']);
 });

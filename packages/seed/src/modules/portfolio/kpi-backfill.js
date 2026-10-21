@@ -6,6 +6,10 @@
  * `kpiBackfill` answers one `rowset` on `kpis` per project, each row a key number he keeps by accepting it, or drops by
  * saying no. A key number is never written here: only a person's press makes one.
  *
+ * AND WHAT HIS PRESS MAKES IS A DRAFT. Every row is offered with `draft: true`, so accepting the question makes the rows
+ * as suggestions and tracks nothing yet: the project page shows them under Suggested, each with Keep and Not this, and
+ * no form of the Numbers block counts one until he keeps it (`sources/kpis.ts` leaves drafts out).
+ *
  * WHAT BECOMES A KEY NUMBER:
  *   - a series of readings, a measure with at least `FEW` of them, read as the KPI's `measure`. Its name is the
  *     reading's name with the project cut off the end ("Servers, Kiln" is Servers), the rule Revenue bands and the
@@ -229,6 +233,7 @@ export function kpiBackfill(things, readings, kpis) {
         good: DOWN.test(m.name) ? 'down' : 'up',
         order: i + 1,
         headline: c === headline,
+        draft: true,
       };
       if (m.unit !== null) row.unit = m.unit;
       if (every) row.every = every;
@@ -284,8 +289,10 @@ export function kpiBackfill(things, readings, kpis) {
  * page would offer the newest fifty readings' measures and miss the rest.
  *
  * IT FILES THROUGH `ctx.propose`, one call a question, because a run's own `ask` is one options question and cannot
- * carry rows to make (`script-run.ts` `askOf`). A host that hands no `propose` gets one sentence in the log and nothing
- * filed, never a key number written in its place.
+ * carry rows to make (`script-run.ts` `askOf`). Each call answers the gate's words: `queued` for a question filed when
+ * the run is applied, `joined` for one already waiting, `answered` for one he answered before, or a refusal (twenty
+ * questions a run at most, `PROPOSALS_PER_RUN`; the next run files the rest). A host that hands no `propose` (an agent's
+ * trial of the script) gets one sentence in the log and nothing filed, never a key number written in its place.
  */
 export default async function run(ctx) {
   const PAGE = 50;
@@ -305,7 +312,7 @@ export default async function run(ctx) {
   const asks = kpiBackfill(things, readings, kpis);
   if (asks.length === 0) return null;
   if (typeof ctx.propose !== 'function') {
-    ctx.log(`${asks.length === 1 ? 'One project has' : `${asks.length} projects have`} key numbers to offer, and this host cannot file a question with rows yet, so nothing was asked.`);
+    ctx.log(`${asks.length === 1 ? 'One project has' : `${asks.length} projects have`} key numbers to offer, and this run files no questions (a trial files none), so nothing was asked.`);
     return null;
   }
 
@@ -319,7 +326,7 @@ export default async function run(ctx) {
     const filed = got && typeof got === 'object' && 'ok' in got ? (got.ok ? got.value : null) : got;
     if (filed === null || filed === undefined) refused.push(a.project);
     else if (filed.answered !== undefined) answered.push(a.project);
-    else if (filed.joined) waiting.push(a.project);
+    else if (filed.joined && !filed.widened) waiting.push(a.project);
     else asked.push(a.project);
   }
 

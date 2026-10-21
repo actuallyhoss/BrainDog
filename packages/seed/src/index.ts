@@ -30,6 +30,8 @@ export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashPoints, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, SAMPLE_KPIS, SAMPLE_READINGS, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
+/* Each project's key numbers offered from Numbers (the KPI plan's K2-C), not yet in Portfolio's document: a host installs it. */
+export { KPI_BACKFILL_SCRIPT } from './modules/portfolio/kpi-backfill.js';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
