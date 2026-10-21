@@ -199,6 +199,10 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
        asserts the ORDER a person sees matches the function that decided it, so it must be that function
        and not a transcription of it. `weigh.ts` imports nothing, so this costs one file. */
     const { COSTS, costRank } = await import(pathToFileURL(join(root, 'packages', 'kernel', 'src', 'weigh.ts')).href);
+    /* AND THE WORDS AN ANSWERED CARD SAYS, from the card's own module for the same reason: since 20 October the line says
+       what the answer did ("Moved to the apex"), not the button's words, and a gate holding its own past tenses would be a
+       second answer to it. `money-row.ts` imports nothing either. */
+    const { moneyRowOf, outcomeOf } = await import(pathToFileURL(join(root, 'apps', 'web', 'src', 'lib', 'decide', 'money-row.ts')).href);
 
     browser = await chromium.launch();
 
@@ -312,7 +316,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
           } else {
             /* THE ANSWER'S NAME, WITHOUT WHAT SITS BESIDE IT: a choice in the form carries "Suggested" and a number key,
                and a button in a row the care a hard answer asks for (", can't be undone easily"). The line the card
-               becomes says the name alone. */
+               becomes says the name alone, or what it did (below). */
             const name = press.locator('.dc-choice-name, .dc-btn-name').first();
             const pressedLabel = ((await name.count()) > 0 ? await name.innerText() : await press.innerText()).trim();
             const from = page.url();
@@ -326,7 +330,11 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
             /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. The card becomes one line naming what was chosen. An older
                record that still wants a reason opens one line under the card first, focused, and Enter sends it. */
             const why = card.locator('.qa-reason input');
-            const done = block.locator('.qa-done', { hasText: pressedLabel });
+            /* THE LINE NAMES THE CHOICE: as the product says it done (`outcomeOf`, on the row or the question it answers),
+               or in the button's own words where the card says it that way (a merge, a line Slash drafted). */
+            const said = outcomeOf(pressedLabel, moneyRowOf(questionText) ?? { title: questionText });
+            const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+            const done = block.locator('.qa-done', { hasText: new RegExp(`${escape(said)}|${escape(pressedLabel)}`, 'u') });
             await Promise.race([why.waitFor({ timeout: budget('ready').settleTimeoutMs }), done.waitFor({ timeout: budget('ready').settleTimeoutMs })]).catch(() => {});
             if ((await why.count()) > 0) {
               if (!(await why.evaluate((el) => el === document.activeElement))) findings.push('the reason line opened without the focus.');
