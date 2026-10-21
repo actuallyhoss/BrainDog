@@ -9,9 +9,9 @@ import { plainOf, revivedOf } from './plain.ts';
 test('A MAP DEEP IN AN ANSWER COMES BACK A MAP, and the copy keeps what it would have refused', () => {
   const answer = { got: { from: 'live', page: { blocks: [{ kind: 'table', names: new Map([['people', new Map([[1, 'Ada']])]]) }] } }, news: null };
   assert.equal(scrubbed(answer), undefined, 'the copy refuses a Map');
-  const plain = plainOf(answer);
-  assert.notEqual(scrubbed(plain), undefined);
-  const back = revivedOf<typeof answer>(JSON.parse(JSON.stringify(plain)));
+  const written = plainOf(answer);
+  assert.notEqual(scrubbed(written), undefined);
+  const back = revivedOf<typeof answer>(JSON.parse(JSON.stringify(written)));
   const names = back.got.page.blocks[0]!.names;
   assert.ok(names instanceof Map);
   assert.equal((names.get('people') as Map<number, string>).get(1), 'Ada');
