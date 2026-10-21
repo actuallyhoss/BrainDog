@@ -1519,6 +1519,7 @@
 
   /* A page's name given focus by script after a move shows no ring to a pointer (`afterNavigate` above). */
   :global(main h1[tabindex='-1']:focus:not(:focus-visible)) {
+    /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
     outline: none;
   }
 
