@@ -61,6 +61,8 @@
   const s = settingsState(() => shell);
   /* WHO MAY SHARE HERE: an owner or an Admin, as `sharing` and `share` are guarded (`team`). */
   const team = $derived(!shell.refused && may(shell, 'decide'));
+  /* WHO READS THE WHOLE RECORD, and so the people on it (`may` on the record and no list). */
+  const whole = $derived(!shell.refused && may(shell, 'read'));
   const client = () => createClient({ base: apiBase() });
 
   let rows = $state<SharingRow[] | null>(null);
@@ -265,9 +267,12 @@
   </div>
 {/if}
 
-<!-- PEOPLE HERE: roles, invites and links, as the People area drew them. -->
-<h2 class="part">{copy.sharingPeopleHere}</h2>
-{@render here?.()}
+<!-- PEOPLE HERE: roles, invites and links, as the People area drew them. NOT FOR A GUEST WHO HOLDS SHARES AND NOT THE
+     WHOLE RECORD: the record refuses them the list of people, so their page is what they can see here, not a refusal. -->
+{#if team || whole || !(mine?.length)}
+  <h2 class="part">{copy.sharingPeopleHere}</h2>
+  {@render here?.()}
+{/if}
 
 {#if unrouted}
   <!-- A host with no sharing: People is the whole of it. -->
