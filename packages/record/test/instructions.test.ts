@@ -60,9 +60,11 @@ test('ONLY A PERSON TELLS: a token is refused NEEDS_BROWSER_SESSION, and the run
   assert.equal(refusal(await api.withdrawInstruction({ id: 'IN1' }, ctx)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.instruct({ said: 'Hi', bogus: 1 } as never, owner)).code, 'FIELD_UNKNOWN');
 
-  const told = value<{ id: string; to: string; to_run: string | null; line: string }>(await api.instruct({ said: 'Merge wave 1, then stop', to_run: run }, owner));
+  const told = value<{ id: string; to: string; to_run: string | null; to_agent: string | null; line: string }>(await api.instruct({ said: 'Merge wave 1, then stop', to_run: run }, owner));
   assert.equal(told.to, 'run');
   assert.equal(told.to_run, run);
+  /* AND THE RUN'S OWN KIND, so his thread names the agent without reading the run. */
+  assert.equal(told.to_agent, 'claude');
   assert.match(told.line, /^Teodor said in BrainDog \(IN1\): "Merge wave 1, then stop"\./u);
 
   const mine = value<{ run: string; pending: { id: string; state: string; line: string }[]; lines: string[]; stamp: string }>(await api.instructionsMine({}, ctx));

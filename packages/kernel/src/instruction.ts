@@ -505,7 +505,11 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
 
     const patch: Record<string, Json> = { said, kind, when, to, expires_at: iso(d.now + waits) };
     if (run) patch.to_run = run.spoken;
-    if (agent !== null && to !== 'run') patch.to_agent = agent;
+    /* ONE TO A RUN SAYS THE RUN'S OWN KIND, so his thread names its agent without reading the run. Who it reaches is
+       still the run alone (`reaches`), and the kind is the run's, never one he typed. */
+    if (to === 'run') {
+      if (run && text(run.fields.agent)) patch.to_agent = run.fields.agent!;
+    } else if (agent !== null) patch.to_agent = agent;
     for (const key of ['project', 'repo'] as const) {
       const v = input[key];
       if (typeof v === 'string' && v.trim() !== '') patch[key] = v.trim();
