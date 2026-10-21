@@ -196,6 +196,11 @@
     const entry = (shell?.nav ?? []).find((n) => n.title === under);
     return entry ? `/p/${entry.id}` : `/r/${about.register}`;
   });
+  /* THE SAME WAY BACK WHILE THE PAGE IS READ, from the rail's entry: the page its section names. */
+  const railedBack = $derived.by(() => {
+    const entry = railed?.row ? (shell?.nav ?? []).find((n) => n.title === railed.section) : undefined;
+    return entry ? `/p/${entry.id}` : undefined;
+  });
   /* THE NEXT STEP IS THE HERO'S LAST LINE (proj F7), so the look's next action is not drawn under the head as well. */
   const bodyPage = $derived(projectPage && live?.page.page.look ? { ...live.page.page, look: { ...live.page.page.look, next: null } } : null);
   /* THE PROJECT'S COLOUR OVER EVERYTHING ON ITS PAGE (proj F6): charts draw in it, the red stays for what is late. */
@@ -616,8 +621,11 @@
 {#if got === null}
   {#if railed}
     <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
+    <!-- A PAGE ONE ROW MADE (a project's) WAITS IN THE HEAD IT WILL HAVE: the way back and no name row, its hero holding
+         the name, and no sentence held, since it says none. A held line and a name row that went when the page landed
+         moved Kiln's whole board up (VERIFY H4). -->
     <div class="hosted">
-      <PageHead icon={railed.icon} hue={railed.hue} title={railed.title} />
+      <PageHead icon={railed.icon} hue={railed.hue} title={railed.title} headless={railed.row === true} back={railed.row ? railedBack : undefined} sentence={railed.row ? '' : undefined} />
       <div class="waiting-body"><Waiting /></div>
     </div>
   {:else}
