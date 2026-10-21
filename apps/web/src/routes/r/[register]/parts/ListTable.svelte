@@ -17,7 +17,7 @@
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { symbolFigure } from 'braindog-render';
+  import { dayThisYear, symbolFigure } from 'braindog-render';
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
   import { display, DOM_CAP, homeCurrency, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
@@ -151,9 +151,10 @@
   const faced = $derived(ofPeople(decl));
 
   /** A value as its cell says it: an amount by its symbol, and without its ".00" where the whole column has none. */
+  /* A DAY IN THE READER'S OWN YEAR IS SAID WITHOUT IT (P22), "1 Jul" and not "1 Jul 2026", as every timeline says it. */
   const figureCell = (field: string, value: string): string => {
     const drawn = symbolFigure(value) ?? value;
-    return whole.has(field) ? withoutZeros(drawn) : drawn;
+    return whole.has(field) ? withoutZeros(drawn) : dayThisYear(drawn, now);
   };
 
   /**
@@ -238,7 +239,7 @@
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
   {#snippet plainSaid(row: TableRow, field: string, value: string)}
     {@const late = lateSaid(row, field)}
-    {#if late}<span class="late-dot"><StateDot state="late" /></span><span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
+    {#if late}<span class="late-dot"><StateDot state="late" /></span><span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span><span class="late-day">{figureCell(field, value)}</span>{:else}{figureCell(field, value)}{/if}
   {/snippet}
   <!-- THE SELECT-ALL BOX over the column of pickers: every row on screen, or none. A dash when some are picked. -->
   {#snippet selectHead()}
@@ -779,6 +780,12 @@
   /* The dot between how late and the day keeps its air where the cell lays its words out in a row. */
   .late-word {
     font-weight: var(--fw-medium);
+  }
+
+  /* THE DAY AFTER IT IS THE SECOND INK (P23): the word says it is late, and a red date beside a red word said it twice. */
+  .late-day,
+  .late-sep {
+    color: var(--ink-2);
   }
 
   .table-slot :global(.table[data-toned] .td[data-glyph]) {
