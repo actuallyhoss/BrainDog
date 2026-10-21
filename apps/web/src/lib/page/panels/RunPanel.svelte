@@ -19,13 +19,19 @@
   later"), read off the run's own row (`api.ts` `stepLeft`). A step nobody has taken yet can be closed here, with a
   reason, through the record's `handoff` `drop`.
 
+  WHAT HE TOLD IT, AND HIS WAY TO TELL IT, PAUSE IT OR STOP IT (agents and MCP plan §7.1): while the run is open, its
+  live row first (where it is, how long, when it was last heard, and what can stop it: its hooks at its next tool call,
+  or only its next BrainDog call), with Tell, Pause and Stop; then every instruction it was sent, saw or took, with its
+  state, its reply and Undo all on what it changed. The record answers both only to the owner, so nobody else sees
+  either. Worded by `$lib/record/instruct.ts`, drawn by braindog-render's control room parts.
+
   A LIST WITHOUT A BOX under the section's own heading ("What it did"), each part under a 13px line of its own once the
   run's row is read (what it changed says "What it changed" then, and nothing before), and no red:
   putting a run back is a choice, not an alarm. A HOST PANEL (`panel-of.ts`), drawn by `BlockSlot.svelte` only on a page
   drawn for a run, and imported by it alone.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { createClient } from '@braindog/client';
   import { apiBase } from '$lib/at.ts';
   import { runWho, stepLeft, type StepLeft } from '$lib/record/api.ts';
@@ -36,6 +42,10 @@
   import { runLines, runWords } from './run-lines.ts';
   import { readRunParts, runTalk, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
   import { PRESENCE_WORDS, presenceSaid } from '$lib/ui/presence-words.ts';
+  import { Instruct, Instructions, Presence, type ControlMark } from 'braindog-render/svelte';
+  import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
+  import { composerOf, control, controlWords, instructArgs, presenceOf, runsOf, threadOf, threadOrder, told, undoAll, unknownRuns, type LiveRun, type Project, type RunKnown, type Thread } from '$lib/record/instruct.ts';
 
   let {
     run,
@@ -174,6 +184,106 @@
     }
   }
 
+  /* ── what he told it, and Tell, Pause and Stop while it is open ─────────── */
+
+  const io = control(apiBase());
+  const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
+  let open = $state.raw<LiveRun[]>([]);
+  let toldIt = $state.raw<Thread[] | null>(null);
+  let places = $state.raw<Map<string, Project>>(new Map());
+  let runsKnown = $state.raw<Map<string, RunKnown>>(new Map());
+  let telling = $state(false);
+  let tellSaid = $state('');
+  let tellBusy = $state(false);
+  let tellFault = $state<string | null>(null);
+  let holding = $state(false);
+  let undoneIt = $state.raw<Map<string, string>>(new Map());
+
+  async function readTold(handle: string) {
+    const [p, t] = await Promise.all([io.presence(), io.threads(20, handle)]);
+    if (handle !== run) return;
+    open = p.ok ? p.value : [];
+    /* THE RECORD LISTS THREADS TO THE OWNER ALONE: a refusal here is a reader who may not tell, and draws nothing. */
+    toldIt = t.ok ? t.value : null;
+    const seen = runsOf(open);
+    const missing = toldIt ? unknownRuns(toldIt, seen) : [];
+    runsKnown = missing.length === 0 ? seen : new Map([...seen, ...(await io.runs(missing))]);
+    if (places.size === 0 && open.some((r) => r.run === handle)) places = await io.projects(open);
+  }
+
+  $effect(() => {
+    const handle = run;
+    untrack(() => {
+      toldIt = null;
+      telling = false;
+      tellSaid = '';
+      tellFault = null;
+      void readTold(handle);
+    });
+  });
+
+  onMount(() => {
+    const off = told.on(() => void readTold(run));
+    /* THE LIVE LINE ("heard 10 s ago") IS A CLOCK, and a pulse moves no version, so it is read again every fifteen seconds. */
+    const clock = setInterval(() => void readTold(run), 15_000);
+    return () => {
+      off();
+      clearInterval(clock);
+    };
+  });
+
+  const me = $derived(open.find((r) => r.run === run && r.state !== 'ended' && r.state !== 'gone') ?? null);
+  const meRow = $derived(me ? { ...presenceOf(me, open, places, toldIt ?? []), href: null, busy: holding } : null);
+  const tellView = $derived.by(() => {
+    const c = composerOf({ to: `run:${run}`, on: '', when: null }, open, places);
+    return { ...c, to: c.to.filter((x) => x.key === c.toKey), busy: tellBusy, fault: tellFault };
+  });
+  const toldViews = $derived(toldIt ? threadOrder(toldIt).map((t) => threadOf(t, { now: recordNow(), runs: runsKnown, projects: places, undone: undoneIt })) : []);
+
+  async function hold(kind: 'stop' | 'pause' | 'resume', why: string) {
+    holding = true;
+    try {
+      const out = await io.hold(run, kind, why);
+      if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+    } finally {
+      holding = false;
+    }
+    told.say();
+  }
+
+  async function sendTell() {
+    if (tellBusy) return;
+    const words = tellSaid;
+    if (words.trim() === '') return void (tellFault = controlWords.empty);
+    tellBusy = true;
+    tellFault = null;
+    try {
+      const out = await io.send(instructArgs(tellView, words));
+      if (out.ok) {
+        tellSaid = '';
+        telling = false;
+      } else tellFault = out.fix;
+    } finally {
+      tellBusy = false;
+    }
+    told.say();
+  }
+
+  async function takeBackIt(key: string) {
+    const out = await io.takeBack(key);
+    if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+    told.say();
+  }
+
+  async function undoIt(key: string) {
+    const t = toldIt?.find((x) => x.id === key);
+    if (!t?.receipts) return;
+    undoneIt = new Map([...undoneIt, [key, await undoAll(apiBase(), t.receipts)]]);
+    told.say();
+    await load(run);
+    await onchanged?.();
+  }
+
   async function putBack() {
     const read = plan;
     if (!read || busy) return;
@@ -208,7 +318,28 @@
 {/snippet}
 
 <section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
-  {#if now}<p class="run-now">{now}</p>{/if}
+  <!-- AN OPEN RUN SAYS WHERE IT IS ON ITS LIVE ROW, from the record's clock, so the word is not said twice. -->
+  {#if now && !(meRow && toldIt)}<p class="run-now">{now}</p>{/if}
+  {#if meRow && toldIt}
+    <div class="run-part run-live" role="group" aria-label="Open now">
+      <Presence
+        rows={[meRow]}
+        {mark}
+        ontell={() => (telling = !telling)}
+        onstop={(_key, kind, why) => void hold(kind, why)}
+        onresume={() => void hold('resume', '')}
+      />
+      {#if telling}
+        <Instruct view={tellView} bind:said={tellSaid} {mark} onto={() => {}} onon={() => {}} onwhen={() => {}} onsend={() => void sendTell()} />
+      {/if}
+    </div>
+  {/if}
+  {#if toldViews.length > 0}
+    <div class="run-part" role="group" aria-label="What you told it">
+      <h3 class="run-meta run-head">What you told it</h3>
+      <Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} />
+    </div>
+  {/if}
   {@render spoken(BEFORE)}
   <div class="run-part" role="group" aria-label={didSaid}>
     {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
@@ -272,6 +403,11 @@
     display: grid;
     gap: var(--sp-1);
     min-inline-size: 0;
+  }
+
+  /* THE OPEN RUN'S LIVE ROW AND, WHEN TELL IS PRESSED, THE BOX UNDER IT, a step apart. */
+  .run-live {
+    gap: var(--sp-3);
   }
 
   .run-part + .run-part {
