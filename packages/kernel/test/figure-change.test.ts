@@ -76,6 +76,15 @@ test('A FIGURE WITH HISTORY SAYS HOW FAR IT MOVED, signed, against the point its
   sql.exec('DELETE FROM metric_point');
   put(sql, '2026-09-02', 460_000);
   assert.equal(change(k), '0%', 'no move is nought, which a lead drops');
+  /* `.moved` SAYS THE SAME MOVE IN WORDS, for a sentence that reads on from it. */
+  const moved = () => k.block({ kind: 'note', lead: true, body: 'Cash is {{cash-now}}, {{cash-now.moved}} on a month ago.' } as never).values?.['cash-now.moved'];
+  assert.equal(moved(), '0%');
+  sql.exec('DELETE FROM metric_point');
+  put(sql, '2026-09-02', 500_000);
+  assert.equal(moved(), '8% down', 'GBP 4,600 against GBP 5,000');
+  sql.exec('DELETE FROM metric_point');
+  put(sql, '2026-09-02', 400_000);
+  assert.equal(moved(), '15% up');
   assert.equal(k.block(LEAD).values?.['cash-now'] !== undefined, true, 'the figure itself is still filled');
   sql.close();
 });

@@ -5032,7 +5032,7 @@ function pathOf(
   own?: Schema['fields'],
 ):
   | { metric: string; param?: string }
-  | { change: string }
+  | { change: string; words?: true }
   | { rowsOf: string; part: RowPart; field?: string }
   | { register: string; seq: number; field: string }
   | { register: string; seq: number; field: string; then: string }
@@ -5067,6 +5067,9 @@ function pathOf(
   /* `<figure>.change` IS HOW FAR A FIGURE MOVED (`changeOf`). A list called `tasks` with a state called `change` would
      say the same words, and `twoOf`'s order decides between the two. */
   if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
+  /* `<figure>.moved` IS THE SAME MOVE SAID IN WORDS, "6% down" and "8% up", for a sentence that reads on from it: "6% down
+     on a month ago" where `.change` wrote "−6% on a month ago" (the UI pass of 20 October, P20). Nought is `0%` in both. */
+  if (tail === 'moved' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head, words: true };
   /* `<figure>.first`, `.names`, `.more` AND `.since` ARE THE ROWS A FIGURE COUNTS (`rowsValue`), decided between a figure
      and a list's state of that name exactly as `.change` is. */
   if ((ROW_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: tail as RowPart };
@@ -5165,7 +5168,7 @@ type PathSaid = NonNullable<ReturnType<typeof pathOf>>;
  * The two words of a path the order below decides, `tasks` and `open`, or `null` for a path of another form.
  */
 function twoOf(said: PathSaid): Two | null {
-  if ('change' in said) return { head: said.change, tail: 'change' };
+  if ('change' in said) return { head: said.change, tail: 'words' in said ? 'moved' : 'change' };
   if ('rowsOf' in said) return { head: said.rowsOf, tail: said.field === undefined ? said.part : `first_${said.field}` };
   if ('count' in said && 'register' in said) return { head: said.register, tail: 'count' };
   if ('state' in said) return { head: said.register, tail: said.state };
@@ -5235,7 +5238,7 @@ const PATH_ORDER: readonly PathRule[] = [
     reads: (deps, said) => {
       const decl = 'change' in said ? deps.metric(said.change) : 'rowsOf' in said ? deps.metric(said.rowsOf) : null;
       if (!decl) return null;
-      return { value: 'rowsOf' in said ? rowsValue(deps, decl, said.part, said.field) : changeOf(deps, decl) };
+      return { value: 'rowsOf' in said ? rowsValue(deps, decl, said.part, said.field) : changeOf(deps, decl, 'words' in said) };
     },
     names: (deps, said) => {
       if ('change' in said) return figureNamed(deps, said.change);
@@ -5602,7 +5605,7 @@ const CHANGE_SLACK_DAYS = 7;
  * figure in several currencies or none, a point written in another currency than today's figure (two currencies are
  * never set against each other), or a point at nought, which no percent is of.
  */
-function changeOf(deps: PageDeps, decl: MetricDecl): Json | undefined {
+function changeOf(deps: PageDeps, decl: MetricDecl, words = false): Json | undefined {
   if (!deps.points) return undefined;
   const read = deps.read(decl);
   if (!read.ok || read.value.parts || read.value.value === null || read.value.refusals.length) return undefined;
@@ -5621,6 +5624,7 @@ function changeOf(deps: PageDeps, decl: MetricDecl): Json | undefined {
   if (bare(then.unit) !== bare(read.value.unit)) return undefined;
   const was = then.unit === 'pct.bp' ? then.value / 10_000 : then.value;
   const pct = Math.round(((now - was) / Math.abs(was)) * 100);
+  if (words) return pct > 0 ? `${pct}% up` : pct < 0 ? `${-pct}% down` : '0%';
   return pct > 0 ? `+${pct}%` : pct < 0 ? `−${-pct}%` : '0%';
 }
 
