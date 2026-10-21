@@ -32,7 +32,7 @@
   import { put } from '$lib/clipboard.ts';
   import { copy } from '$lib/copy.ts';
   import { labelOf } from '$lib/record/api.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { inviteLink } from '$lib/record/settings-write.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -96,7 +96,7 @@
 
   /* ── what the sheet holds ───────────────────────────────────────────────────────────────────────────────────── */
 
-  let now = $state(Date.now());
+  let now = $state(recordNow());
   /* THE SUBJECT AS IT OPENED, its id filled in once the record says it; every opening takes it afresh (`opened`). */
   let held = $state<Subject>(untrack(() => subject));
   let s = $state<SheetState>(startOf(untrack(() => subject)));
@@ -118,7 +118,7 @@
 
   /* EVERY OPENING STARTS AFRESH, and reads who is here then, since that changes between two presses. */
   async function opened() {
-    now = Date.now();
+    now = recordNow();
     held = subject;
     s = change ? stateOfShare(change, subject) : startOf(subject);
     typed = '';

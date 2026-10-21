@@ -21,6 +21,7 @@
   import { untrack } from 'svelte';
   import { createClient } from '@braindog/client';
   import { may } from '$lib/record/may.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
@@ -99,7 +100,8 @@
     return () => removeEventListener(SHARED_EVENT, again);
   });
 
-  const now = $derived(Date.now());
+  /* BY THE RECORD'S CLOCK, which is the one that ends a share (`stateOf`), not this device's. */
+  const now = $derived(recordNow());
   const sections = $derived(sharingSections(rows ?? [], now));
   const liveCount = $derived(sections.shared.reduce((n, b) => n + b.rows.length, 0));
 
