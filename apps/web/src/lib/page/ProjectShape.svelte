@@ -2,7 +2,7 @@
   A project's one shape (`project.ts`) at the top of a declared page scoped to the project's row (proj section 4).
 
   ORDER: the hero, then row 2 (Path and Money, `ProjectVisuals`), row 3 (Work and People), row 4 (Runs on and Agents here
-  today). The declared blocks the page keeps follow (the questions, then More about, folded), `PageView` leaving out what
+  today), then who is working on it now with the box to tell agents on it (agents and MCP plan §7.2). The declared blocks the page keeps follow (the questions, then More about, folded), `PageView` leaving out what
   this says already.
 
   THE HERO HOLDS THE NAME (proj F7): the 56px well and the `h1` at 34 side by side, where it stands under the name ("Earning
@@ -46,6 +46,10 @@
   import { valueSaid } from '$lib/voice.ts';
   import { money, monthShort } from 'braindog-render';
   import ProjectVisuals from './ProjectVisuals.svelte';
+  import PresencePanel from './panels/PresencePanel.svelte';
+  import TellPanel from './panels/TellPanel.svelte';
+  import { page } from '$app/state';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
@@ -334,6 +338,16 @@
   const runsIcon = (kind: string | undefined) => RUNS_ICON[Object.keys(RUNS_ICON).find((k) => (kind ?? '').toLowerCase().includes(k)) ?? ''] ?? 'plug';
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
 
+  /* ── working here now ── */
+  /* HIS ALONE TO TELL: the composer is the owner's; anyone who reads the runs sees who is on it. */
+  const owner = $derived((page.data as unknown as Partial<Shell> | undefined)?.me?.owner === true);
+  /* HOW MANY RUNS ARE ON IT NOW, as the run rows say (`PresencePanel`), for the heading. */
+  let here = $state(0);
+  const hereWords = {
+    working: 'Working here now',
+    tell: (name: string) => (name ? `Tell agents on ${name}` : 'Tell an agent'),
+  } as const;
+
   const people = $derived(shape?.facts.people ?? []);
   const runsOn = $derived(shape?.facts.runsOn ?? []);
   const sessions = $derived(read?.sessions ?? []);
@@ -523,6 +537,15 @@
         {/if}
       </div>
     {/if}
+    <!-- WHO IS ON IT NOW AND THE BOX TO TELL THEM (plan §7.2): the Agents page's run rows and composer, scoped to this
+         project, so a stop or a tell from here says what it says there. With nobody on it the composer stands alone, and
+         the next run to start here gets what he types; for a reader who may not tell, nobody on it draws nothing. -->
+    {#key read.key}
+      <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here hidden={!owner && here === 0}>
+        <PresencePanel {owner} project={read.key} oncount={(n) => (here = n)} />
+        <TellPanel {owner} project={read.key} projectName={name} first={3} />
+      </Tile>
+    {/key}
   </div>
 {/if}
 {#if !shape && holds}
