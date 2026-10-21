@@ -341,12 +341,25 @@
    * before the first read; they are asked again once Today has drawn (`verified`), in case one changed since.
    */
   const HOME_COPY = 'Home';
+  /** How long the copy waits for the desk to land beside the page before it is kept without it. */
+  const DESK_WAIT_MS = 5_000;
   const copyKey = (slug: string | null): string => JSON.stringify([apiBase(), slug]);
   let fromCopy = $state(false);
   $effect(() => {
     if (!fromCopy) return;
     return untrack(() => holdCopyMark());
   });
+  /**
+   * WHETHER THE PAGE UNDER THE HEAD IS DRAWN: once there is a page to draw, from memory, the copy or the record, or once
+   * `PAGE_WAIT_MS` has gone without one, when its bars are drawn as before. A copy slower than its wait lands inside it.
+   */
+  const PAGE_WAIT_MS = 400;
+  let waitedPage = $state(false);
+  $effect(() => {
+    const t = setTimeout(() => (waitedPage = true), PAGE_WAIT_MS);
+    return () => clearTimeout(t);
+  });
+  const shown = $derived(got !== null || settled || waitedPage);
   /** The lists the copy put back, learnt again once the record's own Today has drawn. */
   let restored: string[] = [];
   /** What the copy holds: Today's page, and the desk and what was handled beside it, so nothing moves when they land. */
@@ -354,7 +367,7 @@
   async function drawCopy(slug: string | null, near: Near<CopyBody>): Promise<void> {
     if (got !== null || declares !== slug || near.value.got.from !== 'live') return;
     /* THE DESK'S OWN PART FIRST, so the page and the desk above it are drawn in one frame. */
-    const part = near.value.desk !== undefined && desk === null ? await import('./Desk.svelte').catch(() => null) : null;
+    const part = near.value.desk && desk === null ? await import('./Desk.svelte').catch(() => null) : null;
     if (got !== null || declares !== slug) return;
     if (part && desk === null) desk = { cards: near.value.desk ?? null, Part: part.default };
     if (near.value.handled !== undefined && handled === null) handled = near.value.handled;
@@ -413,6 +426,9 @@
     void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/local.ts'), import('$lib/data/plain.ts')]).then(async ([tab, l, p]) => {
       /* EVERY LIST'S DECLARATION GOES WITH IT, but a list the copy never keeps and one that holds a secret. */
       const lists = data.lists.map((x) => x.id).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
+      /* THE DESK AND WHAT WAS HANDLED GO WITH IT AS THEY LANDED, so the copy is the whole first screen and not the page
+         alone, with the desk pushing it down when it lands. */
+      await Promise.race([Promise.all([deskLanded, handledLanded]), new Promise((done) => setTimeout(done, DESK_WAIT_MS))]);
       let ticket = mark;
       if (tab.localTicket() !== mark) {
         await tab.settledLocal();
@@ -1115,7 +1131,9 @@
 
 <svelte:window onkeydowncapture={walkOn} />
 
-<div class="page">
+<!-- NOT DRAWN UNTIL TODAY HAS SOMETHING TO DRAW (`shown`), a moment at most: a page of bars drawn first and then pushed
+     down by the copy's desk and sentence was a jump on every warm open. Drawn at once, they arrive together. -->
+<div class="page" style:display={shown || data.refused ? null : 'none'}>
   {#if data.refused}
     <!--
       THE RECORD WOULD NOT ANSWER THIS READER, WHICH IS NOT THE SAME THING AS AN EMPTY RECORD. A colleague invited with
