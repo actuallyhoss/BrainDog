@@ -1,7 +1,7 @@
 /** Money's first line: what the money is doing, in one sentence. */
 
 const ONE_BOOK = { metric: 'books-held', lt: 2 };
-const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.';
+const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.';
 
 export const HEADLINE: Record<string, unknown>[] = [
   {
@@ -15,7 +15,8 @@ export const HEADLINE: Record<string, unknown>[] = [
        with the tile it would sum, and the line after it is said in its place.
 
        HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, SINCE money-core 3.3.0 (`{{cash-now.change}}`, "+8% on a month
-       ago"), said against the point the night remembered thirty days back. A record with no point that old, or a
+       ago"), said against the point the night remembered thirty days back. In words since the UI pass of 20 October
+       (`{{cash-now.moved}}`, "6% down on a month ago"), where a minus sign led a clause of a sentence. A record with no point that old, or a
        point in another currency, has no change, and the clause drops with nothing left of it.
 
        WHEN IT RUNS OUT IS THE TILE'S, SINCE money-core 3.11.0: the side column says it in the figure's own size beside

@@ -30,7 +30,7 @@ type Field = { id: string; type?: string; values?: string[] };
 /** The typed forms of `05 §7.2`, whose argument may be a name. */
 const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct', 'ref']);
 /** What `<figure>.<part>` may ask besides the figure itself. */
-const FIGURE_PARTS = new Set(['change', 'first', 'names', 'more', 'since']);
+const FIGURE_PARTS = new Set(['change', 'moved', 'first', 'names', 'more', 'since']);
 /** Where on a page the record fills a name from the figures: the places `pathsOf` reads. */
 const SAID = [/\.blocks\[\d+\]\.(?:heading|body|empty)$/, /\.cells\[\d+\]\.note$/, /\.columns\[\d+\]\.label$/, /\.authored\[\d+\]\.cells\[\d+\]$/];
 

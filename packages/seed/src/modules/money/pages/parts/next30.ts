@@ -57,7 +57,8 @@ export const NEXT_30: Record<string, unknown>[] = [
     span: 12,
     source: 'register.obligations',
     where: DUE_30D,
-    columns: [{ field: 'what' }, { field: 'due' }, { field: 'amount' }],
+    /* THE AMOUNT SIGNED BY THE WAY IT GOES, as the Ledger beside it says it: "−£19,100.00" for a bill, "+£960.00" for an invoice. */
+    columns: [{ field: 'what' }, { field: 'due' }, { field: 'amount', sign: { field: 'direction', minus: 'owed_by_me' } }],
     back: 0,
     ahead: 1,
     when: { metric: 'due-items-30d', gt: 0 },

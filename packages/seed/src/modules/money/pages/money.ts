@@ -146,7 +146,9 @@ export const MONEY_PAGE: SeedPage = {
     ...LEDGER,
     /* Every line of it but the one on categories marked the other way, given up for the line above. */
     /* And not the Last confirmed cards, given up for Where it went (see above): the box that takes today's balance stays. */
-    ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction' && b.kind !== 'cards'),
+    /* And not the box that takes today's balance either, since the UI pass of 20 October: the old balance's line says
+       Update balances, which opens the same form, and Heads up holds three lines and nothing else. */
+    ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction' && b.kind !== 'cards' && b.kind !== 'capture'),
     /* The heading and the calendar, and not the walk of thirty days (see above). */
     ...NEXT_30.filter((b) => b.kind !== 'bridge'),
     ...INSTALMENTS,

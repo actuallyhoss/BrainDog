@@ -825,6 +825,26 @@ const withoutUiPass = (doc: Body): Body => {
   );
   return { ...page, declarations: (page.declarations as Body[]).filter((d) => !NEXT_PART.has(String(d.metric))) };
 };
+/**
+ * AND THE SAME PASS'S LAST ROUND (H18, H19, P20), undone before it: Heads up stands in the side column with each line
+ * ending on its one way to act, and the box that took today's balance is off Money, so Runs out stands beside Lasts in
+ * the room it left. The line says how far the cash moved in words (`.moved`), where it said a signed percent.
+ */
+const STALE_LINE = "The oldest balance in Cash now was last confirmed on {{cash-as-of}}. Say what an account holds today and this page starts from today's money.";
+const ACTS = / \[(?:See them|Update balances)\]\([^)]*\)$/u;
+const withoutUiPassR3 = (doc: Body): Body =>
+  withPage(doc, 'money', (now) =>
+    now
+      .filter((b) => b.heading !== 'Runs out')
+      .flatMap((b): Body[] => {
+        const { area: _area, ...rest } = b;
+        const off = b.area === 'rail' && (b.heading === 'Heads up' || (b.kind === 'note' && b.lead !== true)) ? rest : b;
+        if (typeof off.body !== 'string') return [off];
+        if (off.lead === true) return [{ ...off, body: off.body.replace('{{cash-now.moved}}', '{{cash-now.change}}') }];
+        if (off.body.startsWith('The oldest balance')) return [{ ...off, body: STALE_LINE }, AGES.find((x) => x.kind === 'capture') as Body];
+        return [{ ...off, body: off.body.replace(ACTS, '') }];
+      }),
+  );
 const WHERE_IT_WENT_100: ReadonlySet<string> = new Set(['Where it went', 'This month, by category', 'No category yet, by who was paid']);
 const noAxis = ({ axis: _axis, ...rest }: Body): Body => rest;
 const withoutBatch100 = (doc: Body): Body => {
@@ -910,7 +930,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(raw))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(raw)))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -41,10 +41,9 @@ export const LASTS: Record<string, unknown>[] = [
  * block's tone where it declares one. THE HEADING IS THE ONE IT HAD, so the block keeps its key (`defaultBlockKey`)
  * and a look that placed it still finds it.
  *
- * NOT PLACED ON MONEY YET: the page declares twenty-four blocks, the most a page may (`BLOCK_CEILING` in
- * `packages/kernel/src/declare.ts`), and a twenty-fifth refuses the whole pack at install. It is placed beside Lasts
- * (`...RUNWAY, ...RUNS_OUT`) once a block makes room, and `money-lasts-tile.test.ts` holds the pair on a page that
- * has done so.
+ * PLACED BESIDE LASTS SINCE THE UI PASS OF 20 OCTOBER, when the box that took today's balance under Heads up went (its
+ * old balance line says Update balances, which opens the same form) and made room on a page of twenty-four blocks, the
+ * most a page may (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`). `money-lasts-tile.test.ts` holds the pair.
  */
 export const RUNS_OUT: Record<string, unknown>[] = [
   {
@@ -59,5 +58,5 @@ export const RUNS_OUT: Record<string, unknown>[] = [
   },
 ];
 
-/** What Money places in the side column above the accounts: the calm tile, until the page has room for Runs out. */
-export const RUNWAY: Record<string, unknown>[] = [...LASTS];
+/** What Money places in the side column above the accounts: the calm tile while there is cash, Runs out while none. */
+export const RUNWAY: Record<string, unknown>[] = [...LASTS, ...RUNS_OUT];

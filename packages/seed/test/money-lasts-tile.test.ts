@@ -58,6 +58,8 @@ type Block = Record<string, unknown> & { kind: string; heading?: string };
  * it, so it stays inside the ceiling. Which block makes room is the page's to choose; this only needs one to.
  */
 const roomy = (blocks: readonly Block[]): Block[] => {
+  /* MONEY PLACES IT ITSELF SINCE THE UI PASS OF 20 OCTOBER, and then there is nothing to make room for. */
+  if (blocks.some((b) => b.heading === 'Runs out')) return [...blocks];
   const at = blocks.findIndex((b) => b.heading === 'Lasts');
   return [...blocks.slice(0, at + 1), ...(RUNS_OUT as Block[]), ...blocks.slice(at + 1)].slice(0, CEILING);
 };
@@ -160,11 +162,7 @@ test('CASH BELOW NOUGHT IS THE REVERSE: Runs out, in the danger colour, on today
     make(k, 'recurring', { what: 'Rent', direction: 'out', amount: gbp(50_000), every: 'monthly', next_due: day(7), state: 'live' });
     const { tiles } = side(k);
     assert.ok(!read(tiles.get('Lasts')) && !shown(tiles.get('Lasts')), 'Lasts is read over cash below nought');
-    /* MONEY AS IT IS HAS NO ROOM FOR RUNS OUT YET, so only the page with room draws it. */
-    if (!room) {
-      assert.equal(tiles.get('Runs out'), undefined);
-      continue;
-    }
+    /* MONEY AS IT IS PLACES RUNS OUT SINCE THE UI PASS OF 20 OCTOBER, so both pages draw it. */
     const runs = tiles.get('Runs out');
     assert.ok(shown(runs), 'Runs out is not drawn over cash below nought');
     assert.equal(runs!.tone, 'bad');

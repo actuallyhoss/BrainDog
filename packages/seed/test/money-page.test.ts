@@ -130,7 +130,11 @@ test('THE COSTS BY CATEGORY STAND STRAIGHT AFTER EVERY MONTH, the file\'s own ba
 test('NO QUESTION IS ASKED ON MONEY: the questions are answered in Decide, and the side column holds no queue', () => {
   assert.deepEqual(BLOCKS.filter((b) => b.kind === 'queue').map((b) => b.heading), [], 'Money places a queue again');
   assert.equal(at('Waiting on you'), -1, 'Waiting on you is on Money again');
-  assert.deepEqual(BLOCKS.filter((b) => b.area === 'rail').map((b) => b.heading), ['Lasts', 'Accounts']);
+  /* RUNS OUT BESIDE LASTS, AND HEADS UP UNDER THE ACCOUNTS WITH ITS LINES, since the UI pass of 20 October. */
+  assert.deepEqual(
+    BLOCKS.filter((b) => b.area === 'rail').map((b) => b.heading ?? b.kind),
+    ['Lasts', 'Runs out', 'Accounts', 'Heads up', 'note', 'note', 'note'],
+  );
 });
 
 test('THE CHART READS SIX MONTHS BACK AND THREE AHEAD, and Cash ahead keeps its lengths and controls', () => {
@@ -160,7 +164,8 @@ test('THE SAME TILES STAND BEFORE THE FOLD, counted as `calm-pages.test.ts` coun
   /* WHAT THE PAGE HELD BEFORE: Every month is inside Coming and going, which was already one tile. */
   assert.deepEqual(
     above.map((b) => b.heading),
-    ['What you have, by book', 'Cash ahead', 'Cash now does not add up', 'Ledger', 'Heads up', 'Coming and going'],
+    /* Heads up is in the side column since the UI pass of 20 October, beside the walk and the Ledger. */
+    ['What you have, by book', 'Cash ahead', 'Cash now does not add up', 'Ledger', 'Coming and going'],
   );
 });
 

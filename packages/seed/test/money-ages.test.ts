@@ -117,7 +117,9 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'balances-stale'), 0);
   assert.equal(read(k, 'cash-as-of'), epochDay(day(0)));
   assert.equal(read(k, 'statement-oldest-days'), 0);
-  assert.equal(blocksOf(k, 'money').find((b) => b.heading === 'What it holds today')?.drawn, false, 'the box is drawn with nothing old');
+  /* THE OLD BALANCE'S LINE GOES WITH IT, and with it its Update balances: the box that took today's balance is off Money
+     since the UI pass of 20 October, and that line opens the same form. */
+  assert.equal(blocksOf(k, 'money').find((b) => String(b.body).startsWith('The oldest balance'))?.drawn, false, 'the old balance is said with nothing old');
   assert.equal(card(), day(0), "the book's card keeps the typed day");
 });
 

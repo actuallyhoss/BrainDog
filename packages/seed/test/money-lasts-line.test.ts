@@ -93,8 +93,8 @@ const bill = (k: Kernel, amount: number, due: number): void =>
 /* EACH LINE ENDS ON HOW LONG THE CASH LASTS WITH NO INCOME, since money-core 3.17.0 (money-lasts-no-income-95), BUT
    THE ONE WHERE THE WALK GOES UNDER: there the Lasts tile says it, beside the day on what is due (the UI pass of 20
    October, money F3), and the line says what there is. */
-const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.';
-const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year.';
+const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.';
+const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.';
 const BOOKS = 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).';
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 

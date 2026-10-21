@@ -706,6 +706,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     /* THE SIDE COLUMN, SINCE money-core 3.11.0: how long the money lasts and where it sits, beside the walk. The
        questions went to Decide (REC-B23 step 7). */
     'Lasts',
+    /* AND RUNS OUT, IN ITS PLACE WHILE THE CASH IS BELOW NOUGHT, SINCE THE UI PASS OF 20 OCTOBER: the box below made room. */
+    'Runs out',
     'Accounts',
     /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree. The line
        it drew while no balance is typed went for the lead above: Money is at the most blocks a page declares. */
@@ -715,10 +717,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Ledger',
     /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
        each a note with no heading of its own under one boxed section. */
+    /* IN THE SIDE COLUMN SINCE THE UI PASS OF 20 OCTOBER, each line ending on its one way to act. The box to say what
+       one account holds today (money-core 3.16.0) went: the old balance's line says Update balances, the same form. */
     'Heads up',
     undefined,
-    /* SINCE money-core 3.16.0, under the old balance's line: the box to say what one account holds today. */
-    'What it holds today',
     undefined,
     undefined,
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
@@ -743,7 +745,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
   assert.deepEqual((page as { layout?: unknown }).layout, { rail: 4 });
-  assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Lasts', 'Accounts']);
+  assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Lasts', 'Runs out', 'Accounts', 'Heads up', undefined, undefined, undefined]);
   assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), ['Where it went'], 'Where it went is not the one fold');
   assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
   /* UNDER COMING AND GOING, SINCE REC-B23, THE CALENDAR AND NO WALK: the walk of thirty days is off the page
@@ -814,7 +816,7 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and where the money went is fo
      nothing would cost a tile that does. When this fails the page reader has learnt it or somebody placed it early. */
   assert.ok(!blocks.includes(BUDGET[1] as never), "the passed-budget line is on Money before a page can write it");
 
-  /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger, then Heads up. */
+  /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger. */
   assert.deepEqual(
     blocks.slice(0, 11).map((b) => [b.kind, b.heading, b.area]),
     [
@@ -825,10 +827,10 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and where the money went is fo
       ['capture', 'Add an account', undefined],
       ['forecast', 'Cash ahead', undefined],
       ['stat', 'Lasts', 'rail'],
+      ['stat', 'Runs out', 'rail'],
       ['split', 'Accounts', 'rail'],
       ['stat', 'Cash now does not add up', undefined],
       ['timeline', 'Ledger', undefined],
-      ['section', 'Heads up', undefined],
     ],
   );
   assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead, blocks[2]!.lead], [true, true, true]);
@@ -940,17 +942,18 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
   /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the UI pass
      of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change']);
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.moved']);
   assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
-  assert.equal(lead.values?.['cash-now.change'], `−${-moved}%`);
+  /* IN WORDS SINCE THE UI PASS OF 20 OCTOBER: "6% down on a month ago", where it said "−6%". */
+  assert.equal(lead.values?.['cash-now.moved'], `${-moved}% down`);
   /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
      that clause and keeps the rest. */
   assert.deepEqual(
     lead.body?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
-    [['cash-now', 'cash-accounts'], ['cash-now.change']],
+    [['cash-now', 'cash-accounts'], ['cash-now.moved']],
   );
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */

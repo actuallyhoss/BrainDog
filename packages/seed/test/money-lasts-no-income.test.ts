@@ -120,7 +120,7 @@ test('MONEY\'S LASTS TILE SAYS IT, and the one line drawn says what there is and
   const blocks = value<{ blocks: Drawn[] }>(k.page('money')).blocks;
   const leads = blocks.filter((b) => b.kind === 'note' && b.lead === true && b.drawn !== false);
   assert.equal(leads.length, 1, 'one lead under the page name');
-  assert.equal(leads[0]!.body, 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year.');
+  assert.equal(leads[0]!.body, 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.');
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
   assert.deepEqual(blocks.find((b) => b.heading === 'Lasts')?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
   assert.equal(reading(k, 'lasts-no-income').value, 68);

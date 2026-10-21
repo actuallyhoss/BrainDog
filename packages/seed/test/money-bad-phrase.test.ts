@@ -32,8 +32,9 @@ const bads = (nodes: readonly Inline[]) =>
   nodes.filter((n): n is Extract<Inline, { type: 'bad' }> => n.type === 'bad');
 
 for (const [metric, whole] of [
-  ['late-in', 'Invoices late: 3 to come in.'],
-  ['overdue', 'Bills late: 3 to pay.'],
+  /* EACH LINE ENDS ON ITS ONE WAY TO ACT, since the UI pass of 20 October. */
+  ['late-in', 'Invoices late: 3 to come in. See them'],
+  ['overdue', 'Bills late: 3 to pay. See them'],
 ] as const) {
   test(`${metric}: the words that say it is late are a bad phrase, and the line reads the same`, () => {
     const body = bodyOn(metric);
