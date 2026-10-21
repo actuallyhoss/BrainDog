@@ -64,8 +64,10 @@
 <!-- THE TABS ARE DRAWN ONCE, beside the name at a desk's width and under the sentence on a phone. -->
 {#snippet tabs(at: Tab)}<HubTabs here={at} full={phone.current} />{/snippet}
 
+<!-- ON RUNS THE NAME IS "Runs" (UI pass of 21 October, H29): its count is the runs', and "Automations 4" over a list of
+     runs said a number of something else. -->
 {#if tab && shown}
-  <PageHead icon="refresh" title={words.heading} count={shown.count} sentence={shown.sentence} needs={shown.needs}>
+  <PageHead icon="refresh" title={tab === 'runs' ? w.tab.runs : words.heading} count={shown.count} sentence={shown.sentence} needs={shown.needs}>
     {#snippet actions()}
       {#if !phone.current}{@render tabs(tab)}{/if}
       {#if make && phone.current}
