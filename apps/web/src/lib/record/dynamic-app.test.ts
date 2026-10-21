@@ -188,18 +188,18 @@ test('A LEAD NOTE SAYS ITS FIGURES AS A SENTENCE: one step, not one step(s), and
   /* THE SENTENCE AS A READER HEARS IT: the renderer wraps each figure in its own span, which is drawing, not words. */
   const said = (block: LiveBlock) => toHTML([fence(block)], { resolve: resolverOf(block.values) } as never).replace(/<(?!\/?p>)[^>]+>/gu, '');
   const one = named(await desk(true), 'Lead');
-  assert.match(said(one), /<p>1 essential step done<\/p>/u);
+  assert.match(said(one), /<p>1 essential step done\.<\/p>/u);
   assert.equal(fence(one).form, 'lead', 'the lead note is drawn as the lead form');
 
   /* THE NUMBER BEFORE THE WORD IS THE ONE THAT COUNTS IT, and "of the 3 essential" is three steps, whatever came first. */
-  assert.match(said(named(await desk(true), 'Two figures')), /<p>1 of the 3 essential steps are done, 1 ticked<\/p>/u);
+  assert.match(said(named(await desk(true), 'Two figures')), /<p>1 of the 3 essential steps are done, 1 ticked\.<\/p>/u);
 
   /* WITH NONE DONE THE CLAUSE GOES, and here it is the whole sentence, so the note has nothing to say. */
   const none = await desk(false);
   const gone = named(none, 'Lead');
   assert.equal(gone.drawn, false, 'a lead with nothing left to say is not drawn, as a note whose when: said no is not');
   assert.doesNotMatch(toHTML(draw(gone).segments), /essential/u);
-  assert.match(said(named(none, 'Two figures')), /<p>0 of the 3 essential steps are done<\/p>/u, 'only the clause whose every figure is nought goes');
+  assert.match(said(named(none, 'Two figures')), /<p>0 of the 3 essential steps are done\.<\/p>/u, 'only the clause whose every figure is nought goes');
 });
 
 /* ── the next step on a card, and the lead card ─────────────────────────── */

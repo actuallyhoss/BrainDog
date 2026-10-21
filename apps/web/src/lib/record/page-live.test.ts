@@ -1273,8 +1273,9 @@ test('A PART KEYED BY A YES OR NO IS SAID AS ONE, and not as yes twice', () => {
 
 test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules' line when it did not", () => {
   const lead = { kind: 'note', lead: true, body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s)', values: { 'cash-now': { amount: 3_385_000, currency: 'GBP' }, 'cash-accounts': 2 }, rows: [], matched: 0, refusals: [] };
-  /* THE RULES' LINE KEEPS ITS HOLES, which the renderer fills from `values` as it fills the tiles beside it. */
-  const rules = 'Cash is {{cash-now}} across {{cash-accounts}} accounts';
+  /* THE RULES' LINE KEEPS ITS HOLES, which the renderer fills from `values` as it fills the tiles beside it, and ends as a
+     sentence does, with its full stop (P13). */
+  const rules = 'Cash is {{cash-now}} across {{cash-accounts}} accounts.';
   assert.equal(blockOf(lead, new Map(), AT).body, rules);
   const said = blockOf({ ...lead, said: 'GBP 33,850.00 across HSBC and Monzo, steady on last month.' }, new Map(), AT);
   assert.equal(said.body, 'GBP 33,850.00 across HSBC and Monzo, steady on last month.');

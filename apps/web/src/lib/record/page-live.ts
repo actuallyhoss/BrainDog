@@ -23,6 +23,7 @@ import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, t
 import { MISSING, UNNAMED, integer, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { stopped } from '../shell/headline.ts';
 import { presenceSaid, type RunPresence } from '../ui/presence-words.ts';
 import { factCells } from './card-fact-cells.ts';
 import { lateSaid } from '../home/today-tiles.ts';
@@ -1482,9 +1483,11 @@ export function blockOf(
        before it is kept (`packages/record/src/headlines.ts`): every number in it is one the figures hold, and it is sent
        only while they still hold the values it was written from, so it cannot say what the tiles beside it do not. */
     const own = typeof modelSaid === 'string' ? modelSaid.trim() : '';
-    if (own !== '') return { ...shell, body: own };
+    /* AND IT ENDS AS A SENTENCE DOES (`stopped`, P13): "Portage and Kiln need a push, Marlow & Co is on track" ran out
+       with no full stop under Projects' name, while the header's own line ended with one. */
+    if (own !== '') return { ...shell, body: stopped(own) };
     const lead = leadOf(body, namedResolverOf(values, unnamedOf(b)));
-    return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: lead };
+    return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: stopped(lead) };
   }
   /* AN `inputs` BLOCK IS ONE ROW'S FIELDS TO TYPE INTO, read by `register:` and never by `source:`, so it is answered
      before the check that sends a block with no source back as written text. That check was where it went: the kernel
