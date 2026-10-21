@@ -357,7 +357,7 @@ export const account = {
   staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
 
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
-  whenWeInterrupt: 'When this record interrupts you',
+  whenWeInterrupt: 'When BrainDog interrupts you',
   /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3). One sentence with the two times in it
      and a switch beside it; a member reads the same sentence with no control. A summary due inside them waits for
      their end, and an urgent notice never does. */
