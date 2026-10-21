@@ -83,9 +83,10 @@
     background: var(--ink);
   }
 
+  /* Its words take the tile's colour, ink's inverse in both schemes (white on red would vanish on dark's light ink). */
   .step[data-part='trigger'] .part,
   .step[data-part='trigger'] .said {
-    color: var(--on-red);
+    color: var(--tile);
   }
 
   .part {
