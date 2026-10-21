@@ -154,7 +154,7 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
 export const SAMPLE_KPIS: Fields[] = [
   { name: 'Revenue a month', thing: 1, measures: 'What the licences, studio deals and prints brought in each month', source: 'numbers', measure: 'Revenue a month', unit: 'GBP', kind: 'flow', every: '1m', target_amount: gbp(200_000), headline: true, owner: 'claude', order: 1 },
   { name: 'Studios licensed', thing: 1, measures: 'Studios holding a current licence', source: 'agent', measure: 'Studios licensed', unit: 'studios', kind: 'level', every: '1w', target: 60, target_by: day(90), owner: 'claude', order: 2 },
-  { name: 'Specimen downloads', thing: 1, measures: 'Specimen PDFs downloaded in a week', source: 'typed', measure: 'Specimen downloads', unit: 'downloads', kind: 'level', every: '1w', order: 3 },
+  { name: 'Specimen downloads', thing: 1, measures: 'Specimen PDFs downloaded in a week', source: 'typed', measure: 'Specimen downloads', unit: 'downloads', kind: 'level', every: '1w', owner: 'claude', order: 3 },
   { name: 'Hours billed', thing: 2, measures: 'Hours billed to Marlow & Co each week', source: 'typed', measure: 'Hours billed', unit: 'hours', kind: 'flow', every: '1w', today: 'pinned', order: 1 },
   { name: 'Subscribers', thing: 3, measures: 'People signed up to the Portage newsletter', source: 'agent', measure: 'Subscribers', unit: 'people', kind: 'level', every: '1w', target: 500, target_by: day(-6), headline: true, owner: 'claude', order: 1 },
 ];
