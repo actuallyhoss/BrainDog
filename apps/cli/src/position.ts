@@ -1,7 +1,8 @@
 /**
  * Where a session stands: the folder, the repository, its remote, the machine, the branch and the
- * commit. The record resolves a project from these, so they travel with every call as the session
- * headers, with which host session and which client is calling.
+ * commit, and for Claude Code the profile it runs under, by name. The record resolves a project from
+ * these, so they travel with every call as the session headers, with which host session and which
+ * client is calling.
  *
  * A REPOSITORY IS A GIT TOP-LEVEL FOLDER OR NOTHING. A temporary folder is not a project, so outside
  * a work tree every git field is null rather than a guess.
@@ -13,7 +14,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { hostname } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 
 export const AGENTS = ['claude', 'codex', 'cursor', 'other'] as const;
@@ -151,6 +152,9 @@ const printable = (max: number) => new RegExp(`^[\\x20-\\x7e]{1,${max}}$`);
 
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
+/** A profile's name as `x-braindog-profile` carries it: held to the repository's grammar, so never a path and never `..`. */
+export const PROFILE_NAME = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
 /** A build as `scripts/bundle.mjs` stamps one, `<yyyy.mm.dd>+<sha>` with seven to forty hex digits, or a checkout's `dev+0000000`. */
 export const BUILD = /^(?:[0-9]{4}\.[0-9]{2}\.[0-9]{2}|dev)\+[0-9a-f]{7,40}$/;
 
@@ -182,6 +186,8 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-cli': BUILD,
   'x-braindog-ahead': /^(?:0|[1-9][0-9]{0,3})$/,
   'x-braindog-authors': printable(1024),
+  /* The profile's name (`profileNameOf`); a host that does not read it yet drops it, as it drops any header it does not name. */
+  'x-braindog-profile': PROFILE_NAME,
 };
 
 type Env = Record<string, string | undefined>;
@@ -194,6 +200,26 @@ type Env = Record<string, string | undefined>;
 export function hostSessionOf(env: Env): string | null {
   for (const id of [env.CLAUDE_SESSION_ID, env.CLAUDE_CODE_SESSION_ID]) if (typeof id === 'string' && CLIENT_ID.test(id)) return id;
   return null;
+}
+
+/**
+ * The Claude Code profile a session runs under, by name, from `CLAUDE_CONFIG_DIR`: `default` when it is unset or is
+ * `~/.claude`, `<name>` for `~/.claude-<name>`, a ccenv profile's own folder name (`.../.ccenv/profiles/<name>`, or
+ * under `CCENV_HOME`), and any other folder's own name without its leading dots. `null` when that is no name.
+ *
+ * A NAME AND NEVER A PATH. It leaves the machine on every call, and the folders above a profile say how a person keeps
+ * their machine, so only the last part is read, and a last part outside `PROFILE_NAME` is not sent at all.
+ */
+export function profileNameOf(env: Env, home: string = env.HOME || env.USERPROFILE || homedir()): string | null {
+  const said = (env.CLAUDE_CONFIG_DIR ?? '').trim();
+  if (said === '') return 'default';
+  const dir = resolve(said);
+  const name = basename(dir);
+  const parent = dirname(dir);
+  if (dir === resolve(home, '.claude')) return 'default';
+  const ccenv = basename(parent) === 'profiles' && (basename(dirname(parent)) === '.ccenv' || (!!env.CCENV_HOME && parent === resolve(env.CCENV_HOME, 'profiles')));
+  const out = parent === resolve(home) && name.startsWith('.claude-') ? name.slice('.claude-'.length) : ccenv ? name : name.replace(/^\.+/u, '');
+  return PROFILE_NAME.test(out) ? out : null;
 }
 
 /** What a client says it is when it says hello: MCP's `initialize` `clientInfo`, as in `claude-code` and `2.1.287`. */
@@ -228,11 +254,15 @@ export const aheadHeader = (moved: number | null | undefined): string | undefine
  * A SUBAGENT OUTSIDE ANY REPOSITORY SAYS ITS PARENT RUN'S PLACE (`said.parent`): the repository, remote and folder that
  * run started in, so the record places it in the same project, and the parent's spoken id as `x-braindog-parent` for a
  * record that reads it. One in a repository of its own says its own place, which is where its work is.
+ *
+ * CLAUDE CODE SAYS ITS PROFILE BY NAME (`profileNameOf`), from `said.env` too, and only Claude Code: `CLAUDE_CONFIG_DIR`
+ * is its own, so a Codex run is never called `default`.
  */
 export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: string | undefined; client_id?: string | undefined }, said: Said = {}): Record<string, string> {
   const env = said.env ?? {};
   const parent = said.parent ?? null;
   const from = parent !== null && p.repo === null && (parent.repo !== null || parent.remote !== null || parent.cwd !== null) ? parent : null;
+  const kind = agent ?? (env.CLAUDECODE ? 'claude' : undefined);
   const values: Record<string, string | null | undefined> = {
     'x-braindog-session': run?.spoken,
     'x-braindog-parent': parent?.spoken,
@@ -242,12 +272,13 @@ export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: stri
     'x-braindog-worktree': from ? undefined : p.worktree,
     'x-braindog-remote': from ? from.remote : p.remote,
     'x-braindog-cwd': from ? (from.cwd ?? p.cwd) : p.cwd,
-    'x-braindog-agent': agent ?? (env.CLAUDECODE ? 'claude' : undefined),
+    'x-braindog-agent': kind,
     'x-braindog-client-name': said.client?.name?.trim(),
     'x-braindog-client-version': said.client?.version?.trim(),
     'x-braindog-cli': said.build ?? cliBuild(),
     'x-braindog-ahead': aheadHeader(said.ahead),
     'x-braindog-authors': from ? undefined : p.authors,
+    'x-braindog-profile': said.env !== undefined && kind === 'claude' ? profileNameOf(env) : undefined,
   };
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) if (value && GRAMMAR[name]!.test(value)) out[name] = value;

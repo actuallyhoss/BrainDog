@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { BUILD, authorsOf, cliBuild, hostSessionOf, positionOf, repoOf, sessionHeaders, withCommits, type Position } from '../src/position.ts';
+import { BUILD, authorsOf, cliBuild, hostSessionOf, positionOf, profileNameOf, repoOf, sessionHeaders, withCommits, type Position } from '../src/position.ts';
 import { helloOf } from '../src/stdio.ts';
 
 const AT: Position = { cwd: '/Users/ada/kiln', repo: 'kiln', remote: 'github.com/ada/kiln', host: 'box', branch: 'main', head: 'abc1234' };
@@ -30,7 +30,12 @@ test('THE HOST SESSION IS THE ONE ITS ENVIRONMENT NAMES, CLAUDE_SESSION_ID first
 
 test('ONE RUN PER HOST SESSION: the run’s own id when the caller names it, else the host session’s, and Claude inside Claude Code', () => {
   const env = { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: 'claude-run-mine' };
-  assert.deepEqual(sessionHeaders(AT, undefined, undefined, { env }), { ...WHERE, 'x-braindog-client': 'claude-run-mine', 'x-braindog-agent': 'claude' });
+  assert.deepEqual(sessionHeaders(AT, undefined, undefined, { env }), {
+    ...WHERE,
+    'x-braindog-client': 'claude-run-mine',
+    'x-braindog-agent': 'claude',
+    'x-braindog-profile': 'default',
+  });
   /* What the hook was told wins over what the environment says, and an agent named wins over CLAUDECODE. */
   assert.deepEqual(sessionHeaders(AT, 'codex', { spoken: 'S7', client_id: 'hook-said' }, { env }), {
     ...WHERE,
@@ -41,6 +46,42 @@ test('ONE RUN PER HOST SESSION: the run’s own id when the caller names it, els
   /* No environment handed over is none read: this process's own is never looked at. */
   assert.deepEqual(sessionHeaders(AT), WHERE);
   assert.deepEqual(sessionHeaders(AT, undefined, undefined, { env: { CLAUDECODE: '' } }), WHERE);
+});
+
+test('A PROFILE IS NAMED FROM CLAUDE_CONFIG_DIR: default, .claude-<name>, a ccenv profile, else the folder’s own name', () => {
+  const home = '/Users/ada';
+  const named = (dir: string | undefined, more: Record<string, string> = {}) => profileNameOf({ ...more, ...(dir === undefined ? {} : { CLAUDE_CONFIG_DIR: dir }) }, home);
+  for (const dir of [undefined, '', '  ', '/Users/ada/.claude', '/Users/ada/.claude/']) assert.equal(named(dir), 'default', String(dir));
+  assert.equal(named('/Users/ada/.claude-copperleaf'), 'copperleaf');
+  assert.equal(named('/Users/ada/.ccenv/profiles/oxbow'), 'oxbow');
+  assert.equal(named('/Volumes/work/.ccenv/profiles/lanternfish/'), 'lanternfish');
+  assert.equal(named('/opt/ccenv/profiles/lanternfish', { CCENV_HOME: '/opt/ccenv' }), 'lanternfish');
+  /* ANY OTHER FOLDER IS ITS OWN NAME, without leading dots, and `.claude` elsewhere is not the default profile. */
+  assert.equal(named('/opt/claude-work'), 'claude-work');
+  assert.equal(named('/srv/shared/.claude'), 'claude');
+  assert.equal(named('/srv/.claude-team'), 'claude-team');
+  /* The home is the environment's own when none is handed in. */
+  assert.equal(profileNameOf({ HOME: '/home/bo', CLAUDE_CONFIG_DIR: '/home/bo/.claude-team' }), 'team');
+  /* A NAME THAT IS NO NAME IS NONE: a space, another script, `..`, or nothing at all. */
+  for (const dir of ['/Users/ada/My profile', '/Users/ada/.claude-Zoë', '/Users/ada/.claude-a..b', '/Users/ada/.claude-', '/']) assert.equal(named(dir), null, dir);
+});
+
+test('THE PROFILE TRAVELS BY NAME AND NEVER AS A PATH, for Claude Code only, and only from an environment handed over', () => {
+  const sent = (agent: 'claude' | 'codex' | undefined, env?: Record<string, string>) => sessionHeaders(AT, agent, undefined, env === undefined ? {} : { env });
+  const deep = { CLAUDE_CONFIG_DIR: '/Users/ada/private-clients/quietcart/.ccenv/profiles/copperleaf' };
+  assert.equal(sent('claude', deep)['x-braindog-profile'], 'copperleaf');
+  assert.equal(sent(undefined, { ...deep, CLAUDECODE: '1' })['x-braindog-profile'], 'copperleaf');
+  /* NO PART OF THE FOLDER ABOVE THE NAME IS IN ANY HEADER. */
+  for (const value of Object.values(sent('claude', deep))) assert.ok(!value.includes('private-clients') && !value.includes('.ccenv'), value);
+  for (const dir of ['/Users/ada/.claude-copperleaf', '/x/y/.claude', '/x/.ccenv/profiles/lanternfish', 'C:\\Users\\ada\\.claude-copperleaf']) {
+    const value = sent('claude', { CLAUDE_CONFIG_DIR: dir })['x-braindog-profile'];
+    assert.ok(value === undefined || !/[/\\]/u.test(value), `${dir} sent ${String(value)}`);
+  }
+  /* ANOTHER APP, NO ENVIRONMENT, OR A NAME THAT IS NO NAME: no header at all. */
+  assert.equal(sent('codex', deep)['x-braindog-profile'], undefined);
+  assert.equal(sent(undefined, deep)['x-braindog-profile'], undefined);
+  assert.equal(sent('claude')['x-braindog-profile'], undefined);
+  assert.equal(sent('claude', { CLAUDE_CONFIG_DIR: '/Users/ada/Zoë' })['x-braindog-profile'], undefined);
 });
 
 test('THE CLIENT’S OWN NAME AND VERSION travel as headers, trimmed, and one outside its grammar is dropped', () => {
