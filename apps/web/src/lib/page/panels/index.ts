@@ -31,6 +31,8 @@ export const PANEL_LOADERS: Readonly<Record<Panel, () => Promise<Loaded>>> = {
   'slash-reads': () => import('$lib/ui/SlashReads.svelte'),
   'my-keys': () => import('../../../routes/settings/[area]/areas/MyTokens.svelte'),
   'new-action': () => import('./NewActionPanel.svelte'),
+  instruct: () => import('./TellPanel.svelte'),
+  presence: () => import('./PresencePanel.svelte'),
 };
 
 /** What `panel` is about: the row the page is drawn for, or nothing, so it stands on any page. */

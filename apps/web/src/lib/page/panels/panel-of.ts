@@ -41,6 +41,8 @@ export const PANELS = [
   'slash-reads',
   'my-keys',
   'new-action',
+  'instruct',
+  'presence',
 ] as const;
 
 export type Panel = (typeof PANELS)[number];
@@ -64,6 +66,10 @@ export const PANEL_WHO: Readonly<Record<Panel, { needs: 'row' | 'none'; level: '
   /* ANYONE WHO READS, since the keys it lists are the reader's own (`ownTokens`), never another person's. */
   'my-keys': { needs: 'none', level: 'read' },
   'new-action': { needs: 'none', level: 'owner' },
+  /* THE AGENTS PAGE'S CONTROL ROOM (agents and MCP plan §7.1): the box he tells an agent in, with what each was told, his
+     alone; and the runs open now, read by anyone who reads the runs, with Tell, Pause and Stop for him. */
+  instruct: { needs: 'none', level: 'owner' },
+  presence: { needs: 'none', level: 'read' },
 };
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */

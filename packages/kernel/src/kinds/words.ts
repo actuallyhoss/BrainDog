@@ -24,8 +24,10 @@ export type Raw = Readonly<Record<string, unknown>>;
  * are about the record and need no row, so they stand on any page: the look editor (`look-editor`), the form that says
  * which model Slash uses (`slash-model`), the ladder of who may do what on their own (`trust`), whether Slash reads on
  * its own and what it sends (`slash-reads`), the reader's own agent keys (`my-keys`, the reader's and never another
- * person's, so it is drawn for anyone who reads) and the button that opens the new scheduled action sheet
- * (`new-action`).
+ * person's, so it is drawn for anyone who reads), the button that opens the new scheduled action sheet
+ * (`new-action`), and the Agents page's control room (agents and MCP plan §7.1): the box he tells an agent in with what
+ * each was told (`instruct`, his alone), and the runs open now with Pause and Stop (`presence`, drawn for anyone who
+ * reads the runs, the presses only for him).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
@@ -47,7 +49,9 @@ export type Panel =
   | 'trust'
   | 'slash-reads'
   | 'my-keys'
-  | 'new-action';
+  | 'new-action'
+  | 'instruct'
+  | 'presence';
 
 /** What a host panel is about, who it is drawn for and what it is, in one line. */
 export type PanelEntry = Readonly<{ needs: 'row' | 'none'; level: 'read' | 'write' | 'owner'; says: string }>;
@@ -64,6 +68,8 @@ export const PANEL_TABLE: Readonly<Record<Panel, PanelEntry>> = {
   'slash-reads': { needs: 'none', level: 'owner', says: 'What Slash read and why' },
   'my-keys': { needs: 'none', level: 'read', says: 'Your own keys to this record' },
   'new-action': { needs: 'none', level: 'owner', says: 'Make a new action' },
+  instruct: { needs: 'none', level: 'owner', says: 'Tell an agent, and what each was told' },
+  presence: { needs: 'none', level: 'read', says: 'The agents working now, with pause and stop' },
 };
 
 /* THE KEYS IN THE TABLE'S ORDER, the four of before first, as the refusal lists them and the web's list equals. */
