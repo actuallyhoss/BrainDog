@@ -799,12 +799,18 @@ test('THE KEY CAP IS DRAWN ON THE CURSOR\'S QUESTION ALONE, where the host can a
   assert.doesNotMatch(toHTML([block]), /queue-key/u);
 });
 
-test('SECONDARY LINES ARE MARKED CALM in both renderers: a task\'s due line, when a feed line happened, who asked a question', () => {
-  for (const name of ['a todo whose rows carry a due day and who changed them', 'a feed with bursts, a mark and a tone', 'a queue of two questions, one recommended, with more waiting']) {
+test('SECONDARY LINES ARE MARKED CALM in both renderers: when a feed line happened, who asked a question', () => {
+  for (const name of ['a feed with bursts, a mark and a tone', 'a queue of two questions, one recommended, with more waiting']) {
     const block = page(SHAPES[name]!);
     assert.match(toHTML([block]), /data-calm=""/u, name);
     assert.match(render(Block, { props: { block } }).body, /data-calm=""/u, name);
   }
+});
+
+test('BUT A TASK\'S LINE IS NEVER CALM (the verifier\'s H10): when it falls due and its project are what Work is read for', () => {
+  const block = page(SHAPES['a todo whose rows carry a due day and who changed them']!);
+  assert.doesNotMatch(toHTML([block]), /class="item-meta" data-calm/u);
+  assert.doesNotMatch(render(Block, { props: { block } }).body, /class="item-meta" data-calm/u);
 });
 
 /* ── a task's two verbs, a queue's lead and bulk choice, and the filter strip ─────────────────────── */

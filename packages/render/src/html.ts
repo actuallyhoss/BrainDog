@@ -34,7 +34,7 @@ import { PATH_DONE, PATH_NEXT, pathMore, pathPlan, unvalued } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
-import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
+import { TODO_META_JOIN, todoLines, todoMeta as metaCells } from './todo.ts';
 import { rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
@@ -282,10 +282,8 @@ const cell = (name: string, value: string | undefined, opts: RenderOptions, extr
  * NOTHING, NOT AN EMPTY SPAN, where the row carries neither: a two-cell todo draws the markup it drew
  * before this line existed, and a page pads every two-column todo to four cells with blanks.
  */
-const todoMeta = (cells: readonly string[], opts: RenderOptions): string => {
-  const parts = metaCells(cells);
-  return parts.length ? `<span class="item-meta" data-calm="">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
-};
+const todoMeta = (parts: readonly string[], opts: RenderOptions): string =>
+  parts.length ? `<span class="item-meta">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
 
 /**
  * A board card's third and fourth cells, as the one quiet line under its title.
@@ -655,8 +653,10 @@ function list(b: Block, o: RenderOptions): string {
     .map((r, i) => {
       /* EVERY ROW CARRIES ITS KEY (`cursor.ts`), so a host walks a page's rows with one query across its blocks. */
       const key = ` data-row="${escape(rowKey(r, i))}"`;
-      if (b.kind === 'todo')
-        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${todoMeta(r.cells, o)}</li>`;
+      if (b.kind === 'todo') {
+        const lines = todoLines(r.cells, o.now, r.done === true);
+        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', lines.detail, o)}${todoMeta(lines.meta, o)}</li>`;
+      }
       if (b.kind === 'timeline') {
         /* A GROUPED TIMELINE SAYS EACH DAY ONCE, over its rows, and the rows under it leave their own date blank
            (`timeline.ts`). The heading is an item of the list, so the list stays a list of its children. */
@@ -2181,7 +2181,7 @@ export function filtersHTML(filters: readonly Filter[], chosen: Readonly<Record<
   const plans = filtersPlan(filters, chosen);
   if (plans.length === 0) return '';
   const choice = (label: string, on: boolean, count: number | null): string =>
-    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${escape(label)}${count === null ? '' : `<span class="filters-count num" data-calm="">${count}</span>`}</span>`;
+    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${escape(label)}${count === null ? '' : `<span class="filters-count num">${count}</span>`}</span>`;
   const groups = plans
     .map(
       (p) =>

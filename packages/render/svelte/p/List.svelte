@@ -36,7 +36,7 @@
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
-  import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
+  import { TODO_META_JOIN, todoLines } from '../../src/todo.ts';
   import { timelineCell, timelineDays, timelineTitle } from '../../src/timeline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
@@ -203,7 +203,8 @@
       {@const state = tickState(row.done, ticks.get(i))}
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
-      {@const meta = todoMeta(row.cells)}
+      {@const lines = todoLines(row.cells, opts.now, row.done === true)}
+      {@const meta = lines.meta}
       {@const named = text(inline(title.text ?? '', opts)) || TASK}
       <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         {#if ontick}
@@ -256,12 +257,12 @@
             >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
           >
         {/if}
-        <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
+        <span class="item-detail"><Text nodes={inline(lines.detail, opts)} {opts} /></span>
         <!-- THE THIRD AND FOURTH CELLS, when the row carries either, as one quiet line: when it falls due and who
              changed it last, on Work's Waiting on you. Outside the box's name on purpose, which stays the task. And
              before the unsaved mark, so a reader hears the row's facts before what this session did to it. -->
         {#if meta.length}
-          <span class="item-meta" data-calm=""
+          <span class="item-meta"
             >{#each meta as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span
           >
         {/if}
