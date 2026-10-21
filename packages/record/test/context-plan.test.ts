@@ -338,7 +338,7 @@ test('NUMBERS KEEPS TO THE BUDGET: on a record the size of his it is said within
   assert.ok(!planContext(his(), { budget: 1_200 }).sections.some((s) => s.id === 'kpis'));
 });
 
-test('FROM THE SEED: Claude on Kiln is told the two numbers it keeps there, and Codex none', async () => {
+test('FROM THE SEED: Claude on Kiln is told the three numbers it keeps there, the stale one first, and Codex none', async () => {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
@@ -355,10 +355,12 @@ test('FROM THE SEED: Claude on Kiln is told the two numbers it keeps there, and 
     return got.value.plan ?? '';
   };
   const claude = await plan(as('claude', 'tok_1'));
-  assert.match(claude, /^Numbers {2}Studios licensed, weekly: reported 1d ago$/mu);
+  /* SPECIMEN DOWNLOADS IS CLAUDE'S SINCE 21 OCTOBER (the sample's stale number with an owner, so its fix can ask), and a
+     stale number leads the section. */
+  assert.match(claude, /^Numbers {2}Specimen downloads, weekly: reported \d+d ago, stale$/mu);
+  assert.match(claude, /^ {9}Studios licensed, weekly: reported 1d ago$/mu);
   assert.match(claude, /^ {9}Revenue a month, monthly: reported \d+d ago$/mu);
   assert.ok(claude.includes(KPI_HOW), claude);
-  assert.ok(!claude.includes('Specimen downloads'), 'nobody keeps it, so no agent is told it');
   const codex = await plan(as('codex', 'tok_2'));
   assert.ok(!codex.includes('Numbers  '), codex);
   sql.close();
