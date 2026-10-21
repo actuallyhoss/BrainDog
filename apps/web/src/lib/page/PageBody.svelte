@@ -46,13 +46,14 @@
   import { lookOrder, nextOf, placedOf, repeatsFirst } from './look.ts';
   import { asksAside } from './asks.ts';
   import { judgedWith } from './panels.ts';
+  import { heldOut, holdsWhole, type Reader } from './held.ts';
   import NextStep from './NextStep.svelte';
   import { frameResizeObserver } from '$lib/ui/resize.ts';
 
   let {
     mode,
     page,
-    blocks,
+    blocks: given,
     held = null,
     now,
     writes,
@@ -132,6 +133,12 @@
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
+
+  /* A READER WHO DOES NOT HOLD THE WHOLE RECORD IS NOT DRAWN WHAT IT REFUSED THEM (`held.ts`): a guest's Today has no tile
+     saying it drew nothing, each such block left out at its own index. A preview is the author's, and draws every
+     refusal; the owner's page is the blocks as handed. */
+  const readerWhole = $derived(mode === 'preview' || holdsWhole((route.data as { me?: Reader } | undefined)?.me));
+  const blocks = $derived(heldOut(given, readerWhole));
 
   /* ── the main column and the rail ─────────────────────────────────────────
      A PAGE THAT DECLARES `layout` DRAWS TWO COLUMNS; every other page draws the one flow it always has, through the same

@@ -16,6 +16,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page as route } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
@@ -29,6 +30,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, opened } from '../../ui/screen.svelte.ts';
+  import { holdsWhole, type Reader } from '../held.ts';
 
   /* THE ROW THE PAGE IS DRAWN FOR, by its spoken id and title, which the record's own resolution of each action's
      project is matched against (`forProject`). `null` lists every action, for Settings, ingest, and says so when
@@ -71,6 +73,10 @@
   });
 
   const split = $derived(forProject(rows, project));
+
+  /* A READER WHO DOES NOT HOLD THE WHOLE RECORD IS NOT DRAWN THE REFUSAL (`held.ts`): a guest on Kiln reads no "This
+     belongs to the whole record" under its heading. The owner, and anybody reading all of it, still reads why. */
+  const saysRefusal = $derived(holdsWhole((route.data as { me?: Reader } | undefined)?.me));
 
   /* THE VAULT IS OPENED WITH WHAT IT SHOULD OPEN ON IN THE NAVIGATION'S STATE, never in the address. A press for a new
      tab is left to the browser, which opens the plain Vault. */
@@ -138,11 +144,13 @@
   </li>
 {/snippet}
 
-{#if from === 'refused'}
+{#if from === 'refused' && saysRefusal}
   <section class="actions" aria-labelledby="actions-h">
     <h3 class="actions-h" id="actions-h">{words.heading}</h3>
     <p class="action-fix" role="status">{fix}</p>
   </section>
+{:else if from === 'refused'}
+  <!-- Refused to a reader held to some lists: nothing drawn. -->
 {:else if from === 'ready' && project === null && rows.length === 0}
   <Empty kind="no-data-yet" title={copy.noSources} body={copy.noSourcesWhy} agentPrompt={copy.ingestPrompt} />
 {:else if from === 'ready' && split.own.length + split.everywhere.length > 0}

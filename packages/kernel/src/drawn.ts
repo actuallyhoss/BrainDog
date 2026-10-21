@@ -19,10 +19,12 @@ import { kindModule } from './kinds/index.ts';
 
 /**
  * Why a block is not drawn: it holds nothing (`empty`), what it reads no row has said (`unsaid`), its `when:` said no
- * (`when`), the reader cannot draw it (`cannot`), or the reader's level does not reach what the block writes (`level`).
+ * (`when`), the reader cannot draw it (`cannot`), the reader's level does not reach what the block writes (`level`), or
+ * the record refused it to a reader who does not hold the whole record, who is not drawn a tile saying so (`held`, the
+ * app's `page/held.ts`).
  */
-export type Why = 'empty' | 'unsaid' | 'when' | 'cannot' | 'level';
-export const WHY: readonly Why[] = ['empty', 'unsaid', 'when', 'cannot', 'level'];
+export type Why = 'empty' | 'unsaid' | 'when' | 'cannot' | 'level' | 'held';
+export const WHY: readonly Why[] = ['empty', 'unsaid', 'when', 'cannot', 'level', 'held'];
 
 /** The `empty:` an author writes for a block that keeps its nought: a ledger wants its zeros. */
 export const KEEP = 'keep';
