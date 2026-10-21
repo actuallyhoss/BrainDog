@@ -70,6 +70,7 @@
     define,
     well,
     headless = false,
+    heldLines = 2,
   }: {
     title: string;
     /** The glyph the register or page declares, drawn before the name. */
@@ -107,6 +108,8 @@
     well?: Snippet | undefined;
     /** No name row: the back link and the actions only, for a page whose own hero holds the `h1`. */
     headless?: boolean | undefined;
+    /** How many lines a sentence on its way holds on a phone: Today's says three things, so it holds three. */
+    heldLines?: number | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
     led?: boolean | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
@@ -260,7 +263,7 @@
     {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
   </p>
 {:else if held}
-  <p class="page-said" data-held aria-hidden="true"></p>
+  <p class="page-said" data-held aria-hidden="true" style:--held-lines={heldLines}></p>
 {/if}
 <!--
   THE DEFINITION IS READ ONCE, SO IT DOES NOT RIDE IN THE STICKY HEAD: read where it is met, it scrolls away with the
@@ -569,7 +572,7 @@
 
   @media (width < 640px) {
     .page-said[data-held] {
-      min-block-size: 2lh;
+      min-block-size: calc(var(--held-lines, 2) * 1lh);
     }
   }
 

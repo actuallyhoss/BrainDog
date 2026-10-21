@@ -874,6 +874,7 @@
   icon="today"
   kicker={today}
   sentence={tell ? TELL_LINE : slashed ? slashSaid : lead ? leadSaid : undefined}
+  heldLines={3}
   actions={capture && wide.current && !board ? headCapture : undefined}
   below={capture && !wide.current && !board ? headCapture : undefined}
 />
