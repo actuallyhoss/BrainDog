@@ -81,6 +81,6 @@ test("an add-on's pages are still tabs", () => {
 
 test('the sheet draws its specimens with the part', () => {
   const [track] = PARTS.SheetControls.tracks;
-  assert.equal(track!.tag, 'role="group" aria-label={words.choices(n)}');
+  assert.equal(track!.tag, 'role="group" aria-label={words.choices(n)} full');
   assert.match(track!.held, /aria-pressed=\{picked\[n\] === i\}/u);
 });

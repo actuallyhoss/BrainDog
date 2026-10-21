@@ -140,7 +140,7 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
    * was drawn only over the sample on the Cloud build, which is gone. Going back is `Restore this` on a
    * copy the record listed.
    */
-  const at = AREA.indexOf('<Tile class="section" data-surface="tile" title={copy.restore}>');
+  const at = AREA.indexOf('<Tile icon="refresh" class="section" data-surface="tile" title={copy.restore}>');
   assert.ok(at > 0, 'the going-back section is gone');
   const section = AREA.slice(at, AREA.indexOf('</Tile>', at)).replaceAll(/<!--[\s\S]*?-->/gu, '');
   assert.match(section, /copy\.restoreNotHere/u, 'a record that keeps no copies is told nothing about going back');
