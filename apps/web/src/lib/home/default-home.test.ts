@@ -119,6 +119,17 @@ test('LATE MONEY IS A LINE A THING, oldest first, saying how late it is rather t
   ]);
 });
 
+test('LATE BILLS ARE THE ROWS OF BILLS AND INVOICES, as Money counts them, and a late payment in another list is not one', () => {
+  const gbp = (minor: number) => ({ amount: minor, currency: 'GBP' });
+  const money = block({ kind: 'spec', source: 'deadlines', columns: [{ field: 'title' }, { field: 'amount' }, { field: 'day' }] as never }, [
+    { row: 'obligations#2', day: '2026-07-01', amount: gbp(919000), direction: 'out' },
+    { row: 'ledger#3', day: '2026-09-29', amount: gbp(3961), direction: 'out' },
+  ]);
+  const bills = homeDrawn([money], NOW).lateBills;
+  assert.equal(bills?.count, 1);
+  assert.match(bills?.said ?? '', /^£9,190\b/u);
+});
+
 test('WHAT CHANGED LEAVES OUT WHAT THE PAGE ALREADY SAYS: open questions, and a rule`s note about a row that falls due', () => {
   const queue = block({ kind: 'queue', source: 'governance.open', queue: [{ id: 'SG3' }] as never, total: 4 });
   const due = block({ kind: 'timeline', source: 'deadlines' }, [{ row: 'installments#5', day: '2026-10-02' }]);
