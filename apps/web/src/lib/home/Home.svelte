@@ -1265,6 +1265,18 @@
     padding-block-start: var(--sp-3);
   }
 
+  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in the red, as wide as its words. */
+  .body :global(.block-slot[data-key='coming-up'] > a.block-more) {
+    align-self: flex-start;
+    color: var(--red);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  .body :global(.block-slot[data-key='coming-up'] > a.block-more:hover) {
+    text-decoration: underline;
+  }
+
   /* THE REST OF THE FIRST ROW'S RIGHT COLUMN, held empty so nothing laid out later is put in it. */
   .row-one-rest {
     display: none;

@@ -15,5 +15,7 @@ export function doorOf(b: { register?: string | undefined; where?: string | unde
   if (b.register) return registerHref(b.register, b.where);
   if (b.source?.startsWith('governance.')) return '/decide';
   if (b.source === 'activity') return '/audit';
+  /* WHAT FALLS DUE ACROSS THE LISTS (Today's Coming up) opens Work, where the rest of it is (VERIFY P1). */
+  if (b.source === 'deadlines') return '/?work';
   return null;
 }
