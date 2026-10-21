@@ -15,7 +15,7 @@
   of the work list that points here holds the hero's counts, the Work tile and the Path.
 
   LIVE (proj F9): read again when the record moves (`live.version`), the old read kept on screen until the new one answers,
-  and each figure whose value changed washes in the project's colour for a moment (`data-arrived`).
+  and each figure whose value changed washes in the neutral `--arrived` for a moment (`data-arrived`), as every other row does.
 
   READ FOR THE ROW IT IS GIVEN, in parallel and outside the page's own read. It draws nothing for a row that is not a
   project's, so a page about any other row is unchanged. While the first read is out, a little height is held.
@@ -1165,7 +1165,7 @@
 
   @keyframes landed {
     from {
-      background-color: color-mix(in oklab, var(--ph) 18%, var(--tile));
+      background-color: var(--arrived);
     }
   }
 

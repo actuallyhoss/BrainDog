@@ -665,7 +665,7 @@
 
   @keyframes landed {
     from {
-      background-color: color-mix(in oklab, var(--ph) 18%, var(--tile));
+      background-color: var(--arrived);
     }
   }
 
