@@ -512,14 +512,20 @@
   const scroller = (): HTMLElement | null => document.getElementById('main');
   let fromPalette = false;
 
-  /** Resolves once `ok()` holds, or at `ms` whichever is first, checking once a frame. */
+  /**
+   * Resolves once `ok()` holds, or at `ms` whichever is first, checking about once a frame.
+   *
+   * ON A TIMER, NOT `requestAnimationFrame`: inside a view transition's update the browser draws no frames, so a frame
+   * loop there never ticked, the cross-fade waited for its own 4s timeout, and Back to Needs you landed late and at the
+   * top (VERIFY H4).
+   */
   function waitFor(ok: () => boolean, ms: number): Promise<boolean> {
     return new Promise((done) => {
       const until = performance.now() + ms;
       const tick = (): void => {
         if (ok()) return done(true);
         if (performance.now() >= until) return done(false);
-        requestAnimationFrame(tick);
+        setTimeout(tick, 16);
       };
       tick();
     });
