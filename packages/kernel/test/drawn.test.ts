@@ -91,6 +91,12 @@ test("A FIGURE'S PARTS that no row sits in are unsaid; a figure that read no row
   assert.equal(bare(parts(0, [])), true);
 });
 
+test('A KPIS BLOCK HOLDS ITS KEY NUMBERS, not rows: one with numbers and no rows stands, one with none goes', () => {
+  const kpis = (numbers: unknown[]) => block({ kind: 'kpis', source: 'kpis', kpis: numbers, matched: [] } as never);
+  assert.equal(bare(kpis([{ name: 'Sales a month', points: [] }])), false);
+  assert.equal(bare(kpis([])), true);
+});
+
 test('A SECTION OVER NOTHING GOES WITH ITS BLOCKS, in its own column; one with a panel, or over nothing at all, stays', () => {
   const blocks = [
     block({ kind: 'section', heading: 'Heads up', box: true }),

@@ -51,7 +51,8 @@ export type KpiPoint = { at: string; value?: number; amount?: string };
 /**
  * One key number as a `kpis` block answers it: the renderer's `KpiInput` and what the rules worked out beside it.
  *
- * `kpi` is the row's id and `thing` the project's. `target` is whole units for a plain number or the stored amount for
+ * `kpi` is the row's id and `thing` the project's; `spoken` is the project said as a link holds it (`things#1`), which a host
+ * opens the project's page by. `target` is whole units for a plain number or the stored amount for
  * money. `verdict` is `met` or `off` (off target), absent with no target or no value. `change` is a share (0.34 for up
  * 34%) against the period before, `null` when there is nothing fair to compare. `latest` is the newest point, whatever
  * window the points were cut to. `refusal` is why a figure could not be read, and the number is then drawn with none.
@@ -60,6 +61,7 @@ export type KpiAnswer = {
   kpi: string;
   name: string;
   thing: string;
+  spoken?: string;
   project?: string;
   mark: string | null;
   hue: number | null;
@@ -203,7 +205,7 @@ function readingsOf(deps: PageDeps, kit: SourceKit, lists: readonly ReadingList[
 
 /* ── one key number ──────────────────────────────────────────────────────────────────────────────── */
 
-type Project = { row: Entry; title: string; mark: string | null; hue: number | null; inPlay: boolean; earning: boolean };
+type Project = { row: Entry; spoken: string | null; title: string; mark: string | null; hue: number | null; inPlay: boolean; earning: boolean };
 type Kpi = KpiRow & { id: string };
 
 /** A row of the key numbers as the rules read it, or `null` for one with no name or no project. */
@@ -451,6 +453,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
     const { mark, hue } = kit.markOf(row, identity);
     const p: Project = {
       row,
+      spoken: row.seq !== null ? `${found.projects}#${String(row.seq)}` : null,
       title: titleField ? (text(row.fields[titleField]) ?? '') : '',
       mark,
       hue,
@@ -507,6 +510,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
       kpi: k.id,
       name: k.name,
       thing: project.row.id,
+      ...(project.spoken ? { spoken: project.spoken } : {}),
       ...(project.title ? { project: project.title } : {}),
       mark: project.mark,
       hue: project.hue,

@@ -63,6 +63,8 @@ export type Drawable = {
   walks?: unknown;
   walk?: unknown;
   bars?: unknown;
+  /** A `kpis` block's key numbers (`sources/kpis.ts`), which it is drawn from and not from rows. */
+  kpis?: unknown;
   area?: unknown;
   panel?: unknown;
   box?: unknown;
@@ -196,6 +198,8 @@ export function holdsNothing(b: Drawable): boolean {
     none(b.actions) &&
     none(b.history) &&
     none(b.walks) &&
+    /* KEY NUMBERS ARE WHAT A `kpis` BLOCK HOLDS: a client that keeps its own count of rows read it as holding nothing. */
+    none(b.kpis) &&
     b.walk == null &&
     barsNone(b) &&
     /* A FIGURE THAT READ NO ROW, no part and no whole, holds nothing as a list of none does. */

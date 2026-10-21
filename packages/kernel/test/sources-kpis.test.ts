@@ -213,6 +213,8 @@ test('ONE PROJECT: its live key numbers in his order, the one its card leads wit
   );
   assert.equal(out.matched, 4);
   assert.ok(out.kpis.every((x) => x.thing === ids.kiln && x.project === 'Kiln' && x.mark === 'K' && x.hue === 265));
+  /* AND THE PROJECT AS A LINK HOLDS IT, so a host opens its page from a number. */
+  assert.ok(out.kpis.every((x) => x.spoken === 'things#1'));
   /* NOTHING IS MARKED, SO THE CARD LEADS WITH THE TOP ONE BY TODAY'S SCORE: off target before stale. */
   assert.deepEqual(out.kpis.filter((x) => x.headline).map((x) => x.name), ['Monthly revenue']);
   /* BY ITS ROW ID TOO, as a link may hold it. */
@@ -369,7 +371,7 @@ test('THE ANSWER IS WHAT Kpis.svelte TAKES: every KpiInput field it fills is of 
   const out = read(k, { kind: 'kpis', source: 'kpis', for: 'today' });
   /* `KpiInput` in `packages/render/src/kpis.ts`, written out: the kernel may not import the renderer (`declare.ts`). */
   const INPUT = ['kpi', 'name', 'project', 'slot', 'measures', 'source', 'unit', 'kind', 'good', 'target', 'target_by', 'every', 'headline', 'verdict', 'why', 'points'];
-  const BESIDE = ['thing', 'mark', 'hue', 'owner', 'today', 'order', 'latest', 'change', 'stale', 'chart', 'rank', 'refusal'];
+  const BESIDE = ['thing', 'spoken', 'mark', 'hue', 'owner', 'today', 'order', 'latest', 'change', 'stale', 'chart', 'rank', 'refusal'];
   for (const x of out.kpis) {
     assert.deepEqual(Object.keys(x).filter((key) => !INPUT.includes(key) && !BESIDE.includes(key)), [], x.name);
     assert.ok(Array.isArray(x.points) && x.points.every((p) => typeof p.at === 'string' && (typeof p.value === 'number' || typeof p.amount === 'string')));
