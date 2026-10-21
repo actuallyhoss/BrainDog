@@ -81,7 +81,7 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   /* NOTHING TO ASK: `instructions` answers what he told a run, and the owner here is no run. */
   instructions: () => [],
   /* AND `history` IS ASKED THROUGH `get`, which it was folded into (plan §6.1). */
-  get: (fx) => [fx.onDoomed, fx.onKiln, fx.second].map((r) => ({ spoken: r.spoken })).concat([{ spoken: 'skills#5' }, { spoken: fx.onDoomed.spoken, history: true }]),
+  get: (fx) => [fx.onDoomed, fx.onKiln, fx.second].map((r): Record<string, unknown> => ({ spoken: r.spoken })).concat([{ spoken: 'skills#5' }, { spoken: fx.onDoomed.spoken, history: true }]),
   list: (fx) => [
     { register: 'tasks', where: { field: 'what', is: fx.onDoomed.fields.what } },
     { register: 'learnings', where: { field: 'supersedes', is: fx.first.spoken } },
