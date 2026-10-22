@@ -15,13 +15,12 @@
   import { goto } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
   import { homeCurrency } from '$lib/record/api.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { exponentOf, writeAmount } from 'braindog-render';
-  import { finishOf } from '../../routes/r/[register]/[seq]/lead.ts';
   import type { HomeLine } from './home-rows.ts';
+  import { verbOf } from './late-verb.ts';
 
   let {
     lines,
@@ -61,16 +60,6 @@
   const shown = $derived(open ? lines : lines.slice(0, most));
   const hidden = $derived(lines.length - shown.length);
 
-  /** The list a line's row is in, from its handle (`obligations#2`). */
-  const listOf = (line: HomeLine): string | null => /^([a-z][a-z0-9_-]*)#[1-9][0-9]*$/u.exec(line.key)?.[1] ?? null;
-
-  /** The verb that finishes a line's row, as its own page says it, or `null` where the list has none or the reader may not. */
-  function verbOf(line: HomeLine): string | null {
-    const list = listOf(line);
-    if (list === null || !writes(list)) return null;
-    return finishOf(REGISTERS[list], '')?.said ?? null;
-  }
-
   /** An amount whole, as a person says it: "$4,012", "EGP 467,915". */
   function amountSaid(line: HomeLine): string | null {
     if (!line.money) return line.amount ? line.amount.text.replace(/^[+−-]/u, '') : null;
@@ -107,7 +96,7 @@
 <Tile icon="clock" title={heading} count={lines.length + more} data-late-tile>
   <ul class="late">
     {#each shown as line (line.key)}
-      {@const verb = verbOf(line)}
+      {@const verb = verbOf(line, writes)}
       {@const amount = amountSaid(line)}
       <li class="ln" data-row={line.key} data-done={done.has(line.key) ? '' : undefined}>
         {#if line.href}<a class="ln-title" href={at(line.href)}>{line.title}</a>{:else}<span class="ln-title">{line.title}</span>{/if}

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import type { LiveBlock } from '../record/page-live.ts';
 import type { HomeLine } from './home-rows.ts';
-import { NAMED_MOST, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, unasked } from './today-brief.ts';
+import { NAMED_MOST, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, onceEach, unasked } from './today-brief.ts';
 
 const money = (key: string, title: string, when: string, href = `/r/${key.replace('#', '/')}`): HomeLine => ({
   key,
@@ -118,4 +118,20 @@ test('A LINE A QUESTION ALREADY ASKS ABOUT IS NOT ON THE LATE TILE, by the row i
 test('THE LATE TILE IS IN THE BRIEF\'S ORDER: late money, then what else is late, then what is due today', () => {
   assert.deepEqual(inBriefOrder([REFUND, TODAY, SALARY, FEE]), [SALARY, FEE, REFUND, TODAY]);
   assert.deepEqual(inBriefOrder([]), []);
+});
+
+test('ONE THING IN TWO LISTS IS ONE LINE, by the row a press can finish, and things told apart stay apart', () => {
+  const paid = { ...SALARY, key: 'obligations#2', day: '2026-10-09', money: { minor: 403800, currency: 'USD' } };
+  const twin = { ...SALARY, key: 'income#7', day: '2026-10-09', money: { minor: 403800, currency: 'USD' } };
+  const finishes = (line: HomeLine) => line.key.startsWith('obligations#');
+  /* HIS RECORD ON 23 OCTOBER: the salary twice, the same name, amount and day. */
+  assert.deepEqual(onceEach([FEE, twin, paid, HARBOUR], finishes), [FEE, paid, HARBOUR]);
+  assert.deepEqual(onceEach([FEE, paid, twin, HARBOUR], finishes), [FEE, paid, HARBOUR]);
+  assert.deepEqual(onceEach([twin, paid]), [twin], 'with no preference the first stands');
+  /* ANOTHER DAY, ANOTHER AMOUNT OR ANOTHER KIND IS ANOTHER THING. */
+  assert.equal(onceEach([paid, { ...twin, day: '2026-09-09' }]).length, 2);
+  assert.equal(onceEach([paid, { ...twin, money: { minor: 100, currency: 'USD' } }]).length, 2);
+  assert.equal(onceEach([paid, { key: 'tasks#3', title: 'Encore salary', when: '13 days late', day: '2026-10-09', late: true }]).length, 2);
+  /* AND THE BRIEF SAYS IT ONCE. */
+  assert.equal(briefOf({ lines: onceEach([FEE, twin, paid, HARBOUR], finishes), needYou: 0, agents: [], calm: 'Calm.' }).parts[0]?.text, '3 payments are late');
 });

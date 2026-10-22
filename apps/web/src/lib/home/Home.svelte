@@ -43,7 +43,7 @@
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp } from '$lib/at.ts';
   import { partsOf } from '$lib/shell/headline.ts';
-  import { onAppendOnly, recordNow, type Fetch, type Shell } from '$lib/record/boot-live.ts';
+  import { onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
@@ -62,7 +62,7 @@
   import { listen } from '$lib/page/listen.svelte.ts';
   import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
   import { markAll } from '$lib/record/news-live.ts';
-  import { HOUSE_VOICE, holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
+  import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
     NEEDS_YOU_LIMIT_PHONE,
@@ -99,7 +99,8 @@
   import { afterNavigate } from '$app/navigation';
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
-  import { briefOf, greetingOf, inBriefOrder, lateOf, unasked, type Brief, type BriefPart } from '$lib/home/today-brief.ts';
+  import { briefOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked, type Brief, type BriefPart } from '$lib/home/today-brief.ts';
+  import { verbOf } from '$lib/home/late-verb.ts';
   import LateNow from '$lib/home/LateNow.svelte';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { toldNow } from '$lib/home/told-now.svelte.ts';
@@ -160,9 +161,8 @@
 
   /* TODAY'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after the first
      read asks it again in its own words. Built by the same helper the arrange mode rebuilds Today's body with, so the
-     body arranged is the body drawn. NEEDS YOU IS A PLACE AND KEEPS ITS NAME, and so does its calm line: "Needs your
-     call" over the tile named a place the rail calls Needs you. */
-  const voice = $derived<HomeVoice>({ ...voiceOf(said), needsYou: HOUSE_VOICE.needsYou, nothingWaiting: HOUSE_VOICE.nothingWaiting });
+     body arranged is the body drawn. NEEDS YOU IS A PLACE AND KEEPS ITS NAME there, and so does its calm line (U1). */
+  const voice = $derived<HomeVoice>(voiceOf(said));
 
   /**
    * ONLY A PAGE THE PERSON KEPT IS DRAWN IN THE DESK'S PLACE (U1). A use case's own `home-<id>` page never replaces the
@@ -986,10 +986,12 @@
 
   /* TODAY'S LATE LIST, read off the page as Home shaped it: what the brief names, and the Late tile at the top of the
      desk shows with a button each, in the brief's order and less what a question in Needs you already asks about
-     (`unasked`). */
+     (`unasked`). ONE THING IS ONE LINE: a payment kept in two lists is said once, by the row a press can finish
+     (`onceEach`). */
   const late = $derived(board && shaped ? lateOf(shaped.blocks) : null);
+  const lateLines = $derived(late ? onceEach(late.lines, (line) => verbOf(line, (list) => may(data, 'write', list)) !== null) : []);
   const queued = $derived(shaped?.blocks.find((b) => b.key === 'needs-you')?.queue ?? []);
-  const lateShown = $derived(late ? inBriefOrder(unasked(late.lines, queued)) : []);
+  const lateShown = $derived(inBriefOrder(unasked(lateLines, queued)));
 
   /* WHO IS WORKING, BY NAME and each once, for the brief's last sentence. */
   const agentsNow = $derived([...new Set(workingTile.filter((r) => r.live === 'working').map((r) => r.agent))]);
@@ -998,7 +1000,7 @@
 
   /* THE BRIEF THE RULES WRITE, from the late list and what waits; the model's line stands in its place when it wrote one. */
   const ruled = $derived<Brief | null>(
-    shaped ? briefOf({ lines: late?.lines ?? [], more: late?.more ?? 0, needYou: needing, inbox: waits?.inbox ?? 0, agents: agentsNow, calm: nothing }) : null,
+    shaped ? briefOf({ lines: lateLines, more: late?.more ?? 0, needYou: needing, inbox: waits?.inbox ?? 0, agents: agentsNow, calm: nothing }) : null,
   );
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */

@@ -75,6 +75,30 @@ export function unasked(lines: readonly HomeLine[], questions: readonly { about?
   return lines.filter((l) => !abouts.has(l.key) && !(l.title !== '' && asked.some((q) => q.startsWith(`${l.title} `) || q.startsWith(`${l.title}:`))));
 }
 
+/** Whether two late lines are one thing kept in two lists: one name, one day, and one amount where both carry one. */
+function oneThing(a: HomeLine, b: HomeLine): boolean {
+  if (a.title.trim().toLowerCase() !== b.title.trim().toLowerCase()) return false;
+  if ((a.day ?? a.when ?? '') !== (b.day ?? b.when ?? '') || a.late !== b.late) return false;
+  if ((a.amount === undefined) !== (b.amount === undefined)) return false;
+  return !a.money || !b.money || (a.money.currency === b.money.currency && Math.abs(a.money.minor) === Math.abs(b.money.minor));
+}
+
+/**
+ * ONE THING, ONE LINE: rows that are one payment kept in two lists (on his record the Encore salary stood twice, the
+ * same name, amount and day) are said once, by the row `keep` prefers (the one a press can finish), so the brief never
+ * names a thing twice and the Late tile never shows two lines nobody can tell apart. Rows told apart by any of name,
+ * day or amount stay apart, and the order is the first of each.
+ */
+export function onceEach(lines: readonly HomeLine[], keep: (line: HomeLine) => boolean = () => false): HomeLine[] {
+  const out: HomeLine[] = [];
+  for (const line of lines) {
+    const at = out.findIndex((seen) => oneThing(seen, line));
+    if (at === -1) out.push(line);
+    else if (!keep(out[at]!) && keep(line)) out[at] = line;
+  }
+  return out;
+}
+
 /**
  * THE LATE TILE IN THE BRIEF'S ORDER: late money first, then what else is late, then what is due today, each in the
  * page's order, so the first thing the brief names is the tile's first line and not a task the page listed before it.
