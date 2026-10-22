@@ -59,6 +59,15 @@ test('A MODEL TEST IS NO ASK: half-hourly tests of a silent model leave the week
   assert.equal(r.said, 'The model answered all 5 asks this week.');
 });
 
+test('A SEARCH EMBEDDING IS NO ASK: embeddings answering all week leave a silent writing model red', () => {
+  const sql = ledger();
+  for (let h = 160; h > 0; h -= 2) put(sql, hit(h, 'embed', { model: 'bge-m3' }));
+  for (const h of [60, 30, 4]) put(sql, miss(h, 'prose', { model: 'llama-3.2-1b' }));
+  const r = readModelSign(kernel, sql, NOW);
+  assert.equal(r.state, 'red', r.said);
+  assert.match(r.said, /^The model did not answer 3 of 3 asks this week\./u);
+});
+
 test('AN ASK A SECOND MODEL ANSWERED IS ONE ASK, ANSWERED: the attempt the walk passed over is not a miss', () => {
   const sql = ledger();
   for (const h of [100, 80, 60, 40]) put(sql, hit(h, 'headline'));

@@ -116,6 +116,8 @@ type Ask = { ts: string; ok: number; spent: number; purpose: string | null };
 
 /** The model tests: the engine's probe (`engine-probe.ts`) and the silent model's half-hourly test (`model-jobs.ts`). */
 const PROBE = 'probe';
+/** The search embedding (`jobs.ts`): it answers every few minutes, so counting it read a silent writing model as answering. */
+const EMBED = 'embed';
 
 /**
  * The asks of the window and its budget refusals, Slash's health's way, newest first. `[]` where Slash never ran.
@@ -148,7 +150,7 @@ function asksOf(sql: Sql, sinceMs: number): Ask[] {
        FROM slash_call WHERE ts >= ? AND ((${LEDGER_ANSWERED}) OR (${LEDGER_FAILED}) OR (${LEDGER_BUDGET}))
        WINDOW w AS (ORDER BY rowid)
      )
-     WHERE (purpose IS NULL OR purpose <> '${PROBE}')
+     WHERE (purpose IS NULL OR purpose NOT IN ('${PROBE}', '${EMBED}'))
        AND NOT (failed = 1 AND candidate IS NOT NULL AND n_candidate IS NOT NULL AND n_candidate IS NOT candidate
                 AND n_route IS route AND n_purpose IS purpose)
      ORDER BY ts DESC, r DESC`,
