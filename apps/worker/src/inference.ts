@@ -220,40 +220,66 @@ export const scrubRaw = (said: string): string =>
  */
 const through = (env: AiEnv): AiOptions => (env.AI_GATEWAY ? { gateway: { id: env.AI_GATEWAY, collectLog: false } } : {});
 
+/** One path that failed, and what it said (`scrubRaw`'d). */
+type Heard = { path: 'gateway' | 'binding' | 'rest'; said: string };
+
+/**
+ * What the paths that failed said, the last first. The last is why nothing answered; the gateway's sentence behind it is
+ * why the others were tried, and is said only where it differs. "2001: Please configure AI Gateway" alone once stood for
+ * a binding that had failed again, for a reason nobody could read.
+ */
+const heard = (failed: readonly Heard[]): string => {
+  const last = failed.at(-1)!;
+  const said = new Set([last.said]);
+  const before: string[] = [];
+  for (const h of failed.slice(0, -1)) {
+    if (said.has(h.said)) continue;
+    said.add(h.said);
+    before.push(`${h.path} said: ${h.said}`);
+  }
+  return [last.said, ...before].join('; ');
+};
+
 /**
  * ONE MODEL CALL THAT SURVIVES A BROKEN GATEWAY. The binding with the gateway first; if that throws anything but "no such
  * model", the binding once more without the gateway option (a gateway that does not exist on the account makes the binding
  * throw while the model itself is fine); if that throws too, Workers AI's REST endpoint when `AI_REST_URL` and
- * `WORKERS_AI_TOKEN` are both set. When no later path answers, the first throw is rethrown. A path other than the first that
- * answers, or none answering, leaves ONE `console.warn` line naming it, so `cf-logs ai:` finds it.
+ * `WORKERS_AI_TOKEN` are both set. When no later path answers, the throw says what every path said, the last first, and so
+ * does the log line. A path other than the first that answers, or none answering, leaves ONE `console.warn` line naming
+ * it, so `cf-logs ai:` finds it.
  */
 export async function runModel(env: AiEnv, model: string, inputs: Record<string, unknown>, deps: AiDeps = {}): Promise<unknown> {
   const ai = env.AI;
   if (ai === undefined) throw new Error('no AI binding');
   const log = deps.log ?? ((line: string) => console.warn(line));
   const options = through(env);
+  const failed: Heard[] = [];
   let first: unknown;
   try {
     return await ai.run(model, inputs, options);
   } catch (e) {
     first = e;
     if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+    failed.push({ path: options.gateway !== undefined ? 'gateway' : 'binding', said: scrubRaw(sayOf(e)) });
   }
-  const said = scrubRaw(sayOf(first));
   if (options.gateway !== undefined) {
     try {
       const answer = await ai.run(model, inputs);
-      log(`ai: answered by binding-without-gateway; gateway ${env.AI_GATEWAY ?? ''} failed: ${said}`);
+      log(`ai: answered by binding-without-gateway; gateway ${env.AI_GATEWAY ?? ''} failed: ${failed[0]!.said}`);
       return answer;
     } catch (e) {
       if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+      failed.push({ path: 'binding', said: scrubRaw(sayOf(e)) });
     }
   }
+  /* ONE PATH THAT FAILED THROWS WHAT IT THREW, as it always did; two or more say all of it. */
+  const thrown = (): unknown => (failed.length === 1 ? first : new Error(heard(failed)));
+  const tell = (): string => failed.map((h) => `${h.path} said: ${h.said}`).join('; ');
   const base = env.AI_REST_URL?.trim() ?? '';
   const token = env.WORKERS_AI_TOKEN ?? '';
   if (base === '' || token === '') {
-    log(`ai: no path answered; rest not configured (set AI_REST_URL and secret WORKERS_AI_TOKEN); binding said: ${said}`);
-    throw first;
+    log(`ai: no path answered; rest not configured (set AI_REST_URL and secret WORKERS_AI_TOKEN); ${tell()}`);
+    throw thrown();
   }
   try {
     const res = await (deps.fetch ?? fetch)(`${base.endsWith('/') ? base : `${base}/`}${model}`, {
@@ -264,11 +290,12 @@ export async function runModel(env: AiEnv, model: string, inputs: Record<string,
     const body = (await res.json().catch(() => null)) as { success?: unknown; result?: unknown; errors?: unknown } | null;
     if (!res.ok || body === null || body.success === false || body.result === undefined)
       throw new Error(`rest ${res.status} ${scrubRaw(JSON.stringify(body?.errors ?? ''))}`);
-    log(`ai: answered by rest; binding failed: ${said}`);
+    log(`ai: answered by rest; ${tell()}`);
     return body.result;
   } catch (e) {
-    log(`ai: no path answered; rest said: ${scrubRaw(sayOf(e))}; binding said: ${said}`);
-    throw first;
+    failed.push({ path: 'rest', said: scrubRaw(sayOf(e)) });
+    log(`ai: no path answered; ${tell()}`);
+    throw thrown();
   }
 }
 

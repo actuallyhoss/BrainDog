@@ -77,6 +77,42 @@ test('BOTH THROW AND REST IS NOT CONFIGURED: A CLEAR REFUSAL, one fault line, no
   assert.match(lines[0] ?? '', /rest not configured.*WORKERS_AI_TOKEN/u);
 });
 
+test('WHEN THE BINDING FAILS WITHOUT THE GATEWAY TOO, THE THROW AND THE LOG LEAD WITH WHAT IT SAID, the gateway\'s sentence behind it', async () => {
+  const DIRECT = 'AiError: 5016: the terms of this model are not agreed';
+  const { env } = binding((o) => {
+    throw new Error(o?.gateway ? GATEWAY_ERROR : DIRECT);
+  });
+  const lines: string[] = [];
+  await assert.rejects(runModel(env, 'x', {}, { log: (l) => lines.push(l) }), (e: Error) => e.message === `${DIRECT}; gateway said: ${GATEWAY_ERROR}`);
+  assert.match(lines[0] ?? '', /gateway said: AiError: 2001.*binding said: AiError: 5016/u);
+  /* THE SAME WORDS FROM BOTH ARE SAID ONCE. */
+  const same = binding(() => {
+    throw new Error(GATEWAY_ERROR);
+  });
+  await assert.rejects(runModel(same.env, 'x', {}, { log: () => {} }), (e: Error) => e.message === GATEWAY_ERROR);
+});
+
+test('WITH NO GATEWAY AND REST UNCONFIGURED, THE ONE PATH THROWS WHAT IT THREW, as it did', async () => {
+  const boom = new Error('AiError: 3001: unknown');
+  const env: AiEnv = { AI: { run: async () => Promise.reject(boom) } };
+  await assert.rejects(runModel(env, 'x', {}, { log: () => {} }), (e: unknown) => e === boom);
+});
+
+test('WHEN REST FAILS TOO, ITS WORDS LEAD, then the paths before it, the same words once', async () => {
+  const { env } = binding(() => {
+    throw new Error(GATEWAY_ERROR);
+  });
+  const fetchStub = (async () => new Response(JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }), { status: 403 })) as unknown as typeof fetch;
+  const lines: string[] = [];
+  await assert.rejects(
+    runModel({ ...env, AI_REST_URL: 'https://ai.example/run/', WORKERS_AI_TOKEN: 'tok' }, 'x', {}, { fetch: fetchStub, log: (l) => lines.push(l) }),
+    (e: Error) => e.message === `rest 403 [{"code":10000,"message":"Authentication error"}]; gateway said: ${GATEWAY_ERROR}`,
+  );
+  /* THE LOG NAMES EVERY PATH, so a reader never has to guess which one the words came from. */
+  assert.equal(lines.length, 1);
+  assert.match(lines[0] ?? '', /^ai: no path answered; gateway said: AiError: 2001.*; binding said: AiError: 2001.*; rest said: rest 403 /u);
+});
+
 test('A MODEL THE PLATFORM DOES NOT SERVE IS NOT RETRIED', async () => {
   const { seen, env } = binding(() => {
     throw new Error('No such model');
