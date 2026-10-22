@@ -85,9 +85,9 @@ export const CLAIMS: readonly Claim[] = [
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */
   { id: 'licence', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true' },
   { id: 'open-source', said: 'BrainDog is open source.', where: 'legal.licence.body.0', state: 'not-yet', flag: 'repo' },
-  { id: 'terms-before-signup', said: 'are published on this page before sign-up opens', where: 'legal.terms.body', state: 'not-yet', flag: 'legal' },
-  { id: 'text-before-signup', said: 'This text is published here before sign-up opens.', where: 'legal.pending', state: 'not-yet', flag: 'legal' },
-  { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'flag', flag: 'legal' },
+  { id: 'terms-before-signup', said: 'are published on this page before sign-up opens', where: 'legal.terms.body', state: 'not-yet' },
+  { id: 'text-before-signup', said: 'This text is published here before sign-up opens.', where: 'legal.pending', state: 'not-yet' },
+  { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
   { id: 'issues-on-github', said: 'Report a fault as an issue, or ask a question in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
   { id: 'no-shared-table', said: 'Nothing is shared between customers', where: 'security.kept.facts.0.text', state: 'true' },
