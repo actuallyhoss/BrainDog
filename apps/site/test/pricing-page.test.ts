@@ -3,7 +3,7 @@
  *
  *   node --test "apps/site/test/pricing-page.test.ts"
  *
- * WHY THIS TEST (DIRECTION §47, "Honest at launch"). "Extra use says 'coming soon' until a checkout sells it. The paid
+ * WHY THIS TEST ("Honest at launch"). "Extra use says 'coming soon' until a checkout sells it. The paid
  * buttons follow `LAUNCH.billing`." So the page is rendered twice, the way the prerender renders it, once with a copy
  * of `LAUNCH` that has billing on and once with it off: on, "Choose Cloud" and "Choose Cloud Plus" link their plans;
  * off, no paid card links anything and each says "Coming soon" in its button's place. And every figure in the

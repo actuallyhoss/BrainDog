@@ -1,8 +1,8 @@
 /**
  * The Slash page, and the words of the drawing of Slash that the home card, the desk's bar and this page share.
  *
- * THE WORDS ARE THE PROTOTYPE'S (loop/site-2026-10-17/src/site.html ~:686-756, DIRECTION §47 "have a separate page for
- * Slash ... make it super readable and neat"), with the site's known fix: "Every figure opens what it came from".
+ * THE WORDS ARE THE PROTOTYPE'S (loop/site-2026-10-17/src/site.html ~:686-756: Slash has a page of its own, made
+ * super readable and neat), with the site's known fix: "Every figure opens what it came from".
  * The questions in the examples, and every name and figure in an answer, are the made-up record's
  * (`demo/maya.ts`), so none is typed here.
  *

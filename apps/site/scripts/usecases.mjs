@@ -6,8 +6,8 @@
  *   node scripts/usecases.mjs --png=<dir> student team # just these
  *
  * NOTHING HERE SHIPS. It used to write the founder's dashboard into `static/shots/` for a band on
- * the home page. On 22 September the owner said of the screenshots on that page *i hate those
- * screenshots. they look terrible*; the band went and the page draws the app in HTML and CSS
+ * the home page. On 22 September the screenshots on that page were ruled out because they looked
+ * terrible; the band went and the page draws the app in HTML and CSS
  * instead, so the WebP pass, its encoder and the list of shipped captures went with it. What is left
  * is the cheapest way to see what a stranger actually gets out of /start, and that is a picture for
  * whoever is checking the drawn app in `src/lib/copy.ts` against the real one.
@@ -62,7 +62,7 @@ const CASES = [
 ];
 
 /**
- * THE OTHER TWO COMPANIES, BECAUSE HE SAID "A FEW" AND THE PAGE DREW ONE.
+ * THE OTHER TWO COMPANIES, BECAUSE THE FOUNDER SAYS "A FEW" AND THE PAGE DREW ONE.
  *
  * The founder types "I run a few companies" into /start, and what the dashboard photographed after it
  * was a screen contradicting him: "Across your organisations" over one organisation, "Balance by

@@ -1,8 +1,8 @@
 /**
  * The plans and what each includes, for the pricing page and the home page's teaser, read off the one table of plans.
  *
- * FREE LEADS (DIRECTION §35, the owner on 2 October): "i dont like how it brands the $12 as the go to. instead i want
- * the product to have the free tier to be what's highlighted, and then the subscriptions as an extra thing for pros".
+ * FREE LEADS (since 2 October): the $12 plan is not branded as the one to pick. The free tier is what is highlighted,
+ * and the subscriptions are an extra for pros.
  * Free is drawn first and loudest everywhere; Cloud and Cloud Plus follow it, quieter, as the plans for pros.
  *
  * EVERY FIGURE IS `PLAN_TABLE`'S (LCH-A08), `packages/record/src/plans.ts`: the price, the runs, requests, bytes and
@@ -14,17 +14,17 @@
  * `plans.test.ts` holds every field of every row to `PLAN_TABLE` with `tableDiffers`, so a figure moved in either place
  * names the plan and the meter and goes red.
  *
- * THE DEFAULTS TAKEN FOR THE OWNER (DIRECTION §42, his to change in `PLAN_TABLE` with a word): Cloud Plus is five times
+ * THE DEFAULTS TAKEN FOR THE OWNER (his to change in `PLAN_TABLE` with a word): Cloud Plus is five times
  * Cloud on every figure; agents are 3 on Free, 15 on Cloud and 75 on Cloud Plus; no yearly price, so the site draws
- * none; the packs and extra usage he chose on 26 September stand.
+ * none; the packs and extra usage chosen on 26 September stand.
  *
- * SLASH IS COUNTED IN CREDITS. The owner, 26 September: "$0.1 per slash ask sounds so bad. maybe use slash credits?"
+ * SLASH IS COUNTED IN CREDITS (since 26 September), because a price of $0.10 a Slash ask reads badly.
  * One question or draft is one credit, however much work it takes, and each plan includes a month of them.
  *
  * PACKS ARE SHOWN WITH BILLING ON, AND ONLY THEN (LCH-A10). The checkout sells the table's two packs beside the plans
  * (`apps/worker/src/billing.ts`, in Stripe's test mode while billing is not live), so `PACKS` is `packsOnSale` of
  * `LAUNCH.billing`: the table's packs, each with its price, when the site says a card is charged, and none before. Billing
- * stays off or in test mode until the owner's word to charge (DIRECTION §42), so today the site names no pack and says
+ * stays off or in test mode until the owner's word to charge, so today the site names no pack and says
  * they are coming later, and that word flips one line in `launch.ts`. Extra usage is still sold by no checkout: the site
  * says it is coming later either way. Nothing here charges a card.
  *

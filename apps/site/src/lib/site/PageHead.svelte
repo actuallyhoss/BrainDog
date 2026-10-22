@@ -1,5 +1,5 @@
 <!--
-  A page's head on the night ground, under the header's own night band so the two read as one (DIRECTION §47):
+  A page's head on the night ground, under the header's own night band so the two read as one:
   the page's one h1, huge and set tight, its lead in the night's second ink, and room below for what the page puts
   there (the Slash key, the connect box).
 

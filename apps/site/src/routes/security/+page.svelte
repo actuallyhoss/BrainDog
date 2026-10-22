@@ -1,7 +1,7 @@
 <!--
   Security: how a record is kept, one fact to a tile, each drawn, and how to report a weakness.
 
-  THE NIGHT HEAD, THEN THE BOARD (DIRECTION §47, Look B): the page's name and its one line in `PageHead`, then one flat
+  THE NIGHT HEAD, THEN THE BOARD (Look B): the page's name and its one line in `PageHead`, then one flat
   board of tiles, a fact to each, flat and opaque with no edge and no shadow. Restyled, not redesigned: the facts, the
   drawings and the report are the ones this page has always had.
 
@@ -272,7 +272,7 @@
     }
   }
 
-  /* A TILE: flat and opaque, radius 16, no edge and no shadow (DIRECTION §39). */
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
   .fact {
     display: flex;
     flex-direction: column;

@@ -1,7 +1,7 @@
 <!--
   /docs: the page's head with the search in it, then every section of the docs as a card with its pages.
 
-  THE LOOK IS LOOK B'S (DIRECTION §47, LAUNCH 103 job 7): `PageHead` on the night ground, holding the search and the
+  THE LOOK IS LOOK B'S (LAUNCH 103 job 7): `PageHead` on the night ground, holding the search and the
   link for agents in its slot, then the sections as flat --paper cards on the page, each with its name, how many pages
   it holds, its sentence and its pages as a quiet list.
 

@@ -7,7 +7,7 @@
   reading, where Page lays blocks on twelve, and its `##` headings need anchors for the contents list, which the
   renderer's prose does not give. So `partsOf` cuts the headings out of the prose and this file draws them with ids.
 
-  ONE SHEET ON --paper, read at 68ch (DIRECTION §47, LAUNCH 103 job 7): `head` first, which the page fills with the
+  ONE SHEET ON --paper, read at 68ch (LAUNCH 103 job 7): `head` first, which the page fills with the
   ways to take it as text, then the opening and each `##` part in turn, a heading with its anchor and no tile round it.
 
   Nothing here is interactive: a board or a task list on a docs page is drawn read-only, which is what the renderer

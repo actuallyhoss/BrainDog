@@ -27,30 +27,30 @@ export const changelog = {
     lede: "What shipped and when, in the repository's own words.",
     count: (n: number, days: number) => `${entries(n)} over ${days} days`,
 
-    /* The kind as a reader says it: the pills name it, and each entry and tally repeats it in lower
-       case beside its dot, so the kind never rests on colour alone. */
+    /* THE KIND IS A WORD AND A SHAPE, NEVER A HUE (site F17): the control and each entry's tag name it beside its own
+       glyph, and a month's tally says it in lower case. */
     filter: { shipped: 'Shipped', fixed: 'Fixed', changed: 'Changed' },
     kind: { shipped: 'shipped', fixed: 'fixed', changed: 'changed' },
-    filters: 'Show only',
+    all: 'All',
+    filters: 'Show',
     tally: (n: number, kind: string) => `${n} ${kind}`,
 
-    /* THE CHART ON THE PAGE: every entry by the day it shipped, stacked by kind, and the one line that says what it
-       shows. Every figure in it is counted from `entries.ts` when the page is built. */
+    /* THE CHART ON THE PAGE: how many entries each day holds, in one ink, and the one line that says what it shows.
+       Every figure in it is counted from `entries.ts` when the page is built. */
     byDay: 'Entries by day',
     span: (from: string, to: string) => `${from} to ${to}`,
     chartLabel: (from: string, to: string, busiest: string, most: number) =>
-      `Entries each day from ${from} to ${to}, stacked as shipped, fixed and changed. The busiest day is ${busiest}, with ${most}.`,
+      `Entries each day from ${from} to ${to}. The busiest day is ${busiest}, with ${most}.`,
     reading: (busiest: string, most: number, shipped: number, fixed: number, quiet: number) =>
       `The busiest day was ${busiest}, with ${most} ${most === 1 ? 'entry' : 'entries'}` +
       (quiet > 0 ? `, and ${quiet} ${quiet === 1 ? 'day has' : 'days have'} none.` : '.') +
       ` Shipped ${shipped > fixed ? 'outnumbers' : 'trails'} fixed, ${shipped} to ${fixed}.`,
     dayEntries: (n: number) => entries(n),
 
+    /* The newest day's mark, beside its date inside its month. */
     latest: 'Latest',
     /** A day heading inside its month: "25 September". */
     day: (day: number, month: number) => `${day} ${monthName(month)}`,
-    /** A date that stands alone, as "Latest" and the feed's newest entry do: "25 September 2026". */
-    date: (day: number, month: number, year: number) => `${day} ${monthName(month)} ${year}`,
     /** A month heading: "September 2026". */
     month: (month: number, year: number) => `${monthName(month)} ${year}`,
     entries,

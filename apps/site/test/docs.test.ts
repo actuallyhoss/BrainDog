@@ -101,7 +101,7 @@ test('/llms.txt names every doc, and the build serves each doc as a page and as 
 });
 
 /**
- * THE DOCS IN LOOK B (DIRECTION §47, LAUNCH 103 job 7), read off the source because no browser runs here: the index
+ * THE DOCS IN LOOK B (LAUNCH 103 job 7), read off the source because no browser runs here: the index
  * opens on `PageHead` with the search in its slot, a page reads on one sheet of paper with its nav and contents flat
  * on the board, and nothing in the docs still draws the old tiles, wells, glass or palette.
  */

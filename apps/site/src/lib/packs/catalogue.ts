@@ -45,6 +45,8 @@ export type Entry = {
   versions: Version[];
   categories: Category[];
   publisher: string | null;
+  /** Who the catalogue knows published it: BrainDog itself, an author key, or a signed-in person. */
+  publisherKind: 'braindog' | 'key' | 'person' | null;
   unlisted: boolean;
 };
 
@@ -99,6 +101,8 @@ function entryOf(v: unknown): Entry | null {
   if (versions.length === 0) return null;
   const by = v['publisher'];
   const publisher = isObject(by) ? str(by['name']) : null;
+  const who = isObject(by) ? by['kind'] : null;
+  const publisherKind = who === 'braindog' || who === 'key' || who === 'person' ? who : null;
   const categories = v['categories'];
   return {
     kind,
@@ -111,6 +115,7 @@ function entryOf(v: unknown): Entry | null {
     versions,
     categories: Array.isArray(categories) ? categories.filter(isCategory) : [],
     publisher,
+    publisherKind,
     unlisted: v['unlisted'] === true,
   };
 }
@@ -216,9 +221,16 @@ export function glyphOf(e: Entry, pageIcon: string | null): IconName {
 
 export type Card = {
   slug: string;
+  /** A use case sets up a whole way of working; a pack adds to one. */
+  kind: Entry['kind'];
   title: string;
   summary: string;
   publisher: string;
+  /**
+   * MADE BY BRAINDOG, said only when the catalogue says BrainDog published it (`publisher.kind`), never because the
+   * author line reads "BrainDog": anybody can type that into a file, and only the catalogue knows who sent it.
+   */
+  ours: boolean;
   version: string;
   glyph: IconName;
   categories: Category[];
@@ -243,9 +255,11 @@ export function cardOf(e: Entry, counts: ReadonlyMap<string, number>, pageIcon: 
   const categories = e.categories;
   return {
     slug: slugOf(e),
+    kind: e.kind,
     title: e.title,
     summary: e.summary,
     publisher,
+    ours: e.publisherKind === 'braindog',
     version: v.version,
     glyph: glyphOf(e, pageIcon),
     categories,
@@ -261,9 +275,14 @@ export function matches(card: Pick<Card, 'find'>, query: string): boolean {
   return words.every((word) => card.find.includes(word));
 }
 
-/** The category filters: each category at least one card is in, with its count, in `CATEGORIES`' order. */
+/**
+ * The category filters: each category at least one card is in, with its count, in `CATEGORIES`' order.
+ *
+ * "MADE BY BRAINDOG" IS NOT ONE. It says who made an add-on, not what it does, and every card already says that in its
+ * own foot, so as a segment beside "Use cases" and "Lists" it would only repeat "All" while BrainDog makes them all.
+ */
 export function filtersOf(cards: readonly Pick<Card, 'categories'>[]): { category: Category; name: string; count: number }[] {
-  return CATEGORIES.flatMap((category) => {
+  return CATEGORIES.filter((c) => c !== 'made-by-braindog').flatMap((category) => {
     const count = cards.filter((c) => c.categories.includes(category)).length;
     return count === 0 ? [] : [{ category, name: w.categories[category], count }];
   });

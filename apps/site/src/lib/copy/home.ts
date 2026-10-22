@@ -17,7 +17,7 @@ const CONNECT_DOCS = `${DOCS}/agents/connect`;
 
 export const home = {
   hero: {
-    /* THE SLOGAN, his words, with its full stop (§47). */
+    /* THE SLOGAN, word for word, with its full stop. */
     title: 'Give your business a memory.',
     /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
     sub: 'One place that remembers your work and tells you what needs you today. Your AI tools read from it too.',

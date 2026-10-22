@@ -4,8 +4,8 @@
  *   node --test apps/site/scripts/shots.test.mjs
  *
  * ONE FILE AND ONE READER. `static/shots/` held 33 captures on 22 September and the built site named
- * 9; the next day the owner said of the screenshots on the home page *i hate those screenshots. they
- * look terrible*, and the home page stopped drawing any. What is left is the link preview,
+ * 9; the next day the screenshots on the home page were ruled out because they looked terrible,
+ * and the home page stopped drawing any. What is left is the link preview,
  * `home-light.png`, which `app.html` names as the `og:image`. Deleting the files by hand fixes that
  * once; the next run of a capture script puts them straight back, which is why the scripts are held
  * to the page here too.

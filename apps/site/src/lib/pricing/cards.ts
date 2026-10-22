@@ -6,7 +6,7 @@
  * launch flags, and `pricing-page.test.ts` reads these with a copy of `LAUNCH` that has billing on and one that has it
  * off.
  *
- * THE PAID BUTTONS FOLLOW `LAUNCH.billing` (DIRECTION §47). On, "Choose Cloud" and "Choose Cloud Plus" link the plan's
+ * THE PAID BUTTONS FOLLOW `LAUNCH.billing`. On, "Choose Cloud" and "Choose Cloud Plus" link the plan's
  * own `href` (the app's sign-up with the plan named, `external` because `/app` is the app's). Off, a paid card carries
  * the plain words "Coming soon" where its button would be, and links nothing. Free's button is the shell's `Start`
  * either way.
@@ -44,7 +44,7 @@ export type Card = {
 const paidButton = (plan: Plan, cta: string, flags: Flags): Button =>
   flags.billing ? { kind: 'link', label: cta, href: plan.href } : { kind: 'soon', label: p.cards.soon };
 
-/** The three cards, Free first (DIRECTION §35), for a set of launch flags. */
+/** The three cards, Free first, for a set of launch flags. */
 export function cardsFor(flags: Flags): Card[] {
   return PLANS.map((plan): Card => {
     const row = ROW[plan.id];

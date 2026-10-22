@@ -1,5 +1,5 @@
 <!--
-  The three plans as cards, Free first and black (DIRECTION §35, §47): the pricing page draws them under its head, and
+  The three plans as cards, Free first and black: the pricing page draws them under its head, and
   the home page's plans band draws them `compact`, with the tighter top of the prototype's teaser.
 
   EVERY FIGURE AND EVERY WORD IS `cards.ts`'s, which reads `TABLE` (`plans.ts`) and `copy/pricing.ts`; this file only

@@ -1,5 +1,5 @@
 /**
- * `/changelog`, held until the site is public (`HELD` in `launch.ts`, his word on W.170).
+ * `/changelog`, held until the site is public (`HELD` in `launch.ts`, since W.170).
  *
  * PRERENDERED ON EVERY DAY, because the strict adapter refuses a route that is not (`svelte.config.js`). While
  * held it answers 404, so the build writes no `changelog.html` and the site's own 404 page answers the address;

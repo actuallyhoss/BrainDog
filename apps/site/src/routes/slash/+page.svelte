@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * /slash: Slash on a page of its own, for a reader who wants to know more (DIRECTION §47: "have a separate page for
+   * /slash: Slash on a page of its own, for a reader who wants to know more ("have a separate page for
    * Slash ... make it super readable and neat"). The prototype's `#slash` (loop/site-2026-10-17/src/site.html
    * ~:679-756):
    *

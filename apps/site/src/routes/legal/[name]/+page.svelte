@@ -3,10 +3,10 @@
 
   UNTIL THE TEXT IS IN FORCE the page says one sentence, carries `noindex`, and nothing links to it:
   it exists so the address is fixed and a strict prerender passes. Once `LAUNCH.legal` is on and the
-  file is in `apps/site/legal/`, it draws the owner's words as they are written there, a document in a
+  file is in `apps/site/legal/`, it draws the text as it is written there, a document in a
   page, so its headings sit under the page's own title and a `#` title in the file is not drawn twice.
 
-  THE NIGHT HEAD, THEN ONE SHEET (DIRECTION §47, Look B): the text's name and its one line in `PageHead`, then the
+  THE NIGHT HEAD, THEN ONE SHEET (Look B): the text's name and its one line in `PageHead`, then the
   words on one flat paper tile at a 68ch reading measure, its sections headed in Lexend like every title on the site.
 -->
 <script lang="ts">

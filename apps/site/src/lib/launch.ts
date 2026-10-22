@@ -7,11 +7,11 @@ export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
  * What is true on launch day and not before, one flag per fact.
  *
  * Every sentence that differs before and after launch reads one of these, so nothing else on the site
- * knows the date and the owner's word flips one line. Each stays `false` until he gives it. Two mirror
+ * knows the date and the owner's word flips one line. Each stays `false` until that word is given. Two mirror
  * production's Worker vars (`apps/worker/wrangler.jsonc`), and `claims.test.ts` holds each pair equal:
- * `signup` is `SIGNUP` being `open` or `invite` (a stranger reaches sign-up either way; DIRECTION §49), and `billing` is `BILLING` being `live`.
+ * `signup` is `SIGNUP` being `open` or `invite` (a stranger reaches sign-up either way), and `billing` is `BILLING` being `live`.
  *
- * SIGN-UP OPENED ON HIS WORD ON 8 OCTOBER (DIRECTION §42, "open to strangers now"). Billing did not: charging
+ * SIGN-UP OPENED TO STRANGERS ON 8 OCTOBER. Billing did not: charging
  * money is a separate word, so it stays off or in test mode and `billing` stays `false`.
  */
 export const LAUNCH = {
@@ -28,8 +28,8 @@ export const LAUNCH = {
 export type LaunchFlag = keyof typeof LAUNCH;
 
 /**
- * The addresses held until the site is public. The changelog and its feed on his word on W.170 ("we didnt even deploy
- * publically yet. remove those changelog"), and the packs with the site's design (DIRECTION §47: "Packs and the
+ * The addresses held until the site is public. The changelog and its feed since W.170, because the site was not
+ * deployed publicly yet, and the packs with the site's design ("Packs and the
  * changelog stay held"), the Mac download until a signed build exists, and the pages for personal records, students
  * and new projects (D5, 20 October: the slogan is about a business, and those pull the other way). The pricing page
  * came back on 20 October as the one-plan early access page with no prices (D2). The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/packs/` reads); only

@@ -136,7 +136,7 @@ test('"Open the app" is /app once the app lives on the site name, and the site h
 });
 
 /**
- * THE SIGNED-IN SWAP RUNS UNDER THE SAME POLICY (batch 103, DIRECTION §48). The site reads `bd_in` before the first
+ * THE SIGNED-IN SWAP RUNS UNDER THE SAME POLICY (batch 103). The site reads `bd_in` before the first
  * paint, so "Start free" and "Sign in" become "Open BrainDog" with nothing flickering. That needs a script in the head,
  * and the policy above allows only this origin's own files and the start script SvelteKit hashes. So the shell loads
  * `/signed-in.js` as a file from this origin, blocking on purpose, and writes no inline script of its own: one would

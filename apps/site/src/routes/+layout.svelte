@@ -1,5 +1,5 @@
 <!--
-  The site shell: the night header, the page, and the dark footer (DIRECTION §47, the site design of 17 October).
+  The site shell: the night header, the page, and the dark footer (the site design of 17 October).
 
   THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE, 64px tall. Every page opens on the night ground
   too (its own head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header
@@ -22,7 +22,7 @@
      `BRAINDOG_ENV` aliases this specifier, so an alpha build resolves it to `alpha.css` and ships
      one palette rather than two (28 §4). */
   import '@braindog/skin/house.css';
-  /* LOOK B, the site design's colours and faces (DIRECTION §47). */
+  /* LOOK B, the site design's colours and faces. */
   import '@braindog/skin/look-b.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';

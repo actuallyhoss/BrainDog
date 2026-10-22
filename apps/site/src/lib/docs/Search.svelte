@@ -8,7 +8,7 @@
   filters nothing with scripting off is a control that cannot act. Without a script the section list
   beside it is the way in.
 
-  THE FIELD IS LOOK B'S (DIRECTION §47): the label above it, a flat fill a step off the ground it sits on, radius 8,
+  THE FIELD IS LOOK B'S: the label above it, a flat fill a step off the ground it sits on, radius 8,
   44 high, the search glyph at its start and a 2px ring in the ground's ink on focus. The hits are a list under it.
   `night` draws it on the night ground of the docs' PageHead, in the night's inks; otherwise it sits on the board.
 -->

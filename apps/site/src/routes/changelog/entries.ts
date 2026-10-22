@@ -214,7 +214,7 @@ export const ENTRIES: Entry[] = [
       'Every door has one table of limits and answers a limit in one plain line saying when to try again. Failed writes and expired links now say what to do next. Not released yet.',
     commits: ['16fcac95', '9fd1f6be', '3b648b0e'],
   },
-  /* FREE LEADS (DIRECTION §35), WRITTEN BEFORE ITS COMMIT: the work was not committed when this was written, and an
+  /* FREE LEADS, WRITTEN BEFORE ITS COMMIT: the work was not committed when this was written, and an
      anchor is never guessed. The commit that lands sign-up's free path goes first in `commits`, and the checker
      reports this entry as unanchored until it does. */
   {
@@ -388,7 +388,7 @@ export const ENTRIES: Entry[] = [
        renamed with everything else, because the page describes the product as it is. An environment
        that still sets `SPARK_ENDPOINT` would get no model after the rename and no error either, since
        only `SLASH_*` is read, so this entry is the only place its owner is told. It names no way of
-       running BrainDog (DIRECTION §33: the site does not advertise one).
+       running BrainDog (the site does not advertise one).
        `test/slash.test.ts` fails if any other sentence on any page names Spark.
 
        ANCHORED ON THE DECISION, BECAUSE THE RENAME HAD NOT BEEN COMMITTED WHEN THIS WAS WRITTEN: it

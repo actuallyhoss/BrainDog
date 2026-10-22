@@ -1,6 +1,6 @@
 /**
  * The site's shell, read at the source with no build: the signed-in swap, the header's row, what is held, the footer
- * under the launch flags, and the shared parts every page draws (DIRECTION §47, §48).
+ * under the launch flags, and the shared parts every page draws.
  *
  * THE COMPONENTS ARE COMPILED HERE, FOR THE SERVER, as `apps/web/src/lib/design/offer-card.test.ts` does, because
  * `node --test` cannot load a `.svelte` file and the claim is about the HTML they draw.

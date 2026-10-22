@@ -142,10 +142,3 @@ export const DOTTED: ReadonlySet<IconName> = new Set<IconName>(['more', 'grip'])
  * a name with no glyph draws the entry with its words alone.
  */
 export const isIconName = (name: string): name is IconName => Object.hasOwn(GLYPHS, name);
-
-/**
- * The three hues a mark may take, each a TEXT role so it reads against the surface it sits on in
- * both schemes. `--red-fill` is not one of them: it paints the logo and nothing else. `--red` is
- * not one either, because on the site red is the accent, kept for what waits on you.
- */
-export type Hue = 'info' | 'earn' | 'warn';

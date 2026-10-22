@@ -1,6 +1,6 @@
 /**
- * The order of launch, as a rule (LCH-A02, his words on H.14: "then flip LAUNCH.legal so /legal/<name> goes live before
- * sign-up opens"). One function over a Worker environment's vars and the site's launch flags, answering every rule the
+ * The order of launch, as a rule (LCH-A02, H.14: LAUNCH.legal is flipped so /legal/<name> goes live before sign-up
+ * opens). One function over a Worker environment's vars and the site's launch flags, answering every rule the
  * pair breaks, one plain line each, and nothing when the order holds.
  *
  * THE RULES. Sign-up open needs the legal pages live and a bot check keyed (`TURNSTILE_SITE_KEY`, the page's half; the
@@ -30,7 +30,7 @@ export type LaunchFlags = { readonly legal: boolean };
 
 const said = (value: string | undefined): string => (value ?? '').trim();
 
-/** How many `[owner:` markers the legal texts still hold: the places a text waits on the owner's words. */
+/** How many `[owner:` markers the legal texts still hold: the places a text still waits on its final wording. */
 export const ownerMarkers = (texts: readonly string[]): number => texts.reduce((n, text) => n + text.split('[owner:').length - 1, 0);
 
 /**

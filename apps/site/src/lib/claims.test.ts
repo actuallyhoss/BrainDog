@@ -87,8 +87,8 @@ test('every place nav.ts names is a route the site has', () => {
 /**
  * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS. Production's `SIGNUP` is sign-up's switch (`apps/worker/src/launch.ts`),
  * so `LAUNCH.signup` is on exactly when it is `open` or `invite`: either way a stranger who presses Start free reaches
- * sign-up, where an invited person signs up and anyone else applies. His word, 17 October: "make it invite only... you
- * only know it's invite only when you click sign up, and you can apply" (DIRECTION §49). So the site keeps Start free
+ * sign-up, where an invited person signs up and anyone else applies. Since 17 October sign-up is invite only, a person
+ * only learns that when they press sign up, and they can apply. So the site keeps Start free
  * and says nothing about invites, and the check below this one holds it to that. `BILLING` is billing's, so `LAUNCH.billing` is on exactly when it
  * is `live`. Before 8 October there was no `SIGNUP` and `LAUNCH.signup` read `BILLING`, so a host open to anybody and a
  * site that said it was closed passed together. A production config with no `SIGNUP` fails here, because then nothing

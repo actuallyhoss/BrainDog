@@ -23,8 +23,8 @@
  * So the rule that required the site to name
  * the sample now refuses it, and the first screen has to say sign-in instead.
  *
- * THE GITHUB LINK STAYS, ON THE OWNER'S WORD, AND THIS FILE DOES NOT FIGHT IT. In the owner's
- * words: "link the github repo on the brain.dog site, even though it's private rn".
+ * THE GITHUB LINK STAYS, ON THE OWNER'S WORD, AND THIS FILE DOES NOT FIGHT IT: the brain.dog site
+ * links the GitHub repository even while it is private.
  * What this file refuses is every OTHER address into the repository (a README, a build page, a
  * release), because those are the links that 404 with nothing beside them saying why, and it
  * requires the legal page to keep the sentence that says the repository is private.
@@ -159,8 +159,8 @@ test('the only GitHub address is the bare repository the owner asked for', () =>
 });
 
 /**
- * THE SITE DESCRIBES THE FINISHED PRODUCT (the owner, 26 September): "I want the marketing site to
- * reflect what the FINAL product would be, not where it would stand". The tests that held the opposite (that the
+ * THE SITE DESCRIBES THE FINISHED PRODUCT (since 26 September): the marketing site reflects what the
+ * final product will be, not where it stands today. The tests that held the opposite (that the
  * first screen say the app opens to sign-in, that no sentence offer what a stranger could not have yet, and that the
  * legal page call the repository private) went that day. This one keeps the old sentences from coming back: a page
  * that says a plan is not open, or that there is no way to sign up, is a page written for a day that has passed by
@@ -176,7 +176,7 @@ const NOT_YET = [
   /\bsign-up is not open\b/i,
   /\bnothing is for sale\b/i,
   /\bthe repository is private\b/i,
-  /* SIGN-UP OPENED ON 8 OCTOBER (DIRECTION §42), so a sentence that waits for launch or for sign-up to open is false
+  /* SIGN-UP OPENED ON 8 OCTOBER, so a sentence that waits for launch or for sign-up to open is false
      the day it is read, and so is one that puts off a part with a vague "soon". `packs.ts` said "Anyone can start a
      record at launch." beside an open door until the copy audit of 9 October. */
   /\b(at|after|until|before) launch\b/i,
@@ -184,7 +184,7 @@ const NOT_YET = [
   /\bsign[- ]?ups? opens\b/i,
   COMING_SOON,
   /\bnot yet\b/i,
-  /* THE AUDIT'S NOT-YET CLAIMS (`src/lib/claims.ts`, marked `not-yet`). The repository stays private on his word, so
+  /* THE AUDIT'S NOT-YET CLAIMS (`src/lib/claims.ts`, marked `not-yet`). The repository stays private (the owner's choice), so
      no sentence says the code can be read or that the product is open source; the licence may still be named. */
   /\bthe code is open\b/i,
   /\bopen[- ]source\b/i,
@@ -192,7 +192,7 @@ const NOT_YET = [
 ];
 
 /**
- * THE TWO "COMING SOON"S THE OWNER ASKED FOR (DIRECTION §47: "Extra use says 'coming soon' until a checkout sells it.
+ * THE TWO "COMING SOON"S THE OWNER ASKED FOR ("Extra use says 'coming soon' until a checkout sells it.
  * The paid buttons follow `LAUNCH.billing`."). Extra use is sold by no checkout, and the paid plans are not charged
  * while billing is off, so the pricing page says so in exactly two places: the extra-use section's own line and the
  * paid cards' word in their buttons' place. Each is allowed at its own path, as those exact words, and only while

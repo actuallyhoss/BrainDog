@@ -270,7 +270,7 @@
     margin-block-end: calc(-1 * var(--sp-3));
   }
 
-  /* A TWO-WAY SWITCH, ONE FLAT RECTANGLE (DIRECTION §39): the second rule's fill, which shows on the page and on a
+  /* A TWO-WAY SWITCH, ONE FLAT RECTANGLE: the second rule's fill, which shows on the page and on a
      paper card alike, with no edge and no shadow, radius 8. The chosen half is the tile's own fill in the full ink
      and a heavier weight, so it reads by more than colour. */
   .switch {

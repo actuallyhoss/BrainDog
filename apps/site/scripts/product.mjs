@@ -9,8 +9,8 @@
  *
  * A DRAWING AND NOT A CAPTURE OF THE APP. Until 23 September this script photographed the record
  * app's Work board at 1440 by 900 at a device scale of 2, and the card was a 288 KB screenshot of
- * the app on every page's preview. On 22 September the owner said of the screenshots on the home
- * page *i hate those screenshots. they look terrible. dont just add scnreehots like that*
+ * the app on every page's preview. On 22 September the screenshots on the home page were ruled
+ * out: they looked terrible, and a screenshot is not to be dropped onto a page like that,
  * and the preview was the last one left. It had also stopped
  * running: it looked for `apps/web/build/index.html`, and the record app now builds under
  * `apps/web/build/app/`, so a run printed "no record-app build" and exited 1.

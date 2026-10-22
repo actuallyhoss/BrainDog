@@ -1,6 +1,6 @@
 /**
- * The changelog is held until the site is public, his word on W.170: "we didnt even deploy publically yet. remove
- * those changelog", and the packs with it since the site's design (DIRECTION §47: "Packs and the changelog stay
+ * The changelog is held until the site is public, since W.170, because the site was not deployed publicly yet,
+ * and the packs with it since the site's design ("Packs and the changelog stay
  * held"). One flag, `LAUNCH.public` in `src/lib/launch.ts`, shows them on the day.
  *
  * EVERY HALF IS ASKED UNDER BOTH FLAGS, with a copy of the flags passed in and `launch.ts` never edited: the header
@@ -50,7 +50,7 @@ const pageStatus = (launch: { public: boolean }): number => {
 };
 
 test('the flag is off until the owner flips it, and it holds the page and its feed', () => {
-  assert.equal(LAUNCH.public, false, 'LAUNCH.public is on: that is his word to give (LCH-A20), not a build');
+  assert.equal(LAUNCH.public, false, "LAUNCH.public is on: that is the owner's choice (LCH-A20), not a build");
   assert.equal(held(), true);
   /* The pricing page came back on 20 October as the early access page (D2), and three of the pages for one kind of
      person went (D5). */
@@ -103,7 +103,7 @@ test('with the flag off the packs are no place: not in the header, the footer, t
 test('with a copy of the flag on the packs are back as a place, and never in the header row', () => {
   const place = reachable(ON).find((p) => p.path === '/packs');
   assert.ok(place, 'the packs are not a place with the flag on');
-  assert.equal(place.header, false, 'the packs left the header row with the site design (DIRECTION §47)');
+  assert.equal(place.header, false, 'the packs left the header row with the site design');
 });
 
 test('while held, /packs answers not found and no page is made for any one pack', async () => {

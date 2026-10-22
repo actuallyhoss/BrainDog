@@ -1,41 +1,41 @@
 <!--
-  `/packs`: the catalogue's public face. A tile for every public listing, with a search field and a filter for each
-  category a listing is in.
+  `/packs`: the add-on store as a stranger sees it. Every public listing as a card, a search, and the categories as one
+  segmented control.
 
-  TWO BANDS, AS THE BENTO PACKS BOARD LAYS THEM OUT. The first is the opening tile (the heading, what a pack is, the
-  search and the filters) beside a tile that draws the catalogue by kind, from the same counts the filters carry. The
-  second is the packs themselves, a tile each: an icon well on the heading row, the summary, what it adds as chips,
-  and who made it and which version as the meta line.
+  THE SITE'S DESIGN (site F17): the night head with the search in its slot, then the store on the board's ground with
+  the categories over the cards, then a night band that says anybody can make one and points at the docs, and the
+  early access strip. Two neighbours never share a ground in either scheme.
 
   EVERY CARD IS IN THE HTML. The load hands the page every public card at build time, so the page reads whole with
-  scripting off; the search and the filters narrow what is drawn once the script runs, and nothing is fetched to do it.
+  scripting off; the search and the control narrow what is drawn once the script runs, and nothing is fetched to do it.
 
-  THE WHOLE CARD IS THE TARGET, through its title's link stretched over it, so the card's lists stay lists and a screen
-  reader hears the title as the link's name rather than every word on the card.
+  A CARD SAYS WHAT A STRANGER WEIGHS: its name, one line, what it brings, who made it and how many hold it when the
+  Kennel counted ten or more. "Made by BrainDog" is drawn only where the catalogue says BrainDog published it.
+
+  THE WHOLE CARD IS THE TARGET, through its title's link stretched over it, so a screen reader hears the title as the
+  link's name rather than every word on the card.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
+  import Mark from '$lib/Mark.svelte';
   import { PACKS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
   import { filtersOf, matches, type Category } from '$lib/packs/catalogue.ts';
+  import EarlyStrip from '$lib/site/EarlyStrip.svelte';
+  import PageHead from '$lib/site/PageHead.svelte';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();
 
   const w = packs.packs;
+  const m = w.make;
 
   let query = $state('');
   let picked = $state<Category | null>(null);
 
   const filters = $derived(filtersOf(data.cards));
   const shown = $derived(data.cards.filter((c) => (picked === null || c.categories.includes(picked)) && matches(c, query)));
-
-  /* THE KINDS, LARGEST FIRST, for the chart: the filters' own counts, so the drawing and the controls never disagree.
-     `made-by-braindog` is who made them rather than what they are, so it is a filter and not a bar. */
-  const kinds = $derived(
-    [...filters.filter((f) => f.category !== 'made-by-braindog')].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
-  );
-  const most = $derived(Math.max(1, ...kinds.map((k) => k.count)));
+  const allOurs = $derived(data.cards.length > 0 && data.cards.every((c) => c.ours));
 
   function showAll() {
     query = '';
@@ -52,308 +52,302 @@
   <meta property="og:description" content={w.meta.description} />
 </svelte:head>
 
-<section class="band" aria-labelledby="packs-h1">
-  <div class="in">
-    <div class="tiles">
-      <div class="tile lead span-7 opening">
-        <h1 class="h2" id="packs-h1">{w.title}</h1>
-        <p class="lede">{w.lede}</p>
-
-        {#if data.cards.length > 0}
-          <div class="tools">
-            <label class="search">
-              <span class="search-label">{w.search}</span>
-              <span class="field">
-                <Icon name="search" size="m" />
-                <input type="search" bind:value={query} placeholder={w.searchHint} autocomplete="off" spellcheck="false" />
-              </span>
-            </label>
-            <div class="filters" role="group" aria-label={w.filters}>
-              <button type="button" class="filter" aria-pressed={picked === null} onclick={() => (picked = null)}>
-                {w.all}<span class="filter-count num">{data.cards.length}</span>
-              </button>
-              {#each filters as f (f.category)}
-                <button
-                  type="button"
-                  class="filter"
-                  aria-pressed={picked === f.category}
-                  onclick={() => (picked = picked === f.category ? null : f.category)}
-                >
-                  {f.name}<span class="filter-count num">{f.count}</span>
-                </button>
-              {/each}
-            </div>
-            <p class="shown" role="status">{w.shown(shown.length)}</p>
-          </div>
-        {/if}
-      </div>
-
-      {#if kinds.length > 0}
-        <div class="tile span-5 kinds">
-          <h2 class="tile-head">
-            <span class="well"><Icon name="bars" size="m" /></span>
-            <span class="tile-title">{w.kinds}</span>
-            <span class="tile-meta num">{w.shown(data.cards.length)}</span>
-          </h2>
-          <ul class="bars">
-            {#each kinds as k, i (k.category)}
-              <li class="bar" data-top={i === 0 ? '' : undefined}>
-                <span class="bar-name">{k.name}</span>
-                <span class="track" aria-hidden="true"><span class="fill" style="--share:{k.count / most}"></span></span>
-                <span class="bar-n num">{k.count}</span>
-              </li>
-            {/each}
-          </ul>
-          <p class="reading">{w.kindsRead(kinds[0]?.name ?? '', kinds[0]?.count ?? 0)}</p>
-        </div>
-      {/if}
+<PageHead title={w.title} lead={w.lede}>
+  {#if data.cards.length > 0}
+    <div class="head-search" role="search">
+      <label class="search">
+        <span class="sr">{w.search}</span>
+        <span class="field">
+          <Icon name="search" size="m" />
+          <input type="search" bind:value={query} placeholder={w.searchHint} autocomplete="off" spellcheck="false" />
+        </span>
+      </label>
+      {#if allOurs}<p class="ours-all"><Mark height={14} tone="inherit" />{w.allOurs}</p>{/if}
     </div>
-  </div>
-</section>
+  {/if}
+</PageHead>
 
-<!-- No name of its own: the band above is the region the page title names, and this one named the same was a second landmark with that name. -->
-<section class="band">
-  <div class="in">
+<!-- No name of its own: the head above is the region the page title names. -->
+<section class="store">
+  <div class="wrap">
     {#if data.cards.length === 0}
-      <div class="tiles">
-        <p class="tile span-12 none">{w.none}</p>
-      </div>
-    {:else if shown.length === 0}
-      <div class="tiles">
-        <div class="tile span-12 no-match">
-          <p>{w.noMatch}</p>
-          <button type="button" class="btn" onclick={showAll}>{w.showAll}</button>
-        </div>
-      </div>
+      <p class="none">{w.none}</p>
     {:else}
-      <ul class="tiles cards">
-        {#each shown as card (card.slug)}
-          <li class="tile span-4 card">
-            <div class="tile-head">
-              <span class="well"><Icon name={card.glyph} size="m" /></span>
-              <h2 class="card-title"><a class="card-link" href="{PACKS}/{card.slug}">{card.title}</a></h2>
-              <Icon name="chevron-right" size="m" />
-            </div>
-            <p class="summary">{card.summary}</p>
-            {#if card.adds.length}<p class="adds">{card.adds.join(' · ')}</p>{/if}
-            <p class="card-meta">
-              <span>{w.by(card.publisher)}</span>
-              <span class="num">{w.version(card.version)}</span>
-              {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
-            </p>
-          </li>
-        {/each}
-      </ul>
+      <div class="bar">
+        <!-- ONE SEGMENTED CONTROL, one category at a time (site F17). On a phone it scrolls inside its own track. -->
+        <div class="track" role="group" aria-label={w.filters}>
+          <button type="button" class="seg" aria-pressed={picked === null} onclick={() => (picked = null)}>
+            {w.all}<span class="seg-n num">{data.cards.length}</span>
+          </button>
+          {#each filters as f (f.category)}
+            <button type="button" class="seg" aria-pressed={picked === f.category} onclick={() => (picked = f.category)}>
+              {f.name}<span class="seg-n num">{f.count}</span>
+            </button>
+          {/each}
+        </div>
+        <p class="shown" role="status">{w.shown(shown.length)}</p>
+      </div>
+
+      {#if shown.length === 0}
+        <div class="no-match">
+          <p>{w.noMatch}</p>
+          <button type="button" class="btn line" onclick={showAll}>{w.showAll}</button>
+        </div>
+      {:else}
+        <ul class="cards">
+          {#each shown as card (card.slug)}
+            <li class="addon">
+              <div class="card-top">
+                <span class="icon-well"><Icon name={card.glyph} size="m" /></span>
+                <span class="kind">{w.kind[card.kind]}</span>
+              </div>
+              <h2 class="name"><a class="card-link" href="{PACKS}/{card.slug}">{card.title}</a></h2>
+              <p class="summary">{card.summary}</p>
+              <p class="brings">{card.adds.length ? card.adds.join(' · ') : w.worksOn}</p>
+              <p class="foot">
+                {#if card.ours}
+                  <span class="maker"><Mark height={13} tone="inherit" />{w.ours}</span>
+                {:else}
+                  <span class="maker">{w.by(card.publisher)}</span>
+                {/if}
+                {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
+              </p>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     {/if}
   </div>
 </section>
 
+<section class="band band--make" aria-labelledby="make-title">
+  <div class="wrap cols">
+    <div class="c6 make-say">
+      <h2 id="make-title" class="band-h2">{m.title}</h2>
+      <p class="band-say">{m.say}</p>
+      <p class="make-go">
+        <a class="btn ghost" href={m.firstHref}>{m.first}<Icon name="arrow" size="m" /></a>
+        <a class="more" href={m.publishHref}>{m.publish}<Icon name="arrow" size="m" /></a>
+      </p>
+    </div>
+    <figure class="c6 term">
+      <figcaption class="term-hd">{m.terminal}</figcaption>
+      <pre class="term-body"><code>{#each m.steps as step, i (step)}{#if i > 0}{'\n'}{/if}<span class="prompt" aria-hidden="true">$ </span>{step}{/each}</code></pre>
+    </figure>
+  </div>
+</section>
+
+<EarlyStrip />
+
 <style>
-  /* ── The opening tile ─────────────────────────────────────────────────── */
+  /* ── The head's search, on the night ground ───────────────────────────── */
 
-  .opening .lede {
-    margin-block-start: calc(-1 * var(--sp-2));
-  }
-
-  .tools {
+  .head-search {
     display: grid;
-    gap: var(--sp-4);
+    gap: 14px;
+    max-inline-size: 560px;
+    margin-block-start: 32px;
   }
 
   .search {
-    display: grid;
-    gap: 6px;
-    max-inline-size: 36rem;
+    display: block;
   }
 
-  .search-label {
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-  }
-
-  /* THE FIELD: the tile's second fill, radius 12, 40 tall and 44 under a thumb, the search glyph inside it. */
+  /* THE FIELD: the night's second fill, radius 12, 48 tall, the glyph inside it. The field draws the focus ring. */
   .field {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    min-block-size: 40px;
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-pop);
-    background: var(--tile-2);
-    color: var(--ink-3);
+    gap: 10px;
+    min-block-size: 48px;
+    padding-inline: 14px;
+    border-radius: 12px;
+    background: var(--night-2);
+    box-shadow: inset 0 0 0 1px var(--night-rule);
+    color: var(--on-night-2);
   }
 
   .field:focus-within {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--on-night);
     outline-offset: 2px;
   }
 
-  /* 16PX TEXT IN THE FIELD so a phone does not zoom into it. The ring is the field's, drawn above. */
+  /* 16PX IN THE FIELD so a phone does not zoom into it. */
   .field input {
     flex: 1;
     min-inline-size: 0;
-    min-block-size: 40px;
+    min-block-size: 46px;
     padding: 0;
     border: 0;
     background: none;
-    color: var(--ink);
+    color: var(--on-night);
     font: inherit;
-    font-size: var(--fs-body);
-    /* focus-ok: the field around it draws the 2px ink ring on focus-within. */
+    font-size: var(--t-site-16);
+    /* focus-ok: the field around it draws the ring on focus-within. */
     outline: none;
   }
 
   .field input::placeholder {
-    color: var(--ink-3);
+    color: var(--on-night-2);
   }
 
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .filter {
+  .ours-all {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
+    gap: 8px;
+    margin: 0;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
+  }
+
+  /* ── The store ─────────────────────────────────────────────────────────── */
+
+  .store {
+    padding-block: 48px 96px;
+    background: var(--board);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-block-end: 24px;
+  }
+
+  /* THE TRACK: one pill on the tile's fill, the chosen segment in ink. It scrolls sideways inside itself and never
+     pushes the page wider. */
+  .track {
+    display: flex;
+    gap: 2px;
+    max-inline-size: 100%;
+    padding: 4px;
+    overflow-x: auto;
+    border-radius: 999px;
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    scrollbar-width: none;
+  }
+
+  .track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .seg {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-block-size: 36px;
     padding-inline: 14px;
     border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    border-radius: 999px;
+    background: transparent;
     color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-site-small);
-    font-weight: 500;
+    font: 500 var(--t-site-14) / 1 var(--ui);
+    white-space: nowrap;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* The kind on show is the chosen segment: ink, with its count in the on-ink word. */
-  .filter[aria-pressed='true'] {
-    background: var(--ink);
-    color: var(--on-red);
+  .seg:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
   }
 
-  .filter-count {
-    color: var(--ink-3);
+  .seg[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--page);
+  }
+
+  .seg-n {
+    color: var(--muted);
     font-weight: 400;
   }
 
-  .filter[aria-pressed='true'] .filter-count {
+  .seg[aria-pressed='true'] .seg-n {
     color: inherit;
+    opacity: 0.7;
   }
 
   .shown {
     margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-  }
-
-  /* ── The kinds tile: one bar a kind, the largest in ink and the rest grey ── */
-
-  .kinds .tile-head {
-    font-size: inherit;
-    font-weight: inherit;
-  }
-
-  .bars {
-    display: grid;
-    gap: 10px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .bar {
-    display: grid;
-    grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr) 2.5ch;
-    align-items: center;
-    gap: var(--sp-3);
-  }
-
-  .bar-name {
-    overflow: hidden;
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .track {
-    display: block;
-    block-size: 10px;
-    border-radius: 3px;
-    background: var(--tile-2);
-  }
-
-  .fill {
-    display: block;
-    inline-size: calc(var(--share) * 100%);
-    min-inline-size: 6px;
-    block-size: 100%;
-    border-radius: 3px;
-    background: var(--ink-3);
-  }
-
-  .bar[data-top] .fill {
-    background: var(--ink);
-  }
-
-  .bar[data-top] .bar-name {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .bar-n {
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 600;
-    text-align: end;
-  }
-
-  .kinds .reading {
-    margin-block-start: auto;
-  }
-
-  /* ── The packs, a tile each ───────────────────────────────────────────── */
-
-  .cards {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    color: var(--muted);
+    font-size: var(--t-site-14);
   }
 
   .none,
   .no-match p {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-body);
+    font-size: var(--t-site-17);
   }
 
   .no-match {
+    display: flex;
+    flex-direction: column;
     align-items: flex-start;
+    gap: 16px;
+    padding: 32px;
+    border-radius: 16px;
+    background: var(--tile);
   }
 
-  .card {
+  /* THREE ACROSS AT A DESK, two on a tablet, one on a phone; each card as tall as its row. */
+  .cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A CARD: flat, radius 16, no edge and no shadow (site F7). */
+  .addon {
     position: relative;
-    gap: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-inline-size: 0;
+    padding: 24px;
+    border-radius: 16px;
+    background: var(--tile);
+    color: var(--ink);
     transition: box-shadow var(--d-state) var(--ease-out);
   }
 
-  .card .tile-head {
-    color: var(--ink-3);
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-block-end: 6px;
   }
 
-  .card-title {
-    flex: 1;
-    min-inline-size: 0;
+  /* THE ICON WELL: 40, the board's fill, radius 10, in the second ink. */
+  .icon-well {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: 10px;
+    background: var(--board);
+    color: var(--ink2);
+  }
+
+  .kind {
+    color: var(--muted);
+    font-size: var(--t-site-13);
+    font-weight: 500;
+  }
+
+  .name {
     margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-    line-height: 20px;
+    font-size: var(--t-site-21);
+    line-height: 1.2;
+    letter-spacing: -0.03em;
     overflow-wrap: anywhere;
   }
 
@@ -362,12 +356,22 @@
     text-decoration: none;
   }
 
-  /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the pack. */
+  /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the add-on. */
   .card-link::before {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: var(--r-tile);
+    border-radius: 16px;
+  }
+
+  .card-link:focus-visible {
+    /* focus-ok: the ring is drawn on `::before`, round the whole card the link covers. */
+    outline: none;
+  }
+
+  .card-link:focus-visible::before {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
   }
 
   .summary {
@@ -375,52 +379,157 @@
     margin: 0;
     overflow: hidden;
     color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 20px;
+    font-size: var(--t-site-15);
+    line-height: 1.5;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
   }
 
-  /* WHAT IT ADDS, as one quiet line and not a row of chips (DIRECTION §37). A long host name wraps rather than pushing
-     the tile wider than the column. */
-  .adds {
+  .brings {
     margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-    line-height: 20px;
-    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: var(--t-site-14);
+    font-weight: 500;
   }
 
-  .card-meta {
+  .foot {
     display: flex;
     flex-wrap: wrap;
-    column-gap: var(--sp-3);
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 16px;
     margin: 0;
     margin-block-start: auto;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+    padding-block-start: 14px;
+    border-block-start: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: var(--t-site-14);
+  }
+
+  .maker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .card:hover {
-    }
-
-    .card:hover .tile-head {
+    .seg[aria-pressed='false']:hover {
+      background: var(--soft);
       color: var(--ink);
     }
 
-    .filter[aria-pressed='false']:hover {
-      background: var(--tile-2);
+    .addon:hover {
+      box-shadow: inset 0 0 0 1px var(--rule);
+    }
+
+    .addon:hover .icon-well {
+      color: var(--ink);
     }
   }
 
-  /* A THUMB'S TARGETS: every filter and the field 44 tall on a phone. */
-  @media (width < 640px) {
-    .filter,
-    .field,
-    .field input {
+  @media (width >= 700px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 1060px) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ── Make your own ─────────────────────────────────────────────────────── */
+
+  .band--make {
+    background: var(--band-ai);
+    color: var(--on-night);
+  }
+
+  .band--make .band-say {
+    color: var(--on-night-2);
+  }
+
+  .make-say {
+    align-self: center;
+  }
+
+  .make-go {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+    margin: 28px 0 0;
+  }
+
+  .make-go .more {
+    margin: 0;
+    color: var(--on-night);
+  }
+
+  /* A TERMINAL, drawn: the band's own tile, the four commands of the first add-on in the mono face. */
+  .term {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 20px 24px 24px;
+    border-radius: 16px;
+    background: var(--band-ai-tile);
+  }
+
+  .term-hd {
+    margin-block-end: 14px;
+    color: var(--on-night-2);
+    font-size: var(--t-site-14);
+    font-weight: 500;
+  }
+
+  /* A LONG COMMAND SCROLLS INSIDE THE TILE, never the page. */
+  .term-body {
+    margin: 0;
+    overflow-x: auto;
+    color: var(--on-night);
+    font: 400 var(--t-site-14) / 2 var(--font-mono);
+  }
+
+  .prompt {
+    color: var(--on-night-2);
+    user-select: none;
+  }
+
+  /* ── A phone ───────────────────────────────────────────────────────────── */
+
+  @media (max-width: 760px) {
+    .head-search {
+      margin-block-start: 24px;
+    }
+
+    .store {
+      padding-block: 24px 64px;
+    }
+
+    .bar {
+      margin-block-end: 16px;
+    }
+
+    .seg {
       min-block-size: var(--tap);
+    }
+
+    .addon {
+      padding: 20px;
+    }
+
+    .no-match {
+      padding: 24px 20px;
+    }
+
+    .make-go .btn {
+      inline-size: 100%;
+    }
+
+    .term {
+      padding: 16px 16px 20px;
     }
   }
 </style>

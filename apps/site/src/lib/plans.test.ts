@@ -86,7 +86,7 @@ test("each card's agents and credits are its row's in PLAN_TABLE", () => {
 });
 
 test('Free is the first plan, and the site sells nothing for it', () => {
-  assert.equal(PLANS[0]?.id, 'free', 'plans.ts draws a paid plan before Free, and Free leads (DIRECTION §35)');
+  assert.equal(PLANS[0]?.id, 'free', 'plans.ts draws a paid plan before Free, and Free leads');
   const free = PLANS[0]!;
   assert.equal(free.name, planName('free'), `plans.ts calls Free "${free.name}" and billing.ts "${planName('free')}"`);
   assert.equal(free.price, planPrice('free'), `plans.ts says Free is ${free.price} and billing.ts "${planPrice('free')}"`);

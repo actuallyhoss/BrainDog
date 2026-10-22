@@ -3,7 +3,7 @@
   here, so this component and the app's cannot come apart: see `packages/skin/mark.ts`.
 
   THREE TONES: `brand` paints it the house red, `inherit` paints it the text colour, and `line` draws it as a thin
-  outline in the text colour, the hero's mark behind the headline (the site design's MARKLINE, DIRECTION §47).
+  outline in the text colour, the hero's mark behind the headline (the site design's MARKLINE).
 -->
 <script lang="ts">
   import { MARK } from '@braindog/skin/mark.ts';

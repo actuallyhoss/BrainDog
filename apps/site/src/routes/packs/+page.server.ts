@@ -4,7 +4,7 @@
  * A SERVER LOAD, so the cards ride in the prerendered HTML and the page reads whole with scripting off;
  * the search box and the filters only narrow what is already drawn.
  *
- * HELD UNTIL THE SITE IS PUBLIC (`HELD` in `launch.ts`, DIRECTION §47), as `/changelog` is: it answers 404, so the build
+ * HELD UNTIL THE SITE IS PUBLIC (`HELD` in `launch.ts`), as `/changelog` is: it answers 404, so the build
  * writes no `packs.html` and the site's own 404 page answers the address. The catalogue is read the day it is shown.
  */
 import { error } from '@sveltejs/kit';

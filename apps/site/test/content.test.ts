@@ -383,9 +383,9 @@ test('the home page counts none of the product own parts at a stranger', when(NO
 /**
  * THE HOME PAGE OPENS ON THE PRODUCT, THEN FOUR CARDS, AND IT IS DRAWN.
  *
- * The owner's words that started this check: *i dont like how it's so long, and it's all records and text. i want it
- * to be more graphical, and shows the value, not what it does technically (at least not for the first blocks).*
- * It held a band count and the drawn app in the first band. The page he designed on 17 October (DIRECTION §47) has
+ * What started this check: the page was too long, all records and text. It is to be more graphical and show the value,
+ * not what it does technically (at least not in the first blocks).
+ * It held a band count and the drawn app in the first band. The page designed on 17 October has
  * its own shape, and this holds that shape:
  *
  *   - THE FIRST SECTION IS THE HERO, AND THE DESK IS IN IT. The live desk's tabs (Today, Projects, Needs you,
@@ -393,8 +393,8 @@ test('the home page counts none of the product own parts at a stranger', when(NO
  *     and that was the fault.
  *   - FOUR CARDS, THE FOUR VALUES: the brief, the agents, the chores and Slash, each an `article.card`. A fifth card
  *     is a feature-card grid on its way back, and fewer is a value gone quietly.
- *   - NO PHOTOGRAPH OF IT. He said of the screenshots this page carried *i hate those screenshots. they look
- *     terrible. dont just add scnreehots like that*. A `<picture>` or an `<img>` coming back is that regression.
+ *   - NO PHOTOGRAPH OF IT. The screenshots this page carried looked terrible, and a screenshot is not to be dropped
+ *     onto a page like that. A `<picture>` or an `<img>` coming back is that regression.
  */
 test('the home page opens on the hero with the desk, then its six bands in order, and holds no picture', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
@@ -503,7 +503,7 @@ test('_headers caches hashed assets immutably and the screenshots for a day', ()
  * `braindog:automation/{id}` landed the next day without the page hearing of it. Nothing failed, because the page
  * was a hand count and nothing compared it with the code.
  *
- * FROM BATCH 103 THE CONNECT PAGE LISTS NO TOOLS (DIRECTION §47: one line for each app, and what the agent gets), and
+ * FROM BATCH 103 THE CONNECT PAGE LISTS NO TOOLS (one line for each app, and what the agent gets), and
  * the docs do: `03-agents/02-tools.md` names every tool and `03-agents/03-resources.md` every address. So this
  * imports the arrays themselves and holds those two pages to them, and the next tool or template added fails here
  * until the docs say it.

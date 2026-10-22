@@ -1,6 +1,6 @@
 /**
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`, and the colours and faces are Look B's
- * (`look-b.css`, DIRECTION §47).
+ * (`look-b.css`).
  *
  * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the UI pass of 20 October rebuilt it (`loop/ui-pass-2026-10-20/
  * site.md`, SPEC 4.7): a dark night band at the top of every page (the header, then the page's own head), then
@@ -17,7 +17,7 @@
 @layer components {
   :root {
     /* The one width every page's content, the bar and the footer share, so their edges line up. Wide enough that a
-       laptop is filled to its gutters (DIRECTION §36: never a narrow column floating in empty space). */
+       laptop is filled to its gutters (never a narrow column floating in empty space). */
     --site-max: 1360px;
     /* The page's gutter: the window inset (12) on a phone, then growing with the window from twice it to 56 on a desk. */
     --site-gutter: var(--inset);
@@ -32,7 +32,7 @@
     --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
     --lh-site-body: 1.647;
     --t-site-small: 14px;
-    /* THE SITE DESIGN'S OTHER STEPS (DIRECTION §47), named once here so a component reads a step and not a size. */
+    /* THE SITE DESIGN'S OTHER STEPS, named once here so a component reads a step and not a size. */
     --t-site-11-5: 11.5px;
     --t-site-12: 12px;
     --t-site-12-5: 12.5px;
@@ -105,7 +105,7 @@
     --fs-meta: var(--t-app-sm);
   }
 
-  /* TITLES ARE LEXEND 600 (DIRECTION §47, as on quartz.gg), loaded at that one weight; a page sets each one's size and
+  /* TITLES ARE LEXEND 600 (as on harbour.example), loaded at that one weight; a page sets each one's size and
      its tight spacing. Every other word is Geist, a group's small label included. */
   h1,
   h2,
@@ -380,7 +380,7 @@
   /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
   /**
-   * THE SITE DESIGN'S BUTTONS (DIRECTION §47): a 48px rectangle, radius 12, in Geist 500. `.red` is the solid red
+   * THE SITE DESIGN'S BUTTONS: a 48px rectangle, radius 12, in Geist 500. `.red` is the solid red
    * with white words: the start button (`lib/site/Start.svelte`) and a drawing's suggested answer (site S2); `.ghost`
    * sits on the night ground, `.line` and `.quiet` on the page, and `.sm` is the 34px one. A `.btn` with none of these
    * is the quiet one, so a kept page's plain button stays drawn.
@@ -518,23 +518,7 @@
     white-space: nowrap;
   }
 
-  /**
-   * THE HUES A CHANGELOG KIND MAY TAKE. They mark a state (fixed, added, changed), which is what colour on this site is
-   * for. `icons.ts` narrows its `Hue` type to the same three.
-   */
-  [data-hue='info'] {
-    --hue: var(--info);
-  }
-
-  [data-hue='earn'] {
-    --hue: var(--good);
-  }
-
-  [data-hue='warn'] {
-    --hue: var(--warn);
-  }
-
-  /* ── The site design's shared parts (DIRECTION §47) ──────────────────────── */
+  /* ── The site design's shared parts ──────────────────────── */
 
   /* THE COLUMN: 1200 wide, 24 in from the window's edge, 16 on a phone, and clear of a notch either side. */
   .wrap {

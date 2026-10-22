@@ -1,26 +1,29 @@
 <!--
-  `/packs/<id>`: one pack, as a stranger weighs it before installing.
+  `/packs/<id>`: one add-on, as a stranger weighs it before adding it.
 
-  TWO BANDS OF TILES. The first is the opening tile (the pack's name on its icon well, what it is, who made it, and
-  Install as the one ink pill) beside the facts tile. The second is the drawing, a tile a page, beside the versions.
+  THE SITE'S DESIGN (site F17): the night head holds the way back, the add-on's name and its one line, who made it and
+  how many hold it, and "Add to your BrainDog" as the page's one red. Under it, on the board's ground, the drawing of
+  what it adds beside three tiles: what it brings by name, who made it, and its versions.
 
   THE DRAWING IS THE PRODUCT'S. A version the catalogue made a preview for is drawn page by page from that preview's
   answers, and one with none is drawn as what it adds, both through `lib/app/Page.svelte` and the renderer the app
-  uses. So a list here has the columns the installed page has, and nothing on this page is a picture somebody made.
+  uses. So a list here has the columns the added page has, and nothing on this page is a picture somebody made.
 
-  INSTALL GOES TO THE APP (`/app/packs/browse/<id>`), which shows the plan and asks before it writes, so the link
+  ADDING GOES TO THE APP (`/app/packs/browse/<id>`), which shows the plan and asks before it writes, so the link
   carries `rel="external"`: the prerender crawler must not follow it into the app.
 
-  BELOW 900PX THE TILES STACK with the drawing before the versions, because the drawing is what the reader came to see.
+  BELOW 1060PX THE TILES STACK with the drawing first, because the drawing is what the reader came to see.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
+  import Mark from '$lib/Mark.svelte';
   import { parse } from 'braindog-render';
   import Page from '$lib/app/Page.svelte';
   import type { Span } from '$lib/examples/types.ts';
   import { LAUNCH } from '$lib/launch.ts';
   import { PACKS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
+  import PageHead from '$lib/site/PageHead.svelte';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();
@@ -30,6 +33,12 @@
 
   const card = $derived(data.card);
   const now = $derived(data.now ?? undefined);
+  const b = $derived(data.brings);
+  const nothing = $derived(b.listCount === 0 && b.pageCount === 0 && b.rules === 0 && b.examples === 0);
+
+  /* A NAMED LIST OR PAGE BY ITS NAMES, or by its count when a template names none. */
+  const said = (names: readonly string[], count: number, counted: (n: number) => string): string =>
+    names.length > 0 ? names.join(', ') : counted(count);
 
   /* EVERY SEGMENT THE FULL WIDTH OF ITS TILE. Left to its kind's `minSpan`, a list would take half of a tile that is
      already two thirds of the page, and its columns would crowd for no reason. */
@@ -37,55 +46,81 @@
 </script>
 
 <svelte:head>
-  <title>{card.title} · {w.title}</title>
+  <title>{d.title(card.title)}</title>
   <meta name="description" content={card.summary} />
   <link rel="canonical" href="https://brain.dog/packs/{card.slug}" />
   <meta property="og:url" content="https://brain.dog/packs/{card.slug}" />
-  <meta property="og:title" content="{card.title} · {w.title}" />
+  <meta property="og:title" content={d.title(card.title)} />
   <meta property="og:description" content={card.summary} />
 </svelte:head>
 
-<section class="band" aria-labelledby="pack-h1">
-  <div class="in">
-    <a class="back" href={PACKS}><Icon name="back" size="m" />{d.back}</a>
-    <div class="tiles">
-      <div class="tile lead span-8 opening">
-        <div class="title-row">
-          <span class="well l"><Icon name={card.glyph} size="m" /></span>
-          <h1 class="h2 pack-title" id="pack-h1">{card.title}</h1>
-        </div>
-        <p class="lede">{card.summary}</p>
-        <p class="meta-row">
-          <span>{w.by(card.publisher)}</span>
-          <span class="num">{w.version(card.version)}</span>
-          {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
-        </p>
-        <div class="install">
-          <a class="btn btn-primary btn-lg" href={data.install} rel="external">{d.install}<Icon name="arrow" size="m" /></a>
-          <p class="install-note">{LAUNCH.signup ? d.installNote : d.installNoteSoon}</p>
-        </div>
-      </div>
+{#snippet back()}
+  <a class="back" href={PACKS}><Icon name="back" size="m" />{d.back}</a>
+{/snippet}
 
-      <aside class="tile span-4 facts" aria-labelledby="facts-title">
-        <h2 class="tile-head">
-          <span class="well"><Icon name="box" size="m" /></span>
-          <span class="tile-title" id="facts-title">{d.facts}</span>
-        </h2>
-        <dl class="fact-list">
-          <div class="fact">
-            <dt>{d.publisher}</dt>
-            <dd>{card.publisher}</dd>
-          </div>
-          {#if data.licence !== ''}
-            <div class="fact">
-              <dt>{d.licence}</dt>
-              <dd>{data.licence}</dd>
+<PageHead title={card.title} lead={card.summary} before={back}>
+  <p class="meta-row">
+    <span class="tag">{w.kind[card.kind]}</span>
+    {#if card.ours}
+      <span class="maker"><Mark height={14} tone="inherit" />{w.ours}</span>
+    {:else}
+      <span class="maker">{w.by(card.publisher)}</span>
+    {/if}
+    {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
+  </p>
+  <div class="install">
+    <a class="btn red" href={data.install} rel="external">{d.install}<Icon name="arrow" size="m" /></a>
+    <p class="install-note">{LAUNCH.signup ? d.installNote : d.installNoteSoon}</p>
+  </div>
+</PageHead>
+
+<section class="board" aria-labelledby="drawing-title">
+  <div class="wrap layout">
+    <div class="drawing">
+      <div class="drawing-head">
+        <h2 class="drawing-title" id="drawing-title">{data.pages ? d.preview : d.adds}</h2>
+        <p class="note">{data.pages ? d.previewNote : d.addsNote}</p>
+      </div>
+      {#if data.pages}
+        {#each data.pages as p, i (i)}
+          <figure class="tile sheet" aria-labelledby="page-{i}">
+            <figcaption class="sheet-head">
+              <span class="icon-well"><Icon name="file" size="m" /></span>
+              <span class="sheet-title" id="page-{i}">{p.title}</span>
+            </figcaption>
+            <div class="sheet-body">
+              <Page src={p.src} layout={wide(p.src)} {now} />
             </div>
-          {/if}
-          <div class="fact">
-            <dt>{d.latest}</dt>
-            <dd class="num">{card.version}</dd>
+          </figure>
+        {/each}
+      {:else}
+        <div class="tile sheet">
+          <div class="sheet-body">
+            <Page src={data.adds} layout={wide(data.adds)} />
           </div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="side">
+      <section class="tile" aria-labelledby="brings-title">
+        <h2 class="tile-h" id="brings-title">{d.brings}</h2>
+        {#if nothing}
+          <p class="plain">{d.addsNothing}</p>
+        {/if}
+        <dl class="facts">
+          {#if b.listCount > 0}
+            <div class="fact"><dt>{d.addsLists}</dt><dd>{said(b.lists, b.listCount, w.lists)}</dd></div>
+          {/if}
+          {#if b.pageCount > 0}
+            <div class="fact"><dt>{d.addsPages}</dt><dd>{said(b.pages, b.pageCount, w.pages)}</dd></div>
+          {/if}
+          {#if b.rules > 0}
+            <div class="fact"><dt>{d.addsRules}</dt><dd>{d.ruleCount(b.rules)}</dd></div>
+          {/if}
+          {#if b.examples > 0}
+            <div class="fact"><dt>{d.addsExamples}</dt><dd>{d.exampleCount(b.examples)}</dd></div>
+          {/if}
           <div class="fact">
             <dt>{d.hosts}</dt>
             <dd>
@@ -99,46 +134,24 @@
             </dd>
           </div>
         </dl>
-      </aside>
-    </div>
-  </div>
-</section>
+      </section>
 
-<section class="band" aria-labelledby="drawing-title">
-  <div class="in">
-    <div class="tiles">
-      <div class="span-8 drawing">
-        <div class="drawing-head">
-          <h2 class="h3" id="drawing-title">{data.pages ? d.preview : d.adds}</h2>
-          <p class="note">{data.pages ? d.previewNote : d.addsNote}</p>
-        </div>
-        {#if data.pages}
-          {#each data.pages as p, i (i)}
-            <figure class="tile sheet" aria-labelledby="page-{i}">
-              <h3 class="tile-head">
-                <span class="well"><Icon name="file" size="m" /></span>
-                <span class="tile-title" id="page-{i}">{p.title}</span>
-              </h3>
-              <div class="sheet-body">
-                <Page src={p.src} layout={wide(p.src)} {now} />
-              </div>
-            </figure>
-          {/each}
-        {:else}
-          <div class="tile sheet">
-            <div class="sheet-body">
-              <Page src={data.adds} layout={wide(data.adds)} />
-            </div>
+      <section class="tile" aria-labelledby="facts-title">
+        <h2 class="tile-h" id="facts-title">{d.facts}</h2>
+        <dl class="facts">
+          <div class="fact">
+            <dt>{d.publisher}</dt>
+            <dd class="maker">{#if card.ours}<Mark height={14} tone="inherit" />{/if}{card.publisher}</dd>
           </div>
-        {/if}
-      </div>
+          {#if data.licence !== ''}
+            <div class="fact"><dt>{d.licence}</dt><dd>{data.licence}</dd></div>
+          {/if}
+          <div class="fact"><dt>{d.latest}</dt><dd class="num">{card.version}</dd></div>
+        </dl>
+      </section>
 
-      <section class="tile span-4 versions-tile" aria-labelledby="versions-title">
-        <h2 class="tile-head">
-          <span class="well"><Icon name="branch" size="m" /></span>
-          <span class="tile-title" id="versions-title">{d.versions}</span>
-          <span class="tile-count num">{data.versions.length}</span>
-        </h2>
+      <section class="tile" aria-labelledby="versions-title">
+        <h2 class="tile-h" id="versions-title">{d.versions}<span class="count num">{data.versions.length}</span></h2>
         <ol class="versions" aria-labelledby="versions-title">
           {#each data.versions as v, i (v.version)}
             <li class="version" data-latest={i === 0 ? '' : undefined} data-withdrawn={v.withdrawn !== null ? '' : undefined}>
@@ -158,73 +171,180 @@
 </section>
 
 <style>
+  /* ── The head, on the night ground ─────────────────────────────────────── */
+
   .back {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 8px;
     min-block-size: var(--tap);
-    margin-block-end: var(--sp-2);
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font-size: var(--t-site-small);
+    margin-block-end: 20px;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
     font-weight: 500;
     text-decoration: none;
   }
 
-  /* ── The opening tile ─────────────────────────────────────────────────── */
-
-  .title-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .pack-title {
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .opening .lede {
-    margin-block-start: calc(-1 * var(--sp-2));
+  .back:hover {
+    color: var(--on-night);
   }
 
   .meta-row {
     display: flex;
     flex-wrap: wrap;
-    column-gap: var(--sp-3);
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+    align-items: center;
+    gap: 8px 20px;
+    margin: 24px 0 0;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
+  }
+
+  /* WHAT IT IS, as a quiet pill in the night's second fill: a word, never a colour. */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 28px;
+    padding-inline: 12px;
+    border-radius: 999px;
+    background: var(--night-2);
+    box-shadow: inset 0 0 0 1px var(--night-rule);
+    color: var(--on-night);
+    font-size: var(--t-site-14);
+    font-weight: 500;
+  }
+
+  .maker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
   }
 
   .install {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3) var(--sp-4);
-    margin-block-start: auto;
+    gap: 12px 20px;
+    margin-block-start: 32px;
   }
 
   .install-note {
     margin: 0;
-    max-inline-size: 48ch;
+    max-inline-size: 36ch;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+  }
+
+  /* ── The board ─────────────────────────────────────────────────────────── */
+
+  .board {
+    padding-block: 56px 96px;
+    background: var(--board);
+  }
+
+  /* THE DRAWING IN EIGHT COLUMNS AND THE TILES IN FOUR at a desk; one column, drawing first, under 1060. */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .drawing,
+  .side {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    min-inline-size: 0;
+  }
+
+  .drawing-head {
+    display: grid;
+    gap: 6px;
+    padding-block-end: 8px;
+  }
+
+  .drawing-title {
+    font-size: var(--t-site-28);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .note {
+    margin: 0;
+    max-inline-size: 52em;
     color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 20px;
+    font-size: var(--t-site-15);
+    line-height: 1.5;
   }
 
-  /* ── The facts tile ───────────────────────────────────────────────────── */
-
-  .facts .tile-head,
-  .versions-tile .tile-head,
-  .sheet .tile-head {
-    font-size: inherit;
-    font-weight: inherit;
+  /* A TILE: flat, radius 16, no edge and no shadow (site F7). */
+  .tile {
+    gap: 16px;
+    padding: 24px;
+    border-radius: 16px;
   }
 
-  .fact-list {
+  .sheet {
+    margin: 0;
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .icon-well {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    border-radius: 8px;
+    background: var(--board);
+    color: var(--ink2);
+  }
+
+  .sheet-title {
+    color: var(--ink);
+    font: 600 var(--t-site-17) / 1.2 var(--head);
+    letter-spacing: -0.02em;
+  }
+
+  /* A WIDE LIST SCROLLS INSIDE ITS OWN TILE, never the page, at any width. */
+  .sheet-body {
+    min-inline-size: 0;
+    overflow-x: auto;
+  }
+
+  .tile-h {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: var(--t-site-21);
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+  }
+
+  .count {
+    color: var(--muted);
+    font-family: var(--ui);
+    font-size: var(--t-site-15);
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .plain {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+  }
+
+  /* ── Facts: a label over its value, a hairline between ───────────────── */
+
+  .facts {
     display: grid;
     margin: 0;
   }
@@ -232,7 +352,7 @@
   .fact {
     display: grid;
     gap: 2px;
-    padding-block: var(--sp-3);
+    padding-block: 12px;
     border-block-start: 1px solid var(--rule);
   }
 
@@ -242,14 +362,15 @@
   }
 
   .fact dt {
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+    color: var(--muted);
+    font-size: var(--t-site-14);
   }
 
   .fact dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--fs-body);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
     overflow-wrap: anywhere;
   }
 
@@ -265,48 +386,15 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--ink);
     font-family: var(--font-mono);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-14);
   }
 
-  /* ── The drawing ──────────────────────────────────────────────────────── */
-
-  /* A column of tiles, not a tile: the heading sits on the ground above the pages it names. */
-  .drawing {
-    display: grid;
-    align-content: start;
-    gap: var(--inset);
-  }
-
-  .drawing-head {
-    display: grid;
-    gap: 4px;
-    padding: var(--sp-2) var(--sp-1) var(--sp-1);
-  }
-
-  .note {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-  }
-
-  .sheet {
-    margin: 0;
-  }
-
-  /* A WIDE LIST SCROLLS INSIDE ITS OWN TILE, never the page, at any width. */
-  .sheet-body {
-    min-inline-size: 0;
-    overflow-x: auto;
-  }
-
-  /* ── The versions: a line of dots, newest first, the latest in ink ────── */
+  /* ── The versions: a line of dots, newest first, the latest filled ─────── */
 
   .versions {
-    position: relative;
     display: grid;
-    gap: var(--sp-4);
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -316,14 +404,14 @@
     position: relative;
     display: grid;
     gap: 2px;
-    padding-inline-start: var(--sp-5);
+    padding-inline-start: 24px;
   }
 
   /* The line joining each dot to the next, drawn as each row's own edge. */
   .version:not(:last-child)::before {
     content: '';
     position: absolute;
-    inset-block: 14px calc(-1 * var(--sp-4));
+    inset-block: 14px -16px;
     inset-inline-start: 4px;
     border-inline-start: 2px solid var(--rule);
   }
@@ -334,8 +422,8 @@
     inset-inline-start: 0;
     inline-size: 10px;
     block-size: 10px;
-    border: 2px solid var(--ink-3);
-    border-radius: var(--r-ctl);
+    border: 2px solid var(--muted);
+    border-radius: 50%;
     background: var(--tile);
     box-sizing: border-box;
   }
@@ -349,29 +437,29 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    column-gap: var(--sp-3);
+    column-gap: 12px;
     margin: 0;
   }
 
   .version-name {
     color: var(--ink);
-    font-size: var(--fs-body);
+    font-size: var(--t-site-15);
     font-weight: 600;
   }
 
   .version-day {
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+    color: var(--muted);
+    font-size: var(--t-site-14);
   }
 
   .version-said {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 20px;
+    font-size: var(--t-site-14);
+    line-height: 1.5;
   }
 
-  /* A withdrawn version is said in words, with a hollow dot; red is for what needs you, and nothing here does. */
+  /* A withdrawn version is said in words, with a hollow dashed dot: no colour, nothing here needs anyone. */
   .withdrawn {
     font-style: italic;
   }
@@ -380,10 +468,27 @@
     border-style: dashed;
   }
 
-  @media (hover: hover) and (pointer: fine) {
-    .back:hover {
-      background: var(--hover);
-      color: var(--ink);
+  @media (width >= 1060px) {
+    .layout {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .install .btn {
+      inline-size: 100%;
+    }
+
+    .board {
+      padding-block: 32px 64px;
+    }
+
+    .tile {
+      padding: 20px;
+    }
+
+    .drawing-title {
+      font-size: var(--t-site-24);
     }
   }
 </style>

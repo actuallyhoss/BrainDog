@@ -1,6 +1,6 @@
 /**
- * The changelog's entries, shaped for reading: each with its permalink, grouped by day, the newest
- * day on its own, and the rest folded by month.
+ * The changelog's entries, shaped for reading: each with its permalink, grouped by day, and the days
+ * by month.
  *
  * ONE FILE FOR THE PAGE AND THE FEED, so an entry's address on `/changelog` and its id in
  * `/changelog.xml` are the same string and a reader who follows one lands on the other. It stays
@@ -70,19 +70,19 @@ export const DAYS: readonly Day[] = (() => {
   return days;
 })();
 
-/** The newest day, which the page draws in full above the months. */
+/** The newest day, which the page opens and marks "Latest" inside its month. */
 export const LATEST: Day | undefined = DAYS[0];
 
 /**
- * Every day but the newest, by month, newest month first.
+ * Every day by month, newest month first, the newest day included.
  *
- * THE NEWEST DAY IS NOT REPEATED HERE, because it is already open above as "Latest" and an entry
- * drawn twice would carry its permalink id twice. A month whose only day was the newest one simply
- * does not appear.
+ * ONE COUNT FOR A MONTH AND ITS DAYS (site F17). The page once drew the newest day on its own above the months and
+ * left it out of them, so "October 2026 · 1 entry" sat beside "Latest · 20 October 2026 · 16 entries". Now the newest
+ * day is the first day of its month, open and marked, and a month's tally is every entry in it.
  */
 export const MONTHS: readonly Month[] = (() => {
   const months: Month[] = [];
-  for (const day of DAYS.slice(1)) {
+  for (const day of DAYS) {
     const key = day.date.slice(0, 7);
     let month = months.at(-1);
     if (month?.key !== key) {

@@ -1,17 +1,21 @@
 <!--
-  The changelog: the log drawn as a chart, the newest day in full, and every other day folded under its month, with
-  a filter per kind and an Atom feed beside it.
+  The changelog: what shipped and when, drawn as a chart of days, every day under its month, a control that shows one
+  kind at a time, and an Atom feed.
 
   14 §5 calls this page "proof of life". Proof of life is only proof if it is true, which is why the entries live in
-  `./entries.ts`, where `../../../scripts/changelog.mjs` holds them against `git log`. The chart and its one line are
-  counted from the same entries when the page is built, so neither can drift from the list.
+  `./entries.ts`, where `../../../scripts/changelog.mjs` holds them against `git log`. The chart, its one line and every
+  count are taken from the same entries when the page is built, so none of them can drift from the list.
 
-  THE PAGE IS TILES ON THE GROUND (the design system). The opening tile holds the heading, the count, the feed and the three
-  kinds as filters; beside it every entry is drawn by the day it shipped, stacked by kind. Under them, the newest day
-  is open in full, and each month is a tile of folded days, a row each.
+  THE SITE'S DESIGN (site F17): the night head with the count and the feed, then the board. At a desk the control and
+  the chart sit in a column that stays in view beside the months; on a phone they come first. A month is a heading and
+  its tally, and each day under it is a tile that folds, the newest open and marked "Latest". The month's count is every
+  entry in it, the newest day's included, so a month and its days never disagree.
+
+  NO HUES. A kind is a word beside its own glyph (a plus for shipped, a tick for fixed, arrows for changed), so it is
+  told by shape and word, and the chart is one ink with the busiest day in the strong one.
 
   IT READS WITHOUT SCRIPTING. The folds are native `<details>`, so every entry is one press away with no script at all.
-  The filters and the permalink reveal are the only parts that need it.
+  The control and the permalink reveal are the only parts that need it.
 
   THE SHAPING IS `./log.ts`, shared with `/changelog.xml`, so an entry's anchor here and its id in the feed are one
   string. Nothing sorts: the order inside a day is editorial, and `entries.ts` owns it.
@@ -21,16 +25,16 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
-  import type { Hue } from '$lib/icons.ts';
+  import type { IconName } from '$lib/icons.ts';
   import { site } from '$lib/copy.ts';
   import { FEED } from '$lib/links.ts';
-  import { DAYS, ITEMS, KINDS, LATEST, MONTHS, parts, tally, type Item, type Kind, type Tally } from './log.ts';
+  import PageHead from '$lib/site/PageHead.svelte';
+  import { DAYS, ITEMS, KINDS, LATEST, MONTHS, parts, tally, type Item, type Kind } from './log.ts';
 
   const copy = site.changelog;
 
-  /* The word is the meaning and the hue agrees with it: green for new work, blue for a repair, amber for a change of
-     course. Never red: nothing in a log of what shipped needs the reader. */
-  const HUE: Record<Kind, Hue> = { shipped: 'earn', fixed: 'info', changed: 'warn' };
+  /* The kind's shape: new work is a plus, a repair a tick, a change of course two arrows. */
+  const GLYPH: Record<Kind, IconName> = { shipped: 'plus', fixed: 'check', changed: 'repeat' };
 
   /** Counted from `entries.ts`, so the numbers cannot drift from the list. */
   const ALL = tally(ITEMS);
@@ -40,27 +44,20 @@
     return copy.day(d.day, d.month);
   };
 
-  const longDate = (date: string): string => {
-    const d = parts(date);
-    return copy.date(d.day, d.month, d.year);
-  };
-
-  /* ── The chart: every calendar day from the first entry to the newest, stacked by kind ─────────────────────────── */
+  /* ── The chart: every calendar day from the first entry to the newest, one bar a day ───────────────────────────── */
 
   const DAY_MS = 86_400_000;
   const utc = (date: string): number => {
     const d = parts(date);
     return Date.UTC(d.year, d.month - 1, d.day);
   };
-  const EMPTY: Tally = { shipped: 0, fixed: 0, changed: 0 };
-  const byDate = new Map(DAYS.map((d) => [d.date, tally(d.entries)]));
+  const byDate = new Map(DAYS.map((d) => [d.date, d.entries.length]));
   const oldest = DAYS.at(-1)?.date ?? '';
   const newest = DAYS[0]?.date ?? '';
   const span = oldest === '' ? 0 : Math.round((utc(newest) - utc(oldest)) / DAY_MS) + 1;
   const CHART = Array.from({ length: span }, (_, i) => {
     const date = new Date(utc(oldest) + i * DAY_MS).toISOString().slice(0, 10);
-    const count = byDate.get(date) ?? EMPTY;
-    return { date, day: parts(date).day, count, total: count.shipped + count.fixed + count.changed };
+    return { date, day: parts(date).day, total: byDate.get(date) ?? 0 };
   });
   const most = Math.max(0, ...CHART.map((c) => c.total));
   /* The busiest day, the newest of them on a tie, because it is the one a reader has not heard about yet. */
@@ -73,17 +70,15 @@
   /* A date under the first bar, the last, and every seventh between: the rest would be a row of digits. */
   const labelled = (i: number): boolean => i === 0 || i === CHART.length - 1 || (i % 7 === 0 && CHART.length - 1 - i > 2);
 
-  /**
-   * THE KINDS A READER HAS ASKED FOR, and none means all. A pill adds its kind and a second press takes it away, so
-   * "Shipped and Fixed" is two presses and clearing is the same presses again.
-   */
-  let only = $state<Kind[]>([]);
-  const filtering = $derived(only.length > 0);
-  const shows = (kind: Kind): boolean => only.length === 0 || only.includes(kind);
+  /** THE KIND A READER HAS ASKED FOR, one at a time as a segmented control is, and `null` for all of them. */
+  let only = $state<Kind | null>(null);
+  const filtering = $derived(only !== null);
+  const shows = (kind: Kind): boolean => only === null || only === kind;
   const any = (entries: readonly Item[]): boolean => entries.some((e) => shows(e.kind));
-  const toggle = (kind: Kind): void => {
-    only = only.includes(kind) ? only.filter((k) => k !== kind) : [...only, kind];
-  };
+
+  /** A month's tally as one line: "17 entries · 14 shipped · 2 fixed · 1 changed", a kind it has none of left out. */
+  const said = (total: number, count: Record<Kind, number>): string =>
+    [copy.entries(total), ...KINDS.filter((k) => count[k] > 0).map((k) => copy.tally(count[k], copy.kind[k]))].join(' · ');
 
   /**
    * A PERMALINK INTO A CLOSED FOLD OPENS IT. A browser scrolls to a fragment only if the element has a box, and an
@@ -116,80 +111,58 @@
   <meta property="og:description" content={site.meta.changelog.description} />
 </svelte:head>
 
-{#snippet tallies(count: Record<Kind, number>)}
-  <span class="tallies">
-    {#each KINDS as kind}
-      {#if count[kind] > 0}
-        <span class="tally" data-hue={HUE[kind]}><span class="dot"></span>{copy.tally(count[kind], copy.kind[kind])}</span>
-      {/if}
-    {/each}
-  </span>
-{/snippet}
-
-<!-- ONE ENTRY, drawn the same under "Latest" and inside a month: its kind as a dot and a word, then its title and
-     its body. Only its heading level differs, because inside a month it sits one level deeper. -->
-{#snippet entry(item: Item, level: 'h3' | 'h4')}
+<!-- ONE ENTRY: its kind as a glyph and a word, then its title with its permalink, and its body. -->
+{#snippet entry(item: Item)}
   <li class="entry" id={item.anchor} hidden={!shows(item.kind)}>
-    <span class="kind" data-hue={HUE[item.kind]}><span class="dot"></span>{copy.kind[item.kind]}</span>
+    <span class="kind"><Icon name={GLYPH[item.kind]} size="s" />{copy.filter[item.kind]}</span>
     <div class="entry-main">
-      <svelte:element this={level} class="entry-title">
+      <h4 class="entry-title">
         {item.title}
         <a class="permalink" href="#{item.anchor}" aria-label={copy.permalink(item.title)}><Icon name="link" size="s" /></a>
-      </svelte:element>
+      </h4>
       <p class="entry-body">{item.body}</p>
     </div>
   </li>
 {/snippet}
 
-<section class="band" aria-labelledby="changelog-title">
-  <div class="in">
-    <div class="tiles">
-      <!-- THE OPENING TILE: what the log is, how much of it there is, the feed, and the kinds as filters. -->
-      <article class="tile lead span-4 opening">
-        <h1 class="h2" id="changelog-title">{copy.title}</h1>
-        <p class="lede">{copy.lede}</p>
-        <p class="count">
-          <span class="count-all">{copy.count(ITEMS.length, DAYS.length)}</span>
-          <a class="btn btn-sm" href={FEED}>{copy.follow}<Icon name="arrow" size="s" /></a>
-        </p>
-        <!-- THE FILTERS ARE THE COUNTS, so the tile says how many of each kind there are and offers to show only
-             those. They need scripting; without it the folds below still read. -->
-        <div class="filters-wrap">
-          <p class="filters-label" id="filters-label">{copy.filters}</p>
-          <div class="filters" role="group" aria-labelledby="filters-label">
-            {#each KINDS as kind}
-              <button type="button" class="pill" data-hue={HUE[kind]} aria-pressed={only.includes(kind)} onclick={() => toggle(kind)}>
-                <span class="dot"></span>{copy.filter[kind]}<span class="pill-n num">{ALL[kind]}</span>
-              </button>
-            {/each}
-          </div>
-        </div>
-      </article>
+<PageHead title={copy.title} lead={copy.lede}>
+  <p class="head-row">
+    <span class="head-count num">{copy.count(ITEMS.length, DAYS.length)}</span>
+    <a class="more" href={FEED}>{copy.follow}<Icon name="arrow" size="m" /></a>
+  </p>
+</PageHead>
 
-      <!-- EVERY ENTRY BY THE DAY IT SHIPPED, stacked by kind, with the one line that says what the chart shows. -->
+<!-- No name of its own: the head above is the region the page title names. -->
+<section class="board">
+  <div class="wrap layout">
+    <aside class="side">
+      <!-- ONE SEGMENTED CONTROL (site F17): all, or one kind. It needs scripting; without it every fold still reads. -->
+      <div class="track" role="group" aria-label={copy.filters}>
+        <button type="button" class="seg" aria-pressed={only === null} onclick={() => (only = null)}>
+          {copy.all}<span class="seg-n num">{ITEMS.length}</span>
+        </button>
+        {#each KINDS as kind (kind)}
+          <button type="button" class="seg" aria-pressed={only === kind} onclick={() => (only = kind)}>
+            <Icon name={GLYPH[kind]} size="s" />{copy.filter[kind]}<span class="seg-n num">{ALL[kind]}</span>
+          </button>
+        {/each}
+      </div>
+
       {#if CHART.length > 0}
-        <section class="tile lead span-8 by-day" aria-labelledby="days-title">
-          <header class="tile-head">
-            <span class="well"><Icon name="bars" /></span>
-            <h2 class="tile-title" id="days-title">{copy.byDay}</h2>
-            <span class="tile-meta">{copy.span(shortDate(oldest), shortDate(newest))}</span>
+        <section class="tile chart-tile" aria-labelledby="days-title">
+          <header class="chart-head">
+            <h2 class="tile-h" id="days-title">{copy.byDay}</h2>
+            <span class="chart-span">{copy.span(shortDate(oldest), shortDate(newest))}</span>
           </header>
-          <ul class="legend" aria-hidden="true">
-            {#each KINDS as kind}<li data-hue={HUE[kind]}><span class="swatch"></span>{copy.kind[kind]}</li>{/each}
-          </ul>
           <div class="chart" role="img" aria-label={copy.chartLabel(shortDate(oldest), shortDate(newest), shortDate(busiest), most)}>
             <div class="plot" aria-hidden="true">
-              {#each TICKS as t}
+              {#each TICKS as t (t)}
                 <span class="grid-line" style="--at: {t / top}"><span class="tick num">{t}</span></span>
               {/each}
-              <div class="cols" style="--n: {CHART.length}">
+              <div class="bars" style="--n: {CHART.length}">
                 {#each CHART as c (c.date)}
                   <span class="col">
-                    {#each KINDS as kind}
-                      {#if c.count[kind] > 0}
-                        <span class="seg" data-hue={HUE[kind]} style="--v: {c.count[kind] / top}"></span>
-                      {/if}
-                    {/each}
+                    {#if c.total > 0}<span class="bar" class:most={c.date === busiest} style="--v: {c.total / top}"></span>{/if}
                   </span>
                 {/each}
               </div>
@@ -203,194 +176,198 @@
           <p class="reading">{copy.reading(shortDate(busiest), most, ALL.shipped, ALL.fixed, quiet)}</p>
         </section>
       {/if}
-    </div>
-  </div>
-</section>
+    </aside>
 
-<!-- No name of its own: the band above is the region the page title names, and this one named the same was a second landmark with that name. -->
-<section class="band">
-  <div class="in">
-    <div class="tiles">
-      {#if LATEST}
-        <section class="tile lead span-6 latest" hidden={!any(LATEST.entries)} aria-labelledby="latest-title">
-          <header class="tile-head">
-            <span class="well"><Icon name="today" /></span>
-            <h2 class="tile-title" id="latest-title">{copy.latest}</h2>
-            <time class="tile-meta num" datetime={LATEST.date}>{longDate(LATEST.date)} · {copy.dayEntries(LATEST.entries.length)}</time>
+    <div class="months">
+      {#each MONTHS as month (month.key)}
+        <section class="month" aria-labelledby="m-{month.key}" hidden={!month.days.some((d) => any(d.entries))}>
+          <header class="month-head">
+            <h2 class="month-title" id="m-{month.key}">{copy.month(month.month, month.year)}</h2>
+            <p class="month-tally num">{said(month.total, month.tally)}</p>
           </header>
-          <ol class="entries">
-            {#each LATEST.entries as item (item.anchor)}
-              {@render entry(item, 'h3')}
+          <div class="days">
+            {#each month.days as day (day.date)}
+              <!-- A filter opens every fold, because a reader who asked for fixes wants to see them, not closed rows. -->
+              <details class="day" open={filtering || day === LATEST} hidden={!any(day.entries)}>
+                <summary class="day-sum">
+                  <h3 class="day-date"><time class="num" datetime={day.date}>{shortDate(day.date)}</time></h3>
+                  {#if day === LATEST}<span class="latest">{copy.latest}</span>{/if}
+                  <span class="day-first">{day.entries[0]?.title}</span>
+                  <span class="day-n num">{copy.dayEntries(day.entries.length)}</span>
+                  <span class="chev" aria-hidden="true"><Icon name="chevron-down" size="m" /></span>
+                </summary>
+                <ol class="entries">
+                  {#each day.entries as item (item.anchor)}
+                    {@render entry(item)}
+                  {/each}
+                </ol>
+              </details>
             {/each}
-          </ol>
+          </div>
         </section>
-      {/if}
-
-      <!-- ONE TILE PER MONTH, the newest open, each day a folded row inside it. A filter opens every fold, because a
-           reader who asked for fixes wants to see them, not a column of closed rows. -->
-      <div class="months" class:span-6={!!LATEST && any(LATEST.entries)}>
-        {#each MONTHS as month, i (month.key)}
-          <details class="tile month" open={filtering || i === 0} hidden={!month.days.some((d) => any(d.entries))}>
-            <summary class="month-sum">
-              <span class="well"><Icon name="calendar" /></span>
-              <h2 class="tile-title">{copy.month(month.month, month.year)}</h2>
-              <span class="sum-side">
-                <span class="sum-count">{copy.entries(month.total)}</span>
-                <span class="chev" aria-hidden="true"><Icon name="chevron-down" size="m" /></span>
-              </span>
-            </summary>
-            <p class="month-tally">{@render tallies(month.tally)}</p>
-            <div class="days">
-              {#each month.days as day (day.date)}
-                <details class="day" open={filtering} hidden={!any(day.entries)}>
-                  <summary class="day-sum">
-                    <h3 class="day-date"><time class="num" datetime={day.date}>{shortDate(day.date)}</time></h3>
-                    <span class="day-first">
-                      <span class="dot" data-hue={HUE[day.entries[0]?.kind ?? 'shipped']}></span>
-                      <span class="day-first-title">{day.entries[0]?.title}</span>
-                    </span>
-                    <span class="day-n">{copy.dayEntries(day.entries.length)}</span>
-                    <span class="chev" aria-hidden="true"><Icon name="chevron-down" size="m" /></span>
-                  </summary>
-                  <ol class="entries">
-                    {#each day.entries as item (item.anchor)}
-                      {@render entry(item, 'h4')}
-                    {/each}
-                  </ol>
-                </details>
-              {/each}
-            </div>
-          </details>
-        {/each}
-      </div>
+      {/each}
     </div>
   </div>
 </section>
 
 <style>
-  /* An author `display` beats the `hidden` attribute, so every element a filter hides says so here. */
-  .latest[hidden],
+  /* An author `display` beats the `hidden` attribute, so every element the control hides says so here. */
   .month[hidden],
   .day[hidden],
   .entry[hidden] {
     display: none;
   }
 
-  /* ── The opening tile ───────────────────────────────────────────────── */
+  /* ── The head, on the night ground ─────────────────────────────────────── */
 
-  .count {
+  .head-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3);
+    gap: 4px 24px;
+    margin: 28px 0 0;
+  }
+
+  .head-count {
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
+  }
+
+  .head-row .more {
     margin: 0;
+    color: var(--on-night);
   }
 
-  .count-all {
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+  /* ── The board ─────────────────────────────────────────────────────────── */
+
+  .board {
+    padding-block: 56px 96px;
+    background: var(--board);
   }
 
-  .filters-wrap {
+  /* THE CONTROL AND THE CHART IN A COLUMN BESIDE THE MONTHS at a desk, staying in view; above them under 1060. */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+  }
+
+  .side {
+    display: grid;
+    gap: 16px;
+    min-inline-size: 0;
+  }
+
+  @media (width >= 1060px) {
+    .layout {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      gap: 48px;
+    }
+
+    .side {
+      position: sticky;
+      inset-block-start: 24px;
+    }
+  }
+
+  /* ── The control: one pill track, the chosen segment in ink ─────────────── */
+
+  .track {
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin-block-start: auto;
+    gap: 2px;
+    justify-self: start;
+    max-inline-size: 100%;
+    padding: 4px;
+    overflow-x: auto;
+    border-radius: 999px;
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    scrollbar-width: none;
   }
 
-  .filters-label {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+  .track::-webkit-scrollbar {
+    display: none;
   }
 
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  /* PILLS, because they are toggles and not a navigation: pressed, a pill takes the ink's own fill. */
-  .pill {
+  .seg {
     display: inline-flex;
+    flex: none;
     align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: 14px;
-    background: var(--tile-2);
+    gap: 6px;
+    min-block-size: 36px;
+    padding-inline: 12px;
     border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-site-small);
-    font-weight: 500;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink2);
+    font: 500 var(--t-site-14) / 1 var(--ui);
+    white-space: nowrap;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .pill:hover {
-    background: var(--tile-2);
+  .seg:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
   }
 
-  .pill[aria-pressed='true'] {
+  .seg[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--on-red);
+    color: var(--page);
   }
 
-  .pill-n {
-    color: var(--ink-3);
+  .seg-n {
+    margin-inline-start: 2px;
+    color: var(--muted);
+    font-weight: 400;
   }
 
-  .pill[aria-pressed='true'] .pill-n {
+  .seg[aria-pressed='true'] .seg-n {
     color: inherit;
+    opacity: 0.7;
   }
 
-  .dot {
-    flex: none;
-    inline-size: 6px;
-    block-size: 6px;
-    background: var(--hue);
-    border-radius: var(--r-ctl);
+  /* ── The chart tile ────────────────────────────────────────────────────── */
+
+  /* A TILE: flat, radius 16, no edge and no shadow (site F7). */
+  .tile {
+    gap: 16px;
+    padding: 24px;
+    border-radius: 16px;
   }
 
-  /* ── The chart ──────────────────────────────────────────────────────── */
-
-  .legend {
+  .chart-head {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-4);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    color: var(--ink2);
-    font-size: var(--t-app-sm);
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
   }
 
-  .legend li {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  .tile-h {
+    font-size: var(--t-site-21);
+    line-height: 1.2;
+    letter-spacing: -0.03em;
   }
 
-  .swatch {
-    inline-size: 8px;
-    block-size: 8px;
-    background: var(--hue);
-    border-radius: 2px;
+  .chart-span {
+    color: var(--muted);
+    font-size: var(--t-site-14);
   }
 
   .chart {
-    --axis: 28px;
+    --axis: 24px;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: 6px;
   }
 
-  /* THE PLOT IS 184 TALL, its grid lines at each step up the axis, and the bars stand on the bottom one. */
+  /* THE PLOT IS 128 TALL, its grid lines at each step up the axis, and the bars stand on the bottom one. */
   .plot {
     position: relative;
-    block-size: 184px;
-    margin-block-start: var(--sp-2);
+    block-size: 128px;
+    margin-block-start: 8px;
   }
 
   .grid-line {
@@ -404,118 +381,226 @@
     position: absolute;
     inset-inline-start: 0;
     inset-block-end: -8px;
-    inline-size: calc(var(--axis) - 8px);
-    color: var(--ink-3);
+    inline-size: calc(var(--axis) - 6px);
+    color: var(--muted);
     font-size: var(--t-app-xs);
     line-height: 16px;
     text-align: end;
   }
 
-  .cols,
+  .bars,
   .x {
     display: grid;
     grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-    gap: 4px;
+    gap: 2px;
     margin-inline-start: var(--axis);
   }
 
-  .cols {
+  .bars {
     position: absolute;
     inset-block: 0;
     inset-inline: var(--axis) 0;
     margin-inline-start: 0;
   }
 
-  /* A DAY'S BAR, its kinds stacked from the ground up, each part its share of the axis's height. */
   .col {
     display: flex;
     flex-direction: column-reverse;
-    gap: 2px;
     block-size: 100%;
   }
 
-  .seg {
-    flex: none;
-    block-size: calc(var(--v) * 100% - 2px);
+  /* A DAY'S BAR in the chart's quiet ink; the busiest day in the strong one. */
+  .bar {
+    block-size: calc(var(--v) * 100%);
     min-block-size: 3px;
-    background: var(--hue);
-    border-radius: 3px;
+    border-radius: 3px 3px 1px 1px;
+    background: var(--bar);
+  }
+
+  .bar.most {
+    background: var(--chart);
   }
 
   .x-day {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-app-xs);
     text-align: center;
     white-space: nowrap;
   }
 
-  /* ── Latest ─────────────────────────────────────────────────────────── */
+  /* ── The months ────────────────────────────────────────────────────────── */
+
+  .months {
+    display: grid;
+    gap: 48px;
+    min-inline-size: 0;
+  }
+
+  .month-head {
+    display: grid;
+    gap: 6px;
+    margin-block-end: 16px;
+  }
+
+  .month-title {
+    font-size: clamp(28px, 2.6vw, 36px);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+  }
+
+  .month-tally {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--t-site-15);
+  }
+
+  .days {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* A DAY IS A TILE THAT FOLDS: its head the whole row, the entries under it. */
+  .day {
+    border-radius: 16px;
+    background: var(--tile);
+  }
+
+  .day-sum {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-block-size: 60px;
+    padding: 8px 20px;
+    border-radius: 16px;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .day-sum::-webkit-details-marker {
+    display: none;
+  }
+
+  .day-sum:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  .day-date {
+    flex: none;
+    min-inline-size: 7.5em;
+    color: var(--ink);
+    font-size: var(--t-site-17);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  /* "LATEST", a word in a quiet pill and never a colour. */
+  .latest {
+    flex: none;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--board);
+    color: var(--ink);
+    font-size: var(--t-site-13);
+    font-weight: 500;
+  }
+
+  .day-first {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink2);
+    font-size: var(--t-site-15);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .day[open] .day-first {
+    visibility: hidden;
+  }
+
+  .day-n {
+    flex: none;
+    margin-inline-start: auto;
+    color: var(--muted);
+    font-size: var(--t-site-14);
+  }
+
+  .chev {
+    display: grid;
+    flex: none;
+    place-items: center;
+    color: var(--muted);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .day[open] > summary .chev {
+    transform: rotate(180deg);
+  }
+
+  /* ── An entry ──────────────────────────────────────────────────────────── */
 
   .entries {
-    display: flex;
-    flex-direction: column;
+    display: grid;
     margin: 0;
-    padding: 0;
+    padding: 0 20px 8px;
     list-style: none;
   }
 
-  /* AN ENTRY IS A ROW: its kind in a narrow column, then its title and its body, with a hairline between entries. */
+  /* AN ENTRY IS A ROW: its kind in a narrow column, then its title and its body, a hairline above each. */
   .entry {
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr);
-    gap: var(--sp-3);
-    padding-block: var(--sp-4);
-    /* A permalink lands below the floating bar, not under it. */
-    scroll-margin-block-start: calc(var(--inset) + 56px + var(--sp-4));
-  }
-
-  .entry + .entry {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 12px;
+    padding-block: 16px;
     border-block-start: 1px solid var(--rule);
+    /* A permalink lands with room above it. */
+    scroll-margin-block-start: 24px;
   }
 
   .kind {
     display: inline-flex;
     align-items: center;
     align-self: start;
-    gap: 6px;
+    justify-self: start;
+    gap: 5px;
     min-block-size: 24px;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
+    padding-inline: 8px 10px;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink2);
+    font-size: var(--t-site-13);
     font-weight: 500;
   }
 
   .entry-main {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
+    display: grid;
+    gap: 4px;
     min-inline-size: 0;
   }
 
   .entry-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--fs-body);
+    font-family: var(--ui);
+    font-size: var(--t-site-16);
     font-weight: 600;
-    line-height: 24px;
-    letter-spacing: 0;
+    line-height: 1.5;
     text-wrap: pretty;
   }
 
   /* Always drawn, because a phone has no hover to find it with; quiet until it is pointed at. */
   .permalink {
+    position: relative;
     display: inline-flex;
-    margin-inline-start: var(--sp-2);
-    color: var(--ink-3);
+    margin-inline-start: 6px;
+    color: var(--muted);
     vertical-align: -0.1em;
-    opacity: 0.55;
+    opacity: 0.6;
     transition: opacity var(--d-state) var(--ease-out);
   }
 
-  /* THE LINK GLYPH IS 12PX AND THE PRESS IS NOT: a 44px square round it, drawn by nothing. */
-  .permalink {
-    position: relative;
-  }
-
+  /* THE LINK GLYPH IS SMALL AND THE PRESS IS NOT: a 44px square round it, drawn by nothing. */
   .permalink::before {
     content: '';
     position: absolute;
@@ -532,179 +617,72 @@
   }
 
   .entry-body {
-    max-inline-size: 72ch;
+    max-inline-size: 68ch;
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 22px;
+    font-size: var(--t-site-15);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
-  /* ── The months ─────────────────────────────────────────────────────── */
+  @media (hover: hover) and (pointer: fine) {
+    .seg[aria-pressed='false']:hover {
+      background: var(--soft);
+      color: var(--ink);
+    }
 
-  .months {
-    display: flex;
-    flex-direction: column;
-    gap: var(--inset);
-  }
-
-  .month {
-    display: block;
-  }
-
-  /* A FOLD'S HEAD IS THE TILE'S HEADING ROW: the well, the name, the count and a chevron, the whole row the control.
-     The browser's own triangle goes, because the chevron sits where the eye ends the row. */
-  .month-sum,
-  .day-sum {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    list-style: none;
-    cursor: pointer;
-  }
-
-  .month-sum::-webkit-details-marker,
-  .day-sum::-webkit-details-marker {
-    display: none;
-  }
-
-  .month-sum {
-    min-block-size: max(var(--well), var(--tap));
-  }
-
-  .sum-side {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-inline-start: auto;
-  }
-
-  .sum-count {
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-  }
-
-  .chev {
-    display: grid;
-    place-items: center;
-    color: var(--ink-3);
-    transition: transform var(--d-state) var(--ease-out);
-  }
-
-  details[open] > summary .chev {
-    transform: rotate(180deg);
-  }
-
-  .month-tally {
-    margin: var(--sp-3) 0 var(--sp-2);
-  }
-
-  .tallies {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-  }
-
-  .tally {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .day {
-    border-block-start: 1px solid var(--rule);
-  }
-
-  /* A DAY IS ONE ROW: its date, its first entry's kind and title, how many it holds, and the chevron. */
-  .day-sum {
-    min-block-size: var(--tap);
-    padding-block: var(--sp-2);
-    border-radius: var(--r-pop);
-  }
-
-  .day-sum:hover {
-    background: var(--hover);
-  }
-
-  .day-date {
-    flex: none;
-    inline-size: 110px;
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-    font-weight: 500;
-    letter-spacing: 0;
-  }
-
-  .day-first {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  .day-first-title {
-    overflow: hidden;
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .day-n {
-    flex: none;
-    color: var(--ink-3);
-    font-size: var(--t-site-small);
-  }
-
-  .day .entries {
-    margin-block-end: var(--sp-3);
-    padding-inline-start: var(--sp-3);
-    border-inline-start: 2px solid var(--rule);
-  }
-
-  /* 13 §7: 44 under a thumb, on the filters and on every fold's row. */
-  @media (width < 640px), (pointer: coarse) {
-    .pill {
-      min-block-size: var(--tap);
+    .day-sum:hover .chev,
+    .day-sum:hover .day-date {
+      color: var(--ink);
     }
   }
 
-  /* THE PHONE: an entry's kind sits over its title, a day's first title gives way to its count, and the chart keeps
-     every bar but only its end dates. */
-  @media (width < 640px) {
-    .entry {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-1);
+  /* ── A phone: 44 under a thumb, the kind over its title, and a day's first title gives way to its count ───── */
+
+  @media (max-width: 760px) {
+    .board {
+      padding-block: 24px 64px;
+    }
+
+    .seg {
+      min-block-size: var(--tap);
+    }
+
+    .tile {
+      padding: 20px;
+    }
+
+    .plot {
+      block-size: 104px;
+    }
+
+    .x-day:not(:first-child, :last-child) {
+      visibility: hidden;
+    }
+
+    .months {
+      gap: 40px;
+    }
+
+    .day-sum {
+      padding-inline: 16px;
     }
 
     .day-date {
-      inline-size: auto;
+      min-inline-size: 0;
     }
 
     .day-first {
       display: none;
     }
 
-    .day-n {
-      margin-inline-start: auto;
+    .entries {
+      padding-inline: 16px;
     }
 
-    .plot {
-      block-size: 140px;
-    }
-
-    .cols,
-    .x {
-      gap: 2px;
-    }
-
-    .x-day:not(:first-child, :last-child) {
-      visibility: hidden;
+    .entry {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
     }
   }
 </style>

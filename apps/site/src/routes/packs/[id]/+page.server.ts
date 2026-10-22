@@ -8,7 +8,7 @@
 import { error } from '@sveltejs/kit';
 import { held } from '$lib/launch.ts';
 import { APP } from '$lib/links.ts';
-import { addsSrc, cardOf, changeOf, dayOf, installPath, isPublic, offered, slugOf } from '$lib/packs/catalogue.ts';
+import { addsSrc, cardOf, changeOf, dayOf, installPath, isPublic, nameOf, offered, slugOf } from '$lib/packs/catalogue.ts';
 import { readCounts, readEntries, readPreview } from '$lib/packs/read.server.ts';
 import type { EntryGenerator, PageServerLoad } from './$types';
 
@@ -31,6 +31,16 @@ export const load: PageServerLoad = async ({ params }) => {
     card,
     licence: entry.license,
     hosts: version.reach.hosts,
+    /* WHAT IT BRINGS, BY NAME: a list or page id said as words, and one a template names (`{{name}}`) left out of the
+       names but kept in the count, so "3 pages" stays true when only two can be named. */
+    brings: {
+      lists: version.reach.lists.map(nameOf).filter((n) => n !== ''),
+      listCount: version.reach.lists.length,
+      pages: version.reach.pages.map(nameOf).filter((n) => n !== ''),
+      pageCount: version.reach.pages.length,
+      rules: version.reach.rules.length,
+      examples: version.reach.examples,
+    },
     install: installPath(APP, entry),
     /* The clock a preview's figures were read at, so a due day reads as it did in the scratch record. */
     now: Number.isFinite(made) ? made : null,

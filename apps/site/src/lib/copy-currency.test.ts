@@ -152,7 +152,7 @@ test('the figure check sees what it is meant to', () => {
 });
 
 test('no sentence says a card is charged today', () => {
-  /* BILLING STAYS OFF OR IN TEST MODE (DIRECTION §42): a live charge is a word he has not said. */
+  /* BILLING STAYS OFF OR IN TEST MODE: a live charge is a word he has not said. */
   const text = said.join('\n');
   assert.doesNotMatch(text, /\b(?:card|you) (?:is|are|will be|gets?) charged\b|charged (?:today|now)\b|charge your card/i);
   assert.doesNotMatch(text, /\bper year\b|\ba year\b|\byearly\b|\bannual/i, 'the site draws a yearly price, and the table sells none');

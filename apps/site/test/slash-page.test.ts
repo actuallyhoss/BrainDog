@@ -1,5 +1,5 @@
 /**
- * The Slash page and the drawing of Slash that the home card, the desk's bar and this page share (DIRECTION §47).
+ * The Slash page and the drawing of Slash that the home card, the desk's bar and this page share.
  *
  *   node --test apps/site/test/slash-page.test.ts
  *

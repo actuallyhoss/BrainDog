@@ -1,7 +1,7 @@
 /**
  * THE MADE-UP RECORD the site draws its product on: Maya Okafor, who runs four projects, and the people she works with.
  * Nobody real. Every drawing on the site imports its names and figures from here and types none of its own, so the
- * desk, Slash and the bands always tell one story (DIRECTION §47, launch call 5: an invented founder, never his record).
+ * desk, Slash and the bands always tell one story (launch call 5: an invented founder, never his record).
  *
  * DATA ONLY. No markup and no components: a figure is a `Figure`, which a drawing shows as a button that opens what
  * it came from, or as a plain span. The words are the prototype's (`loop/site-2026-10-17/src/site.html`, its script),

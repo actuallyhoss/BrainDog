@@ -2,7 +2,7 @@
   One docs page: a slim night strip with where the page sits and its title, then the section nav, the page drawn by the
   product's renderer, and the list of its parts.
 
-  THE LOOK IS LOOK B'S (DIRECTION §47, LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
+  THE LOOK IS LOOK B'S (LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
   The page is one sheet of --paper read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
   round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list. A code

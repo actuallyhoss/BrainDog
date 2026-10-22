@@ -1,7 +1,7 @@
 <!--
   The docs' section nav: the search, then every section with its pages, the open page marked.
 
-  FLAT ON THE BOARD, NO TILE (DIRECTION §47, LAUNCH 103 job 7): the search field, "All sections", then each section's
+  FLAT ON THE BOARD, NO TILE (LAUNCH 103 job 7): the search field, "All sections", then each section's
   name with its pages under it, and the page you are on on the tile's fill with a red mark at its start and in bold,
   so it is told by more than colour.
 

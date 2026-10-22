@@ -1,7 +1,7 @@
 <!--
   The trust pages' one skeleton: the night head, then a board of tiles. /support and /legal draw with it.
 
-  THE HEAD IS `PageHead` (DIRECTION §47): the page's name and its one line on the night ground, as every page of the
+  THE HEAD IS `PageHead`: the page's name and its one line on the night ground, as every page of the
   site opens. Under it is one flat board (Look B), and every part is a tile on it: flat and opaque, radius 16, no edge
   and no shadow, headed by its glyph and its title in Lexend.
 
@@ -126,7 +126,7 @@
     }
   }
 
-  /* A TILE: flat and opaque, radius 16, no edge and no shadow (DIRECTION §39). */
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
   .part {
     display: flex;
     flex-direction: column;
