@@ -17,6 +17,8 @@ import { join, resolve } from 'node:path';
 import { argv } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
+import { KIND_NAMES } from './words.mjs';
+
 /** How tall each picture is on the sheet, and how wide its caption. */
 const ROW_PX = 340;
 const CAPTION_PX = 260;
@@ -42,8 +44,6 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/gu, (c) => ({ '&': '&amp;', '
 
 const plural = (n, one) => `${n} ${n === 1 ? one : `${one}s`}`;
 const listOf = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
-/** What each kind of raw text is called on the sheet. */
-const RAW_WORDS = { placeholders: 'placeholder', instants: 'raw time', ids: 'raw id', handles: 'raw handle', stuck: 'stuck value' };
 
 /**
  * What a screen's pictures say against it, one line a fault with the widths it was seen at: never settled, refused,
@@ -59,7 +59,7 @@ export function flags(shots) {
     if (s.overflowPx > 1) add(`${s.overflowPx}px sideways`, s.width);
     if (s.writesBlocked > 0) add(`${plural(s.writesBlocked, 'write')} blocked`, s.width);
     if (s.consoleErrors?.length > 0) add(plural(s.consoleErrors.length, 'console error'), s.width);
-    for (const [kind, { count }] of Object.entries(s.raw ?? {})) add(plural(count, RAW_WORDS[kind] ?? `raw ${kind}`), s.width);
+    for (const [kind, { count }] of Object.entries(s.raw ?? {})) add(plural(count, KIND_NAMES[kind] ?? `raw ${kind}`), s.width);
   }
   return [...at].map(([said, ws]) => `${said} at ${listOf([...new Set(ws)])}`);
 }

@@ -28,37 +28,17 @@ import { chromium } from '@playwright/test';
 import { budget, readiness } from '../gates/lib.mjs';
 import { pick, screensOf } from './screens.mjs';
 import { sheets } from './sheet.mjs';
+import { RAW, rawIn, slugsOf } from './words.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/* THE RAW COUNTING MOVED TO `words.mjs` AND IS STILL THIS FILE'S EXPORT, so the people's walks (`rawIn`) read it where they did. */
+export { RAW, rawIn };
+
+const ROOT =resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export const THEMES = ['light', 'dark'];
 
 /** The look's widths, read where every number a check asserts is kept. */
 export const widths = () => [...budget('look').widths];
-
-/** What a person must never read on a screen, counted on each picture for the reader to look at first. */
-export const RAW = {
-  /* A template slot that was never filled: `{{revenue.monthly}}`, the audit's first finding on his record. */
-  placeholders: /\{\{[^}\n]{1,80}\}\}/gu,
-  /* A machine instant in print: 2026-10-06T19:07:01.610Z. */
-  instants: /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b/gu,
-  /* A row's own id, a ULID: 26 characters of Crockford's alphabet. */
-  ids: /\b[0-9A-HJKMNP-TV-Z]{26}\b/gu,
-  /* An address in the record's own spelling, `tools#8`, where a name belongs. */
-  handles: /\b[a-z][a-z_]{2,}#\d+\b/gu,
-  /* The words a stuck value prints. */
-  stuck: /\b(?:undefined|NaN|null|\[object Object\])\b/gu,
-};
-
-/** The raw things in a screen's text, each with up to three examples. */
-export function rawIn(text) {
-  const out = {};
-  for (const [kind, re] of Object.entries(RAW)) {
-    const found = [...String(text).matchAll(re)].map((m) => m[0]);
-    if (found.length > 0) out[kind] = { count: found.length, e: [...new Set(found)].slice(0, 3) };
-  }
-  return out;
-}
 
 /**
  * EVERY RUN OF TEXT ON THE SCREEN AS THE BOXES IT IS DRAWN IN, run inside the page (`page.evaluate`). Only what a person
@@ -190,7 +170,7 @@ export const since = (before, after) => {
 };
 
 /** One picture of one screen at one width and theme, and its line of `said.json`. */
-async function shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs }) {
+async function shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known }) {
   heard.errors.length = 0;
   heard.failed.length = 0;
   const before = source.counts();
@@ -279,7 +259,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     writesBlocked: blocked.writes ?? 0,
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),
-    raw: rawIn(facts.text),
+    raw: rawIn(facts.text, { all: true, slugs: known.slugs }),
     overlaps: { count: crossed.length, e: crossed.slice(0, 5) },
     marked: facts.marked,
     lint: null,
@@ -293,6 +273,7 @@ export default async function capture({ origin, app, set, out, source }) {
   const settleMs = budget('layout').settleMs;
   const ready = readiness('look', timeoutMs, join(ROOT, 'apps', 'web', 'build'));
   const picked = await pick(asker(origin));
+  const known = { slugs: slugsOf(picked.pages) };
   const { screens, missing } = Array.isArray(source.screens) ? await namedScreens(source.screens, picked) : await screensOf(set, picked);
   const cannot = [];
   const drawn = [];
@@ -336,7 +317,7 @@ export default async function capture({ origin, app, set, out, source }) {
         page.on('requestfailed', (r) => heard.failed.push(`${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText ?? 'failed'}`));
         page.on('response', (r) => r.status() >= 400 && heard.failed.push(`${r.request().method()} ${new URL(r.url()).pathname}: ${r.status()}`));
         for (const screen of drawn) {
-          said.shots.push(await shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs }));
+          said.shots.push(await shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known }));
           console.log(`  ${screen.key} ${width} ${theme}: ${said.shots.at(-1).settled ?? 'never settled'}`);
           write();
         }
