@@ -658,7 +658,7 @@
         "BILLING": "",
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of the owner's Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
-        "STRIPE_PRICE_PLUS": "",
+        "STRIPE_PRICE_PLUS": "price_1UKiNQPop5yzbTmm6IjGxQFd",
         "STRIPE_PRICE_PACK_100": "",
         "STRIPE_PRICE_PACK_500": "",
         /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS FROM 8 OCTOBER:

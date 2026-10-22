@@ -1094,7 +1094,13 @@ export async function installFromCatalogue(
   const entry = at.index.entries.find((e) => e.id === bare && e.kind === kind);
   if (!entry) {
     const ids = at.index.entries.filter((e) => e.kind === kind).map((e) => e.id);
-    io.say(`There is no ${NOUN[kind].the} called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`);
+    /* AN ADD-ON ASKED FOR AS A USE CASE is the owner's to install: an agent asks for it with `propose` and he presses yes. */
+    const pack = kind === 'usecase' && at.index.entries.some((e) => e.id === bare && e.kind === 'pack');
+    io.say(
+      pack
+        ? `${bare} is an add-on, not a use case. Ask for it with propose, body_kind pack and {"install":"${bare}"}, and it installs when the owner says yes.`
+        : `There is no ${NOUN[kind].the} called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`,
+    );
     return 1;
   }
   if (version !== undefined && !VERSION.test(version)) {
