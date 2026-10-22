@@ -48,6 +48,8 @@
   import { judgedWith } from './panels.ts';
   import { heldOut, holdsWhole, type Reader } from './held.ts';
   import NextStep from './NextStep.svelte';
+  import { COMPACT_MOST } from './queue-answer.ts';
+  import { slotPlace } from './slot.ts';
   import { frameResizeObserver } from '$lib/ui/resize.ts';
   import { presses } from '$lib/data/held.svelte.ts';
   import { openPalette } from '$lib/palette/open.svelte.ts';
@@ -63,6 +65,7 @@
     ids = '',
     level = 2,
     headed = false,
+    leadHead = null,
     strip = null,
     host = null,
     pick = null,
@@ -100,6 +103,12 @@
     level?: 2 | 3;
     /** The page's sentence is the header's line (`PageView`'s `led`): lifted out of the board, over both columns. */
     headed?: boolean;
+    /**
+     * THE LEAD TILE'S HEAD (`PageView`'s): the page's name, its count and its actions on one row, drawn inside the tile
+     * the page's sentence opens, over the sentence. Given, the lifted sentence is a tile of its own, the Bento boards'
+     * lead tile, and what goes under the sentence goes inside it. `null` keeps the sentence the header's plain line.
+     */
+    leadHead?: Snippet | null;
     /** What narrows the page (its filter strip), drawn under the headline on a page whose head rides over it. */
     strip?: Snippet | null;
     /**
@@ -141,6 +150,10 @@
      refusal; the owner's page is the blocks as handed. */
   const readerWhole = $derived(mode === 'preview' || holdsWhole((route.data as { me?: Reader } | undefined)?.me));
   const blocks = $derived(heldOut(given, readerWhole));
+  /* A PAGE THAT SAYS WHICH QUESTIONS ARE ITS OWN BORROWS NO OTHER: a queue of questions narrowed by `where` (the Agents
+     page's "what a run asked", a project's own) is the page's place for them, and the slot over it drew the first
+     question of the whole record, about a mail domain, at the head of Agents. A page with no such queue keeps the slot. */
+  const ownQuestions = $derived(given.some((b) => b.kind === 'queue' && (b as { source?: unknown }).source === 'governance.open' && (b as { narrowed?: unknown }).narrowed === true));
 
   /* ── the main column and the rail ─────────────────────────────────────────
      A PAGE THAT DECLARES `layout` DRAWS TWO COLUMNS; every other page draws the one flow it always has, through the same
@@ -150,7 +163,7 @@
 
   /**
    * THE BLOCKS AS THIS MODE DRAWS THEM. On every page being read, a home or any other, a block that holds nothing and
-   * says nothing about it, or that this build cannot draw, is not drawn (DIRECTION §35: an empty or unused part is not
+   * says nothing about it, or that this build cannot draw, is not drawn (an empty or unused part is not
    * drawn), at the index it was declared at, so every id and write on the page still finds it. THE RECORD SAYS WHICH
    * (`drawn: false` with `why`, the kernel's `drawn.ts`), and `emptyHidden` keeps what it left out and judges only what
    * it drew. AUTHORING DRAWS THEM ALL (`arranged`): while the page is arranged, or as a preview of a change, a block that
@@ -192,7 +205,7 @@
   const looked = $derived(lookOrder(blocks.map((b, i) => placedOf(b, keys[i]!)), look));
 
   /**
-   * A PAGE'S WAITING QUESTIONS NEVER LEAD IT WHEN IT IS ABOUT SOMETHING ELSE (`asks.ts`, DIRECTION §39): on a page at its
+   * A PAGE'S WAITING QUESTIONS NEVER LEAD IT WHEN IT IS ABOUT SOMETHING ELSE (`asks.ts`): on a page at its
    * own address they are drawn compact, in the side column or after the page's own figures, so Money opens on its cash.
    * Home leads with what needs you, and keeps it there, compact. Not while arranging, where the order is the one being
    * written, and not in a preview.
@@ -253,7 +266,7 @@
 
   /**
    * THE HEADLINE, LIFTED: the page's sentence, drawn as the header's line under the page's name and not as a tile
-   * (`headed`, `lead.ts`, DIRECTION §39). Over both columns on a page with a rail, and the board starts under it.
+   * (`headed`, `lead.ts`). Over both columns on a page with a rail, and the board starts under it.
    */
   const lifted = $derived.by((): Laid | null => {
     if (!headed) return null;
@@ -265,6 +278,10 @@
    * sits straight under it.
    */
   const headline = $derived(lifted ?? pairs.find((x) => x.block.drawn && x.block.kind === 'note' && isLead(x.block)) ?? null);
+  /** Whether the lifted sentence is drawn as the lead tile, with the page's head row inside it. */
+  const leadTile = $derived(lifted !== null && leadHead !== null);
+  /** Where the reserved slot stands on this page, or `null` where it draws none (`slot.ts` `slotPlace`). */
+  const slotAt = $derived(slotPlace(page));
   /** Each column's pairs, less the headline lifted over both: a sentence declared in the rail is lifted too, and drawn once. */
   const mainRest = $derived(lifted ? split.main.filter((x) => x !== lifted) : split.main);
   const railRest = $derived(lifted ? split.rail.filter((x) => x !== lifted) : split.rail);
@@ -337,7 +354,7 @@
 
   /**
    * THE ONE NEXT ACTION UNDER THE HEADER, only where it is not the first thing on the board already (`look.ts`
-   * `repeatsFirst`, DIRECTION §39): the line said again what the first card asked, straight under it.
+   * `repeatsFirst`): the line said again what the first card asked, straight under it.
    */
   /* THE FIRST CARD, NOT THE FIRST BLOCK: the line a task is typed into and a heading are not what the eye reads first. */
   /* WHERE WHAT THE SCREEN OPENS THE BOARD WITH IS DRAWN (`opens`): under the headline when the headline is the first
@@ -437,7 +454,7 @@
   const narrow = $derived(workWidth !== null && workWidth < ONE_UNDER && mode !== 'preview');
 
   /**
-   * THE SIDE COLUMN CLOSES WHERE ITS LAST TILE ENDS (`layout.ts` `flowAfterRail`, DIRECTION §36.22): the main blocks
+   * THE SIDE COLUMN CLOSES WHERE ITS LAST TILE ENDS (`layout.ts` `flowAfterRail`): the main blocks
    * that start below it are drawn in a third area across the whole board, paired as whole rows are, so Money is not a
    * tall column beside an empty third. Only on a page at its own address at a desk's width, two columns side by side,
    * and never while arranging (each column is a list being moved) or with a rail pinned in view (it would ride over the
@@ -484,7 +501,7 @@
           })),
         );
       }
-      /* AND EVERY ROW ON THE BOARD'S OWN WIDTHS (DIRECTION §39): a quarter, a third, a half, two thirds or the whole row. */
+      /* AND EVERY ROW ON THE BOARD'S OWN WIDTHS: a quarter, a third, a half, two thirds or the whole row. */
       const board = snapped(run.items.map((x, n) => ({ span: x === lifted ? COLUMNS : got[n]!, drawn: x.block.drawn })));
       run.items.forEach((x, n) => {
         if (x !== lifted && board[n] !== x.slot.span) out.set(x.slot.i, board[n]!);
@@ -494,7 +511,7 @@
   });
 
   /* ── recomposing in place ──────────────────────────────────────────────────
-     A NEW ANSWER MOVES THE PAGE, IT DOES NOT REDRAW IT (DIRECTION §38, `recompose.ts`): each block is measured before
+     A NEW ANSWER MOVES THE PAGE, IT DOES NOT REDRAW IT (`recompose.ts`): each block is measured before
      the page draws the answer and played from where it was to where it is, a new block fades and rises in, and one
      that left fades out where it stood. Never on the first draw of a page, never on a page that is another page, never
      as the arrange mode opens or shuts (every block takes a bar, which is the mode and not the record moving), and
@@ -620,7 +637,7 @@
   });
 
   /* ── a long note, folded ───────────────────────────────────────────────────
-     A NOTE OR A DOCUMENT OF MORE THAN TWELVE LINES ON A PAGE SHOWS ITS FIRST TWELVE (`fold.ts`, DIRECTION §35.19): an
+     A NOTE OR A DOCUMENT OF MORE THAN TWELVE LINES ON A PAGE SHOWS ITS FIRST TWELVE (`fold.ts`): an
      imported document poured down a project page whole. Measured where it is drawn, by its prose's own line, so the
      cut falls under a line and never through one; "Read all" opens it in place. Per visit: what was opened is held
      here by the block's key and goes with the page, never stored. Not while arranging, where a block is being placed.
@@ -1157,12 +1174,14 @@
       data-key={keys[slot.i]}
       aria-labelledby={arranging || block.heading ? `${ids}h-${slot.i + 1}` : undefined}
       style="--span:{spans.get(slot.i) ?? slot.span}"
+      data-full={(spans.get(slot.i) ?? slot.span) >= COLUMNS ? '' : undefined}
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
       role={arranging ? 'listitem' : block.heading ? 'region' : undefined}
       data-dragging={dragging === at ? '' : undefined}
       data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
       data-stacked={stacked ? '' : undefined}
+      data-lead={leadTile && lifted?.at === at ? '' : undefined}
       draggable={arranging}
       ondragstart={() => (dragging = at)}
       ondragend={() => ((dragging = null), (over = null))}
@@ -1186,6 +1205,7 @@
         }
       }}
     >
+      {#if leadTile && lifted?.at === at}{@render leadHead?.()}{/if}
       {#if arranging && arrangement}
         <!-- `a` IS A CONSTANT so the callbacks below keep the narrowing they were built under. -->
         {@const a = arrangement}
@@ -1241,6 +1261,11 @@
       {:else}
         {@render tile(slot, block, at)}
       {/if}
+      <!-- IN THE LEAD TILE, UNDER ITS SENTENCE: the line the page opens on and what narrows it, as the boards draw them. -->
+      {#if leadTile && lifted?.at === at}
+        {#if under}<div class="lead-under">{@render under()}</div>{/if}
+        {#if strip}<div class="lead-under">{@render strip()}</div>{/if}
+      {/if}
     </div>
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
     {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
@@ -1249,8 +1274,8 @@
     {#if lifted?.at === at}
       <!-- THEN the line the page opens on, on a phone, under its sentence and never between the name and the sentence;
            then what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
-      {#if under}<div class="page-strip">{@render under()}</div>{/if}
-      {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
+      {#if under && !leadTile}<div class="page-strip">{@render under()}</div>{/if}
+      {#if strip && !leadTile}<div class="page-strip">{@render strip()}</div>{/if}
       {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
   {/if}
@@ -1349,6 +1374,13 @@
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
   {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
+  <!-- THE RESERVED SLOT (`slot.ts`): BrainDog's one suggestion, at the head of a page or a home being read by someone who
+       may answer it. It arrives after the page has drawn and draws nothing when there is nothing to suggest, and never
+       on a page that is no place to decide (`slotPlace`). ON A HOME EVERY QUESTION ITS QUEUE HOLDS COUNTS AS DRAWN, the
+       folded ones too: Today's Needs you is where they are asked, and the slot never asks one of them a second time. -->
+  {#if (mode === 'page' || mode === 'home') && writes && readerWhole && !arranging && slotAt && !ownQuestions}
+    <div class="page-strip" data-slot>{#await import('./SuggestionSlot.svelte') then { default: SuggestionSlot }}<SuggestionSlot blocks={given} page={slotAt.page} row={slotAt.row} compact={whole || mode === 'home' ? null : COMPACT_MOST} reread={writes.reread} />{/await}</div>
+  {/if}
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -1380,13 +1412,13 @@
      column to the rightmost, and people lost their spatial memory of where a control lived. A flow cannot do that: the
      order you declared is the order you get, at every width.
 
-     ONE BOARD (DIRECTION §39): EVERY BLOCK IS A TILE ON IT, flat, opaque, no border and no shadow, radius 16, 20 in,
+     ONE BOARD: EVERY BLOCK IS A TILE ON IT, flat, opaque, no border and no shadow, radius 16, 20 in,
      12 between tiles on both axes. A TILE IS AS TALL AS WHAT IT HOLDS, from the top of its row: stretched to one
      height, a list of one line beside a tile of figures was a tile three quarters empty, and two rows beside eight
      were 400px of white. Nothing floats on the board but the header. The page has no surface of its own; the board's
      colour is the shell's, and the tile's is `--tile` beside it (`packages/skin/tokens.css`).
 
-     NO CAP ON THE PAGE, ONLY ON THE PROSE (DIRECTION §36, §38). The page is as wide as the window, inside the fluid
+     NO CAP ON THE PAGE, ONLY ON THE PROSE. The page is as wide as the window, inside the fluid
      gutters, and once the work column is wide enough its full-width blocks pair into two columns (`twoUp`) rather than
      stretching into lines nobody reads to the end; running text keeps its own measure (`--measure`, 72ch) inside the
      block that has it.
@@ -1494,9 +1526,16 @@
   }
 
   /* ── the tile ─────────────────────────────────────────────────────────────
-     A BLOCK IS A TILE, whatever it draws: a list, a table, the questions, a figure and a chart alike (DIRECTION §39).
+     A BLOCK IS A TILE, whatever it draws: a list, a table, the questions, a figure and a chart alike.
      Lists and tables sat on the ground under their heading and figures sat in tiles, so nothing on a page lined up and
      half of it looked unfinished. Its heading row is `BlockSlot`'s: the icon, the name at 15 and 600, the count. */
+  /* TWO TILES SHARING A ROW BETWEEN TWO WHOLE ROWS, ONE OF THEM A PANEL THAT DREW NOTHING (left out whole by
+     `BlockSlot`'s rule): the other takes the row, so At work never stands at seven parts beside a gap. */
+  :global(.block-slot[data-full] + .block-slot:not([data-full]):has(+ .block-slot > [data-seen-none]):has(+ .block-slot + .block-slot[data-full])),
+  :global(.block-slot[data-full] + .block-slot:has(> [data-seen-none]) + .block-slot:not([data-full]):has(+ .block-slot[data-full])) {
+    grid-column: 1 / -1;
+  }
+
   .block-slot {
     grid-column: span var(--span, 12);
     /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses to shrink below its
@@ -1556,7 +1595,7 @@
   }
 
   /**
-   * THE PAGE'S SENTENCE IS THE HEADER'S LINE, NOT A HERO (DIRECTION §39): once, under the name, at 17 in the body ink
+   * THE PAGE'S SENTENCE IS THE HEADER'S LINE, NOT A HERO: once, under the name, at 17 in the body ink
    * and regular weight, at a reading measure, over the whole row, with the board under it. It was 40/600 in a white
    * card of its own, which pushed the work below the fold and read as a slogan. Pulled up under the head, so the name
    * and the line read as one header.
@@ -1582,6 +1621,53 @@
     font-weight: 500;
   }
 
+  /**
+   * THE LEAD TILE (the Bento boards' first tile on every main page): the page's head row, then its sentence at 40/44 and
+   * 600, a step under the display weight, and what goes under the sentence. A tile again, 24 in, across the whole row.
+   * On a phone the sentence is 32/36 and the tile 16 in, so it still opens the first screen without filling it.
+   */
+  .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: var(--tile-pad-lead);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
+    max-inline-size: 24em;
+    font-size: var(--fs-hero);
+    font-weight: var(--fw-semi);
+    line-height: 40px;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block strong) {
+    font-weight: inherit;
+  }
+
+  .lead-under {
+    min-inline-size: 0;
+  }
+
+  /* THE LINE TO TYPE INTO, IN THE TILE: the row's width, on the tile's second fill so it reads as a field there. */
+  .lead-under :global(.head-capture) {
+    inline-size: 100%;
+  }
+
+  .lead-under :global(.head-capture .capture-field) {
+    background: var(--tile-2);
+  }
+
+  @media (width < 640px) {
+    .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
+      font-size: var(--fs-hero-phone);
+      line-height: 34px;
+    }
+  }
+
   /* WHAT NARROWS THE PAGE, under its line and across the row: the header's last row. */
   .page-strip {
     grid-column: 1 / -1;
@@ -1589,13 +1675,14 @@
   }
 
   /* A STRIP THAT DREW NOTHING TAKES NO ROW, so the page's gap is not spent twice over nothing. */
-  .page-strip[data-opens]:empty {
+  .page-strip[data-opens]:empty,
+  .page-strip[data-slot]:empty {
     display: none;
   }
 
   /* ── a section on the board ───────────────────────────────────────────────
      A SECTION IS A TILE TOO, its heading row the same as every tile's: the icon in its well, the name at 15 and 600,
-     its count, and Show or Hide at the end as a quiet rectangle (DIRECTION §39: buttons are rectangles). The blocks it
+     its count, and Show or Hide at the end as a quiet rectangle (buttons are rectangles). The blocks it
      folds are the tiles after it, which is why it stays their sibling and is not a box round them. No rule under it. */
   .block-slot > :global(.block[data-kind='section'] .sec) {
     padding: 0;

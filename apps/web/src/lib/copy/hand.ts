@@ -19,7 +19,6 @@ export const hand = {
   /* THE EVENT A HAND LEAVES ON THE ROW, signed by whoever pressed, so the history reads "Sami handed this to Mona". */
   handedNote: (name: string): string => `Handed this to ${name}`,
   handedToast: (name: string): string => `Handed to ${name}`,
-  handPutBack: 'Put back',
   handPutBackDone: 'Put back as it was',
   /* AN AGENT HOLDS A ROW UNTIL ITS NEXT RUN TAKES IT, or while a job it was started as runs. */
   handWaiting: (agent: string): string => `Waiting for ${agent}'s next run`,
@@ -34,6 +33,11 @@ export const hand = {
   handStartSaid: (title: string): string => (title ? `Work on "${title}".` : 'Work on this.'),
   handStarted: (agent: string): string => `${agent} is starting on it`,
   handStartFailed: 'The run could not be started. It waits for the agent’s next run.',
+  /* WHERE IT STARTS, offered where a runner is on two machines or more, or its runs were under a profile of his own. */
+  handStartOn: 'On',
+  handStartAs: 'As',
+  handStartAnyMachine: 'Any machine',
+  handStartOwnProfile: 'The runner’s own profile',
   handRetry: 'Retry',
   /* MERGE WITH, from a person's own menu: the item, the sheet's title, its search and its two empty lines. */
   mergeWith: 'Merge with another person',

@@ -11,6 +11,7 @@
 
 import { copy } from '../copy.ts';
 import { reportKeyOf, type Connection } from './device.ts';
+import { machineSaid } from './machine-name.ts';
 import { AGENT_NAMES, APP_NAMES as RUN_APPS } from './names.ts';
 
 /** How the app holding a token came to have it, as the kernel stamps it. Read off the wire, so checked here. */
@@ -120,7 +121,8 @@ export function partsOf(c: Connection, nowMs: number = Date.now()): Parts {
   if (report) return { app: copy.reportKeyNamed(report.name), where: null, how: 'a key you made', idle };
   const client = clientOf(c.token?.client);
   if (c.machine || client?.kind === 'device') {
-    const where = (client?.kind === 'device' ? client.host : null) ?? c.run?.host ?? null;
+    const host = (client?.kind === 'device' ? client.host : null) ?? c.run?.host ?? null;
+    const where = host === null ? null : machineSaid(host);
     const agent = runApp(c) ?? (client?.kind === 'device' ? deviceApp(client.id) : null);
     const app = where !== null && agent !== null ? agent : (c.machine?.label ?? label ?? agent ?? copy.unnamedMachine);
     return { app, where, how: 'signed in', idle };

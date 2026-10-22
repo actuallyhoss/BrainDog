@@ -17,12 +17,14 @@
  */
 
 import { createClient } from '@braindog/client';
-import { JOB_MCP_PREFIX, JOB_PERMISSIONS, jobBody, type JobBody } from '@braindog/kernel';
+import { JOB_AGENTS, JOB_MCP_PREFIX, JOB_PERMISSIONS, jobBody, type JobBody } from '@braindog/kernel';
 
 import type { Fetch } from '../record/jobs.ts';
 
 /** How a run may ask: the kernel's two, `dontAsk` and `acceptEdits`. */
 export type JobPermission = (typeof JOB_PERMISSIONS)[number];
+/** Which agent runs it: the kernel's two, Claude Code and Codex. */
+export type JobAgent = (typeof JOB_AGENTS)[number];
 
 /** One argument as the form holds it: the slot's id, the words a person types it in by, and how long it may be. */
 export type KindArg = { id: string; label: string; max: number };
@@ -38,6 +40,7 @@ export type KindDraft = {
   turns: number;
   permission: JobPermission;
   writes: boolean;
+  agent: JobAgent;
 };
 
 /** The file tools a kind may name as they are (the kernel's `JOB_FILE_TOOLS`, which its index does not export). */
@@ -61,6 +64,9 @@ export const RECORD_TOOLS: readonly string[] = ['record_index', 'context', 'get'
 /** The permissions offered, which are the kernel's, so a skipped permission is never one of them. */
 export const PERMISSIONS: readonly JobPermission[] = JOB_PERMISSIONS;
 
+/** The agents offered, the kernel's own, Claude Code first since a kind that says none runs on it. */
+export const AGENTS: readonly JobAgent[] = JOB_AGENTS;
+
 /** A kind's own id, as the kernel's grammar takes it. */
 const ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 /** One slot in a prompt, as the kernel reads one. */
@@ -68,7 +74,7 @@ const SLOT = /%([a-z][a-z0-9_]{0,31})%/gu;
 
 /** An empty draft: eight turns, and the permission that runs only the tools it names. */
 export function blankKind(): KindDraft {
-  return { title: '', prompt: '', args: [], repo: '', tools: [], commands: '', turns: 8, permission: 'dontAsk', writes: false };
+  return { title: '', prompt: '', args: [], repo: '', tools: [], commands: '', turns: 8, permission: 'dontAsk', writes: false, agent: 'claude' };
 }
 
 /** A slot's id in words a person reads as a label: `repo_name` is "Repo name". */
@@ -134,6 +140,7 @@ export function kindBody(d: KindDraft): JobBody {
     turns: d.turns,
     permission: d.permission,
     ...(writesOf(d) ? { writes: true } : {}),
+    ...(d.agent === 'codex' ? { agent: 'codex' as const } : {}),
   };
 }
 
@@ -216,6 +223,10 @@ export const words = {
   turns: 'Turns',
   turnsHelp: `How many turns one run may take, from 1 to ${TURNS_MOST}.`,
   permission: 'Permission',
+  agent: 'Runs on',
+  claude: 'Claude Code',
+  codex: 'Codex',
+  agentHelp: 'Codex cannot hold a run to named commands, so a Codex kind names only file and connected tools.',
   dontAsk: 'Only these tools',
   dontAskHelp: 'A run uses only the tools above and stops at anything else.',
   acceptEdits: 'Accept edits',

@@ -3,7 +3,7 @@
  * an agent run did with its Undo, or none.
  *
  * `panel: run` IS A RUN'S PAGE (`RunPanel.svelte`), drawn for one row of the list of runs: what the run did, in plain
- * lines, and Undo this run (DIRECTION §37). Only a page drawn for a run draws it; under any other row it draws nothing.
+ * lines, and Undo this run. Only a page drawn for a run draws it; under any other row it draws nothing.
  *
  * A PANEL IS NAMED, NOT FOUND BY ITS HEADING. The reader drew Resume and the report key under any section whose heading
  * was the exact English "Runs on", and the report key and the poll form under "Send numbers here". Renaming a section,
@@ -43,6 +43,9 @@ export const PANELS = [
   'new-action',
   'instruct',
   'presence',
+  'run-list',
+  'left-steps',
+  'machines',
 ] as const;
 
 export type Panel = (typeof PANELS)[number];
@@ -70,6 +73,12 @@ export const PANEL_WHO: Readonly<Record<Panel, { needs: 'row' | 'none'; level: '
      alone; and the runs open now, read by anyone who reads the runs, with Tell, Pause and Stop for him. */
   instruct: { needs: 'none', level: 'owner' },
   presence: { needs: 'none', level: 'read' },
+  /* EVERY RUN IN ONE LIST AND THE DAY AS LANES (`RunsPanel.svelte`), under the Agents page's Today's runs. */
+  'run-list': { needs: 'none', level: 'read' },
+  /* THE STEPS LEFT FOR THE NEXT RUN, Take and Drop for him (`StepsPanel.svelte`). */
+  'left-steps': { needs: 'none', level: 'read' },
+  /* THE MACHINES AND PROFILES AGENTS RUN ON, the Agents page's foot (`MachinesPanel.svelte`). */
+  machines: { needs: 'none', level: 'read' },
 };
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */

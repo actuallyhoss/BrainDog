@@ -1,5 +1,5 @@
 <!--
-  What BrainDog did by itself today (DIRECTION d3, today F6): a few lines of what it did without asking, when, the reason
+  What BrainDog did by itself today (today F6): a few lines of what it did without asking, when, the reason
   under each, and an Undo on each that puts that whole batch back.
 
   A PLACE, NOT A QUESTION. These already happened, with a mark; the only press here takes one back. On Needs you it is

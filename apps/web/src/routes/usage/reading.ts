@@ -22,6 +22,9 @@ export const said = {
   runs: (n: number) => (n === 1 ? 'run' : 'runs'),
   runsSaid: (n: number) => (n === 1 ? '1 run' : `${n.toLocaleString('en-GB')} runs`),
   asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} asks`,
+  firedWeek: (n: number) => `Automations fired ${n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`} in the last 7 days.`,
+  noActionRun: 'No scheduled action has run this month',
+  firedBody: "A scheduled action's runs are counted here, day by day. An automation that files or marks a row is not counted.",
 } as const;
 
 /** Where a meter reads as near its limit: the Directory's `NOTICE_AT`, as `actions.ts` holds it. */
@@ -60,7 +63,13 @@ export function sentenceOf(view: UsageView): Sentence | null {
   }
   /* A MONTH WITH NO RUNS SAYS SO IN THE HEAD TOO (money F14), by the month's name, over the empty tile that says what
      would be counted. */
-  if (view.totals.runs === 0) return { text: `Nothing has run in ${month}.` };
+  if (view.totals.runs === 0) {
+    /* AND AUTOMATIONS THAT FIRED ARE SAID, since they ran: "Nothing has run in September" stood over a record whose rules
+       had filed seventeen payments that morning. What is counted here is a scheduled action's runs. */
+    const fired = view.fired ?? 0;
+    if (fired > 0) return { text: `No scheduled action has run in ${month}. ${said.firedWeek(fired)}` };
+    return { text: `Nothing has run in ${month}.` };
+  }
   const runs = said.runsSaid(view.totals.runs);
   const limit = r ? ', with no monthly limit' : '';
   return { text: view.current ? `${runs} this month${limit}.` : `${runs} in ${month}${limit}.` };

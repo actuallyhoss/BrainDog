@@ -1,5 +1,5 @@
 /**
- * ONE PRESS ANSWERS (DIRECTION §37), and what each screen of Decide needs to know to make it one: which answer a key
+ * ONE PRESS ANSWERS, and what each screen of Decide needs to know to make it one: which answer a key
  * gives, when the suggestion is drawn at all, the amount a button names when money moves, and when a note is offered
  * after the answer rather than a reason demanded before it.
  *

@@ -1,5 +1,6 @@
 /**
- * `/settings/agents`, the address every device code points at: what the screen decides, with no runes.
+ * `/settings/agents` and `/connect/approve`, the address every device code points at: what the screens decide, with no
+ * runes.
  *
  * PURE, SO `node --test` CAN IMPORT IT. A `.svelte.ts` file needs the compiler, and the parts with
  * consequences are here: what counts as a code and what each answer from `deviceApprove` means to the
@@ -379,6 +380,34 @@ export type Heard = { agent: string; seq: number; seen: string; scope: HeardScop
  * kind of agent heard from in the last `HEARD_DAYS`, newest first, read from every run (`runsOf` keeps only a key's).
  * `projects` names a run's project ref (`<list>#<n>`) by its project; one it cannot name is left out of the line, never printed as an id.
  */
+/** A kind of agent heard from under one Claude Code profile: the newest run, and when (migration 44's `seat`). */
+export type HeardSeat = { agent: string; seat: string; seq: number; seen: string };
+
+/**
+ * THE CLAUDE CODE PROFILES EACH KIND OF AGENT WAS HEARD UNDER, from the runs, in the last `HEARD_DAYS`: one per kind and
+ * profile, newest first, by name. Settings › Agents draws a row for each that is not the default one.
+ */
+export function seatsHeard(rows: readonly unknown[], nowMs: number): HeardSeat[] {
+  const newest = new Map<string, HeardSeat>();
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const { seq, fields } = row as { seq?: unknown; fields?: unknown };
+    if (typeof seq !== 'number' || typeof fields !== 'object' || fields === null) continue;
+    const f = fields as Record<string, unknown>;
+    const agent = text(f.agent)?.toLowerCase().replace(/^agent:/u, '') ?? null;
+    const seat = text(f.seat);
+    const seen = text(f.last_seen) ?? text(f.started);
+    if (agent === null || seat === null || seen === null) continue;
+    const at = Date.parse(seen);
+    if (!Number.isFinite(at) || nowMs - at > HEARD_DAYS * 86_400_000) continue;
+    const key = `${agent}:${seat}`;
+    const had = newest.get(key);
+    if (had && had.seen >= seen) continue;
+    newest.set(key, { agent, seat, seq, seen });
+  }
+  return [...newest.values()].sort((a, b) => (a.seen > b.seen ? -1 : a.seen < b.seen ? 1 : 0));
+}
+
 export function heardFrom(rows: readonly unknown[], nowMs: number, projects: ReadonlyMap<string, HeardScope> = new Map()): Heard[] {
   const newest = new Map<string, Heard>();
   for (const row of rows) {

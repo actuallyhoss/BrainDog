@@ -1,5 +1,5 @@
 <!--
-  Imported automations as filing rules, as one tile at the end of the board (DIRECTION §39). REC-B10, job 7: the
+  Imported automations as filing rules, as one tile at the end of the board. REC-B10, job 7: the
   automations an import made to file Ledger entries by their description, offered as filing rules in one press.
 
   AN OFFER HE PRESSES AND NEVER A QUESTION. The tile says how many and what the press does; nothing is written until

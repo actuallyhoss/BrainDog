@@ -1,5 +1,5 @@
 /**
- * WHAT ONE OPTION WOULD CHANGE, AS A SMALL PICTURE (DIRECTION §45, "decisions with their options drawn"): worked out
+ * WHAT ONE OPTION WOULD CHANGE, AS A SMALL PICTURE ("decisions with their options drawn"): worked out
  * once from the question, the option and what the host knows, and drawn by `OptionVisual.svelte`. Pure, no DOM.
  *
  * AN OPTION THAT CHANGES NOTHING HAS NO PICTURE, and neither has one that cannot be drawn truthfully (a money bar with

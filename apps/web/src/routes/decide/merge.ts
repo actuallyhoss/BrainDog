@@ -1,5 +1,5 @@
 /**
- * A MERGE, READ AS ONE QUESTION ABOUT WHO IS WHO (DIRECTION §38): every name the record thinks may be one person or one
+ * A MERGE, READ AS ONE QUESTION ABOUT WHO IS WHO: every name the record thinks may be one person or one
  * organisation, where each was seen, and the three answers, Merge all, Keep apart and Pick one, each one press.
  *
  * TWO SHAPES, ONE CARD. The record asks today with a `rowset` that folds rows into the one it keeps (`kernel/people.ts`

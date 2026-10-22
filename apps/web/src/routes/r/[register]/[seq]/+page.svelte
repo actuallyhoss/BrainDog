@@ -1,7 +1,7 @@
 <!--
   One row: a task, a project, a person, a money line.
 
-  THE PAGE IS A DOCUMENT (DIRECTION §39), and it reads top to bottom, left to right:
+  THE PAGE IS A DOCUMENT, and it reads top to bottom, left to right:
     - the head: the list's name as the way back, the row's title at 28, the one sentence saying where the row stands,
       when it is due and how old it is with only the late phrase in red, and the verbs on the right of the title;
     - the fields tile: the row's amount first and large, then every field it has answered as a two-column definition
@@ -46,7 +46,7 @@
   import Face from '$lib/ui/Face.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import { faceWords, liveOf, slotOf } from '$lib/ui/face.ts';
-  import { isQuiet } from '@braindog/kernel';
+  import { isQuiet } from '@braindog/kernel/constants';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -631,6 +631,8 @@
   let mergeOpen = $state(false);
   /* SHARING THIS ROW, an owner's or an Admin's, and never while the record is seen as somebody (sharing plan §3.1). */
   let sharingOpen = $state(false);
+  /* "HAND TO", from the head's "…": a teammate or an agent, on a list that says who holds its rows. */
+  let handOpen = $state(false);
   const sharable = $derived(seeingAs() === null && canShare((page.data as { me?: Parameters<typeof canShare>[0] }).me));
   const mergeable = $derived(changes && !archived && decl?.meets !== undefined);
   let people = $state<ReadonlyMap<string, string>>(new Map());
@@ -1225,31 +1227,44 @@
 
   <!-- THE LIST'S NAME IS THE WAY BACK: a link above the title from 900px, and the chevron in the
        phone's bar below it. No number follows the title, here or anywhere on the page. -->
-  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={!archived && (lead?.parts || lead?.last) ? whoLine : sentenceLine}>
+  <!-- THE HEAD'S META LINE: where the row applies, then the sentence, then who holds it. The chip and "Hand to" stood in
+       the head's row beside the primary, five controls at 1440 and "Mark do…" off the edge at 390; now the row keeps its
+       primary and its "…", and what is true of the row is said under its name. -->
+  {#snippet headLine()}<span class="head-scope"
+      ><ScopeMove register={id} {row} {names} live={changes} size="s" title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} /></span
+    >{#if !archived && (lead?.parts || lead?.last)}{@render whoLine()}{:else}{@render sentenceLine()}{/if}{#if live && !archived}{' '}<HandSheet
+        register={id}
+        {row}
+        {decl}
+        line
+      />{/if}{/snippet}
+
+  <!-- ON A PHONE THE NAME TAKES ITS OWN ROW, three lines at most, with the "…" at its end, and the primary stands under it
+       (`.row-head` below): a name, a chip, a primary and a "…" on one row cut "Chase Halden on 2026-041" to "Chase
+       Halden…". -->
+  <div class="row-head">
+  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={headLine}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
            something to the invoice. "Copy link" is in the "…", and `y` still copies the id. -->
-      <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
-      <ScopeMove register={id} {row} {names} live={changes} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
-      <!-- THE ONE PRIMARY (DIRECTION 39), AND THE REST IN THE "…". A row still open on a list that says what finishes
+      <!-- THE ONE PRIMARY, AND THE REST IN THE "…". A row still open on a list that says what finishes
            it leads with that: "Mark paid" on an invoice, "Mark done" on a task (`finishOf`). Anywhere else there is no
            primary: a field is edited where it stands, and "Edit" is in the "…" (money F9). Edit and Archive stood beside
            each other at one weight, and neither was what a person opens an unpaid invoice to do. -->
       {#if finish}
-        <Button weight="primary" disabled={saving} data-finish onclick={() => void finishRow(finish)}>{finish.said}</Button>
+        <Button weight="primary" disabled={saving} data-finish data-head-primary onclick={() => void finishRow(finish)}>{finish.said}</Button>
       {/if}
       <!-- `Put back` STANDS IN THE HEAD for as long as this tab holds the row it just archived: see `archived` for why
            that moment is the only one it can be offered in. Archive itself is in the "…", the list's own verb on the
            row itself, and neither is drawn for somebody who cannot change the list, where the foot of the fields tile
            says why. -->
       {#if changes && archived}
-        <Button weight="primary" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
+        <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
-      <!-- "HAND TO": a teammate or an agent in one press, on a list that says who holds its rows, and while an
-           agent holds this one, the run working on it or whose next session it waits for. -->
+      <!-- "HAND TO": a teammate or an agent in one press, from the "…"; who holds the row now is in the sentence. -->
       {#if live && !archived}
-        <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
+        <HandSheet bind:open={handOpen} register={id} {row} {decl} onhanded={() => void rowMoved(id, seq)} />
       {/if}
       <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin (sharing plan §3.1), from the
            head's "⋯", so the head keeps its primary and its "⋯" (2.A.20). -->
@@ -1268,6 +1283,7 @@
             >
           {/snippet}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
+          {#if changes && !archived && handFor(decl) !== null}<button type="button" class="mi" role="menuitem" data-hand-row onclick={() => (handOpen = true)}>{copy.handTo}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
           {#if live && !archived && sharable}<button type="button" class="mi" role="menuitem" data-share-row onclick={() => (sharingOpen = true)}>{copy.shareOpen}</button>{/if}
           <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
@@ -1278,6 +1294,7 @@
       {/if}
     {/snippet}
   </PageHead>
+  </div>
   {#if mergeable && row}<MergeSheet bind:open={mergeOpen} register={id} seq={row.seq} name={String(row.fields[decl.title] ?? '')} title={decl.title} mergedInto={decl.meets?.merged_into} />{/if}
   {#if live && proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={() => (got = got && { ...got })} />{/if}
 
@@ -2368,11 +2385,57 @@
     white-space: nowrap;
   }
 
+  /* ── the head's meta line ──────────────────────────────────────────── */
+
+  /* A BOX THE HEAD IS DRAWN IN AND NOT A BOX ON THE PAGE, so the name's row still sticks from 900px up. */
+  .row-head {
+    display: contents;
+  }
+
+  /* WHERE THE ROW APPLIES LEADS THE LINE, the list's small chip, held level with the words. */
+  .head-scope:has(:global(.scope-chip)) {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: middle;
+  }
+
   /* ── the phone ─────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
     .page {
       padding: var(--sp-3) var(--gutter) var(--sp-8);
+    }
+
+    /* THE NAME ON ITS OWN ROW, THREE LINES AT MOST, the "…" at its end and level with its first line. */
+    .row-head :global(.page-head .head-main) {
+      flex-wrap: wrap;
+      align-items: start;
+    }
+
+    .row-head :global(.page-head .name-row) {
+      margin-block-start: var(--sp-2);
+    }
+
+    .row-head :global(.page-head .name-words) {
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+    }
+
+    /* THE ACTIONS' BOX GIVES WAY, so the "…" stays on the name's row and the primary takes the next one, at its own
+       width under the name: a break after the "…", and the primary ordered after the break. */
+    .row-head :global(.page-head .head-actions) {
+      display: contents;
+    }
+
+    .row-head :global(.page-head .head-main:has([data-head-primary])::after) {
+      content: '';
+      flex-basis: 100%;
+      order: 1;
+    }
+
+    .row-head :global(.page-head [data-head-primary]) {
+      order: 2;
+      margin-block-start: var(--sp-3);
     }
   }
 

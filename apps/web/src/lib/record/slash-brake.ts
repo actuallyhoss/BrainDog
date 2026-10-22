@@ -1,5 +1,5 @@
 /**
- * The brake, said where the owner sees Slash (ENG-B17, DIRECTION 40 "health shown").
+ * The brake, said where the owner sees Slash (ENG-B17, health shown).
  *
  * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `slash.ts` takes it.
  *

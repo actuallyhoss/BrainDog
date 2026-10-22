@@ -54,7 +54,6 @@
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
-  import ProjectShape from './ProjectShape.svelte';
   import { isProject, withoutRepeats, type Block } from '$lib/record/project.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
@@ -68,7 +67,6 @@
   import type { Cursor } from '@braindog/client';
   import { asksActions, judgedWith, readHeld } from './panels.ts';
   import type { ActionRow } from '$lib/record/actions.ts';
-  import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
@@ -123,7 +121,7 @@
      * The pen's offer for this page (uc6-places-47), drawn UNDER THE PAGE'S OWN BLOCKS and inside `.hosted`. It was
      * drawn between the header and the first tile, where on Money it took a phone's whole first screen and stood over
      * the accounts on a laptop (look fault G): an offer never outranks what the page was opened for. So it is the
-     * board's last line, one quiet row that opens on tap, as DIRECTION 39 puts "Changed for you" at the bottom of the
+     * board's last line, one quiet row that opens on tap, as "Changed for you" sits at the bottom of the
      * board. Not drawn over the page's source, which is the declaration and nothing else.
      */
     offer?: Snippet | undefined;
@@ -178,7 +176,7 @@
   $effect(() => () => clearTimeout(searchTimer));
 
   /* ── what the actions panel holds ──────────────────────────────────────────
-     A PART WITH SOMETHING IN IT MUST NOT VANISH (DIRECTION §35, §37). A boxed section whose panel is the project's
+     A PART WITH SOMETHING IN IT MUST NOT VANISH. A boxed section whose panel is the project's
      scheduled actions is judged with its blocks, and the panel reads its actions only once it is drawn, so the page
      counts them first (`panels.ts`): ONE READ A PAGE, for the row it is drawn for, and only where a section waits on
      it. `null` until the read is back, and for good where nothing asks or the record refused. Read again for another
@@ -187,7 +185,7 @@
   let shapeDrew = $state.raw<readonly Block[]>([]);
   let shapeRow = $state.raw<Readonly<Record<string, unknown>> | null>(null);
   /* Whether the shape's reads are back. Until they are, what it runs on is taken as the shape's, so a declared Runs on
-     does not stand empty and then go when the shape lands (the audit of 20 October, his Sketchpad). */
+     does not stand empty and then go when the shape lands (the audit of 20 October, on a project page). */
   let shapeKnown = $state(false);
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
@@ -362,13 +360,20 @@
   let arranger = $state<ReturnType<typeof Arrange>>();
 
   /**
-   * WHETHER THE PAGE OPENS ON ITS SENTENCE (`lead.ts`), which is then the header's line and not a tile (DIRECTION §39,
-   * "page header, not a hero"): the name at 28 with its icon, the sentence once under it at 17 in the body ink, and the
+   * WHETHER THE PAGE OPENS ON ITS SENTENCE (`lead.ts`), which is then the header's line and not a tile (a page header,
+   * not a hero): the name at 28 with its icon, the sentence once under it at 17 in the body ink, and the
    * board after. The sentence was a 40px headline in a white card of its own, with the name riding over its top, and it
    * ate the top fifth of every page. Not while arranging, where every block is a list item with a bar of its own. The
    * blocks are read as the body draws them, so a block it hides for holding nothing does not stand first.
    */
   const led = $derived(!!live && !arranging && !showSource && leadIndex(judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs))) >= 0);
+
+  /**
+   * AND THEN THE SENTENCE IS THE LEAD TILE (the Bento boards, 22 October): the page's name, count and buttons on the
+   * tile's first row and the sentence under them at 40, in place of a 28px name over a 17px line floating on the board.
+   * Not on a project's page, whose hero already holds its name and its line (`ProjectShape`).
+   */
+  const tiled = $derived(led && !projectPage);
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
@@ -568,8 +573,8 @@
   }
 
   /**
-   * WHAT SLASH ARRANGES WHILE THE PERSON IS LOOKING IS OFFERED BACK FOR SIX SECONDS, and kept once they pass (DIRECTION
-   * §37's Undo, `look.ts` `offerUndo`): when the page is read again under a new arrangement of Slash's, once an
+   * WHAT SLASH ARRANGES WHILE THE PERSON IS LOOKING IS OFFERED BACK FOR SIX SECONDS, and kept once they pass (`look.ts`
+   * `offerUndo`): when the page is read again under a new arrangement of Slash's, once an
    * arrangement in this tab, to the owner, who alone may write a look. The look a page opens on was arranged while
    * nobody was there, and is not offered: the menu says who arranged it, and Pin answers it. Undo puts back the look
    * Slash's replaced and reads the page again; keeping says who kept it, which the look's history reads.
@@ -663,13 +668,15 @@
     </Empty>
   </div>
 {:else if !live}
+  {@const pages = (got.from === 'missing' ? got.held : []).map((h) => ({ title: h.title ?? h.address, href: `/p/${h.address}`, address: h.address }))}
   <div class="said">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has the sentence for it.
          Nothing failed, so there is no request id to quote (`50 §13 D11`), and no filter ran, so "nothing matched" is
          about something that did not happen. It names the thing, says it is not here, and lists what is: `10 §7`'s
-         fourth rule, the refusal is the teacher. -->
-    <Empty kind="error" heading title={copy.noSuch('page', slug)} body={copy.theseExist('Pages', got.from === 'missing' ? got.held : [])}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+         fourth rule, the refusal is the teacher. WHAT IS HERE IS THE FIVE NEAREST PAGES, AS LINKS (`record/nearest.ts`):
+         the whole index in one sentence was thirty-eight addresses, none of them a thing to press. -->
+    <Empty kind="error" heading title={copy.noPageCalled(slug)} body={pages.length === 0 ? copy.theseExist('Pages', []) : undefined}>
+      {#snippet actions()}{#await Promise.all([import('$lib/ui/NearLinks.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NearLinks }, { nearest }]}<NearLinks places={nearest(slug, pages)} said={copy.nearPages} />{/await}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
 {:else if mode === 'page'}
@@ -688,16 +695,24 @@
     headless={projectPage && !arranging && !showSource}
     sentence={projectPage ? '' : undefined}
     define={headlined ? undefined : 'page'}
-    below={headBelow ? declaredBelow : undefined}
+    below={headBelow && !tiled ? declaredBelow : undefined}
+    {tiled}
   >
     {#snippet actions()}
-      {#if headLine && wide.current}{@render lineInHead()}{/if}
+      {#if !tiled}{@render pageButtons()}{/if}
+      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
+    {/snippet}
+  </PageHead>
+
+  <!-- THE PAGE'S OWN BUTTONS, drawn once: at the end of the name's row, or on the lead tile's first row. -->
+  {#snippet pageButtons()}
+      {#if headLine && wide.current && !tiled}{@render lineInHead()}{/if}
       {#if declared?.action && !arranging && !showSource}
         <!-- AN ADD WEARS THE PLUS, so on a phone it is the 36px square the head draws for a glyph (`PageHead.svelte`). -->
         <Button weight="primary" onclick={pressHead}>{#if /^(add|new)\b/iu.test(declared.action.label)}<Icon name="plus" size="s" />{/if}{declared.action.label}</Button>
       {/if}
       {#if !arranging}
-        <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
+        <!-- SHARE, AND ONE "⋯" FOR THE REST: How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <!-- EDIT DETAILS IS THE ⋯ MENU'S FIRST ROW ON A PROJECT (proj F7, VERIFY H13): a button of its own made the phone
@@ -717,9 +732,27 @@
           extra={projectPage && about ? [{ label: 'Edit details', icon: 'edit', href: `/r/${about.register}/${about.seq}` }] : []}
         />
       {/if}
-      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
-    {/snippet}
-  </PageHead>
+  {/snippet}
+
+  <!--
+    THE LEAD TILE'S FIRST ROW (`tiled`): the page's glyph and name at 17/600, its count, the parent it sits under where
+    that is not the page itself, and its buttons at the end; the declared head's state and search under it. The name is
+    the page's `h1`, focusable by script, as `PageHead`'s is, so a move lands on it.
+  -->
+  {#snippet leadRow()}
+    {@const crumb = headKicker && headKicker.trim().toLowerCase() !== live.page.page.title.trim().toLowerCase() ? headKicker : undefined}
+    {@const backTo = backInKicker ? declared?.back?.href : projectBack}
+    <div class="lead-head">
+      <span class="lead-glyph" aria-hidden="true"><Icon name={iconFor(live.page.page.icon, 'doc')} size="m" /></span>
+      <h1 class="lead-name" tabindex="-1" dir="auto">{live.page.page.title}</h1>
+      {#if declared?.count?.value}<span class="lead-count num">{declared.count.value.toLocaleString('en')}</span>{/if}
+      {#if crumb}
+        {#if backTo}<a class="lead-crumb" href={at(backTo)}>{crumb}</a>{:else}<span class="lead-crumb">{crumb}</span>{/if}
+      {/if}
+      <span class="lead-actions">{@render pageButtons()}</span>
+    </div>
+    {#if headBelow}{@render declaredBelow()}{/if}
+  {/snippet}
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
   {#snippet lineInHead()}
@@ -769,10 +802,12 @@
 
   {#if showSource}
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
-    <SourceView {slug} title={live.page.page.title} />
+    {#await import('./SourceView.svelte') then { default: SourceView }}<SourceView {slug} title={live.page.page.title} />{/await}
   {:else}
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
-    {#snippet shapeAt()}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/snippet}
+    <!-- THE SHAPE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a project's shape, so its
+         first load does not carry one. The page waits on the shape's reads either way (`shapeWaits`). -->
+    {#snippet shapeAt()}{#await import('./ProjectShape.svelte') then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"
@@ -784,8 +819,9 @@
       {writes}
       {arrangement}
       headed={led}
+      leadHead={tiled ? leadRow : null}
       captured={headLine?.at ?? -1}
-      under={headLine && !wide.current && !shapeWaits ? lineInHead : null}
+      under={headLine && (tiled || !wide.current) && !shapeWaits ? lineInHead : null}
       strip={strip && led && !shapeWaits ? narrow : null}
       host={hosting && !shapeWaits ? host : null}
       pick={hosting ? picked : null}
@@ -808,7 +844,7 @@
   <div class="home-page" data-arranging={arranging ? '' : undefined}>
     {#if kept}
       <!-- THE PAGE'S ⋯, AS EVERY DECLARED PAGE HAS, waiting at the body's top end and drawn only while the pointer or
-           focus is on the page (DIRECTION §35: secondary controls appear on hover or focus); while arranging, the
+           focus is on the page (secondary controls appear on hover or focus); while arranging, the
            mode's own Add a block, Cancel and Done in its place, in view. -->
       <div class="home-tools">
         {#if !arranging}
@@ -1044,6 +1080,108 @@
   /* THE STRIP SITS IN THE PAGE'S OWN GUTTER, over the first tile, with the gap a row of tiles keeps. */
   .page-filters {
     padding: var(--sp-3) var(--gutter) 0;
+  }
+
+  /* THE LEAD TILE'S FIRST ROW: the glyph and the name at 17/600 on one line, the count quiet beside it, the parent in
+     meta, and the page's buttons at the end, quiet on the tile's second fill. */
+  .lead-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+  }
+
+  .lead-glyph {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    color: var(--ink-2);
+  }
+
+  .lead-name {
+    min-inline-size: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: calc(24 / 17);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lead-name:focus:not(:focus-visible) {
+    /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
+    outline: none;
+  }
+
+  .lead-count {
+    flex: none;
+    color: var(--ink-3);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-medium);
+  }
+
+  .lead-crumb {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lead-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-inline-start: auto;
+  }
+
+  .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger)) {
+    background: var(--tile-2);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    a.lead-crumb:hover {
+      color: var(--red);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .lead-actions :global(:is(.btn[data-weight='quiet']:hover:not(:disabled), .menu-trigger:hover > .share-trigger)) {
+      background: var(--hover);
+    }
+  }
+
+  /* ON A PHONE A BUTTON WITH A GLYPH IS THE GLYPH ALONE in a 44px square, as the head draws it; its words stay its name. */
+  @media (width < 900px) {
+    .lead-actions {
+      gap: var(--sp-1);
+    }
+
+    .lead-actions :global(.btn:has(.icon)) {
+      inline-size: var(--tap);
+      min-inline-size: var(--tap);
+      min-block-size: var(--tap);
+      padding: 0;
+      gap: 0;
+      font-size: 0em;
+    }
+
+    .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger)) {
+      background: none;
+    }
+
+    .lead-actions :global(.change-more) {
+      inline-size: var(--tap);
+      min-block-size: var(--tap);
+      color: var(--ink);
+    }
   }
 
   /* A DECLARED HEAD'S LINE (PGS-A14): one row under the sentence that wraps on a phone. Flat, on the board: no tile,

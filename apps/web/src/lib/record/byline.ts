@@ -1,5 +1,5 @@
 /**
- * WHO LAST CHANGED A ROW, AS A BYLINE (DIRECTION §37, "Trust and his screens: bylines, undo"): a row an agent, an app, a
+ * WHO LAST CHANGED A ROW, AS A BYLINE ("Trust and his screens: bylines, undo"): a row an agent, an app, a
  * rule or Slash changed wears "Claude for Mara · 2h ago" and a faint tint until the reader has seen it, and its Undo puts
  * back the write it came in (by `batch`), naming first whatever else that write touched (`page/byline-undo.ts`).
  *

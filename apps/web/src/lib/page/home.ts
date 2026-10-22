@@ -2,7 +2,7 @@
  * What a declared page does differently when it is a home: a long block is folded in place, and the keys walk the rows
  * of every block rather than the blocks. And the rule for what a page draws, which is the record's.
  *
- * THE RULE IS THE RECORD'S (`packages/kernel/src/drawn.ts`, DIRECTION §35: an empty or unused part is not drawn; §37:
+ * THE RULE IS THE RECORD'S (`packages/kernel/src/drawn.ts`: an empty or unused part is not drawn, and
  * one empty line a page). The record marks each block it leaves out `drawn: false` with `why`, so an agent reading a
  * page, a shared page and an export draw what the screen draws. Every caller here reads that flag: `emptyHidden` keeps
  * a block the record left out as it came and judges only what the record drew, which is also what a record on an older

@@ -827,7 +827,7 @@
       {#await import('./FromAgent.svelte') then { default: FromAgent }}<FromAgent />{/await}
     {:else}
       {#if alreadyMade}
-        <section class="again" aria-labelledby="again-h">
+        <section class="again made-note" data-surface="tile" aria-labelledby="again-h">
           <IconWell name="home" size="l" />
           <div class="again-main">
             <p class="again-h" id="again-h">{firstRun.againMade}</p>
@@ -1571,7 +1571,7 @@
     line-height: var(--lh-body);
   }
 
-  /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size (DIRECTION §36). */
+  /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size. */
   .quiet {
     margin: 0;
     color: var(--ink-2);
@@ -1684,7 +1684,7 @@
     margin-inline-end: 0;
   }
 
-  /* THE KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): while the conversation is pointed at or has focus, and never
+  /* THE KEYS ARE PRINTED WHEN ASKED FOR: while the conversation is pointed at or has focus, and never
      as standing chrome over the one question. Hidden and not removed, so the head does not move when they come. */
   .talk:not(:hover, :focus-within) .keys {
     visibility: hidden;
@@ -1742,6 +1742,24 @@
     gap: var(--sp-3);
   }
 
+  /* THE "ALREADY MADE" NOTE IS A TILE (UI audit of 22 October, 28): on the bare board its words and its white button
+     floated over the question like a stray line of the page. A tile, one row, its button the tile's quiet fill. */
+  .made-note {
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  .made-note .again-h {
+    font-size: var(--fs-body);
+    line-height: 20px;
+  }
+
+  .made-note .again-why {
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
   .again.alone {
     display: flex;
     flex-direction: column;
@@ -1772,7 +1790,7 @@
   /* ── a phone ───────────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
-    /* MAKE IT MINE RIDES THE BOTTOM EDGE on the board's own flat colour (DIRECTION 39: no glass), as the tab bar does:
+    /* MAKE IT MINE RIDES THE BOTTOM EDGE on the board's own flat colour (no glass), as the tab bar does:
        the button's own 44 and 4 either side, which is the `--sticky` height, with the home indicator's inset paid once
        under it. */
     .make-bar {

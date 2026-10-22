@@ -198,6 +198,8 @@
         <p class="pf-note">It follows Defaults for new agents now. Saving here gives it settings of its own.</p>
       {:else if row.follows === 'key'}
         <p class="pf-note">Nothing is set for it yet, so its key decides. Write here means as far as its key allows.</p>
+      {:else if row.follows === 'kind'}
+        <p class="pf-note">It follows {kindName(row.kind ?? 'other')} now. Saving here gives this profile settings of its own.</p>
       {/if}
 
       <!-- HOW FAR IT MAY GO -->

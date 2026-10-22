@@ -91,7 +91,9 @@ test('null, undefined and empty are absent rather than zero', () => {
 
 test('a day is spelled, so no reader has to know the local order', () => {
   // Months as words is the point: 03/09 is two different days either side of an ocean.
-  assert.equal(display('obligations', 'due', '2026-07-27'), '27 Jul 2026');
+  const now = Date.parse('2026-09-03T12:00:00Z');
+  assert.equal(display('obligations', 'due', '2026-07-27', now), '27 Jul', 'a day in the year it is read in has no year');
+  assert.equal(display('obligations', 'due', '2025-07-27', now), '27 Jul 2025');
 });
 
 test('an enum reads as words, not as an identifier', () => {

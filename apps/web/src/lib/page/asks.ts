@@ -1,5 +1,5 @@
 /**
- * Where a page's waiting questions sit when the page is about something else (DIRECTION §39).
+ * Where a page's waiting questions sit when the page is about something else.
  *
  * A QUESTION NEVER LEADS A PAGE WHOSE SUBJECT IS SOMETHING ELSE. Money opened on three questions drawn whole, each a
  * tile of options, and its cash, its accounts and what is due were under the fold: the engine's look put the queue

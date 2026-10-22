@@ -21,7 +21,11 @@ const inlineHashes = (tag) =>
 /* EVERY FRAME A PAGE MAY HOLD. The embeds are the origins of `EMBED_PROVIDERS` in `packages/render/src/embed.ts`,
    which the kernel copies and refuses any other against, and `test/csp.test.ts` holds this list equal to that one.
    Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/app/signup` and `/app/signin`
-   (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere. */
+   (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere.
+   `'self'` IS FOR ONE DOCUMENT, the frame a drawn block is drawn in (`@braindog/host/drawn-frame`), which both hosts serve
+   under its own sandboxing policy. Not `srcdoc`: a `srcdoc` frame takes this page's policy, which runs no inline script,
+   so a component written into one would never run. Every other page of this origin sends `frame-ancestors 'none'`, so
+   naming `'self'` here frames nothing else. */
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
@@ -101,7 +105,7 @@ export default {
         'script-src': ['self', ...inlineHashes('script'), TURNSTILE],
         'style-src-elem': ['self', ...inlineHashes('style')],
         'style-src-attr': ['unsafe-inline'],
-        'frame-src': [...EMBEDS, TURNSTILE],
+        'frame-src': ['self', ...EMBEDS, TURNSTILE],
         'object-src': ['none'],
         'base-uri': ['none'],
       },

@@ -12,7 +12,7 @@
   `held` IS WHAT WAS TYPED EARLIER, when there was an earlier: the name asked for at the start of sign-up, the person's
   own name and their zone. On `/start` there was none, and the name field starts empty.
 
-  ON `/start`, SAYING WHO YOU ARE LEADS (`describe`, DIRECTION §35 and §37): the ink press opens `/signup`, which builds a
+  ON `/start`, SAYING WHO YOU ARE LEADS (`describe`): the ink press opens `/signup`, which builds a
   free BrainDog from the answer, and the paid name is the quieter way under it, never the lead.
 -->
 <script lang="ts">

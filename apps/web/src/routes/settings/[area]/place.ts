@@ -2,7 +2,7 @@
  * Settings as a place, DECLARED: every area this build draws, the index as a page body the one reader draws, and how
  * a declared index is read back into the groups the chooser beside an open area draws.
  *
- * THE INDEX IS A PAGE LIKE ANY OTHER (DIRECTION §35, "every page is declared"). It was a hand-written list of rows in
+ * THE INDEX IS A PAGE LIKE ANY OTHER ("every page is declared"). It was a hand-written list of rows in
  * `+page.svelte`, the same for everybody and changed by nobody. It is `SETTINGS_INDEX` now: one `link` block for each
  * group, each area a row written out (its name, its address and its one line), drawn by `PageView`. A record that
  * holds a page called `settings` is read in its place, so a person reorders the groups, moves an area from one to
@@ -67,10 +67,9 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
     ],
   },
-  /* THE REST UNDER MORE, EIGHT SINCE THE UI PASS OF 20 OCTOBER (agents F14): signing in (who you are, passkeys, where you
-     are signed in and the records you can open, which were three half-empty areas), sharing, what comes in, the keys, what
-     the record keeps and costs, and, last, the one irreversible act, so deleting the record is the last row of the last
-     group and never a neighbour of the colour scheme. Pages is Navigation's now: the phone bar, the order and every page. */
+  /* THE REST UNDER MORE, SEVEN SINCE THE UI PASS OF 20 OCTOBER (agents F14) less Delete: signing in (who you are, passkeys, where you
+     are signed in and the records you can open, which were three half-empty areas), sharing, what comes in, the keys, and what
+     the record keeps and costs. Pages is Navigation's now: the phone bar, the order and every page. */
   {
     title: 'More',
     icon: 'archive',
@@ -85,10 +84,16 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
       area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
-      /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`: a destructive act reached by somebody looking for a backup is
-         reached by the person least expecting it. */
-      area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good'),
     ],
+  },
+  /* THE ONE IRREVERSIBLE ACT IN A GROUP OF ITS OWN, LAST (UI audit of 22 October, 18). It was the last row of More, one
+     hairline under Export and Billing, and read as one more thing to look at. Its heading says what sets it apart. It
+     was the last section of `Export` before that: a destructive act reached by somebody looking for a backup is reached
+     by the person least expecting it. */
+  {
+    title: 'Cannot be undone',
+    icon: 'alert',
+    areas: [area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good')],
   },
 ];
 

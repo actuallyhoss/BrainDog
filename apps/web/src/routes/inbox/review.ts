@@ -1,5 +1,5 @@
 /**
- * To review: the doubtful arrivals BrainDog suggested a filing for and did not make (DIRECTION §45). Each is a
+ * To review: the doubtful arrivals BrainDog suggested a filing for and did not make. Each is a
  * suggestion whose body says `review`, which Needs you leaves out; the inbox lists them with one line each.
  *
  * Route-only, like `shapes.ts`. The fetch is the client's, so a test drives the reading with a plain value.

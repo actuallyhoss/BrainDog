@@ -41,6 +41,8 @@
     apps: 'Your app',
     install: 'Install BrainDog',
     connect: 'Connect this BrainDog',
+    /* WHAT `braindog setup` DOES NEXT, so the link and the six digits it prints are expected and not a surprise. */
+    approve: 'It prints a link and six digits. Open the link, type the digits, and the terminal carries on.',
   } as const;
 
   let heading = $state<HTMLHeadingElement | undefined>(undefined);
@@ -121,6 +123,7 @@
               {#if steps.length > 1}<span class="cmd-n" aria-hidden="true">{i + 1}</span>{/if}{s.said}
             </p>
             <div class="cmd"><CodeLine text={s.line} label={s.said} /></div>
+            {#if s.line.startsWith('braindog setup')}<p class="cmd-then">{words.approve}</p>{/if}
           </li>
         {/each}
       </ol>
@@ -230,6 +233,14 @@
 
   .cmd {
     min-inline-size: 0;
+  }
+
+  .cmd-then {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-wrap: pretty;
   }
 
   /* WAITING IN THE QUIET INK beside a grey dot; connected in ink beside the live green one. */

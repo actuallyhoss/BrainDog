@@ -6,8 +6,8 @@
  * press. The gate was slower than the queue then: `Choose this` opened a REQUIRED reason box, the
  * commit was refused while the box was empty, and the reason was the whole ceremony. So a colleague
  * at `read` who reached this screen from a card link typed the longest paragraph in the product
- * before anything told them their access did not reach the act. One press answers here now too
- * (DIRECTION §37), and the refusal still comes before it.
+ * before anything told them their access did not reach the act. One press answers here now too,
+ * and the refusal still comes before it.
  *
  * COUNTED FROM THE MARKUP OF THIS SCREEN, for the sample's `shall-we-charge-per-seat` with its three
  * options, before the repair: 4 controls inside the decision (three `Choose this` buttons and the
@@ -84,7 +84,7 @@ test('the third verb is off too, and points at the same sentence', () => {
      clock beside the answers as on every card (VERIFY H8). */
   assert.match(
     page,
-    /<button type="button" class="dc-btn dc-later" data-weight="bare" disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} aria-label=\{queueWords\.notNow\} title=\{queueWords\.notNow\} onclick=\{defer\}\n\s+><Icon name="clock" size="s" \/><\/button/u,
+    /<button type="button" class="dc-btn dc-later" data-weight="bare" disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} aria-label=\{queueWords\.notNow\} title=\{queueWords\.notNow\} onclick=\{defer\}\n\s+><Icon name="clock" size="s" \/><span class="dc-later-words">\{queueWords\.notNow\}<\/span><\/button/u,
     'Not now is still offered to a reader who may not answer',
   );
 });
@@ -125,7 +125,7 @@ test('the sentence the controls point at is rendered, and before the first of th
 });
 
 /**
- * ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, the answers straight after, then what accepting does as
+ * ONE TILE, READ LIKE A FORM: who asked and when, the answers straight after, then what accepting does as
  * a plain part of the same tile, and the comments under it all.
  *
  * MEASURED before: up to seven tiles (what an arrangement does, what a proposal puts in place, the rows to tick, the
@@ -238,7 +238,7 @@ test('nothing a reader was invited to read is hidden from them', () => {
 });
 
 /**
- * ONE PRESS IS THE ANSWER (DIRECTION §37), and a reason is the record's to ask for, once, never this screen's to demand.
+ * ONE PRESS IS THE ANSWER, and a reason is the record's to ask for, once, never this screen's to demand.
  *
  * MEASURED on the walk of 2 October: a press made a round trip and then asked "Why?", and two of the owner's decisions
  * carried the reasons "f" and "y". So the press sends the answer alone, the one line opens only on the record's own
@@ -269,7 +269,7 @@ test('one press is the answer, and a reason is asked for only when the record as
 });
 
 /**
- * A KEY NEVER SENDS MONEY, AND NEVER A CHANGE THAT IS HARD TO UNDO (DIRECTION §37). Enter gives the suggested answer, or
+ * A KEY NEVER SENDS MONEY, AND NEVER A CHANGE THAT IS HARD TO UNDO. Enter gives the suggested answer, or
  * Accept, only where `acceptKey` says a key may; anywhere else it puts the focus on the first answer, whose words name
  * the amount, so the press that sends it is the reader's own on that button. The same on a row to tick, where Enter is
  * "done" with what `e` opened.
@@ -309,7 +309,7 @@ test('a reloaded receipt never quotes the sentence the record wrote for a press 
 });
 
 /**
- * A MERGE IS ASKED AS WHO IS WHO (DIRECTION §38), and an answer that cannot be taken back waits six seconds for its Undo:
+ * A MERGE IS ASKED AS WHO IS WHO, and an answer that cannot be taken back waits six seconds for its Undo:
  * a merge's presses, and Backspace's decline on any question, since a declined question is never reopened and a pair
  * kept apart is never asked about again. A key that starts in a field or a box is never the gate's.
  */

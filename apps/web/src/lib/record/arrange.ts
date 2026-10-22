@@ -24,8 +24,8 @@ export type Area = 'main' | 'rail';
 export type Slot = { i: number; span: number; area?: Area };
 
 /**
- * 12 · 8 · 6 · 4 · 3: the whole row, two thirds, a half, a third and a quarter. The board's own widths (DIRECTION §39,
- * `layout.ts` `TILE_SPANS`), so a width offered is a width the board draws rather than one it snaps to a neighbour.
+ * 12 · 8 · 6 · 4 · 3: the whole row, two thirds, a half, a third and a quarter. The board's own widths (`layout.ts`
+ * `TILE_SPANS`), so a width offered is a width the board draws rather than one it snaps to a neighbour.
  */
 export const STEPS = [12, 8, 6, 4, 3] as const;
 

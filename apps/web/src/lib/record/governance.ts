@@ -69,7 +69,7 @@ export type Held = { id?: string; register?: string; seq: number | null; version
 
 /**
  * What a diff is drawn from: each named register's declaration, the rows it would change, and `names`, what each row a
- * ref in it points at is called (`refNames`), so a diff says "Prism" and never `01M3MV…` or `things#23`.
+ * ref in it points at is called (`refNames`), so a diff says "Copperleaf" and never `01M3MV…` or `things#23`.
  */
 export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]>; names?: Record<string, string> };
 

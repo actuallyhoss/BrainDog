@@ -37,10 +37,11 @@ function directives(policy: string): Map<string, string[]> {
   return out;
 }
 
-test('THE POLICY FRAMES EXACTLY THE EMBED PROVIDERS AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
+test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
   const { default: config } = (await import(CONFIG)) as { default: { kit?: { csp?: Csp } } };
   const d = config.kit?.csp?.directives ?? {};
-  assert.deepEqual(d['frame-src'], [...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], 'frame-src is not EMBED_PROVIDERS plus Turnstile');
+  /* `'self'` FOR THE DRAWN BLOCK'S FRAME ALONE, which both hosts serve under its own policy (`@braindog/host/drawn-frame`). */
+  assert.deepEqual(d['frame-src'], ['self', ...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], "frame-src is not 'self', EMBED_PROVIDERS and Turnstile");
   assert.equal(config.kit?.csp?.mode, 'hash');
   assert.deepEqual(d['style-src-attr'], ['unsafe-inline']);
   for (const name of ['default-src', 'script-src', 'style-src-elem'] as const)

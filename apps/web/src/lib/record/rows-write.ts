@@ -107,8 +107,8 @@ const words = {
 /**
  * THE ROW A SENTENCE ABOUT A WRITE NAMES, as a person reads it: its title as the record holds it now (`row`, the copy
  * the conflict handed back or the one read again), else the name this tab last walked for that number, else "This task"
- * in the list's own singular. It was `obligations#2`, which is an agent's handle and never what a person reads
- * (DIRECTION §37). A write with no row yet (an add the record raced) names the list.
+ * in the list's own singular. It was `obligations#2`, which is an agent's handle and never what a person reads.
+ * A write with no row yet (an add the record raced) names the list.
  */
 export function rowSaid(register: string, seq: number | null, row: unknown = null): string {
   const decl = REGISTERS[register];

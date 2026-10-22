@@ -373,7 +373,7 @@ const SITTING = {
     { register: 'accounts', at: 'accounts#2', version: 3, patch: { last4: '7731', kind: 'card' }, before: { name: 'Credit Card', last4: '', kind: 'card' } },
     { at: 'accounts#3', version: 1, patch: { last4: '1100' } },
     { register: 'accounts', at: 'accounts#4', version: 2, patch: { name: 'Savings', open: true }, before: { name: 'HSBC', open: false } },
-    { register: 'books', fields: { name: 'Quartz' } },
+    { register: 'books', fields: { name: 'Harbour' } },
   ],
   parts: [
     { id: 'p1', question: 'How often should rates arrive?', suggested: 'daily', options: [{ id: 'daily', label: 'Every day', does: 'One call a day' }, { id: 'hourly', label: 'Every hour' }] },
@@ -408,7 +408,7 @@ test('THE SITTING reads in the brief’s order after why, and the queue counts k
     { question: 'How often should rates arrive?', options: [{ name: 'Every day', line: 'One call a day', suggested: true }, { name: 'Every hour', line: '', suggested: false }] },
   ]);
   const rows = out.parts.find((p) => p.part === 'rows');
-  assert.deepEqual(rows?.part === 'rows' && rows.lists, [{ name: 'Books', lines: ['Quartz'] }]);
+  assert.deepEqual(rows?.part === 'rows' && rows.lists, [{ name: 'Books', lines: ['Harbour'] }]);
   assert.equal(out.summary, '3 keys, 3 updates, 3 feeds, 1 addition');
 });
 

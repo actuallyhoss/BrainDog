@@ -1,5 +1,5 @@
 <!--
-  BrainDog's own page updates, as one card in Needs you (DIRECTION §37): "BrainDog improved 4 of your pages", what changes
+  BrainDog's own page updates, as one card in Needs you: "BrainDog improved 4 of your pages", what changes
   on each, and Accept.
 
   ONE CARD AND NOT FOUR QUESTIONS. Each update is one line under the heading, the page and the newest thing it changes,

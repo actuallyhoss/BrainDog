@@ -16,7 +16,7 @@
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { FILE_TOOLS, PERMISSIONS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, recordToolWords, slotsOf, words, writesOf, type KindDraft } from './new-kind.ts';
+  import { AGENTS, FILE_TOOLS, PERMISSIONS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, recordToolWords, slotsOf, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
 
@@ -32,7 +32,7 @@
   const forced = $derived(draft.permission === 'acceptEdits');
 
   /** The fields that carry a help line a sentence can be drawn in. */
-  const SHOWN = ['title', 'prompt', 'repo', 'commands', 'turns', 'permission', 'writes'];
+  const SHOWN = ['title', 'prompt', 'repo', 'commands', 'turns', 'permission', 'writes', 'agent'];
 
   const toggle = (list: readonly string[], one: string): string[] => (list.includes(one) ? list.filter((t) => t !== one) : [...list, one]);
 
@@ -147,6 +147,16 @@
           </div>
           {@render help('kind-turns-help', 'turns', words.turnsHelp)}
         </div>
+
+        <fieldset class="item" aria-describedby="kind-agent-help">
+          <legend class="label">{words.agent}</legend>
+          <div class="picks form-checks">
+            {#each AGENTS as a (a)}
+              <label class="pick"><input type="radio" name="kind-agent" value={a} checked={draft.agent === a} onchange={() => (draft.agent = a)} />{a === 'codex' ? words.codex : words.claude}</label>
+            {/each}
+          </div>
+          {@render help('kind-agent-help', 'agent', words.agentHelp)}
+        </fieldset>
 
         <!-- TWO CHOICES, AND ONLY THE KERNEL'S. A skipped permission is not among them, so it cannot be picked. -->
         <fieldset class="item" aria-describedby="kind-permission-help">

@@ -1,7 +1,7 @@
 /**
  * DECIDE, DECLARED, AND THE TWO LISTS UNDER THE QUEUE THAT ARE NOT YET A SOURCE.
  *
- * THE PAGE IS A BODY LIKE ANY OTHER (DIRECTION §35, "every page is declared"). `/decide` was a screen of its own, kept
+ * THE PAGE IS A BODY LIKE ANY OTHER ("every page is declared"). `/decide` was a screen of its own, kept
  * now at `/decide?classic` (`Classic.svelte`) until the declared page does everything it did; `decideHome` is the body
  * the page draws through `PageView`, as Today's is (`lib/home/default-home.ts`): the line the head says, the first
  * question drawn whole, the rest to be chosen and answered at once, what was put off and what was decided folded shut

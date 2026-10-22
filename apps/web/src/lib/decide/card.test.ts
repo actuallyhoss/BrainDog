@@ -18,7 +18,7 @@ const ask = (over: Record<string, unknown> = {}): QueueQuestion =>
     who: 'agent:claude',
     at: '2026-10-06T07:00:00Z',
     kind: 'options',
-    question: 'Which plan for Bake?',
+    question: 'Which plan for Oxbow?',
     why: 'Two of the three quotes came back.',
     cost: 'call',
     options: [
@@ -30,7 +30,7 @@ const ask = (over: Record<string, unknown> = {}): QueueQuestion =>
 
 test('WHY COMES FIRST, with who asked, and the suggestion is marked where it can be undone', () => {
   const card = cardOf(ask(), { now, home: 'GBP' });
-  assert.equal(card.question, 'Which plan for Bake?');
+  assert.equal(card.question, 'Which plan for Oxbow?');
   assert.equal(card.why, 'Two of the three quotes came back.');
   assert.equal(card.by.kind, 'agent');
   assert.equal(card.when, '2h ago');
@@ -183,7 +183,7 @@ test('NO ADDRESS OR ID IN AN ANSWER, ITS REASON OR WHAT A CHANGE WAS AND BECOMES
       ask({
         changes: [
           { field: 'email', before: 'old@x.com', after: 'new@y.com' },
-          { field: 'link', before: '01ARZ3NDEKTSV4RRFFQ69G5FAV', after: 'Bake' },
+          { field: 'link', before: '01ARZ3NDEKTSV4RRFFQ69G5FAV', after: 'Oxbow' },
           { field: 'note', before: 'Ask jo@x.io', after: 'Ask Jo, see tasks#8' },
         ],
       }),
@@ -229,7 +229,7 @@ test('A MERGE IS STILL DRAWN AS ONE, from the options the record offers', () => 
   assert.equal(card.merge?.apart.option, 'apart');
 });
 
-/* ── the card reads like a form (DIRECTION §39) ───────────────────────────── */
+/* ── the card reads like a form ───────────────────────────── */
 
 test('A FORM STARTS ON THE SUGGESTION ONLY WHERE A KEY MAY GIVE IT, and a hard answer says so in its button', () => {
   assert.equal(startsOn(cardOf(ask(), { now, home: 'GBP' })), 'seat', 'the suggestion is not chosen to start with');
@@ -431,8 +431,14 @@ test('THE SUGGESTED ANSWER IS THE RED PRIMARY, IN ITS OWN WORDS, and the others 
 const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
-  for (const path of ['../page/QueueAnswer.svelte', '../home/Question.svelte', '../../routes/decide/Classic.svelte', '../palette/Palette.svelte'])
+  for (const path of ['../../routes/decide/Classic.svelte', '../palette/Palette.svelte'])
     assert.match(src(path), /import DecisionCard from '\$lib\/decide\/DecisionCard\.svelte'/u, `${path} draws a card of its own`);
+  /* A PAGE'S QUEUE AND TODAY'S QUESTION LOAD THE SAME CARD beside their data, rather than ahead of the first paint. */
+  for (const path of ['../page/QueueAnswer.svelte', '../home/Question.svelte']) {
+    assert.match(src(path), /import \{ cardNow, loadCard \} from '\$lib\/decide\/card-load\.ts'/u, `${path} draws the card it loads`);
+    assert.match(src(path), /<DecisionCard [^>]*\{question\}/u, `${path} draws a card of its own`);
+  }
+  assert.match(src('./card-load.ts'), /import\('\.\/DecisionCard\.svelte'\)/u, 'the loader loads this card');
   const card = src('./DecisionCard.svelte');
   assert.match(card, /cardOf\(/u, 'the card reads its view model');
   assert.match(card, /import MergeCard from/u, 'a merge is a variant of the card');

@@ -173,7 +173,7 @@
   </Button>
 {/if}
 
-<Sheet bind:open title={mode === 'template' ? templateWords.title : can.state === 'yes' ? words.shareTitle : words.shareOpen} onclose={forget}>
+<Sheet bind:open fit title={mode === 'template' ? templateWords.title : can.state === 'yes' ? words.shareTitle : words.shareOpen} onclose={forget}>
   <div class="share">
     {#if mode === 'template'}
       {#if template.state === 'reading'}
@@ -310,6 +310,18 @@
     display: grid;
     gap: var(--sp-3);
     min-inline-size: 0;
+  }
+
+  /* THE DAYS AS THE HOUSE'S SEGMENTED CONTROL, as wide as its four words and no wider: stretched across the sheet its
+     track ran on past "90 days" as an empty bar. The bare verbs under it sit at the start edge with the rest of the
+     sheet's words, not centred under nothing. */
+  .share > :global(.segmented),
+  .share > :global(.btn[data-weight='bare']) {
+    justify-self: start;
+  }
+
+  .share > :global(.btn[data-weight='bare']) {
+    margin-inline-start: calc(-1 * var(--sp-3));
   }
 
   .once {

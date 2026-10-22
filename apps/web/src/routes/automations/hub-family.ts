@@ -37,7 +37,19 @@ export const familyWords = {
   count: (n: number) => `${n.toLocaleString('en')} rules`,
   noneRan: 'None has run',
   someNever: (n: number) => `${spell(n, true)} never ran.`,
+  /* WHAT THE FAMILY'S SWITCHES SAY TOGETHER, in the column every other row's switch stands in. */
+  allOn: 'All on',
+  allOff: 'All off',
+  someOn: (on: number, of: number) => `${on} of ${of} on`,
 } as const;
+
+/** A family's switches said as one, or `null` where its rules carry none (a list shown without switches). */
+export function familyOn(members: readonly { toggle?: { on: boolean } | null | undefined }[]): string | null {
+  const switched = members.filter((m) => m.toggle);
+  if (switched.length === 0) return null;
+  const on = switched.filter((m) => m.toggle!.on).length;
+  return on === switched.length ? familyWords.allOn : on === 0 ? familyWords.allOff : familyWords.someOn(on, switched.length);
+}
 
 /** "A", "A and B", "A, B and C". */
 const and = (names: readonly string[]): string =>

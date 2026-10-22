@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { families, familyName, familySaid, type Kin } from './hub-family.ts';
+import { families, familyName, familyOn, familySaid, type Kin } from './hub-family.ts';
 
 const NOW = new Date(2026, 9, 14, 12).getTime();
 const KEY = 'reg_parcels/inline/set:shelf';
@@ -60,4 +60,12 @@ test("A FAMILY'S NAME IS THE FIELDS AND THE LIST, NEVER THE KEY", () => {
   assert.doesNotMatch(f.family.name, /reg_|inline|set:|\//u);
   assert.equal(familyName('Parcels', ['Shelf', 'Tags']), 'Shelf and Tags on Parcels');
   assert.equal(familyName('Parcels', []), 'Rules on Parcels');
+});
+
+test('a family says its switches together, in the column a switch stands in', () => {
+  const on = (b: boolean) => ({ toggle: { on: b } });
+  assert.equal(familyOn([on(true), on(true)]), 'All on');
+  assert.equal(familyOn([on(false), on(false)]), 'All off');
+  assert.equal(familyOn([on(true), on(false), on(true)]), '2 of 3 on');
+  assert.equal(familyOn([{}, {}]), null, 'a list with no switches says nothing');
 });

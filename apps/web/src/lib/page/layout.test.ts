@@ -263,7 +263,7 @@ test('A ROW THAT WAS NEVER WHOLE IS LEFT AS IT WAS, and a row with nothing drawn
   assert.deepEqual(widened([hidden(6), hidden(6), shown(6)]), [6, 6, 6]);
 });
 
-/* ON A WIDE SCREEN A FLOW OF FULL-WIDTH LISTS IS TWO COLUMNS (DIRECTION §36, §38). */
+/* ON A WIDE SCREEN A FLOW OF FULL-WIDTH LISTS IS TWO COLUMNS. */
 const k = (kind: string, span = 12, more: { drawn?: boolean; lead?: boolean; columns?: number; declared?: boolean } = {}) => ({ kind, span, drawn: more.drawn ?? true, ...more });
 
 test('TWO WHOLE-ROW LISTS ONE AFTER THE OTHER ARE TWO HALVES, and one left over keeps the whole row', () => {
@@ -335,7 +335,7 @@ test('A MAIN COLUMN THAT OPENS ON ANYTHING ELSE KEEPS ITS ORDER, and so does a c
   assert.equal(leadChartAt([o('forecast', { drawn: false })]), -1);
 });
 
-/* ── the board's widths (DIRECTION §39) ─────────────────────────────────────── */
+/* ── the board's widths ─────────────────────────────────────── */
 
 const at = (...spans: number[]) => spans.map((span) => ({ span, drawn: true }));
 

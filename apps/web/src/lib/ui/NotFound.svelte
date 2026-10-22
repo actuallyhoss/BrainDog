@@ -23,6 +23,8 @@
   import Button from './Button.svelte';
   import Empty from './Empty.svelte';
   import Icon from './Icon.svelte';
+  import NearLinks from './NearLinks.svelte';
+  import type { Place } from '../record/nearest.ts';
 
   /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
@@ -35,11 +37,14 @@
   let {
     title = words.title,
     body = words.body,
+    near = [],
   }: {
     /** The screen's heading, when the caller knows more than "nothing is here": a number that names no one list. */
     title?: string;
     /** One sentence on what to do next. */
-    body?: string;
+    body?: string | undefined;
+    /** The places nearest to what was typed (`record/nearest.ts`), as links over Today and Search. */
+    near?: readonly Place[];
   } = $props();
 
   /* SIGNED OUT is a record that refused who is asking: there is no Today to go to and no record to search. */
@@ -51,6 +56,7 @@
     {#if out}
       <Button weight="primary" href="/signin">{words.signIn}</Button>
     {:else}
+      <NearLinks places={near} said={copy.nearPages} />
       <Button weight="primary" href="/">{copy.errorPage.home}</Button>
       <Button onclick={openPalette}><Icon name="search" size="m" />{words.search}</Button>
     {/if}

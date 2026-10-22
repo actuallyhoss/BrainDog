@@ -13,8 +13,8 @@ import type { RecordRow } from './remote.ts';
 
 const row = (seq: number, fields: Record<string, unknown>): RecordRow => ({ id: `r${seq}`, seq, fields, version: 1, created_at: '2026-10-01T00:00:00Z' });
 const rows = [
-  row(1, { name: 'Priya Raman', email: 'priya@kiln.example' }),
-  row(2, { name: 'Priya Raman', email: 'priya@larkspur.example' }),
+  row(1, { name: 'Teodor Brandt', email: 'teodor@kiln.example' }),
+  row(2, { name: 'Teodor Brandt', email: 'teodor@larkspur.example' }),
   row(3, { name: 'Ada', email: 'ada@example.com' }),
   row(4, { name: 'Gone', merged_into: 'people#1' }),
   row(5, { name: '' }),

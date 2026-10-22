@@ -1,5 +1,5 @@
 <!--
-  What one agent run did, under a section that declares `panel: run` on the run's own page (DIRECTION §37, the run docked
+  What one agent run did, under a section that declares `panel: run` on the run's own page (the run docked
   beside the runs board): every change it made that is still there, in plain lines, and Undo this run.
 
   READ FROM THE PLAN UNDO WOULD PUT BACK (`undo-write.ts` `undoPlan`, dry): the record's own list of the run's changes in
@@ -448,7 +448,7 @@
     line-height: 1.55;
   }
 
-  /* A RECTANGLE, as every field is (DIRECTION §39): radius 8, the field's flat fill, no border of its own. */
+  /* A RECTANGLE, as every field is: radius 8, the field's flat fill, no border of its own. */
   .run-input {
     min-block-size: 36px;
     padding-inline: var(--sp-2);

@@ -22,7 +22,7 @@ import { BASE } from '../at.ts';
 /** The one cache: the app's shell, its files and the record's answers, deleted together. */
 export const COPY = 'braindog-copy';
 
-/** How long an answer is drawn offline: a week, his pick. Older than this it is deleted rather than shown. */
+/** How long an answer is drawn offline: a week. Older than this it is deleted rather than shown. */
 export const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 /** The header a kept answer carries its keeping time in, in milliseconds since the epoch. */
@@ -123,7 +123,7 @@ export const words = {
 /**
  * When a copy was kept, said the way the offline line says it.
  *
- * THE TIME ALONE FOR TODAY, which is his pick's own example ("from 14:02"), and the weekday with it for an older one,
+ * THE TIME ALONE FOR TODAY ("from 14:02"), and the weekday with it for an older one,
  * because a copy is at most a week old and "from 14:02" on Tuesday's answer would read as this afternoon's.
  */
 export function when(at: number, now: number): string {

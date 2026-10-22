@@ -31,7 +31,7 @@
   import { suggested } from '../design/pen.ts';
   export { suggested };
 
-  /* edge-cue:start (`sidebar-scroll-58.test.ts` reads the lines between these two marks and runs them) */
+  /* edge-cue:start (`sidebar-scroll.test.ts` reads the lines between these two marks and runs them) */
   /** How far, in px, the scroller's content fades out at an edge that has more past it. */
   export const EDGE_FADE = 24;
   /**
@@ -721,7 +721,7 @@
 <style>
   /**
    * THE RAIL'S WIDTH, TIME AND CURVE, SAID ON THE ROOT for the shell and the toast stack to read. 240, the board's left
-   * column (DIRECTION §39). `[data-rail-card]` rather than the rail's class, which another stylesheet may also use.
+   * column. `[data-rail-card]` rather than the rail's class, which another stylesheet may also use.
    */
   :global(:root) {
     --rail-w: var(--rail);
@@ -1342,8 +1342,7 @@
     display: none;
   }
 
-  /* THE NARROW RAIL'S NAME FOR A GLYPH: over the work, so an opaque tile with one hairline and a shadow, and no glass
-     (DIRECTION §39). */
+  /* THE NARROW RAIL'S NAME FOR A GLYPH: over the work, so an opaque tile with one hairline and a shadow, and no glass. */
   .flyout {
     position: fixed;
     inset-block-start: var(--fly-y);

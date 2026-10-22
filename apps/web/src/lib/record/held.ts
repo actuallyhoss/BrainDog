@@ -84,7 +84,7 @@ export function leftOut(decl: Pick<RegisterDecl, 'state' | 'done' | 'fields'> | 
 /**
  * The rows a ref into `register` can point at, as a picker offers them: by name, or as its kind and number for a row
  * with none, "Book #2", as `unnamed` in `api.ts` says it. It said `books#2`, the id an agent passes, which is never what
- * a person reads (DIRECTION §37).
+ * a person reads.
  *
  * EMPTY UNTIL THE LIST HAS BEEN WALKED, and that is the honest answer. The new-row form offered the sample's rows here,
  * so on a record whose projects are Harbour Lane and Tidewater a new service could only be pointed at Kiln, Marlow & Co,

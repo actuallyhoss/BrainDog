@@ -44,6 +44,7 @@
     title,
     subtitle,
     kind,
+    fit = false,
     onclose,
     children,
     footer,
@@ -53,6 +54,8 @@
     subtitle?: string | undefined;
     /** `menu`: a menu's rows under a thumb. No title row; the title names the dialog; a bottom sheet at every width. */
     kind?: 'menu' | undefined;
+    /** A short sheet, a choice and a button: from 900 up the drawer is as tall as what it holds, hung from the top. */
+    fit?: boolean | undefined;
     /** For a caller whose open state is derived from something else, a peeked row's number, say. */
     onclose?: (() => void) | undefined;
     children: Snippet;
@@ -247,6 +250,7 @@
   bind:this={el}
   class="sheet"
   data-kind={kind}
+  data-fit={fit ? '' : undefined}
   aria-labelledby={kind === 'menu' ? undefined : `${uid}-title`}
   aria-label={kind === 'menu' ? title : undefined}
   onclick={onbackdrop}
@@ -336,6 +340,16 @@
     transition-duration: var(--sheet-out);
     transition-timing-function: var(--sheet-curve);
     transition-behavior: allow-discrete;
+  }
+
+  /* A SHORT SHEET FITS WHAT IT HOLDS (UI audit of 22 October, 21). A read-only link is a sentence, four days and one
+     button, and the full-height drawer drew them over 700px of empty tile. It is hung from the top `--inset` in, as the
+     drawer is, and grows to the drawer's own height at most, so a sheet that gains a step (the template's facts) still
+     scrolls inside the same box. */
+  .sheet[data-fit] {
+    inset-block-end: auto;
+    block-size: auto;
+    max-block-size: calc(100dvh - 2 * var(--inset) - var(--kb));
   }
 
   /* Closed, and on its way out: nothing on it can be pressed. */

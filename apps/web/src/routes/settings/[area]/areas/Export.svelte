@@ -111,7 +111,7 @@
 
   /**
    * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: "Tasks, Clients and Invoices", or the first three and how many more. The
-   * two slices name the person's own things rather than the system's word for them (DIRECTION §35).
+   * two slices name the person's own things rather than the system's word for them.
    */
   const NAMED_MOST = 3;
   const things = $derived.by(() => {

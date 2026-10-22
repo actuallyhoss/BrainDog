@@ -136,8 +136,8 @@ test('A RECORD THAT SENDS THE MEASURES READ ONCE BESIDE ITS LINES DRAWS THEM AS 
   const keys = ['2026-08-31', '2026-09-07', '2026-09-14'];
   const series = { name: 'Users', unit: '', bucket: 'week', keys, now: [100, null, 140], was: [80, 90, 95], latest: { value: 140, at: day(16), day: '2026-09-16' } };
   const latest = [
-    { measure: 'Aov, Crumb.gg', value: 24.1, unit: 'GBP', at: day(16), day: '2026-09-16' },
-    { measure: 'Accounts, Sketchpad', value: 4, unit: '', at: day(15), day: '2026-09-15' },
+    { measure: 'Aov, Oxbow.gg', value: 24.1, unit: 'GBP', at: day(16), day: '2026-09-16' },
+    { measure: 'Accounts, Pinwheel', value: 4, unit: '', at: day(15), day: '2026-09-15' },
     { measure: 'broken', value: 'four' },
   ];
   const block = blockOf(answered('lines', 'register.datapoints', FIELDS, [], { measures: [series], latest }) as never, new Map(), NOW);
@@ -145,7 +145,7 @@ test('A RECORD THAT SENDS THE MEASURES READ ONCE BESIDE ITS LINES DRAWS THEM AS 
   assert.equal(block.total, 3);
   const drawn = toSegments(block).filter((s): s is Block => s.type === 'block');
   assert.deepEqual(drawn.map((b) => [b.kind, b.heading]), [['lines', 'Users'], ['spec', 'Reported once']]);
-  assert.deepEqual(drawn[1]!.rows.map((r) => r.cells.join(' | ')), ['Aov, Crumb.gg | GBP 24.10 | 16 Sep', 'Accounts, Sketchpad | 4 | 15 Sep']);
+  assert.deepEqual(drawn[1]!.rows.map((r) => r.cells.join(' | ')), ['Aov, Oxbow.gg | GBP 24.10 | 16 Sep', 'Accounts, Pinwheel | 4 | 15 Sep']);
 
   /* AND A STAT TAKES NONE: its tiles are each a measure's newest reading already. */
   const stat = blockOf(answered('stat', 'register.datapoints', FIELDS, [], { measures: [series], latest }) as never, new Map(), NOW);

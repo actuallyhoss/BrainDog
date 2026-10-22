@@ -1851,6 +1851,10 @@ export function draw(
   const drawer = drawerOf(block.kind);
   if (drawer && block.answer) return drawer.draw(block.answer, { home: homeCurrency(), now: clockOf(block), nothing });
 
+  /* A `drawn` block is a frame and not rows, so one the record has not answered (no answer kept on it) says its nothing;
+     with an answer it is the registered kind's above, and `BlockSlot.svelte` draws the frame from its plan. */
+  if (block.kind === 'drawn') return { segments: [], refusal: nothing() };
+
   /* A `table` is drawn by the grid rather than through the dialect, so its rows are the check. */
   if (block.kind === 'table')
     return {
@@ -1906,7 +1910,7 @@ export function draw(
  * How a cell of a block of `kind` says its money: a tile's figure as a headline, a bar's or a split's value as a figure,
  * a table's to the penny, and the rest as a sentence. A BAR'S VALUE IS A FIGURE READ AGAINST THE BARS BESIDE IT, in the
  * record's own sign and exact, never rounded to whole units: two books a few piastres apart must not read the same
- * (research audit M6). Only a tile's figure, standing alone, drops them from ten thousand up (DIRECTION §37).
+ * (research audit M6). Only a tile's figure, standing alone, drops them from ten thousand up.
  */
 const exactness = (kind: string, cell: number): 'headline' | 'figure' | 'exact' | 'sentence' =>
   cell === 1 && kind === 'stat'

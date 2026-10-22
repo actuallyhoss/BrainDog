@@ -12,7 +12,8 @@
   ends it at once. Each person's "Seen and changed" opens in a drawer, read from `shareActivity` when it opens (§2.10).
 
   AN OWNER'S OR AN ADMIN'S, as the record's methods are. Anybody else here holds shares rather than giving them, so the
-  area says what they can see instead (§3.4), from `myShares`.
+  area says what they can see instead (§3.4), from `myShares`, and where their share lets them share it on (the manage
+  rung), "Share on" beside it opens the onward sheet (`OnwardSheet.svelte`).
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
@@ -37,6 +38,7 @@
     endedAt,
     groupMember,
     makeGroup,
+    onwardOf,
     readActivity,
     readGroups,
     readMine,
@@ -106,6 +108,19 @@
   const now = $derived(recordNow());
   const sections = $derived(sharingSections(rows ?? [], now));
   const liveCount = $derived(sections.shared.reduce((n, b) => n + b.rows.length, 0));
+
+  /* ── Share on: the shares that let them, and the sheet opened on one (`OnwardSheet.svelte`) ── */
+
+  const onward = $derived(onwardOf(mine ?? []));
+  let onwardOpen = $state(false);
+  let onwardWanted = $state(false);
+  let onwardFrom = $state<string | undefined>(undefined);
+
+  function shareOn(id: string): void {
+    onwardFrom = id;
+    onwardWanted = true;
+    onwardOpen = true;
+  }
 
   /* ── Stop, asked once and in place ── */
 
@@ -267,10 +282,10 @@
   </div>
 {/if}
 
-<!-- PEOPLE HERE: roles, invites and links, as the People area drew them. NOT FOR A GUEST WHO HOLDS SHARES AND NOT THE
+<!-- THE PEOPLE AREA'S OWN TILES: roles, invites and links, as the People area drew them, under no heading of their own,
+     since each tile names itself and the page's title already says People. NOT FOR A GUEST WHO HOLDS SHARES AND NOT THE
      WHOLE RECORD: the record refuses them the list of people, so their page is what they can see here, not a refusal. -->
 {#if team || whole || !(mine?.length)}
-  <h2 class="part">{copy.sharingPeopleHere}</h2>
   {@render here?.()}
 {/if}
 
@@ -282,9 +297,21 @@
   {:else if mine !== null && mine.length > 0}
     <Tile icon="eye" title={copy.sharingYouCanSee} count={mine.length}>
       <ul class="shares">
-        {#each mine as m (m.id)}<li class="share"><p class="share-said">{m.sentence}</p></li>{/each}
+        {#each mine as m (m.id)}
+          <li class="share">
+            <p class="share-said share-mine">{m.sentence}</p>
+            {#if onward.some((o) => o.id === m.id)}
+              <!-- SHARE ON, where their share lets them: the onward sheet opens on this one. -->
+              <Button weight="quiet" aria-label={copy.shareOnwardLabel(m.sentence)} onclick={() => shareOn(m.id)}><Icon name="user-plus" size="s" />{copy.shareOnward}</Button>
+            {/if}
+          </li>
+        {/each}
       </ul>
     </Tile>
+    {#if onwardWanted}
+      <!-- LOADED THE FIRST TIME IT IS ASKED FOR, and kept so it can close the way it came. -->
+      {#await import('$lib/sharing/OnwardSheet.svelte') then { default: OnwardSheet }}<OnwardSheet bind:open={onwardOpen} mine={onward} from={onwardFrom} />{/await}
+    {/if}
   {/if}
 {:else if refused !== null}
   <Tile icon="link" title={copy.sharingShared}><Empty kind="error" title={refused} /></Tile>
@@ -426,14 +453,6 @@
     margin: 0;
   }
 
-  /* PEOPLE HERE IS A HEADING OVER THE PEOPLE AREA'S OWN TILES, which a tile may not hold. */
-  .part {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-
   .bunches,
   .shares {
     display: grid;
@@ -489,6 +508,11 @@
     font: inherit;
     text-align: start;
     cursor: pointer;
+  }
+
+  .share-mine {
+    flex: 1 1 16rem;
+    min-inline-size: 0;
   }
 
   .share-said {

@@ -178,7 +178,7 @@ test('WHAT CHANGED LEAVES OUT WHAT THE PAGE ALREADY SAYS: open questions, and a 
 });
 
 test('THE PAGE LINE IS LIFTED INTO THE HEAD, and one that fills figures stays the author tile', () => {
-  const plain = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' }), block({ kind: 'chips', body: 'Kiln · Bake' })], NOW);
+  const plain = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' }), block({ kind: 'chips', body: 'Kiln · Oxbow' })], NOW);
   assert.equal(plain.lead, 'Calm.');
   assert.deepEqual(shown(plain.blocks).map((b) => b.kind), ['chips']);
   /* A PAGE OF FIGURES HAS NOTHING TO COUNT, so the line is its own. */
@@ -415,7 +415,7 @@ test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it say
   /* WORDED ITS OWN WAY, it is drawn in ink throughout: no red the rules did not choose. */
   assert.deepEqual(head('The Kiln invoice is overdue.'), { text: 'The Kiln invoice is overdue.', needs: '', by: 'slash' });
   /* A PAGE THE RECORD DECLARES WRITES ITS OWN LEAD, which is never taken for Slash's line on Home. */
-  assert.deepEqual(head('Bake opens at nine.', false), rules);
+  assert.deepEqual(head('Oxbow opens at nine.', false), rules);
   /* A BLOCK THAT STILL CARRIES THE RECORD'S `said` IS READ FROM IT, and a dated line only on its day. */
   assert.equal(slashLineOf(page(undefined, { said: 'Kiln first.' } as Partial<LiveBlock>), false), 'Kiln first.');
   const dated = (day: string) => homeLineOf(page().sentence!, slashLineOf(page(undefined, { said: { text: 'Kiln first.', day, basis: 'b' } } as Partial<LiveBlock>), true), NOW);
@@ -701,7 +701,7 @@ test('THE MONEY TILE SAYS WHAT IS STILL TO COME IN, beside what was paid and wha
   assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Paid', 'Came in', 'Still to come in']);
 });
 
-/* ── the line Today says while a vital sign reads red (PRF-A05, DIRECTION §40) ── */
+/* ── the line Today says while a vital sign reads red (PRF-A05) ── */
 
 /** Today's two notes on `signs-red`, of which the record draws one at most. */
 const signNotes = (holds: Holds = { tasks: true, adds: true, money: true, health: true }) =>

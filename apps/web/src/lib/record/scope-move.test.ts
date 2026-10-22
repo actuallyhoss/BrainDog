@@ -59,7 +59,7 @@ REGISTERS['learnings'] = {
 REGISTERS['notes'] = { id: 'notes', name: 'Notes', one: 'note', title: 'label', fields: [{ id: 'label', type: 'text' }] } as never;
 
 const kiln: Place = { id: 'e_kiln', ref: 'projects#1', spoken: 'P1', name: 'Kiln', mark: null, hue: null };
-const marsh: Place = { id: 'e_isles', ref: 'projects#2', spoken: 'P2', name: 'Marsh', mark: null, hue: null };
+const driftwood: Place = { id: 'e_driftwood', ref: 'projects#2', spoken: 'P2', name: 'Driftwood', mark: null, hue: null };
 
 type Sent = { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string };
 
@@ -194,13 +194,13 @@ test('one the record refused is counted with its reason, and the Undo leaves it 
   const { client, sent } = fake((s) =>
     s.seq === 2 && s.note !== words.movedBack ? { ok: false, refusal: { code: 'VERSION_STALE', fix: 'Stale.' } } : undefined,
   );
-  const out = await moveMany(client, 'skills', [row(1, null), row(2, null), row(3, null)], marsh);
+  const out = await moveMany(client, 'skills', [row(1, null), row(2, null), row(3, null)], driftwood);
   assert.equal(out.ask, false);
   if (out.ask) return;
   assert.deepEqual(out.moved.map((m) => m.seq), [1, 3]);
   assert.equal(out.failed, 1);
   assert.deepEqual(out.stale, [2]);
-  assert.match(movedSaid(out, marsh), /^Moved 2 to Marsh\. 1 did not move\. Key 2 /u);
+  assert.match(movedSaid(out, driftwood), /^Moved 2 to Driftwood\. 1 did not move\. Key 2 /u);
   sent.length = 0;
   await out.undo?.();
   assert.deepEqual(sent.map((s) => s.seq), [1, 3]);
@@ -236,7 +236,7 @@ test('a key going to Everywhere asks first, and every other press moves or close
   const atKiln = scopeOf('keys', { project: 1 }, names) ?? null;
   assert.equal(choiceOf('keys', atKiln, null), 'ask');
   assert.equal(choiceOf('skills', atKiln, null), 'move');
-  assert.equal(choiceOf('keys', atKiln, marsh), 'move');
+  assert.equal(choiceOf('keys', atKiln, driftwood), 'move');
   assert.equal(choiceOf('keys', null, kiln), 'move');
   /* WHERE IT IS ALREADY, THE PRESS CLOSES THE SHEET AND WRITES NOTHING, Everywhere included. */
   assert.equal(choiceOf('keys', atKiln, kiln), 'here');
@@ -264,9 +264,9 @@ test('Enter and Space open the move from a grid cell, and a key with a modifier 
 
 test('a move that landed stands in for the row until the list reads it again', () => {
   const was = scopeOf('skills', { project: 1 }, names);
-  const landed = { seq: 4, version: 8, to: marsh };
-  /* BEFORE THE READ: the chip says Marsh, and the next move goes against the version the move answered. */
-  assert.deepEqual(afterMove({ seq: 4, version: 7 }, was, landed), { version: 8, scope: marsh });
+  const landed = { seq: 4, version: 8, to: driftwood };
+  /* BEFORE THE READ: the chip says Driftwood, and the next move goes against the version the move answered. */
+  assert.deepEqual(afterMove({ seq: 4, version: 7 }, was, landed), { version: 8, scope: driftwood });
   /* THE READ ARRIVED, OR THE ROW CHANGED SOMEWHERE ELSE SINCE: the row as read wins. */
   assert.deepEqual(afterMove({ seq: 4, version: 8 }, was, landed), { version: 8, scope: was });
   assert.deepEqual(afterMove({ seq: 4, version: 11 }, was, landed), { version: 11, scope: was });

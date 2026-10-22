@@ -1,5 +1,5 @@
 /**
- * What BrainDog arranged by itself today, as one tile on Today (`Handled.svelte`). DIRECTION d3: a change that only
+ * What BrainDog arranged by itself today, as one tile on Today (`Handled.svelte`). A change that only
  * arranges his own rows happens with a mark, the reason and an Undo, and is told here in a short list instead of being
  * asked on Decide. One line each, the record's reason under it, and one Undo that puts that whole batch back.
  *

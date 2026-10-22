@@ -201,7 +201,7 @@
     toasts.push(copy.blockAddedLive(named));
   }
 
-  /* MAKE A COMPONENT AND THE SHELF (DIRECTION §45). A composed block is added like a picked one, so it is drawn on the
+  /* MAKE A COMPONENT AND THE SHELF. A composed block is added like a picked one, so it is drawn on the
      page at once and written only by Done; `draft` is the one added block still awaiting Keep, Shelf or Throw away. */
   let making = $state(false);
   /* A "Make ..." LINE FROM SLASH (the palette): the composer opens on it and draws it at once. */

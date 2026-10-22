@@ -2,7 +2,7 @@
   The one next action under a page's headline, as the engine's look names it (`look.ts` `nextOf`): a line in the
   page's own words with an arrow, and nothing else.
 
-  ONE QUIET ACTION, NOT A BUTTON ROW (DIRECTION §37: fewer things on screen). The headline says what is true; this says
+  ONE QUIET ACTION, NOT A BUTTON ROW (fewer things on screen). The headline says what is true; this says
   the one thing to do about it, in ink one step down from the headline's, so the eye meets the sentence first.
 
   A ROW OF THE RECORD OPENS BESIDE THE PAGE, in the docked panel, as every row on the page does; one the page does not

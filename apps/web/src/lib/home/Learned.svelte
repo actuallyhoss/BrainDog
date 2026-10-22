@@ -1,5 +1,5 @@
 <!--
-  What your answers taught, as one tile at the end of the board (DIRECTION §39): the heading, at most three lines of
+  What your answers taught, as one tile at the end of the board: the heading, at most three lines of
   what the record will not ask again because it was answered, in the record's own words, and a count of the rest.
 
   AN ANSWER USED TO VANISH INTO DECIDE. Once given it closed its question and nothing on the first screen said what it

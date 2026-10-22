@@ -342,7 +342,7 @@ test('a typed line becomes a row the record accepts, and says what it filled in'
   });
   /* SAID IN THE READER'S SPELLING, never the record's: `owed_by_me` is "owed by me". */
   /* AND AN AMOUNT AS A PERSON WRITES IT, never "amount GBP 0.00": with no home currency known here its code is said after it. */
-  assert.deepEqual(out.filled, ['which way Money out', 'amount £0\u00a0GBP', 'due 3 Sep 2026', 'status Open']);
+  assert.deepEqual(out.filled, ['which way Money out', 'amount £0\u00a0GBP', 'due 3 Sep', 'status Open']);
 });
 
 test('the address answers what it already says, and is never guessed at from a set', () => {

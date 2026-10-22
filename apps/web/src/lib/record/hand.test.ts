@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { INSTRUCTION_ARG, ROW_ARG, noteFor, startArgs, startFor, startKindOf, startNow, startsOnARunner, type Holder } from './hand.ts';
+import { INSTRUCTION_ARG, ROW_ARG, noteFor, runnerConnected, startArgs, startFor, startKindOf, startNow, startPlacesOf, startsOnARunner, type Holder } from './hand.ts';
 import type { JobKind } from './jobs.ts';
 
 const NOW = Date.parse('2026-10-21T09:00:00Z');
@@ -69,4 +69,28 @@ test('the note is an instruction to the task, and the run starts with that instr
 test('a note the record refuses says its reason', async () => {
   const io = (async () => json({ ok: false, refusal: { code: 'RATE_LIMITED', fix: 'Send this one again in 20 seconds.' } })) as typeof fetch;
   assert.deepEqual(await noteFor('http://x.test', 'tasks', 12, 'x', io), { ok: false, fix: 'Send this one again in 20 seconds.' });
+});
+
+test('"Start one now" picks a runner on a machine: the machines runners took runs on within the day, with their profiles', async () => {
+  const at = (ago: number) => new Date(NOW - ago).toISOString();
+  const jobs = [
+    { runner: 'mac', claimed_at: at(60_000), ran_on: 'kiln-mbp' },
+    { runner: 'studio', claimed_at: at(3_600_000), ran_on: 'kiln-studio' },
+    { runner: 'old', claimed_at: at(30 * 3_600_000), ran_on: 'old-box' },
+    { runner: 'quiet', claimed_at: at(120_000), ran_on: null },
+  ];
+  const run = (host: string, seat?: string) => ({ id: host, seq: 1, fields: { host, ...(seat ? { seat } : {}) } }) as never;
+  const runs = [run('kiln-mbp', 'harbour'), run('kiln-mbp', 'default'), run('kiln-mbp', 'harbour'), run('kiln-studio')];
+  assert.deepEqual(startPlacesOf(jobs, runs, NOW), [
+    { machine: 'kiln-mbp', seats: ['harbour', 'default'] },
+    { machine: 'kiln-studio', seats: [] },
+  ]);
+  assert.equal(runnerConnected(jobs, NOW, 'kiln-studio'), true);
+  assert.equal(runnerConnected(jobs, NOW, 'old-box'), false, 'a runner last heard yesterday is not listening');
+
+  /* THE RUN STARTS ON THE MACHINE AND UNDER THE PROFILE HE PICKED, by name, and anywhere when he picked neither. */
+  const r = record(60_000, [TOLD_KIND]);
+  assert.equal(await startNow('http://x.test', TOLD_KIND, 'IN7', 'tasks', 12, r.io, { machine: 'kiln-mbp', seat: 'harbour' }), 'j9');
+  const job = r.asked.find((a) => a.name === 'createJob')?.body as Record<string, unknown>;
+  assert.deepEqual(job, { kind: 'job.told', args: { instruction: 'IN7', row: 'tasks#12' }, machine: 'kiln-mbp', seat: 'harbour' });
 });

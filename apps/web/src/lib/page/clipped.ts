@@ -16,7 +16,7 @@
  * PURE, AND NODE LOADS IT, so `clipped.test.ts` holds both rules against a real kernel.
  */
 
-import { ROW_TEXT_MOST } from '@braindog/kernel';
+import { ROW_TEXT_MOST } from '@braindog/kernel/constants';
 
 import type { Entry, Fields } from '../record/schema.ts';
 

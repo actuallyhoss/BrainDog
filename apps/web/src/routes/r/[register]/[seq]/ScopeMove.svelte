@@ -52,6 +52,7 @@
     live,
     title,
     compact = false,
+    size = 'm',
     onmoved,
   }: {
     register: string;
@@ -65,6 +66,8 @@
     title?: string | undefined;
     /** On a list's table or cards: no chip of its own, and the one sheet every row's chip opens with `openFor`. */
     compact?: boolean;
+    /** The chip's size: `s` in the meta line under a row's name. */
+    size?: 's' | 'm';
     /** Called once a move has landed with what landed, or with `null` when the row changed somewhere else first. */
     onmoved?: ((landed: Landed | null) => void) | undefined;
   } = $props();
@@ -178,7 +181,7 @@
 {/snippet}
 
 {#if !compact && scope !== undefined}
-  <ScopeChip {scope} size="m" onmove={canMove ? openMove : undefined} />
+  <ScopeChip {scope} {size} onmove={canMove ? openMove : undefined} />
 {/if}
 
 {#if canMove && field}

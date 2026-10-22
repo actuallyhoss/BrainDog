@@ -25,7 +25,7 @@ test('A TYPED SENTENCE IS THE KERNEL LEAF: each comparison, and has nothing for 
   assert.deepEqual(whenOf('cash-now  is EMPTY'), { metric: 'cash-now', empty: true });
   assert.deepEqual(whenOf('cash-now has no value'), { metric: 'cash-now', empty: true });
   assert.deepEqual(whenOf('cash-now has a value'), { metric: 'cash-now', empty: false });
-  assert.deepEqual(whenOf('project-owed:Bake gg has nothing'), { metric: 'project-owed:Bake gg', empty: true });
+  assert.deepEqual(whenOf('project-owed:Oxbow gg has nothing'), { metric: 'project-owed:Oxbow gg', empty: true });
   assert.equal(whenOf('  '), undefined);
 });
 
@@ -108,7 +108,7 @@ test('BEYOND IS A SENTENCE: lasts beyond for a walk that never went under, and i
   assert.deepEqual(whenOf('cash-runway  Is Beyond'), { metric: 'cash-runway', beyond: true });
   assert.deepEqual(whenOf('cash-runway does not last beyond'), { metric: 'cash-runway', beyond: false });
   assert.deepEqual(whenOf('cash-runway is not beyond'), { metric: 'cash-runway', beyond: false });
-  assert.deepEqual(whenOf('project-lasts:Bake gg lasts beyond'), { metric: 'project-lasts:Bake gg', beyond: true });
+  assert.deepEqual(whenOf('project-lasts:Oxbow gg lasts beyond'), { metric: 'project-lasts:Oxbow gg', beyond: true });
   assert.equal(whenOf('lasts beyond'), null);
 
   for (const leaf of [
@@ -189,7 +189,7 @@ test('THE SHEET SENDS BEYOND AND ALL AS THE KERNEL WRITES THEM, and an untouched
 
 test('ONLY WHEN IT HAS NOTHING SAYS NOTHING OF SEVERAL TESTS: there is no one figure to say it about', () => {
   assert.equal(whenNothing('owed > 0 and cash-now has a value'), null);
-  assert.equal(whenNothing('project-owed:Bake > 0 and cash-now > 1'), null);
+  assert.equal(whenNothing('project-owed:Oxbow > 0 and cash-now > 1'), null);
   assert.equal(whenNothing('cash-runway lasts beyond'), 'cash-runway has nothing');
 });
 

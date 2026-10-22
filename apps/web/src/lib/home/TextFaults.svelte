@@ -1,5 +1,5 @@
 <!--
-  What the record found wrong in its own pages and notes, as one tile on the board (DIRECTION §39): the record's own
+  What the record found wrong in its own pages and notes, as one tile on the board: the record's own
   sentence as its heading ("14 values on 6 pages name nothing"), then a line a fault, each by its place's own name.
 
   THE RECORD READ ITS OWN TEXT AND NO SCREEN SAID WHAT IT FOUND. A placeholder naming nothing and a broken block were

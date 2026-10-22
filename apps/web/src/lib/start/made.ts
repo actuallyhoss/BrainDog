@@ -1,6 +1,6 @@
 /**
  * What the end of the first run offers, once the BrainDog is made (`/start#made`): one agent and one source, each saying
- * what it would find here, then Home (DIRECTION §37, research-firstrun-17's recommended flow).
+ * what it would find here, then Home (research-firstrun-17's recommended flow).
  *
  * ONE OF EACH, CHOSEN FROM WHAT THIS BRAINDOG KEEPS, never a gallery. The agent is Claude Code, the one most people
  * connecting from a first run have, by the one command that connects it over sign-in (`device.ts` `connectLines`); the

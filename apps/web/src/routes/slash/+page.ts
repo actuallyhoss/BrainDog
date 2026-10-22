@@ -1,5 +1,5 @@
 /**
- * The Slash page folds into the palette (batch 5d, his call 5): "Ask or change anything" is the one way to ask, so the
+ * The Slash page folds into the palette (batch 5d): "Ask or change anything" is the one way to ask, so the
  * old address opens the palette over Today and the address is replaced so Back does not bounce.
  *
  * `?history` IS THE PAGE ITSELF, kept as the palette's history: what Slash suggested, what was asked lately and what came

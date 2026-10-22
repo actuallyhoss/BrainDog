@@ -1,6 +1,6 @@
 <!--
   Reminders on Today: the lines automations were told to put here ("remind me on Today"). A small tile that is not drawn
-  at all when there are none, as no tile on Today says it is empty (DIRECTION §35).
+  at all when there are none, as no tile on Today says it is empty.
 -->
 <script lang="ts">
   import Tile from '$lib/ui/Tile.svelte';

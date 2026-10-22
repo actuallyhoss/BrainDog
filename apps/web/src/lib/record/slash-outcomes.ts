@@ -1,6 +1,6 @@
 /**
- * What came of Slash's suggestions, said where the owner sees Slash (ENG-B01 and ENG-A16 seen, DIRECTION 40 "answers
- * that teach", "health shown").
+ * What came of Slash's suggestions, said where the owner sees Slash (ENG-B01 and ENG-A16 seen: answers
+ * that teach, health shown).
  *
  * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `slash-brake.ts` takes it.
  *

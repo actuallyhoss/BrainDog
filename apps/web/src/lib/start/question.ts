@@ -1,7 +1,7 @@
 /**
  * THE ONE QUESTION THE FIRST RUN ASKS, about what it could not guess from what was said (use case 6, step 3).
  *
- * ONE, NEVER TWO (his word of 9 October, over USE-B06's "up to two"): a first run that asks back becomes an interview.
+ * ONE, NEVER TWO (chosen 9 October, over USE-B06's "up to two"): a first run that asks back becomes an interview.
  * So the rules pick the one that changes the most, in this order, and ask nothing when nothing is missing:
  *
  * 1. THE CURRENCY, where an amount was typed with none and neither the words nor the device gave one: an amount is not

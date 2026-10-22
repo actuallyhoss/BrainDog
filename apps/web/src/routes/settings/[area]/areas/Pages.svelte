@@ -1,7 +1,7 @@
 <!--
   Settings > Pages: every page this record declares, what the app opens on, and the add-ons the pages came with.
 
-  ONE PLACE TO CHANGE ANY PAGE FROM, without code (DIRECTION §35). A page's own head already offers Edit layout and
+  ONE PLACE TO CHANGE ANY PAGE FROM, without code. A page's own head already offers Edit layout and
   "Change this page", which a person finds only once they are on the page; here every page is one row, the whole row
   its link, and the rest behind one menu: Edit layout, Change with Slash, a name of their own in the nav, open it
   first, and Hide. Fewer things on screen: Open and the menu wait for the pointer or the keyboard to reach their row,

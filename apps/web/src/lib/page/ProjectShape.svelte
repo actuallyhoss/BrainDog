@@ -283,7 +283,7 @@
 
 {#if drawsHero && hero && read}
   <section class="hero" aria-label={name} style={slotStyle(hue)}>
-    <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="xl" /></span>
+    <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="s" /></span>
     <div class="h-name">
       <h1 class="h-title" dir="auto">{name}</h1>
       {#if status.lane || status.health || status.since}
@@ -503,11 +503,14 @@
   /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient.
      8% IN BOTH SCHEMES. Dark took 12%, and the late count's `--red` over it read 4.2 to 4.4 to 1 for every slot, the
      amber and the lime lowest; at 8% the lightest slot keeps it over 4.5, and the tint still reads as the project's. */
+  /* THE BENTO BOARDS' LEAD TILE (22 October): the project's well and name on one small row, its status beside the name,
+     and the sentence under them at 40/44 and 600 (32/36 on a phone), which is what the screen opens on. The name was a
+     34px title over a 17px line, which read the name first and the news second. */
   .hero {
     --ph: var(--ink);
     --h-wash: 8%;
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
     column-gap: 12px;
     row-gap: 12px;
     align-items: center;
@@ -521,27 +524,22 @@
     display: grid;
   }
 
-  .h-well :global(.well) {
-    inline-size: 48px;
-    block-size: 48px;
-    border-radius: 14px;
-  }
-
   .h-name {
-    display: grid;
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px var(--sp-3);
     min-inline-size: 0;
   }
 
   .h-title {
+    min-inline-size: 0;
     margin: 0;
     overflow: hidden;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: calc(var(--fs-page) - 2px);
+    font-size: var(--fs-head);
     font-weight: 600;
-    letter-spacing: -0.035em;
-    line-height: 1;
+    line-height: calc(24 / 17);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -577,17 +575,20 @@
 
   .h-say {
     grid-column: 1 / -1;
-    max-inline-size: 68ch;
+    max-inline-size: 24em;
     margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 1.5;
+    color: var(--ink);
+    font-size: var(--fs-hero-phone);
+    font-weight: 600;
+    line-height: 34px;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
     overflow-wrap: anywhere;
   }
 
   .fig {
     color: var(--ink);
-    font-weight: 500;
+    font-weight: inherit;
   }
 
   .late {
@@ -776,23 +777,13 @@
 
   @media (width >= 640px) {
     .hero {
-      grid-template-columns: 56px minmax(0, 1fr);
-      column-gap: 20px;
+      column-gap: 12px;
       padding: 24px;
     }
 
-    .h-well :global(.well) {
-      inline-size: 56px;
-      block-size: 56px;
-      border-radius: 16px;
-    }
-
-    .h-title {
-      font-size: var(--fs-hero);
-    }
-
     .h-say {
-      font-size: var(--fs-head);
+      font-size: var(--fs-hero);
+      line-height: 40px;
     }
 
     .h-figs {
@@ -841,7 +832,7 @@
   /* FROM 1100px THE FIGURES STAND ON THE RIGHT, three tiles 168 wide over the hero's three rows. */
   @media (width >= 1100px) {
     .hero {
-      grid-template-columns: 56px minmax(0, 1fr) auto;
+      grid-template-columns: 40px minmax(0, 1fr) auto;
       align-items: start;
     }
 

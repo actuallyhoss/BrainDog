@@ -54,7 +54,6 @@
   import Actions from './panels/Actions.svelte';
   import ActionRows from './panels/ActionRows.svelte';
   import Reporting from './panels/Reporting.svelte';
-  import RunPanel from './panels/RunPanel.svelte';
   import { PANEL_WHO, panelOf } from './panels/panel-of.ts';
   import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
@@ -78,6 +77,8 @@
   import { quartOut } from 'svelte/easing';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
+  import { drawnOf } from './kinds/drawn.ts';
+  import { goto } from '$app/navigation';
 
   let {
     block,
@@ -161,7 +162,7 @@
      (`Hole.svelte`): it opens the place the value lives, or offers to find it out. On an inert page it stays a mark. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
   /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS: "Cash is EGP 1,086,213", the way a person says it,
-     where it said "EGP 1,086,213.41" (`money.ts` `symbolText`, DIRECTION §37). */
+     where it said "EGP 1,086,213.41" (`money.ts` `symbolText`). */
   const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note' && block.lead === true));
 
   /* ── the fold ──────────────────────────────────────────────────────────────
@@ -420,7 +421,16 @@
   );
   const drawn = $derived(draw(block, emptied));
 
-  /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE (DIRECTION §39): its glyph, or its kind's where it names none, and
+  /* A DRAWN BLOCK'S COMPONENT, its rows and the height it starts at (`kinds/drawn.ts`), drawn in its sandbox by
+     `DrawnFrame.svelte`, which arrives with the first block that needs it. Opening one of its rows goes where a row's
+     link goes, and only for a row the frame was handed (`drawnAsk`). */
+  const sketch = $derived(drawnOf(block, (id) => listNamed(id)));
+  function openDrawn(ref: string) {
+    const to = rowHref(ref);
+    if (to !== null) void goto(inApp(to));
+  }
+
+  /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE: its glyph, or its kind's where it names none, and
      how many it holds where it is a list a person counts (`tile-head.ts`). */
   /* A `kpis` BLOCK'S KEY NUMBERS, as the drawer takes them. */
   const kpis = $derived(block.kind === KPIS_KIND ? kpisIn(block as { kpis?: unknown }) : []);
@@ -597,7 +607,7 @@
       ><span id="{ids}h-{i + 1}"><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></span>{#if count !== null}<span class="block-count num"><Figure value={count} /></span>{/if}</svelte:element
     >
     {#if source}
-      <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (DIRECTION §35: secondary controls appear on
+      <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (secondary controls appear on
            hover or focus). "Tasks" at the top right of every tile on Work was chrome on every tile, said five times. The
            predicate stays, because without it a reader has no way to know the list is filtered and may take a block of
            four rows for the whole list; the clause that names the page they are on is dropped. AS A GLYPH, AND THE
@@ -642,6 +652,9 @@
     const to = kpiHref(k);
     return to === null ? null : inApp(to);
   }} />
+{:else if sketch && !block.refusals.length}
+  <!-- A DRAWN COMPONENT, in its sandbox: never in the page, and handed only its own rows and the theme. -->
+  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} />{/await}
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
   <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>
@@ -666,7 +679,8 @@
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
-  {@const asked = compact ? compactOf(block.queue, block.total) : { shown: block.queue, more: block.total - block.queue.length }}
+  <!-- A COMPACT QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Today's Needs you on a phone) shows that many. -->
+  {@const asked = compact ? compactOf(block.queue, block.total, typeof block.most === 'number' ? block.most : undefined) : { shown: block.queue, more: block.total - block.queue.length }}
   {@const every = compact ? asked.shown.map((q): QueueEntry => ({ kind: 'one', q })) : alikeOf(asked.shown)}
   <!-- A QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Needs you's groups) shows that many cards and opens the rest in place. -->
   {@const most = !compact && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
@@ -772,7 +786,7 @@
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
   {:else if panel === 'run'}
     <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
-    {#if param.register === 'session'}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/if}
+    {#if param.register === 'session'}{#await import('./panels/RunPanel.svelte') then { default: RunPanel }}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/await}{/if}
   {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
 {:else if panel === 'job' && param && writes && !arranging}
   <!-- THE JOBS FOR THIS ROW AND A WAY TO START ONE (`panel: job`), a row panel, so the hosted branch never draws it. -->
@@ -886,7 +900,7 @@
     color: var(--ink);
   }
 
-  /* THE DOOR WAITS FOR THE POINTER OR THE KEYBOARD to reach its tile (DIRECTION §35), and fades rather than folds, so
+  /* THE DOOR WAITS FOR THE POINTER OR THE KEYBOARD to reach its tile, and fades rather than folds, so
      the heading row never moves under the pointer. ON TOUCH THERE IS NO HOVER TO WAIT FOR, so it is not drawn: a
      phone opens a row by pressing it, and Open the rest under a cut list is still there. */
   @media (hover: hover) and (pointer: fine) {
@@ -909,7 +923,7 @@
     }
   }
 
-  /* A CHART'S FOLD OF POINTS WAITS FOR ITS CHART (DIRECTION §35, §37). "Points on this chart" stood under every line on
+  /* A CHART'S FOLD OF POINTS WAITS FOR ITS CHART. "Points on this chart" stood under every line on
      a page, one caption a chart, and a page of measures read as a page of the same words. The fold stays where a
      keyboard and a screen reader reach it, and the pointer's readout says each point on the chart itself, so it fades
      in while the pointer or the keyboard is on that chart and stays while it is open. It fades rather than folds, so

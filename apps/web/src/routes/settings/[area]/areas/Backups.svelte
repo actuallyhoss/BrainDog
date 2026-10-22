@@ -24,6 +24,8 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { nightParts, nightsLine, nightsOf, nightsSaid, nightWords, tileWords } from '../../billing.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import { aboutCopies } from '../health.ts';
+  import { createClient } from '@braindog/client';
   import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
@@ -39,6 +41,8 @@
     exportInstead: 'Export a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
     askForIt: 'Going back to a copy',
+    missedLine: 'It is waiting for you in Decide: run it now, or let tonight try again.',
+    answer: 'Answer it',
   };
 
   /* THE OWNER QUESTION IS SHARED with every area that has an owner's control (`settings-state.svelte.ts`).
@@ -141,6 +145,28 @@
     untrack(() => void readDrill(fetch).then((d) => (drill = d)));
   });
 
+  /**
+   * A NIGHT THAT DID NOT RUN, AS THE RECORD ASKED ABOUT IT: the open question the record opened itself when a copy
+   * failed ("The backup on 3 Sep did not run"). The Settings index leads with it, and this area said "No backups here
+   * yet" under it, so the two read as a contradiction. It is said here first, with the one way to act on it. A record
+   * that cannot be asked draws nothing.
+   */
+  let missed = $state<{ id: string; said: string } | null>(null);
+  $effect(() => {
+    untrack(() => void readMissed());
+  });
+
+  async function readMissed() {
+    const out = await createClient({ base: apiBase() })
+      .governance({ status: 'open' })
+      .catch(() => null);
+    if (!out?.ok || !Array.isArray(out.value)) return;
+    const row = (out.value as Record<string, unknown>[]).find(
+      (r) => typeof r === 'object' && r !== null && r.opened_by === 'system' && typeof r.question === 'string' && aboutCopies(r.question),
+    );
+    if (row) missed = { id: String(row.id), said: String(row.question).trim().replace(/([^.!?])$/u, '$1.') };
+  }
+
   async function readCopies() {
     const at = opened();
     const out = await readSnapshots(apiBase());
@@ -235,6 +261,17 @@
   {/if}
 {/snippet}
 
+{#snippet answerButton()}
+  {#if missed}<Button href={`/decide/${missed.id}`}>{words.answer}</Button>{/if}
+{/snippet}
+
+<!-- THE NIGHT THAT DID NOT RUN, FIRST IN WHAT IS KEPT, in the warn well: the same sentence the index leads with. -->
+{#snippet missedRow()}
+  {#if missed}
+    <div role="status"><StateRow icon="alert" tone="warn" title={missed.said} line={words.missedLine} action={answerButton} /></div>
+  {/if}
+{/snippet}
+
 {#snippet backUpButton()}
   {#if anOwner && copiesFrom === 'live'}
     <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
@@ -277,6 +314,7 @@
            out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
            host that keeps no copies is a promise the next row takes back. -->
       <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
+      {@render missedRow()}
       {@render drillLineOf()}
       <div role="status">
         <StateRow icon="archive" title={words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
@@ -292,6 +330,7 @@
        first backup has not run it describes a policy over nothing, above nothing. -->
   <Tile icon="history" class="section" data-surface="tile" title={copy.kept} actions={backUpButton}>
     <div class="section-body">
+      {@render missedRow()}
       {@render lastCopyLine()}
       <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
     </div>
@@ -342,7 +381,7 @@
   {#each months as month, i (`${month.key}:${i}`)}
     {@const kept = month.lines.filter((line) => line.failed === null).length}
     {#if i === 0}
-      <Tile icon="history" class="section" data-surface="tile" title={month.label} count={kept || undefined} actions={backUpButton}><div class="section-body">{@render lastCopyLine()}{@render monthRows(month.lines)}</div></Tile>
+      <Tile icon="history" class="section" data-surface="tile" title={month.label} count={kept || undefined} actions={backUpButton}><div class="section-body">{@render missedRow()}{@render lastCopyLine()}{@render monthRows(month.lines)}</div></Tile>
     {:else}
       <Tile icon="history" class="section" data-surface="tile" title={month.label} count={kept || undefined}><div class="section-body">{@render monthRows(month.lines)}</div></Tile>
     {/if}

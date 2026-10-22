@@ -59,7 +59,7 @@ const notReached = 'Nothing was saved. Check your connection, then try again.';
 export const SUPPORT_EMAIL = 'support@brain.dog';
 
 export const shell = {
-  /* THE ONE ASK, IN HIS WORDS (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
+  /* THE ONE ASK, WORD FOR WORD (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
      own field say the same five words. Here and not in palette.ts because the frame draws it before the palette loads. */
   palettePlaceholder: 'Ask or change anything',
   /* the product */
@@ -309,6 +309,13 @@ export const shell = {
    * was no call.
    */
   noSuch: (kind: string, name: string) => `There is no ${kind} called ${name}`,
+  /**
+   * AN ADDRESS THAT NAMES NO PAGE, AND THE FIVE NEAREST IN PLACE OF THE WHOLE INDEX (`record/nearest.ts`). `/p/nope`
+   * said every address the record holds in one sentence, thirty-eight of them, and `/nowhere` drew Today as though it
+   * had been asked for. The heading says what was typed, and the links under it are the likeliest of what is here.
+   */
+  noPageCalled: (name: string) => `No page called ${name}`,
+  nearPages: 'The closest pages here:',
   /**
    * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.
    *

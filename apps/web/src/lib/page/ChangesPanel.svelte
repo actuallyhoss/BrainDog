@@ -1,6 +1,6 @@
 <!--
-  The week's changes on this page, in the docked panel: what the line at the foot of the board opens (`Changed.svelte`,
-  DIRECTION §39). Each row an agent, a rule or Slash changed this week, newest first: its words, which open the row in
+  The week's changes on this page, in the docked panel: what the line at the foot of the board opens (`Changed.svelte`).
+  Each row an agent, a rule or Slash changed this week, newest first: its words, which open the row in
   the same panel; who changed it and when, the agent's name the door to the run that did it; and Undo, which reads the
   plan first and says what else it takes back when the change touched more than the row (`UndoAsk.svelte`).
 

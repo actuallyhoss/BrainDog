@@ -14,7 +14,7 @@
  */
 
 import { createClient, type Member } from '@braindog/client';
-import type { Share } from '@braindog/kernel';
+import type { Share, ShareTarget } from '@braindog/kernel';
 
 import type { Fetch } from '../record/boot-live.ts';
 
@@ -99,6 +99,15 @@ export function sheetApi(base: string, io?: Fetch) {
         if (share.effect === 'allow') sentence = out.value.sentence;
       }
       return { ok: true, value: { sentence, ids } };
+    },
+
+    /**
+     * Share on what the caller manages (`shareOnward`): `from` is their own share, `who` somebody here, `what` absent
+     * for all of it. The record keeps it under theirs and answers its sentence.
+     */
+    async onward(a: { from: string; who: string; can: 'view' | 'comment' | 'edit'; what?: ShareTarget | undefined }): Promise<Got<{ id: string; sentence: string }>> {
+      const out = await c.call<{ id: string; sentence: string }>('shareOnward', { from: a.from, who: a.who, can: a.can, ...(a.what === undefined ? {} : { what: a.what }) });
+      return out.ok ? out : refused(out);
     },
 
     /** The link that joins an address to what waits for it, shown once. No level: the shares are what it gives. */

@@ -1,9 +1,9 @@
 <!--
   "When you want more": the next steps a first Today offers once something real is in (use case 6, step 6; planner-45,
   the onboarding target). The two offers the first run made once, at `/start#made` (`madeOffers`), here where she comes
-  back to, in the order her one answer puts them (`madeSteps`, `first-today.ts` `wantMore`), with Hide.
+  back to, in the order her one answer puts them (`madeSteps`, `want-more.ts` `wantMore`), with Hide.
 
-  A TILE OF LINES, NOT A GALLERY (DIRECTION §39): one line a step, its glyph, what it is, what it would do, and one quiet
+  A TILE OF LINES, NOT A GALLERY: one line a step, its glyph, what it is, what it would do, and one quiet
   rectangle that goes there. Hide is the heading's own word, and it is kept (`pref.ts` `nextStepsHidden`), so a hidden
   tile stays hidden on the next visit.
 

@@ -2,13 +2,13 @@
  * Signing up, from the browser's side: the three `/auth/signup/*` calls, the billing calls a new record is made or paid
  * through, and what the address says when somebody arrives from their mail or from Stripe.
  *
- * DESCRIBE, THEN BUILD (DIRECTION §37). The page asks "Who are you?" first and draws the BrainDog from the answer, and
+ * DESCRIBE, THEN BUILD. The page asks "Who are you?" first and draws the BrainDog from the answer, and
  * only then asks for one email. The record's name is chosen from what was heard (`namesHeard`, `recordNames`,
  * `chooseName`), and the sentence waits for the link in `localStorage` (`keepSaid`, `saidKept`), so the tab the link
  * opens builds the record from it. It also rides in the link itself (`saidForLink`, read back by `arrivalOf`), so a link
  * opened on another device builds from it too.
  *
- * FREE LEADS (DIRECTION §35). The site's buttons open `/signup` with no plan, and no plan is Free: checkout with
+ * FREE LEADS. The site's buttons open `/signup` with no plan, and no plan is Free: checkout with
  * `plan: 'free'` makes the record there and then and answers its `/start`. `?plan=cloud` and `?plan=plus` are the
  * site's pricing buttons, and those go to Stripe's page as before.
  *
@@ -247,7 +247,7 @@ export function namesHeard(p: { name: string | null; rows: readonly { register: 
 }
 
 /**
- * THE RECORD'S NAME, FROM WHAT WAS HEARD (DIRECTION §37: describe, then make the account with one field). The business
+ * THE RECORD'S NAME, FROM WHAT WAS HEARD (describe, then make the account with one field). The business
  * first, since a record is mostly about what somebody runs; then the person; then the address's own name, so there is
  * always one to try. Each at most once, in that order.
  */

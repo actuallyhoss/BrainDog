@@ -85,10 +85,18 @@ test("THE LINE SAYS WHAT PRIYA WILL SEE OF KILN, ITS MONEY INCLUDED, from shareP
     return seenSaid(s.with!, subject, got.lists, got.money, s.hide, drawn);
   };
   const guest = withPicked(startOf(subject), PRIYA, NOW);
-  assert.equal(await said(guest), "Priya will see Kiln's tasks and notes, with money figures hidden, since they're not on your team. Amounts written in notes still show.");
+  assert.equal(await said(guest), "Priya will see Kiln's tasks and notes, with amounts hidden, in notes too, since they're not on your team.");
   assert.equal(await said(amountsPressed(guest)), "Priya will see Kiln's tasks, notes and money: £18,400 earned in a year.");
-  assert.equal(await said(amountsPressed(amountsPressed(guest))), "Priya will see Kiln's tasks and notes, with money figures hidden. Amounts written in notes still show.");
+  assert.equal(await said(amountsPressed(amountsPressed(guest))), "Priya will see Kiln's tasks and notes, with amounts hidden, in notes too.");
   assert.equal(await said(withPicked(startOf(subject), LEE, NOW)), "Lee will see Kiln's tasks, notes and money: £18,400 earned in a year.");
   /* ONE LIST OF THE PROJECT STILL SHOWS THE PROJECT'S OWN ROW, its money among it, and the line says so. */
   assert.equal(await said({ ...withPicked(startOf(subject), LEE, NOW), what: { kind: 'list', list: 'tasks' } }), "Lee will see Kiln's tasks and money: £18,400 earned in a year.");
+});
+
+test('A FIGURE THAT READS NOTHING IS SAID AS NOTHING, so a project with no bills still says what is owed', () => {
+  const kiln: Subject = { kind: 'project', register: 'things', seq: 1, id: 'e_kiln', name: 'Kiln' };
+  const lee = withPicked(startOf(kiln), LEE, NOW);
+  const lists = [{ list: 'tasks', name: 'Tasks', rows: 1 }];
+  const money: MoneyShown = { lists: ['Projects', 'Bills'], hidden: false, figures: [{ label: 'Earned in a year', said: 'GBP 18,400.00' }, { label: 'Still to come in', said: null }] };
+  assert.equal(seenSaid(LEE, kiln, lists, money, lee.hide, drawn), "Lee will see Kiln's tasks and money: £18,400 earned in a year and nothing still to come in.");
 });

@@ -1,6 +1,6 @@
 /**
  * The pattern builder says what a rule does with a message in the person's words: where what it reads is filed, never
- * the rows it writes or the list they go into (DIRECTION §35).
+ * the rows it writes or the list they go into.
  */
 
 import { test } from 'node:test';

@@ -1,5 +1,5 @@
 <!--
-  What went stale, as one quiet tile under the page (DIRECTION §39): "4 things went stale" as its heading, then a line
+  What went stale, as one quiet tile under the page: "4 things went stale" as its heading, then a line
   a kind with how many, each of them the record's own sentence.
 
   THE RECORD COUNTED WHAT WENT STALE AND NO SCREEN SAID IT. An agent was told when it started work; the person whose

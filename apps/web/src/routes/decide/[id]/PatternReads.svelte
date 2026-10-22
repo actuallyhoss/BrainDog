@@ -94,7 +94,7 @@
     list-style: none;
   }
 
-  /* A MESSAGE IS A FLAT BLOCK INSIDE THE CARD, a control's fill on the tile: no border, no shadow (DIRECTION 39). */
+  /* A MESSAGE IS A FLAT BLOCK INSIDE THE CARD, a control's fill on the tile: no border, no shadow. */
   .read {
     display: flex;
     flex-direction: column;

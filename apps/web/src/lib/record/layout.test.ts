@@ -14,7 +14,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COLUMNS, spanOf } from './arrange.ts';
+import { COLUMNS } from './arrange.ts';
+import { slotOf } from '../page/layout.ts';
 import { page } from './fixtures/readers.ts';
 import { pages } from './fixtures/readers.ts';
 
@@ -29,7 +30,7 @@ const effective = (slug: string): { heading: string; declared: number | undefine
     .map((b) => ({
       heading: b.heading ?? b.kind,
       declared: b.span,
-      span: spanOf(b.kind, b.span, b.columns.length),
+      span: slotOf(b, 0, null).span,
     }));
 
 /** Greedy fill, the same one the page does: a block that does not fit starts a new row. */

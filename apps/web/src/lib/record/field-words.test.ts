@@ -1,6 +1,6 @@
 /**
  * The words for adding, renaming and retiring a field say the person's own things and never the system's: no "row", no
- * "list", no "register", no "block" in anything a person reads (DIRECTION §35). A list somebody named is said by its
+ * "list", no "register", no "block" in anything a person reads. A list somebody named is said by its
  * name, which the caller hands in.
  */
 

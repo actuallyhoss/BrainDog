@@ -8,9 +8,9 @@
  * the record's rows for a visitor with no record; the sample is gone, and the
  * screen now draws only what `listDevices`, `list` and `listGrants` answer.
  *
- * ONE APPROVAL, TWO SCREENS. A machine asking to open keys prints `/settings/agents`, and the Vault
- * shows the same request at the top. Both send the six digits through `approve` and say what came back
- * through `answerLine`, so the two cannot drift into different rules for one act.
+ * ONE APPROVAL, EVERY SCREEN. A machine asking to open keys prints `/connect/approve`, Settings, Agents takes the
+ * same code, and the Vault shows the same request at the top. All send the six digits through `approve` and say what came back
+ * through `answerLine`, so they cannot drift into different rules for one act.
  *
  * NEVER A VALUE, A CODE OR A HANDLE. A key row carries what is known about its grant: whether a value is
  * sealed, how often it was opened and when. A machine row carries its label, its scope and its days.

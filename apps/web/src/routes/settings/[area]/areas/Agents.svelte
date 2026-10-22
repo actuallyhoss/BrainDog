@@ -32,14 +32,18 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
     RUNS_READ, connectLines, connected, heardFrom, keyScopeOf, nameOf, reachKey, reachOf, reportKeyOf,
-    runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Heard, type HeardScope, type Run, type TokenRow,
+    runName, runsOf, seatsHeard, standing, waiting, type Connection, type DeviceRow, type Heard, type HeardScope, type HeardSeat, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { agentKey, agentName } from '$lib/record/hand.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { movable, placesIn, scopeFieldOf, type Place } from '$lib/record/scope-move.ts';
-  import { agentRows, argsOf, followers, heardLine, keepersOf, LEVEL_WORDS, machinesLine, type AgentRow, type ProfileView } from '$lib/agents/profile.ts';
+  import {
+    agentRows, argsOf, chipName, followers, groupRows, heardLine, keepersOf, keyDecides, LEVEL_LINES, LEVEL_WORDS, machinesLine, narrowed,
+    type AgentRow, type ProfileView,
+  } from '$lib/agents/profile.ts';
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
+  import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf, partsOf } from '$lib/record/apps.ts';
@@ -48,6 +52,7 @@
      the approval `/vault` sends, so the screens cannot drift apart. */
   import CodeForm from '$lib/agents/CodeForm.svelte';
   import { approverOf } from '$lib/agents/code-form.ts';
+  import { askerOf } from '$lib/agents/approve.ts';
   import { callsOutOf, type CallOut } from '$lib/record/actions.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
@@ -58,7 +63,7 @@
   import { listenFor } from '$lib/agents/listen.ts';
   import { leavingFetch } from '$lib/ui/leaving.ts';
   import { TONES, relative, since } from 'braindog-render';
-  import { isQuiet } from '@braindog/kernel';
+  import { isQuiet } from '@braindog/kernel/constants';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
   import { PRESENCE_WORDS, presenceSaid, type RunPresence } from '$lib/ui/presence-words.ts';
   import { untrack } from 'svelte';
@@ -101,6 +106,8 @@
     tokens: TokenRow[];
     runs: Run[];
     heard: Heard[];
+    /** The Claude Code profiles each kind was heard under, for a row per profile (migration 44). */
+    seats: HeardSeat[];
     live: Map<number, RunLive>;
     presence: Map<number, RunPresence>;
     /** His settings rows (`agentProfiles`), Defaults first; `null` from a host older than them. */
@@ -181,6 +188,7 @@
       tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
       runs: runs.ok ? runsOf(runs.value.rows) : [],
       heard: runs.ok ? heardFrom(runs.value.rows, now, projects) : [],
+      seats: runs.ok ? seatsHeard(runs.value.rows, now) : [],
       live: runs.ok ? livenessOf(runs.value.rows, now, presence) : new Map(),
       presence,
       profiles: profiles !== null && profiles.ok ? (profiles.value as unknown as ProfileView[]) : null,
@@ -199,7 +207,8 @@
   const held = read(() => (anOwner ? `agents:${apiBase()}` : null), listed);
   const rows = $derived(held.value ? connected(held.value.machines, held.value.tokens, held.value.runs) : []);
   const machines = $derived(held.value?.machines ?? []);
-  const first = $derived(waiting(machines, recordNow()).length > 0);
+  const asking = $derived(waiting(machines, recordNow()));
+  const first = $derived(asking.length > 0);
 
   /**
    * THE AGENTS HEARD FROM IN RUNS that no machine or key row above already names (agents F1): a record whose agents
@@ -225,12 +234,28 @@
   const agents = $derived.by((): AgentRow[] => {
     const v = held.value;
     if (!v || v.profiles === null) return [];
-    return agentRows({ profiles: v.profiles, heard: v.heard, keyScope: (kind) => keyScopeOf(kind, v.runs, v.tokens), nameOf: nameOfSaid });
+    return agentRows({ profiles: v.profiles, heard: v.heard, seats: v.seats, keyScope: (kind) => keyScopeOf(kind, v.runs, v.tokens), nameOf: nameOfSaid });
+  });
+
+  /** The rows grouped by agent: each agent's profiles as chips under it (`groupRows`). */
+  const groups = $derived(groupRows(agents));
+
+  /**
+   * WHAT EACH LEVEL MEANS, ONCE, UNDER THE LIST: one line for each level a row ends with, in the order Write, Suggest,
+   * Read. Every row said "Writes; asks for money, keys and deletes. Its key decides for now." under its name, twenty
+   * times on a record with five profiles; a row now draws its own sentence only when it is held to less than its level.
+   */
+  const legend = $derived.by(() => {
+    /* DEFAULTS SAYS ITS OWN SENTENCE ON ITS ROW, so its level is not said again here. */
+    const used = new Set(agents.filter((a) => a.key !== 'default' && !narrowed(a)).map((a) => a.may).filter((m) => m !== null));
+    return (['write', 'propose', 'read'] as const).filter((l) => used.has(l)).map((l) => ({ word: `${LEVEL_WORDS[l]}:`, line: LEVEL_LINES[l].charAt(0).toLowerCase() + LEVEL_LINES[l].slice(1) }));
   });
 
   /** Whether an agent's newest run is at work now, which its face and its line say. */
   const workingOf = (a: AgentRow): boolean => a.heard?.seq != null && held.value?.live.get(a.heard.seq) === 'working';
-  const atWorkNow = $derived(agents.filter(workingOf).length);
+  /* HOW MANY ARE AT WORK IS THE RAIL'S NUMBER (`boot`'s `working`), the agents at work by the record's one clock: it
+     counted the rows here whose newest run works, and said 5 beside the rail's 12, where one row holds many runs. */
+  const atWorkNow = $derived((shell as { working?: readonly unknown[] }).working?.length ?? agents.filter(workingOf).length);
 
   /** The lists a row may be held to: every list he has, but the record's own two for runs and instructions. */
   const sheetLists = $derived(shell.index.registers.filter((r) => r.id !== 'session' && r.id !== 'instructions').map((r) => ({ id: r.id, name: r.name })));
@@ -287,6 +312,8 @@
     noKeysWorking: (who: string, n: number) => `${who} ${n === 1 ? 'is' : 'are'} working without a machine or key listed here`,
     noKeysWhy: 'Connect an agent to give it a key of its own. Its settings then hold for that key alone.',
     atWorkNow: (n: number) => `${n} at work now.`,
+    keyDecides: 'Until you set one, an agent does what its key allows.',
+    profiles: (name: string) => `${name}'s profiles`,
     seeThem: 'See their runs',
     /* "yesterday", not "1d ago" (UI pass of 21 October, P38). */
     lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
@@ -519,7 +546,16 @@
   {/snippet}
 
   {#if first}
-    <Tile icon="key" title={copy.approveTitle}><CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} /></Tile>
+    <!-- WHO IS WAITING, NAMED ABOVE THE BOXES (`lib/agents/approve.ts`), so the owner reads what the code would approve
+         before the sixth digit sends it. -->
+    <Tile icon="key" title={copy.approveTitle}>
+      <ul class="asking">
+        {#each asking.slice(0, 3) as m (m.handle)}
+          <li><span class="asking-who" dir="auto">{askerOf(m.label, m.reach)}</span> {copy.codeAsks(copy.reachMeans[reachKey(m.reach, m.scope)] ?? m.reach)}</li>
+        {/each}
+      </ul>
+      <CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} />
+    </Tile>
   {/if}
 
   <!--
@@ -546,7 +582,8 @@
       {:else}
         {@const nowMs = recordNow()}
         <ul class="agents">
-          {#each agents as a (a.key)}
+          {#each groups as g (g.row.key)}
+            {@const a = g.row}
             {@const working = workingOf(a)}
             {@const line = heardLine(a, working, (at) => since(at, nowMs))}
             <!-- THE FACE BESIDE THE BUTTON, NEVER IN IT: a face that names a run is a link to the run, and a link inside a
@@ -562,7 +599,8 @@
                 <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
                 <span class="who-words">
                   <span class="who-name" dir="auto">{a.name}</span>
-                  <span class="agent-says">{a.says}</span>
+                  <!-- ITS OWN SENTENCE ONLY WHERE IT IS HELD TO LESS THAN ITS LEVEL; Defaults always says what it gives. -->
+                  {#if a.key === 'default' || narrowed(a)}<span class="agent-says">{a.says}</span>{/if}
                   {#if line}
                     {@const machine = machinesLine(a.machines)}
                     <span class="who-detail who-heard"
@@ -574,9 +612,29 @@
                 <Icon name="chevron" size="s" />
                 </button>
               </div>
+              <!-- ITS PROFILES, ONE CHIP EACH, under the row they belong to: each opens its own sheet. A chip says its level
+                   only where it is not its agent's, and carries the live dot while its run is at work. -->
+              {#if g.chips.length > 0}
+                <ul class="chips" aria-label={words.profiles(a.name)}>
+                  {#each g.chips as c (c.key)}
+                    {@const on = workingOf(c)}
+                    <li>
+                      <button type="button" class="chip tap" data-profile-row={c.key} onclick={() => openProfile(c)}>
+                        {#if on}<span class="chip-dot" aria-hidden="true"></span>{/if}<span dir="auto">{chipName(c)}</span>{#if c.may && c.may !== a.may}<span class="chip-may">{LEVEL_WORDS[c.may]}</span>{/if}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
             </li>
           {/each}
         </ul>
+        {#if legend.length > 0 || keyDecides(agents)}
+          <div class="legend">
+            {#each legend as l (l.word)}<p><span class="legend-word">{l.word}</span> {l.line}</p>{/each}
+            {#if keyDecides(agents)}<p>{words.keyDecides}</p>{/if}
+          </div>
+        {/if}
         {#if atWorkNow > 0}
           <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run tap" href={at('/r/session')}>{words.seeThem}</a></p>
         {/if}
@@ -611,18 +669,19 @@
             <span class="who-words">
               <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
               <span class="who-name" dir="auto">{parts.app}</span>
-              <!-- WHERE IT RUNS AND HOW IT CAME IN, one quieter line: "On Studio, signed in", "A key you made". -->
-              <span class="who-detail" dir="auto">{lineOf(c, parts)}</span>
-              {#if !scope.whole}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
+              <!-- ONE QUIET LINE UNDER THE NAME (UI audit of 22 October, 11): where it runs and how it came in ("Signed in",
+                   "A key you made"), then the facts, each its own item so a wrap breaks between them. A machine's grant
+                   is said by its two words at the row's end, so its sentence is not drawn under it as well. -->
+              {#if !scope.whole && !c.machine}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
               <span class="who-detail who-facts">
+                {#if lineOf(c, parts)}<span dir="auto">{lineOf(c, parts)}</span>{/if}
                 <!-- UNUSED FOR OVER A WEEK: the warn tone, and its mark beside the words, never the colour alone. -->
                 {#if parts.idle !== null}<span class="who-idle"><span role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span> {copy.notUsedFor(parts.idle)}</span>{/if}
-                {#each factsOf(c, nowMs, parts.idle) as fact}<span>{fact}</span>{/each}
-                <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
-                     because `S47` in small text is a target far under a thumb's 44px. -->
-                {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
-                <!-- WHERE THAT RUN IS NOW, in the record's six words: a finished run reads Ended, an imported one From before. -->
-                {#if c.run && wordOfRun(c.run)}<span>{wordOfRun(c.run)}</span>{/if}
+                {#each factsOf(c, nowMs, parts.idle).filter((f) => f !== lineOf(c, parts)) as fact}<span>{fact}</span>{/each}
+                <!-- THE RUN THAT LAST USED IT, BY WHERE IT IS NOW ("Working now", "Gone quiet", "Ended"), as a link to what it
+                     did; "Last run" where the record gives no word. Never its id: "S41" is the record's name for it, not his.
+                     `.tap` because small text is a target far under a thumb's 44px. -->
+                {#if c.run}<a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{wordOfRun(c.run) ?? copy.lastRun}</a>{/if}
               </span>
             </span>
             {#if c.live && scope.word}<span class="who-scope">{scope.word}</span>{/if}
@@ -705,6 +764,10 @@
       </p>
     </div>
   {/if}
+
+  <!-- ANSWER FROM INSIDE CHAT APPS, the owner's one switch for the decision card in Claude and ChatGPT
+       (`lib/agents/ChatAnswer.svelte`): off, its buttons open BrainDog. -->
+  <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
        press, and the six-digit field rides in it under the setup line while no machine waits above. -->
@@ -897,6 +960,81 @@
     color: var(--ink);
   }
 
+  /* AN AGENT'S PROFILES, AS CHIPS under its row, starting where its name starts: one press each, to its own sheet. */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: calc(-1 * var(--sp-1)) 0 var(--sp-3);
+    padding: 0 0 0 calc(var(--well-l) + var(--sp-3));
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    max-inline-size: 100%;
+    min-block-size: var(--btn-h-sm);
+    padding: 0 var(--sp-2);
+    background: var(--tile-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    overflow-wrap: anywhere;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .chip:hover {
+      background: var(--hover);
+    }
+  }
+
+  /* 32 UNDER A THUMB, its hit box the house's 44 (`.tap`): a chip a full 44 tall made four profiles a third of a phone. */
+  @media (pointer: coarse) {
+    .chip {
+      min-block-size: 32px;
+    }
+  }
+
+  .chip-dot {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: var(--live);
+  }
+
+  .chip-may {
+    color: var(--ink-3);
+  }
+
+  /* WHAT EACH LEVEL MEANS, ONCE, under the list: the level's word in ink, its sentence in the second ink. */
+  .legend {
+    display: grid;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-2);
+    max-inline-size: var(--measure);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .legend p {
+    margin: 0;
+  }
+
+  .legend-word {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
   /* DEFAULTS IS NOT AN AGENT: it sits after them, a step apart. */
   .agents > li[data-default] {
     margin-block-start: var(--sp-2);
@@ -972,6 +1110,24 @@
   .code-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+  }
+
+  /* WHO IS WAITING, one line each, over the six boxes. */
+  .asking {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    list-style: none;
+  }
+
+  .asking-who {
+    color: var(--ink);
+    font-weight: 500;
   }
 
   /* WHAT THE ADD-ON WOULD ADD, as label and value on the page with nothing round them: a filled, bordered panel

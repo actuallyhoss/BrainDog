@@ -617,7 +617,7 @@
 
   /* ABOVE THE TAB BAR, NOT UNDER IT: below 900 the shell's scroller runs to the bottom of the window and `TabBar` is
      docked to the bottom edge over its last `--tabbar`, so the bar sticks a step above it. An opaque tile with one
-     hairline round it, no glass (DIRECTION §39), so the steps passing under it are never read through it. */
+     hairline round it, no glass, so the steps passing under it are never read through it. */
   @media (width < 900px) {
     .stop-bar {
       position: sticky;

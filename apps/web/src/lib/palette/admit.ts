@@ -334,7 +334,7 @@ export const COMMANDS: readonly Command[] = [
     when: (live) => live.creation !== null,
   },
   /**
-   * AND THE ROWS THAT CHANGE THE APP ITSELF (DIRECTION §35), drawn like the add row: as the sentences the query makes,
+   * AND THE ROWS THAT CHANGE THE APP ITSELF, drawn like the add row: as the sentences the query makes,
    * `Dark mode`, `Open on Money`, `Hide Inbox`, and only while it makes one. With nothing typed there are none, so a
    * freshly opened palette looks as it always has.
    */

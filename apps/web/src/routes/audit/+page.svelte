@@ -47,7 +47,7 @@
      shows come from a map over the forty, so the string is checked against the vocabulary before
      it is used as a place in it, rather than indexing the map with a stranger and rendering
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
-  import { isEventKind } from '@braindog/kernel';
+  import { isEventKind } from '@braindog/kernel/constants';
   import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
   import { markAll, type LogRead } from '$lib/record/news-live.ts';
   import type { Cursor } from '@braindog/client';
@@ -82,12 +82,12 @@
     isBookkeeping,
     keepsBooks,
     keyOf,
+    lineSaid,
     LANE_SPAN_MS,
     lanesOf,
     lanesSaid,
     listOf,
     passOf,
-    reaches,
     runFolds,
     settledOf,
     tallyOf,
@@ -103,15 +103,6 @@
   /* WHEN THE READER'S MARK MOVES: stamped as they leave, with the newest line this page held. The rule is every
      screen's (`lib/page/read-mark.ts`), and Home stamps through it too. */
   import { readMarkOf, seenAfter, stampOf as markStamp } from '$lib/page/read-mark.ts';
-  /* WHICH OF THE TWO THIS VISIT DRAWS, and the way across. Small and pure; the page itself is fetched when asked for. */
-  import { declaredHref, wantsDeclared, words as declaredWords } from './declared.ts';
-
-  /**
-   * WHETHER THIS VISIT DRAWS ACTIVITY AS THE RECORD'S PAGE (PGS-C24 job 8, `DeclaredActivity.svelte`), which the address
-   * asks for by one key (`?declared`). The screen as it was stays the default until his yes. While the page is drawn,
-   * nothing below is, and this screen's reads, its listener and its mark stand down: the page reads and marks its own.
-   */
-  const composed = $derived(wantsDeclared(route.url));
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -201,7 +192,7 @@
   let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: Cursor | null } | null>(null);
   let refused = $state<string | null>(null);
   /* THE SAMPLE'S LOG AND ITS 3 SEPTEMBER CLOCK WERE THE OTHER HALF OF THESE TWO LINES, behind `route.data.live`, which
-     every shell now sets `true` (`no-sample-b4.test.ts` says why it is no witness). */
+     every shell now sets `true` (`no-sample-offline-screens.test.ts` says why it is no witness). */
   const LOG = $derived(live?.events ?? []);
 
   /**
@@ -248,7 +239,6 @@
   let asked = 0;
   $effect(() => {
     if (!route.data.live) return;
-    if (composed) return;
     const all = everything;
     const n = ++asked;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
@@ -276,7 +266,6 @@
   let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null; upTo?: Cursor | null } | null>(null);
   $effect(() => {
     if (!route.data.live) return;
-    if (composed) return;
     const at = untrack(opened);
     void readUnseen(apiBase())
       .then((out) => {
@@ -306,9 +295,7 @@
     const stamp = markStamp((upTo) => markAll(base, upTo));
     const leave = () => {
       if (!route.data.live) return;
-      /* LEFT FROM THE PAGE, which stamps its own feed's mark: this screen held no line to stamp with. */
-      if (composed) return;
-      const held = (live?.events ?? []).reduce((top, e) => Math.max(top, e.seq), 0);
+        const held = (live?.events ?? []).reduce((top, e) => Math.max(top, e.seq), 0);
       const upTo = readMarkOf(unseen?.upTo ?? route.data.upTo, unseen ? unseen.actors.length : null, held);
       void stamp.leave(upTo).then((landed) => {
         if (landed) unseen = seenAfter();
@@ -358,8 +345,7 @@
   listen(
     async () => {
       if (!route.data.live || !live) return;
-      if (composed) return;
-      const at = opened();
+        const at = opened();
       try {
         const out = await logOf(null, everything);
         if (out.from !== 'live' || !live) return;
@@ -459,8 +445,6 @@
   const when = $derived(route.url.searchParams.get('on') ?? '');
   /* A DAY AS A PERSON SAYS IT, from its local noon so no clock change moves it into its neighbour. */
   const daySaid = (d: string): string => dayWord(new Date(`${d}T12:00`).getTime(), clock);
-  /* A DAY IN A LINE'S WORDS AS A PERSON SAYS IT: "renews 2026-09-10" read as the record wrote it (money F11). */
-  const daysIn = (note: string): string => note.replace(/\b(\d{4}-\d{2}-\d{2})(?![T\d])/gu, (d) => daySaid(d));
 
   /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
      control of its own, since a list is chosen from Today or pasted, and the button in the toolbar says it and takes it off. */
@@ -521,11 +505,10 @@
    * runs off at three in the morning is not a busy hour. WHAT CHANGED counts the lines the filters match, because its
    * figure is the title's.
    *
-   * EACH SAYS WHEN IT IS PARTIAL. There is no read of a time range yet, so a window the pages read so far do not reach
-   * back through is counted over what was read, and the tile's foot says so: a quiet morning the log has not reached is
-   * not a quiet morning.
+   * NO FOOT SAYING HOW MANY LINES WERE READ. "Counted over the 200 newest entries read so far" stood under all three, a
+   * line about the reader's paging where the tile says what the record did; Older entries under the stream is where the
+   * rest of the log is.
    */
-  const more = $derived(live !== null && live.cursor !== null);
   const lanes = $derived(lanesOf(kept, clock, me, names));
   const tally = $derived(tallyOf(matched, me, names));
   /* THE SAME COUNT OVER EVERYTHING READ, whatever the chips narrow, for the line under the title (`awaySaid`). */
@@ -583,12 +566,11 @@
    * this line says. Not for the record's page, which says it once its own read has answered.
    */
   $effect(() => {
-    if (!composed) drew('ready');
+    drew('ready');
   });
 </script>
 
-<!-- THE PAGE NAMES ITSELF when it is drawn (`PageView`), so the screen as it was names only itself. -->
-<svelte:head>{#if !composed}<title>{titleOf(copy.audit)}</title>{/if}</svelte:head>
+<svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
 {#snippet tools()}
   <div class="tools">
@@ -688,7 +670,16 @@
   {@const settled = pass === null ? settledOf(e, me, names) : null}
   {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
   {@const thing = pass !== null ? null : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
-  {@const note = declared === null && pass === null ? daysIn(t.note) : ''}
+  <!-- THE LINE AS ONE SENTENCE (`lineSaid`): no second verb where the title already says what was done, a question in
+       quotation marks, and a note that does not say the title again, its days said as a person says them. -->
+  {@const said = lineSaid(
+    kindOf(e.kind).word,
+    thing?.text ?? null,
+    declared === null && pass === null ? t.note : '',
+    t.many === null && /^(?:suggestion|decision|prediction):/u.test(e.target ?? ''),
+    clock,
+  )}
+  {@const note = said.note}
   <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE, and every other well is neutral: "Created"
        wore the green of done on a hundred lines at once (money F11). Nothing here is red: a log is history, not need. -->
   {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : undefined}
@@ -709,15 +700,15 @@
         {#if pass !== null}<span class="line-title">{pass.said}</span>
         {:else if declared !== null}<span class="line-title">{declared}</span>
         {:else}<span class="line-title"
-            ><span class="verb">{kindOf(e.kind).word}</span>{#if thing}{' '}{#if thing.href}<a class="target tap" href={at(thing.href)}
-                  ><bdi class="target-name">{thing.text}</bdi></a
-                >{:else}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span
+            >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
+                  >{said.quoted ? '“' : ''}<bdi class="target-name">{thing.text}</bdi>{said.quoted ? '”' : ''}</a
+                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name">{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}</span
           >{/if}
         <span class="line-detail">
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? by.name}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
+            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
                 >{' · '}{thing.list}</span
               >{/if}</span
           >
@@ -761,7 +752,6 @@
       <Tile icon="session" title={historyWords.whoWorked} meta={historyWords.lastDay}>
         <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
         <p class="reading">{lanesSaid(lanes)}</p>
-        {#if !reaches(LOG, more, clock - LANE_SPAN_MS)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
       </Tile>
     {/if}
 
@@ -769,7 +759,6 @@
       <Tile icon="history" title={historyWords.whatChanged} count={matched.length} meta={tallyMeta}>
         <Bars items={topKinds} subject={historyWords.kindsSubject} />
         <p class="reading">{tallyReading}</p>
-        {#if more}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
       </Tile>
     {/if}
 
@@ -777,21 +766,11 @@
       <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
         <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
         <p class="reading">{busySaid(busy.values)}</p>
-        {#if !reaches(LOG, more, busy.start)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
       </Tile>
     {/if}
   </div>
 {/snippet}
 
-<!-- THE WAY ACROSS, one quiet line under the sentence: the same address with the one key, every filter kept. -->
-{#snippet asPage()}
-  <p class="as-page"><a href={at(declaredHref(route.url))}>{declaredWords.asPage}</a></p>
-{/snippet}
-
-{#if composed}
-  <!-- ACTIVITY AS THE RECORD'S PAGE, fetched when the address asks for it and never otherwise. -->
-  {#await import('./DeclaredActivity.svelte') then loaded}<loaded.default />{/await}
-{:else}
 <PageHead
   icon="history"
   title={copy.audit}
@@ -799,7 +778,6 @@
   total={kept.length}
   sentence={lead}
   actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? (phone ? filterOpen : tools) : undefined}
-  below={asPage}
 />
 
 <div class="page">
@@ -851,7 +829,9 @@
         <Tile class="section" data-surface="tile" title={day.title} count={day.count || undefined}>
           <div class="section-body">
             {#each day.hours as band (band.key)}
-              <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile. -->
+              <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile; with
+                   room, it is the stream's first column, beside the hour's first line, and each line's minute beside it. -->
+              <div class="hour-band">
               <h3 class="hour num">{band.title}</h3>
               <ul class="ledger">
                 <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
@@ -868,6 +848,7 @@
                   {/if}
                 {/each}
               </ul>
+              </div>
             {/each}
           </div>
         </Tile>
@@ -892,23 +873,8 @@
     </div>
   </div>
 </div>
-{/if}
 
 <style>
-  /* QUIETER THAN THE SENTENCE OVER IT, and still body size; a finger's height on a phone. */
-  .as-page {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-  }
-
-  @media (pointer: coarse) {
-    .as-page a {
-      display: inline-flex;
-      align-items: center;
-      min-block-size: 44px;
-    }
-  }
 
   /**
    * THE PAGE IS A CONTAINER, so the stream and its tiles decide their columns by the room the page actually has (the
@@ -1289,8 +1255,61 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .ledger + .hour {
+  .hour-band + .hour-band .hour {
     margin-block-start: var(--sp-4);
+  }
+
+  /**
+   * WITH ROOM, THE STREAM READS AS THE DESIGN BOARD DRAWS IT: the hour in ink in a column of its own beside the first
+   * line it holds, then each line's minute in the quiet ink, the kind's well, what was done and by whom, and the list
+   * at the end. The hours run on as one list, a hairline between every two lines.
+   */
+  @container (width >= 640px) {
+    .hour-band {
+      display: grid;
+      grid-template-columns: 6ch minmax(0, 1fr);
+      column-gap: var(--sp-2);
+      align-items: start;
+    }
+
+    .hour-band + .hour-band {
+      border-block-start: 1px solid var(--rule);
+    }
+
+    .hour,
+    .hour-band + .hour-band .hour {
+      margin: 0;
+      padding-block-start: calc((var(--row-h-2) - 20px) / 2);
+      color: var(--ink);
+      font-size: var(--fs-body);
+      line-height: 20px;
+    }
+
+    .act {
+      grid-template-columns: 6ch var(--well-l) minmax(0, 1fr) auto;
+    }
+
+    .act > :global(:first-child) {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .act .line-main {
+      grid-column: 3;
+    }
+
+    .where {
+      grid-column: 4;
+    }
+
+    .act .line-when {
+      grid-column: 1;
+    }
+
+    .line-when time {
+      color: var(--ink-3);
+      font-family: var(--font-mono);
+    }
   }
 
   /**

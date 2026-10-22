@@ -403,9 +403,9 @@ test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps
 });
 
 /**
- * A FIGURE STANDING ON ITS OWN IS WHOLE UNITS (DIRECTION §37): the founder's Today drew "EGP 1,086,213.41" beside each
+ * A FIGURE STANDING ON ITS OWN IS WHOLE UNITS: the founder's Today drew "EGP 1,086,213.41" beside each
  * book, a ledger's figure, piastres and all. A CURRENCY ENGLISH WRITES BY ITS CODE KEEPS IT THERE TOO, "EGP 1,350" as
- * every other place writes it, never "E£1,350" (his word, 9 October).
+ * every other place writes it, never "E£1,350" (settled 9 October).
  */
 test('A HEADLINE IS WHOLE UNITS, AND EGP IS WRITTEN EGP THERE AS EVERYWHERE: "EGP 1,086,213.41" over Today is "EGP 1,086,213"', () => {
   assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'headline'), 'EGP\u00a01,086,213');

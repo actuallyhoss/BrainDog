@@ -9,7 +9,7 @@
   to the page made, and Not now writes the dismissal, terminal on every device. The card holds no state of its own, so
   the screen that draws it is the one that knows it is gone.
 
-  A TILE ON THE BOARD (DIRECTION 39): flat, no border, no shadow. The drawing is a small board inside it, its blocks
+  A TILE ON THE BOARD: flat, no border, no shadow. The drawing is a small board inside it, its blocks
   drawn as the board's own colour, so it reads as a picture of a page and not as a tile inside a tile.
 
   THE COMPACT FORM IS ONE QUIET LINE THAT OPENS ON TAP (`compact`, look fault G). On a page somebody opened to read
@@ -178,7 +178,7 @@
     }
   }
 
-  /* THE CARD'S LINE IS THE QUESTION'S SIZE (DIRECTION 39's 17), at medium, as the mockup's step 7 draws it. */
+  /* THE CARD'S LINE IS THE QUESTION'S SIZE (17px), at medium, as the mockup's step 7 draws it. */
   .offer-why {
     margin: 0;
     color: var(--ink);

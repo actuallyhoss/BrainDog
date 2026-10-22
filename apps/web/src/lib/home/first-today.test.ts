@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 
 import { firstPartyDocument } from '@braindog/seed/packs';
 
-import { addedByHand, addedSaid, countWord, heldSaid, readyRows, showTell, tellLists, wantMore } from './first-today.ts';
+import { addedByHand, addedSaid, countWord, heldSaid, readyRows, showTell, tellLists } from './first-today.ts';
+import { wantMore } from './want-more.ts';
 import { optimist } from '../data/optimistic.ts';
 import { madeSteps } from '../start/made.ts';
 import { listsOfModules, playedBy } from '../start/parts.ts';

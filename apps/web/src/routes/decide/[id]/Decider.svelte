@@ -14,7 +14,6 @@
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { apiBase } from '$lib/at.ts';
-  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -67,6 +66,12 @@
   $effect(() => {
     picked = decider ?? '';
   });
+  /* OPENED FROM THE "⋯" BY THE TITLE, THE PICKER IS BROUGHT INTO VIEW: on a phone the side is under the answers, a
+     screen or more below the press that opened it. */
+  let part = $state<HTMLElement>();
+  $effect(() => {
+    if (open && part) part.scrollIntoView({ block: 'nearest' });
+  });
   let sending = $state(false);
   let refused = $state('');
 
@@ -86,14 +91,18 @@
   }
 </script>
 
-{#if line || owns}
+{#if line || (owns && (open || refused !== ''))}
   <!-- FOLDED BEHIND "⋯" (the 20 October walk): "Anybody who may decide can answer this. Who decides: Nobody [Save]"
        opened every question and pushed the question down. The line stays when somebody is named, since that is news;
-       the picker opens from the "⋯" at the right of the page's title, which the page draws, so nothing floats in a row
-       of its own above the question, and it opens by itself only when the record refused a name. -->
-  {#if line}<p class="decider-line">{line}</p>{/if}
+       the picker opens from the "⋯" at the right of the page's title, which the page draws, and it opens by itself only
+       when the record refused a name.
+
+       IN THE SIDE TILE, BESIDE WHAT THE QUESTION IS ABOUT, and no tile of its own: it is context for the answers, and a
+       line and a tile over the question pushed the answers down while the side column stood empty. -->
+  <section class="decider" bind:this={part} aria-labelledby="{field}-h">
+    <h2 class="decider-h" id="{field}-h">{WORDS.pick}</h2>
+    <p class="decider-line">{line ?? WORDS.nobodyLine}</p>
   {#if owns && (open || refused !== '')}
-  <Tile class="decider" title={line ?? WORDS.nobodyLine}>
       <div class="decider-pick" id="{field}-pick">
         <label class="decider-label" for={field}>{WORDS.pick}</label>
         <div class="decider-row">
@@ -107,11 +116,28 @@
         </div>
         {#if refused}<p class="decider-said" role="alert"><Icon name="alert" size="s" />{refused}</p>{/if}
       </div>
-  </Tile>
   {/if}
+  </section>
 {/if}
 
 <style>
+  .decider {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  /* THE SIDE'S SMALL HEADING, as why it is asked and what it is about wear theirs. */
+  .decider-h {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
+  }
+
   .decider-line {
     margin: 0;
     color: var(--ink-2);

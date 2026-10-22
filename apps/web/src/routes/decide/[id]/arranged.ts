@@ -26,8 +26,9 @@ import { appearsOf, type Appears } from './proposed.ts';
 
 type Row = Record<string, unknown>;
 
-export const ARRANGING = ['pack', 'settings', 'arrange'] as const;
-export const isArranging = (kind: string | undefined): boolean => (ARRANGING as readonly string[]).includes(kind ?? '');
+/* Which questions arrange the record: `arranging.ts`'s, where a page's queue asks it without this file. */
+import { ARRANGING, isArranging } from './arranging.ts';
+export { ARRANGING, isArranging };
 
 /**
  * One call out a press approves: the host it reaches, and how often and what it sends, in plain words. `every` is the

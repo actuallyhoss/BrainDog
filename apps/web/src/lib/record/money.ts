@@ -251,7 +251,7 @@ export function merge(totals: readonly Total[]): Total {
  * `money.ts`, and this asks it: the sign is whatever the one writer puts in front of the home currency's figure. This
  * module kept a sign table of its own, and with two tables one record wrote `$3.63 USD` in a cell, `US$4,012.46` on a
  * bar and `EGP -700` in a line. So `£` for GBP, `$` for USD, and `null` for EGP, CHF and KWD, which English writes by
- * their codes ("EGP 1,350", his word, 9 October, never "E£1,350").
+ * their codes ("EGP 1,350", never "E£1,350").
  */
 export function symbolOf(currency: string): string | null {
   return writeAmount({ minor: 0, currency }, currency, 'read')?.sign || null;
@@ -349,7 +349,7 @@ function amountIn(currency: string, minus: string, whole: string, fraction = '')
  *
  * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence is width
  * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
- * and stays. A HEADLINE OF TEN THOUSAND OR MORE IS WHOLE UNITS (DIRECTION §37): "EGP 1,086,213.41" over Today is
+ * and stays. A HEADLINE OF TEN THOUSAND OR MORE IS WHOLE UNITS: "EGP 1,086,213.41" over Today is
  * "EGP 1,086,213", with the piastres gone; "£999.50" stays "£999.50", since a smaller
  * amount rounded is a different amount (research audit M6). A bar asks for `figure`, which is never rounded. `true` is
  * `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell asks for `exact`.

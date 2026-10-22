@@ -17,6 +17,11 @@
   refuses is said in the foot, since a toast waits for the sheet to close. A done write closes the sheet and leaves a
   toast naming the number with Undo.
 
+  ITS PAST VALUES, under the fields of a number already kept (`past.ts`): its readings in Numbers, newest first, each
+  with its day and who set it. The newest is taken back with Undo, and any one is changed in place or taken out, each
+  through the same row writer on the readings list. The sheet stays open, so each write is put back from its own row
+  ("Put back") rather than from a toast. A number worked out from the lists has no readings, and lists none.
+
   44 UNDER A THUMB: every field, segment, choice and the switch take `--tap` where the pointer is coarse or the screen
   is a phone's.
 -->
@@ -25,10 +30,11 @@
   import { tick } from 'svelte';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { homeCurrency } from '$lib/record/api.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { display, homeCurrency } from '$lib/record/api.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { REGISTERS } from '$lib/record/held.ts';
-  import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
+  import type { RecordRow } from '$lib/record/remote.ts';
+  import { rowWriter, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import type { Entry, Fields } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Field from '$lib/ui/Field.svelte';
@@ -37,6 +43,9 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import '$lib/ui/forms.css';
+  import { findReadingList, projectsOf, type Reads } from './kpi-rows.ts';
+  import { PAST_READ, pastAfter, pastBackOf, pastOf, pastPatchOf, pastWhere, setByOf, whoSaid, type Past, type PastEvent } from './past.ts';
+  import { daySaid, projectFieldOf } from './stale-fix.ts';
   import {
     draftOf,
     everyFor,
@@ -118,6 +127,13 @@
     tried = false;
     busy = false;
     refused = null;
+    past = null;
+    pastFault = false;
+    who = new Map();
+    done = new Map();
+    editing = null;
+    editFault = null;
+    if (kpi && kpi.fields.source !== 'figure') void readPast(kpi);
   }
 
   const faults = $derived<Faults>(tried ? faultsOf(draft) : {});
@@ -224,6 +240,164 @@
     if (!out.ok) return void toasts.push(out.fix, { intent: 'bad' });
     toasts.push(copy.kpiUndone);
     onsaved?.(out.entry);
+  }
+
+  /* ── its past values (`past.ts`) ── */
+
+  /** A write made from a row of the list, and what puts it back: the value it held, and the write that restores it. */
+  type Done = { kind: 'removed' | 'changed'; before: Past; back: () => Promise<Wrote> };
+
+  let past = $state.raw<Past[] | null>(null);
+  let pastFault = $state(false);
+  let who = $state.raw<ReadonlyMap<number, string>>(new Map());
+  let done = $state.raw<ReadonlyMap<number, Done>>(new Map());
+  let editing = $state<number | null>(null);
+  let editTyped = $state('');
+  let editFault = $state<string | null>(null);
+  /** The readings list, found by its shape once a tab (`kpi-rows.ts`), never named. */
+  let readings: string | null = null;
+  /* THE LAST READ WINS: a sheet opened on another number before the first read lands draws only the second's. */
+  let asked = 0;
+
+  const listsPast = $derived(kept && kpi?.fields.source !== 'figure');
+  const textOf = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+  /**
+   * THE NUMBER'S READINGS, newest first, and who set each: one read of the readings list held to this number's measure on
+   * its project, then each listed row's history, read together. Nothing here stops the sheet: a refusal says one line.
+   */
+  async function readPast(k: Entry): Promise<void> {
+    const n = ++asked;
+    const thing = typeof k.fields.thing === 'string' ? k.fields.thing : null;
+    if (thing === null) return void (past = []);
+    try {
+      const [{ createClient }, { entryOf }] = await Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')]);
+      const client = createClient({ base: apiBase() });
+      const projects = projectsOf(list);
+      readings ??= await findReadingList(client as unknown as Reads, (shell.index?.registers ?? []).map((r) => r.id), projects);
+      const decl = readings ? REGISTERS[readings] : undefined;
+      const field = decl ? projectFieldOf(decl.fields as never, projects) : null;
+      if (n !== asked) return;
+      if (!readings || !field) return void (past = []);
+      const at = readings;
+      const on = { id: thing, name: project.name };
+      const of = { name: textOf(k.fields.name), measure: textOf(k.fields.measure) };
+      const got = await client.list({ register: at, where: pastWhere(of, on, field), order: [{ field: 'at', dir: 'desc' }], limit: PAST_READ });
+      if (n !== asked) return;
+      if (!got.ok) return void (pastFault = true);
+      const listed = pastOf((got.value.rows as RecordRow[]).map((r) => entryOf(at, r, new Map())), of, on, field);
+      past = listed;
+      const by = await Promise.all(
+        listed.map((p) =>
+          client
+            .history(at, p.seq)
+            .then((h) => (h.ok && Array.isArray(h.value) ? setByOf(h.value as PastEvent[]) : null))
+            .catch(() => null),
+        ),
+      );
+      if (n !== asked) return;
+      const names = new Map(Object.entries(shell.names ?? {}));
+      const me = shell.me?.person ?? null;
+      who = new Map(
+        listed.flatMap((p, i): [number, string][] => {
+          const actor = by[i];
+          return actor ? [[p.seq, whoSaid(actor, me, names)]] : [];
+        }),
+      );
+    } catch {
+      if (n === asked) pastFault = true;
+    }
+  }
+
+  /** A past value as a person reads it: money in its currency, a plain number with its unit. */
+  function said(p: Past): string {
+    const shown = readings ? (p.money ? display(readings, 'amount', p.money) : display(readings, 'value', p.value)) : null;
+    const figure = shown ?? p.typed;
+    return p.money || p.unit === '' ? figure : `${figure} ${p.unit}`;
+  }
+
+  const swap = (p: Past) => (past = (past ?? []).map((x) => (x.seq === p.seq ? p : x)));
+  function marked(seq: number, d: Done | null) {
+    const next = new Map(done);
+    if (d) next.set(seq, d);
+    else next.delete(seq);
+    done = next;
+  }
+
+  async function editPast(p: Past) {
+    editing = p.seq;
+    editTyped = p.typed;
+    editFault = null;
+    await tick();
+    document.getElementById(id(`past-${String(p.seq)}`))?.focus();
+  }
+
+  /** One past value changed in place: its value alone, at the version it was read at. */
+  async function changePast(p: Past) {
+    if (busy || !readings) return;
+    const out = pastPatchOf(p, editTyped);
+    if (!out.ok) {
+      editFault = out.fault;
+      await tick();
+      document.getElementById(id(`past-${String(p.seq)}`))?.focus();
+      return;
+    }
+    if (out.same) return void (editing = null);
+    busy = true;
+    refused = null;
+    const w = writes();
+    const at = readings;
+    const wrote = await w.update(at, p.seq, out.patch, p.version);
+    busy = false;
+    if (!wrote.ok) return void (refused = wrote.fix);
+    editing = null;
+    editFault = null;
+    const version = wrote.entry.version;
+    swap(pastAfter(p, out.patch, version));
+    marked(p.seq, { kind: 'changed', before: p, back: () => w.update(at, p.seq, pastBackOf(p), version) });
+    if (kpi) onsaved?.(kpi);
+  }
+
+  /** The newest taken back with Undo, or any other taken out: archived, so `restore` puts it back. */
+  async function removePast(p: Past) {
+    if (busy || !readings) return;
+    busy = true;
+    refused = null;
+    const w = writes();
+    const at = readings;
+    const wrote = await w.archive(at, p.seq, p.version);
+    busy = false;
+    if (!wrote.ok) return void (refused = wrote.fix);
+    const version = wrote.entry.version;
+    swap({ ...p, version });
+    marked(p.seq, { kind: 'removed', before: p, back: () => w.restore(at, p.seq, version) });
+    if (kpi) onsaved?.(kpi);
+  }
+
+  /** A row's write put back: the value it held, or the reading back in Numbers. */
+  async function putBack(p: Past) {
+    const d = done.get(p.seq);
+    if (busy || !d) return;
+    busy = true;
+    refused = null;
+    const out = await d.back();
+    busy = false;
+    if (!out.ok) return void (refused = out.fix);
+    swap({ ...d.before, version: out.entry.version });
+    marked(p.seq, null);
+    if (kpi) onsaved?.(kpi);
+  }
+
+  /** Enter saves the value in the box and Escape leaves it, without the sheet's own form or its close hearing either. */
+  function pastKeys(e: KeyboardEvent, p: Past) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void changePast(p);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      editing = null;
+    }
   }
 
   /** Arrows move a radiogroup's choice, and wrap, as `RowForm`'s segments do. */
@@ -463,6 +637,70 @@
           >
         </div>
       </div>
+    {/if}
+
+    {#if listsPast}
+      <section class="kpi-past" aria-labelledby={id('past-head')}>
+        <h3 class="field-label kpi-past-head" id={id('past-head')}>{copy.kpiPast}</h3>
+        {#if pastFault}
+          <p class="kpi-say">{copy.kpiPastNotRead}</p>
+        {:else if past !== null && past.length === 0}
+          <p class="kpi-say">{copy.kpiPastNone}</p>
+        {:else if past !== null}
+          <ul class="kpi-past-list">
+            {#each past as p, i (p.seq)}
+              {@const day = daySaid(p.at, recordNow())}
+              {@const d = done.get(p.seq)}
+              {@const by = who.get(p.seq)}
+              <li class="kpi-past-row" data-out={d?.kind === 'removed' ? '' : undefined}>
+                {#if editing === p.seq}
+                  <div class="kpi-past-edit">
+                    <Field id={id(`past-${String(p.seq)}`)} label={copy.kpiPastValueOn(day)} error={editFault}>
+                      {#snippet children(c)}
+                        <div class="field">
+                          <input
+                            id={id(`past-${String(p.seq)}`)}
+                            class="field-input"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            enterkeyhint="done"
+                            aria-describedby={c.describedBy}
+                            aria-invalid={c.invalid ? 'true' : undefined}
+                            bind:value={editTyped}
+                            onkeydown={(e) => pastKeys(e, p)}
+                          />
+                        </div>
+                      {/snippet}
+                    </Field>
+                    <span class="kpi-past-acts">
+                      <Button size="sm" disabled={busy} onclick={() => void changePast(p)}>{copy.kpiSave}</Button>
+                      <Button size="sm" weight="bare" disabled={busy} onclick={() => (editing = null)}>{copy.kpiCancel}</Button>
+                    </span>
+                  </div>
+                {:else}
+                  <span class="kpi-past-words">
+                    <span class="kpi-past-value">{said(p)}</span>
+                    <span class="kpi-past-meta"
+                      >{day}{#if by}{' · '}{copy.kpiPastBy(by)}{/if}{#if d?.kind === 'removed'}{' · '}{copy.kpiPastRemoved}{:else if d}{' · '}{copy.kpiPastChanged(said(d.before))}{/if}</span
+                    >
+                  </span>
+                  <span class="kpi-past-acts">
+                    {#if d}
+                      <Button size="sm" weight="bare" disabled={busy} aria-label={copy.kpiPastPutBackOn(day)} onclick={() => void putBack(p)}>{copy.kpiPastPutBack}</Button>
+                    {:else}
+                      <Button size="sm" weight="bare" disabled={busy} aria-label={copy.kpiPastChangeOn(day)} onclick={() => void editPast(p)}>{copy.kpiPastChange}</Button>
+                      <Button size="sm" weight="bare" disabled={busy} aria-label={i === 0 ? copy.kpiPastUndoOn(day) : copy.kpiPastRemoveOn(day)} onclick={() => void removePast(p)}
+                        >{i === 0 ? copy.kpiPastUndo : copy.kpiPastRemove}</Button
+                      >
+                    {/if}
+                  </span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
     {/if}
 
     {#if kept && kpi?.fields.state !== 'retired'}
@@ -709,6 +947,96 @@
     gap: var(--sp-2) var(--sp-3);
     padding-block-start: var(--sp-4);
     border-block-start: 1px solid var(--rule);
+  }
+
+  /* ITS PAST VALUES: a heading as a field's label, then a row a value, its figure over its day and who set it at the
+     start and its presses at the end. One taken out is drawn faint and struck through until it is put back. */
+  .kpi-past {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .kpi-past-head {
+    margin: 0;
+  }
+
+  .kpi-past-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .kpi-past-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--ctl-h);
+    padding-block: var(--sp-2);
+  }
+
+  .kpi-past-row + .kpi-past-row {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .kpi-past-words {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .kpi-past-value {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--fw-medium);
+  }
+
+  .kpi-past-meta {
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kpi-past-row[data-out] .kpi-past-value {
+    color: var(--ink-3);
+    text-decoration: line-through;
+  }
+
+  .kpi-past-acts {
+    display: flex;
+    flex: none;
+    gap: var(--sp-1);
+  }
+
+  /* CHANGING ONE: the box takes the row, its two presses beside it where there is room and under it on a phone. */
+  .kpi-past-edit {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-2) var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .kpi-past-edit > :global(:first-child) {
+    flex: 1 1 160px;
+    min-inline-size: 0;
+  }
+
+  @media (pointer: coarse), (width < 640px) {
+    .kpi-past-row {
+      min-block-size: var(--tap);
+    }
   }
 
   .kpi-refused {

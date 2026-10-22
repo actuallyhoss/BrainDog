@@ -1,5 +1,5 @@
 <!--
-  ONE OPTION'S PICTURE (DIRECTION §45): what it would change, drawn small beside its words by kind (`option-visual.ts`).
+  ONE OPTION'S PICTURE: what it would change, drawn small beside its words by kind (`option-visual.ts`).
   Nothing is drawn for an option with no kind, not even a space.
 -->
 <script lang="ts">

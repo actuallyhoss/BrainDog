@@ -5,7 +5,7 @@
   what needs you, the next two weeks as a strip of days, and the days coming up. On the right, up to three tiles: the
   agents at work and their day as swimlanes, what changed since you were last here, and cash with the walk ahead.
 
-  CALM BEFORE RICH (DIRECTION §35). Nothing is drawn to say it is empty: with nothing needing you the sentence says so
+  CALM BEFORE RICH. Nothing is drawn to say it is empty: with nothing needing you the sentence says so
   and the list is not drawn, and a tile with nothing to show is not drawn either. A row's verbs and the keys appear on
   hover or focus, never standing; `?` lists every key.
 
@@ -33,7 +33,8 @@
   import { goto } from '$app/navigation';
   import { money as moneyText, since } from 'braindog-render';
   import { moneyInText } from '$lib/record/money.ts';
-  import { QUIET_MS, type QueueQuestion } from '@braindog/kernel';
+  import type { QueueQuestion } from '@braindog/kernel';
+  import { QUIET_MS } from '@braindog/kernel/constants';
   import { apiBase, at } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';

@@ -1,5 +1,5 @@
 /**
- * ONE PRESS ANSWERS (DIRECTION §37): which answer each of Decide's keys gives, when the suggestion is drawn, the amount
+ * ONE PRESS ANSWERS: which answer each of Decide's keys gives, when the suggestion is drawn, the amount
  * a button names when money moves, and when a note is offered after the answer instead of a reason before it.
  */
 
@@ -264,7 +264,7 @@ test('on the queue every answer, Backspace’s too, is held six seconds with Und
 
 test('the suggested answer is the accent’s tint, and not marked where the choice is hard to undo', () => {
   /* THE SKIN MARKS THE SUGGESTION IN A ROW OF ANSWERS THE RENDERER DRAWS with the accent's first tint and the accent's
-     words (DIRECTION §39), only where the choice can be taken back; the one decision card draws its choices with
+     words, only where the choice can be taken back; the one decision card draws its choices with
      `lib/decide/form.css` over the same classes, says "Suggested" in the accent's words in its list, and fills the
      suggested button of its row with the accent. the Needs you page draws no copy of its own. */
   const rules = rulesOf(skin);

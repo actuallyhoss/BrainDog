@@ -12,7 +12,7 @@
   drawn field as a typed cell and the figures, and every one of them is drawn in the record's language and zone, which
   the answer carries, so a stranger's device never decides how an amount or a day reads.
 
-  THE LOOK IS THE BOARD'S (DIRECTION 39): a flat bar with the mark, the name and what the link is; the page's name at 28
+  THE LOOK IS THE BOARD'S: a flat bar with the mark, the name and what the link is; the page's name at 28
   and one sentence at 17; the owner's blocks as flat tiles on twelve columns, and "Made with BrainDog" at the foot.
 
   NO RAIL AND NO PALETTE: the root layout draws `/s` bare. A LINK THAT DOES NOT OPEN SAYS THE PAGE IS NOT SHARED AND NOT

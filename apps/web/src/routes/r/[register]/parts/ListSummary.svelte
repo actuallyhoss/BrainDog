@@ -1,10 +1,10 @@
 <!--
-  The list's figures, above its rows: ONE TILE (DIRECTION 39), the list's number on the left with the line that says
+  The list's figures, above its rows: ONE TILE, the list's number on the left with the line that says
   what it means, and on the right where it sits, one line per state (or per largest row) with its count, its share of
   the number and a thin bar of that share. No tile holds a number without its reading.
 
   BY STATE IS HOW THE LIST DIVIDES, read from the declaration: each state that holds rows, in the list's own order, its
-  bar in the accent while it is still to do and grey once it is finished (DIRECTION 39), so the part that asks for
+  bar in the accent while it is still to do and grey once it is finished, so the part that asks for
   something reads first. THE NUMBER is the list's number column added up; on a list with no state its largest rows
   share it out instead. A list with neither has no tile.
 
@@ -15,7 +15,7 @@
 
   ".00" GOES WHERE EVERY AMOUNT IS WHOLE (`wholeMoney`), as it does down the column under the tile.
 
-  A FIGURE IS DRAWN ONLY WHEN IT SAYS SOMETHING (DIRECTION 39). The number needs three rows that hold one before it is a
+  A FIGURE IS DRAWN ONLY WHEN IT SAYS SOMETHING. The number needs three rows that hold one before it is a
   figure of the list rather than two day rates added together, and the lines need two parts before they compare
   anything; with less, the tile is the number and its line.
 
@@ -157,6 +157,9 @@
   const one = $derived(sides.length === 1 && sides[0]!.label === null ? sides[0]! : null);
   const lead = $derived(fig !== null || reading !== '');
   const shown = $derived(fig !== null || sides.some((x) => x.lines.length >= 2));
+  /* A FIGURE THAT IS NOT MONEY SAYS WHAT IT COUNTS beside the line's count: "Active 12 10" read as two counts of one
+     thing on the list of runs, where the 10 was writes. Money says itself by its symbol. */
+  const figureNamed = (f: Figured, n: number): string => (f.field.type === 'money' ? said(f, n) : `${said(f, n)} ${labelOf(f.field).toLowerCase()}`);
   /* The late line of a side, in the list's own figures: "2 late · £10,540". */
   const lateSaid = (late: { count: number; value: number }): string => words.late(late.count, fig ? said(fig, late.value) : null);
   /* A side's short name on a phone: "Out" and "In" for the two ways money goes, else the side's own name. */
@@ -174,7 +177,7 @@
       <li class="sum-line" data-stand={l.stand ?? undefined} data-tint={l.tint ? '' : undefined}>
         <span class="sum-name">{#if l.stand}<StateDot state={l.stand} />{/if}<span class="sum-label" dir="auto">{l.label}</span></span>
         <span class="sum-count num">{l.count ?? ''}</span>
-        <span class="sum-value num">{#if fig && l.value !== null}{said(fig, l.value)}{:else}{words.share(Math.round(l.share * 100))}{/if}</span>
+        <span class="sum-value num">{#if fig && l.value !== null}{figureNamed(fig, l.value)}{:else}{words.share(Math.round(l.share * 100))}{/if}</span>
         <span class="sum-bar" aria-hidden="true"
           ><span class="sum-fill" style:inline-size="{Math.max(l.share * 100, l.share > 0 ? 1.5 : 0)}%"
             >{#if l.late}<span class="sum-late" style:inline-size="{l.share > 0 ? Math.min(100, (l.late.share / l.share) * 100) : 0}%"></span>{/if}</span
@@ -292,7 +295,7 @@
     min-inline-size: 0;
   }
 
-  /* THE TILE'S FIGURE, 22 AT 600 (DIRECTION 39): read beside its heading, not shouted over it. */
+  /* THE TILE'S FIGURE, 22 AT 600: read beside its heading, not shouted over it. */
   .figure {
     margin: 0;
     color: var(--ink);

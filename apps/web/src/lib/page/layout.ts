@@ -52,6 +52,17 @@ const areaIn = (area: unknown, layout: Layout | null): Area => (layout ? named(a
 export const areaOf = (block: object, layout: Layout | null): Area => areaIn((block as { area?: unknown }).area, layout);
 
 /**
+ * A SECTION THAT DRAWS A HOST PANEL AND BOXES NOTHING IS A TILE OF ITS OWN, so it keeps the width its page gave it, as a
+ * list does: the Agents page's At work beside Left for the next run. A heading is the whole row because it heads the
+ * blocks after it; a panel's section heads nothing but its panel. Its floor is a list's (`PANEL_TILE`).
+ */
+const PANEL_TILE = 'feed';
+const panelTile = (block: { kind: string }): boolean => {
+  const b = block as { kind: string; panel?: unknown; box?: unknown };
+  return b.kind === 'section' && typeof b.panel === 'string' && b.box !== true;
+};
+
+/**
  * A declared block's slot: its declared index `i`, its span clamped to what its KIND can survive, and `area: rail` when
  * it sits in the rail.
  *
@@ -66,7 +77,7 @@ export const areaOf = (block: object, layout: Layout | null): Area => areaIn((bl
  * arrange controls begin and add with it, and the two must agree.
  */
 export function slotOf(block: { kind: string; span?: number | undefined; columns: readonly unknown[] }, i: number, layout: Layout | null): Slot {
-  const span = spanOf(block.kind, block.span, block.columns.length);
+  const span = panelTile(block) ? spanOf(PANEL_TILE, block.span) : spanOf(block.kind, block.span, block.columns.length);
   return areaOf(block, layout) === 'rail' ? { i, span, area: 'rail' } : { i, span };
 }
 
@@ -200,7 +211,7 @@ export function widened(blocks: readonly Placed[], columns: number = COLUMNS): n
 export type Pairable = Placed & { readonly kind: string; readonly columns?: number; readonly lead?: boolean; readonly declared?: boolean };
 
 /**
- * THE WIDTH OF THE WORK COLUMN FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS (DIRECTION §36, §38): a 1,512 or
+ * THE WIDTH OF THE WORK COLUMN FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS: a 1,512 or
  * 1,728 laptop drawn with every list as wide as the window is lines stretched across the screen, not the screen used.
  *
  * THE COLUMN'S OWN WIDTH, MEASURED, NOT THE WINDOW'S (`PageBody.svelte`): the rail and a docked panel each take a column
@@ -230,7 +241,7 @@ const WHOLE_ROW = new Set(['section', 'capture', 'inputs', 'cards', 'gallery', '
  * The span each block of one twelve-column flow is drawn at on a wide screen: two blocks the author left at the whole
  * row, one after the other, and each happy at half of it, become two halves side by side.
  *
- * TWO COLUMNS OF BLOCKS, NOT STARVED LINES. The page is drawn edge to edge (DIRECTION §36), so a list at the whole row
+ * TWO COLUMNS OF BLOCKS, NOT STARVED LINES. The page is drawn edge to edge, so a list at the whole row
  * of a 1,728 window is a line nobody reads to its end. Paired, each keeps a measure a person reads, and the screen is
  * used; the prose inside a block still keeps its own measure (`--measure`).
  *
@@ -266,7 +277,7 @@ export function paired(blocks: readonly Pairable[], columns: number = COLUMNS): 
 }
 
 /**
- * THE WIDTHS A TILE MAY HAVE ON THE BOARD (DIRECTION §39): a quarter, a third, a half, two thirds and the whole row.
+ * THE WIDTHS A TILE MAY HAVE ON THE BOARD: a quarter, a third, a half, two thirds and the whole row.
  * "One board": every tile lines up with the tiles above and below it, which a page of fives and sevens never did.
  */
 export const TILE_SPANS: readonly number[] = [12, 8, 6, 4, 3];
@@ -407,7 +418,7 @@ export type Measured = { readonly height: number; readonly top?: number };
 
 /**
  * WHERE THE SIDE COLUMN CLOSES: the index of the first main block that starts below the rail's last tile, or
- * `main.length` when none does. "No narrow column floating in empty space" (DIRECTION §36.22): Money's side column
+ * `main.length` when none does. "No narrow column floating in empty space": Money's side column
  * ended while its main column ran on at two thirds, so the right third of the board was bare below the first screen.
  * The blocks from here on are drawn across the whole board under both columns (`areasWithFlow`).
  *

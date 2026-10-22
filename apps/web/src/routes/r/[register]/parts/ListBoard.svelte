@@ -130,7 +130,7 @@
   {@const due = dueOf(decl, e, now)}
   {@const word = mode === 'cards' && decl.state ? saidOf(e, decl.state) : null}
   <!-- THE DETAIL, or where the list names none, the project the row is about, by name: its shape led the title once, and
-       told nobody which project without a key (DIRECTION 39). -->
+       told nobody which project without a key. -->
   {@const extra = (detail ? saidOf(e, detail) : null) || (own?.name ?? null)}
   {@const said = receiptFor(e.seq)}
   {@const value = figure ? e.fields[figure] : undefined}
@@ -377,7 +377,7 @@
     display: none;
   }
 
-  /* ── a card: a tile on the board, flat, told from the board by its fill (DIRECTION 39) ── */
+  /* ── a card: a tile on the board, flat, told from the board by its fill ── */
 
   .bcard {
     position: relative;
@@ -473,7 +473,7 @@
     color: var(--ink-2);
   }
 
-  /* A PERSON'S FACE ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39). */
+  /* A PERSON'S FACE ON ONE NEUTRAL TINT, as on every list of people. */
   .bcard-lock {
     display: inline-flex;
     margin-inline-end: var(--sp-2);
@@ -536,7 +536,7 @@
 
   /* THE KEYBOARD'S CARD AND A SELECTED ONE: a ring round the tile, since a wash over it is no mark at all. The caret's is
      the quiet boundary ink, as the table's caret row is only a wash at rest; a selected card's is the accent, which is
-     what selection looks like (DIRECTION 39), with its tick, and it wins when a card is both. */
+     what selection looks like, with its tick, and it wins when a card is both. */
   .bcard[data-cursor] {
     box-shadow: 0 0 0 1.5px var(--rule-strong);
   }

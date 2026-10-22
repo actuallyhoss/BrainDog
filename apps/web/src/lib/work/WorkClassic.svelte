@@ -3,7 +3,7 @@
 
   KEPT AT `/?work&classic` UNTIL THE PAGE DOES ALL IT DID, as Today kept `Today.svelte` at `/?classic`, and drawn in
   its place on a record that holds tasks and no Work page. Delete it, and what only it reads in `board.ts` and
-  `work-tiles.ts`, once the page has parity. What DIRECTION §35 cut from Work is cut here too: the tier chart, the
+  `work-tiles.ts`, once the page has parity. What was cut from Work is cut here too: the tier chart, the
   printed keys (they are in the ? sheet), the counts on whose work it is, and the "reads as" line under the capture box.
 
   THE OWNER'S OLD TOOL HAD ONE, AND 85% OF HIS WRITES LANDED ON IT. This screen is the old one's shape over the
@@ -22,8 +22,8 @@
        the project, the day, the tier and who does it, saved in one write. The list narrows for it and keeps its keys.
     7. THE ROW CARRIES THE VERBS: tick, edit, set the day, move it, delete it, on hover and focus, and in a menu a tap
        opens on a phone. Every write is drawn at once and sent after (`lib/data/optimistic.ts`), with Undo.
-    8. THE KEYBOARD: j k, x, e, d, m, Delete, Enter, n or c, /, Esc, listed in the ? sheet and printed nowhere standing
-       (DIRECTION §35): a row's keys show on the row under the cursor or the pointer, a band's note on hover of its
+    8. THE KEYBOARD: j k, x, e, d, m, Delete, Enter, n or c, /, Esc, listed in the ? sheet and printed nowhere standing:
+       a row's keys show on the row under the cursor or the pointer, a band's note on hover of its
        heading, and a count only on a band that is folded shut.
     9. IT LISTENS. The read is asked again when the record's version moves, rows that arrive are tinted, and nothing is
        redrawn from under the caret, the cursor or the scroll.
@@ -1717,7 +1717,7 @@
     color: var(--ink-3);
   }
 
-  /* THE PANEL'S KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `x`, Esc and Enter show on their pill under the
+  /* THE PANEL'S KEYS ARE PRINTED WHEN ASKED FOR: `x`, Esc and Enter show on their pill under the
      pointer or with keyboard focus, never as standing chrome. Without its cap a pill takes its even padding back. */
   .p-done {
     display: contents;

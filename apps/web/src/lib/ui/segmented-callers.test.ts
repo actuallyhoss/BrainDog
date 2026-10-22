@@ -1,6 +1,6 @@
 /**
  * THE FORM, THE ASK SHEET, THE SHARE MENU AND THE NEW ACTION SHEET DRAW THEIR SEGMENTED CONTROL THROUGH THE ONE PART
- * (`Segmented.svelte`), so each of them slides (DIRECTION 39).
+ * (`Segmented.svelte`), so each of them slides.
  *
  * WHAT WAS MEASURED. The part draws the track and moves the selection under the chosen segment; a track written by hand
  * (`<div class="segmented">`) has no `data-slides`, and `controls.css` leaves it the fill that fades out in one place

@@ -1,6 +1,6 @@
 /**
- * Outside text, as Settings > Agents says it (ENG-A13, "Untrusted text ... drops the run to Ask" D37.116, "for the
- * rest of it" D37.121): the line under an agent whose run read something from outside the record, and each import with
+ * Outside text, as Settings > Agents says it (ENG-A13: untrusted text drops the run to Ask for the
+ * rest of it): the line under an agent whose run read something from outside the record, and each import with
  * the owner's own answer to whether all of it is his.
  *
  * PURE, SO `node --test` CAN IMPORT IT. `TrustRows.svelte` and `ImportAsk.svelte` only draw what these answer, as
@@ -64,7 +64,7 @@ export function importLists(row: ImportRow): string {
 export function importLine(row: ImportRow, now: number): string {
   if (row.adopted === true) return words.yours;
   if (row.adopted === false) return words.treated;
-  /* "Entries", never "rows": the house's words never say a record's own (DIRECTION's plain-words rule). */
+  /* "Entries", never "rows": the house's words never say a record's own (the plain-words rule). */
   return `You brought in ${count(row.rows, 'entry', 'entries')} into ${count(row.lists.length, 'list', 'lists')} on ${dayOf(row.at, now)}. Is all of it your own?`;
 }
 

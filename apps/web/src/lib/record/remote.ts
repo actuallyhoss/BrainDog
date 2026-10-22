@@ -154,7 +154,7 @@ export function withoutUnread(entry: Entry, unread: readonly string[]): Entry {
  *
  * AND THE NAMES ARE KEPT FOR THE TAB, in `held.ts`'s `TITLES`, because three readers of a ref by name have no map to be
  * handed: `where.ts` compiling `thing is Harbour Lane`, `declares` below, and the new-row form's picker. All three
- * read the sample's `ROWS`, so on a record they refused its own projects and offered the sample's (`no-sample-b3.test.ts`).
+ * read the sample's `ROWS`, so on a record they refused its own projects and offered the sample's (`no-sample-held.test.ts`).
  * The list is replaced whole, because every caller walks it to the end of its cursor; the one exception,
  * `decide/[id]/proposed.ts`, keeps what it had when a page is refused, and a name missing from a list cut short is a
  * ref drawn by its number until the next walk, never the sample's name.

@@ -1,5 +1,5 @@
 <!--
-  The top bar of 19 October (his call 1, 20 October; 2.A.21): the shell's navigation from 900px up, unless somebody
+  The top bar of 19 October (chosen 20 October; 2.A.21): the shell's navigation from 900px up, unless somebody
   picked the side rail in Settings > Navigation.
 
   ONE FLAT STRIP, 56 TALL, ON THE NAV'S OWN SURFACE (white with one hairline under it in light, the nav's indigo in dark).
@@ -9,8 +9,10 @@
   bar's five). A "⋯" after them, named More, opens the same sheet. At the right, "Ask or change anything" with its "/"
   key at rest, the one way to ask; then who is working with a live dot; then the person's face, named Account.
 
-  THE PLACE YOU ARE ON IS THE NAV'S SELECTED FILL inside the bar, in ink at 600, no accent. The only red is the count of
-  what needs you, the one `Count`.
+  THE PLACE YOU ARE ON IS AN INK BLOCK, the Bento boards' current tab: the ink as its fill and the tile's colour as its
+  words, so where you are reads at a glance from across the room. A PLACE SAYS ITS COUNT beside its name, quiet, where
+  the shell holds one: what needs you in the one red `Count`, and how many agents are at work on Agents, the same
+  number the working chip says.
 
   THE LIVE DOT HOLDS STILL (frame F22): a pulse that never stops means nothing, so it pulses once when the working count
   changes, and not at all under reduced motion.
@@ -66,9 +68,10 @@
     product: 'BrainDog',
     you: 'You',
     account: 'Account',
+    /* "AT WORK", THE AGENTS PAGE'S OWN WORDS, so the pill and that page's line read as one number ("12 at work"). */
     working: (w: readonly Working[]) => {
       const name = w.length === 1 ? MAKERS[w[0]!.kind] : undefined;
-      return name ? `${name} is working` : `${w.length} working`;
+      return name ? `${name} is at work` : `${w.length} at work`;
     },
     open: 'Open Agents',
   } as const;
@@ -90,6 +93,12 @@
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
   /* THE ASK FIELD STANDS DOWN ON THE SEARCH PAGE, which draws the field itself (money F12). */
   const searching = $derived(inside(page.url.pathname) === '/search');
+  /** A place's quiet count: its own, or on Agents how many are at work. Nothing for none. */
+  const countOf = (item: FlatItem): number | null => {
+    const n = item.count ?? (item.href === agents ? working.length : 0);
+    return n > 0 ? n : null;
+  };
+
   /** The makers of the agents at work, each once, three at most. */
   const crew = $derived([...new Set(working.map((w) => w.kind))].slice(0, 3));
 
@@ -119,7 +128,7 @@
     {#each entries as item (item.key)}
       <a class="bar-item tap" href={at(item.href)} aria-current={isHere(item, path) ? 'page' : undefined} title={item.label}>
         <Icon name={item.icon as IconName} size="m" /><span class="bar-name">{item.label}</span>
-        {#if item.count && item.key === 'decide'}<Count n={item.count} label={`${item.count} ${copy.openQuestions}`} />{/if}
+        {#if item.count && item.key === 'decide'}<Count n={item.count} label={`${item.count} ${copy.openQuestions}`} />{:else if countOf(item)}<span class="bar-count num">{countOf(item)}</span>{/if}
       </a>
     {/each}
     <button type="button" class="bar-item bar-more tap" aria-label={copy.more} title={copy.more} onclick={() => onmore?.()}>
@@ -241,11 +250,22 @@
       color var(--d-state) var(--ease-out);
   }
 
-  /* HERE IS THE NAV'S SELECTED FILL, ink, and the weight a step up. */
+  /* HERE IS AN INK BLOCK: the ink as the fill, the tile's colour as the words. */
   .bar-item[aria-current='page'] {
-    background: var(--nav-selected);
-    color: var(--ink);
-    font-weight: var(--fw-semi);
+    background: var(--ink);
+    color: var(--tile);
+  }
+
+  /* THE COUNT BESIDE A NAME, in the name's size at regular weight, a step quieter; on the ink block the tile's colour,
+     dimmed. */
+  .bar-count {
+    color: var(--ink-3);
+    font-weight: var(--fw-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bar-item[aria-current='page'] .bar-count {
+    color: color-mix(in oklab, var(--tile) 72%, transparent);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -436,6 +456,7 @@
   /* NARROWER THAN 1,100 the places are their glyphs, named on hover and to a screen reader, and the record's name goes. */
   @media (width < 1100px) {
     .bar-name,
+    .bar-count,
     .bar-record {
       position: absolute;
       inline-size: 1px;

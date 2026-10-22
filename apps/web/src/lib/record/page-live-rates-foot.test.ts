@@ -254,7 +254,7 @@ test('the reader looks for a rates action when rates are out of date, and only t
 const HOLDINGS = { id: 'holdings', name: 'Holdings', one: 'holding', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'balance', type: 'money' }] };
 
 /** A bar or split over a list of holdings, as the record answers one: its entries, and the home currency and rates beside them. */
-const held = (kind: 'bar' | 'split', asOf: string | null, money: [string, number, string][] = [['Till', 250_000, 'GBP'], ['Quartz', 100_000, 'USD']]) => {
+const held = (kind: 'bar' | 'split', asOf: string | null, money: [string, number, string][] = [['Till', 250_000, 'GBP'], ['Harbour', 100_000, 'USD']]) => {
   REGISTERS.holdings = HOLDINGS as never;
   return {
     kind,

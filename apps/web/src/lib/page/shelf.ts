@@ -1,5 +1,5 @@
 /**
- * THE SHELF (DIRECTION §45): drawn components a person kept, each a name and a block's declaration as the page's own
+ * THE SHELF: drawn components a person kept, each a name and a block's declaration as the page's own
  * source would hold it, placed onto any page from the add menu.
  *
  * A SHELF ITEM IS HOW A BLOCK IS BUILT AND NEVER DATA. It names a list and says how to draw it (kind, columns, filter,

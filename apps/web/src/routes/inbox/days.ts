@@ -84,7 +84,7 @@ export function sentenceOf(tally: Tally | null, oldest: string | null, now: numb
  * `null` from a host with no weekly count.
  *
  * AND `null` WHEN IT HAS NOTHING TO SAY: no rule filed anything this week and nothing waits, so the tile would be a 0
- * over an empty bar beside an inbox that already says it is clear (DIRECTION §35, an unused part is not drawn).
+ * over an empty bar beside an inbox that already says it is clear (an unused part is not drawn).
  */
 export function whoFiledOf(tally: Tally | null): { figure: number; parts: { label: string; value: number; tone: string }[]; reading: string } | null {
   if (!tally || tally.ruled === null) return null;

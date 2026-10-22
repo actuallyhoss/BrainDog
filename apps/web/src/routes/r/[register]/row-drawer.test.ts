@@ -4,7 +4,7 @@
  * none; the panel changes a row in one write, says so with an Undo, and the list reads its rows again so the changed
  * day shows at once.
  *
- * READ FROM THE SOURCE, as `offer-compact-60.test.ts` reads this screen: what the host does with an address, a walk and
+ * READ FROM THE SOURCE, as `offer-compact.test.ts` reads this screen: what the host does with an address, a walk and
  * something typed is held by its own test (`lib/page/row-host-list.test.ts`), and here only that this screen makes one,
  * hands it the list as drawn, and sends its keys and its menu to it.
  */

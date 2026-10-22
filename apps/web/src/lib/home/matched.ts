@@ -108,7 +108,7 @@ export function matchedShown(rows: readonly MatchedRow[]): { shown: MatchedRow[]
 }
 
 /**
- * THE ONE LINE ON THE BOARD (DIRECTION §39): "One person matched for you", "3 people matched for you", and `null`
+ * THE ONE LINE ON THE BOARD: "One person matched for you", "3 people matched for you", and `null`
  * for none, which draws nothing.
  *
  * EACH MATCH IS ONE PERSON, however many were matched into them. "THIS WEEK" IS SAID ONLY WHEN IT IS TRUE OF ALL OF

@@ -9,7 +9,7 @@
   A BUTTON NAMED BY WHAT IT DOES, "Add an item", since a bare "+" says nothing to a screen reader.
   The page owns whether the sheet is open, so this only asks for it.
 
-  IT IS THE PHONE'S ONE PRIMARY: the accent's square with the plus in the tile's colour (DIRECTION 39).
+  IT IS THE PHONE'S ONE PRIMARY: the accent's square with the plus in the tile's colour.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';

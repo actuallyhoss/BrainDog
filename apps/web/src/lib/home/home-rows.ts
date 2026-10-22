@@ -1,5 +1,5 @@
 /**
- * TODAY'S TWO LISTS OF THINGS THAT FALL DUE, as Home draws them (DIRECTION §39, "Today reads as one story").
+ * TODAY'S TWO LISTS OF THINGS THAT FALL DUE, as Home draws them ("Today reads as one story").
  *
  * LATE IS ONE LIST. The late tasks and the money that fell due are two reads, because a task is ticked where it is shown
  * and a bill is not, and they were drawn in two shapes under one name: a checklist over a three-column ledger in smaller

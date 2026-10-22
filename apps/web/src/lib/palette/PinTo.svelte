@@ -1,5 +1,5 @@
 <!--
-  Pin, under Slash's answer in the palette, and its sheet, "Pin to" (PGS-B12, "answers you can pin", D37.34).
+  Pin, under Slash's answer in the palette, and its sheet, "Pin to" (PGS-B12, "answers you can pin").
 
   COPIED FROM `BindBlock.svelte` AND SMALLER. A pinned answer has already said its list and its filter, so the sheet asks
   one thing, the page, and one press on a page is the pin: there is no kind to choose (an answer over a list is a table,

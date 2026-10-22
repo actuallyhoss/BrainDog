@@ -114,7 +114,7 @@ test('WHAT WAS SEEN IS KEPT PER PAGE, the newest rows only, and a store that ref
   assert.deepEqual(seenOn('work', null, now), { page: now, rows: {} });
 });
 
-/* ── the line at the foot of the board (DIRECTION §39) ────────────────────── */
+/* ── the line at the foot of the board ────────────────────── */
 
 const line = (by: Byline['by'], name: string, h: number): Byline => ({
   by,

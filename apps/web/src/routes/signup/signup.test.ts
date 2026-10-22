@@ -250,7 +250,7 @@ test('THE INVITATION PAGE IS ONE PLAIN LINE, with no dash and no code to type', 
   }
 });
 
-/* ── use case 6, steps 1 to 4 (his word of 9 October) ───────────────── */
+/* ── use case 6, steps 1 to 4 (set 9 October) ───────────────────────── */
 
 const PAGE = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";

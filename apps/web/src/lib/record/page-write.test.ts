@@ -14,7 +14,7 @@ import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { REGISTERS } from './fixtures/sample.ts';
 import type { Fetch as ClientFetch } from './pages-live.ts';
-import { arrangedBody, keepInPlace, movePatch, rowKey, saveArrangement, saveLayout, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
+import { arrangedBody, declaredBlock, keepInPlace, movePatch, rowKey, saveArrangement, saveLayout, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -440,4 +440,9 @@ test('A RECORD OLDER THAN A LOOK’S WIDTHS IS WRITTEN THE OLD WAY, once, and sa
   const other = gardenHost(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner sets a look.' } }));
   assert.deepEqual(await saveLayout(BASE, 'garden', null, LAID, { drawn: 3, placed: [] }, other.io), { from: 'refused', fix: 'Only an owner sets a look.' });
   assert.equal(other.sets.length, 1);
+});
+
+test('a drawn block added while arranging is declared with its code and the height it starts at', () => {
+  const block = declaredBlock({ kind: 'drawn', heading: 'Strip', source: 'register.bills', columns: [{ field: 'what', width: '1fr' }], code: '<p>x</p>', height: 320 });
+  assert.deepEqual(block, { kind: 'drawn', heading: 'Strip', source: 'register.bills', columns: [{ field: 'what' }], code: '<p>x</p>', height: 320 });
 });

@@ -7,7 +7,7 @@
   rather than promising every device everywhere. A record too old to keep them leaves them on the device, a change the
   record has not received yet waits on this one, and the hint says which.
 
-  ONE SECTION, FOUR CHOICES AND THE THING THEY CHANGE (DIRECTION §35: calm, few controls per screen). The scheme, the
+  ONE SECTION, FOUR CHOICES AND THE THING THEY CHANGE (calm, few controls per screen). The scheme, the
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
   person changing how the product reads scrolled past a screen of chrome to find the next choice. They are one column of
   short choices now, beside a preview that is the app itself in small: drawn from the same tokens every screen reads, so
@@ -811,7 +811,7 @@
     font-weight: 500;
   }
 
-  /* THE BOARD WITH ONE TILE ON IT (DIRECTION §39): flat, opaque, no border and no shadow. Every colour here is a role the
+  /* THE BOARD WITH ONE TILE ON IT: flat, opaque, no border and no shadow. Every colour here is a role the
      look solves, so the scheme's tokens set on this element (`styleOf`) repaint all of it, words included. */
   .pv {
     display: flex;

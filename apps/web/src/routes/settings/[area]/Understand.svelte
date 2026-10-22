@@ -1,5 +1,5 @@
 <!--
-  Settings › People, "Read what you already have" (DIRECTION §38, understanding is the engine's first job): the record's
+  Settings › People, "Read what you already have" (understanding is the engine's first job): the record's
   walk over what it already holds, asked for now rather than tonight. One plain line and Look first; the look says, in
   names, what it would link and what it would ask on Decide, and only then Do it. What Do it did has an Undo beside it.
 

@@ -74,12 +74,16 @@ export const shareSheet = {
   shareSeenMoney: 'money',
   shareSeenWhat: 'what is shared',
   shareSeenFigures: (who: string, things: string, figures: string): string => `${who} will see ${things}: ${figures}.`,
+  /* A FIGURE THAT READS NOTHING, "nothing still to come in", so a project with no bills still says what is owed. */
+  shareSeenNothing: (label: string): string => `nothing ${label}`,
   shareSeenAmounts: (who: string, things: string): string => `${who} will see ${things}, amounts included.`,
-  shareSeenHidden: (who: string, things: string): string => `${who} will see ${things}, with money figures hidden. Amounts written in notes still show.`,
-  shareSeenHiddenOutside: (who: string, things: string): string => `${who} will see ${things}, with money figures hidden, since they're not on your team. Amounts written in notes still show.`,
+  /* AMOUNTS WRITTEN IN NOTES ARE HIDDEN TOO: the record takes every amount out of the text they read (`sight.maskMoney`). */
+  shareSeenHidden: (who: string, things: string): string => `${who} will see ${things}, with amounts hidden, in notes too.`,
+  shareSeenHiddenOutside: (who: string, things: string): string => `${who} will see ${things}, with amounts hidden, in notes too, since they're not on your team.`,
   shareCounting: 'Counting what they would see',
   shareCopyLine: 'They can copy what they can see.',
   shareSeeAs: (name: string): string => `See as ${name}`,
+  shareNeedsPlus: 'Sharing comes with Plus',
   shareSend: 'Share',
   shareSending: 'Sharing',
 
@@ -92,6 +96,20 @@ export const shareSheet = {
   shareLinkCopy: 'Copy the link',
   shareLinkCopied: 'Link copied',
   shareLinkMissed: (email: string): string => `Shared. The link for ${email} wasn't made, so make one in Settings.`,
+
+  /* SHARING ON (the manage rung): somebody who manages part of the record passes it on, inside their own share. */
+  shareOnward: 'Share on',
+  shareOnwardTitle: (subject: string): string => `Share on ${subject}`,
+  shareOnwardLabel: (sentence: string): string => `Share on: ${sentence}`,
+  shareOnwardFrom: 'From',
+  shareOnwardAll: (subject: string): string => `All of ${subject}`,
+  shareOnwardYours: 'what you manage',
+  shareOnwardPlain: (who: string, can: string, subject: string): string => `${who} can ${can} ${subject}.`,
+  shareOnwardVerbs: { view: 'view', comment: 'comment on', edit: 'edit' } as Record<string, string>,
+  shareOnwardEnds: 'Ends when yours does.',
+  shareOnwardRungs: 'View, comment or edit. Only an owner or an Admin gives Manage.',
+  shareOnwardNobody: 'Nobody else is on this record yet. Ask the owner to add them.',
+  shareOnwardPick: 'Pick somebody here',
 
   seeAsBanner: (name: string): string => `Seeing as ${name}. Nothing you do here counts.`,
   seeAsExit: 'Exit',

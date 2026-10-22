@@ -15,11 +15,12 @@
  */
 
 import { batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
-import { railRoom } from '@braindog/kernel';
+import { railRoom } from '@braindog/kernel/constants';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
-   own manifest said it. */
-import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
+   own manifest said it, then each module's document (`firstPartyModule`), which put every document on the first open.
+   The seed's light door says the same lists and names, held to the documents by its own test. */
+import { listsOfModule, moduleNamed } from '@braindog/seed/packs/lists';
 import { asPartOf, useCaseName } from '@braindog/seed/usecases/names';
 
 import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
@@ -634,7 +635,7 @@ function packText(e: EventLine): string | null {
      "Added the Team use case" for Team board. */
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
   if (usecase) return copy.useCaseEvent(verb, useCaseName(usecase));
-  const names = (moduleOf(id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  const names = (listsOfModule(id) ?? []).map((r) => REGISTERS[r]?.name ?? r);
   if (names.length === 0) return `${verb} the ${id} add-on`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
@@ -642,7 +643,7 @@ function packText(e: EventLine): string | null {
 
 const nameOfPack = (id: string): string => {
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
-  return usecase ? useCaseName(usecase) : (moduleOf(id)?.name ?? id);
+  return usecase ? useCaseName(usecase) : (moduleNamed(id) ?? id);
 };
 
 /** A use case's `speaks` setting saved, alone, as `{ id, from, to }`; `null` for any other line. */

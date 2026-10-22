@@ -42,7 +42,8 @@
 
   import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy/frame.ts';
-  import { leaving, settled } from '$lib/ui/screen.svelte.ts';
+  import { callsOut, leaving, quiet, settled } from '$lib/ui/screen.svelte.ts';
+  import { onCallsOut } from '@braindog/client';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
   import TopBar from '$lib/ui/TopBar.svelte';
@@ -67,7 +68,7 @@
   import { palette } from '$lib/palette/open.svelte.ts';
   import { moreSheet } from '$lib/shell/more.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
-  import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -109,7 +110,7 @@
     void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default));
   });
 
-  /* THE SIDE RAIL, AND ONLY FOR SOMEBODY WHO CHOSE IT. The top bar is the shell again (his call 1, 20 October) and the
+  /* THE SIDE RAIL, AND ONLY FOR SOMEBODY WHO CHOSE IT. The top bar is the shell again (chosen 20 October) and the
      rail is one choice away in Settings, so its script and its styles would ride in the entry every visit loads, for
      the few who pick it, and the entry has a budget (`tools/gates/budgets.json`). Asked for once the shape says `rail`.
 
@@ -126,13 +127,13 @@
      `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
-     screen claiming you are already in. `/connect`, an app's consent screen, comes before any work
-     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. AND EVERY SCREEN UNDER
+     screen claiming you are already in. `/connect`, an app's consent screen, and `/connect/approve`, the six digits a
+     terminal prints, come before any work in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. AND EVERY SCREEN UNDER
      `/signin/`: the desktop app's return drew inside the shell, the top bar's counts over a "Signing in" (first F12). */
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
-    return at === '/start' || at === '/signin' || at.startsWith('/signin/') || at === '/signup' || at === '/invite' || at === '/connect' || at === '/s' || at.startsWith('/s/');
+    return at === '/start' || at === '/signin' || at.startsWith('/signin/') || at === '/signup' || at === '/invite' || at === '/connect' || at === '/connect/approve' || at === '/s' || at.startsWith('/s/');
   });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
@@ -302,7 +303,7 @@
    * sections a day runs through, Activity, Decide while something waits, seven at most, and everything else under More.
    */
   /* AND WORK OPENS THE WORK SCREEN ON A RECORD WHOSE TASKS LIST HOLDS SOMETHING (`lib/work/Work.svelte`). A list with
-     nothing in it is a part the record does not use yet, so it is not drawn (DIRECTION §35): Work with no tasks drew a
+     nothing in it is a part the record does not use yet, so it is not drawn: Work with no tasks drew a
      row of zeros and empty bands. `index.registers` carries each list's count, which `data.lists` does not; the first
      task brings Work back, and until then the palette and Today's capture line both add one. */
   const holdsTasks = $derived(data.index.registers.some((r) => r.id === TASKS && r.count > 0));
@@ -310,14 +311,21 @@
     flatNav(grouped, open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
   );
   /**
-   * THE RAIL'S SECTIONS (DIRECTION §39, `railOf`): the seven places, each section's own things under its name, and the
+   * THE RAIL'S SECTIONS (`railOf`): the seven places, each section's own things under its name, and the
    * rest under More. One reading for the rail, the tab bar and the More sheet, so a place is in the same spot on each.
    */
   const rail = $derived(railOf(flat, said('decide')));
-  const tabs = $derived(tabsOf(rail.places, 5, navPrefs.tabs));
+  /* A BAR HAS NO ROW FOR KILN, SO ON KILN'S PAGE ITS SECTION IS WHERE YOU ARE: the rail marks Kiln under Projects
+     (`railOf`), and the top bar and the tab bar, which draw no Kiln, mark Projects in its ink block. */
+  const withThings = (items: FlatItem[]): FlatItem[] =>
+    items.map((i) => {
+      const own = rail.things.find(([section]) => section === i.label)?.[1] ?? [];
+      return own.length > 0 ? { ...i, near: [...i.near, ...own.map((e) => e.href)] } : i;
+    });
+  const tabs = $derived(withThings(tabsOf(rail.places, 5, navPrefs.tabs)));
   /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
      phone. Agents may sit past the rail's seven, so the places under More are read too. */
-  const barPlaces = $derived(tabsOf([...rail.places, ...rail.more]));
+  const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.more])));
   /* WHAT THE MORE SHEET HOLDS IS WHAT THE BAR ON SCREEN DOES NOT (frame F7): the tab bar's five below 900px, the top
      bar's five above it, nothing at all beside a rail, which draws every place itself. */
   let narrow = $state(false);
@@ -653,7 +661,7 @@
   });
 
   /**
-   * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (DIRECTION 38: the shell holds still, what fills it recomposes).
+   * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (the shell holds still, what fills it recomposes).
    *
    * Where the browser has the View Transitions API, a navigation to another screen is wrapped in one: the browser
    * takes a picture of the work as it was, Kit draws the new screen, the screen is given 250ms to draw, and the old
@@ -702,7 +710,7 @@
   });
 
   /**
-   * THE WORK SLIDES WITH THE RAIL (DIRECTION 38's fluid shell).
+   * THE WORK SLIDES WITH THE RAIL (a fluid shell).
    *
    * The rail card takes its new width in one frame and its glass is scaled from the old width to the new one
    * (`Sidebar.svelte`), so without this the work jumped 156 pixels sideways at the start of a movement the rail then
@@ -849,6 +857,13 @@
       removeEventListener('online', again);
       clearInterval(timer);
     };
+  });
+
+  /* THE QUIET MARK (`screen.svelte.ts`): `data-quiet` on the document while no call is out and none is promised. It is a
+     second answer beside `data-screen`, for what looks at a page at rest; nothing in the app waits on it. */
+  $effect(() => onCallsOut(callsOut));
+  $effect(() => {
+    document.documentElement.toggleAttribute('data-quiet', quiet());
   });
 
   /* THE FIRST SCREEN SETTLED IS THE FIRST SCREEN DRAWN (`first-drawn.ts`), for a screen that says so no sooner itself. */
@@ -1451,7 +1466,7 @@
   }
 
   /**
-   * ONE BOARD, AND ON IT THE RAIL AND THE WORK (DIRECTION §39).
+   * ONE BOARD, AND ON IT THE RAIL AND THE WORK.
    *
    * The page IS the board (painted on `body` in the skin's `base.css`). The rail is the board's left column, flat and
    * the board's own colour, and the work sits straight on the board, the skin's fluid `--gutter` from the rail and from
@@ -1538,7 +1553,7 @@
     padding-inline: var(--sp-3) var(--sp-4);
     background: none;
     border: 0;
-    /* A rectangle, as every button is (DIRECTION §39). */
+    /* A rectangle, as every button is. */
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
@@ -1547,7 +1562,7 @@
     cursor: pointer;
   }
 
-  /* THE SURFACE ON A PSEUDO-ELEMENT: an opaque tile with one hairline, no glass (DIRECTION §39), and a step of ink
+  /* THE SURFACE ON A PSEUDO-ELEMENT: an opaque tile with one hairline, no glass, and a step of ink
      under a pointer. */
   .menu-open::before,
   .launcher::before {
@@ -1703,7 +1718,7 @@
   }
 
   /**
-   * THE DOCKED PANEL'S OWN COLUMN, FROM 1,280 UP (DIRECTION 37: a docked right panel; `DOCKS` in `panel.ts`).
+   * THE DOCKED PANEL'S OWN COLUMN, FROM 1,280 UP (a docked right panel; `DOCKS` in `panel.ts`).
    *
    * `Panel.svelte` is a fixed card at the window's end edge, and it writes `--dock-w` on the root while it is open
    * docked: its width and the inset either side, `0px` otherwise. `--dock-col` is the same width for this column, so

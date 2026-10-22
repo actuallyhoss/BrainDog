@@ -1,5 +1,5 @@
 <!--
-  "Test the model now", under Slash's health line (ENG-A08, "health shown" D40.45). Loaded by `import()` from
+  "Test the model now", under Slash's health line (ENG-A08, health shown). Loaded by `import()` from
   `SlashAsks.svelte` for the owner only, so nothing here reaches what every screen loads.
 
   ONE BUTTON, THEN WHAT IT SAID. A press asks `engineProbe` once; the lines are `probeSaid`'s, one a candidate, or the

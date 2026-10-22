@@ -8,7 +8,7 @@
  * through it, but the helpers those screens draw with lived in the same module as the mock, so the mock shipped with
  * them and six screens still called it: the Add a block previews, `/s/<token>`, `/jobs/<id>`, the aim on `/decide`, the
  * pen in Settings and the shell's own type. The readers are in
- * `fixtures/readers.ts` now, which only a test may import, and `no-sample-b2.test.ts` holds both halves of that.
+ * `fixtures/readers.ts` now, which only a test may import, and `no-sample-render-helpers.test.ts` holds both halves of that.
  *
  * AND NOTHING HERE READS THE SAMPLE NOW. Until the sample left the app `ROWS` was the fallback of `display`, `identityOf` and
  * `spokenRow` when a caller handed no `names`, and all of `currencyFor`, `homeCurrency` and `hueOf`, and the
@@ -16,11 +16,13 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { addDays, agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
+import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
-import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
-import { PEOPLE, QUIET_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
+/* THE LISTS A MODULE BRINGS, BY NAME AND WITHOUT ITS DOCUMENT (`@braindog/seed/packs/lists`): this file is on the first open. */
+import { listsOfModule } from '@braindog/seed/packs/lists';
+import type { Bars, MeasureSeries, Part, QueueQuestion, Rate } from '@braindog/kernel';
+import { PEOPLE, QUIET_MS } from '@braindog/kernel/constants';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
@@ -201,7 +203,7 @@ export function readableFields(register: string): FieldDecl[] {
  */
 export function unnamed(register: string, seq: number | string, label?: string): string {
   const said = REGISTERS[register]?.one ?? label;
-  /* A NUMBER IS A ROW SOMEBODY CAN OPEN, AND ANYTHING ELSE IS AN ID, WHICH IS NEVER SAID (DIRECTION §37). A ref is
+  /* A NUMBER IS A ROW SOMEBODY CAN OPEN, AND ANYTHING ELSE IS AN ID, WHICH IS NEVER SAID. A ref is
      stored as its target row's ULID, so a ref this screen could not walk to reached here as one, and the founder's
      Today drew "Book #01M3VMPSHV07AM4S51WDTFM5XG" for each part of the cash by book. It is the kind alone, named as a
      row nobody named. A list this build does not declare is said by its id made singular, `courses` as a course. */
@@ -252,7 +254,7 @@ function undeclared(value: unknown): string | null {
   const c = currencyOf(value);
   const a = c === null ? null : amountOf(value);
   if (c !== null && a !== null) return money(a, c);
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value)) return fmtDay(value);
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value)) return dateSaid(value);
   /* AN ID IS NOT WORDS: a ULID in a field no declaration types is a ref this build cannot name, and is not drawn. */
   if (typeof value === 'string' && ROW_ID.test(value)) return null;
   if (typeof value === 'object') return null;
@@ -269,7 +271,7 @@ function undeclared(value: unknown): string | null {
  */
 function answered(type: string, value: unknown, now: number, names?: Names): string | null {
   if (type === 'instant' && typeof value === 'string') return since(value, now);
-  if (type === 'day' && typeof value === 'string') return fmtDay(value);
+  if (type === 'day' && typeof value === 'string') return dateSaid(value, now);
   if (type === 'int' && typeof value === 'number') return integer(value);
   if (type === 'run' && typeof value === 'string') return names?.get(value) || actor(value).name;
   return undeclared(value);
@@ -385,7 +387,7 @@ export function display(
       return c === null ? integer(a) : money(a, c);
     }
     case 'day':
-      return `${fmtDay(String(value))}`;
+      return dateSaid(String(value), now);
     case 'instant':
       /**
        * `since`, NOT A DAY WITH THE TIME CUT OFF.
@@ -637,7 +639,7 @@ export function columnsFor(register: string, declared?: RegisterDecl, number = f
    */
   for (const f of r.fields) if (f.qualifies !== undefined && wanted.has(f.qualifies)) wanted.add(f.id);
   /**
-   * AND THE THING THE ROW BELONGS TO, AS A COLUMN OF ITS OWN (DIRECTION 39). It was a shape in front of every title, a
+   * AND THE THING THE ROW BELONGS TO, AS A COLUMN OF ITS OWN. It was a shape in front of every title, a
    * diamond, a triangle or a dot, which said "some project" to nobody who had not learnt the shapes. Its column says
    * the project's name beside a small dot of its colour, where it can be read, sorted and hidden like any other. The
    * field is the one `identityFor` walks to: the first link to a list that declares an identity.
@@ -1768,7 +1770,7 @@ export function setupSaid(target: string | null, rows: number): string {
   const id = (target ?? '').replace(/^pack:/u, '');
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
   if (usecase) return copy.setUpWith(useCaseName(usecase), rows);
-  const names = (moduleOf(id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  const names = (listsOfModule(id) ?? []).map((r) => REGISTERS[r]?.name ?? r);
   return names.length > 0 ? copy.setUpWith(names.join(', '), rows) : copy.setUpRows(rows);
 }
 

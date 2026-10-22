@@ -1,7 +1,7 @@
 <!--
-  Sign-up, for a stranger: say who you are, watch the BrainDog build, then keep it with one email (DIRECTION §37).
+  Sign-up, for a stranger: say who you are, watch the BrainDog build, then keep it with one email.
 
-  USE CASE 6, STEPS 1 TO 4 (his word of 9 October, `loop/progress/planner-45.md`, "The onboarding target").
+  USE CASE 6, STEPS 1 TO 4 (set 9 October, `loop/progress/planner-45.md`, "The onboarding target").
 
   1. DESCRIBE. "Who are you?", one field with one example in it, and three promises under it. As it is typed, the
      rules read it on this device, a beat after each key (`proposeFirst` with no model, `lib/start/propose.ts`), and

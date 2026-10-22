@@ -14,7 +14,8 @@
  */
 
 import { createClient, type Cursor, type EventLine } from '@braindog/client';
-import { isEventKind, type FxRead, type Part } from '@braindog/kernel';
+import type { FxRead, Part } from '@braindog/kernel';
+import { isEventKind } from '@braindog/kernel/constants';
 import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';

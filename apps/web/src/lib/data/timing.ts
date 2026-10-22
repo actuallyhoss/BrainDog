@@ -2,7 +2,7 @@
  * How long a screen took from open to its first paint, from the local copy, from memory or from the network, logged to
  * the console when `localStorage['braindog.timing']` is `1`, and silent otherwise.
  *
- * FOR MEASURING THE LOCAL COPY'S TARGETS LATER WITHOUT A CODE CHANGE (DIRECTION 5): under 1 s from the network, under
+ * FOR MEASURING THE LOCAL COPY'S TARGETS LATER WITHOUT A CODE CHANGE: under 1 s from the network, under
  * 0.3 s from the copy, and a visited page (memory) under 0.1 s. It only logs: no hook on `window`, nothing it changes.
  *
  * PURE BUT FOR THE CLOCK AND THE STORAGE, which are read here and nowhere else, so `timing.test.ts` holds the rest.

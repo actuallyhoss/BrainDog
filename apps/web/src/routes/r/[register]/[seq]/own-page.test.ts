@@ -47,6 +47,7 @@ test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the she
     { slug: 'kiln', about: { register: 'things', seq: 3 } },
     { slug: 'ada-vine', about: { register: 'people', seq: 4 } },
     { slug: 'review-pr', about: { register: 'skills', seq: 1 } },
+    { slug: 'drafting-the-specimen-page-copy', about: { register: 'session', seq: 20 } },
   ]);
   REGISTERS.things = { scopes: {}, fields: [] } as unknown as RegisterDecl;
   REGISTERS.people = { fields: [] } as unknown as RegisterDecl;
@@ -56,6 +57,9 @@ test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the she
     assert.equal(await loaded('/app/studio/r/tasks/3'), null, 'a row with no page stays');
     assert.equal(await loaded('/app/studio/r/people/4'), null, 'a row of a list that is not the projects list keeps its own screen');
     assert.equal(await loaded('/app/studio/r/skills/1'), null, 'a list not yet declared, and whose declaration was refused, stays');
+    /* A RUN'S ROW OPENS ON THE RUN'S OWN PAGE, where what it did is read: there is one page for one run. */
+    assert.deepEqual(await loaded('/app/studio/r/session/20'), { status: 307, location: '/app/studio/p/drafting-the-specimen-page-copy' });
+    assert.equal(await loaded('/app/studio/r/session/20?fields=1'), null, 'its fields stay on the row');
   } finally {
     learnRowPages([]);
     delete REGISTERS.things;

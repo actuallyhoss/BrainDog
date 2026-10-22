@@ -6,47 +6,21 @@
  * part links to. So "where Money is kept" is a list that plays `rates`, not a module the web knows by its id, and a
  * record whose people are in a list called `contacts` is read the same (`tools/gates/web-lists.mjs`).
  *
- * READ OFF THE MODULES THIS BUILD SHIPS (`moduleDocument`), as `lists.ts` reads their fields, and asked of the lists a
- * record holds, so a part is played here only when the record keeps the list that plays it.
+ * READ OFF THE MODULES THIS BUILD SHIPS, and asked of the lists a record holds, so a part is played here only when the
+ * record keeps the list that plays it. The seed says which list that is (`@braindog/seed/packs/lists` `PLAYED_BY`), and its
+ * test reads it back off the modules' documents the way this file once did. This file used to build those documents
+ * itself, and Today asks it on the first open, so every module's document and example rows came with the first screen.
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screens only call it.
  */
 
-import { MODULE_ORDER } from '@braindog/seed/usecases';
-import { moduleDocument } from '@braindog/seed/usecases/install';
-import { firstPartyModule } from '@braindog/seed/packs/modules';
+import { PLAYED_BY, listsOfModule, type Part } from '@braindog/seed/packs/lists';
 
 /** A part the first run reads a list by. */
-export type Part = 'meets' | 'projects' | 'hand' | 'rates';
-
-type Body = Record<string, unknown>;
-const isMap = (v: unknown): v is Body => typeof v === 'object' && v !== null && !Array.isArray(v);
-
-let known: ReadonlyMap<Part, string> | null = null;
-
-/** The list that plays each part in the modules this build ships, read once. */
-function players(): ReadonlyMap<Part, string> {
-  if (known !== null) return known;
-  const out = new Map<Part, string>();
-  for (const id of MODULE_ORDER) {
-    const doc = moduleDocument(null, id, { today: '1970-01-01' });
-    for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as unknown[]) : []) {
-      if (!isMap(d) || typeof d.register !== 'string') continue;
-      for (const part of ['meets', 'hand', 'rates'] as const) if (isMap(d[part]) && !out.has(part)) out.set(part, d.register);
-      /* THE PROJECTS ARE WHERE THE PEOPLE'S `projects` PART POINTS: the field it names, and the list that field links to. */
-      const meets = d.meets;
-      if (isMap(meets) && typeof meets.projects === 'string' && Array.isArray(d.fields)) {
-        const field = (d.fields as unknown[]).find((f) => isMap(f) && f.id === meets.projects);
-        if (isMap(field) && typeof field.to === 'string' && !out.has('projects')) out.set('projects', field.to);
-      }
-    }
-  }
-  known = out;
-  return known;
-}
+export type { Part };
 
 /** The list that plays `part`, or `null` where no module this build ships declares one. */
-export const playedBy = (part: Part): string | null => players().get(part) ?? null;
+export const playedBy = (part: Part): string | null => (Object.hasOwn(PLAYED_BY, part) ? PLAYED_BY[part] : null);
 
 /** Whether one of `lists` plays `part`. */
 export const plays = (lists: Iterable<string>, part: Part): boolean => {
@@ -55,7 +29,7 @@ export const plays = (lists: Iterable<string>, part: Part): boolean => {
 };
 
 /** The lists the modules `ids` bring, for a record made from them a moment ago and not read back yet. */
-export const listsOfModules = (ids: readonly string[]): string[] => ids.flatMap((id) => firstPartyModule(id)?.registers ?? []);
+export const listsOfModules = (ids: readonly string[]): string[] => ids.flatMap((id) => listsOfModule(id) ?? []);
 
 /** The lists a record holds on: every list of every pack that is on, from what `packs` answers. */
 export const listsOn = (packs: readonly { disabled_at: string | null; registers?: readonly string[] }[]): string[] =>

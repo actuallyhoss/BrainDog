@@ -22,7 +22,8 @@ export const words = {
   changesFirst: 'What goes out',
   firstAll: 'It is the first version, so everything in it is new.',
   noChanges: 'Nothing changed, so this would be the same file under a new version.',
-  drafting: 'Reading the file',
+  drafting: 'Writing the file…',
+  unwritten: 'The file could not be written just now. Change any field to try again.',
   installer: 'As somebody installing it sees it',
 } as const;
 

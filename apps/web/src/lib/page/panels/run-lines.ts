@@ -1,5 +1,5 @@
 /**
- * WHAT ONE AGENT RUN DID, IN PLAIN LINES (`RunPanel.svelte`, DIRECTION §37): "Added Fix the login", "Set Status on Fix
+ * WHAT ONE AGENT RUN DID, IN PLAIN LINES (`RunPanel.svelte`): "Added Fix the login", "Set Status on Fix
  * the login to Done", "Changed Amount on Invoice 12", read off the plan the record would put back (`undo-write.ts`
  * `undoPlan` for the run), which is every change the run made that is still there to undo, in names.
  *

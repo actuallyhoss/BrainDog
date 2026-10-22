@@ -13,7 +13,6 @@
 
 export const sharing = {
   /* ── Settings > Sharing ── */
-  sharingPeopleHere: 'People here',
   sharingShared: 'Shared',
   sharingWaiting: 'Waiting',
   sharingGroups: 'Groups',

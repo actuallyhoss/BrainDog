@@ -1,6 +1,6 @@
 /**
  * Arranging a home: Today and Decide, which their screens draw as a preview of a body nobody installed, reshaped as any
- * declared page is (DIRECTION §35: "every page is declared and dynamic, the hand-written ones included").
+ * declared page is ("every page is declared and dynamic, the hand-written ones included").
  *
  * THE FIRST DONE KEEPS IT. Today's body (`default-home.ts` `todayHome`) and Decide's (`views.ts` `decideHome`) are drawn
  * by the record with `previewPage` and installed nowhere, so there is nothing to arrange against until somebody commits.

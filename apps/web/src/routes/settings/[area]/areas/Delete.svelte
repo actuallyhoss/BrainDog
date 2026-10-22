@@ -144,15 +144,19 @@
               onkeydown={onkey}
             />
           </div>
-          <Button
-            weight={matches ? 'primary' : 'quiet'}
-            tone="bad"
-            aria-disabled={!matches}
-            aria-busy={deleting}
-            disabled={deleting}
-            onclick={deleteNow}
-            >{copy.deleteRecord(RECORD)}</Button
-          >
+          <!-- DANGEROUS BEFORE IT IS ARMED TOO (UI audit of 22 October, 18): the bin and the words in red on the quiet
+               fill, so the grey button no longer reads as one more setting. Armed, it is the red fill. -->
+          <span class="go" data-armed={matches ? '' : undefined}>
+            <Button
+              weight={matches ? 'primary' : 'quiet'}
+              tone="bad"
+              aria-disabled={!matches}
+              aria-busy={deleting}
+              disabled={deleting}
+              onclick={deleteNow}
+              >{#if !matches}<Icon name="trash" size="m" />{/if}{copy.deleteRecord(RECORD)}</Button
+            >
+          </span>
         </div>
         <p id="delete-said" class="said" data-wrong={wrong ? '' : undefined} aria-live="polite">
           {#if wrong}<Icon name="alert" size="s" />{words.notIt(RECORD)}{:else if !matches}{words.exactly(RECORD)}{/if}
@@ -213,6 +217,14 @@
   }
 
   .said[data-wrong] {
+    color: var(--red);
+  }
+
+  .go {
+    display: contents;
+  }
+
+  .go:not([data-armed]) :global(.btn) {
     color: var(--red);
   }
 

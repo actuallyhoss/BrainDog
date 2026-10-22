@@ -1,5 +1,5 @@
 /*
- * DECIDE READS LIKE A FORM (DIRECTION §39): one drawing of a question's choices and its buttons, for the one decision
+ * DECIDE READS LIKE A FORM: one drawing of a question's choices and its buttons, for the one decision
  * card (`DecisionCard.svelte`, on Home, Decide and every page with a queue) and the question's own page
  * (`routes/decide/[id]/+page.svelte`), so the two never draw a choice two ways.
  *

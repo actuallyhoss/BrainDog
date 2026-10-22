@@ -45,6 +45,8 @@ export type Settled = 'ready' | 'empty' | 'refused';
  * stop. So a call is evidence of a settled screen only once it has come back, and a screen with a
  * call still out is not settled whatever else it has said.
  */
+import { untrack } from 'svelte';
+
 const s = $state({ pending: 0, calls: 0, refused: false, ready: false, empties: 0, refusals: 0 });
 
 /**
@@ -153,4 +155,37 @@ export function settled(): Settled | undefined {
   if (s.empties > 0) return 'empty';
   if (s.ready) return 'ready';
   return s.calls > 0 ? 'ready' : undefined;
+}
+
+/**
+ * THE QUIET MARK, a second and separate answer from `data-screen`: nothing the screen asked is still out.
+ *
+ * `data-screen` says a screen is drawn, and a screen drawn from the tab's kept copy says so before the reads behind it
+ * have landed. That is the speed, and it is kept. What it cannot say is that the page is at rest, and a gate that
+ * navigates away while those reads are in flight is told by WebKit that each was refused. So this is the other half:
+ * the client's calls out (`onCallsOut`) and any later read a screen has promised (`holdQuiet`) are both nothing.
+ * Nothing waits on it in the app; the gates read it, after the drawn mark, with a short cap.
+ */
+const q = $state({ out: 0, held: 0 });
+
+/** The client's count of calls out, kept here for the layout to show. */
+export function callsOut(out: number): void {
+  q.out = out;
+}
+
+/** A read this screen means to start later (behind a timer or a chunk): quiet is not told until the returned function runs. */
+export function holdQuiet(): () => void {
+  let open = true;
+  /* UNTRACKED, or an effect that holds reads the count it writes and runs again for ever. */
+  untrack(() => q.held++);
+  return () => {
+    if (!open) return;
+    open = false;
+    untrack(() => q.held--);
+  };
+}
+
+/** Whether nothing is out and nothing is promised. */
+export function quiet(): boolean {
+  return q.out === 0 && q.held === 0;
 }

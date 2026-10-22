@@ -1,5 +1,5 @@
 <!--
-  The page header (DIRECTION §39; 2.A.20): the page's name with its icon, its count, the actions at the right of the
+  The page header (2.A.20): the page's name with its icon, its count, the actions at the right of the
   name, and under them the one sentence that says what is true today.
 
   A HEADER, NOT A HERO. The sentence is said once, at 17 in body text, under a 28px name: figures in it a step heavier and
@@ -37,6 +37,11 @@
   back link and the actions, for a page whose own hero holds the `h1`. Below 900px a headless head is not drawn: the bar
   holds the way back, and the actions sit in the bar before the search button.
 
+  `tiled` HANDS THE NAME ROW TO THE PAGE'S LEAD TILE (`PageBody`'s `leadHead`): the name, its count and the page's own
+  buttons are drawn inside the tile its sentence opens, as on the Bento boards, and the head keeps only the phone's bar.
+  What `actions` still holds (the arranging controls, which only show while a page is arranged) stays in the page, in
+  no box of its own, so nothing it holds is mounted twice.
+
   `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone, or a page-level switch, full width.
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
 -->
@@ -72,6 +77,7 @@
     define,
     well,
     headless = false,
+    tiled = false,
     heldLines = 2,
     heldText,
   }: {
@@ -111,6 +117,8 @@
     well?: Snippet | undefined;
     /** No name row: the back link and the actions only, for a page whose own hero holds the `h1`. */
     headless?: boolean | undefined;
+    /** The name row is the lead tile's: only the phone's bar is drawn here, and `actions` without a box. */
+    tiled?: boolean | undefined;
     /** How many lines a sentence on its way holds on a phone: Today's says three things, so it holds three. */
     heldLines?: number | undefined;
     /**
@@ -230,7 +238,7 @@
     </button>
   </span>
 </div>
-{#if crumb && !headless}
+{#if crumb && !headless && !tiled}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
   {#if back}
     <a class="kicker kicker-link tap" href={at(back)}>{crumb}</a>
@@ -239,9 +247,11 @@
   {/if}
 {/if}
 {#if !barred}
-<header class="page-head" data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined}>
+<header class="page-head" data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
   <div class="head-main">
-    {#if headless}
+    {#if tiled}
+      <!-- THE NAME IS THE LEAD TILE'S. -->
+    {:else if headless}
       {#if back && kicker}
         <a class="head-back tap" href={at(back)}><span class="back-mark"><Icon name="chevron" size="m" /></span>{kicker}</a>
       {/if}
@@ -275,11 +285,11 @@
   </div>
 </header>
 {/if}
-{#if sentence}
+{#if sentence && !tiled}
   <p class="page-said">
     {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
   </p>
-{:else if held}
+{:else if held && !tiled}
   <p class="page-said" data-held aria-hidden="true" style:--held-lines={heldLines}>{#if heldText}<span class="held-words">{heldText}</span>{/if}</p>
 {/if}
 <!--
@@ -343,6 +353,18 @@
     box-sizing: border-box;
     /* The Mac app's title bar sits above the head; --shell-inset is 0 in a browser. */
     padding: calc(20px + var(--shell-inset, 0px)) var(--gutter) 0;
+  }
+
+  /* THE NAME ROW IS THE LEAD TILE'S: no box here, and what `actions` keeps is drawn in the page's flow, which while it
+     is not being arranged is nothing but closed sheets. */
+  .page-head[data-tiled],
+  .page-head[data-tiled] .head-main,
+  .page-head[data-tiled] .head-actions {
+    display: contents;
+  }
+
+  .page-head[data-tiled]::before {
+    display: none;
   }
 
   /* A kicker already stands between the row and the top of the work. */
@@ -858,6 +880,20 @@
 
     .head-actions :global(.btn) {
       min-block-size: var(--tap);
+    }
+
+    /* THE PAGE'S "+" IS A STEP SMALLER THAN THE BAR'S SQUARES (UI audit of 22 October, 28): 36 with its 16px glyph, its
+       hit box still the 44 of `.tap`. A red 44 square beside the title was the loudest thing on the phone's first
+       screen, louder than the sentence that says what the page holds. */
+    .head-actions :global(.btn[data-weight='primary']:has(.icon)) {
+      inline-size: 36px;
+      min-inline-size: 36px;
+      min-block-size: 36px;
+    }
+
+    .head-actions :global(.btn[data-weight='primary']:has(.icon) .icon[data-size]) {
+      inline-size: var(--icon-m);
+      block-size: var(--icon-m);
     }
 
     .head-actions :global(:is(.capture-open, .head-more)) {

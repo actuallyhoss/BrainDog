@@ -365,7 +365,7 @@ test('EVERY RUN ON THE RUNS TAB SAYS HOW IT ENDED IN ITS OWN SENTENCE, newest fi
   );
 });
 
-/* WHAT ONE AUTOMATION'S PAGE SAYS NAMES THE PERSON'S THINGS, never the system's (DIRECTION §35). */
+/* WHAT ONE AUTOMATION'S PAGE SAYS NAMES THE PERSON'S THINGS, never the system's. */
 test("an automation's page says what it would act on, and never rows", () => {
   assert.equal(canvasWords.matchParts, 'What it would act on now');
   for (const w of Object.values(canvasWords))

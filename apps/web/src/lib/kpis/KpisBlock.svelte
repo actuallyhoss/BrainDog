@@ -18,6 +18,9 @@
   with Undo taking it back; one nobody's agent keeps, or a reader who tells no agents, says "Add a reading", which opens
   a one-field sheet (`ReadingSheet.svelte`) writing one reading into Numbers.
 
+  ON TODAY, "All numbers" under the rows opens the list they are kept in, which the record names on the block
+  (`kpi_list`), so the web writes no list of its own here.
+
   THE LIST IS FOUND BY ITS SHAPE (`kpi-rows.ts`), never named. On a project's page its rows are read as the block is
   drawn, since the suggestions need them; on Today only once a number is pressed or its menu opened. A reader who may not
   write is drawn the numbers and nothing to press. The sheet is loaded on the first press, so the page pays nothing for
@@ -28,7 +31,7 @@
   import { createClient } from '@braindog/client';
   import { Kpis, type KpiInput, type KpiView } from 'braindog-render/svelte';
   import { untrack } from 'svelte';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at as inApp } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { kpiActionsFor, kpiSaidOf, kpiWritesOf, runKpiWrites, undoKpiWrites, type KpiAction, type KpiDone } from '$lib/page/block-menu.ts';
   import type { KpiAnswered } from '$lib/page/kpis-in.ts';
@@ -76,6 +79,12 @@
     return Array.isArray(held) ? held.filter((k): k is Record<string, unknown> => typeof k === 'object' && k !== null) : [];
   });
   const rawOf = (id: string | undefined): Record<string, unknown> | undefined => (id ? raw.find((r) => r.kpi === id) : undefined);
+  /* "ALL NUMBERS" UNDER TODAY'S ROWS opens the list they are kept in, as the record names it on the block (`kpi_list`),
+     never a list written here; drawn only while Today shows one. */
+  const allNumbers = $derived.by((): string | null => {
+    const at = (block as { kpi_list?: unknown }).kpi_list;
+    return form === 'today' && kpis.length > 0 && typeof at === 'string' && at !== '' ? at : null;
+  });
 
   let list = $state<string | null>(null);
   let rows = $state.raw<Entry[] | null>(null);
@@ -303,6 +312,10 @@
   {/if}
   <Kpis {kpis} {form} lead={form !== 'project'} leads={copy.kpiLeads} home={homeCurrency()} {now} onopen={writable ? (k) => void openKpi(k) : undefined} href={href ? (k) => href(k as KpiAnswered) : undefined} menu={writable ? menu : undefined} {fix} add={adds ? foot : undefined} />
 
+  {#if allNumbers}
+    <a class="kb-all tap" href={inApp(`/r/${encodeURIComponent(allNumbers)}`)}>{copy.kpiAllNumbers}<Icon name="arrow" size="s" /></a>
+  {/if}
+
   {#if drafts.length && list}
     {@const at = list}
     <section class="kb-suggested" aria-labelledby="{uid}-suggested">
@@ -342,6 +355,24 @@
     display: grid;
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  /* "ALL NUMBERS →" UNDER TODAY'S ROWS, a tile's door in its look (`BlockSlot.svelte` `a.block-all`): 13/500 in the
+     second ink with its arrow, no underline, as wide as its words. */
+  .kb-all {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    justify-self: start;
+    gap: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  .kb-all:hover {
+    color: var(--ink);
   }
 
   .kb-none {

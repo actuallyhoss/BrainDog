@@ -8,6 +8,10 @@
  * (`things#1`) are keys handed back to a press and never a word on the screen: a run is its agent and its project
  * ("Claude on Kiln"), a project its name.
  *
+ * ON A MACHINE, AS A PROFILE (migration 44). Where his runs are on more than one machine or under more than one Claude
+ * Code profile, the composer offers each by name ("Machine", "Profile"), from the runs he is shown and his Profiles and
+ * Places (`instructionList`'s `places`); an instruction to anyone but a named run then reaches only the runs there.
+ *
  * SAID HONESTLY, PATH BY PATH (§2.3, §2.4). What happens next is said for the run it will reach: Claude Code with our
  * hooks sees an instruction within about 15 seconds, at its next prompt or tool call, and is stopped at its next tool
  * call; an agent without them (`reach: next_call`) sees it and is stopped only at its next BrainDog call, and keeps
@@ -23,6 +27,7 @@ import { AGENT_NAMES } from './names.ts';
 import { REGISTERS } from './held.ts';
 import { slotOf } from '../ui/face.ts';
 import { undoChange } from './undo-write.ts';
+import { machineSaid } from './machine-name.ts';
 import type { Fetch } from './boot-live.ts';
 
 /* ── what the record answers ────────────────────────────────────────────── */
@@ -33,6 +38,8 @@ export type LiveRun = {
   name: string | null;
   agent: string | null;
   machine: string | null;
+  /** The Claude Code profile it runs under, by name; absent from a host older than migration 44. */
+  seat?: string | null;
   project: string | null;
   repo: string | null;
   worktree: string | null;
@@ -72,6 +79,9 @@ export type Thread = {
   to_agent: string | null;
   project: string | null;
   task: string | null;
+  /** The machine and the profile it was aimed at, by name; absent from a host older than migration 44. */
+  machine?: string | null;
+  seat?: string | null;
   state: InstrState;
   seen_by: string | null;
   seen_how: SeenHow | null;
@@ -93,6 +103,18 @@ export type RunKnown = { agent: string | null; project: string | null; branch: s
 /** A project as the composer offers it: its handle as runs hold it (`things#1`), its name and its stored hue. */
 export type Project = { key: string; name: string; hue: number | null };
 
+/** The machines and Claude Code profiles the composer may offer, by name (`Places` in `methods/instructions.ts`). */
+export type Places = { machines: string[]; seats: string[] };
+
+export const NO_PLACES: Places = { machines: [], seats: [] };
+
+/** What a host answered for `places`, kept to names and nothing else. */
+export function placesFrom(v: unknown): Places {
+  const names = (x: unknown): string[] => (Array.isArray(x) ? x.filter((n): n is string => typeof n === 'string' && n.trim() !== '').map((n) => n.trim()) : []);
+  const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  return { machines: names(o.machines), seats: names(o.seats) };
+}
+
 /* ── the words ──────────────────────────────────────────────────────────── */
 
 /** The kinds of agent "To" offers, in the order a person meets them. */
@@ -104,6 +126,8 @@ export const WAIT_DAYS = 14;
 export const controlWords = {
   anyone: 'Whoever’s next',
   anywhere: 'Any project',
+  anyMachine: 'Any machine',
+  anyProfile: 'Any profile',
   aRun: 'An agent',
   aTask: 'A task',
   now: 'now',
@@ -136,6 +160,18 @@ export function spanSaid(ms: number): string {
   const h = Math.floor(min / 60);
   if (h < 48) return min % 60 === 0 ? `${String(h)} h` : `${String(h)} h ${String(min % 60)} min`;
   return plural(Math.floor(h / 24), 'day');
+}
+
+/**
+ * HOW LONG A RUN HAS BEEN AT IT, SHORT, for the end of a one-line row: "for 12 min", "for 3 h", "for 2 days", one unit
+ * only, so a column of them reads at a glance; a run under a minute old is "just now".
+ */
+export function ageSaid(seconds: number): string {
+  const min = Math.floor(Math.max(0, seconds) / 60);
+  if (min < 1) return 'just now';
+  if (min < 60) return `for ${String(min)} min`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `for ${String(h)} h` : `for ${plural(Math.floor(h / 24), 'day')}`;
 }
 
 /** When something was last heard, from seconds ago: "just now", "3 min ago", "2 h ago". */
@@ -173,13 +209,61 @@ export function runSaid(handle: string | null, runs: ReadonlyMap<string, RunKnow
 
 /* ── the composer ───────────────────────────────────────────────────────── */
 
-/** What he chose in the composer: who it goes to (`anyone`, `agent:<kind>`, `run:<handle>`), on what, and when. */
-export type Chosen = { to: string; on: string; when: 'now' | 'next' | null };
+/**
+ * What he chose in the composer: who it goes to (`anyone`, `agent:<kind>`, `run:<handle>`), on what, and when; and the
+ * machine and the profile, by name, `''` or absent for any.
+ */
+export type Chosen = { to: string; on: string; when: 'now' | 'next' | null; machine?: string; seat?: string };
 
 export const PICK_FIRST: Chosen = { to: 'anyone', on: '', when: null };
 
 /** The lead runs open now, a helper folded under the run it works for, as "To" and the run rows list them. */
 export const leadsOf = (rows: readonly LiveRun[]): LiveRun[] => rows.filter((r) => r.parent === null && r.state !== 'ended' && r.state !== 'gone');
+
+/** Whether a run is at work: working or thinking, the record's own word for it, so an idle run is not. */
+export const isAtWork = (r: LiveRun): boolean => r.state === 'working' || r.state === 'thinking';
+
+/**
+ * THE AGENTS AT WORK, AS THE RAIL COUNTS THEM: each run at work, a helper left out while the run it works for is at
+ * work too (`atWork` in the record, `runs-working` in the kernel). So "12 at work" here is the rail's 12.
+ */
+export function atWorkOf(rows: readonly LiveRun[]): LiveRun[] {
+  const working = rows.filter(isAtWork);
+  const runs = new Set(working.map((r) => r.run));
+  return working.filter((r) => r.parent === null || !runs.has(r.parent));
+}
+
+/** The runs open and not at work, waiting on him: an idle turn or a long silence, each counted once (`runs-waiting`). */
+export function waitingOf(rows: readonly LiveRun[]): LiveRun[] {
+  const open = new Set(rows.map((r) => r.run));
+  return rows.filter((r) => r.state === 'waiting' && (r.parent === null || !open.has(r.parent)));
+}
+
+/** The runs at work grouped by the machine each is on, the busiest first, a run naming none under `null`. */
+export function byMachine(rows: readonly LiveRun[]): { machine: string | null; rows: LiveRun[] }[] {
+  const groups = new Map<string | null, LiveRun[]>();
+  for (const r of rows) groups.set(r.machine, [...(groups.get(r.machine) ?? []), r]);
+  return [...groups.entries()]
+    .map(([machine, rs]) => ({ machine, rows: rs }))
+    .sort((a, b) => b.rows.length - a.rows.length || (a.machine ?? '\uffff').localeCompare(b.machine ?? '\uffff'));
+}
+
+/** A list of names as a person says it: "Codex", "Codex and Cursor", "Codex, Cursor and Gemini". */
+const andList = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
+
+/**
+ * WHAT PAUSE AND STOP REACH, SAID ONCE FOR THE LIST (§2.4), never once a row: the agents a stop halts at their next tool
+ * call through their hooks, and the ones it reaches only at their next BrainDog call, which keep working until then.
+ */
+export function reachLine(rows: readonly LiveRun[]): string | null {
+  const named = (rs: readonly LiveRun[]) => [...new Set(rs.map((r) => agentNamed(r.agent) ?? (r.name?.trim() || controlWords.aRun)))];
+  const hooks = named(rows.filter((r) => r.reach === 'hooks'));
+  const later = named(rows.filter((r) => r.reach !== 'hooks'));
+  if (hooks.length === 0 && later.length === 0) return null;
+  if (later.length === 0) return `Pause and Stop reach ${andList(hooks)} at the next tool call, through the hooks.`;
+  const tail = `${andList(later)} only at the next BrainDog call, and ${later.length === 1 ? 'it keeps' : 'they keep'} working until then.`;
+  return hooks.length === 0 ? `Pause and Stop reach ${tail}` : `Pause and Stop reach ${andList(hooks)} at the next tool call, through the hooks; ${tail}`;
+}
 
 const reachSoon = (r: LiveRun): string => (r.reach === 'hooks' ? 'within about 15 seconds, at its next prompt or tool call' : 'at its next BrainDog call, and not before');
 
@@ -189,8 +273,16 @@ function runChoice(r: LiveRun, all: readonly LiveRun[], projects: ReadonlyMap<st
   const on = projectName(r.project, projects);
   const twin = all.some((o) => o !== r && o.agent === r.agent && o.project === r.project);
   const tail = twin ? (r.branch ?? r.doing ?? null) : null;
-  return { key: `run:${r.run}`, label: `${who}${on ? ` on ${on}` : ''}${tail ? `, ${tail}` : ''} (working now)` };
+  return { key: `run:${r.run}`, label: `${who}${on ? ` on ${on}` : ''}${tail ? `, ${tail}` : ''} (${isAtWork(r) ? 'working now' : 'open, waiting on you'})` };
 }
+
+/** The names a place offers: what the record said, then what the live runs say, each once, in that order. */
+const namesOf = (said: readonly string[], live: readonly (string | null | undefined)[]): string[] =>
+  [...new Set([...said, ...live.filter((n): n is string => typeof n === 'string' && n.trim() !== '')])];
+
+/** A choice of names, "Any …" first, offered only where there are two to choose between. */
+const choicesOf = (names: readonly string[], any: string, say: (n: string) => string = (n) => n): InstructChoice[] | null =>
+  names.length > 1 ? [{ key: '', label: any }, ...names.map((n) => ({ key: n, label: say(n) }))] : null;
 
 /**
  * The composer as it stands for `pick`: its choices, the one each is at, and what happens once it is sent, said from
@@ -198,8 +290,17 @@ function runChoice(r: LiveRun, all: readonly LiveRun[], projects: ReadonlyMap<st
  *
  * ON ONE PROJECT'S PAGE (`project`, plan §7.2: "Tell agents on Kiln") "On" is that project and nothing else, and "To"
  * offers only the runs working there, so nothing typed on Kiln's page goes to a run on another project.
+ *
+ * "MACHINE" AND "PROFILE" are offered where his runs are on two or more (`places`, and the live runs), and never for a
+ * named run, which is one machine and one profile already.
  */
-export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: ReadonlyMap<string, Project>, project?: string | null): Omit<InstructView, 'busy' | 'fault'> {
+export function composerOf(
+  pick: Chosen,
+  rows: readonly LiveRun[],
+  projects: ReadonlyMap<string, Project>,
+  project?: string | null,
+  places: Places = NO_PLACES,
+): Omit<InstructView, 'busy' | 'fault'> {
   const scoped = project ?? null;
   const leads = leadsOf(rows).filter((r) => scoped === null || r.project === scoped);
   const to: InstructChoice[] = [
@@ -234,21 +335,48 @@ export function composerOf(pick: Chosen, rows: readonly LiveRun[], projects: Rea
   const kind = toKey.startsWith('agent:') ? toKey.slice('agent:'.length) : null;
   const onKey = scoped ?? (on.some((c) => c.key === pick.on) ? pick.on : '');
   const place = projectName(onKey || null, projects);
-  const live = leads.filter((r) => r.stopped === null && (kind === null || r.agent === kind) && (onKey === '' || r.project === onKey));
+  /* A MACHINE IS KEYED BY ITS NAME AND SAID AS A PERSON SAYS IT (`machineSaid`), so the right one is still reached. */
+  const machineNames = namesOf(places.machines, leads.map((r) => r.machine));
+  const machines = choicesOf(machineNames, controlWords.anyMachine, (n) => machineSaid(n, machineNames));
+  const seats = choicesOf(namesOf(places.seats, leads.map((r) => r.seat)), controlWords.anyProfile);
+  const machineKey = machines?.some((c) => c.key === pick.machine) ? pick.machine! : '';
+  const seatKey = seats?.some((c) => c.key === pick.seat) ? pick.seat! : '';
+  const live = leads.filter(
+    (r) =>
+      r.stopped === null &&
+      (kind === null || r.agent === kind) &&
+      (onKey === '' || r.project === onKey) &&
+      (machineKey === '' || r.machine === machineKey) &&
+      (seatKey === '' || r.seat === seatKey),
+  );
   const when: ('now' | 'next')[] = live.length > 0 ? ['now', 'next'] : ['next'];
   const whenKey = pick.when !== null && when.includes(pick.when) ? pick.when : when[0]!;
   const kindName = agentNamed(kind);
-  const there = place ? `on ${place}` : 'anywhere';
+  const where = [place ? `on ${place}` : null, machineKey ? `on ${machineSaid(machineKey, machineNames)}` : null].filter((x): x is string => x !== null).join(', ');
+  const there = `${where || (seatKey ? '' : 'anywhere')}${seatKey ? `${where ? ' ' : ''}as ${seatKey}` : ''}`;
   let next: string;
   if (whenKey === 'now' && live.length === 1) {
     const r = live[0]!;
-    next = `Goes to ${runSaid(r.run, new Map([[r.run, r]]), projects, true)}, working now: it sees this ${reachSoon(r)}. If it ends first, the next ${kindName ?? 'agent'} ${there} gets it.`;
+    next = `Goes to ${runSaid(r.run, new Map([[r.run, r]]), projects, true)}, ${isAtWork(r) ? 'working' : 'open'} now: it sees this ${reachSoon(r)}. If it ends first, the next ${kindName ?? 'agent'} ${there} gets it.`;
   } else if (whenKey === 'now') {
-    next = `Goes to the ${plural(live.length, `${kindName ?? 'agent'} run`)} working ${there} now. The first to take it does it, and the others are told it is taken.`;
+    /* "OPEN" AND NOT "WORKING": an idle run takes it too, and "working" is the rail's number alone. */
+    next = `Goes to the ${plural(live.length, `open ${kindName ?? 'agent'} run`)} ${there} now. The first to take it does it, and the others are told it is taken.`;
   } else {
     next = `The next ${kindName ? `${kindName} run` : 'agent'} ${there} gets this when it starts or next checks in. It waits up to ${String(WAIT_DAYS)} days.`;
   }
-  return { to, toKey, on, onKey, onFixed: scoped !== null, when, whenKey, next, agent: kind };
+  return {
+    to,
+    toKey,
+    on,
+    onKey,
+    onFixed: scoped !== null,
+    ...(machines === null ? {} : { machine: machines, machineKey }),
+    ...(seats === null ? {} : { seat: seats, seatKey }),
+    when,
+    whenKey,
+    next,
+    agent: kind,
+  };
 }
 
 /** The runs a panel scoped to one run or one project draws: that run, or the lead runs on that project, else all. */
@@ -264,12 +392,14 @@ export const scopedThreads = (threads: readonly Thread[], scope: { run?: string 
   );
 
 /** What `instruct` is sent for the composer as it stood and the words he typed. */
-export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenKey'>, said: string): Record<string, string> {
+export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenKey' | 'machineKey' | 'seatKey'>, said: string): Record<string, string> {
   const args: Record<string, string> = { said: said.trim() };
   if (view.toKey.startsWith('run:')) return { ...args, to: 'run', to_run: view.toKey.slice('run:'.length), when: 'now' };
   if (view.toKey.startsWith('agent:')) Object.assign(args, { to: 'agent', to_agent: view.toKey.slice('agent:'.length) });
   else args.to = 'anyone';
   if (view.onKey !== '') args.project = view.onKey;
+  if (view.machineKey) args.machine = view.machineKey;
+  if (view.seatKey) args.seat = view.seatKey;
   args.when = view.whenKey;
   return args;
 }
@@ -292,7 +422,10 @@ export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: Reado
     name,
     doing: doing === name ? null : doing,
     project: project ? { name: project.name, slot: slotOf(project.hue) } : null,
-    meta: [r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`].filter((x): x is string => !!x).join(' · '),
+    /* THE PROFILE IT RUNS UNDER, BY NAME, where it is one of his own and not the default one (migration 44). */
+    meta: [r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
+      .filter((x): x is string => !!x)
+      .join(' · '),
     live: r.state === 'working' || r.state === 'thinking' ? r.state : 'waiting',
     holds: held ? `On your word: “${held.said.replace(/\s+/gu, ' ').trim()}”` : null,
     helpers:
@@ -313,6 +446,7 @@ export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: Reado
     },
     href: /^S[1-9][0-9]*$/u.test(r.run) ? `/r/session/${r.run.slice(1)}` : null,
     busy: false,
+    time: ageSaid(r.for_s),
   };
 }
 
@@ -349,7 +483,16 @@ export function threadOf(
   const who =
     t.to === 'run' ? runSaid(t.to_run, runs, projects) : t.to === 'agent' ? (agentNamed(t.to_agent) ?? controlWords.aRun) : t.to === 'task' ? controlWords.aTask : controlWords.anyone;
   const kindWord = controlWords.kind[t.kind];
-  const to = [kindWord || null, who, projectName(t.project, projects), t.kind === 'tell' || t.kind === 'redirect' ? controlWords[t.when] : null].filter((x): x is string => !!x).join(' · ');
+  const to = [
+    kindWord || null,
+    who,
+    projectName(t.project, projects),
+    t.machine ? `on ${machineSaid(t.machine)}` : null,
+    t.seat ? `as ${t.seat}` : null,
+    t.kind === 'tell' || t.kind === 'redirect' ? controlWords[t.when] : null,
+  ]
+    .filter((x): x is string => !!x)
+    .join(' · ');
 
   const trail: string[] = [`Sent ${hm(t.at)}`];
   const seenRuns = [...new Map((t.seen ?? []).map((s) => [s.run, s])).values()];
@@ -419,12 +562,14 @@ export function threadOrder(threads: readonly Thread[]): Thread[] {
 /** A thread drawn the moment Send is pressed, before the record answers: what he said, to whom, on its way. */
 export function sendingOf(key: string, said: string, view: Omit<InstructView, 'busy' | 'fault'>): ThreadView {
   const label = (list: readonly InstructChoice[], k: string) => list.find((c) => c.key === k)?.label ?? '';
-  const who = label(view.to, view.toKey).replace(/ \(working now\)$/u, '');
+  const who = label(view.to, view.toKey).replace(/ \((?:working now|open, waiting on you)\)$/u, '');
   const on = view.onKey === '' || view.toKey.startsWith('run:') ? null : label(view.on, view.onKey);
+  const machine = view.machineKey ? `on ${label(view.machine ?? [], view.machineKey) || machineSaid(view.machineKey)}` : null;
+  const seat = view.seatKey ? `as ${view.seatKey}` : null;
   return {
     key,
     said: said.trim(),
-    to: [who, on, controlWords[view.whenKey]].filter((x): x is string => !!x).join(' · '),
+    to: [who, on, machine, seat, controlWords[view.whenKey]].filter((x): x is string => !!x).join(' · '),
     agent: view.agent,
     steps: ['at', 'ahead', 'ahead', 'ahead'],
     word: 'On its way',
@@ -468,6 +613,8 @@ function channel<T>() {
 export const aim = channel<string>();
 /** Something he told changed: read again. */
 export const told = channel<void>();
+/** A step left for the next run, handed on: the composer takes its words, to whoever is next, for him to send. */
+export const fill = channel<string>();
 
 /* ── the record ─────────────────────────────────────────────────────────── */
 
@@ -483,10 +630,16 @@ export function control(base: string, io?: Fetch) {
     async presence(): Promise<Out<LiveRun[]>> {
       return outOf<LiveRun[]>(await c.presence(), 'The agents working now could not be read.');
     },
-    /** What he told agents, newest first; `run` narrows to what went to, was seen by or was taken by one run. */
-    async threads(limit = 50, run?: string, project?: string): Promise<Out<Thread[]>> {
-      const out = outOf<{ rows: Thread[] }>(await c.instructionList({ limit, ...(run ? { run } : {}), ...(project ? { project } : {}) }), 'What you told agents could not be read.');
-      return out.ok ? { ok: true, value: out.value.rows } : out;
+    /**
+     * What he told agents, newest first; `run` narrows to what went to, was seen by or was taken by one run. With it, the
+     * machines and profiles the composer may offer (`places`), none from a host older than migration 44.
+     */
+    async threads(limit = 50, run?: string, project?: string): Promise<Out<Thread[]> & { places?: Places }> {
+      const out = outOf<{ rows: Thread[]; places?: unknown }>(
+        await c.instructionList({ limit, ...(run ? { run } : {}), ...(project ? { project } : {}) }),
+        'What you told agents could not be read.',
+      );
+      return out.ok ? { ok: true, value: out.value.rows, places: placesFrom(out.value.places) } : out;
     },
     async send(args: Record<string, string>): Promise<Out<Thread>> {
       return outOf<Thread>(await c.instruct(args as unknown as Parameters<typeof c.instruct>[0]), 'That could not be sent.');

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   PICK_FIRST,
+  ageSaid,
   agoSaid,
   composerOf,
   instructArgs,
@@ -119,7 +120,7 @@ test('WHAT HAPPENS NEXT IS SAID FOR HOW THE RUN IS REACHED: hooks within seconds
   const codex = composerOf({ to: 'run:S2', on: '', when: null }, ROWS, PROJECTS);
   assert.equal(codex.next, 'Codex on Kiln sees this at its next BrainDog call, and not before.');
   const many = composerOf({ to: 'anyone', on: 'things#1', when: 'now' }, ROWS, PROJECTS);
-  assert.equal(many.next, 'Goes to the 2 agent runs working on Kiln now. The first to take it does it, and the others are told it is taken.');
+  assert.equal(many.next, 'Goes to the 2 open agent runs on Kiln now. The first to take it does it, and the others are told it is taken.');
   const paused = composerOf({ to: 'run:S1', on: '', when: null }, [run({ stopped: 'pause' })], PROJECTS);
   assert.match(paused.next, /It is paused; it reads this, and works once you resume it\.$/u);
 });
@@ -131,6 +132,32 @@ test('WHAT IS SENT: a run by handle and now, a kind on a project with its when, 
   assert.deepEqual(at({ to: 'anyone', on: '', when: null }), { said: 'Merge wave 1', to: 'anyone', when: 'now' });
 });
 
+test('MACHINE AND PROFILE ARE OFFERED WHERE HIS RUNS ARE ON TWO OR MORE, narrow who is live, and are sent by name and said as a person says them', () => {
+  const HARBOUR = run({ run: 'S3', seat: 'harbour', machine: 'kiln-studio', branch: 'harbour' });
+  const rows = [CLAUDE, CODEX, HARBOUR];
+  const places = { machines: ['kiln-mbp'], seats: ['default', 'harbour'] };
+  const c = composerOf({ to: 'agent:claude', on: 'things#1', when: null, machine: 'kiln-studio', seat: 'harbour' }, rows, PROJECTS, null, places);
+  assert.deepEqual(c.machine?.map((x) => x.label), ['Any machine', 'MacBook Pro', 'Kiln studio']);
+  assert.deepEqual(c.seat?.map((x) => x.label), ['Any profile', 'default', 'harbour']);
+  assert.deepEqual([c.machineKey, c.seatKey], ['kiln-studio', 'harbour']);
+  /* ONLY THE RUN THERE IS LIVE FOR IT, and the sentence says where. */
+  assert.match(c.next, /^Goes to Claude on Kiln, working now: /u);
+  assert.match(c.next, /the next Claude on Kiln, on Kiln studio as harbour gets it\.$/u);
+  assert.deepEqual(instructArgs(c, 'Ship it'), { said: 'Ship it', to: 'agent', to_agent: 'claude', project: 'things#1', machine: 'kiln-studio', seat: 'harbour', when: 'now' });
+  assert.equal(sendingOf('outgoing:2', 'Ship it', c).to, 'Claude · Kiln · on Kiln studio · as harbour · now');
+
+  /* ONE MACHINE AND NO PROFILE IS NOTHING TO CHOOSE, and a named run is one machine and one profile already. */
+  const plain = composerOf(PICK_FIRST, ROWS, PROJECTS);
+  assert.equal(plain.machine, undefined);
+  assert.equal(plain.seat, undefined);
+  const named = composerOf({ to: 'run:S3', on: '', when: null, machine: 'kiln-mbp', seat: 'default' }, rows, PROJECTS, null, places);
+  assert.equal(named.machine, undefined);
+  assert.deepEqual(instructArgs(named, 'Stop here'), { said: 'Stop here', to: 'run', to_run: 'S3', when: 'now' });
+
+  /* AND A THREAD SAYS WHERE IT WAS AIMED. */
+  assert.equal(threadOf(thread({ machine: 'kiln-studio', seat: 'harbour' }), ctx).to, 'Claude · Kiln · on Kiln studio · as harbour · now');
+});
+
 /* ── the runs open now ────────────────────────────────────────────────── */
 
 test('A RUN ROW IS THE AGENT, WHAT IT SAID, WHERE AND WHEN, its helpers folded under it with their branches', () => {
@@ -138,6 +165,8 @@ test('A RUN ROW IS THE AGENT, WHAT IT SAID, WHERE AND WHEN, its helpers folded u
   const row = presenceOf(CLAUDE, ROWS, PROJECTS);
   assert.deepEqual([row.name, row.doing, row.project], ['Claude', 'Variable axis QA, instances 3 of 9', { name: 'Kiln', slot: 'blue' }]);
   assert.equal(row.meta, 'axis-qa · running 3 h 30 min · heard 3 min ago');
+  assert.equal(presenceOf({ ...CLAUDE, seat: 'harbour' }, ROWS, PROJECTS).meta, 'as harbour · axis-qa · running 3 h 30 min · heard 3 min ago');
+  assert.equal(presenceOf({ ...CLAUDE, seat: 'default' }, ROWS, PROJECTS).meta, row.meta, 'the default profile is not said');
   assert.equal(row.helpers, '+1 helper, on axis-qa-2');
   assert.equal(row.href, '/r/session/1');
 });
@@ -232,5 +261,6 @@ test('A RUN A THREAD NAMES THAT IS NOT OPEN NOW IS READ ONCE, by handle', () => 
 
 test('TIME IN WORDS', () => {
   assert.deepEqual([spanSaid(20_000), spanSaid(9 * 60_000), spanSaid(200 * 60_000), spanSaid(3 * 86_400_000)], ['under a minute', '9 min', '3 h 20 min', '3 days']);
+  assert.deepEqual([ageSaid(20), ageSaid(9 * 60), ageSaid(200 * 60), ageSaid(3 * 86_400)], ['just now', 'for 9 min', 'for 3 h', 'for 3 days']);
   assert.deepEqual([agoSaid(10), agoSaid(180), agoSaid(7200)], ['just now', '3 min ago', '2 h ago']);
 });

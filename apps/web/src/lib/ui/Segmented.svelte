@@ -1,5 +1,5 @@
 <!--
-  A segmented control with a sliding selection (DIRECTION 39): one rectangle in the field's fill, and the chosen
+  A segmented control with a sliding selection: one rectangle in the field's fill, and the chosen
   segment the tile's colour, which MOVES to the next choice instead of fading out in one place and in at another.
 
   IT WRAPS THE MARKUP THE PRODUCT ALREADY WRITES. The caller keeps its own `.segment` buttons, with `data-on` on the
@@ -72,6 +72,7 @@
 
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { frameResizeObserver } from './resize.ts';
   import type { HTMLAttributes } from 'svelte/elements';
 
   let {
@@ -139,7 +140,7 @@
     };
 
     /* A label that grows, a font that arrives and a track that wraps are all a size changing. */
-    const sizes = new ResizeObserver(place);
+    const sizes = frameResizeObserver(place);
     const watch = () => {
       sizes.disconnect();
       sizes.observe(el);
@@ -183,7 +184,7 @@
       const pad = parseFloat(getComputedStyle(el).paddingInlineStart) * 2 || 0;
       scroll = scrolls(segments.length, needs, el.clientWidth - pad);
     };
-    const sizes = new ResizeObserver(measure);
+    const sizes = frameResizeObserver(measure);
     sizes.observe(el);
     for (const child of el.children) sizes.observe(child);
     phone.addEventListener('change', measure);

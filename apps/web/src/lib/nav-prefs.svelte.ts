@@ -81,7 +81,7 @@ export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; f
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 /**
- * Where the navigation lives when nobody said: the top bar of 19 October (his call 1, 20 October), from 900px up. The
+ * Where the navigation lives when nobody said: the top bar of 19 October (chosen 20 October), from 900px up. The
  * side rail stays one choice away in Settings > Navigation.
  */
 const SHAPE_DEFAULT: NavShape = 'bar';

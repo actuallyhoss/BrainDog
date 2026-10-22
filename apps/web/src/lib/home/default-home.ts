@@ -1,6 +1,6 @@
 /**
  * TODAY, DECLARED: the page every record opens on when it declares neither its use case's `home-<id>` nor a `home`
- * page, and what Home does to whichever of the three it draws (DIRECTION §35, "every page is declared").
+ * page, and what Home does to whichever of the three it draws ("every page is declared").
  *
  * A PAGE BODY LIKE ANY OTHER. Today was a screen of its own (`Today.svelte`, kept at `/?classic`), and Overview a second
  * one over the house Home; both are this body now, drawn by the one reader (`PageView` in `home` mode), so a person or
@@ -88,8 +88,12 @@ export const COMING_UP_LIMIT = 5;
 /** How many questions Needs you draws before its count becomes the door to Decide. Tiles are big, so three. */
 export const NEEDS_YOU_LIMIT = 3;
 
-/** On a phone, two (today F8): the first screen then holds the sentence, two questions, and cash and who is working. */
-export const NEEDS_YOU_LIMIT_PHONE = 2;
+/**
+ * On a phone, four (the Bento phone board, 22 October): the first answered where it stands, with its buttons, and the
+ * three after it rows a tap opens, so the first screen holds four of what waits and not two. It was two (today F8),
+ * each with its buttons, and two of eight was all the first screen said.
+ */
+export const NEEDS_YOU_LIMIT_PHONE = 4;
 
 /**
  * HOW MANY OPEN QUESTIONS TODAY ASKS THE RECORD FOR, so it can put the money first (`needsYouOrder`) before it shows the
@@ -138,7 +142,7 @@ export type Holds = {
   people?: People | undefined;
 };
 
-/** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
+/** The fewest days a figure's line is drawn from (a chart has at least three points, else the tile shows the number). */
 const LINE_LEAST = 3;
 
 /**
@@ -336,7 +340,7 @@ export const SIGNS_RED = 'signs-red';
 export const SIGNS_PAGE = 'health';
 
 /**
- * THE LINE TODAY SAYS WHILE A VITAL SIGN READS RED (PRF-A05, DIRECTION §40 "says so in the app when one fails"), in the
+ * THE LINE TODAY SAYS WHILE A VITAL SIGN READS RED (PRF-A05: a sign that fails says so in the app), in the
  * words the health sentence in Settings says it in. TWO NOTES ON THE ONE FIGURE, so one of them draws at most and the
  * count reads as a person says it, as the Health page's own line does. `signs-red` reads nothing while no sign has
  * anything to judge by and nought once none is red, and neither draws a note: a Today with nothing wrong is as it was.
@@ -581,7 +585,7 @@ const known = (line: readonly (number | null)[] | undefined): number => (line ??
  * figure kept for a week is then seven points in the last twelfth of the tile, a tick at its far edge under a number,
  * and one kept for a day or two is a dot. So the days before the first one kept are left off, and the line runs the
  * tile's width; a gap after that stays a gap, since a night nobody kept is not a nought. Fewer than three days kept is
- * no line at all (DIRECTION §39), and the tile shows the number.
+ * no line at all, and the tile shows the number.
  *
  * A NEW OBJECT ONLY WHERE A LINE CHANGES, so a tile whose line is whole is the block it was handed.
  */
@@ -702,7 +706,7 @@ export type HomeDrawn = {
   /** The page's own line, when it declares one in plain words (`note lead`), lifted out to be the head's. */
   lead: string | null;
   /**
-   * THE LINE A TASK IS TYPED INTO, lifted out to sit in the head beside the page's name (DIRECTION §39: a whole tile spent
+   * THE LINE A TASK IS TYPED INTO, lifted out to sit in the head beside the page's name (a whole tile spent
    * on one field), or `null` where the page has none. It stays in the list, not drawn, so every block keeps its place.
    */
   capture: LiveBlock | null;

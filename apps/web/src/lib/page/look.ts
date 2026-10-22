@@ -1,6 +1,6 @@
 /**
  * A page's look on screen: the order the engine put its blocks in, the one next action under its headline, a person's
- * pin, and the Undo on what Slash arranged (DIRECTION §38, `loop/contract-17.md`'s look overlay).
+ * pin, and the Undo on what Slash arranged (`loop/contract-17.md`'s look overlay).
  *
  * THE RECORD APPLIES THE LOOK AND THE PAGE APPLIES IT AGAIN, AS A VIEW. `readPage` answers the blocks in the look's
  * order (`applyLook` in `packages/kernel/src/compose.ts`), and `lookOrder` is the same rule, so it puts them in that order
@@ -189,7 +189,7 @@ export type FirstTile = {
 };
 
 /**
- * WHETHER THE NEXT STEP IS ALREADY THE FIRST THING ON THE BOARD (DIRECTION §39): the first question of the first tile,
+ * WHETHER THE NEXT STEP IS ALREADY THE FIRST THING ON THE BOARD: the first question of the first tile,
  * or its first row. The line under the header then says nothing the eye does not meet straight after it, and is not
  * drawn: Money's "Invoice 2026-041 was due 38 days ago. Chase it?" stood over the same question as the first card.
  */

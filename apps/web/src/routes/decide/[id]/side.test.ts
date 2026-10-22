@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { LINKED_MOST, linkedOf, sideOf, words } from './side.ts';
+import { aboutLine, aboutOf, LINKED_MOST, linkedOf, sideOf, words } from './side.ts';
 
 const FIGURES = {
   'ref:invoices#7': { kind: 'row', register: 'invoices', seq: 7, title: 'Halden, September' },
@@ -77,4 +77,17 @@ test('the evidence is the pair the question’s body gives as data, and never on
   const prose = sideOf({ why: '2 of 5 steps are done.', reasons: [{ text: "41 of September's 58 HSBC lines were typed in by hand." }] });
   assert.equal(prose.evidence, null, 'a share was read out of the words again');
   assert.equal(sideOf({ reasons: [{ text: '2 of 5 steps are done.' }], body: { options: [] } }).any, false);
+});
+
+test('the side names the row a question is about by its list and number, and nothing for a body that names none', () => {
+  assert.deepEqual(aboutOf({ about: 'recurring#7', options: [] }), { list: 'recurring', seq: 7, spoken: 'recurring#7' });
+  assert.equal(aboutOf({ about: 'recurring#0' }), null);
+  assert.equal(aboutOf({ about: 'not a row' }), null);
+  assert.equal(aboutOf({ options: [] }), null);
+  assert.equal(aboutOf(null), null);
+});
+
+test('the line under the row says its list, then the amount and how late where the question says them', () => {
+  assert.equal(aboutLine('Repeating', { amount: '£39', late: '4 days late' }), 'Repeating · £39 · 4 days late');
+  assert.equal(aboutLine('Tasks', null), 'Tasks');
 });

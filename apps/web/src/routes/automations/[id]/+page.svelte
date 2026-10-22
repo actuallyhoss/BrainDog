@@ -1158,7 +1158,7 @@
     margin-inline-start: auto;
   }
 
-  /* UNDO AND REDO PRINT THEIR KEYS WHEN ASKED FOR (DIRECTION 35): under the pointer or with keyboard focus. Without its
+  /* UNDO AND REDO PRINT THEIR KEYS WHEN ASKED FOR: under the pointer or with keyboard focus. Without its
      cap a pill takes its even padding back. */
   .foot-actions :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
     display: none;
@@ -1224,7 +1224,7 @@
   }
 
   /* THE HEAD'S "…": a tile-coloured rectangle on the board, as every quiet control beside the name is
-     (`PageHead.svelte`): no glass, no edge, no shadow (DIRECTION §39). */
+     (`PageHead.svelte`): no glass, no edge, no shadow. */
   .more-trigger {
     display: flex;
     align-items: center;

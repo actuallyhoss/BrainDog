@@ -156,7 +156,9 @@ const layoutCssPlugin: Plugin = {
  * slug, matched and was sent to the record instead of the app. A slug is at least two characters, so `r`, `p`, `v`
  * and the other one-letter routes can never be one.
  */
-const PROXY = { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API, '^/app/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
+/* `/app/drawn-frame` IS THE HOSTS' TOO: the frame a drawn block is drawn in is answered from code under its own policy
+   (`@braindog/host/drawn-frame`), and Vite would answer it with the shell, which in that sandbox posts nothing. */
+const PROXY = { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API, '^/app/drawn-frame$': API, '^/app/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
 
 /**
  * `virtual:own-words` IS THE SET OF TEXTS THE COPY FILES TYPE WHOLE, which is what screenshot mode needs

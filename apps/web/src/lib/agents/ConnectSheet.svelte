@@ -21,8 +21,11 @@
   import { LABEL_MAX, TOKEN_DAYS, headerLine, type ConnectLines } from '$lib/record/device.ts';
   import { mintAgent } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import type { AgentKind } from '$lib/ui/agent-glyphs.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { CONNECT_TILES, connectWords, copyOf, heardOf, lineOf, liveRow, poll, type Heard, type KeyHeard, type TileId } from './connect.ts';
 
@@ -43,6 +46,9 @@
     /** Something changed the connected list: a key was made. */
     onchanged?: (() => void) | undefined;
   } = $props();
+
+  /* EACH WAY IN WEARS ITS APP'S MARK, as Connect your agent's segments do; the two with no maker wear a glyph. */
+  const MARKS: Record<TileId, AgentKind> = { 'claude-code': 'claude', 'claude-web': 'claude', codex: 'codex', cursor: 'cursor', other: 'other', script: 'other' };
 
   /* ONE TILE OPEN AT A TIME, and when it opened, which is the moment its live row waits for a call after. */
   let openId = $state<TileId | null>(null);
@@ -144,7 +150,11 @@
       {@const on = openId === t.id}
       <li class="way" data-on={on ? '' : undefined}>
         <h3 class="way-head">
-          <button type="button" class="way-pick" aria-expanded={on} aria-controls={on ? `way-${t.id}` : undefined} onclick={() => pick(t.id)}>{t.title}</button>
+          <button type="button" class="way-pick" aria-expanded={on} aria-controls={on ? `way-${t.id}` : undefined} onclick={() => pick(t.id)}
+            ><span class="way-mark" aria-hidden="true"
+              >{#if t.id === 'script'}<Icon name="code" size="m" />{:else}<AgentMark kind={MARKS[t.id]} size="m" />{/if}</span
+            ><span class="way-title">{t.title}</span><span class="way-chev" aria-hidden="true"><Icon name="chevron" size="s" /></span></button
+          >
         </h3>
         {#if on}
           <div class="way-body" id="way-{t.id}">
@@ -258,6 +268,44 @@
 
   .way[data-on] .way-pick {
     color: var(--red);
+  }
+
+  /* THE APP'S MARK IN A 28 WELL OF THE SHEET'S OWN SURFACE, then the name, then the chevron that turns as it opens. */
+  .way-pick {
+    gap: var(--sp-3);
+  }
+
+  .way-mark {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+  }
+
+  /* THE SIX BOXES UNDER THE SETUP LINE take the lines' own surface, since the way they sit in is the board's colour and
+     the boxes' usual fill would vanish into it. */
+  .way-body :global(.code-box) {
+    background: var(--tile);
+  }
+
+  .way-title {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .way-chev {
+    display: inline-flex;
+    flex: none;
+    color: var(--ink-3);
+    transition: transform var(--d-state) var(--ease-standard);
+  }
+
+  .way[data-on] .way-chev {
+    transform: rotate(90deg);
   }
 
   .way-pick:focus-visible {

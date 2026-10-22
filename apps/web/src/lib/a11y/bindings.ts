@@ -173,7 +173,7 @@ export const BINDINGS: Binding[] = [
   // function of the object in focus, not of the page you happen to be on.
   { id: 'block-source-code', scope: 'page', key: '⇧E', label: 'Open the source', bare: false },
 
-  /* ONE PRESS ANSWERS (DIRECTION §37): Enter gives the suggested answer or Accept, Backspace declines and `e` changes
+  /* ONE PRESS ANSWERS: Enter gives the suggested answer or Accept, Backspace declines and `e` changes
      what accepting takes, and no reason is asked for first. Enter never sends money or a change that is hard to undo:
      on the gate it goes to Accept, whose words name the amount, and on the queue it opens the question whole. */
   { id: 'gate-highlight', scope: 'gate', key: '1–9', label: 'Go to that answer. Enter gives it', bare: true },

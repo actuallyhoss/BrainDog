@@ -72,6 +72,11 @@ test('a member is told whose the plan is, and a month with no limit or no ledger
   const events: UsageView = { ...usageFromLedger(ledger(0), '2026-09'), records: [], totals: { runs: 12, requests: 0, bytes: 0, failures: 0 } };
   assert.deepEqual(sentenceOf(events), { text: '12 runs this month.' });
   assert.deepEqual(sentenceOf({ ...events, totals: { ...events.totals, runs: 0 } }), { text: 'Nothing has run in September.' }, 'nothing ran is said by the month, over the empty state');
+  assert.deepEqual(
+    sentenceOf({ ...events, totals: { ...events.totals, runs: 0 }, fired: 17 }),
+    { text: 'No scheduled action has run in September. Automations fired 17 times in the last 7 days.' },
+    'automations that fired are said, never "Nothing has run"',
+  );
 });
 
 test('the rings: amber from 80%, red only when used up, and the figure never says 0% of something', () => {

@@ -15,7 +15,8 @@ import { useCase } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
 
 import { DEFAULT_HOME, FIRST_TODAY_MOST, MONEY_WEEK, OWED, OWED_TO_YOU, TELL_LINE, WEEK_IN_SAID, amountSpoken, drawsAny, homeDrawn, todayHome, weekOf, type WeekDecl } from './default-home.ts';
-import { addedByHand, showTell, wantMore } from './first-today.ts';
+import { addedByHand, showTell } from './first-today.ts';
+import { wantMore } from './want-more.ts';
 import { playedBy } from '../start/parts.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { PageBlock } from '../record/schema.ts';

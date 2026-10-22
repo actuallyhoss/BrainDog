@@ -144,8 +144,8 @@ test('a signs card is drawn: each sign by its name and its sentence, its state i
     block.rows.map((r) => r.cells),
     [
       ['Tasks are moving', 'Needs a look', 'No task was closed in nine days.'],
-      ['Agents are heard from', 'Alive', 'Two agents wrote today.'],
-      ['Money is read', 'Not read yet', 'Nothing to read yet.'],
+      ['Agents are heard from', 'All good', 'Two agents wrote today.'],
+      ['Money is read', 'Not checked yet', 'Nothing to read yet.'],
     ],
   );
   assert.deepEqual(block.rows.map((r) => r.key), ['sign:tasks-moving', 'sign:agents-heard', 'sign:money-read']);

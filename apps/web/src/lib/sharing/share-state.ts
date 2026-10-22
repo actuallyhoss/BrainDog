@@ -7,7 +7,7 @@
  * template's rows, its allow carrying what the sheet says for Can, Hide, Until and More, its denies as the template
  * wrote them; the record keeps them as one bundle and says them as one sentence.
  *
- * THE DEFAULTS ARE §6's. A share to an email ends in 90 days unless somebody says otherwise; a share to somebody with a
+ * THE DEFAULTS ARE §6's. A share to an email ends in 30 days unless somebody says otherwise; a share to somebody with a
  * role has no end. Their agents are on, and Can delete is on for Edit. A switch left at its default is not written, so
  * the share JSON says only what was chosen.
  *
@@ -24,7 +24,7 @@ import { deletesOf, rowsOf, rungOf, templateOf, type Fills, type Offers } from '
 
 const DAY_MS = 86_400_000;
 /** How long a share with somebody not on the record lasts unless somebody says otherwise (§6, default 2). */
-export const GUEST_DAYS = 90;
+export const GUEST_DAYS = 30;
 /** Weekdays 9 to 6, as the More switch writes it. */
 export const WEEKDAYS = { days: [1, 2, 3, 4, 5], from: '09:00', to: '18:00' } as const;
 
@@ -87,7 +87,7 @@ export const dayAhead = (now: number, days: number): string => new Date(now + da
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 export const isEmail = (s: string): boolean => EMAIL.test(s.trim());
 
-/** Somebody the record does not hold yet: their share ends in 90 days unless somebody says otherwise. */
+/** Somebody the record does not hold yet: their share ends in 30 days unless somebody says otherwise. */
 export const guest = (w: With | null): boolean => w?.kind === 'email';
 
 /** Whether somebody is on his own team: a person with a role on the whole record. A group or an address never is. */
@@ -124,7 +124,7 @@ export function startOf(subject: Subject): SheetState {
   };
 }
 
-/** Somebody picked: an address starts at 90 days, anybody on the record at no end, unless a chip says its own. */
+/** Somebody picked: an address starts at 30 days, anybody on the record at no end, unless a chip says its own. */
 export function withPicked(s: SheetState, w: With | null, now: number): SheetState {
   return { ...s, with: w, until: lengthOf(templateOf(s.template)?.days ?? null, w, now), hide: amountsFor(s, w) };
 }
@@ -310,14 +310,15 @@ export function sentenceOf(shares: readonly Share[], s: SheetState, subject: Sub
 const joined = (xs: readonly string[]): string => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 /** The money a share shows, as `sharePreview` answers it (`SharePreview.money` in the record's `sharing.ts`). */
-export type MoneyShown = { lists: readonly string[]; hidden: boolean; figures: readonly { label: string; said: string }[] } | null;
+export type MoneyShown = { lists: readonly string[]; hidden: boolean; figures: readonly { label: string; said: string | null }[] } | null;
 
 /**
  * WHAT THEY WILL SEE, MONEY INCLUDED, SAID PLAINLY (the owner's call of 21 October): "Priya will see Kiln's tasks,
  * notes and money: £18,400 earned in a year." From `sharePreview`'s counts and money: each list it reaches rows of now
  * by name (a project's own row is the project, not a list in it), then money with the project's own figures, or
- * "amounts included", or "with money figures hidden", and why when it is hidden because they are outside his team.
- * `drawn` writes the record's "GBP 18,400.00" as the screen draws money. `null` for a share of named rows.
+ * "amounts included", or "with amounts hidden", and why when it is hidden because they are outside his team. A figure
+ * that reads nothing is said as "nothing still to come in". `drawn` writes the record's "GBP 18,400.00" as the screen
+ * draws money. `null` for a share of named rows.
  */
 export function seenSaid(
   w: With,
@@ -338,7 +339,7 @@ export function seenSaid(
   if (money.hidden) return hide.amounts && hide.chosen !== true && !onTeam(w) ? copy.shareSeenHiddenOutside(who, said(named)) : copy.shareSeenHidden(who, said(named));
   const things = said([...named, copy.shareSeenMoney]);
   if (money.figures.length === 0) return copy.shareSeenAmounts(who, things);
-  return copy.shareSeenFigures(who, things, joined(money.figures.map((f) => `${drawn(f.said)} ${f.label.toLowerCase()}`)));
+  return copy.shareSeenFigures(who, things, joined(money.figures.map((f) => (f.said === null ? copy.shareSeenNothing(f.label.toLowerCase()) : `${drawn(f.said)} ${f.label.toLowerCase()}`))));
 }
 
 /**

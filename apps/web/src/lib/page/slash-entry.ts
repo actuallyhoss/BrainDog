@@ -1,5 +1,5 @@
 /**
- * SLASH'S TWO LINES ABOUT A PAGE (DIRECTION §45): "Make ..." goes to the composer, "Change ..." to Change this.
+ * SLASH'S TWO LINES ABOUT A PAGE: "Make ..." goes to the composer, "Change ..." to Change this.
  *
  * THE PALETTE ONLY CARRIES THE LINE. It goes to the page in the address (`?make=` or `?change=`), the way a new page's
  * `?describe=1` does, so the page that owns the draft or the block does the work and a reload or Back never repeats it.

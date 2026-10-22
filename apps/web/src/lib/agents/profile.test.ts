@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { CONTEXT_BUDGETS as KERNEL_BUDGETS, DEFAULT_PROFILE, PROFILE_KINDS } from '@braindog/kernel';
 
-import { keyScopeOf, type Run, type TokenRow } from '../record/device.ts';
+import { keyScopeOf, seatsHeard, type Run, type TokenRow } from '../record/device.ts';
 import {
   BUDGET_WORDS,
   KIND_NAMES,
@@ -17,13 +17,18 @@ import {
   TOOL_ROWS,
   agentRows,
   argsOf,
+  chipName,
   draftOf,
   faultOf,
   followers,
+  groupRows,
   hasHooks,
   heardLine,
   machinesLine,
   keepersOf,
+  keyDecides,
+  narrowed,
+  plainSays,
   sameDraft,
   saysOf,
   type Heard,
@@ -72,10 +77,31 @@ test('nothing stored: its key decides, and the row it would become starts at Wri
   assert.equal(claude.follows, 'key');
   assert.equal(claude.may, 'write');
   assert.equal(claude.draft.ceiling, 'write');
-  assert.match(claude.says, /Its key decides for now/u);
+  /* WHAT THE KEY ALLOWS, AND NOT THAT IT DECIDES: the list says that once (`keyDecides`). */
+  assert.equal(claude.says, plainSays('write'));
+  assert.ok(!narrowed(claude), 'a plain Write row draws no sentence of its own');
+  assert.ok(keyDecides(rows));
   const codex = rows[1]!;
   assert.equal(codex.may, null, 'a key not read is not guessed');
-  assert.equal(codex.says, 'Nothing set yet; its key decides.');
+  assert.equal(codex.says, '', 'a key not read says nothing');
+});
+
+test('the list groups by agent: profiles hang off their agent as chips, Defaults stays a row', () => {
+  const rows = agentRows({
+    profiles: [UNSTORED_DEFAULT],
+    heard: [heard('claude', 9)],
+    seats: [
+      { agent: 'claude', seat: 'studio', seq: 9, seen: '2026-10-21T08:00:00.000Z' },
+      { agent: 'claude', seat: 'brain', seq: 8, seen: '2026-10-21T07:00:00.000Z' },
+    ],
+    keyScope: () => 'write',
+  });
+  const groups = groupRows(rows);
+  const claude = groups.find((g) => g.row.key === 'kind:claude')!;
+  assert.deepEqual(claude.chips.map(chipName), ['brain', 'studio']);
+  assert.ok(!groups.some((g) => g.row.seat), 'no profile is a row of its own');
+  assert.equal(groups.at(-1)!.row.name, 'Defaults for new agents');
+  assert.equal(chipName({ seat: null, name: 'Claude Code as garden', kind: 'claude' }), 'garden');
 });
 
 test('Defaults saved: an agent with no row of its own follows it, at Suggest for a new agent', () => {
@@ -168,8 +194,8 @@ test('the line under a name: working now, last heard, or not yet, then its machi
   assert.equal(heardLine({ key: 'kind:codex', heard: null }, false, ago), 'Not heard from yet');
   assert.equal(heardLine({ key: 'default', heard: null }, false, ago), null);
   assert.equal(machinesLine([]), null);
-  assert.equal(machinesLine(['kiln-mbp']), 'kiln-mbp');
-  assert.equal(machinesLine(['kiln-mbp', 'studio-desktop']), 'kiln-mbp and 1 more');
+  assert.equal(machinesLine(['kiln-mbp']), 'MacBook Pro');
+  assert.equal(machinesLine(['kiln-mbp', 'studio-desktop']), 'MacBook Pro and 1 more');
 });
 
 test('the key behind a kind’s newest run decides while nothing is stored', () => {
@@ -198,4 +224,32 @@ test('every tool the MCP lists has a switch, and no switch names a tool it does 
   const listed = [...body.matchAll(/^ {4}name: '([a-z_]+)',$/gmu)].map((m) => m[1]!).filter((n) => n !== 'schema' && n !== 'history');
   assert.deepEqual([...TOOL_ROWS.map((t) => t.name)].sort(), [...new Set(listed)].sort());
   assert.deepEqual(TOOL_ROWS.filter((t) => t.always).map((t) => t.name), ['context', 'instructions'], 'how it hears him is never switched off');
+});
+
+test('A ROW PER CLAUDE CODE PROFILE OF HIS: it follows its kind until saved, and its first save matches the kind under that profile', () => {
+  const NOW = Date.parse('2026-10-22T09:00:00.000Z');
+  const runs = [
+    { seq: 7, fields: { agent: 'claude', seat: 'harbour', last_seen: '2026-10-22T08:00:00.000Z' } },
+    { seq: 5, fields: { agent: 'claude', seat: 'harbour', last_seen: '2026-10-21T08:00:00.000Z' } },
+    { seq: 6, fields: { agent: 'claude', seat: 'default', last_seen: '2026-10-22T07:00:00.000Z' } },
+    { seq: 2, fields: { agent: 'claude', seat: 'garden', last_seen: '2026-08-01T08:00:00.000Z' } },
+  ];
+  const seats = seatsHeard(runs, NOW);
+  assert.deepEqual(seats.map((h) => [h.agent, h.seat, h.seq]), [['claude', 'harbour', 7], ['claude', 'default', 6]]);
+
+  const claude = view({ id: 'pf_c', name: 'Claude Code', match: { kind: 'claude' }, ceiling: 'write' });
+  const rows = agentRows({ profiles: [STORED_DEFAULT, claude], heard: [heard('claude', 7)], seats, keyScope: noKey });
+  const harbour = rows.find((r) => r.name === 'Claude Code as harbour')!;
+  assert.deepEqual([harbour.kind, harbour.seat, harbour.follows, harbour.may, harbour.stored], ['claude', 'harbour', 'kind', 'write', null]);
+  assert.ok(!rows.some((r) => r.name === 'Claude Code as default'), 'the default profile is its kind’s own row');
+  assert.ok(!followers(rows).includes('Claude Code as harbour'), 'a profile’s row follows its kind, not Defaults');
+  assert.deepEqual(argsOf(harbour, harbour.draft).match, { kind: 'claude', seat: 'harbour' });
+  assert.equal(argsOf(harbour, harbour.draft).name, 'Claude Code as harbour');
+
+  /* SAVED, IT IS ITS OWN ROW, beside its kind and before the rows bound to one key. */
+  const saved = view({ id: 'pf_q', name: 'Claude Code as harbour', match: { kind: 'claude', seat: 'harbour' }, ceiling: 'read' });
+  const again = agentRows({ profiles: [STORED_DEFAULT, claude, saved], heard: [heard('claude', 7)], seats, keyScope: noKey });
+  const own = again.filter((r) => r.seat === 'harbour');
+  assert.deepEqual(own.map((r) => [r.key, r.follows, r.may]), [['pf_q', 'own', 'read']]);
+  assert.deepEqual(argsOf(own[0]!, own[0]!.draft).id, 'pf_q');
 });

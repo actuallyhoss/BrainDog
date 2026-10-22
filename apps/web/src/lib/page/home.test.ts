@@ -65,7 +65,7 @@ test('WHAT A BLOCK HOLDS IS READ IN ITS OWN FIELD: figures, questions, a feed, a
   assert.equal(holdsNothing(block({ kind: 'feed', feed: [{} as never] })), false);
   assert.equal(holdsNothing(block({ kind: 'forecast', walk: {} as never })), false);
   assert.equal(holdsNothing(block({ kind: 'calendar', answer: {} as never })), false, 'a registered kind is read by its own module');
-  assert.equal(holdsNothing(block({ kind: 'chips', body: 'Kiln · Bake' })), false, 'what the author wrote on the block is what it holds');
+  assert.equal(holdsNothing(block({ kind: 'chips', body: 'Kiln · Oxbow' })), false, 'what the author wrote on the block is what it holds');
   assert.equal(holdsNothing(block({ kind: 'todo' })), true);
 });
 
@@ -148,11 +148,11 @@ test('A CHART OVER WHAT NO ROW HAS SAID IS NOT DRAWN, its empty line or not, and
   assert.deepEqual(emptyHidden([none, block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' })]).map((b) => b.drawn), [true, false]);
 
   /* No project says what it earns: a bar of nothing over its empty line. */
-  const projects = [entry(1, { name: 'Bake', revenue: null }), entry(2, { name: 'Sketchpad' })];
+  const projects = [entry(1, { name: 'Oxbow', revenue: null }), entry(2, { name: 'Pinwheel' })];
   const earns = block({ kind: 'bar', source: 'register.things', register: 'things', columns: [{ field: 'name' }, { field: 'revenue' }] as never, matched: projects, entries: projects, total: 2, empty: 'No project in play says what it earns.' });
   assert.equal(unsaid(earns), true);
-  assert.equal(unsaid({ ...earns, matched: [entry(1, { name: 'Bake', revenue: { amount: 10_500_000, currency: 'USD' } })] }), false);
-  const list = block({ kind: 'todo', source: 'register.things', register: 'things', columns: [{ field: 'name' }, { field: 'revenue' }] as never, matched: projects, entries: projects, rows: [row('Bake'), row('Sketchpad')], total: 2 });
+  assert.equal(unsaid({ ...earns, matched: [entry(1, { name: 'Oxbow', revenue: { amount: 10_500_000, currency: 'USD' } })] }), false);
+  const list = block({ kind: 'todo', source: 'register.things', register: 'things', columns: [{ field: 'name' }, { field: 'revenue' }] as never, matched: projects, entries: projects, rows: [row('Oxbow'), row('Pinwheel')], total: 2 });
   assert.equal(unsaid(list), false, 'a list draws its rows’ names whatever else is empty');
   assert.deepEqual(emptyHidden([earns, list]).map((b) => b.drawn), [false, true]);
 
@@ -217,7 +217,7 @@ const held = (title: string, fields: Record<string, unknown> = {}) => ({ id: tit
 const full = () => block({ kind: 'table', rows: [row('Rent')], entries: [held('Rent')], shown: 1, total: 1 });
 
 test('EACH WHY: a list of nothing is empty, a chart of a field nobody filled is unsaid, a when that said no is when, and cannot', () => {
-  const chips = block({ kind: 'chips', columns: [{ field: 'health' }] as LiveBlock['columns'], matched: [held('Kiln', { health: null }), held('Bake', { health: '' })], rows: [row('Kiln')] });
+  const chips = block({ kind: 'chips', columns: [{ field: 'health' }] as LiveBlock['columns'], matched: [held('Kiln', { health: null }), held('Oxbow', { health: '' })], rows: [row('Kiln')] });
   const out = markDrawn([
     full(),
     block({ kind: 'todo', empty: 'Nothing due today.' }),

@@ -31,7 +31,7 @@ export const queueWords = {
   why: 'Why? (one line)',
   send: 'Send',
   suggested: 'Suggested',
-  /** The button that answers a question of options with the one chosen (DIRECTION §39, "Decide reads like a form"). */
+  /** The button that answers a question of options with the one chosen ("Decide reads like a form"). */
   decide: 'Answer',
   /** Putting a question off, said as a person says it (today F11): a clock at the row's end opens its page at the step. */
   notNow: 'Ask me later',
@@ -73,8 +73,8 @@ export const COMPACT_MOST = 3;
  * A QUEUE SHOWN OUTSIDE DECIDE: at most three questions, and how many more wait on Decide. `total` is the block's count
  * of what is open, which may be more than it was handed; it is never read as less than what was handed.
  */
-export function compactOf<T>(queue: readonly T[], total: number = queue.length): { shown: T[]; more: number } {
-  const shown = queue.slice(0, COMPACT_MOST);
+export function compactOf<T>(queue: readonly T[], total: number = queue.length, most: number = COMPACT_MOST): { shown: T[]; more: number } {
+  const shown = queue.slice(0, most);
   return { shown, more: Math.max(total, queue.length) - shown.length };
 }
 
@@ -150,7 +150,7 @@ const WORD = /^(?:\p{L}[\p{L}\p{M}]*(?:['\u2019./-]\p{L}[\p{L}\p{M}]*)*\.?|[+\u2
 const COUNTED = /\p{Nd}{12}/u;
 
 /**
- * WHETHER WORDS ARE A PLAIN FIGURE (audit 74 #3, DIRECTION 40: no raw id or raw timestamp on his pages). `spoken` takes
+ * WHETHER WORDS ARE A PLAIN FIGURE (audit 74 #3: no raw id or raw timestamp on a person's pages). `spoken` takes
  * out the ids it knows by their spelling, and a run's name, a ULID with a letter no ULID holds, a machine's time and a
  * key pass it untouched. So a figure is held to what a figure IS and not to what an id is not: it says a number, and
  * every word of it is a number, a short name with its number, or a word that stands beside one.

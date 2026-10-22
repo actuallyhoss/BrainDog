@@ -331,7 +331,7 @@ test("UNDER A SLUG THE RECORD'S EVENTS ARE THAT RECORD'S, and the ledger and sig
   });
   const read = await readUsage(io, NOW_MS, '', '/app/acme');
   assert.ok(read.ok === true && read.view.from === 'events' && read.view.weeks[0]?.runs === 7);
-  assert.deepEqual(sent.map((x) => x.url.split('?')[0]), ['/auth/methods', '/account/usage', '/app/acme/api/actions']);
+  assert.deepEqual(sent.map((x) => x.url.split('?')[0]), ['/auth/methods', '/account/usage', '/app/acme/api/actions', '/app/acme/api/automations']);
 });
 
 test('no host at all says so; a ledger refusal is its sentence; a record with neither read draws none', async () => {

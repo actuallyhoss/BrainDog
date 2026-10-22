@@ -1,5 +1,5 @@
 /**
- * THE ONE DECISION CARD WHERE HE ASKED, on `/slash` as in the palette (ENG-B16, his D37.129 to D37.133): an ask on the Slash
+ * THE ONE DECISION CARD WHERE HE ASKED, on `/slash` as in the palette (ENG-B16): an ask on the Slash
  * page that answers with a change draws its card under the Ask field. Enter accepts it, a six-second Undo follows
  * (`DecisionCard.svelte`, `press.ts` `HOLD_MS`), and it reads "Slash suggested · Mara accepted" once answered.
  *

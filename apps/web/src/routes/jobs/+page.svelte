@@ -26,6 +26,7 @@
   It picks a kind, takes its arguments, starts it and opens the run, where the transcript fills in as the machine works.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
@@ -234,6 +235,11 @@
     kinds = got;
     if (got.ok && chosen === null && got.value.length === 1) chosen = got.value[0]?.id ?? null;
   }
+
+  /* `?start` IS "RUN A JOB" FROM THE AGENTS PAGE: the sheet opens as the page does, since the list moved there. */
+  onMount(() => {
+    if (page.url.searchParams.has('start') && !page.data.refused) void openRun();
+  });
 
   function pick(id: string) {
     chosen = id;

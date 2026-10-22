@@ -1,6 +1,6 @@
 /**
  * Pin an answer: what Slash answered in the palette, kept on a page the person picks, so it is still there after the
- * palette closes (PGS-B12, "answers you can pin", D37.34).
+ * palette closes (PGS-B12, "answers you can pin").
  *
  * A LIST'S ANSWER PINS AS A TABLE, AND PROSE AS A NOTE. An answer drawn from one list by a filter is that list and that filter, so it
  * pins as a table the page reads again every time it opens: the rows are the record's on the day it is read, not a copy

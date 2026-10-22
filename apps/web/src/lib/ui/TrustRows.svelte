@@ -1,13 +1,13 @@
 <!--
-  What each agent may do on its own: the ladder of trust, read back (`trust`, ENG-A12, DIRECTION §37 "a ladder per
-  agent and kind").
+  What each agent may do on its own: the ladder of trust, read back (`trust`, ENG-A12, a ladder per
+  agent and kind).
 
   ONE TILE, ONE SENTENCE A LINE: an agent, a kind of change, and what the rung means, "Claude Code may add tasks and do
   it quietly since 3 Oct". It goes under the connected list in Settings > Agents, so who is connected and how far each
   is trusted are read together. The sentences and the rules are `record/trust.ts`, which the tests hold.
 
-  ONE CONTROL, "ASK AGAIN", beside each kind an agent does on its own: the owner's own way down (`trustTakeBack`, "undo"
-  D37.167). It puts that kind back to asking and reads the ladder again, so the line says "Put back" and why. Nothing
+  ONE CONTROL, "ASK AGAIN", beside each kind an agent does on its own: the owner's own way down (`trustTakeBack`, the
+  ladder's undo). It puts that kind back to asking and reads the ladder again, so the line says "Put back" and why. Nothing
   here climbs a rung: that is the owner's answer to an offer, in Needs you. Under the lines, two say what no rung reaches.
 
   ONLY THE OWNER SEES IT. For anyone the record refuses, on the sample, and on a host built before the call, nothing is
@@ -16,7 +16,7 @@
   A KIND PUT BACK TO ASKING CARRIES THE WORDS, never the colour alone: "Put back" in the deeper red, then why, as the
   record worded it.
 
-  OUTSIDE TEXT SAYS SO (ENG-A13, D37.116): under an agent whose run read the inbox, or anything else from outside the
+  OUTSIDE TEXT SAYS SO (ENG-A13): under an agent whose run read the inbox, or anything else from outside the
   record, one muted line says it asks about everything in that run and why. Under the floors, each import asks whether
   all of it is his (`ImportAsk.svelte`), loaded only when the record holds one, so no other screen carries it. A host
   that sends neither draws exactly what it drew before.
@@ -37,10 +37,11 @@
   /** The record's sentence for a press that did not land, beside the line it was for. */
   let failed = $state<{ key: string; fix: string } | null>(null);
 
-  const lines = $derived(standing ? trustLines(standing, Date.now()) : []);
-
   /** Each agent's marked line, by its place in the record's order, read off the standing `readTrust` keeps. */
   const marked = $derived(standing ? standing.agents.map(markedLine) : []);
+
+  /* THE AGENTS THAT ASK BEFORE EVERY CHANGE ARE ONE LINE, unless a marked line is said under one of them. */
+  const lines = $derived(standing ? trustLines(standing, Date.now(), (i) => !marked[i]) : []);
   /** The imports the record holds, or `null` when it sent none or has no such call. */
   let imports = $state<ImportRow[] | null>(null);
 

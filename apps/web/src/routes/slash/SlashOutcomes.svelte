@@ -1,5 +1,5 @@
 <!--
-  What came of Slash's suggestions (ENG-B01 and ENG-A16 seen, DIRECTION 40 "answers that teach", "health shown").
+  What came of Slash's suggestions (ENG-B01 and ENG-A16 seen: answers that teach, health shown).
 
   ONE TILE, A LIST INSIDE IT: a line a kind of change, then the duplicates merged, then whether Slash wrote anything
   outside what it may. The lines are `slash-outcomes.ts`'s, worked out from the record's `engineReadings` before this

@@ -67,41 +67,41 @@ const holdings = (kind: string, rows: { id: string; fields: Record<string, unkno
 test('a dollar amount on a record kept in Egyptian pounds draws a bar whose note says converted from USD, and a home amount says nothing', () => {
   const read = holdings('bar', [
     { id: 'h1', fields: { name: 'Personal', balance: { amount: 70_231_800, currency: 'EGP' } } },
-    { id: 'h2', fields: { name: 'Quartz', balance: { amount: 294_795, currency: 'USD' } } },
+    { id: 'h2', fields: { name: 'Harbour', balance: { amount: 294_795, currency: 'USD' } } },
   ]);
   const rows = rowsOf(toSegments({ ...read, fx: { home: 'EGP', rates: egp } }));
   assert.deepEqual(rows, [
     ['Personal', 'EGP 702,318.00', ''],
-    ['Quartz', 'EGP 147,397.50', 'converted from USD'],
+    ['Harbour', 'EGP 147,397.50', 'converted from USD'],
   ]);
 });
 
 test('a split says it too, on the part that was converted', () => {
   const read = holdings('split', [
     { id: 'h1', fields: { name: 'Personal', balance: { amount: 70_231_800, currency: 'EGP' } } },
-    { id: 'h2', fields: { name: 'Quartz', balance: { amount: 294_795, currency: 'USD' } } },
+    { id: 'h2', fields: { name: 'Harbour', balance: { amount: 294_795, currency: 'USD' } } },
   ]);
   const notes = Object.fromEntries(rowsOf(toSegments({ ...read, fx: { home: 'EGP', rates: egp } })).map((r) => [r[0], r[2]]));
-  assert.equal(notes.Quartz, 'converted from USD');
+  assert.equal(notes.Harbour, 'converted from USD');
   assert.equal(notes.Personal, '');
 });
 
 test('one bar that adds up home money and two other currencies names both, once each', () => {
   const read = holdings('bar', [
-    { id: 'h1', fields: { name: 'Quartz', balance: { amount: 100_000, currency: 'USD' } } },
-    { id: 'h2', fields: { name: 'Quartz', balance: { amount: 200_000, currency: 'USD' } } },
-    { id: 'h3', fields: { name: 'Quartz', balance: { amount: 100_000, currency: 'EUR' } } },
-    { id: 'h4', fields: { name: 'Quartz', balance: { amount: 500_000, currency: 'EGP' } } },
+    { id: 'h1', fields: { name: 'Harbour', balance: { amount: 100_000, currency: 'USD' } } },
+    { id: 'h2', fields: { name: 'Harbour', balance: { amount: 200_000, currency: 'USD' } } },
+    { id: 'h3', fields: { name: 'Harbour', balance: { amount: 100_000, currency: 'EUR' } } },
+    { id: 'h4', fields: { name: 'Harbour', balance: { amount: 500_000, currency: 'EGP' } } },
   ]);
   const rows = rowsOf(toSegments({ ...read, fx: { home: 'EGP', rates: twoInto } }));
-  assert.deepEqual(rows, [['Quartz', 'EGP 210,000.00', 'converted from EUR and USD']]);
+  assert.deepEqual(rows, [['Harbour', 'EGP 210,000.00', 'converted from EUR and USD']]);
 });
 
 test('bars cut to a limit keep the word on the bar that holds the rest', () => {
   const read = holdings('bar', [
     { id: 'h1', fields: { name: 'Personal', balance: { amount: 70_231_800, currency: 'EGP' } } },
     { id: 'h2', fields: { name: 'Savings', balance: { amount: 1_000_000, currency: 'EGP' } } },
-    { id: 'h3', fields: { name: 'Quartz', balance: { amount: 1_000, currency: 'USD' } } },
+    { id: 'h3', fields: { name: 'Harbour', balance: { amount: 1_000, currency: 'USD' } } },
   ]);
   const rows = rowsOf(toSegments({ ...read, limit: 2, fx: { home: 'EGP', rates: egp } }));
   assert.equal(rows.length, 2);
@@ -112,7 +112,7 @@ test('bars cut to a limit keep the word on the bar that holds the rest', () => {
 test('with no home currency nothing is converted, and no bar says it was', () => {
   const read = holdings('bar', [
     { id: 'h1', fields: { name: 'Personal', balance: { amount: 70_231_800, currency: 'EGP' } } },
-    { id: 'h2', fields: { name: 'Quartz', balance: { amount: 294_795, currency: 'USD' } } },
+    { id: 'h2', fields: { name: 'Harbour', balance: { amount: 294_795, currency: 'USD' } } },
   ]);
   const rows = rowsOf(toSegments({ ...read, fx: { home: null, rates: [] } }));
   assert.deepEqual(rows.map((r) => r[2]), ['', '']);

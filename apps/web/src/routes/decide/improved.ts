@@ -1,5 +1,5 @@
 /**
- * BRAINDOG'S OWN PAGE UPDATES, ON DECIDE AS ONE CARD (DIRECTION §37): "BrainDog improved 4 of your pages", what changes
+ * BRAINDOG'S OWN PAGE UPDATES, ON DECIDE AS ONE CARD: "BrainDog improved 4 of your pages", what changes
  * on each, and Accept.
  *
  * WHY. A newer version of a module or a use case this build ships waited on the Updates tab of Add-ons and nowhere

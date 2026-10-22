@@ -105,12 +105,12 @@ test('THE SHEET BECOMES THE SHARE JSON: Priya can edit tasks in Kiln for 30 days
   assert.deepEqual(sharesOf({ ...s, hide: { amounts: true, fields: { tasks: ['stage'] } } }, kiln, NOW, DECLS)[0]!.hide, { tasks: ['stage', 'rate'], money: ['amount'] });
 });
 
-test('AN EMAIL ENDS IN 90 DAYS, a condition is a list and its tree, a row is its id, and nothing is ready half-chosen', () => {
+test('AN EMAIL ENDS IN 30 DAYS, a condition is a list and its tree, a row is its id, and nothing is ready half-chosen', () => {
   const tasks: Subject = { kind: 'list', list: 'tasks', name: 'Tasks' };
   let s = startOf(tasks);
   assert.equal(ready(s, tasks), false, 'ready with nobody to share with');
   s = withPicked(s, { kind: 'email', email: ' Priya@Studio.co ' }, NOW);
-  assert.deepEqual(s.until, { kind: 'day', day: '2027-01-18' });
+  assert.deepEqual(s.until, { kind: 'day', day: '2026-11-19' });
   s = { ...s, what: { kind: 'where', where: null } };
   assert.equal(ready(s, tasks), false, 'ready before the condition was said');
   s = { ...s, can: 'comment', what: { kind: 'where', where: { field: 'stage', is: 'Review' } } };
@@ -122,7 +122,7 @@ test('AN EMAIL ENDS IN 90 DAYS, a condition is a list and its tree, a row is its
       what: { list: 'tasks', where: { field: 'stage', is: 'Review' } },
       can: 'comment',
       hide: { types: ['money'] },
-      when: { until: '2027-01-18T23:59:59.000Z' },
+      when: { until: '2026-11-19T23:59:59.000Z' },
     },
   ]);
   assert.equal(ready(withPicked(s, { kind: 'email', email: 'priya' }, NOW), tasks), false, 'ready with an address that is not one');
@@ -180,7 +180,7 @@ test("THE SHEET'S SENTENCE IS sharePreview's, and its count line is drawn from s
     'Priya can edit tasks in Kiln until 1 Dec.',
     'Priya can view everything in Kiln.',
     'Priya can comment on tasks on weekdays 9 to 6.',
-    'ana@studio.co can view some tasks until 18 Jan.',
+    'ana@studio.co can view some tasks until 19 Nov.',
     'Priya can view Task 1 once, for a day.',
   ]);
 
@@ -196,4 +196,15 @@ test("THE SHEET'S SENTENCE IS sharePreview's, and its count line is drawn from s
   /* A CHIP'S BUNDLE IS ONE SENTENCE, its denies after it. */
   const bundle = chipPressed(withPicked(startOf(list), PRIYA, NOW), 'accountant', NOW);
   assert.equal(sentenceOf(sharesOf(bundle, list, NOW, DECLS), bundle, list, NOW, DECLS), 'Priya can view money lists until 18 Jan. No keys.');
+});
+
+test('SHARING IS PLUS\'S ON FREE AND CLOUD, and an unknown plan leaves the sheet to open', async () => {
+  const { needsPlus } = await import('./may-share.ts');
+  const rec = (plan: string) => ({ open: true, records: [{ slug: 'kiln', plan }] });
+  assert.equal(needsPlus(rec('free'), 'kiln'), true);
+  assert.equal(needsPlus(rec('cloud'), 'kiln'), true);
+  assert.equal(needsPlus(rec('plus'), 'kiln'), false);
+  assert.equal(needsPlus({ ...rec('free'), open: false }, 'kiln'), false);
+  assert.equal(needsPlus(rec('free'), 'other'), false);
+  assert.equal(needsPlus(null, 'kiln'), false);
 });

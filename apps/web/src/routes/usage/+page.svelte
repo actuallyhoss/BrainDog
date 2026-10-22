@@ -110,6 +110,7 @@
   const usageWords = {
     emptyBody: 'When an agent or an automation runs, what it used is counted here, day by day.',
     seeAgents: 'See your agents',
+    seeAutomations: 'See your automations',
   } as const;
 
   const said = {
@@ -273,7 +274,9 @@
           </Tile>
         {/each}
 
-        {#if view.totals.runs > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0))}
+        <!-- ONLY WHERE A DAY OF A RUN IS KNOWN: an automation's runs are counted for the month and not by day, and a figure
+             over bars of nothing read as runs that happened on no day. -->
+        {#if view.totals.runs > 0 && view.days.length > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0))}
           <Tile icon="history" title={reading.weeks}>
             <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
             <Bars items={weekBars(view)} subject={words.overTime} />
@@ -309,8 +312,16 @@
       <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
       {#if view.totals.runs === 0}
         <!-- WHAT WOULD BE COUNTED, AND WHERE IT RUNS FROM (money F14): the tile said a month was empty and stopped. -->
-        <Empty kind="no-data-yet" glyph="chart-bar" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} body={usageWords.emptyBody}>
-          {#snippet actions()}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/snippet}
+        <Empty
+          kind="no-data-yet"
+          glyph="chart-bar"
+          title={view.current ? ((view.fired ?? 0) > 0 ? reading.noActionRun : words.noUsage) : words.noUsageIn(monthWords(view.month))}
+          body={(view.fired ?? 0) > 0 ? reading.firedBody : usageWords.emptyBody}
+        >
+          {#snippet actions()}
+            {#if (view.fired ?? 0) > 0}<Button weight="primary" href="/automations">{usageWords.seeAutomations}</Button>
+            {:else}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/if}
+          {/snippet}
         </Empty>
       {:else}
         <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
@@ -393,6 +404,16 @@
 
   /* THE SWITCHER, in the toolbar. The chosen month is the white pill (`controls.css`); a link is a segment like any
      other, and never underlined. */
+  /* AS WIDE AS ITS MONTHS AT A DESK: stretched under the sentence its track ran on past the last month as an empty bar.
+     A phone's is the page's width (`full`), its months sharing it. */
+  @media (width >= 640px) {
+    :global(.segmented.months) {
+      align-self: flex-start;
+      justify-self: start;
+      inline-size: max-content;
+    }
+  }
+
   :global(.months) .month {
     display: inline-flex;
     align-items: center;

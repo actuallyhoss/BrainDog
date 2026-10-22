@@ -1,5 +1,5 @@
 /**
- * WHO CHANGED A ROW FOR YOU, ON A PAGE (DIRECTION §37, trust): a row an agent, a rule or Slash changed wears a faint tint
+ * WHO CHANGED A ROW FOR YOU, ON A PAGE (trust): a row an agent, a rule or Slash changed wears a faint tint
  * until you have seen it, and a quiet line, "Claude for Mara · 2h ago · Undo", where Undo puts that change back on the
  * record by its batch, saying first what else it takes back when the change touched more than the row (`byline-undo.ts`).
  *
@@ -69,7 +69,7 @@ export function bylinesIn(
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * THE ONE LINE AT THE FOOT OF THE BOARD (DIRECTION §39): how many of the page's rows were changed for the reader this
+ * THE ONE LINE AT THE FOOT OF THE BOARD: how many of the page's rows were changed for the reader this
  * week, and by whom, in one sentence. "5 changes by your rules this week". The list itself opens in the docked panel;
  * five lines over the page's questions, a bank's name in capitals on each, were noise above the work.
  *

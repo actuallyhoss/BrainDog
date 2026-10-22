@@ -234,7 +234,7 @@ test('THE RECORD’S OWN TAGS ARE NOT KEYS OF `copy`', () => {
 });
 
 /**
- * THE PERSON'S WORDS, NOT THE STORAGE'S (DIRECTION §35). "Rows", "list item" and "entity" are how the record is
+ * THE PERSON'S WORDS, NOT THE STORAGE'S. "Rows", "list item" and "entity" are how the record is
  * stored, and a reader never asked for any of them: they keep invoices, tasks and people. Every sentence this file
  * builds is rendered with a few shapes of argument, as `access.test.ts` does, and none may say one of those words.
  *
@@ -262,7 +262,7 @@ test('NO SENTENCE SAYS "ROW", "LIST ITEM" OR "ENTITY"', () => {
 });
 
 /**
- * AND NOT "LIST" WHERE A PERSON MEETS THEIR OWN THINGS (DIRECTION §35). The sidebar's heading, the palette's groups,
+ * AND NOT "LIST" WHERE A PERSON MEETS THEIR OWN THINGS. The sidebar's heading, the palette's groups,
  * the inbox's file button and Decide's queue words said "Lists", "Pages and lists", "File it in a list" and "goes back
  * to the list": the storage's word over the person's invoices and tasks. These name the things or the place instead.
  */

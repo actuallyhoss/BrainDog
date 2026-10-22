@@ -1,5 +1,5 @@
 /**
- * The page header's sentence (DIRECTION §39): figures a step heavier, the phrase that needs the reader in red, and the
+ * The page header's sentence: figures a step heavier, the phrase that needs the reader in red, and the
  * words between them as they were.
  */
 import { test } from 'node:test';

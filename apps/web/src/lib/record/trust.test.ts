@@ -139,3 +139,16 @@ test('Ask again sends the agent and the kind to trustTakeBack, and says the reco
   assert.match(lost.ok ? '' : lost.fix, /Nothing was changed\.$/u, 'a press that never landed says nothing moved');
   assert.doesNotMatch(lost.ok ? '' : lost.fix, /—/u);
 });
+
+test('agents that ask before every change are one line where nothing more is said under them', () => {
+  const agents = [agent('Codex', []), agent('Cursor', [kind('add tasks', 'quiet', '2026-10-03')]), agent('Gemini', []), agent('Claude Code', [])];
+  assert.deepEqual(
+    trustLines({ agents }, NOW, (i) => i !== 3).map((l) => [l.key, l.text]),
+    [
+      ['0', 'Codex and Gemini ask before every change'],
+      ['1:0', 'Cursor may add tasks and do it quietly since 3 Oct'],
+      ['3', 'Claude Code asks before every change'],
+    ],
+  );
+  assert.equal(said(agents).length, 4, 'without the question every agent keeps its line');
+});

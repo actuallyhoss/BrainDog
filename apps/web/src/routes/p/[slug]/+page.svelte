@@ -165,10 +165,20 @@
     const keptCopy = reader.kept(asked, filtered);
     const choice = filtered;
     const mark = localTicket();
+    /* A PAGE DRAWN FROM WHAT THIS TAB KEPT IS THE SCREEN, and the read behind it lands over it: the bracket is closed now
+       and not when the record answers, as Today's is (`Home.svelte`), so Back to Money is settled when it is drawn and
+       not after the figures have been worked out again. A refusal of that read is still said (`closeRead`). */
+    let released = false;
+    const closeRead = (ok: boolean): void => {
+      if (released) return ok ? undefined : closed(false, opened());
+      released = true;
+      closed(ok, at);
+    };
     if (keptCopy) {
       answered(asked, keptCopy);
       remembered = asked;
       painted('page', 'memory');
+      closeRead(true);
     } else fromLocal(asked, choice);
     waited = 0;
     clearTimeout(holdTimer);
@@ -185,18 +195,18 @@
     });
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
        while this was out, has already drawn over. */
-    if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);
+    if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closeRead(true);
     /* OFFLINE OVER THE COPY'S PAGE, IT STAYS, until the record answers again. */
     if (out.from === 'refused' && copied === asked && ((route.data as unknown as Shell).offline === true || live.state === 'offline')) {
       reading = false;
-      return closed(true, at);
+      return closeRead(true);
     }
     answered(asked, out);
     copied = null;
     if (out.from === 'live') painted('page', 'network');
     keepPage(asked, choice, out, mark);
     reading = false;
-    closed(out.from !== 'refused', at);
+    closeRead(out.from !== 'refused');
   }
 
   $effect(() => {

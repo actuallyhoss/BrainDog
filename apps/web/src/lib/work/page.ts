@@ -1,7 +1,7 @@
 /**
  * Which Work is drawn at `/?work`, with no network and no runes: the declared page, or the screen it replaces.
  *
- * WORK IS A DECLARED PAGE NOW (DIRECTION §35), `page.work` from the work module, drawn by the one reader every page goes
+ * WORK IS A DECLARED PAGE NOW, `page.work` from the work module, drawn by the one reader every page goes
  * through (`$lib/page/PageView.svelte`), so the person or an agent can reshape it as they can Money. The hand-written
  * screen it replaces is kept at `/?work&classic` (`WorkClassic.svelte`) until the page does all it did, and is drawn
  * as well on a record that holds tasks and no Work page, which the nav still opens here (`WORK` in `lib/nav.ts`).

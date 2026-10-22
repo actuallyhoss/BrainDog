@@ -61,9 +61,10 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   const api = apiBase(url);
   /* Read inside the record: the address is `/app/acme/start` and every rule below is written about `/start`. */
   const inner = here(url.pathname);
-  /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. */
+  /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. And
+     `/connect/approve`, the page a terminal prints, for the same reason: a machine is waiting on it. */
   const spared =
-    inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/s' || inner.startsWith('/s/');
+    inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/connect/approve' || inner === '/s' || inner.startsWith('/s/');
   /* THE LOCAL COPY IS OPENED BEFORE ANYTHING HERE IS WAITED ON, beside `boot` (which `app.html` already asked) and never
      in front of the first paint, and its last reader verified, so the first screen's ask finds it open. */
   const first = !opened;

@@ -1,6 +1,6 @@
 /**
- * ACTIVITY'S FILTERS ARE DRAWN THROUGH THE ONE PART (`lib/ui/Segmented.svelte`), as a list's view switch is
- * (DIRECTION 39).
+ * ACTIVITY'S FILTERS ARE DRAWN THROUGH THE ONE PART (`lib/ui/Segmented.svelte`), as a list's view switch is.
+ *
  *
  * WHAT WAS MEASURED. The track was written by hand (`<div class="segmented filters">`), which has no `data-slides`, so
  * `controls.css` drew its chosen segment with the hairline and shadow of a hand-written track and never moved it.

@@ -1,10 +1,10 @@
 /**
- * The offer on a list's own screen is the folded line, as it is on a declared page (look fault G, DIRECTION 39: quiet
+ * The offer on a list's own screen is the folded line, as it is on a declared page (look fault G: quiet
  * the noise above the work). The whole card stood over the list's figures and its entries, a phone's first screen
  * before the list somebody opened to read. Folded, it is Slash's mark and the sentence on one line, and a press opens
  * the card whole with Make it and Not now where they were.
  *
- * READ FROM THE SOURCE, as `page-offer-58.test.ts` reads the declared page's route: the folded form itself is held
+ * READ FROM THE SOURCE, as `page-offer-folded.test.ts` reads the declared page's route: the folded form itself is held
  * there, compiled, and here only that this screen asks for it and still hands the card its two presses.
  */
 

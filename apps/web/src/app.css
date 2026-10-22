@@ -21,7 +21,7 @@
 }
 
 @layer components {
-  /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top (DIRECTION 37).
+  /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top.
      This sheet used to paint `body` flat `--board` over that, from the days of the board, and so took the light away on
      every screen. `html` carries the plain ground, for the frame before `body` has a size.
 
@@ -41,7 +41,7 @@
     background: var(--board);
   }
 
-  /* THE PAGE IS AS WIDE AS THE WINDOW (DIRECTION 36 and 38). It stopped at 1440, so a 1,728 laptop drew the work as a
+  /* THE PAGE IS AS WIDE AS THE WINDOW. It stopped at 1440, so a 1,728 laptop drew the work as a
      column with a band of empty ground beside it. Nothing caps it now: the skin's fluid `--gutter` keeps it off the
      edges, and a reading measure is kept inside a tile, never by starving the page. A `calc()` over this goes invalid
      and falls back to `none` with it, which is the same answer. */

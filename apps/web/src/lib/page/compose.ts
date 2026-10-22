@@ -1,5 +1,5 @@
 /**
- * "MAKE A COMPONENT" (DIRECTION §45, "BrainDog designs itself", Compose): something asked to be drawn, composed from
+ * "MAKE A COMPONENT" ("BrainDog designs itself", Compose): something asked to be drawn, composed from
  * BrainDog's own blocks into one block of the page's declaration, with no model.
  *
  * THE COMMON SHAPES ARE RULES. A list named in the line (or the page's own), a shape named in it (calendar, board,

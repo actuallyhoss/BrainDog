@@ -1,8 +1,8 @@
 /**
  * What a page's host panel holds, said to the rule that decides what a page draws, before it decides.
  *
- * THE FAULT THIS ANSWERS. An empty part is not drawn, and a part with something in it must not vanish (DIRECTION §35,
- * §37). A boxed section whose panel is the project's scheduled actions is shut with its blocks when they all went
+ * THE FAULT THIS ANSWERS. An empty part is not drawn, and a part with something in it must not vanish.
+ * A boxed section whose panel is the project's scheduled actions is shut with its blocks when they all went
  * (`drawn.ts` `panelHeld`), by what the section's `actions` say it holds. Nothing handed it any: the panel reads its
  * own actions after the page is judged (`BlockSlot.svelte`, `panels/Actions.svelte`), and the record, which judges the
  * page first, cannot see the host's panel at all. So a project with scheduled actions and nothing else under "More

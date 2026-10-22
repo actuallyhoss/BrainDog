@@ -1,5 +1,5 @@
 <!--
-  The design book, read-only (DIRECTION §45): the language BrainDog's own pages are written in, with every kind of block
+  The design book, read-only: the language BrainDog's own pages are written in, with every kind of block
   drawn live from invented data, the tokens as swatches and specimens, and the layout rules.
 
   GENERATED, NOT WRITTEN HERE. `designBook` (braindog-render) reads the kinds from the renderer's tables and the colours,
@@ -31,6 +31,7 @@
     voice: 'Voice',
     kinds: 'Blocks and charts',
     compose: 'Composing',
+    draw: 'Drawing a component',
     group: { say: 'To say something', figure: 'To show a figure', list: 'To list', plan: 'To plan', media: 'To show a picture or a link' },
     cells: 'Cells',
     reads: 'Reads',
@@ -93,6 +94,10 @@
   <Tile title={words.compose}>
     <ul class="plain">{#each book.compose as line (line)}<li>{line}</li>{/each}</ul>
     <ul class="plain">{#each book.reach_for as line (line)}<li>{line}</li>{/each}</ul>
+  </Tile>
+
+  <Tile title={words.draw}>
+    <ul class="plain">{#each book.draw as line (line)}<li>{line}</li>{/each}</ul>
   </Tile>
 
   <h2 class="book-h">{words.kinds}</h2>

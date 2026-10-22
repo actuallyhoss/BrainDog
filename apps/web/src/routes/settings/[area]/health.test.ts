@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { dayAgo, daysLeft, engineLines, healthSaid, lastCopy, leadFault, modelName, nearest, redSigns, unreadSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
+import { aboutCopies, dayAgo, daysLeft, engineLines, healthSaid, lastCopy, leadFault, modelName, nearest, plainSign, redSigns, unreadSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
 
 const text = (parts: Part[] | null): string => (parts ?? []).map((p) => p.text).join('');
 const needs = (parts: Part[] | null): string[] => (parts ?? []).filter((p) => p.needs).map((p) => p.text);
@@ -220,4 +220,16 @@ test('a red sign is named by its own sentence (UI pass 20 Oct, agents F13), and 
   assert.equal(text(healthSaid(null, null, { signs: named.slice(0, 1), signsAt: '/p/health' })), 'Last night’s copy did not run. Look');
   assert.equal(text(healthSaid(null, null, { signs: named })), 'Last night’s copy did not run, and 1 more.');
   assert.deepEqual(needs(healthSaid(null, null, { signs: named })), ['Last night’s copy did not run, and 1 more']);
+});
+
+test('a red sign about a copy is said plainly and links to Backups, so the line and Backups say one thing', () => {
+  const backup: Sign = { sign: 'questions', state: 'red', said: 'Something went wrong, not a choice for you: The backup on 3 Sep did not run.' };
+  const said = healthSaid(null, null, { signs: [backup], signsAt: '/p/health', backupsAt: '/settings/backups' });
+  assert.equal(text(said), 'The backup on 3 Sep did not run. Backups');
+  assert.deepEqual(links(said), ['/settings/backups']);
+  /* A missed night links there too; anything else still links to the signs. */
+  assert.deepEqual(links(healthSaid('missing', null, { backupsAt: '/settings/backups' })), ['/settings/backups']);
+  assert.deepEqual(links(healthSaid('in', null, { signs: signs('red'), signsAt: '/p/health', backupsAt: '/settings/backups' })), ['/p/health']);
+  assert.equal(plainSign('Something went wrong, not a choice for you: The mail did not send.'), 'The mail did not send.');
+  assert.ok(aboutCopies('The backup on 3 Sep did not run') && !aboutCopies('The mail did not send'));
 });

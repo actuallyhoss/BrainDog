@@ -12,7 +12,7 @@
  * reading says. A question is one line of 120 characters at most and a choice 24; a model's that does not fit is no
  * question, and a currency whose name is longer is shown by its code.
  *
- * TWO, AGAINST "ONE, NEVER TWO": `question.ts` and the sign-up page keep one question, by his word of 9 October; USE-B06
+ * TWO, AGAINST "ONE, NEVER TWO": `question.ts` and the sign-up page keep one question, as chosen on 9 October; USE-B06
  * says two. The cap is `most`, two by default as the unit says, so a page keeps one by passing 1.
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; `Prompt.svelte` draws what it answers.

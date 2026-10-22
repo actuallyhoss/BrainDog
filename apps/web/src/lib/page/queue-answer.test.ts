@@ -128,7 +128,7 @@ test('A QUEUE OUTSIDE DECIDE SHOWS AT MOST THREE, and says how many more wait th
 /* WHERE A PAGE SERVES A FILE IT HOLDS: the lining's photograph, and nothing for a file the block does not hold. */
 const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/app/acme/files/${row.replace('#', '/')}/${field}` : null);
 
-test('AN OPTION THAT IS A PICTURE IS DRAWN FROM THE ADDRESS THE PAGE SERVES IT AT (D28.33)', () => {
+test('AN OPTION THAT IS A PICTURE IS DRAWN FROM THE ADDRESS THE PAGE SERVES IT AT', () => {
   const photo = { file: { row: 'parts#2', field: 'photo' } };
   assert.deepEqual(visualOf(photo, serves), { file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } });
   assert.equal(visualOf(photo), null, 'a card handed no way to an address draws no picture');

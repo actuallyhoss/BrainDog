@@ -1,6 +1,6 @@
 /**
- * Sign-up's own words: describe, then build, then one email (DIRECTION §37), and the screen a free record is made on
- * (DIRECTION §35, "Free leads").
+ * Sign-up's own words: describe, then build, then one email, and the screen a free record is made on
+ * ("Free leads").
  *
  * A `words` OBJECT IN A MODULE THIS SCREEN OWNS, and not keys in `copy.ts`, as `signin/words.ts` is. The question and
  * its chips are the first run's own (`firstRun.whoQuestion`), so `/start` and this page ask in one voice. Nothing here
@@ -17,8 +17,8 @@ export const words = {
   /** Under "Who are you?": what to say. That nothing is kept yet is the second promise. */
   lede: 'Say who you are and what you want to keep track of. Your BrainDog builds as you type.',
   /**
-   * THREE PROMISES UNDER THE FIELD (use case 6, step 1), each one the product keeps: a free record takes no card
-   * (DIRECTION §35); nothing typed leaves this device until the email is sent; and Settings, Export hands every record
+   * THREE PROMISES UNDER THE FIELD (use case 6, step 1), each one the product keeps: a free record takes no card;
+   * nothing typed leaves this device until the email is sent; and Settings, Export hands every record
    * its own file, on every plan. The first is said only on Free, since Cloud and Cloud Plus lead to a payment.
    */
   promises: ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time'],

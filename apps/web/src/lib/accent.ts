@@ -25,12 +25,12 @@
  * that is the one move the person holding the picker can make.
  *
  * 2026-10-07, THE COLOUR IS THE WORKING ACCENT, NOT ONLY THE BRAND'S. The product paints its buttons, links, selection
- * and charts in `--red-fill` (DIRECTION §39) and kept `--red-fill` for the mark's red, so a picker that re-solved only
+ * and charts in `--red-fill` and kept `--red-fill` for the mark's red, so a picker that re-solved only
  * `--red-fill` changed two swatches and nothing a person uses. `recordTheme` solves `--red-fill` and its tints, label and
  * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's working red is pinned only beside the
  * house mark), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
  *
- * 2026-10-08, HOUSE IS RED NOW (DIRECTION §42). So `apply(null)` puts the red buttons back, and a person who picks a
+ * 2026-10-08, HOUSE IS RED NOW. So `apply(null)` puts the red buttons back, and a person who picks a
  * swatch moves them off red.
  *
  * 2026-10-20, THE FRAME'S NAMES (UI pass, SPEC 1). The sheet writes `--red-fill`, its hover and pressed steps, `--on-red`

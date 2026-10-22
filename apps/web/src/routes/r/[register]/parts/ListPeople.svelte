@@ -6,7 +6,7 @@
   folded below them, a press away, so twenty-four colleagues of one company read as one group and not as a page of
   faces. An organisation with one person here is not a group: that person is a line of their own that names it.
 
-  INSIDE THE LIST'S TILE, NO BOX OF THEIR OWN (DIRECTION 39): the rows are `rows.css`'s ledger under quiet headings,
+  INSIDE THE LIST'S TILE, NO BOX OF THEIR OWN: the rows are `rows.css`'s ledger under quiet headings,
   each a link to its row's page, the person a face of their initials on one neutral tint (the name says who; a column
   of pastel hues said nothing) and the organisation its list's own glyph. Nothing here is an id: an organisation the
   record has not named yet is said as one.

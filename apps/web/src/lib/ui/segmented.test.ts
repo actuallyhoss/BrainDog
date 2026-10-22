@@ -1,5 +1,5 @@
 /**
- * The segmented control's sliding selection (`Segmented.svelte`, DIRECTION 39): where the thumb sits is read from the
+ * The segmented control's sliding selection (`Segmented.svelte`): where the thumb sits is read from the
  * chosen segment's box and nothing else, and whether a move is drawn or jumped.
  *
  * The functions live in the component's module script, which Node cannot import, so this reads the lines between the
@@ -117,7 +117,7 @@ test('a track given many is marked, and measures and draws no thumb', () => {
   const leaves = effect.indexOf('if (many) {');
   assert.ok(leaves >= 0, 'the effect does not leave for a track of many');
   assert.match(effect.slice(leaves, effect.indexOf('}', leaves)), /thumb = null;\s*return;/u);
-  assert.ok(leaves < effect.indexOf('new ResizeObserver'), 'a track of many is measured');
+  assert.ok(leaves < effect.indexOf('frameResizeObserver('), 'a track of many is measured');
   assert.ok(leaves < effect.indexOf('new MutationObserver'), 'a track of many is watched');
 });
 

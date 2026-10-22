@@ -215,7 +215,7 @@
   <!--
     WHAT LEADS A TITLE: THE MARK OF A ROW THAT HAS JUST ARRIVED, AND ON A LIST OF PEOPLE A FACE.
 
-    THE PROJECT'S SHAPE WENT (DIRECTION 39). A diamond, a triangle or a dot started every title, and it said "some
+    THE PROJECT'S SHAPE WENT. A diamond, a triangle or a dot started every title, and it said "some
     project" to nobody who had not learnt the shapes. The project is a column of its own now (`columnsFor`), its name
     beside a small dot of its colour, where it can be read.
   -->
@@ -637,7 +637,7 @@
   }
 
   /* THE FACE SITS ON THE TITLE'S LINE, in the middle of it, with the gap a mark keeps before the words. Its disc is one
-     neutral tint on every row (DIRECTION 39): a column of pastel hues read as decoration, and the name says who. */
+     neutral tint on every row: a column of pastel hues read as decoration, and the name says who. */
   .row-face {
     display: inline-flex;
     margin-inline-end: var(--sp-2);
@@ -702,7 +702,7 @@
   }
 
   /* WHERE A ROW APPLIES READS AS THE PROJECT COLUMN DOES: its dot, or the globe, and its name in the cell's own type, with
-     no pill round it (DIRECTION 39). The chip keeps its shape where it is a control, on a row's page. */
+     no pill round it. The chip keeps its shape where it is a control, on a row's page. */
   .table-slot :global(.td .scope-chip) {
     gap: var(--sp-2);
     min-block-size: 0;

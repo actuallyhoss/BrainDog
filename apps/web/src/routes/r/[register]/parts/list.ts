@@ -15,6 +15,7 @@ import { seqWidth } from '../../../../lib/record/api.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
 import { orgFieldOf } from '../people.ts';
+import { presenceOf } from '@braindog/kernel';
 
 /**
  * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
@@ -499,7 +500,7 @@ export function arrivedAt(from: Navigated, to: Navigated): string | null {
 }
 
 /**
- * WHERE A ROW STANDS, for the small dot drawn before its state's word (DIRECTION 39): `open` while it is still to do, in
+ * WHERE A ROW STANDS, for the small dot drawn before its state's word: `open` while it is still to do, in
  * the working accent; `done` once the list calls its state finished, in grey; `late` past its deadline, in red, whatever
  * its state says. Three answers and not more, because the declaration says which states are finished and nothing else:
  * a fourth colour for "on the way" was a guess from the order the values are written in, and on Tasks it painted
@@ -569,9 +570,24 @@ export function dueOf(decl: RegisterDecl | undefined, e: Entry, now: number): { 
 /** The list's name for how many rows, "1 bill" or "12 bills". */
 const counted = (decl: RegisterDecl, n: number): string => `${n} ${(n === 1 ? decl.one : decl.name).toLowerCase()}`;
 
+/** The record's own list of runs, which every record holds under this name. */
+const RUNS = 'session';
+
+/**
+ * HOW MANY AGENTS ARE AT WORK ON THE LIST OF RUNS, by the record's one clock (`presenceOf`), a helper left out while the
+ * run it works for is at work too: the rail's number, so the list says "12 at work" beside the pill's "12 working" and
+ * not only "33 open", which counted every run not finished.
+ */
+export function atWorkIn(entries: readonly Entry[], now: number): number {
+  const working = entries.filter((e) => presenceOf({ fields: e.fields as never }, now) === 'working');
+  const runs = new Set(working.map((e) => `S${String(e.seq)}`));
+  return working.filter((e) => !(typeof e.fields.parent === 'string' && runs.has(e.fields.parent))).length;
+}
+
 /* This module's own words, the sentence and the tile's reading lines. */
 const words = {
   open: (n: number) => `${n} open`,
+  atWork: (n: number) => `${n} at work`,
   toSettle: (n: number) => `${n} to settle`,
   nothingOpen: 'Nothing is open',
   late: (n: number) => `${n} late`,
@@ -637,7 +653,14 @@ export function readingOf(
   /* "TO SETTLE" ON A LIST OF AMOUNTS (money F16): "28 open" read against a board's "Open 22", which counts one state; a
      bill part paid is still to settle, and the words say what the number counts. */
   const settles = decl.fields.some((f) => f.type === 'money') && Boolean(decl.done?.length);
-  const lead = decl.state ? (settles && dated ? words.toSettle(open.length) : words.open(open.length)) : counted(decl, open.length);
+  const lead =
+    decl.id === RUNS
+      ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
+      : decl.state
+        ? settles && dated
+          ? words.toSettle(open.length)
+          : words.open(open.length)
+        : counted(decl, open.length);
   if (!dated) return plain(`${lead}.`);
   const late = open.filter((e) => isLate(decl, e, now)).length;
   const next = open

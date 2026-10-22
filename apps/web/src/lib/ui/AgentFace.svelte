@@ -24,6 +24,8 @@
   import { agentKindOf, faceWords, runHue, runSeq, slotOf, type RunLive } from './face.ts';
   import { isMarked } from '@braindog/skin/agent-marks.ts';
   import AgentMark from './AgentMark.svelte';
+  import Icon from './Icon.svelte';
+  import { isGlyph, type IconName } from './icons.ts';
 
   let {
     agent,
@@ -49,13 +51,17 @@
   const slot = $derived(seq === null || marked ? undefined : slotOf(runHue(seq)));
   /* THE BADGE ONLY FROM 28 UP: at 24 a second mark in the corner is a smudge, and the line beside it names the
      project in words anyway. */
-  const badge = $derived(size !== 'xs' && project?.mark ? project : null);
+  /* THE MARK A PROJECT NAMES IS A GLYPH, DRAWN AS ONE: "tag" printed as the word sat over the face like a label. A mark
+     that is no glyph is drawn only while it is a letter or two; a longer word is no mark, and nothing is drawn. */
+  const glyph = $derived(project?.mark && isGlyph(project.mark) ? (project.mark as IconName) : null);
+  const short = $derived(project?.mark && !glyph && [...project.mark.trim()].length <= 2 ? project.mark.trim() : null);
+  const badge = $derived(size !== 'xs' && project && (glyph || short) ? project : null);
   const badgeSlot = $derived(badge ? slotOf(badge.hue) : undefined);
 </script>
 
 {#snippet inside()}{#if kind === 'slash'}<svg class="agent-face-slash" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8.5 19.5" /></svg
   >{:else}<AgentMark {kind} size={size === 'xs' ? 's' : 'm'} />{/if}{#if badge}<span class="agent-face-project" data-slot={badgeSlot} aria-hidden="true"
-      >{badge.mark}</span
+      >{#if glyph}<Icon name={glyph} size="s" />{:else}{short}{/if}</span
     >{/if}{#if live !== 'stopped'}<span class="agent-face-live" data-live={live} aria-hidden="true"></span>{/if}{/snippet}
 
 {#if seq !== null}
@@ -171,6 +177,11 @@
     font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     line-height: 1;
+  }
+
+  .agent-face-project :global(svg) {
+    inline-size: 10px;
+    block-size: 10px;
   }
 
   [data-slot='blue'] {

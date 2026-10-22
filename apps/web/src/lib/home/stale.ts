@@ -95,7 +95,7 @@ export function staleShown(rows: readonly StaleRow[]): { shown: StaleRow[]; more
 }
 
 /**
- * THE ONE LINE ON THE BOARD (DIRECTION §39): "4 things went stale", "1 thing went stale", and `null` for none, which
+ * THE ONE LINE ON THE BOARD: "4 things went stale", "1 thing went stale", and `null` for none, which
  * draws nothing. It counts the things and not the kinds, every kind and not only the six listed.
  */
 export function staleLine(rows: readonly StaleRow[]): string | null {

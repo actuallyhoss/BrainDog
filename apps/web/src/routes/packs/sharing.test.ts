@@ -366,6 +366,7 @@ test('A PLAN NAMES A MODULE BY ITS TITLE AND A PAGE FOR EACH ROW BY ITS LIST, ne
   assert.deepEqual(built.packs[0]?.adds.map((x) => x.name), ['A page for each project']);
   assert.equal(moduleTitle('no-such-module'), 'No such module');
   assert.deepEqual(['Studies', 'Organisations', 'Classes', 'Status', 'Steps'].map(oneOf), ['study', 'organisation', 'class', 'status', 'step']);
+  assert.deepEqual(['People', 'Key people', 'Children'].map(oneOf), ['person', 'key person', 'child'], 'a plural with no s');
 });
 
 test('WITH THREE USE CASES ON, ADDING ONE BESIDE NEVER CHANGES WHO SPEAKS, and exactly one speaks after every door', async () => {

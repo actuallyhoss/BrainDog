@@ -52,6 +52,19 @@ export type Sign = { sign: string; state: 'green' | 'red' | 'none'; said?: strin
 /** The word of the link at the line's end, to where the signs are shown. */
 export const LOOK = 'Look';
 
+/** The word of the link at the line's end when what needs a look is a copy: Backups, where the copies are. */
+export const BACKUPS = 'Backups';
+
+/**
+ * A sign's sentence as the line says it: the thing that happened, without the record's framing in front of it. The
+ * questions sign says "Something went wrong, not a choice for you: The backup on 3 Sep did not run." on the Health page,
+ * where the framing tells it from the questions that are choices; on this one line it was eleven words before the news.
+ */
+export const plainSign = (said: string): string => said.replace(/^Something went wrong, not a choice for you:\s*/u, '').trim();
+
+/** Whether a sentence is about a copy of the record, so its link is Backups rather than the signs. */
+export const aboutCopies = (said: string): boolean => /\b(backups?|snapshots?|nightly cop(y|ies))\b/iu.test(said);
+
 /**
  * What else was read, each `null` or absent where it was not: a build without the method, a refusal, a host that hands
  * none. `signsAt` is where the signs are shown, so the count is a link to them; without it the count is plain words.
@@ -61,6 +74,8 @@ export type More = {
   engine?: Engine | null;
   signs?: readonly Sign[] | null;
   signsAt?: string | null;
+  /** Where the copies are, so a line about a copy links there and says so; absent, it links where the signs are. */
+  backupsAt?: string | null;
 };
 
 /** Whether last night's copy is in: `null` when there is nothing to judge by. */
@@ -177,8 +192,11 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   /* A RED SIGN IS NAMED BY ITS OWN SENTENCE (agents F13): "Last night's copy did not run." and, with more, ", and 1
      more." A sign that hands no sentence is counted as before. */
   const red = redSigns(more.signs);
+  let copies = copy === 'missing';
   if (red !== null && red > 0) {
-    const named = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '')?.said?.trim().replace(/[.!?]$/u, '');
+    const raw = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '')?.said;
+    const named = raw === undefined ? undefined : plainSign(raw).replace(/[.!?]$/u, '');
+    if (named !== undefined && aboutCopies(named)) copies = true;
     const said = named ? (red === 1 ? named : `${named}, and ${red - 1} more`) : red === 1 ? 'One vital sign needs a look' : `${red} vital signs need a look`;
     lead.push([{ text: said, needs: true }, { text: '.' }]);
   }
@@ -206,8 +224,14 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     unread === 0
       ? []
       : [{ text: unread === 1 ? 'One vital sign has not been read yet' : `${unread} vital signs have not been read yet` }, { text: '.' }];
-  /* THE ONE LINK, AT THE END: "Look", to where the signs are shown, when a sign is red or unread. */
-  const look: Part[] = more.signsAt && ((red ?? 0) > 0 || unread > 0) ? [{ text: ' ' }, { text: LOOK, href: more.signsAt }] : [];
+  /* THE ONE LINK, AT THE END: "Look", to where the signs are shown, when a sign is red or unread. WHEN WHAT NEEDS A
+     LOOK IS A COPY it is "Backups", to the area that says the same thing, so this line and that area never disagree. */
+  const look: Part[] =
+    copies && more.backupsAt
+      ? [{ text: ' ' }, { text: BACKUPS, href: more.backupsAt }]
+      : more.signsAt && ((red ?? 0) > 0 || unread > 0)
+        ? [{ text: ' ' }, { text: LOOK, href: more.signsAt }]
+        : [];
 
   if (lead.length === 0 && bad.length === 0 && good.length === 0) return unreadSaid.length > 0 ? [...unreadSaid, ...look] : null;
   if (lead.length === 0 && bad.length === 0 && unreadSaid.length === 0) return [{ text: faultsClear ? `All healthy: ${joined(good)}.` : `${upper(joined(good))}.` }];
@@ -267,7 +291,7 @@ export const modelName = (model: string): string => model.split('/').filter((p) 
 /**
  * The lines under Slash's sentence in Settings (ENG-A05, ENG-A06, "health shown"): which model answered last and when,
  * the provider's own words under a failure, and how often an ask needed a second model. "Rules are the fallback, not
- * the engine." (D35.43), so a fallback that is doubling the bill is said, and only once it has happened.
+ * the engine.", so a fallback that is doubling the bill is said, and only once it has happened.
  *
  * EACH LINE ONLY FROM WHAT WAS READ. A host older than these fields hands none of them, and nothing is drawn; `off` is
  * said by Slash's own row. The provider's words are already scrubbed by the engine, and are shown only under a failure,

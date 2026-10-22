@@ -5,7 +5,7 @@
  * gets nothing. It is global rather than scoped because the tones are shared by nine components, and
  * nine copies of one ramp is how a ramp drifts. Every class here starts with `viz`.
  *
- * THE RAMP IS THE ACCENT AND ITS TINTS (DIRECTION §39: "charts use the accent and its tints, the red only for late or
+ * THE RAMP IS THE ACCENT AND ITS TINTS ("charts use the accent and its tints, the red only for late or
  * over, grey only for other"). The tone names are older than the accent and keep their order, darkest first: `ink`
  * and `g1` are the accent at full and at 76% on the tile, `g2` and `g3` are `--chart-2` and `--chart-3`, and `g4` is
  * `--chart-other`, the one grey. They were ink mixed into the tile, which is why Add-ons and Activity drew black slabs.

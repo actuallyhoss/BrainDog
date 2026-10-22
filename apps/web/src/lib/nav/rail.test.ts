@@ -1,5 +1,5 @@
 /**
- * The rail's sections (DIRECTION §39): the seven places in their order, each project under Projects, Work's views left
+ * The rail's sections: the seven places in their order, each project under Projects, Work's views left
  * to the Work screen, and the rest under More.
  */
 import { test } from 'node:test';

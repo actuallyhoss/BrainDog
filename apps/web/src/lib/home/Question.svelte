@@ -1,6 +1,6 @@
 <!--
   One open question on Today's classic list (`/?classic`), answered where it is shown: the 32px well with the Needs you glyph
-  in the list's lead column, and beside it the one decision card (`lib/decide/DecisionCard.svelte`, DIRECTION §37), the
+  in the list's lead column, and beside it the one decision card (`lib/decide/DecisionCard.svelte`), the
   same card every page and Decide draw: why first, who asked, what it moves, the suggestion as an outline with a small
   dot, and one press with Undo.
 
@@ -9,14 +9,24 @@
 
   A READER WHO MAY NOT ANSWER READS THE OPTIONS AS WORDS, and the question still opens on Decide.
 -->
+<script lang="ts" module>
+  import { cardNow, loadCard } from '$lib/decide/card-load.ts';
+
+  /* ASKED AS THIS FILE LOADS, so the card arrives beside Today's read rather than ahead of its first paint (`card-load.ts`). */
+  void loadCard().catch(() => undefined);
+</script>
+
 <script lang="ts">
   import type { QueueQuestion } from '@braindog/kernel';
-  import DecisionCard from '$lib/decide/DecisionCard.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
 
   let { question, onanswered }: { question: QueueQuestion; now?: number; onanswered: () => void } = $props();
 
-  let card = $state<ReturnType<typeof DecisionCard> | null>(null);
+  /** The card, drawn once it has arrived: at once on every question after the first. */
+  let DecisionCard = $state.raw(cardNow());
+  if (DecisionCard === null) void loadCard().then((card) => (DecisionCard = card), () => undefined);
+
+  let card = $state<ReturnType<NonNullable<typeof DecisionCard>> | null>(null);
 
   /** The option at `i` (from 0), as its number key presses it; a reader who may not answer presses nothing. */
   export function choose(i: number): boolean {
@@ -27,7 +37,9 @@
 <div class="q">
   <span class="line-mark"><IconWell name="decide" size="l" /></span>
   <div class="q-card">
-    <DecisionCard bind:this={card} {question} {onanswered} keys link />
+    {#if DecisionCard}
+      <DecisionCard bind:this={card} {question} {onanswered} keys link />
+    {/if}
   </div>
 </div>
 

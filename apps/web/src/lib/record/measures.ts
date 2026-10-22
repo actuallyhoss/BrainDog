@@ -228,7 +228,7 @@ export const measureWords = {
 
 /**
  * THE MEASURES READ ONCE, AS ONE QUIET LIST: each measure's name, its reading and the day it was read, a line each, in
- * the record's order (newest first). A list and not a tile a measure (DIRECTION §37: tiles only for figures and charts,
+ * the record's order (newest first). A list and not a tile a measure (tiles only for figures and charts,
  * and fewer things on screen), headed only where lines stand above it, so it is not taken for one of them. `beside` is
  * the lines above, so "Orders" read once for one project and charted for another is told apart.
  */

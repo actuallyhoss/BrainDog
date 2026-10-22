@@ -267,7 +267,7 @@ test('a burst over many rows is said as how many rows, with their list', () => {
   assert.equal(told!.note, 'From the statement');
 });
 
-/* THE LOG SAYS AN ENTRY IN THE PERSON'S OWN LIST, named beside it, and never a row or a list (DIRECTION §35). */
+/* THE LOG SAYS AN ENTRY IN THE PERSON'S OWN LIST, named beside it, and never a row or a list. */
 test('the log names no row and no list in its own words', () => {
   for (const line of [historyWords.aRow, historyWords.rows(1), historyWords.rows(4), historyWords.everyList('Payments'), historyWords.onlyList('Payments')])
     assert.doesNotMatch(line, /\b(rows?|lists?|registers?|blocks?)\b/iu, line);

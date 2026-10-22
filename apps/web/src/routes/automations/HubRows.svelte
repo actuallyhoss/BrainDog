@@ -27,7 +27,7 @@
   import { ownPress } from '$lib/record/actions.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { families, familySaid, familyWords } from './hub-family.ts';
+  import { families, familyOn, familySaid, familyWords } from './hub-family.ts';
   import type { HubRow } from './hub.ts';
 
   let {
@@ -129,7 +129,12 @@
               ><span class="what">{familyWords.count(fam.count)}</span>{#if said}<span class="sep">{' · '}</span><span class="said">{said}</span>{/if}</span
             >
           </span>
-          <span class="aside turn" data-open={shown ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+          <!-- WHAT ITS SWITCHES SAY, IN THE SWITCHES' COLUMN (UI audit of 22 October, 28): a bare chevron in a column of
+               switches read as a row with its switch missing. "All on", then the chevron that opens it. -->
+          <span class="aside fold-end">
+            {#if ontoggle && familyOn(fam.members)}<span class="fold-on">{familyOn(fam.members)}</span>{/if}
+            <span class="turn" data-open={shown ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+          </span>
         </button>
         {#if shown}
           <ul class="ledger ledger-lead members">
@@ -255,6 +260,19 @@
   .kin:focus-visible .name {
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+
+  .fold-end {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .fold-on {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
   }
 
   /* THE CHEVRON TURNS WHEN THE FAMILY IS OPEN, in the quiet ink: the row's words say what it is. */

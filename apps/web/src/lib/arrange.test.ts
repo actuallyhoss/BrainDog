@@ -64,7 +64,7 @@ test('THE PROPOSAL FORMS AROUND THE TURN THAT NAMED IT, when turn two only heard
 });
 
 /* EACH CHIP ON ITS OWN PROPOSES ITS OWN PERSON. The first run asks one question, and its chips are use case 6's five
-   starting points (his word of 9 October): a shop, a freelancer, a student, a founder of a few companies and a team. */
+   starting points: a shop, a freelancer, a student, a founder of a few companies and a team. */
 const CHIPS: Record<string, string> = {
   'I run a small shop': 'shop',
   'I freelance': 'business',

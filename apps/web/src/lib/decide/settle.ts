@@ -1,5 +1,5 @@
 /**
- * AN ANSWERED CARD SETTLES, IT DOES NOT JUMP (DIRECTION §36, "no layout jump"). A press makes the card its one answered
+ * AN ANSWERED CARD SETTLES, IT DOES NOT JUMP ("no layout jump"). A press makes the card its one answered
  * line at once (`DecisionCard.svelte`), and the next question used to leap up the height of the form it replaced, about
  * 250px in one frame. Now the line opens at the height the card had and closes to its own over `--d-rows`, the step the
  * scale names for rows settling after one is taken away, and every card and tile under it rides up with it. Undo plays

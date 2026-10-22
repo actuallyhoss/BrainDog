@@ -1,7 +1,7 @@
 /**
  * THE LINES UNDER "WHAT IT CHANGES" (`card.ts` `cardOf`), on questions shaped as the record sends them (`changes`, one
  * entry a field with its label and what it holds before and after, and `does`, the kernel's sentence of the same):
- * a day is said as a day and never as it is held (DIRECTION §40), a change past the third is counted and not dropped,
+ * a day is said as a day and never as it is held, a change past the third is counted and not dropped,
  * and a change the lines say whole is not said again as a sentence.
  */
 

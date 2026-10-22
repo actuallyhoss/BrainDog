@@ -10,7 +10,7 @@
   THE PAGE AS IT IS NOW HAS NO PUT BACK: there is nothing to put back to. It says "On the page now" in words, and keeps
   its Save.
 
-  ONE TILE, AND A LIST INSIDE IT (DIRECTION 39). A line is the who and when on the left and its verbs on the right, and
+  ONE TILE, AND A LIST INSIDE IT. A line is the who and when on the left and its verbs on the right, and
   under a narrow screen the verbs wrap under the words instead of squeezing them.
 -->
 <script lang="ts">

@@ -298,7 +298,7 @@ test('every act the palette can perform is a named one, so no row smuggles in an
   }
 });
 
-/* ── customising the app in words (DIRECTION §35) ─────────────────────────── */
+/* ── customising the app in words ─────────────────────────── */
 
 const place = (href: string, name: string, more: Partial<Place> = {}): Place => ({ href, name, own: name, icon: 'doc', hide: true, rename: true, ...more });
 

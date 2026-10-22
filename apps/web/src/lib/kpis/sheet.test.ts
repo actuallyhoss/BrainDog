@@ -136,7 +136,7 @@ const KEPT = {
   name: 'Players',
   thing: 4,
   source: 'numbers',
-  measure: 'Players, Sketchpad',
+  measure: 'Players, Pinwheel',
   unit: 'players',
   good: 'up',
   target: 5000,
@@ -153,7 +153,7 @@ const KEPT = {
 test('A NUMBER ALREADY KEPT READS BACK AS TYPED, keeps reading Numbers, and opens More when its hidden fields say something', () => {
   const d = draftOf(KEPT);
   assert.equal(d.source, 'numbers');
-  assert.equal(d.measure, 'Players, Sketchpad');
+  assert.equal(d.measure, 'Players, Pinwheel');
   assert.equal(d.target, '5,000');
   assert.equal(d.today, 'pinned');
   assert.ok(sourcesFor(d).includes('numbers'));

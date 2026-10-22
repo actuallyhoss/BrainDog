@@ -1,6 +1,6 @@
 /**
- * HOME'S ONE LINE, said by the model when it has said one today, and by the rules otherwise (DIRECTION §35,
- * "intelligence is the product; rules are the fallback").
+ * HOME'S ONE LINE, said by the model when it has said one today, and by the rules otherwise (intelligence is
+ * the product; rules are the fallback).
  *
  * THE RECORD WRITES IT: once a day Slash reads Today (what needs the person, the titles of what is late, who is working)
  * and keeps one line as its pref `headline.home` (`packages/record/src/headlines.ts`), checked before it is kept so it

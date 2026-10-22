@@ -23,7 +23,7 @@ const IMPORTED = [
   '# Lanternfish',
   '',
   '## Notes',
-  'Launch is set for spring. Mateo leads the build.',
+  'Launch is set for spring. Joaquin leads the build.',
   '',
   '## Blockers',
   '- Waiting on the app store review.',

@@ -1,5 +1,5 @@
 <!--
-  The one filled badge in the product, and the one pill (DIRECTION §39, "pills only for counts"; 2.A.2): a red capsule
+  The one filled badge in the product, and the one pill ("pills only for counts"; 2.A.2): a red capsule
   with a count in it, for what needs the reader.
 
   EVERY NEEDS-YOU COUNT IS THIS ONE: the top bar's, the tab bar's, the rail's and the More sheet's. It was drawn four

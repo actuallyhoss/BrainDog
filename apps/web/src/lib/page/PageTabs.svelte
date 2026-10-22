@@ -9,7 +9,7 @@
   That is also why this is a `nav` of links with `aria-current` and not an ARIA `tablist`: a tablist promises arrow keys
   that move between panels on one page, and these go to another page.
 
-  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: one segmented rectangle (DIRECTION §39), "here" the tile's own
+  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: one segmented rectangle, "here" the tile's own
   fill in it, and nothing in it takes a colour from the record (what a person builds is structure,
   and BrainDog's look stays its own).
 -->
@@ -75,7 +75,7 @@
 </nav>
 
 <style>
-  /* THE STRIP IS ONE SEGMENTED RECTANGLE (DIRECTION §39: buttons are rectangles, radius 8, and no glass on the board):
+  /* THE STRIP IS ONE SEGMENTED RECTANGLE (buttons are rectangles, radius 8, and no glass on the board):
      a quiet tinted track, each tab a rectangle in it, and the page you are on the tile's own fill lifted by a tiny
      shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge. */
   .page-tabs {

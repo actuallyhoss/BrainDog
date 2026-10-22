@@ -95,12 +95,14 @@ export const blockWords = {
     link: 'Links',
     gallery: 'Gallery',
     embed: 'Video or map',
+    drawn: 'Drawn component',
   } as Record<string, string>,
   kinds: {
     calendar: 'the days things fall on, a month at a time',
     link: 'places to go, each with a note',
     gallery: 'pictures and files, each with a caption',
     embed: 'one video, design or map, played on the page',
+    drawn: 'a visual of its own, drawn in a sandbox',
   } as Record<string, string>,
   flags: {
     lead: { stat: 'Draw the first figure large', cards: 'Draw the first card larger', note: 'Open with the first sentence larger' },

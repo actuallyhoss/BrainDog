@@ -6,7 +6,7 @@
  * answer, and they shipped for as long as they sat beside the helpers the live screens draw with.
  * Also here are the sample-bound helpers no screen called (`applyFilters`, `backlinks`,
  * `noticed`, `trackHealth`, `workingNow`, `trendOf`, `figureTile` and the like), because each reads the sample's rows or
- * its clock. `no-sample-b2.test.ts` refuses any file outside a test that imports this directory.
+ * its clock. `no-sample-render-helpers.test.ts` refuses any file outside a test that imports this directory.
  *
  * THE RECORD ANSWERS AND THIS FILE ONLY ASKS. `page`, `pages`, `readBlock`, `metric`, `values`, `list` and `applyFilters`
  * ask a real kernel over `node:sqlite`, seeded once by `installSeed` when this module loads, and a page or a figure comes

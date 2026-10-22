@@ -7,7 +7,7 @@
 
   TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT. Line one is the title and the figure. Line two is
   the dot and its word, the date that word is about, and one detail, with nothing after it: "Overdue ·
-  3 Sep · Kiln", "Paid · 2 Sep · Portage". The project's shape that led the title went (DIRECTION 39): it
+  3 Sep · Kiln", "Paid · 2 Sep · Portage". The project's shape that led the title went: it
   said "some project" to nobody who had not learnt the shapes, and the project's name ends line two
   where the list names no other detail. The dot sat beside
   "Money out" once, so what it meant was never said, and the row's number ended the line in the id
@@ -50,16 +50,13 @@
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
-  import { day, leadingCode, shortDay, symbolFigure } from 'braindog-render';
+  import { dateSaid, leadingCode, symbolFigure } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { dirOf, display, identityFor, labelOf, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
-  import { page } from '$app/state';
-  import { may } from '$lib/record/may.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
-  import { afterMove, movesIn, scopeFieldOf, scopeOf, type Landed, type Scope } from '$lib/record/scope-move.ts';
+  import { scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
   import { flip } from 'svelte/animate';
@@ -123,33 +120,12 @@
   });
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
 
-  /**
-   * WHERE A ROW APPLIES MOVES FROM ITS CARD, as from the table and the row's own page: one press on the chip opens the
-   * projects and one more moves the row. Only where the reader may write the list and its rows apply to one project; a
-   * list of several, or a reader who may only look, keeps the chip as words in the card's second line.
-   *
-   * THE CHIP LEAVES THE LINK FOR IT, since a button inside a link is neither, and sits at the card's end. The one sheet
-   * every card opens (`ScopeMove`'s `compact`) is loaded the first time a list that moves is drawn, so the saved view
-   * and Decide, whose cards are often a list that cannot, pay nothing for it.
+  /*
+   * WHERE A ROW APPLIES IS A WORD OF THE CARD'S SECOND LINE, its project's dot and name, and never a control at the
+   * card's end. The chip that moved the row stood there, as wide as "Marlow & Co ⌄", and left a task's title less than
+   * half a phone's width ("Chase Halden on 2…"). A row moves from its own page, whose line under the name holds the same
+   * chip as the press, and from the table.
    */
-  const moves = $derived.by(() => {
-    const shell = page.data as unknown as Partial<Shell>;
-    return shell.me !== undefined && movesIn(register, may(shell as Shell, 'write', register));
-  });
-  type Mover = typeof import('../../routes/r/[register]/[seq]/ScopeMove.svelte').default;
-  let MoveSheet = $state<Mover>();
-  let mover = $state<ReturnType<Mover>>();
-  let landed = $state<Record<number, Landed>>({});
-  $effect(() => {
-    if (!moves || MoveSheet) return;
-    void import('../../routes/r/[register]/[seq]/ScopeMove.svelte').then((m) => (MoveSheet = m.default)).catch(() => undefined);
-  });
-  /* THE CHIP IS THE PRESS ONCE THE SHEET IS HERE, and words until then, so a press never lands on nothing. */
-  const pressable = $derived(moves && MoveSheet !== undefined);
-  function moveFrom(e: Entry, title: string) {
-    const from = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
-    mover?.openFor(e, title, from);
-  }
 
   /**
    * THE ROW'S HOLDER, AFTER A HAND: a person by their People row's own name, read as any other ref field is
@@ -208,7 +184,7 @@
   /* A stored day as a card says it: "2 Sep" in the year it is read in, "2 Sep 2025" outside it. */
   const daySaid = (iso: unknown): string | null => {
     if (typeof iso !== 'string' || !DAY.test(iso)) return null;
-    return iso.slice(0, 4) === String(new Date(now).getUTCFullYear()) ? shortDay(iso) : day(iso);
+    return dateSaid(iso, now);
   };
 
   /**
@@ -218,7 +194,7 @@
   const markFor = (e: Entry) => identityFor(register, e.fields, names);
 
   /**
-   * WHERE THE ROW STANDS, FOR ITS DOT (DIRECTION 39): grey once the list calls its state finished, and the working
+   * WHERE THE ROW STANDS, FOR ITS DOT: grey once the list calls its state finished, and the working
    * accent while it is still to do. A late or close row's dot is the tone's, through `data-intent`, and wins over this.
    */
   const finishedOf = (e: Entry): boolean => Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));
@@ -301,7 +277,7 @@
     const also = tone && state && !done && held !== '' && held !== first ? saidOf(e, state) || null : null;
     const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
     const text = detailFields.find((f) => saidOf(e, f) !== '');
-    const place: Scope | null | undefined = scoped === undefined ? undefined : afterMove(e, scopeOf(register, e.fields, names), landed[e.seq]).scope;
+    const place: Scope | null | undefined = scoped === undefined ? undefined : scopeOf(register, e.fields, names);
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
     /* THE PROJECT'S NAME, where nothing else fills the detail and the project is not already the chip. */
     const thing = !chip && text === undefined ? (markFor(e)?.name ?? null) : null;
@@ -386,12 +362,10 @@
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
             {#if line.also}<span aria-hidden="true">{' · '}</span><span class="card-state">{line.also}</span>{/if}
             {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
-            {#if line.chip && pressable}
-              <!-- The chip is the move, drawn after the link (below); line two keeps its word and its date. -->
-            {:else if line.chip}
-              <!-- WHERE THE ROW APPLIES, AS THE DETAIL: a pill needs no separator before it, so it takes
-                   the gap the line's words keep instead. Inside the link the chip is words and never a control. -->
-              <ScopeChip scope={line.place ?? null} />
+            {#if line.chip}
+              <!-- WHERE THE ROW APPLIES, AS THE DETAIL: the project's dot and its name, a word of the line after its
+                   separator, as the bills' cards say "27 Jul · Marlow & Co". -->
+              {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<ScopeChip scope={line.place ?? null} inline />
             {:else if line.detail}
               {@const f = line.detail}
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
@@ -410,11 +384,6 @@
             </span>
           {/if}
         </a>
-        <!-- WHERE THE ROW APPLIES, AS THE PRESS THAT MOVES IT: outside the link, at the card's end before its verbs, the
-             pill the row's own page draws, a 44px target under a thumb. -->
-        {#if line.chip && pressable}
-          <span class="card-move"><ScopeChip scope={line.place ?? null} onmove={() => moveFrom(e, title ?? copy.thisRow)} /></span>
-        {/if}
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
              tap target for opening the row and this sits beside it. -->
         {#if action}{@render action(e)}{/if}
@@ -422,19 +391,6 @@
       </li>
     {/each}
   </ul>
-{/if}
-
-{#if moves && MoveSheet}
-  <MoveSheet
-    bind:this={mover}
-    {register}
-    {names}
-    live={moves}
-    compact
-    onmoved={(got) => {
-      if (got) landed = { ...landed, [got.seq]: got };
-    }}
-  />
 {/if}
 
 <style>
@@ -519,17 +475,19 @@
       text-decoration: none;
     }
 
-    /* THE TITLE IS ONE LINE, and what does not fit ends in an
-       ellipsis. The line under it says what state the row is in and when, so the end of a long title
-       is the part a person can most afford to lose, and a card that grows to three lines pushes the
-       next row's word and date off the screen. */
+    /* THE TITLE TAKES TWO LINES BEFORE IT GIVES WAY, and what does not fit ends in an ellipsis. One line cut a task to
+       "Chase Halden on 2…" once the project's chip shared it; two say the task, and the line under them still says
+       what state the row is in and when, so a card is never more than three lines. */
     .card-title {
       grid-column: 1;
       grid-row: 1;
+      display: -webkit-box;
       min-inline-size: 0;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
       font-weight: 500;
     }
 
@@ -644,7 +602,7 @@
       display: flex;
     }
 
-    /* ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39): the name beside it says who. */
+    /* ON ONE NEUTRAL TINT, as on every list of people: the name beside it says who. */
     .card .card-face :global(.face[data-kind='person']) {
       background: var(--tile-2);
       color: var(--ink-2);
@@ -666,19 +624,6 @@
       vertical-align: baseline;
     }
 
-    .card-b > :global(.scope-chip:not(:first-child)) {
-      margin-inline-start: var(--sp-2);
-    }
-
-    /* THE CHIP THAT MOVES THE ROW, at the card's end and the middle of its two lines, as wide as its words up to
-       twelve characters of a name (`ScopeChip`) and never more than half the card, so the title keeps its line. */
-    .card-move {
-      display: flex;
-      flex: none;
-      align-items: center;
-      max-inline-size: 50%;
-      padding-inline: var(--sp-2) var(--sp-1);
-    }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a
        screen reader. */

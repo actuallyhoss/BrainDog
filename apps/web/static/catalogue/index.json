@@ -2129,8 +2129,64 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "f6d0a77ad5e38c2708fb3a98431f01b8cf12c9b8769ae529f3388d0e1dcd7169",
+          "bytes": 12446,
+          "published_at": "2026-10-22T08:32:07.090Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Each profile’s runs from the last day, the working ones first, on the Profiles page. The Agents page says when a machine is out of step with a profile, and keeps your profiles folded at its foot. Tools and Keys gain Belongs to, for an account that is someone else’s. Each profile shows how much of its 5 hour and 7 day limits it has used and when they reset, sent by the status line command; shown only, nothing switches or stops a profile."
+        },
+        {
+          "version": "1.1.0",
+          "checksum": "4e9d5b8331c472b4a7b95b14bd9af155b5465637f9a185f091b5ce3466e1f061",
+          "bytes": 11303,
+          "published_at": "2026-10-22T04:34:27.225Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Each profile’s runs from the last day, the working ones first, on the Profiles page. The Agents page says when a machine is out of step with a profile, and keeps your profiles folded at its foot. Tools and Keys gain Belongs to, for an account that is someone else’s."
+        },
         {
           "version": "1.0.0",
           "checksum": "9c964b3dfd2ecdc220eef10ed9665aa7a6fbdbbf75be5f0c6b027c042f2d5811",
@@ -2668,6 +2724,56 @@
       ],
       "categories": [
         "templates",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "setup-sync",
+      "title": "Setup sync",
+      "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, sealed on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "c9ffc28cec772297ac9a9213775cda8f7fb433102b07214b45c9eb94b878c33c",
+          "bytes": 14938,
+          "published_at": "2026-10-22T05:19:01.177Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "modules",
         "made-by-braindog"
       ],
       "publisher": {

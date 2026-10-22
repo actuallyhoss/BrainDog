@@ -6,7 +6,7 @@
  * ONE AT A TIME, AS THE MOCKUP DRAWS THEM. While nothing has been added the card is the first act, alone; the moment
  * something is, the card goes and the next steps take its place, until the person hides them.
  *
- * NOTHING HERE IS ANY ONE RECORD'S (DIRECTION §27). It reads what every `boot` sends, the lists and how many entries each
+ * NOTHING HERE IS ANY ONE RECORD'S. It reads what every `boot` sends, the lists and how many entries each
  * holds, and the lists are known by the part they play (`start/parts.ts`), never by a name.
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
@@ -16,14 +16,13 @@ import type { Boot } from '@braindog/client';
 
 import type { Pref } from '../pref.ts';
 import { playedBy } from '../start/parts.ts';
-import { madeSteps, type MadeStep } from '../start/made.ts';
 import { PAID_STATES, type TellList } from '../tell/read.ts';
 
 /** What these read of `boot`: the lists, each with how many entries it holds. */
-type Holds = Pick<Boot, 'registers'>;
+export type Holds = Pick<Boot, 'registers'>;
 
 /** What these read of the device's preferences: whether the next steps are hidden, and how work arrives. */
-type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy'>;
+export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy'>;
 
 /**
  * How many entries a person has put in, across every list.
@@ -47,14 +46,8 @@ export function addedByHand(boot: Holds): number {
 /** Whether Today offers the card to tell it one real thing: while nothing is added by hand, and the person has not hidden it. */
 export const showTell = (boot: Holds, pref: Said = {}): boolean => pref.nextStepsHidden !== true && addedByHand(boot) === 0;
 
-/**
- * The next steps Today offers, in the order the person's answer puts them, or none: while the card is still the first
- * act, and once the person has hidden them.
- */
-export function wantMore(boot: Holds, pref: Said = {}): MadeStep[] {
-  if (pref.nextStepsHidden === true || showTell(boot, pref)) return [];
-  return madeSteps(boot.registers, pref.arrivesBy);
-}
+/* THE NEXT STEPS THEMSELVES ARE `want-more.ts`'s, which Today loads on a first Today only: they read every use case this
+   build ships, and this file is on every Today's first open. */
 
 /* ── the card's words that are worked out ────────────────────────────────────── */
 

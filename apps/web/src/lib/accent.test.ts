@@ -328,7 +328,7 @@ test('and a colour restore drops is not written over the record', async () => {
 });
 
 /**
- * HOUSE IS THE WORKING RED, AND A PICK MOVES THE BUTTONS AND NEVER LATE (DIRECTION §42).
+ * HOUSE IS THE WORKING RED, AND A PICK MOVES THE BUTTONS AND NEVER LATE.
  *
  * The house's working accent is BrainDog red: `House` adopts nothing, so the committed `house.css` is what paints, and it
  * is read here for the red pair rather than trusted. A swatch re-solves the working accent from its own colour and

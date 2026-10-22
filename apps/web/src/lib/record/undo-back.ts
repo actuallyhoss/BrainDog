@@ -1,5 +1,5 @@
 /**
- * A RECEIPT'S UNDO, PUT BACK BY THE RECORD WHERE IT CAN BE (DIRECTION §37: "always undoable"). A write that landed under
+ * A RECEIPT'S UNDO, PUT BACK BY THE RECORD WHERE IT CAN BE ("always undoable"). A write that landed under
  * a batch is undone by the record from its own log (`undo-write.ts` `undoChange`), which puts back what the write AND
  * the rules it set off did, and leaves alone a field somebody changed since. The screen's own inverse, the opposite
  * patch built from what landed (`data/optimistic.ts`), puts back only the fields the screen knew it wrote, so it is the

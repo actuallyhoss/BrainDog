@@ -115,6 +115,8 @@ export const kpis = {
   kpiNoneYet: 'No key numbers yet.',
   kpiNotRead: 'The key numbers could not be read just now.',
   kpiLeads: 'Leads the card',
+  /* UNDER TODAY'S NUMBERS, the door to every number kept. */
+  kpiAllNumbers: 'All numbers',
 
   /* WHAT BRAINDOG OR AN AGENT SUGGESTED, on the project's page only, each kept or turned down with one press. */
   kpiSuggested: 'Suggested',
@@ -138,7 +140,7 @@ export const kpis = {
   /* A STALE NUMBER'S FIX (`lib/kpis/stale-fix.ts`): ask the agent that keeps it, or add a reading by hand. */
   kpiAskAgent: (agent: string): string => `Ask ${agent} to report it`,
   kpiAddReading: 'Add a reading',
-  /* WHAT THE AGENT IS TOLD, in his words: which number, where, and since when. */
+  /* WHAT THE AGENT IS TOLD, in the owner's words: which number, where, and since when. */
   kpiAskSaid: (name: string, project: string | null, since: string | null): string =>
     `Please report ${name}${project ? ` on ${project}` : ''}. ${since ? `The last reading was on ${since}.` : 'It has no reading yet.'}`,
   kpiAsked: (agent: string, name: string): string => `Asked ${agent} to report ${name}.`,
@@ -149,4 +151,22 @@ export const kpis = {
   kpiReadingEmpty: 'Type the value.',
   kpiReadingNoList: 'This record has nowhere to keep readings.',
   kpiReadingAdded: (name: string): string => `Added a reading to ${name}.`,
+
+  /* ITS PAST VALUES, under the sheet (`lib/kpis/past.ts`): newest first, who set each, the newest taken back with Undo and
+     any other changed or taken out. Each write is put back in its own row, since a toast waits for the sheet to close. */
+  kpiPast: 'Past values',
+  kpiPastNone: 'No values yet.',
+  kpiPastNotRead: 'Its past values could not be read just now.',
+  kpiPastBy: (who: string): string => `by ${who}`,
+  kpiPastChange: 'Change',
+  kpiPastUndo: 'Undo',
+  kpiPastRemove: 'Remove',
+  kpiPastPutBack: 'Put back',
+  kpiPastRemoved: 'Taken out',
+  kpiPastChanged: (was: string): string => `Was ${was}`,
+  kpiPastValueOn: (day: string): string => `Value on ${day}`,
+  kpiPastChangeOn: (day: string): string => `Change the value on ${day}`,
+  kpiPastUndoOn: (day: string): string => `Undo the value on ${day}`,
+  kpiPastRemoveOn: (day: string): string => `Remove the value on ${day}`,
+  kpiPastPutBackOn: (day: string): string => `Put back the value on ${day}`,
 } as const;

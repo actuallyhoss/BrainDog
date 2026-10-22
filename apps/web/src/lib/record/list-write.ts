@@ -42,9 +42,11 @@ export const listWords = {
   reason: 'Made by the owner from the app.',
   made: (name: string) => `${name} is ready.`,
   filed: (name: string) => `${name} is waiting in Needs you, because a new list is the owner’s call.`,
-  /* THE LIST AN ADDRESS NAMED AND THE RECORD DOES NOT HAVE, said in words, with what it does have offered beside it. */
-  missingTitle: 'There is no list here yet',
-  missing: (said: string) => `This record has no list called ${said}. Open one it has, or make this one.`,
+  /* THE LIST AN ADDRESS NAMED AND THE RECORD DOES NOT HAVE, said in words, with the nearest it does have offered under
+     it (`record/nearest.ts`): every list as a chip was thirty of them, and none said which was meant. */
+  missingTitle: (said: string) => `No list called ${said}`,
+  missing: 'Make it here, or open the list you meant.',
+  nearLists: 'The closest lists here:',
   missingNone: (said: string) => `This record has no list called ${said}, and no lists yet. Make this one to start.`,
   makeBody: 'Give it a name, one line of what it holds, and the fields each row should have.',
 } as const;

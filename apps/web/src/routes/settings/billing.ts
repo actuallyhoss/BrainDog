@@ -90,7 +90,7 @@ export type BilledRecord = {
   record: string;
   slug: string | null;
   state: 'active' | 'past_due' | 'lapsed' | 'unbilled';
-  /** `free`, `cloud` or `plus`. A free record is `unbilled` and on `free`: nothing is sold for it (DIRECTION §35). */
+  /** `free`, `cloud` or `plus`. A free record is `unbilled` and on `free`: nothing is sold for it. */
   plan: string;
   /** The Worker's own words for the price, "$12 a month", so no figure is written twice. */
   price: string;
@@ -321,7 +321,7 @@ export function packsOf(r: BilledRecord, answer: BillingAnswer): { left: string 
 /**
  * The paid plan a free record is offered, and the one sentence that offers it, or `null` when there is none.
  *
- * ONE OFFER, CALMLY (DIRECTION §35): the first plan the host sells, which is Cloud, said once under the record with its
+ * ONE OFFER, CALMLY: the first plan the host sells, which is Cloud, said once under the record with its
  * price in the Worker's words. Nothing is offered while the host takes no payment, because the button could only fail.
  */
 export function upgradeOf(r: BilledRecord, answer: BillingAnswer): { plan: SoldPlan; line: string } | null {

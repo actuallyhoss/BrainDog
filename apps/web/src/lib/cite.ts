@@ -39,7 +39,7 @@ export type Segment =
 
 /**
  * Words this renderer says for a brace it cannot resolve, and nothing else. They name the person's own things, by the
- * name their list goes by ("something in Projects"), and never the system's (DIRECTION §35): no row, no list.
+ * name their list goes by ("something in Projects"), and never the system's: no row, no list.
  */
 export const words = {
   rowIn: (list: string) => `something in ${list}`,

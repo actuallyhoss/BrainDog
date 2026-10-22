@@ -20,8 +20,8 @@ test('A LINE IS TODAY`S ON THE RECORD`S DAY, and one sent as words is the record
 });
 
 test('THE RULES` PHRASE IS FOUND WORD FOR WORD, case aside, a count spelled or in digits, and never inside a longer word', () => {
-  assert.deepEqual(phraseAt('Bake first; four things need you.', 'Four things need you'), [12, 32]);
-  assert.deepEqual(phraseAt('Bake first; 4 things need you.', 'Four things need you'), [12, 29]);
+  assert.deepEqual(phraseAt('Oxbow first; four things need you.', 'Four things need you'), [13, 33]);
+  assert.deepEqual(phraseAt('Oxbow first; 4 things need you.', 'Four things need you'), [13, 30]);
   assert.deepEqual(phraseAt('Of these, two are 3 days late.', 'three days late'), [18, 29]);
   assert.deepEqual(phraseAt('Of these, two are late.', 'two are late'), [10, 22]);
   assert.equal(phraseAt('Twenty-two are late.', 'two are late'), null);
@@ -33,9 +33,9 @@ test('THE RULES` PHRASE IS FOUND WORD FOR WORD, case aside, a count spelled or i
 
 test('THE MODEL`S LINE CARRIES THE RED IN ITS OWN CASE, and with nothing fresh the rules` line is handed back whole', () => {
   const rules = { text: 'Four things need you, and two agents are working.', needs: 'Four things need you' };
-  const said = homeLineOf(rules, { text: 'Bake leads: four things need you before noon.', day: '2026-10-02', basis: 'b' }, NOW);
-  assert.deepEqual(said, { text: 'Bake leads: four things need you before noon.', needs: 'four things need you', by: 'slash' });
-  assert.deepEqual(cutLine(said), { before: 'Bake leads: ', needs: 'four things need you', after: ' before noon.' });
+  const said = homeLineOf(rules, { text: 'Oxbow leads: four things need you before noon.', day: '2026-10-02', basis: 'b' }, NOW);
+  assert.deepEqual(said, { text: 'Oxbow leads: four things need you before noon.', needs: 'four things need you', by: 'slash' });
+  assert.deepEqual(cutLine(said), { before: 'Oxbow leads: ', needs: 'four things need you', after: ' before noon.' });
   assert.deepEqual(homeLineOf(rules, undefined, NOW), { ...rules, by: 'rules' });
   /* A CALM MORNING HAS NO RED PHRASE, so the model's line has none either. */
   assert.equal(homeLineOf({ text: 'Nothing needs you, and no agent is working.', needs: '' }, 'Nothing needs you today.', NOW).needs, '');

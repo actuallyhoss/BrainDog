@@ -1,5 +1,5 @@
 /**
- * A tile's heading row on the board (DIRECTION §39): its icon, its name at 15 and 600, and how many it holds, the same
+ * A tile's heading row on the board: its icon, its name at 15 and 600, and how many it holds, the same
  * on every tile. A block that names its own glyph keeps it; one that names none takes its kind's, so a page is not half
  * tiles with a glyph and half without. A count is said only where the tile is a list of things a person counts (the
  * questions, the tasks, the rows), never on a figure, a chart or a sentence, where the number is the tile itself.
@@ -48,7 +48,7 @@ const KIND_ICON: Readonly<Record<string, string>> = {
 };
 
 /**
- * WHAT A TILE'S WELL SAYS BY ITS COLOUR (DIRECTION §39, one accent used): a question waiting on the person in the working
+ * WHAT A TILE'S WELL SAYS BY ITS COLOUR (one accent used): a question waiting on the person in the working
  * accent's tint, cash and what is earned in the earn green, and everything else the quiet grey. Late is not a kind, so
  * it is read off the block itself (`headTone`).
  */

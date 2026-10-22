@@ -257,11 +257,34 @@
     waits = waitingLine(waiting, (hold) => holdName(hold, titles));
   }
 
-  /** One press of the switch. Off is undone, never asked, as on /packs: the same call puts it back. */
+  /**
+   * THE HEAD'S SWITCH SAYS WHAT IT DOES AND ASKS BEFORE IT TURNS AN ADD-ON OFF (UI audit of 22 October, 23). It sat
+   * unlabelled at the head's end, where it read as a setting of the page, and one press took every list and page of the
+   * add-on out of the menu. Off now asks once, in a line under the head, with what it takes away; on is at once.
+   */
+  const turnWords = {
+    on: 'On',
+    off: 'Off',
+    ask: (name: string, n: number) =>
+      `Turn ${name} off? ${n === 0 ? 'It stops working' : `Its ${n === 1 ? 'list or page leaves' : `${n} lists and pages leave`} the menu`} until you turn it on again. Nothing in it is deleted.`,
+    yes: 'Turn off',
+    no: 'Keep it on',
+  } as const;
+  let asking = $state(false);
+
+  /** A press of the switch: on is at once, off asks first (`turnWords.ask`). */
+  function pressSwitch() {
+    if (!installed || turning) return;
+    if (installed.disabled_at === null) asking = true;
+    else void turn();
+  }
+
+  /** One press of the switch, or the confirm under it. Off can be undone too, as on /packs: the same call puts it back. */
   async function turn() {
     const s = source;
     const h = installed;
     if (!s || !h || turning) return;
+    asking = false;
     const on = h.disabled_at !== null;
     turning = true;
     turnSaid = '';
@@ -362,6 +385,10 @@
   const inWords = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1).replaceAll(/[-_]/g, ' ');
   /* A PAGE IS CALLED WHAT THE RECORD CALLS IT (UI pass of 21 October, P45), the title the nav and the browse page say,
      before the sample's name for it or its address in words. */
+  /* THE PAGES A PERSON OPENS BY NAME (UI audit of 22 October, 23): a page drawn for each row of a list ("Someone",
+     "Relation", titled by the row) is not one of them, so it is not listed as a page the add-on adds. */
+  const shownPages = $derived((pack?.pages ?? []).filter((p) => !(pack?.rowPages ?? []).includes(p)));
+
   const pageName = (slug: string): string =>
     ((page.data.nav ?? []) as { id?: string; title?: string }[]).find((e) => e.id === slug)?.title || PAGES[slug]?.title || inWords(slug);
 </script>
@@ -388,15 +415,20 @@
   <PageHead icon={glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
     {#snippet actions()}
       {#if installed}
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          aria-checked={installed.disabled_at === null}
-          aria-label={copy.packSwitch(name)}
-          disabled={turning}
-          onclick={() => void turn()}
-        ><span class="switch-track"></span></button>
+        <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->
+        <label class="head-switch">
+          <span class="head-switch-word" aria-hidden="true">{installed.disabled_at === null ? turnWords.on : turnWords.off}</span>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={installed.disabled_at === null}
+            aria-label={copy.packSwitch(name)}
+            aria-expanded={asking}
+            disabled={turning}
+            onclick={pressSwitch}
+          ><span class="switch-track"></span></button>
+        </label>
       {/if}
     {/snippet}
   </PageHead>
@@ -409,6 +441,15 @@
         {#if settings.version}<span class="num">{market.versionOf(settings.version)}</span>{/if}
         {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
       </p>
+      {#if asking}
+        <div class="turn-ask" role="group" aria-label={copy.packSwitch(name)}>
+          <p class="turn-ask-said">{turnWords.ask(name, (pack?.registers.length ?? 0) + shownPages.length)}</p>
+          <div class="turn-ask-do">
+            <Button size="sm" disabled={turning} onclick={() => void turn()}>{turnWords.yes}</Button>
+            <Button size="sm" weight="bare" onclick={() => (asking = false)}>{turnWords.no}</Button>
+          </div>
+        </div>
+      {/if}
       <p class="turn-said" role="status">{turnSaid}</p>
       {#if waits}<p class="waits">{waits}</p>{/if}
     </div>
@@ -632,7 +673,7 @@
           </div>
         </Tile>
       {/if}
-    {:else if !(pack && (pack.registers.length || pack.pages.length))}
+    {:else if !(pack && (pack.registers.length || shownPages.length))}
       <!-- ONLY WHEN IT ADDS NOTHING ELSE (UI pass of 21 October, P45): beside the lists and pages it added, a tile saying
            there is nothing to set was a tile of nothing. -->
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
@@ -644,13 +685,13 @@
             kind="no-data-yet"
             compact
             title={copy.packNothingToSet}
-            body={pack && (pack.registers.length || pack.pages.length) ? copy.packNothingToSetWhy : undefined}
+            body={pack && (pack.registers.length || shownPages.length) ? copy.packNothingToSetWhy : undefined}
           />
         </div>
       </Tile>
     {/if}
-    {#if pack && (pack.registers.length || pack.pages.length)}
-      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + pack.pages.length) || undefined}>
+    {#if pack && (pack.registers.length || shownPages.length)}
+      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + shownPages.length) || undefined}>
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
           <ul class="ledger">
@@ -663,7 +704,7 @@
                 </a>
               </li>
             {/each}
-            {#each pack.pages as p (p)}
+            {#each shownPages as p (p)}
               <li>
                 <a class="line added" href={at(`/p/${p}`)}>
                   <span class="line-mark"><IconWell name="doc" size="l" /></span>
@@ -711,6 +752,39 @@
   .about:empty,
   .turn-said:empty {
     display: none;
+  }
+
+  .head-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+  }
+
+  .head-switch-word {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  /* THE CONFIRM, A LINE AND TWO VERBS ON THE GROUND under the head, as Backups asks before putting a copy back. */
+  .turn-ask {
+    display: grid;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+  }
+
+  .turn-ask-said {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .turn-ask-do {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
   }
 
   .turn-said {

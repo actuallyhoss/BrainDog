@@ -18,7 +18,7 @@ const andOf = (items: readonly string[]): string =>
   items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
 /**
- * THE FIVE STARTING POINTS OF USE CASE 6 (his word of 9 October): a shop, a freelancer, a student, a founder of a few
+ * THE FIVE STARTING POINTS OF USE CASE 6: a shop, a freelancer, a student, a founder of a few
  * companies and a team, as a person would say each. No screen draws them any more (the chips under the prompt were a
  * chip cloud, the UI pass of 20 October, first F6); the reading is still held to understand each one, so they are the
  * reading's fixtures and not the screen's words.
@@ -149,7 +149,7 @@ export const firstRun = {
 
   /**
    * SIGNED IN AND ON NO RECORD: the way in is to say who you are on `/signup`, and a paid name is the quieter way
-   * beside it, never the lead (DIRECTION §35, "Free leads").
+   * beside it, never the lead ("Free leads").
    */
   noRecordWhy: 'You are signed in and have no BrainDog yet. Say who you are and it builds one for you, free.',
   noRecordDescribe: 'Tell it who you are',

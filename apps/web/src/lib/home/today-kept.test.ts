@@ -40,5 +40,8 @@ test('HOME DRAWS ITS BODY, DESK AND BRIEFING FROM WHAT IT KEPT, and asks each ti
   for (const tile of ['briefing', 'matched', 'stale', 'desk', 'handled', 'learned', 'named', 'hues', 'imported'])
     assert.match(home, new RegExp(`tileOnce\\('${tile}', base, ver,`, 'u'), `${tile} is asked again at the same version`);
   /* THE KEPT BODY SETTLES THE SCREEN AT ONCE, and the read behind it is not bracketed. */
-  assert.match(home, /const at = was \? null : untrack\(opened\);/u);
+  assert.match(home, /const at = was \|\| viaCopy \? null : untrack\(opened\);/u);
+  /* AND SO DOES THE COPY'S: drawn from it, the screen settles, and the page is not asked twice for one question. */
+  assert.match(home, /releaseReads\(\);\n\s+painted\('Today', 'copy'\)/u);
+  assert.match(home, /if \(key === readKey && !readFailed\) return;/u);
 });

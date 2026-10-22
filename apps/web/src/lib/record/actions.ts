@@ -460,6 +460,12 @@ export type UsageView = {
    */
   days: { day: string; runs: number }[];
   records: Allowed[];
+  /**
+   * How many times the record's automations fired in the last seven days, where the record and not a ledger is read. A
+   * rule that files a row fires without a run, so none of it is in `totals`, and a month with no run of an action read
+   * "Nothing has run" over automations that had fired all day.
+   */
+  fired?: number;
 };
 
 /**
@@ -534,8 +540,20 @@ function groupsOf(rows: readonly Scoped[]): Group[] {
   return [...out.values()].sort((a, b) => Number(a.faint) - Number(b.faint) || b.totals.runs - a.totals.runs || a.name.localeCompare(b.name));
 }
 
-/** The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits. */
-export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events', through?: string, current = true): UsageView {
+/**
+ * An automation as the record's `automations` read answers it, as far as usage reads it: its name, where it applies and
+ * what it ran this month (`month.runs`, of which `month.failed` failed).
+ */
+export type AutomationRuns = { name: string; project?: string | null; month?: { runs?: number; failed?: number } | null; week?: number };
+
+/**
+ * The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits.
+ *
+ * AND WHAT ITS AUTOMATIONS RAN THIS MONTH, which the record counts on each. Without them a month of rules filing bank
+ * lines read "Nothing has run in September" on a record whose automations had run all day; the hosts' ledger counts a
+ * rule's run too (`rule:<id>`). The record keeps no day of an automation's run, so the days and weeks stay the actions'.
+ */
+export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events', through?: string, current = true, automations: readonly AutomationRuns[] = []): UsageView {
   const totals = zero();
   const projects = new Map<string, Named>();
   const days = new Map<string, number>();
@@ -553,6 +571,22 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
     actions.push(named);
     scoped.push({ key, scope: key, name: title, named });
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
+  }
+  const titles = projectNames(rows);
+  for (const a of automations) {
+    const runs = a.month?.runs ?? 0;
+    if (!(runs > 0)) continue;
+    /* UNDER ITS PROJECT WHERE AN ACTION HERE NAMED IT, else under Everywhere: a project is never said by its id. */
+    const title = a.project ? titles.get(a.project) : undefined;
+    const key = title === undefined ? '' : a.project!;
+    const name = title ?? words.everywhereUsage;
+    const named: Named = { name: a.name, faint: key === '', runs, requests: 0, bytes: 0, failures: a.month?.failed ?? 0 };
+    add(totals, named);
+    const p = projects.get(key) ?? { name, faint: key === '', ...zero() };
+    add(p, named);
+    projects.set(key, p);
+    actions.push(named);
+    scoped.push({ key, scope: key, name, named });
   }
   return {
     from,
@@ -818,12 +852,14 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
     else if (!ledger.notFound && !ASK_THE_RECORD.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
   }
 
-  const events = await live(io, api).actions();
+  const [events, automations] = await Promise.all([live(io, api).actions(), current ? send<AutomationRuns[]>(io, `${api}/api/automations`) : null]);
   if (events.ok) {
     /* THE RECORD'S EVENTS ARE THIS MONTH'S ONLY (`ActionRow.month`), so a past month read from them is a month with
-       nothing to say, never this month's runs under last month's name. */
+       nothing to say, never this month's runs under last month's name. Its automations' counts are this month's too. */
+    const autos = automations?.ok && Array.isArray(automations.value) ? automations.value : [];
     return drawn(() => {
-      const view = usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current);
+      const fired = autos.reduce((n, a) => n + (typeof a.week === 'number' && a.week > 0 ? a.week : 0), 0);
+      const view = { ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos), ...(fired > 0 ? { fired } : {}) };
       return member ? { ...view, owner: false } : view;
     });
   }
@@ -892,7 +928,7 @@ export type CallOut = {
   perDay?: number;
   /** The record's own sentence about a project action sending a key, which is approved with the line. */
   note?: string;
-  /** The plan's sentence for what it files, "Writes Numbers on Bake: revenue, customers, 3 more." (`writes_line`). */
+  /** The plan's sentence for what it files, "Writes Numbers on Oxbow: revenue, customers, 3 more." (`writes_line`). */
   writes?: string;
   /** Its interval is the provider's own floor, the least it may run at (`at_floor`). */
   floor?: true;

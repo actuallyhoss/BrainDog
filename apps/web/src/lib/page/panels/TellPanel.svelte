@@ -13,6 +13,11 @@
 
   HIS ALONE (`level: owner`): the record refuses `instruct` to anyone but a person, and lists the threads to the owner.
 
+  ON THE AGENTS PAGE, ONE LINE, AND WHAT HE TOLD BESIDE IT: the field, To and Send on one row, the other choices once he
+  starts (`Instruct`'s `line`), and the last three threads in a column of their own beside it where the tile is wide
+  enough, under it where it is not. ON A PHONE THE LINE IS A PRESS THAT OPENS THE SHEET with the whole composer in it,
+  so the page opens on a line and the form takes the screen only while he writes. A run row's Tell opens it too.
+
   SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2). `run` opens the composer aimed at that run and lists what went to it
   (Today's run sheet); `project` fixes "On" to that project, offers only the runs working there and lists what he told
   agents on it (a project's page). `projectName` names the project before the projects are read, so the composer is
@@ -25,11 +30,14 @@
   import { apiBase } from '$lib/at.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { listen } from '../listen.svelte.ts';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import {
+    NO_PLACES,
     PICK_FIRST,
     aim,
     composerOf,
     control,
+    fill,
     controlWords,
     instructArgs,
     runsOf,
@@ -42,6 +50,7 @@
     unknownRuns,
     type LiveRun,
     type Chosen,
+    type Places,
     type Project,
     type RunKnown,
     type Thread,
@@ -75,6 +84,8 @@
   const seeded = (): Map<string, Project> => (project && projectName ? new Map([[project, { key: project, name: projectName, hue: null }]]) : new Map());
   let projects = $state.raw<Map<string, Project>>(seeded());
   let known = $state.raw<Map<string, RunKnown>>(new Map());
+  /* THE MACHINES AND PROFILES "MACHINE" AND "PROFILE" OFFER, read with the threads (migration 44). */
+  let places = $state.raw<Places>(NO_PLACES);
   const firstPick = (): Chosen => (run ? { ...PICK_FIRST, to: `run:${run}` } : project ? { ...PICK_FIRST, on: project } : { ...PICK_FIRST });
   let pick = $state<Chosen>(firstPick());
   let said = $state('');
@@ -83,7 +94,9 @@
   let sending = $state.raw<ThreadView | null>(null);
   let undone = $state.raw<Map<string, string>>(new Map());
   let pressing = $state.raw<Set<string>>(new Set());
-  const firstShown = (): number => first;
+  /** How many threads stand beside the line on the Agents page, where the column beside it is short. */
+  const SHOWN_BESIDE = 3;
+  const firstShown = (): number => (run === null && project === null ? Math.min(first, SHOWN_BESIDE) : first);
   let shown = $state(firstShown());
   let now = $state(recordNow());
   let box = $state<{ focus(): void } | undefined>(undefined);
@@ -91,11 +104,20 @@
 
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
 
+  /* THE AGENTS PAGE'S OWN FORM: one line, what he told beside it, and the sheet on a phone. A scoped panel keeps the box. */
+  const line = $derived(run === null && project === null);
+  /* A PHONE, by the width the app's sheets turn at (`PHONE_WIDTH` in `panel.ts`), read and followed while mounted. */
+  let narrow = $state(false);
+  let sheetOpen = $state(false);
+
   async function read(): Promise<void> {
     const [p, t] = await Promise.all([io.presence(), io.threads(50, run ?? undefined, project ?? undefined)]);
     now = recordNow();
     if (p.ok) rows = p.value;
-    if (t.ok) threads = t.value;
+    if (t.ok) {
+      threads = t.value;
+      places = t.places ?? NO_PLACES;
+    }
     const seen = new Map([...known, ...runsOf(rows)]);
     const missing = unknownRuns(threads, seen);
     known = missing.length === 0 ? seen : new Map([...seen, ...(await io.runs(missing))]);
@@ -104,7 +126,11 @@
 
   onMount(() => {
     void read();
-    const off = [told.on(() => void read()), aim.on((run) => void aimAt(run))];
+    const phone = matchMedia('(width < 640px)');
+    const follow = () => (narrow = phone.matches);
+    follow();
+    phone.addEventListener('change', follow);
+    const off = [told.on(() => void read()), aim.on((run) => void aimAt(run)), fill.on((words) => void fillWith(words)), () => phone.removeEventListener('change', follow)];
     /* THE WORDS THAT ARE A CLOCK ("Working 9 min") move once a minute between reads. */
     const clock = setInterval(() => (now = recordNow()), 30_000);
     return () => {
@@ -119,12 +145,24 @@
   async function aimAt(run: string): Promise<void> {
     pick = { ...pick, to: `run:${run}`, when: null };
     fault = null;
+    if (line && narrow) sheetOpen = true;
     await tick();
     here?.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     box?.focus();
   }
 
-  const composer = $derived(composerOf(pick, rows, projects, project));
+  /* A STEP HANDED ON: its words in the field, to whoever is next at their next start, his to send or change. */
+  async function fillWith(words: string): Promise<void> {
+    said = words;
+    pick = { ...PICK_FIRST, when: 'next' };
+    fault = null;
+    if (line && narrow) sheetOpen = true;
+    await tick();
+    here?.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    box?.focus();
+  }
+
+  const composer = $derived(composerOf(pick, rows, projects, project, places));
   const view = $derived({ ...composer, busy, fault });
 
   async function send(): Promise<void> {
@@ -199,20 +237,41 @@
   });
 </script>
 
+{#snippet field(oneLine: boolean)}
+  <Instruct
+    bind:this={box}
+    {view}
+    bind:said
+    {mark}
+    line={oneLine}
+    onto={(key) => ((pick = { ...pick, to: key, when: null }), (fault = null))}
+    onon={(key) => ((pick = { ...pick, on: key, when: null }), (fault = null))}
+    onwhen={(w) => (pick = { ...pick, when: w })}
+    onmachine={(key) => ((pick = { ...pick, machine: key, when: null }), (fault = null))}
+    onseat={(key) => ((pick = { ...pick, seat: key, when: null }), (fault = null))}
+    onsend={() => void send()}
+  />
+{/snippet}
+
 {#if owner}
-  <div class="tell" bind:this={here}>
-    <Instruct
-      bind:this={box}
-      {view}
-      bind:said
-      {mark}
-      onto={(key) => ((pick = { ...pick, to: key, when: null }), (fault = null))}
-      onon={(key) => ((pick = { ...pick, on: key, when: null }), (fault = null))}
-      onwhen={(w) => (pick = { ...pick, when: w })}
-      onsend={() => void send()}
-    />
-    {#if drawn.length > 0}<h3 class="told-head">What you told agents</h3>{/if}
-    <Instructions threads={drawn} {mark} more={Math.max(0, ordered.length - shown)} ontakeback={(k) => void takeBack(k)} onundo={(k) => void undo(k)} onmore={() => (shown += STEP)} />
+  <div class="tell" data-line={line ? '' : undefined} bind:this={here}>
+    <div class="tell-compose">
+      {#if line && narrow}
+        <!-- THE PHONE'S LINE: a press that looks like the field and opens the sheet, his draft in it if he has one. -->
+        <button type="button" class="tell-open" data-said={said.trim() ? '' : undefined} aria-haspopup="dialog" onclick={() => (sheetOpen = true)}><span class="tell-open-text">{said.trim() || 'Tell an agent what to do…'}</span></button>
+        <Sheet bind:open={sheetOpen} title="Tell an agent">
+          {#if sheetOpen}{@render field(false)}{/if}
+        </Sheet>
+      {:else}
+        {@render field(line)}
+      {/if}
+    </div>
+    {#if drawn.length > 0}
+      <div class="tell-told">
+        <h3 class="told-head">What you told agents</h3>
+        <Instructions threads={drawn} {mark} more={Math.max(0, ordered.length - shown)} ontakeback={(k) => void takeBack(k)} onundo={(k) => void undo(k)} onmore={() => (shown += STEP)} />
+      </div>
+    {/if}
   </div>
 {:else}
   <!-- NOT HIS RECORD TO TELL: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew nothing). -->
@@ -225,5 +284,62 @@
     min-inline-size: 0;
     padding-block-start: var(--sp-1);
     scroll-margin-block: var(--sp-8);
+    container-type: inline-size;
+  }
+
+  .tell-compose,
+  .tell-told {
+    display: grid;
+    align-content: start;
+    min-inline-size: 0;
+  }
+
+  /* WHAT HE TOLD, BESIDE THE LINE where the tile is wide enough: the line takes seven parts and the threads five, with no
+     rule over them, since the column is their edge. */
+  @container (width >= 760px) {
+    .tell[data-line] {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: var(--sp-6);
+    }
+
+    .tell[data-line] .tell-told :global(.told-head) {
+      margin-block-start: 0;
+      padding-block-start: 0;
+      border-block-start: 0;
+    }
+  }
+
+  /* THE PHONE'S LINE: the field's fill, its height and its quiet words, as a press. */
+  .tell-open {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: var(--tap, 44px);
+    padding-inline: var(--sp-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-3);
+    font: inherit;
+    font-size: var(--fs-body);
+    text-align: start;
+    cursor: text;
+  }
+
+  .tell-open-text {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tell-open[data-said] {
+    color: var(--ink);
+  }
+
+  .tell-open:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
   }
 </style>

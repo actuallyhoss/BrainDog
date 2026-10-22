@@ -1,9 +1,9 @@
 <!--
-  ONE DECISION CARD, EVERYWHERE A QUESTION IS ANSWERED (DIRECTION §37): Home, Money, Work, a project's page, the Agents
+  ONE DECISION CARD, EVERYWHERE A QUESTION IS ANSWERED: Home, Money, Work, a project's page, the Agents
   page and Decide (through `QueueAnswer.svelte`), Today's classic list (`home/Question.svelte`), Decide's classic screen
   (`Classic.svelte`) and Slash's palette. What it says is `card.ts`'s; this draws it and answers it.
 
-  IT READS LIKE A FORM (DIRECTION §39). Who asked and when, one quiet line over the question on a laptop and a phone
+  IT READS LIKE A FORM. Who asked and when, one quiet line over the question on a laptop and a phone
   alike; the question; why it is asked; then the answers as a vertical list of full-width choices, each its name and one
   line of what it does, with "Suggested" in the accent's words beside the one an agent suggests. The drawing is
   `form.css`, which the question's own page draws its choices with too.
@@ -163,7 +163,7 @@
      host that holds none: the card keeps no address of its own. */
   const fileAt = getContext<FileAt | undefined>(QUEUE_FILE);
 
-  /* AN OPTION THAT IS A PICTURE (his D28.33, "each option shown as what it is") carries its address from `cardOf`, which
+  /* AN OPTION THAT IS A PICTURE (each option shown as what it is) carries its address from `cardOf`, which
      reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
      Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: recordNow(), lead, file: fileAt }));
@@ -585,12 +585,13 @@
   {/each}
 {/snippet}
 
-<!-- ASK ME LATER (today F11): a quiet clock at the row's end, opening the question's own page at the step that puts it off. -->
+<!-- ASK ME LATER (today F11): a quiet clock and its words at the row's end, opening the question's own page at the step
+     that puts it off. The clock alone floated under the answers on every card and said nothing until it was pressed. -->
 {#snippet later()}
   {#if notNow && kept}
-    <button type="button" class="dc-btn dc-later" data-weight="bare" aria-disabled="true" aria-label={queueWords.notNow}><Icon name="clock" size="s" /></button>
+    <button type="button" class="dc-btn dc-later" data-weight="bare" aria-disabled="true" aria-label={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></button>
   {:else if notNow}
-    <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /></a>
+    <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></a>
   {/if}
 {/snippet}
 
@@ -792,7 +793,7 @@
       {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
     </div>
     {#if side}
-      <!-- THE CARD'S SIDE (DIRECTION §39), only where there is something to put in it: on a wide tile a 280px column
+      <!-- THE CARD'S SIDE, only where there is something to put in it: on a wide tile a 280px column
            beside the form with why it is asked and what it changes, each under a quiet heading. On a narrow one why
            follows the question and what it changes comes under the buttons. -->
       <div class="dc-side">
@@ -910,7 +911,7 @@
     margin-block-end: calc(var(--sp-2) * -1);
   }
 
-  /* WHO ASKED AND WHEN ARE ALWAYS THERE (DIRECTION §37): the skin's by-line waits for a hover on its card before the
+  /* WHO ASKED AND WHEN ARE ALWAYS THERE: the skin's by-line waits for a hover on its card before the
      time shows, which it reads off a by-line that is the card's own child. This one is the form's, so it says it here. */
   .queue-by > :is(.queue-when, .dc-from) {
     opacity: 1;
@@ -1138,7 +1139,7 @@
     }
   }
 
-  /* THE BULK BOX IS A SECONDARY CONTROL, drawn on hover or focus of its card (DIRECTION §35), and on every card once one
+  /* THE BULK BOX IS A SECONDARY CONTROL, drawn on hover or focus of its card, and on every card once one
      is chosen so the choice can be widened; under a thumb, where nothing hovers, it is always there. */
   @media (hover: hover) and (pointer: fine) {
     .qa-select {
@@ -1353,17 +1354,33 @@
     }
   }
 
-  /* ASK ME LATER (today F11): a clock, 32 square (44 under a thumb), at the end of the row of answers. */
+  /* ASK ME LATER (today F11): the clock and its words, quiet, at the end of the row of answers; 44 tall under a thumb. */
   .dc-actions > :global(.dc-later) {
-    inline-size: var(--btn-h);
-    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-inline: var(--sp-2);
     margin-inline-start: auto;
-    color: var(--ink-3);
+    color: var(--ink-2);
   }
 
   @media (pointer: coarse) {
     .dc-actions > :global(.dc-later) {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* WHERE TWO ANSWERS SHARE A PHONE'S LINE WITH IT (`form.css`, 400 to 600px), it keeps its square and its words go to
+     its name alone, so the answers keep the room they need. */
+  @media (400px <= width < 600px) {
+    .dc-actions[data-inline] > :global(.dc-later) {
+      justify-content: center;
       inline-size: var(--tap);
+      padding: 0;
+    }
+
+    .dc-actions[data-inline] > :global(.dc-later .dc-later-words) {
+      display: none;
     }
   }
 

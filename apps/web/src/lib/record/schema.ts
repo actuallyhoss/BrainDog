@@ -766,7 +766,7 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat
  * vocabulary. `EventKind` above came in for the same reason, in the same words: a new kind is a
  * kernel migration, so the kernel is where the list lives and everything else reads it.
  */
-export { REDUCES } from '@braindog/kernel';
+export { REDUCES } from '@braindog/kernel/constants';
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

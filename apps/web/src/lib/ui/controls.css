@@ -321,7 +321,7 @@
   }
 
   /**
-   * THE SLIDING SELECTION (DIRECTION §39, `Segmented.svelte`). A track the component draws carries `data-slides`, and
+   * THE SLIDING SELECTION (`Segmented.svelte`). A track the component draws carries `data-slides`, and
    * once it has measured its chosen segment, `data-thumb` and that segment's box as `--x`, `--y`, `--w` and `--h`.
    * The thumb is the track's `::before` at that box, and choosing MOVES it: one `transform` transition of `--d-state`,
    * so nothing is laid out again and nothing beside the control shifts. Its width is the new label's at once.

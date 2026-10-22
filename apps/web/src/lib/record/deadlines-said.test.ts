@@ -67,7 +67,7 @@ test('TODAY SAYS WHAT FALLS DUE AS DAYS AND SIGNED MONEY, in Overdue and in Comi
 
 test('A VALUE NO FIELD DECLARES IS SAID BY ITS SHAPE, never as [object Object] or a stored day', () => {
   assert.equal(display('deadlines', 'amount', { amount: 919000, currency: 'GBP' }), display('obligations', 'amount', { amount: 919000, currency: 'GBP' }));
-  assert.equal(display('deadlines', 'day', '2026-07-01'), '1 Jul 2026');
+  assert.equal(display('deadlines', 'day', '2025-07-01'), '1 Jul 2025');
   assert.equal(display('deadlines', 'what', { nothing: 'to say' }), null);
   assert.equal(display('deadlines', 'title', 'Legal review, February'), 'Legal review, February');
   assert.equal(display('deadlines', 'n', 3), '3');

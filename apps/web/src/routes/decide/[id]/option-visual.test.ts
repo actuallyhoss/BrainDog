@@ -105,8 +105,8 @@ test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and each card’s o
 
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /data-across=\{question\.options\.length <= 3 \? '' : undefined\}/u, 'two or three options are a list again');
-  assert.match(page, /<OptionVisual visual=\{drawingFor\(option\.key\)\} \/>/u, 'an option is drawn without its picture');
+  assert.match(page, /<OptionVisual visual=\{drawn\} \/>/u, 'an option is drawn without its picture');
   assert.match(page, /\.dc-options \{\n\s+display: grid;\n\s+grid-template-columns: repeat\(auto-fit, minmax\(240px, 1fr\)\);/u);
-  assert.match(page, /onclick=\{\(\) => void press\(option\.key\)\}\n\s+onkeydown=\{\(e\) => onChoiceKey\(e, option\.key\)\}\n\s+>\{said\}/u, 'a card’s button no longer says its own answer');
+  assert.match(page, /onclick=\{\(\) => void press\(option\.key\)\}\n\s+onkeydown=\{\(e\) => onChoiceKey\(e, option\.key\)\}\n\s+>\{#if bare\}\{said\}\{:else\}\{gate\.choose\}/u, 'a card’s button says its own answer, or Choose beside the name the card carries');
   assert.doesNotMatch(page, /id="gate-decide"/u, 'an Answer button under the cards gives the one chosen again');
 });

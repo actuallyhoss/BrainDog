@@ -1,7 +1,7 @@
 <!--
   Settings > Billing: this month's plan and usage as a tile of meters, then what each record you own costs on the Cloud
   and where its bill stands, or on a self-host the one line that says there is nothing to bill; then where usage and
-  the export are. A free record says Free and offers the first paid plan once, quietly (DIRECTION §35).
+  the export are. A free record says Free and offers the first paid plan once, quietly.
 -->
 <script lang="ts">
   import { page } from '$app/state';

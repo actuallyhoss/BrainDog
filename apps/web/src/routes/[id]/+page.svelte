@@ -33,6 +33,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import NotFound from '$lib/ui/NotFound.svelte';
+  import { nearest, shellPlaces } from '$lib/record/nearest.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /* A MALFORMED ESCAPE IS STILL AN ADDRESS, and `decodeURIComponent` throws on one (`/%E0`), which took the whole
@@ -189,7 +190,11 @@
 
   /* THE HEADING OF EACH NOT-FOUND, which is also the tab's title. An address that is not an id has none of its own:
      `NotFound` says its own title, and the tab says the address. */
-  const missing = $derived(shape === 'bare' ? words.bareTitle(raw) : shape === 'spoken' ? words.spokenTitle(raw) : null);
+  const missing = $derived(shape === 'bare' ? words.bareTitle(raw) : shape === 'spoken' ? words.spokenTitle(raw) : copy.noPageCalled(raw));
+
+  /* THE PAGES AND LISTS THE RAIL OFFERS, NEAREST TO WHAT WAS TYPED FIRST (`record/nearest.ts`). */
+  const shell = $derived(page.data as { nav?: { title: string; href: string }[]; index?: { registers?: { id: string; name: string }[] } });
+  const near = $derived(shape === 'address' ? nearest(raw, shellPlaces(shell.nav ?? [], shell.index?.registers ?? [])) : []);
 </script>
 
 <!-- A REFUSAL IS NOT "NOTHING ANSWERS" IN THE TAB EITHER. With the sample gone a 401 draws the record's sentence
@@ -227,7 +232,8 @@
     {:else if shape === 'spoken'}
       <NotFound title={missing ?? raw} body={words.spokenBody} />
     {:else}
-      <NotFound />
+      <!-- AN ADDRESS THAT WAS NEVER AN ID IS A PAGE THAT IS NOT HERE, said by what was typed, with the nearest pages. -->
+      <NotFound title={copy.noPageCalled(raw)} near={near} />
     {/if}
   </div>
 {/if}

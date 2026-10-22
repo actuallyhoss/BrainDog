@@ -509,7 +509,7 @@
           </div>
         {/if}
 
-        <!-- UNTIL: five lengths, a picked day among them. An email starts at 90 days. -->
+        <!-- UNTIL: five lengths, a picked day among them. An email starts at 30 days. -->
         <div class="share-row">
           <span class="share-label" id="{uid}-until">{copy.shareUntilLabel}</span>
           <div class="share-control">

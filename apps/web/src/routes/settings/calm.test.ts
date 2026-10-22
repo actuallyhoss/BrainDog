@@ -1,5 +1,5 @@
 /**
- * Settings, calm (DIRECTION §35): one hint a section, where a choice is kept said once, the ways in reading as titles
+ * Settings, calm: one hint a section, where a choice is kept said once, the ways in reading as titles
  * until one is chosen, and the person's own words where the system's were.
  *
  * A TEXT TEST OVER MARKUP, for the reason `levels.test.ts` gives. Comments are stripped first, so a comment that says

@@ -10,7 +10,8 @@
  * is imported only by a run's page, the Agents settings and a page's runs block, never by what every screen loads.
  */
 
-import { presenceOf, type Json } from '@braindog/kernel';
+import type { Json } from '@braindog/kernel';
+import { presenceOf } from '@braindog/kernel/constants';
 import type { RunLive } from './face.ts';
 
 /** Where a run is now, as the record's clock says it: the kernel's `Presence`, word for word. */

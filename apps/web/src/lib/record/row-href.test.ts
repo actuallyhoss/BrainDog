@@ -16,7 +16,7 @@ import './fixtures/fill.ts';
 
 const PAGES = [
   { slug: 'home', about: null },
-  { slug: 'bake-gg', about: { register: 'things', seq: 3 } },
+  { slug: 'oxbow-gg', about: { register: 'things', seq: 3 } },
   /* A TEMPLATE'S PAGE FOR A ROW WITH NO NUMBER YET is nobody's own page. */
   { slug: 'things-0', about: { register: 'things', seq: null } },
 ];
@@ -37,7 +37,7 @@ test('a row whose list has no template opens on the row screen', () => {
 test('a row its list made a page for opens on its own page', () => {
   assert.ok(REGISTERS.things, 'the sample holds a list of projects');
   learnRowPages(PAGES);
-  assert.equal(rowHref('things#3'), '/p/bake-gg');
+  assert.equal(rowHref('things#3'), '/p/oxbow-gg');
   /* THE TEMPLATE TOOK ONLY SOME ROWS (`for: { where }`): a row it left out still has its screen. */
   assert.equal(rowHref('things#4'), '/r/things/4');
 });
@@ -59,7 +59,7 @@ test('the address is worked out from what it is handed, so a host can ask for an
   const pages = rowPagesOf(PAGES);
   assert.equal(pages.size, 1);
   const held = (list: string) => list === 'things';
-  assert.equal(rowHrefIn('things#3', held, pages), '/p/bake-gg');
+  assert.equal(rowHrefIn('things#3', held, pages), '/p/oxbow-gg');
   assert.equal(rowHrefIn('tasks#241', held, pages), null);
   /* A SLUG IS ONE SEGMENT OF AN ADDRESS, whatever a row was named. */
   assert.equal(rowHrefIn('things#9', held, rowPagesOf([{ slug: 'a b/c', about: { register: 'things', seq: 9 } }])), '/p/a%20b%2Fc');

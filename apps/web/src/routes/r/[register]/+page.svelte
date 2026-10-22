@@ -118,6 +118,8 @@
   import FieldAdd from './parts/FieldAdd.svelte';
   import ListEditor from '$lib/ui/ListEditor.svelte';
   import { listWords, MAKE_ID, MAKE_PARAM, nameFromId, offered } from '$lib/record/list-write.ts';
+  import { nearest } from '$lib/record/nearest.ts';
+  import NearLinks from '$lib/ui/NearLinks.svelte';
   import { sheetWords } from '$lib/record/field-words.ts';
   import { ownsRecord, type Me } from '../../settings/levels.ts';
   import { may } from '$lib/record/may.ts';
@@ -150,7 +152,7 @@
 
   /**
    * WHETHER THIS VISIT DRAWS THE LIST AS A PAGE THE RECORD COMPOSES (PGS-A23, `DeclaredList.svelte`), which the address
-   * asks for by one key and nothing on this screen links to until his yes on the list board. While it does, nothing
+   * asks for by one key and nothing on this screen links to until the list board is signed off. While it does, nothing
    * below is drawn, and this screen's keys and its panel's host stand down: its rows are not on screen to act on.
    */
   const composed = $derived(wantsDeclared(page.url));
@@ -329,7 +331,10 @@
     sharingOpen = true;
   }
 
-  const adds = $derived(may(shell, 'append', id));
+  /* NO ADD ON THE LIST OF RUNS: a run is what an agent's session is, opened by the agent and never typed in by hand,
+     and the list says nothing in the add's place, since nobody may add one. */
+  const madeByAgents = $derived(id === 'session');
+  const adds = $derived(!madeByAgents && may(shell, 'append', id));
   const changes = $derived(may(shell, 'write', id));
   const proposes = $derived(owner || may(shell, 'append'));
   /* A BOUND KEY DOES NOT ANSWER WITH SILENCE (`openEditor`), so `n`, `e` and `⌫` say to a Reads colleague why. */
@@ -2927,14 +2932,14 @@
     <Empty
       kind={id === MAKE_ID ? 'no-data-yet' : 'error'}
       heading
-      title={id === MAKE_ID ? listWords.title : listWords.missingTitle}
-      body={id === MAKE_ID ? listWords.makeBody : have.length > 0 ? listWords.missing(nameFromId(id)) : listWords.missingNone(nameFromId(id))}
+      title={id === MAKE_ID ? listWords.title : listWords.missingTitle(nameFromId(id))}
+      body={id === MAKE_ID ? listWords.makeBody : have.length > 0 ? listWords.missing : listWords.missingNone(nameFromId(id))}
     >
       {#snippet actions()}
-        {#if proposes}<Button weight="primary" onclick={() => (makeOpen = true)}>{listWords.make}</Button>{/if}
         {#if id !== MAKE_ID}
-          {#each have as r (r.id)}<Button href={`/r/${r.id}`}>{r.name}</Button>{/each}
+          <NearLinks places={nearest(id, have.map((r) => ({ title: r.name, href: `/r/${r.id}`, address: r.id })))} said={listWords.nearLists} />
         {/if}
+        {#if proposes}<Button weight="primary" onclick={() => (makeOpen = true)}>{listWords.make}</Button>{/if}
       {/snippet}
     </Empty>
   </div>
@@ -2955,7 +2960,7 @@
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
-      <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW (DIRECTION 39). How the list is drawn, its search and its filters
+      <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW. How the list is drawn, its search and its filters
            are about the rows, so they moved down into the list's own tile, where the rows are. -->
       <!-- ONE WAY TO ADD, AND IT IS THE LIST'S FIRST LINE. The head said "New item" over a line saying "Add an item",
            two controls for one act a hand's width apart. The line stays, since a name and Enter is the cheapest add
@@ -3005,7 +3010,7 @@
 
     <!-- THE OFFER, WHERE SHE IS: one at most, above the list's figures and its entries, and none while the list is
          still arriving, since an offer is drawn from use and a list being made has none yet. FOLDED TO ONE LINE
-         (`compact`, DIRECTION 39): she opened the list to read it, so the offer is a sentence over it and a press
+         (`compact`): she opened the list to read it, so the offer is a sentence over it and a press
          opens the card whole, with Make it and Not now where they were. -->
     {#if offer && !arriving}
       <OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />
@@ -3019,7 +3024,7 @@
     {/if}
 
     <!--
-      THE LIST IS ONE TILE ON THE BOARD (DIRECTION 39): its toolbar across the top (the search and the filters at the
+      THE LIST IS ONE TILE ON THE BOARD: its toolbar across the top (the search and the filters at the
       start, how it is drawn and Display at the end), the line that adds a row, then the rows. The board and the cards
       are tiles of their own, so on those two views the tile holds the toolbar and the cards stand on the board under it,
       since a tile never holds a tile.
@@ -3119,7 +3124,7 @@
 
       <!-- CAPTURE IS A SHEET NOW, behind the toolbar's primary and the phone's "+": a name and Enter, and it stays open for
            the next (motion F7.4). Where nobody may add, why not, in the add's place. -->
-      {#if !adds}
+      {#if !adds && !madeByAgents}
         <p class="reach">{reachWords.readOnly(decl.name)}</p>
       {:else if !arriving}
         <CaptureLine one={decl.one} example={captureExample} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
@@ -3342,7 +3347,7 @@
   }
 
   /* THE BOARD UNDER THE HEAD: the figures' tiles, the list's tile and, on the board and cards views, the cards, 12
-     apart (DIRECTION 39). The page is as wide as the window; the gutter keeps it off the edges. */
+     apart. The page is as wide as the window; the gutter keeps it off the edges. */
   .page {
     display: flex;
     flex-direction: column;
@@ -3426,7 +3431,7 @@
     }
   }
 
-  /* THE KEY IS PRINTED WHEN ASKED FOR (DIRECTION 35): `n` on New shows under the pointer or with keyboard focus. */
+  /* THE KEY IS PRINTED WHEN ASKED FOR: `n` on New shows under the pointer or with keyboard focus. */
   .new-row :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
     display: none;
   }
@@ -3499,7 +3504,7 @@
   }
 
   @media (width < 640px) {
-    /* THE PHONE'S BOARD: one column, 12 from the edges (DIRECTION 39), and the list's tile a step tighter inside. */
+    /* THE PHONE'S BOARD: one column, 12 from the edges, and the list's tile a step tighter inside. */
     .page {
       padding: var(--sp-2) var(--sp-3) var(--sp-8);
     }

@@ -120,7 +120,7 @@ test('THE COMPACT FORM IS ONE LINE: the sentence and a way to open it, and nothi
   const why = /\.offer-line-why \{([^}]*)\}/u.exec(css)?.[1] ?? '';
   assert.match(why, /white-space: nowrap/u);
   assert.match(why, /text-overflow: ellipsis/u);
-  /* A FLAT TILE (DIRECTION 39): no border, no shadow, no gradient. */
+  /* A FLAT TILE: no border, no shadow, no gradient. */
   const line = /\.offer-line \{([^}]*)\}/u.exec(css)?.[1] ?? '';
   assert.match(line, /border: 0/u);
   assert.doesNotMatch(css, /box-shadow|gradient|backdrop-filter/u);

@@ -31,8 +31,11 @@
     title,
     line,
     action,
+    tone,
   }: {
     icon: IconName;
+    /** `warn` on the one row that waits on the reader (a night that did not run); every other row is untoned. */
+    tone?: 'warn' | undefined;
     title: string;
     /** The one sentence under the title; a row with nothing more to say leaves it out. */
     line?: string | undefined;
@@ -42,7 +45,7 @@
 </script>
 
 <div class="state-row" class:has-action={!!action}>
-  <span class="state-icon"><IconWell name={icon} /></span>
+  <span class="state-icon"><IconWell name={icon} {tone} /></span>
   <span class="state-words">
     <span class="state-title" dir="auto">{title}</span>
     {#if line}<span class="state-line" dir="auto">{line}</span>{/if}

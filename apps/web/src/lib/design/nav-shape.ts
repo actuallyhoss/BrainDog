@@ -17,7 +17,7 @@
  * WHAT IT NEVER DOES: it never writes `nav.shape`. That write happens on the click that accepts the
  * suggestion, in the caller, exactly as `settings/navigation` already does for a promoted page.
  *
- * AND IT NEVER TALKS SOMEBODY OFF THE DEFAULT INTO THE RAIL. The top bar of 19 October is the shell again (his call 1,
+ * AND IT NEVER TALKS SOMEBODY OFF THE DEFAULT INTO THE RAIL. The top bar of 19 October is the shell again (chosen
  * 20 October), so a record that never chose a shape is on the bar, and the side rail stays a choice in Settings rather
  * than an offer. A bar somebody picked can still be told the rail would hold everything.
  */

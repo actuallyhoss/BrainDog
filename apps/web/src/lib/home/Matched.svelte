@@ -1,5 +1,5 @@
 <!--
-  Matched for you, as one line at the foot of the board (DIRECTION §39, as `page/Changed.svelte` is for what the rules
+  Matched for you, as one line at the foot of the board (as `page/Changed.svelte` is for what the rules
   changed): "3 people matched for you this week", and Review, which opens who they were under the line, inside the
   same tile.
 

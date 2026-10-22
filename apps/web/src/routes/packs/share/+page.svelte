@@ -26,7 +26,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/state';
   import type { Changes } from '@braindog/declare/catalogue';
   import { createClient } from '@braindog/client';
@@ -264,18 +264,24 @@
     if (!client) return;
     const mine = ++drafts;
     if (draft === null) draft = { state: 'reading' };
-    const out = await exportShared(client, args);
-    if (mine !== drafts) return;
-    if (!out.ok) {
-      draft = { state: 'refused', fix: out.fix };
-      return;
+    /* NEVER LEFT READING (UI audit of 22 October, 22): a write, a read of the last version or a diff that throws ends
+       in a sentence, not in "Reading the file" for as long as the page stays open. */
+    try {
+      const out = await exportShared(client, args);
+      if (mine !== drafts) return;
+      if (!out.ok) {
+        draft = { state: 'refused', fix: out.fix };
+        return;
+      }
+      const doc = JSON.parse(out.text) as Record<string, unknown>;
+      const base = await baselineOf(typeof doc.usecase === 'string' ? doc.usecase : null);
+      const diff = await changesSince(base?.text ?? null, out.text);
+      if (mine !== drafts) return;
+      /* A FILE ITS OWN DOOR REFUSES IS SAID HERE, with the door's sentence, before anybody downloads or sends it. */
+      draft = diff.ok ? { state: 'ready', doc, since: base?.since ?? null, changes: diff.changes } : { state: 'refused', fix: diff.fix };
+    } catch {
+      if (mine === drafts) draft = { state: 'refused', fix: words.unwritten };
     }
-    const doc = JSON.parse(out.text) as Record<string, unknown>;
-    const base = await baselineOf(typeof doc.usecase === 'string' ? doc.usecase : null);
-    const diff = await changesSince(base?.text ?? null, out.text);
-    if (mine !== drafts) return;
-    /* A FILE ITS OWN DOOR REFUSES IS SAID HERE, with the door's sentence, before anybody downloads or sends it. */
-    draft = diff.ok ? { state: 'ready', doc, since: base?.since ?? null, changes: diff.changes } : { state: 'refused', fix: diff.fix };
   }
 
   /* THE FILE IS WRITTEN AGAIN ONCE THE FORM RESTS. `argsOf` reads every field here, so a change to any one of them
@@ -283,7 +289,8 @@
   $effect(() => {
     if (!client || !live) return;
     const args = argsOf();
-    const timer = setTimeout(() => void redraft(args), DRAFT_WAIT_MS);
+    /* THE FIRST FILE IS WRITTEN AT ONCE: there is nothing typed to wait for, and the wait was what a reader saw. */
+    const timer = setTimeout(() => void redraft(args), untrack(() => draft === null) ? 0 : DRAFT_WAIT_MS);
     return () => clearTimeout(timer);
   });
 

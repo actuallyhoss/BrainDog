@@ -132,9 +132,15 @@ export type SharedPlan = {
   approve: string[];
 };
 
+/** Plurals English makes without an s, each to its one. */
+const IRREGULAR: Readonly<Record<string, string>> = { people: 'person', children: 'child', men: 'man', women: 'woman', staff: 'staff' };
+
 /** One row of a list, as a page for each is said: Organisations reads organisation, Studies reads study. */
 export const oneOf = (list: string): string => {
   const lower = list.trim().toLowerCase().replace(/_/gu, ' ');
+  /* A PLURAL WITH NO s TO CUT: "A page for each people" read as a mistake on the People add-on. */
+  const odd = IRREGULAR[lower.split(' ').at(-1) ?? ''];
+  if (odd !== undefined) return lower.replace(/\S+$/u, odd);
   if (/ies$/u.test(lower)) return `${lower.slice(0, -3)}y`;
   if (/(ss|us)$/u.test(lower)) return lower;
   if (/(ss|x|ch|sh)es$/u.test(lower)) return lower.slice(0, -2);

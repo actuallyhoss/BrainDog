@@ -180,9 +180,37 @@ export const spokenOf = (register: string, seq: number): string => `${register}#
  */
 const CONNECTED_MS = 24 * 60 * 60 * 1000;
 
-/** Whether a runner took a run lately, from the newest page of runs. */
-export const runnerConnected = (runs: readonly Pick<JobRow, 'runner' | 'claimed_at'>[], now: number): boolean =>
-  runs.some((r) => r.runner !== null && r.claimed_at !== null && now - Date.parse(r.claimed_at) < CONNECTED_MS);
+/** A run as `runnerConnected` reads it: who took it, when, and on which machine (`ran_on`, since migration 44). */
+type Taken = Pick<JobRow, 'runner' | 'claimed_at'> & { ran_on?: string | null };
+
+/** Whether a runner took a run lately, from the newest page of runs; on `machine` alone when one is named. */
+export const runnerConnected = (runs: readonly Taken[], now: number, machine?: string): boolean =>
+  runs.some(
+    (r) => r.runner !== null && r.claimed_at !== null && now - Date.parse(r.claimed_at) < CONNECTED_MS && (machine === undefined || r.ran_on === machine),
+  );
+
+/**
+ * Where "Start one now" may start a run (migration 44): each machine a runner took a run on within the day, by the name
+ * its runs give it, with the Claude Code profiles its recent runs were under. A runner that said no machine is in none.
+ */
+export type StartPlace = { machine: string; seats: string[] };
+
+/** The places "Start one now" offers, from the newest page of jobs and of runs, newest machine first. */
+export function startPlacesOf(jobs: readonly Taken[], runs: readonly RecordRow[], now: number): StartPlace[] {
+  const machines = [
+    ...new Set(
+      [...jobs]
+        .filter((r) => r.runner !== null && r.claimed_at !== null && now - Date.parse(r.claimed_at) < CONNECTED_MS)
+        .sort((a, b) => (a.claimed_at! < b.claimed_at! ? 1 : a.claimed_at! > b.claimed_at! ? -1 : 0))
+        .map((r) => said(r.ran_on))
+        .filter((m) => m !== ''),
+    ),
+  ];
+  return machines.map((machine) => ({
+    machine,
+    seats: [...new Set(runs.filter((r) => said(r.fields.host) === machine).map((r) => said(r.fields.seat)).filter((s) => s !== ''))],
+  }));
+}
 
 /** The first approved kind that takes a row, by title, or `null` when none does. */
 export const rowKindOf = (kinds: readonly JobKind[]): JobKind | null => kinds.find((k) => k.args.some((a) => a.id === ROW_ARG)) ?? null;
@@ -222,10 +250,22 @@ export function startArgs(kind: JobKind, instruction: string, spoken: string): R
  * sheet does not draw the press: the row waits for the agent's next session, which the briefing tells it about first.
  */
 export async function startFor(base: string, now: number, io?: Fetch): Promise<JobKind | null> {
+  return (await startWith(base, now, io))?.kind ?? null;
+}
+
+/**
+ * The kind "Start one now" would start, as `startFor` reads it, and where it may start one: the machines a runner is on
+ * and the profiles each one's runs were under (`startPlacesOf`), read only when there is a kind to start.
+ */
+export async function startWith(base: string, now: number, io?: Fetch): Promise<{ kind: JobKind; places: StartPlace[] } | null> {
   const runs = await readJobs(base, null, io).catch(() => null);
   if (!runs?.ok || !runnerConnected(runs.value.jobs, now)) return null;
   const kinds = await readKinds(base, runs.value.jobs, io).catch(() => null);
-  return kinds?.ok ? startKindOf(kinds.value) : null;
+  const kind = kinds?.ok ? startKindOf(kinds.value) : null;
+  if (kind === null) return null;
+  const machines = runs.value.jobs.some((r) => typeof r.ran_on === 'string' && r.ran_on !== '');
+  const sessions = machines ? await rowsOf(base, 'session', io, RUNS_READ).catch(() => null) : null;
+  return { kind, places: startPlacesOf(runs.value.jobs, sessions ?? [], now) };
 }
 
 /** Whether a holder is one "Start one now" can start: an agent a runner runs. */
@@ -245,9 +285,20 @@ export async function noteFor(base: string, register: string, seq: number, said:
   return { ok: false, fix: got?.refusal?.fix ?? copy.handNoteFailed };
 }
 
-/** Start the run "Start one now" asks for: the kind, with the instruction and the row. Answers the run's id, or `null`. */
-export async function startNow(base: string, kind: JobKind, instruction: string, register: string, seq: number, io?: Fetch): Promise<string | null> {
-  const started = await startJob(base, kind.id, startArgs(kind, instruction, spokenOf(register, seq)), io).catch(() => null);
+/**
+ * Start the run "Start one now" asks for: the kind, with the instruction and the row, on the machine and under the
+ * profile he picked, each by name, or on any runner. Answers the run's id, or `null`.
+ */
+export async function startNow(
+  base: string,
+  kind: JobKind,
+  instruction: string,
+  register: string,
+  seq: number,
+  io?: Fetch,
+  place: { machine?: string; seat?: string } = {},
+): Promise<string | null> {
+  const started = await startJob(base, kind.id, startArgs(kind, instruction, spokenOf(register, seq)), io, undefined, place).catch(() => null);
   return started?.ok ? started.value.id : null;
 }
 

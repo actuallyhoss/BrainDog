@@ -1,7 +1,7 @@
 /**
  * A page recomposing in place: when its answer changes (a poll, a write, a headline written again), each block moves
  * from where it was to where it is, a new one fades and rises in, and one that left fades out where it stood
- * (DIRECTION §38: "the page recomposes live and the change animates in place, without a reload or a jump").
+ * ("the page recomposes live and the change animates in place, without a reload or a jump").
  *
  * FLIP, ON THE BLOCKS AS DRAWN. `PageBody` measures every block before the page draws the new answer and again after,
  * and each block that moved is played from its old place to its new one on transform alone, so nothing is laid out

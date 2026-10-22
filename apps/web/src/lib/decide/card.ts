@@ -1,11 +1,11 @@
 /**
- * ONE DECISION CARD, AS A PERSON READS IT (DIRECTION §37, "one decision card everywhere"): what `DecisionCard.svelte`
+ * ONE DECISION CARD, AS A PERSON READS IT ("one decision card everywhere"): what `DecisionCard.svelte`
  * draws on Home, Money, Work, a project's page, the Agents page, Decide, its classic screen and Slash's palette, worked
  * out once from the record's `QueueQuestion` and nothing else.
  *
  * WHY FIRST. The question, then at once why it is asked, then who asked (the agent, the app it ran in and the run), then
  * what it moves: the money accepting writes and what changes from what to what, where the record says. The ways to
- * answer come last, the suggested one marked with the small dot (his pick) on every card. Where the choice is hard to
+ * answer come last, the suggested one marked with the small dot on every card. Where the choice is hard to
  * undo or money moves, the dot stays and only Enter is taken away (`press.ts` `acceptKey`): hiding the suggestion
  * there hid the agent's advice exactly where it matters most (audit 19 M10).
  *
@@ -74,7 +74,7 @@ export const cardWords = {
   by: (name: string) => `Asked by ${name}`,
   byRule: (name: string) => `Asked by your rule ${name}`,
   byYou: 'Asked by you',
-  /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
+  /** THE CARD'S SIDE, ON A WIDE TILE: why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
   changes: 'What it changes',
   /** The same heading where the changes are drawn as lines and the record's sentence, which named the list, is not. */
@@ -235,7 +235,7 @@ const emptyValue = (v: unknown): boolean =>
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /**
- * A DAY AS THE RECORD HOLDS ONE, SAID AS A DAY (DIRECTION §40, no raw timestamp): `2026-10-20` is "20 October 2026",
+ * A DAY AS THE RECORD HOLDS ONE, SAID AS A DAY (no raw timestamp): `2026-10-20` is "20 October 2026",
  * the kernel's own wording in the sentence over these lines (`does.ts` `shortSaid`), year kept. With a time and no
  * zone it is that day on the wall. With a zone it is an instant, whose day is whichever one the reader's clock puts it
  * in: the kernel knows no zone and leaves such a value unsaid, and the card is drawn where the reader is. `null` for
@@ -539,7 +539,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
 export const hardOf = (card: Pick<Card, 'cost'>, way?: Pick<Way, 'hard'> | null): boolean => card.cost === 'undo' || way?.hard === true;
 
 /**
- * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Answer, can’t
+ * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words: "Answer, can’t
  * be undone easily", "Accept £12.98, can’t be undone easily". Every other band leaves the words as they are; the band
  * still ranks the card and still takes Enter away (`acceptKey`), it is only not drawn as a chip.
  */

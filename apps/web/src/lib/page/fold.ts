@@ -1,5 +1,5 @@
 /**
- * A LONG NOTE ON A PAGE SHOWS ITS FIRST TWELVE LINES, and "Read all" opens the rest in place (DIRECTION §35.19, "and
+ * A LONG NOTE ON A PAGE SHOWS ITS FIRST TWELVE LINES, and "Read all" opens the rest in place ("and
  * shows less rather than more"; §36.23, "Reading measure is kept inside a tile, not by starving the page"). An imported
  * document poured down a project page whole, fourteen thousand pixels of it, and everything after it was out of reach.
  *

@@ -1303,7 +1303,7 @@ test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules'
   assert.equal(blockOf({ kind: 'note', body: 'Pinned.', said: 'Something else.', rows: [], matched: 0, refusals: [] }, new Map(), AT).body, 'Pinned.');
 });
 
-/* WHAT THIS PATH SAYS FOR ITSELF NAMES NO SYSTEM THING (DIRECTION §35): a part of the page, never a block. */
+/* WHAT THIS PATH SAYS FOR ITSELF NAMES NO SYSTEM THING: a part of the page, never a block. */
 test('the sentences a live page says for itself name no block, row or list', () => {
   for (const line of Object.values(liveWords)) assert.doesNotMatch(line, /\b(blocks?|rows?|lists?|registers?)\b/iu, line);
 });
@@ -1469,11 +1469,11 @@ test("A HEAT SET AGAINST ANOTHER WHOLE WRITES EACH DAY AS ITS SHARE, and a block
   const heat = { kind: 'heat', source: 'register.tasks', columns: [{ field: 'by' }, { field: 'effort' }], rows: [], matched: 3, refusals: [], wholeRead: days };
   const drawn = blockOf(heat as never, new Map(), AT);
   assert.equal(drawn.cannot, undefined);
-  assert.deepEqual(drawnCells(drawn), [['14 Sep 2026', '3 of 12'], ['10 Sep 2026', '0 of 4']]);
+  assert.deepEqual(drawnCells(drawn), [['14 Sep', '3 of 12'], ['10 Sep', '0 of 4']]);
   assert.ok(toSegments(drawn).every((s) => s.type !== 'block' || s.rows.every((r) => r.ref === undefined)), 'a day of the whole opens a row');
   /* AND ONE THAT DECLARES ONLY ITS DAY still says the share, in a second column of its own. */
   const lone = blockOf({ ...heat, columns: [{ field: 'by' }] } as never, new Map(), AT);
-  assert.deepEqual(drawnCells(lone)[0], ['14 Sep 2026', '3 of 12']);
+  assert.deepEqual(drawnCells(lone)[0], ['14 Sep', '3 of 12']);
   /* A DAY WITH NO WHOLE AMONG DAYS THAT HAVE ONE IS NOT GUESSED AT. */
   assert.equal(blockOf({ ...heat, wholeRead: { rows: [...days.rows, { label: '2026-09-11', value: 1 }] } } as never, new Map(), AT).cannot, liveWords.cannot);
 

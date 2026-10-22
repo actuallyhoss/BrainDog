@@ -116,10 +116,11 @@ test('every area this build declares has an arm in the page that draws it', () =
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });
 
-test('FIVE AREAS STAND ON TOP AND EIGHT UNDER MORE, and the design book is on no index but still opens at /design', () => {
-  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'More']);
+test('FIVE AREAS STAND ON TOP, SEVEN UNDER MORE AND DELETE ALONE LAST, and the design book is on no index but still opens at /design', () => {
+  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'More', 'Cannot be undone']);
   assert.deepEqual(DEFAULT_GROUPS[0]!.areas.map((a) => a.id), ['appearance', 'navigation', 'words', 'notifications', 'agents']);
-  assert.deepEqual(DEFAULT_GROUPS[1]!.areas.map((a) => a.id), ['signing-in', 'people', 'ingest', 'keyboard', 'backups', 'billing', 'export', 'delete']);
+  assert.deepEqual(DEFAULT_GROUPS[1]!.areas.map((a) => a.id), ['signing-in', 'people', 'ingest', 'keyboard', 'backups', 'billing', 'export']);
+  assert.deepEqual(DEFAULT_GROUPS[2]!.areas.map((a) => a.id), ['delete']);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /param === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');

@@ -5,7 +5,7 @@
  * people the record has met, the lists it keeps with their icons, and the rows changed last. Nothing is named by its id
  * here: a thing is its title, a person their name, a list its name.
  *
- * THE PEOPLE ARE WHOEVER A LIST DECLARES `meets:` FOR, never a list called "people" (DIRECTION §27): the lists' own
+ * THE PEOPLE ARE WHOEVER A LIST DECLARES `meets:` FOR, never a list called "people": the lists' own
  * declarations are asked, and the first that plays the people role is read. The same answers carry each list's
  * declared icon, so the lists tile wears the glyph the pack gave it.
  *

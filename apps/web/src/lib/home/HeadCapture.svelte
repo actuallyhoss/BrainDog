@@ -1,5 +1,5 @@
 <!--
-  The line a task is typed into, in a page's head (DIRECTION §39, "Today reads as one story"): a 320px field at the right
+  The line a task is typed into, in a page's head ("Today reads as one story"): a 320px field at the right
   of the page's name, where it spent a whole tile on one field above the questions. On a phone it is one line of its own
   under the page's sentence (`PageHead`'s `below` on Home, the body's `under` on a declared page). Home draws it, and so
   does any declared page whose main column opens on a lone capture (`page/layout.ts` `headCaptureAt`).

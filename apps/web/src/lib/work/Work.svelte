@@ -1,5 +1,5 @@
 <!--
-  Work: the record's tasks, where most writing happens, drawn from the declared page `page.work` (DIRECTION §35).
+  Work: the record's tasks, where most writing happens, drawn from the declared page `page.work`.
 
   ONE READER, AS EVERY PAGE. The page is the work module's declaration (`packages/seed/src/modules/work.ts`): one line
   of what matters, the capture line, Late, Today, This week, With an agent, Waiting on you, Done recently and what is

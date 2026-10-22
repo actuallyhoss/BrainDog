@@ -1,5 +1,5 @@
 /**
- * What Settings > Billing says of a free record (DIRECTION §35): it is on Free, never "Not billed", and it is offered the
+ * What Settings > Billing says of a free record: it is on Free, never "Not billed", and it is offered the
  * first plan the host sells once, with the Worker's own price, and only while the host takes payment.
  */
 

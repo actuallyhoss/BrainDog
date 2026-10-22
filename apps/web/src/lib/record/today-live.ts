@@ -13,7 +13,8 @@
  */
 
 import { createClient, type Boot, type Cursor, type EventLine } from '@braindog/client';
-import { presenceOf, type Json, type QueueQuestion } from '@braindog/kernel';
+import type { Json, QueueQuestion } from '@braindog/kernel';
+import { presenceOf } from '@braindog/kernel/constants';
 import { money } from 'braindog-render';
 
 import type { Fetch } from './boot-live.ts';
@@ -179,7 +180,7 @@ export function amountSaid(v: unknown): string | null {
 /**
  * A ROW NOBODY NAMED, AS TODAY SAYS IT: "Untitled task", in the list's own singular as the record words it (a label
  * the voice gives the list is drawn over its declaration, `relabelAll`). It was `#12`, the row's number alone, which
- * is a handle and never a name a person reads (DIRECTION §37). A list this build has not learnt says its id made
+ * is a handle and never a name a person reads. A list this build has not learnt says its id made
  * singular, as `unnamed` does.
  */
 export function untitled(register: string): string {

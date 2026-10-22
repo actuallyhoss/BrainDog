@@ -50,8 +50,31 @@ export type SharingRow = {
 /** One group as `groups` answers it: its name, its people by name, and how many live shares it holds. */
 export type GroupRow = { id: string; name: string; people: { id: string; name: string | null }[]; shares: number };
 
-/** One of the caller's own shares as `myShares` answers it, with who shared it and the line said to them. */
-export type MyShare = { id: string; sentence: string; can: string; until: string | null; onward: boolean; live: boolean; by: string | null; welcome: string };
+/**
+ * One of the caller's own shares as `myShares` answers it, with who shared it and the line said to them. A share they
+ * may share on may also say what it is (`what`, by ids, and `subject`, by name), the lists it reaches whole by name
+ * (`lists`), and who is here to share it on with (`to`), which the onward sheet reads where they are sent (`onward.ts`).
+ */
+export type MyShare = {
+  id: string;
+  sentence: string;
+  can: string;
+  until: string | null;
+  onward: boolean;
+  live: boolean;
+  by: string | null;
+  welcome: string;
+  what?: unknown;
+  subject?: string;
+  lists?: { id: string; name: string }[];
+  to?: { id: string; name: string }[];
+};
+
+/**
+ * The caller's shares they may share on now: managed, on, and not switched off for sharing on. HERE AND NOT IN
+ * `onward.ts`, so Settings asks it without loading the kernel's sentences, which only the onward sheet needs.
+ */
+export const onwardOf = (mine: readonly MyShare[]): MyShare[] => mine.filter((m) => m.onward && m.live);
 
 /** Where a share is drawn on the Sharing page. */
 export type ShareState = 'live' | 'waiting' | 'ended';

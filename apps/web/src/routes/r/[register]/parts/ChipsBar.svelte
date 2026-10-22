@@ -9,7 +9,7 @@
   clauses a segment cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
   same filters behind the one button. Display is the toolbar's now, beside the view switch.
 
-  IT IS THE START OF THE LIST'S TOOLBAR, INSIDE THE LIST'S TILE (DIRECTION 39): the search box is a field, a field with
+  IT IS THE START OF THE LIST'S TOOLBAR, INSIDE THE LIST'S TILE: the search box is a field, a field with
   three or more values is one rectangle that opens a menu, and two are a segmented control. Every control is a
   rectangle in the field's fill; a filter with a value chosen in it takes the accent's tint. No glass, and no pills.
 

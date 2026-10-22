@@ -86,7 +86,7 @@ export function huesSaid(list: Pick<HueList, 'title' | 'count'>): string {
   return list.count === 1 ? `1 ${singularOf(list.title)} has no colour of its own` : `${String(list.count)} ${inSentence(list.title)} have no colour of their own`;
 }
 
-/** The first names under it: "Crumb.gg, Lantern and Quill", or "Crumb.gg, Lantern, Quill, Otterbay and 2 more". */
+/** The first names under it: "Oxbow.gg, Lantern and Quill", or "Oxbow.gg, Lantern, Quill, Otterbay and 2 more". */
 export function namesSaid(list: Pick<HueList, 'names' | 'count'>): string {
   const shown = list.names.slice(0, HUES_SHOWN);
   if (shown.length === 0) return '';

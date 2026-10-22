@@ -1,5 +1,5 @@
 /**
- * "CHANGE THIS" ON A BLOCK (DIRECTION §45, "BrainDog designs itself"): one line typed about one block, turned into a
+ * "CHANGE THIS" ON A BLOCK ("BrainDog designs itself"): one line typed about one block, turned into a
  * patch on that block of the page's own .dog declaration, with no model.
  *
  * THE COMMON ASKS ARE RULES, NOT GUESSES. Show it as a calendar, sort by due, newest first, only this month, hide paid

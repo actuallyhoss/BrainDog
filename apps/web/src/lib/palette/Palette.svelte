@@ -242,7 +242,7 @@
   }
 
   /**
-   * SLASH'S FILED PROPOSAL, DRAWN WHERE IT WAS ASKED, as the one decision card (DIRECTION §37): when it arrives the
+   * SLASH'S FILED PROPOSAL, DRAWN WHERE IT WAS ASKED, as the one decision card: when it arrives the
    * keyboard is on it (`cursor` is -1, above the rows), Enter accepts it, a six-second Undo follows on its line, and the
    * line reads "Slash suggested · Mara accepted". `↓` goes down to the rows as ever, and `↑` from the first row comes
    * back to it. A proposal that moves money is not accepted by a key: Enter opens it on Decide, where Accept names the
@@ -953,7 +953,7 @@
     const plainAt = plainMade ? commands({ ...live, creation: plainMade }).find((c) => c.act === 'add') : undefined;
     if (plainMade && plainAt && into)
       kept.push({ id: 'c-add-plain', title: createWords.plain(into.one ?? into.name), detail: plainMade.title, href: null, group: createWords.plainGroup, icon: plainAt.icon, act: plainAt.act, creation: plainMade, plain: true });
-    /* "MAKE ..." AND "CHANGE ..." GO TO THE PAGE (DIRECTION §45): the first row, since a person who typed the verb means it. */
+    /* "MAKE ..." AND "CHANGE ..." GO TO THE PAGE: the first row, since a person who typed the verb means it. */
     const entry = parsed.prefix === null ? slashLine(parsed.text) : null;
     const toPage = entry ? entryHref(entry, pageHere ? page.url.pathname : null) : null;
     if (entry && toPage)

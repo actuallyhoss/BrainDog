@@ -325,12 +325,31 @@ export const account = {
   codeLong: (n: number) => `That is ${n} digits. A code is six.`,
   codeOther: 'A code is six digits, and this has something else in it.',
   /* The record says no more than this about a miss, so neither does the screen: no count of tries. */
-  codeWrong: 'No machine is waiting with that code.',
-  codeTries: 'Five wrong codes turned away every waiting machine. Start again on the machine.',
-  codeExpired: 'That code ran out of time. Run braindog login again on the machine.',
+  codeWrong: 'No machine is waiting with that code. Check the digits in your terminal.',
+  codeTries: 'Five wrong codes turned away every waiting machine. Run the command again for a new code.',
+  codeExpired: 'That code ran out of time. Run the command again on your machine for a new one.',
   signInAgainWhy: 'Approving a machine needs a sign-in from the last fifteen minutes.',
   approvedNow: (label: string, means: string) => `${label} is approved. It can ${means}.`,
   unnamedMachine: 'A machine with no name',
+
+  /* THE PAGE THE TERMINAL PRINTS (`routes/connect/approve`): the six digits and nothing else on it. */
+  codeLede: 'Type the six digits your terminal is showing.',
+  codeChecking: 'Checking the code',
+  codeWaitingTitle: 'Waiting for you',
+  codeAsks: (means: string) => `asks to ${means}.`,
+  codeWaitingNone: 'No machine is waiting right now. Run the command on your machine and its code shows up there.',
+  codeWaitingLeft: (min: number) => (min <= 1 ? 'under 1 min left' : `${min} min left`),
+  codeSafe: 'Only approve a code you started yourself. Each code works once and lasts ten minutes.',
+  codeNotOwner: (record: string) => `Only the owner of ${record} can approve a machine. Ask them to open this page.`,
+  approvedTitle: 'Approved',
+  approvedWhat: 'What you approved',
+  approvedCan: 'What it can do',
+  approvedNext: 'Go back to your terminal. It carries on by itself, and you can close this tab.',
+  approvedUndo: 'Changed your mind? You can remove it in',
+  approvedUndoGo: 'Settings, Agents',
+  approveAnother: 'Approve another',
+  /* WHAT WAS APPROVED, said as the command he ran, on the machine he ran it on (`lib/agents/approve.ts`). */
+  askerOn: (who: string, machine: string) => `${who} on ${machine}`,
 
   /* the tokens — `12 §3`: listed with a revoke button, and never the token itself */
   /* `19 §9` again: what it can do, said as what it can do. There is no `admin` (ADR-060). */
@@ -709,7 +728,7 @@ export const account = {
   billingPlan: (plan: string, price: string) => (price ? `${plan}, ${price}` : plan),
   billingPlanHosted: 'Cloud',
   billingPlanPlus: 'Cloud Plus',
-  /* FREE, the plan a record made without paying is on (DIRECTION §35): named, then one calm offer of the paid plan. */
+  /* FREE, the plan a record made without paying is on: named, then one calm offer of the paid plan. */
   billingPlanFree: 'Free',
   billingFreeOffer: (plan: string, price: string) =>
     `Everything in the app, for one person. When you need more Slash, more automations or colleagues, ${plan} is ${price}.`,

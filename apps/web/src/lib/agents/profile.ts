@@ -11,6 +11,10 @@
  * than he moved. A new agent's Defaults start at Suggest (§5.2, 12a).
  *
  * ONLY HE CHANGES THEM. `setAgentProfile` is ADMIN and refuses every token, so nothing here is drawn for a colleague.
+ *
+ * A ROW PER CLAUDE CODE PROFILE (migration 44). Where his runs of a kind were under a profile of his own (`studio`, any
+ * but `default`), that profile has a row of its own under its kind, "Claude Code as studio": it follows the kind's row
+ * until he saves it, and saved it matches `{kind, seat}`, which the record holds nearer than the kind alone.
  */
 
 import {
@@ -30,6 +34,8 @@ import {
   type ProfileQuiet,
 } from '@braindog/kernel';
 
+import { machineSaid } from '../record/machine-name.ts';
+
 export { BRIEF_MOST, CEILINGS, CONTEXT_BUDGETS };
 
 /** One row of `agentProfiles` (`ProfileView` in `packages/record/src/methods/agent-profile.ts`). */
@@ -37,6 +43,8 @@ export type ProfileView = Profile & {
   effective: { says: string; applies: 'token' | 'name' | 'default' };
   heard_at: string | null;
   machines: string[];
+  /** The Claude Code profiles it was heard under, by name; absent from a host older than migration 44. */
+  seats?: string[];
 };
 
 /** The kinds that always have a row, in this order, whether or not one was heard from yet. */
@@ -164,10 +172,15 @@ export type AgentRow = {
   name: string;
   /** The kind its face draws, or `null` (Defaults, or a row matched on a key alone). */
   kind: string | null;
+  /** The Claude Code profile it is for, by name, or `null` for a row on no one profile. */
+  seat?: string | null;
   /** The row as the record holds it, or `null` while this agent has none of its own. */
   stored: ProfileView | null;
-  /** What applies to it now: its own row, Defaults, or (nothing stored at all) its key. */
-  follows: 'own' | 'defaults' | 'key';
+  /**
+   * What applies to it now: its own row, Defaults, (nothing stored at all) its key, or for a profile's row with none of
+   * its own, its kind's row.
+   */
+  follows: 'own' | 'defaults' | 'key' | 'kind';
   /** How far it may go, as the row's end says it; `null` when its key decides and no key of it was read. */
   may: Ceiling | null;
   /** One sentence: what it may do. */
@@ -184,6 +197,9 @@ export type AgentRow = {
 /** An agent heard from in its runs (`heardFrom` in `record/device.ts`), as this file needs it. */
 export type Heard = { agent: string; seq: number; seen: string; scope: { spoken: string; name: string; mark: string | null; hue: number | null } | null };
 
+/** A kind of agent heard from under one Claude Code profile (`seatsHeard` in `record/device.ts`): the newest run. */
+export type HeardSeat = { agent: string; seat: string; seq: number; seen: string };
+
 const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
 
 /**
@@ -199,8 +215,16 @@ export function saysOf(d: Pick<Draft, 'ceiling' | 'projects' | 'lists_write'>, n
   return `Writes${lists}${where}; asks for money, keys and deletes${narrowed ? ', and anything outside that' : ''}.`;
 }
 
-/** A row's match on a kind alone: no key, no machine. */
-const onKind = (p: Profile): string | null => (p.match.kind !== undefined && p.match.token === undefined && p.match.host === undefined ? p.match.kind : null);
+/** A row's match on a kind alone: no key, no machine, no profile. */
+const onKind = (p: Profile): string | null =>
+  p.match.kind !== undefined && p.match.token === undefined && p.match.host === undefined && p.match.seat === undefined ? p.match.kind : null;
+
+/** A row's match on a kind under one profile: no key, no machine. */
+const onSeat = (p: Profile): { kind: string; seat: string } | null =>
+  p.match.kind !== undefined && p.match.seat !== undefined && p.match.token === undefined && p.match.host === undefined ? { kind: p.match.kind, seat: p.match.seat } : null;
+
+/** The profile every Claude Code runs under when nothing names another, which its kind's row covers. */
+const DEFAULT_SEAT = 'default';
 
 /** A heard agent as the record matches it: one of its kinds, else `other`. */
 export const kindOfAgent = (agent: string): string => {
@@ -219,6 +243,8 @@ export function agentRows(input: {
   heard: readonly Heard[];
   keyScope: (kind: string) => Ceiling | null;
   nameOf?: (said: string) => string;
+  /** The profiles each kind was heard under (`seatsHeard`); none from a host older than migration 44. */
+  seats?: readonly HeardSeat[];
 }): AgentRow[] {
   const nameOf = input.nameOf ?? ((s: string) => s);
   const held = input.profiles.find((p) => p.id === DEFAULT_PROFILE_ID) ?? null;
@@ -253,7 +279,9 @@ export function agentRows(input: {
       const draft = draftOf(defaults);
       return { key: `kind:${kind}`, name: kindName(kind), kind, stored: null, follows: 'defaults', may: defaults.ceiling, says: saysOf(draft, nameOf), applies: 'name', draft, heard: heardOf(kind), machines: [] };
     }
-    /* NOTHING STORED: ITS KEY DECIDES, and the row it would become starts at Write, which is "what the key allows". */
+    /* NOTHING STORED: ITS KEY DECIDES, and the row it would become starts at Write, which is "what the key allows". The
+       row says what the key allows and no more: that its key decides is said once under the list (`keyDecides`), not on
+       every row, and a key not read says nothing rather than "Nothing set yet". */
     const scope = input.keyScope(kind);
     const draft = { ...draftOf(defaults), ceiling: 'write' as const };
     return {
@@ -263,13 +291,49 @@ export function agentRows(input: {
       stored: null,
       follows: 'key',
       may: scope,
-      says: scope === null ? 'Nothing set yet; its key decides.' : `${saysOf({ ...draft, ceiling: scope }, nameOf)} Its key decides for now.`,
+      says: scope === null ? '' : saysOf({ ...draft, ceiling: scope }, nameOf),
       applies: 'name',
       draft,
       heard: heardOf(kind),
       machines: [],
     };
   });
+
+  /* A ROW PER PROFILE OF HIS, after the kinds: the ones he saved, then each other profile a kind was heard under, which
+     follows its kind's row until he saves it. `default` is the kind's own row. */
+  const seats: AgentRow[] = [];
+  const seated = new Set<string>();
+  for (const p of input.profiles) {
+    const at = onSeat(p);
+    if (at === null || p.id === DEFAULT_PROFILE_ID || p.retired_at !== null) continue;
+    used.add(p.id);
+    seated.add(`${at.kind}:${at.seat}`);
+    const draft = draftOf(p);
+    const heard = input.seats?.find((h) => kindOfAgent(h.agent) === at.kind && h.seat === at.seat);
+    seats.push({
+      key: p.id,
+      name: p.name,
+      kind: at.kind,
+      seat: at.seat,
+      stored: p,
+      follows: 'own',
+      may: p.ceiling,
+      says: saysOf(draft, nameOf),
+      applies: 'name',
+      draft,
+      heard: heard ? { at: heard.seen, seq: heard.seq, scope: null } : p.heard_at === null ? null : { at: p.heard_at, seq: null, scope: null },
+      machines: p.machines,
+    });
+  }
+  for (const h of input.seats ?? []) {
+    const kind = kindOfAgent(h.agent);
+    const parent = rows.find((r) => r.key === `kind:${kind}`);
+    if (h.seat === DEFAULT_SEAT || seated.has(`${kind}:${h.seat}`) || parent === undefined) continue;
+    seated.add(`${kind}:${h.seat}`);
+    seats.push({ ...parent, key: `seat:${kind}:${h.seat}`, name: `${kindName(kind)} as ${h.seat}`, seat: h.seat, stored: null, follows: 'kind', heard: { at: h.seen, seq: h.seq, scope: null }, machines: [] });
+  }
+  const kindAt = (r: AgentRow): number => kinds.indexOf(r.kind ?? '');
+  rows.push(...seats.sort((a, b) => kindAt(a) - kindAt(b) || (a.seat ?? '').localeCompare(b.seat ?? '')));
 
   /* ROWS BOUND TO ONE KEY OR ONE MACHINE, under their own names, after the kinds. */
   for (const p of input.profiles) {
@@ -296,6 +360,52 @@ export function agentRows(input: {
   return rows;
 }
 
+/** What a level lets an agent do with nothing narrowed: the sentence most rows would say, said once under the list. */
+export const plainSays = (level: Ceiling): string => saysOf({ ceiling: level, projects: null, lists_write: null });
+
+/**
+ * Whether a row's sentence says more than its level: held to some lists or projects. Only those rows draw their sentence;
+ * the rest say their level in one word at the row's end, and what the level means is said once under the list.
+ */
+export const narrowed = (row: Pick<AgentRow, 'may' | 'says'>): boolean => row.may !== null && row.says !== '' && row.says !== plainSays(row.may);
+
+/** Whether any agent follows its key, which the list says once ("Until you set one, an agent does what its key allows."). */
+export const keyDecides = (rows: readonly AgentRow[]): boolean => rows.some((r) => r.follows === 'key');
+
+/** One agent and the rows that hang off it as chips: its Claude Code profiles, and rows bound to one of its keys. */
+export type AgentGroup = { row: AgentRow; chips: AgentRow[] };
+
+/**
+ * THE LIST GROUPED BY AGENT (UI audit of 22 October, 11): a kind's row, with each profile of it, and each row bound to
+ * one of its keys or machines, as a chip under it, so twenty rows of "Claude Code as studio" read as one agent with
+ * four profiles. A row whose kind has no row of its own, and Defaults, stay rows.
+ */
+export function groupRows(rows: readonly AgentRow[]): AgentGroup[] {
+  const heads = new Map(rows.filter((r) => r.kind !== null && r.key === `kind:${r.kind}`).map((r) => [r.kind!, r]));
+  const groups: AgentGroup[] = [];
+  const at = new Map<AgentRow, AgentGroup>();
+  for (const r of rows) {
+    const head = r.kind === null || r.key === DEFAULT_PROFILE_ID ? undefined : heads.get(r.kind);
+    if (head !== undefined && head !== r) {
+      at.get(head)?.chips.push(r);
+      continue;
+    }
+    const g: AgentGroup = { row: r, chips: [] };
+    at.set(r, g);
+    groups.push(g);
+  }
+  return groups;
+}
+
+/** A chip's words: the profile it is for, else the row's own name less its agent's ("Claude Code as brain" is "brain"). */
+export function chipName(row: Pick<AgentRow, 'seat' | 'name' | 'kind'>): string {
+  if (row.seat) return row.seat;
+  const lead = row.kind === null ? '' : kindName(row.kind);
+  for (const join of [' as ', ', ', ' · ', ' '])
+    if (lead !== '' && row.name.startsWith(`${lead}${join}`) && row.name.length > lead.length + join.length) return row.name.slice(lead.length + join.length);
+  return row.name;
+}
+
 /**
  * The agents saving Defaults would leave as they are, by name: heard from, with nothing stored for them, so their key
  * decides now. HIS CURRENT AGENTS KEEP WHAT THEY HAVE (§5.2, 12a), as migration 42's data step keeps them, so the
@@ -306,7 +416,7 @@ export const keepersOf = (rows: readonly AgentRow[]): AgentRow[] => rows.filter(
 /** The agents that take Defaults as their own once it is saved, by name: no row of their own, and not kept. */
 export const followers = (rows: readonly AgentRow[]): string[] => {
   const kept = new Set(keepersOf(rows).map((r) => r.key));
-  return rows.filter((r) => r.key !== DEFAULT_PROFILE_ID && r.follows !== 'own' && !kept.has(r.key)).map((r) => r.name);
+  return rows.filter((r) => r.key !== DEFAULT_PROFILE_ID && r.follows !== 'own' && r.follows !== 'kind' && !kept.has(r.key)).map((r) => r.name);
 };
 
 /** A fault in a draft, before it is sent: the field and the sentence, or `null`. */
@@ -326,7 +436,7 @@ export function faultOf(d: Draft): { at: string; fix: string } | null {
  * What `setAgentProfile` is sent to save a draft for a row: the row's id when the record holds it (Defaults always by
  * its id), else the kind's name and match, so the first save makes the agent's own row.
  */
-export function argsOf(row: Pick<AgentRow, 'key' | 'kind' | 'stored' | 'name'>, d: Draft): Record<string, unknown> {
+export function argsOf(row: Pick<AgentRow, 'key' | 'kind' | 'stored' | 'name'> & { seat?: string | null }, d: Draft): Record<string, unknown> {
   const caps = Object.fromEntries(Object.entries(d.caps).filter(([, v]) => v !== undefined));
   const off = Object.fromEntries(Object.entries(d.tools).filter(([, on]) => on === false));
   const fields = {
@@ -344,6 +454,8 @@ export function argsOf(row: Pick<AgentRow, 'key' | 'kind' | 'stored' | 'name'>, 
   };
   if (row.key === DEFAULT_PROFILE_ID) return { id: DEFAULT_PROFILE_ID, ...fields };
   if (row.stored) return { id: row.stored.id, ...fields };
+  /* A PROFILE'S FIRST SAVE MAKES ITS OWN ROW, matched on its kind under that profile. */
+  if (row.seat) return { name: row.name, match: { kind: row.kind ?? 'other', seat: row.seat }, ...fields };
   return { name: row.kind === null ? row.name : kindName(row.kind), match: { kind: row.kind ?? 'other' }, ...fields };
 }
 
@@ -358,8 +470,9 @@ export function heardLine(row: Pick<AgentRow, 'heard' | 'key'>, working: boolean
   return working ? 'Working now' : `Last heard ${when === '1d ago' ? 'yesterday' : when}`;
 }
 
-/** The machines it was heard on, after the line: "kiln-mbp", "kiln-mbp and 1 more", or `null`. */
+/** The machines it was heard on, after the line, as a person says them (`machineSaid`): "MacBook Pro", "MacBook Pro and 1 more", or `null`. */
 export function machinesLine(machines: readonly string[]): string | null {
   if (machines.length === 0) return null;
-  return machines.length === 1 ? machines[0]! : `${machines[0]!} and ${machines.length - 1} more`;
+  const first = machineSaid(machines[0]!, machines);
+  return machines.length === 1 ? first : `${first} and ${machines.length - 1} more`;
 }

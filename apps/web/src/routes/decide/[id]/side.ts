@@ -32,6 +32,7 @@ export const words = {
   evidence: 'Evidence',
   linked: 'Linked',
   more: (n: number) => `and ${count(n)} more`,
+  about: 'About',
 } as const;
 
 /**
@@ -90,3 +91,21 @@ export function sideOf(q: {
   const { links, more } = linkedOf([...q.reasons.map((r) => r.text), why], figures, q.now);
   return { evidence, links, more, any: why !== '' || evidence !== null || links.length > 0 };
 }
+
+/** The row a question is about, by its list and number. */
+export type AboutRow = { list: string; seq: number; spoken: string };
+
+/**
+ * THE ROW THE QUESTION IS ABOUT, when its body names one (`about: "recurring#7"`, as a rule's question carries it). The
+ * side leads with it, by the row's own title and a link to it, so the thing is seen before it is answered for, without
+ * leaving the page: two thirds of a laptop's width was empty beside "It went through" and "It stopped".
+ */
+export function aboutOf(body: unknown): AboutRow | null {
+  const about = body !== null && typeof body === 'object' ? (body as { about?: unknown }).about : undefined;
+  const m = typeof about === 'string' ? /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u.exec(about.trim()) : null;
+  return m ? { list: m[1]!, seq: Number(m[2]), spoken: `${m[1]}#${m[2]}` } : null;
+}
+
+/** The facts under the row's title in the side: its list's name, then the amount and how late, where the question says them. */
+export const aboutLine = (list: string, money: { amount: string; late: string } | null): string =>
+  [list, money?.amount ?? '', money?.late ?? ''].filter((s) => s.trim() !== '').join(' · ');

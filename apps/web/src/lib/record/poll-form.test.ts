@@ -19,7 +19,7 @@ const DRAFT: PollDraft = {
 };
 
 const ORG = { register: 'organisations', seq: 2, title: 'Northwind Labs Ltd' };
-const PROJECT = { register: 'things', seq: 4, title: 'Sketchpad', organisation: 'organisations#2' };
+const PROJECT = { register: 'things', seq: 4, title: 'Pinwheel', organisation: 'organisations#2' };
 
 type Map = Record<string, { value?: unknown; path?: unknown; type?: unknown; currency?: unknown; minor?: unknown; arrived?: unknown }>;
 const declsOf = (p: { body: { doc: unknown } }) => (p.body.doc as { declarations: (Record<string, unknown> & { map: Map[] })[] }).declarations;

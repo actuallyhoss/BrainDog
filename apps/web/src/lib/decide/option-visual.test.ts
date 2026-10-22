@@ -42,10 +42,10 @@ test('a field change draws before and after, and a first value alone draws nothi
 });
 
 test('a merge draws the names joining into the one kept, or the one picked', () => {
-  const q = ask({ candidates: [{ at: 'r1', name: 'Priya Raman', seen: [], kept: true }, { at: 'r2', name: 'S. Raman', seen: [] }] });
-  assert.deepEqual(visualOf(q, { key: 'merge' }, { now }), { kind: 'merge', names: ['Priya Raman', 'S. Raman'], into: 'Priya Raman' });
+  const q = ask({ candidates: [{ at: 'r1', name: 'Teodor Brandt', seen: [], kept: true }, { at: 'r2', name: 'T. Brandt', seen: [] }] });
+  assert.deepEqual(visualOf(q, { key: 'merge' }, { now }), { kind: 'merge', names: ['Teodor Brandt', 'T. Brandt'], into: 'Teodor Brandt' });
   const picked = visualOf(q, { key: 'pick:r2' }, { now });
-  assert.equal(picked?.kind === 'merge' && picked.into, 'S. Raman');
+  assert.equal(picked?.kind === 'merge' && picked.into, 'T. Brandt');
   assert.equal(visualOf(q, { key: 'apart' }, { now }), null);
 });
 

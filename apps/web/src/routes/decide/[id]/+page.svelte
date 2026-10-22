@@ -1,7 +1,7 @@
 <!--
   The gate. One question, its answers, and what accepting it does, examined whole.
 
-  ONE PRESS ANSWERS (DIRECTION §37). Each answer is a button that says what it does, and pressing it is the decision:
+  ONE PRESS ANSWERS. Each answer is a button that says what it does, and pressing it is the decision:
   no reason box opens first and no second press commits it. The walk of 2 October found the queue making a round trip
   and then asking "Why?" before an answer landed (`loop/research-ux-walk.md` #3), and two of the owner's decisions
   carried the reasons "f" and "y", which agents later read back as the why. So the reason is offered, never demanded:
@@ -9,7 +9,7 @@
   keeps a reason for a question (`govern.ts`), it says so on the press and one line opens under the answers, with the
   choice kept.
 
-  THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, his pick, and it is drawn only where the choice can be taken back and
+  THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, and it is drawn only where the choice can be taken back and
   no money moves (`press.ts`). A pre-selected answer reads as an endorsement, so where the other button tomorrow cannot
   undo it, nothing is marked. When money moves, Accept names the amount.
 
@@ -73,7 +73,10 @@
   import { mergeListOf, mergeOf, pressOfKey, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
-  import { sideOf, words as sideWords } from './side.ts';
+  import { aboutLine, aboutOf, sideOf, words as sideWords } from './side.ts';
+  import { moneyRowOf } from '$lib/decide/money-row.ts';
+  import { rowHref } from '$lib/record/row-href.ts';
+  import { listName } from '$lib/record/names.ts';
   import { readFiles, visualsOf } from './option-visual.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
@@ -126,6 +129,29 @@
     keysHeld = undefined;
     if (live?.about && isArranging(live.about.kind)) void readHeld();
     void readPictures(id);
+    void readAbout(id);
+  }
+
+  /**
+   * THE ROW THE QUESTION IS ABOUT, by its title, read from the record once the question has answered (`side.ts`
+   * `aboutOf`). A row the record will not show this reader, or one already gone, draws no part: the side never names a
+   * thing by its handle.
+   */
+  let aboutRow = $state.raw<{ title: string; href: string | null; line: string } | null>(null);
+  async function readAbout(id: string) {
+    const named = aboutOf(live?.about?.body);
+    if (!client || !named) {
+      aboutRow = null;
+      return;
+    }
+    const got = await client.get(named.list, named.seq).catch(() => ({ ok: false as const }));
+    if (String(page.params.id) !== id) return;
+    const fields = got.ok && got.value !== null && typeof got.value === 'object' ? ((got.value as { fields?: Record<string, unknown> }).fields ?? {}) : null;
+    const held = fields ? fields[REGISTERS[named.list]?.title ?? 'title'] : undefined;
+    const money = live?.question ? moneyRowOf(spoken(live.question.title)) : null;
+    const title = typeof held === 'string' && held.trim() !== '' ? held.trim() : (money?.title ?? '');
+    const href = rowHref(named.spoken) ?? `/r/${named.list}/${named.seq}`;
+    aboutRow = fields && title !== '' ? { title, href, line: aboutLine(lists.get(named.list) ?? listName(named.list), money) } : null;
   }
 
   /**
@@ -206,7 +232,7 @@
   let optionFile = $state.raw<FileAt | undefined>(undefined);
   const visuals = $derived(visualsOf(offered, optionFile));
 
-  /* WHAT EACH OPTION WOULD CHANGE, DRAWN (DIRECTION §45, plan of 20 October): a date it sets, a change from what to
+  /* WHAT EACH OPTION WOULD CHANGE, DRAWN (plan of 20 October): a date it sets, a change from what to
      what, a merge, money against what it is set against, from the option as it was filed (`option-visual.ts`). An option
      with nothing it can draw truthfully draws nothing, and one that already shows a colour, a figure or a picture keeps
      that. */
@@ -311,7 +337,7 @@
   const suggestedKey = $derived(question?.options.find((o) => o.recommended === true)?.key);
 
   /**
-   * THE ANSWER CHOSEN, ON A QUESTION OF OPTIONS (DIRECTION §39, "Decide reads like a form"): a press on a choice chooses
+   * THE ANSWER CHOSEN, ON A QUESTION OF OPTIONS ("Decide reads like a form"): a press on a choice chooses
    * it and Decide gives it. The form starts on the answer Enter would give (`acceptKey`), the suggestion where a key may
    * give it, and on nothing where the answer is hard to undo or money moves. The record's own two answers and a merge
    * have no choice to start on: their buttons are the answers.
@@ -906,9 +932,10 @@
      It opens the step that asks why not yet and until when. -->
 {#snippet later()}
   {#if !deferring}
-    <!-- A CLOCK, as on every card (VERIFY H8): 32 square, 44 under a thumb, named "Ask me later". -->
+    <!-- A CLOCK AND ITS WORDS, as on every card (VERIFY H8): "Ask me later", 44 under a thumb. The clock alone floated
+         under the answers and said nothing to anybody who had not pressed it. -->
     <button type="button" class="dc-btn dc-later" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} aria-label={queueWords.notNow} title={queueWords.notNow} onclick={defer}
-      ><Icon name="clock" size="s" /></button
+      ><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></button
     >
   {/if}
 {/snippet}
@@ -943,7 +970,7 @@
 {:else}
   <!-- THE QUESTION IS THE PAGE'S TITLE, and a question that gathered several says how many beside it. No sentence under
        it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
-       the trivia the reset took out (DIRECTION §39). -->
+       the trivia the reset took out. -->
   <div class="q-head">
     <!-- NO SENTENCE, SO NONE IS HELD: the head's empty line held while the page read and then went, moving the question up
          56px on a phone. -->
@@ -956,9 +983,6 @@
   <div class="page">
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
-    <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
-    {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
-
     <!-- TWO TILES ON A WIDE BOARD (today F9): the answers, each option a card with its own button, and beside them why
          it is asked, what it changes and the comments. One column on a phone, the answers first. A settled question is
          its receipt in the first tile, and its comments stay beside it. -->
@@ -1093,7 +1117,12 @@
                     {@const marked = suggestedKey === option.key}
                     {@const said = labelOf(option, question, moves)}
                     {@const on = asked === option.key || (holding?.key ?? null) === option.key}
-                    <li class="dc-option" data-suggested={marked ? '' : undefined} data-checked={on ? '' : undefined}>
+                    {@const drawn = drawingFor(option.key)}
+                    <!-- AN OPTION WITH NOTHING BUT ITS NAME IS ITS BUTTON, and no card: "It went through" was a heading over
+                         a button saying "It went through". One with a reason or a picture keeps its name as the card's
+                         heading, and its button says what a press does, so the same words are never read twice. -->
+                    {@const bare = because.trim() === '' && !shows && drawn === null && confirming !== option.key}
+                    <li class="dc-option" data-bare={bare ? '' : undefined} data-suggested={marked ? '' : undefined} data-checked={on ? '' : undefined}>
                       <!-- WHAT THE OPTION IS LEADS IT, inside its own card and nowhere else: a swatch writes its colour into
                            `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
                       {#if shows && 'swatch' in shows}
@@ -1107,12 +1136,12 @@
                         <span class="card-visual" data-shows="file"><img class="card-file" src={shows.file.src} alt={said} loading="lazy" decoding="async" /></span>
                       {/if}
                       {#if marked}<span class="dc-rec">{gate.suggested}</span>{/if}
-                      <h3 class="dc-option-name" dir="auto">{said}</h3>
+                      {#if !bare}<h3 class="dc-option-name" dir="auto">{said}</h3>{/if}
                       <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
                       {#if because.trim() !== ''}
                         <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
                       {/if}
-                      <OptionVisual visual={drawingFor(option.key)} />
+                      <OptionVisual visual={drawn} />
                       <div class="dc-option-foot">
                         {#if confirming === option.key}
                           <!-- THE CONFIRM STAYS IN THE CARD, never a dialog over the page: what cannot be undone, then the
@@ -1135,7 +1164,7 @@
                             aria-describedby={answerable ? undefined : 'cannot-decide'}
                             onclick={() => void press(option.key)}
                             onkeydown={(e) => onChoiceKey(e, option.key)}
-                            >{said}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
+                            >{#if bare}{said}{:else}{gate.choose}<span class="dc-sr"> {said}</span>{/if}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
                           >
                         {/if}
                       </div>
@@ -1200,6 +1229,18 @@
     </Tile>
     {#if aside}
     <Tile class="gate-aside">
+      <!-- WHAT IT IS ABOUT, FIRST: the row by its title, a link to it, and its list, amount and how late under it. -->
+      {#if asking && aboutRow}
+        <section class="aside-part" aria-labelledby="gate-about-h">
+          <h2 class="gate-h" id="gate-about-h">{sideWords.about}</h2>
+          <p class="gate-about">
+            {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}
+            {#if aboutRow.line}<span class="gate-about-line">{aboutRow.line}</span>{/if}
+          </p>
+        </section>
+      {/if}
+      <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
+      {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
       <!-- WHY IT IS ASKED, in the asker's own words. -->
       {#if asking && question.context}
         <section class="aside-part" aria-labelledby="gate-why-h">
@@ -1365,18 +1406,18 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* ASK ME LATER: the card's clock, 32 square (44 under a thumb), after the answers. */
+  /* ASK ME LATER: the clock and its words, quiet, after the answers; 44 tall under a thumb. */
   .dc-actions > .dc-later {
-    display: inline-grid;
-    place-items: center;
-    inline-size: var(--btn-h);
-    padding: 0;
-    color: var(--ink-3);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-inline: var(--sp-2);
+    color: var(--ink-2);
   }
 
   @media (pointer: coarse) {
     .dc-actions > .dc-later {
-      inline-size: var(--tap);
+      min-block-size: var(--tap);
     }
   }
 
@@ -1415,7 +1456,7 @@
     min-inline-size: 0;
   }
 
-  .gate-grid :global(.tile.gate-aside > * + :is(.does, .aside-more, .thread)) {
+  .gate-grid :global(.tile.gate-aside > * + :is(.aside-part, .decider, .does, .aside-more, .thread)) {
     padding-block-start: var(--sp-4);
     border-block-start: 1px solid var(--rule);
   }
@@ -1487,6 +1528,24 @@
     .gate-link {
       min-block-size: var(--tap);
     }
+  }
+
+  /* WHAT IT IS ABOUT: the row's title as its link, and under it the quiet line of its list, amount and how late. */
+  .gate-about {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: var(--sp-1);
+    margin: 0;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
+  }
+
+  .gate-about-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
   }
 
   /* ── who asked, and why ────────────────────────────────────────────────── */
@@ -1947,7 +2006,7 @@
 
   /* NOT NOW UNDER THE CARDS, its word level with their edge rather than its button's. */
   .dc-options + .dc-actions {
-    margin-inline-start: -14px;
+    margin-inline-start: calc(var(--sp-2) * -1);
   }
 
   .dc-option {
@@ -1963,6 +2022,25 @@
 
   .dc-option[data-checked] {
     border-color: var(--ink);
+  }
+
+  /* AN OPTION THAT IS ONLY ITS NAME IS ONLY ITS BUTTON: no card round it, the button the cell's width and a thumb's
+     height, so a row of them reads as the answers side by side. */
+  .dc-option[data-bare] {
+    gap: var(--sp-1);
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+
+  .dc-option[data-bare] > .dc-option-foot {
+    align-items: stretch;
+    padding-block-start: 0;
+  }
+
+  .dc-option[data-bare] > .dc-option-foot > .dc-btn {
+    min-block-size: var(--tap);
+    font-size: var(--fs-body);
   }
 
   .dc-option > .dc-rec {
@@ -2040,6 +2118,13 @@
     .q-head :global(.page-head .head-actions) {
       align-self: start;
       margin-block-start: var(--sp-1);
+    }
+
+    /* THE QUESTION IS THE THING READ HERE, so it takes three lines before it gives way, not a page's two: "Ledger Post,
+       sending plan was due 4 days …" cut off what it asked. */
+    .q-head :global(.page-head .name-words) {
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
     }
   }
 </style>

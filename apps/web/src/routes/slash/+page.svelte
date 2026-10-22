@@ -1,7 +1,7 @@
 <!--
   Slash: `/slash`.
 
-  CALM AT REST (`DIRECTION §35`). The screen answers one question first, in the line under the title: what waits for him
+  CALM AT REST. The screen answers one question first, in the line under the title: what waits for him
   on Decide, in red, else what is new, else that there is nothing yet. Under it are the Ask field, where the host has a
   model, and one tile: what Slash suggests, what waits on Decide first, or with nothing yet one sentence and one thing to
   try. That is all that is drawn at rest, two tiles and the line. Who drafts is one dim line at the foot, linked to the
@@ -203,7 +203,7 @@
   );
 
   /**
-   * THE ONE DECISION CARD, WHERE HE ASKED (ENG-B16, his D37.129 to D37.133): an answer that proposes a change draws the
+   * THE ONE DECISION CARD, WHERE HE ASKED (ENG-B16): an answer that proposes a change draws the
    * palette's own card (`in-place.ts` `cardInPlace`, through `filedCard`) under the Ask field. Enter in the field accepts
    * it while the field still holds its question, a six-second Undo follows on its line, and once answered it reads
    * "Slash suggested · Mara accepted". The record filed it when it answered, so a card left unanswered, by asking again or

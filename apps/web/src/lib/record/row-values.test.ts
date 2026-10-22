@@ -35,8 +35,8 @@ test('A PATH THE RECORD READ NOTHING FOR IS THE DASH, AND ONE THAT NAMES NOTHING
 
 test('A DAY FIELD IS SAID AS A DAY, AND A TYPED FORM IS HANDED THE LITERAL IT FORMATS', () => {
   const src = 'Due {{due}}. Sells at {{money:price}}, since {{date:started}}.';
-  const resolve = resolverOf({ values: { due: '2026-10-09', price: { amount: 135_000, currency: 'EGP' }, started: '2026-09-01' } }, src);
-  assert.equal(resolve('due'), '9 Oct 2026');
+  const resolve = resolverOf({ values: { due: '2025-10-09', price: { amount: 135_000, currency: 'EGP' }, started: '2026-09-01' } }, src);
+  assert.equal(resolve('due'), '9 Oct 2025', 'a day of another year keeps its year');
   assert.equal(resolve('price'), '135000 EGP');
   const price = inline('{{money:price}}', { resolve });
   assert.equal(price.length, 1);

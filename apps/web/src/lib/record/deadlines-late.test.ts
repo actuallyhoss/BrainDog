@@ -19,7 +19,7 @@ import { toSegments } from './blocks.ts';
 import { readBlock } from './fixtures/readers.ts';
 import { NOW } from './fixtures/sample.ts';
 import { blockOf } from './page-live.ts';
-import { day as fmtDay } from 'braindog-render';
+import { dateSaid } from 'braindog-render';
 
 const today = dayOf(NOW);
 const past = addDays(today, -5);
@@ -57,8 +57,8 @@ test('A DUE THIS WEEK TABLE SAYS A DAY GONE IS LATE, in Today\'s words and with 
   assert.equal(gone!.cells[2], lateSaid(past, today));
   assert.equal(gone!.cells[2], '5 days late');
   assert.equal(gone!.tone, 'bad', 'a late row is told by colour alone, or not at all');
-  assert.equal(now!.cells[2], fmtDay(today));
-  assert.equal(later!.cells[2], fmtDay(soon));
+  assert.equal(now!.cells[2], dateSaid(today, NOW));
+  assert.equal(later!.cells[2], dateSaid(soon, NOW));
   assert.equal(now!.tone, undefined, 'a row due today is not late yet');
   assert.equal(later!.tone, undefined);
   /* THE REST OF THE ROW IS AS IT WAS: the title, the signed amount, and the door to the row. */
@@ -75,8 +75,8 @@ test('A TIMELINE OVER WHAT FALLS DUE SAYS THE SAME, and its fence carries the ba
   const b = blockOf(timeline as never, new Map(), NOW);
   assert.equal(b.rows[0]!.cells[0], '5 days late');
   assert.equal(b.rows[0]!.tone, 'bad');
-  assert.equal(b.rows[1]!.cells[0], fmtDay(today));
-  assert.equal(b.rows[2]!.cells[0], fmtDay(soon));
+  assert.equal(b.rows[1]!.cells[0], dateSaid(today, NOW));
+  assert.equal(b.rows[2]!.cells[0], dateSaid(soon, NOW));
   assert.equal(b.rows[1]!.tone, undefined);
   const drawn = toSegments(b).flatMap((s) => (s.type === 'block' ? ((s as { rows?: { cells: string[]; tone?: string }[] }).rows ?? []) : []));
   assert.equal(drawn.length, 3);

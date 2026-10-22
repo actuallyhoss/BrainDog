@@ -1,5 +1,5 @@
 /**
- * READ WHAT YOU ALREADY HAVE (DIRECTION §38, "understanding is the engine's first job"): the record's walk over what it
+ * READ WHAT YOU ALREADY HAVE ("understanding is the engine's first job"): the record's walk over what it
  * holds, asked for by hand from Settings › People. Each old payment linked to who it was with, each run to its project,
  * each service to what it is for, a slice at a time, the doubtful ones filed on Decide as questions.
  *

@@ -270,7 +270,7 @@
     font-weight: 600;
   }
 
-  /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size (DIRECTION §36). */
+  /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size. */
   .quiet {
     margin: 0;
     color: var(--ink-2);

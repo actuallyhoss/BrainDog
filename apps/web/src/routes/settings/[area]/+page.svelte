@@ -9,7 +9,7 @@
   TWO ADDRESSES, ONE SCREEN. `/settings/<area>` is this route, and `/settings` draws this same file
   with no area in the address (its own `+page.svelte` renders it), which is the index.
 
-  THE INDEX IS DECLARED (DIRECTION §35). `/settings` is a page body drawn by the one reader, `PageView`, at every
+  THE INDEX IS DECLARED. `/settings` is a page body drawn by the one reader, `PageView`, at every
   width: a tile for each group, its areas as links (`place.ts` `SETTINGS_INDEX`), or the record's own `settings` page
   where it holds one, which is how a person reorders, renames and leaves out areas. Once an area is open, the chooser
   beside it (`SettingsIndex.svelte`) draws the same groups in the same order; below 900px the area is the page, with a
@@ -332,7 +332,7 @@
    */
   const signsAt = $derived(shell.pages.includes('health') ? '/p/health' : area === undefined ? null : '/settings');
 
-  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt }) : null);
+  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups' }) : null);
 
   /**
    * TRY AGAIN AND DETAILS, under the sentence while a fault is open (AGT-C06). Try again queues the job behind the fault
@@ -493,7 +493,7 @@
     {:else if area === 'navigation'}
       <Navigation {shell} {area} />
     {:else if area === 'people'}
-      <!-- PEOPLE & SHARING DRAWS THE PEOPLE AREA FIRST, as People here: roles, invites and links, then every share. -->
+      <!-- PEOPLE & SHARING DRAWS THE PEOPLE AREA FIRST: roles, invites and links, then every share. -->
       <!-- By `import()`, as Agents is: its lists, groups and the Share sheet's host are a chunk only somebody opening it
            waits for. -->
       {#await import('./areas/Sharing.svelte') then { default: Sharing }}

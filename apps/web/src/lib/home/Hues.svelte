@@ -1,5 +1,5 @@
 <!--
-  Colours, as one quiet tile at the end of the board (DIRECTION §39): the rows of a list that have no colour of their
+  Colours, as one quiet tile at the end of the board: the rows of a list that have no colour of their
   own, counted and named in the list's own word ("6 projects have no colour of their own"), the first names under it,
   and one press, "Give them colours".
 

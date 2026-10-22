@@ -12,7 +12,7 @@
  * takes, `135000 EGP` or the ISO day, because the renderer formats it itself and could not read a written amount back.
  */
 
-import { TYPED, day, type Resolve } from 'braindog-render';
+import { TYPED, dateSaid, type Resolve } from 'braindog-render';
 
 import { namedResolverOf } from './page-live.ts';
 
@@ -93,7 +93,7 @@ export function resolverOf(doc: DocValues | undefined, src = ''): Resolve {
     const v = values && Object.hasOwn(values, path) ? values[path] : undefined;
     if (v === undefined) return said(path);
     if (typed.has(path)) return literalOf(v);
-    if (typeof v === 'string' && ISO_DAY.test(v)) return day(v);
+    if (typeof v === 'string' && ISO_DAY.test(v)) return dateSaid(v);
     return said(path);
   };
 }

@@ -1,5 +1,5 @@
 /**
- * A page's headline sentence, cut into the parts the page header draws differently (DIRECTION §39): the figures in it
+ * A page's headline sentence, cut into the parts the page header draws differently: the figures in it
  * at medium weight, the phrase that needs the reader in the alert red, and everything else in body text.
  *
  * "Cash is £33,850 across 2 accounts, and on what is due it runs out in 57 days." reads at a glance when £33,850, 2

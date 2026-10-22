@@ -1,6 +1,6 @@
 /**
  * The ladder of trust as a person reads it: one sentence for each agent and each kind of change (`trust`, ENG-A12,
- * DIRECTION §37 "a ladder per agent and kind").
+ * a ladder per agent and kind).
  *
  * PURE, SO `node --test` CAN IMPORT IT. The words and the rules live here and `TrustRows.svelte` only draws what these
  * answer, as `slash-reads.ts` is to `SlashReads.svelte`.
@@ -17,9 +17,9 @@
  * ONLY THE OWNER IS ANSWERED. Anyone the record refuses, and a host built before the call, reads as `null`, and nothing
  * is drawn: there is no ladder of theirs to show.
  *
- * AND THE OWNER TAKES A RUNG BACK HERE: a kind an agent does on its own carries "Ask again" (`trustTakeBack`, "undo"
- * D37.167), which puts it back to asking. Under the lines, two more say what no rung reaches: what the agent was not
- * lifted on, and the floor the ladder never lifts at all.
+ * AND THE OWNER TAKES A RUNG BACK HERE: a kind an agent does on its own carries "Ask again" (`trustTakeBack`, the
+ * ladder's undo), which puts it back to asking. Under the lines, two more say what no rung reaches: what the agent
+ * was not lifted on, and the floor the ladder never lifts at all.
  */
 
 import type { TrustStanding } from '@braindog/client';
@@ -71,7 +71,7 @@ const kindSaid = (who: string, k: Kind, now: number): string => {
  * Every line of the ladder, in the record's order: agents oldest first, and each one's kinds by their words. An agent
  * with no rung yet is one line, since everything it does asks.
  */
-export function trustLines(standing: TrustStanding, now: number): TrustLine[] {
+export function trustLines(standing: TrustStanding, now: number, plain?: (i: number) => boolean): TrustLine[] {
   const alike = new Map<string, number>();
   for (const a of standing.agents) alike.set(fold(a.agent), (alike.get(fold(a.agent)) ?? 0) + 1);
   const out: TrustLine[] = [];
@@ -89,8 +89,20 @@ export function trustLines(standing: TrustStanding, now: number): TrustLine[] {
       out.push({ key: `${i}:${j}`, text: kindSaid(who, k, now), back, why: back ? (k.dropped?.why ?? null) : null, take });
     });
   });
-  return out;
+  if (plain === undefined) return out;
+  /* EVERY AGENT THAT ASKS BEFORE EVERY CHANGE IS ONE LINE, where `plain` says nothing more is said under it (UI audit
+     of 22 October, 11): five keys made one line each, "… asks before every change", five times. The line stands where
+     the first of them stood, keyed by it, so whatever follows that agent still follows the line. */
+  const asks = standing.agents.map((a, i) => (a.kinds.length === 0 && plain(i) ? i : -1)).filter((i) => i >= 0);
+  if (asks.length < 2) return out;
+  const folded = new Set(asks.slice(1).map(String));
+  const names = LIST.format(asks.map((i) => out.find((l) => l.key === `${i}`)!.text.replace(/ asks before every change$/u, '')));
+  return out
+    .filter((l) => !folded.has(l.key))
+    .map((l) => (l.key === `${asks[0]}` ? { ...l, text: `${names} ask before every change` } : l));
 }
+
+const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
 
 const RUNGS = new Set(['ask', 'tell', 'quiet']);
 

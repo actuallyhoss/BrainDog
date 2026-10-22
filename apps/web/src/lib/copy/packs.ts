@@ -78,7 +78,7 @@ export const packs = {
   browseHome: 'Home',
   browseLists: 'Lists',
   browseNoRail: 'Nothing added to the rail',
-  shareNoUseCase: 'No use case is on here, so the file carries the modules that are on and the pages you placed.',
+  shareNoUseCase: 'No setup is on here, so the file carries the add-ons that are on and the pages you placed.',
   shareTitle: 'Title',
   shareVersion: 'Version',
   shareSummary: 'What it is for',

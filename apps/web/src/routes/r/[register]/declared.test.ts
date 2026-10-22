@@ -1,5 +1,5 @@
 /**
- * A list as a page the record composes (PGS-A23), at `/r/<list>?declared` until his yes on the list board: the kernel's
+ * A list as a page the record composes (PGS-A23), at `/r/<list>?declared` until the list board is signed off: the kernel's
  * `listPage` drawn by the one renderer, with the panel every declared page opens on each row, and the screen as it was
  * left where it is.
  *
@@ -151,7 +151,7 @@ test('THE SCREEN MOUNTS THE COMPOSED PAGE ONLY WHEN THE ADDRESS ASKS, and draws 
   const host = SCREEN.indexOf('    void result.entries;\n    void page.url.href;');
   assert.match(SCREEN.slice(host, host + 200), /if \(composed\) return;/u);
 
-  /* UNTIL HIS YES IT IS REACHED BY ITS ADDRESS: the screen as it was offers no way to it. */
+  /* UNTIL IT IS SIGNED OFF IT IS REACHED BY ITS ADDRESS: the screen as it was offers no way to it. */
   assert.doesNotMatch(SCREEN, /declaredHref/u);
   assert.doesNotMatch(SCREEN, /[?&]declared\b/u);
 });

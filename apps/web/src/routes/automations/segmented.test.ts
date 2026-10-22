@@ -104,7 +104,6 @@ test('one automation: its tabs are a named group that wraps on a narrow screen',
 const LAYOUT = read('./+layout.svelte');
 const HUB_PAGES = [
   { name: '+page.svelte', text: read('./+page.svelte') },
-  { name: 'runs/+page.svelte', text: read('./runs/+page.svelte') },
 ];
 
 test('the hub: the tabs are drawn once, in the layout, on the tab the address names', () => {

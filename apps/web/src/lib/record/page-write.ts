@@ -352,7 +352,9 @@ export type Added = { kind: string; [key: string]: unknown };
  * hints (a column's width and alignment) the record does not read and would name as keys it cannot. A column keeps its
  * field, its label and its role.
  */
-const DECLARES = ['kind', 'heading', 'span', 'source', 'where', 'cells', 'order', 'limit', 'target', 'authored', 'empty', 'tone', 'body', 'when', 'icon', 'fold'];
+/* `code` AND `height` ARE A DRAWN BLOCK'S (Make a component's Draw it): its component and where it starts. Left off, a
+   drawn draft kept with Done was written as a drawn block with no code, which the record refuses on read. */
+const DECLARES = ['kind', 'heading', 'span', 'source', 'where', 'cells', 'order', 'limit', 'target', 'authored', 'empty', 'tone', 'body', 'when', 'icon', 'fold', 'code', 'height'];
 
 export function declaredBlock(block: Added): BlockBody {
   const out: Record<string, unknown> = {};

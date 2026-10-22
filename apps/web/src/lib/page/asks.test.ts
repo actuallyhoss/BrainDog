@@ -1,5 +1,5 @@
 /**
- * Where a page's waiting questions sit: never leading a page about something else (DIRECTION §39). Money opened on
+ * Where a page's waiting questions sit: never leading a page about something else. Money opened on
  * three questions and its cash was under the fold; a project page with a side column takes them there.
  */
 

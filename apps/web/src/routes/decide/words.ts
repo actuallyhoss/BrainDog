@@ -4,7 +4,7 @@
  * typed into the markup. The words the classic screen already kept beside their code stay there (`views.ts` `WORDS`,
  * `lead.ts` `WORDS`, `[id]/onward.ts`, `[id]/picked.ts`).
  *
- * PLAIN AND SHORT (DIRECTION §37): a button says what it does, a question is answered by a press, and a reason is
+ * PLAIN AND SHORT: a button says what it does, a question is answered by a press, and a reason is
  * offered as a note after a decline or an edit, never asked for before it. No em dash, and no word of the system's.
  *
  * A PLAIN MODULE, so a test reads the same words the screens say.
@@ -61,10 +61,12 @@ export const words = {
 
   /* ── the gate ── */
 
-  /** The gate's answer to a question of options, with the one chosen (DIRECTION §39). */
+  /** The gate's answer to a question of options, with the one chosen. */
   decide: 'Answer',
   /** Putting the question off: opens the step that asks why and until when. */
   notNow: 'Not now',
+  /** An option card's button under its name and reason, so the name is not said twice; a screen reader hears the name after it. */
+  choose: 'Choose',
   /** The question page's second tile (today F9): why it is asked, in the asker's words. */
   whyAsked: 'Why this is asked',
   /** And what answering would change, under it. */

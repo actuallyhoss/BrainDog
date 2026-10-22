@@ -458,7 +458,7 @@ test('AN INSTANT CELL IS BANDED, NOT TRUNCATED TO ITS DAY', () => {
   assert.notEqual(display('session', 'last_seen', at(2), NOW), display('session', 'last_seen', at(11), NOW));
   /* And a `day` field is still a DATE, which is the branch beside it and a different answer on
      purpose: a deadline is a date somebody diaries against, and an age is not. */
-  assert.equal(display('obligations', 'due', '2026-09-03'), '3 Sep 2026');
+  assert.equal(display('obligations', 'due', '2026-09-03', NOW), '3 Sep');
 });
 
 test('money groups by currency then amount, and text sorts without case, as the record sorts them', () => {

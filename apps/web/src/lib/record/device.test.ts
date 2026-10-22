@@ -80,9 +80,10 @@ test('any other refusal keeps the record\'s own sentence', () => {
 });
 
 test('the sentences for the refusals say what to do, and none prints a count of tries', () => {
-  assert.match(copy.codeTries, /start again on the machine/i);
-  assert.match(copy.codeExpired, /braindog login/);
-  assert.equal(copy.codeWrong, 'No machine is waiting with that code.');
+  assert.match(copy.codeTries, /run the command again/i);
+  /* NOT `braindog login` BY NAME: export, setup and a runner print the same page, and each is run again to get a code. */
+  assert.match(copy.codeExpired, /run the command again/i);
+  assert.match(copy.codeWrong, /^No machine is waiting with that code\./u);
   assert.match(copy.codeShort(5), /5 digits/);
   assert.match(copy.codeLong(7), /7 digits/);
 });
@@ -217,7 +218,7 @@ const key = (over: Partial<TokenRow> = {}): TokenRow => ({
 const only = (token: TokenRow, run: Connection['run'] = null): Connection => connected([], [token], run ? [run] : [])[0]!;
 
 const studio: DeviceRow = {
-  handle: 'dv_1', status: 'active', reach: 'login', scope: null, label: 'STUDIO-PC · braindog-cli', ua: null, tries: 0,
+  handle: 'dv_1', status: 'active', reach: 'login', scope: null, label: 'Studio pc · braindog-cli', ua: null, tries: 0,
   expires: '2026-12-01T00:00:00Z', approved_by: 'p_1', approved_at: daysAgo(20), last_used: daysAgo(1),
 };
 
@@ -239,14 +240,14 @@ test('a key with no client reads its label and is a key you made', () => {
 test('a machine reads its agent on its machine, as it did before the stamp', () => {
   const token = key({ id: 'tk_m', label: studio.label, expires_at: studio.expires });
   const c = connected([studio], [token], [{ seq: 4, token: 'tk_m', agent: 'claude', host: 'STUDIO-PC' }])[0]!;
-  assert.deepEqual(partsOf(c, NOW), { app: 'Claude', where: 'STUDIO-PC', how: 'signed in', idle: null });
-  assert.equal(nameOf(c), 'Claude on STUDIO-PC');
-  assert.equal(lineOf(c), 'On STUDIO-PC, signed in');
+  assert.deepEqual(partsOf(c, NOW), { app: 'Claude', where: 'Studio pc', how: 'signed in', idle: null });
+  assert.equal(nameOf(c), 'Claude on Studio pc');
+  assert.equal(lineOf(c), 'On Studio pc, signed in');
   /* THE APP THE RUN SAID IT RAN IN IS READ BEFORE THE KIND OF AGENT. */
   const coded = connected([studio], [token], [{ seq: 5, token: 'tk_m', agent: 'claude', host: 'STUDIO-PC', client: 'claude-code 2.1.4' }])[0]!;
-  assert.equal(nameOf(coded), 'Claude Code on STUDIO-PC');
+  assert.equal(nameOf(coded), 'Claude Code on Studio pc');
   /* NO RUN, NO MACHINE NAME: the label it signed in with stands. */
-  assert.equal(nameOf(connected([studio], [token], [])[0]!), 'STUDIO-PC · braindog-cli');
+  assert.equal(nameOf(connected([studio], [token], [])[0]!), 'Studio pc · braindog-cli');
 });
 
 test('a machine whose sign-in was stamped reads on the name it gave', () => {

@@ -363,13 +363,20 @@
       inline-size: auto;
     }
 
+    /* THE CHIPS TAKE THE LINE AND SORT GOES UNDER THEM, at the start: beside them it left the strip a third of a phone,
+       and "Building blocks" was cut to "Bu" against the select. */
     .filter {
       flex: 1 1 100%;
+      flex-wrap: wrap;
     }
 
     .filter > :global(.segmented) {
-      flex: 1 1 auto;
+      flex: 1 1 100%;
       min-inline-size: 0;
+    }
+
+    .sort {
+      margin-inline-start: 0;
     }
 
     /* ON A PHONE THE WORD "SORT" GOES, and the select says the order: room for the filter. */

@@ -1,7 +1,7 @@
 /**
  * May be one, on Home: the record's `namedTwice` as the last tile of the board (`NamedTwice.svelte`). ENG-B04 on the
  * screen: two of his things that may be one, by name, with the record's own reason under them, and one press that puts
- * the pair to him on Decide as one question (D38.56). Its yes folds the pair with one Undo; nothing here folds.
+ * the pair to him on Decide as one question. Its yes folds the pair with one Undo; nothing here folds.
  *
  * THROUGH THE RECORD'S OWN `namedTwice` AND `heldTwice` AND NOTHING ELSE. (`heldTwice` over the people list says how many
  * people the kernel holds twice, the pairs a merge question waits on among them, as one line under the pairs.) The record says each pair (`{ pair, kind, how, a, b,

@@ -7,9 +7,12 @@
  *
  * THROUGH `@braindog/seed/packs`, NOT THE ROOT. The root is the sample as well, and `tools/gates/no-fixtures.mjs`
  * refuses a shipped file that imports it; the subpath carries the declarations and none of the rows.
+ *
+ * AND THROUGH `/packs/metrics`, NOT `/packs`: that door carries the modules' documents too, and this file is on the first
+ * open. This one is the five modules' own tables and nothing behind them, the same value `/packs` hands out.
  */
 
-import { METRICS as SEED_METRICS } from '@braindog/seed/packs';
+import { METRICS as SEED_METRICS } from '@braindog/seed/packs/metrics';
 
 import type { MetricDecl } from './metrics.ts';
 

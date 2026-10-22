@@ -1,6 +1,6 @@
 /**
  * A screen's first read, asked while a pointer rests on its link, a key focuses it or a finger lands on it, so the
- * press opens a screen whose answer is already here or on its way (DIRECTION 45, d5-speed: "load a page when he hovers
+ * press opens a screen whose answer is already here or on its way (d5-speed: "load a page when he hovers
  * or touches its link").
  *
  * THE READ GOES THROUGH THE CLIENT'S KEPT READS (`keepReads`), so the screen's own read, asked the moment it opens, is

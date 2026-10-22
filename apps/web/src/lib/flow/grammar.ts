@@ -2,7 +2,7 @@
  * The automation grammar, as the record answers it: which triggers and steps there are, what each takes, and the
  * ceilings a body is held to.
  *
- * ONE DEFINITION, TWO EDITORS (D22.51). The canvas copied the kernel's tables by hand, and the copy drifted: it had no
+ * ONE DEFINITION, TWO EDITORS. The canvas copied the kernel's tables by hand, and the copy drifted: it had no
  * `meet` and no `run_job`, so a rule an agent wrote with either opened with a card that said nothing. The kernel builds
  * `flowGrammar()` from `flow-lint.ts`'s own tables, the record answers it as a read, and this file holds that answer
  * for the tab. `flow.ts` works over what is held here; nothing under `lib/flow` lists the steps again.

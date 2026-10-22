@@ -204,8 +204,21 @@ export function argsFor(kind: JobKind, typed: Readonly<Record<string, string>>):
 }
 
 /** Start one run of a kind; `about` is the spoken id of the row it is for (a project's), which the record checks. */
-export async function startJob(base: string, kind: string, args: Record<string, string>, io?: Fetch, about?: string): Promise<Answer<{ id: string }>> {
-  return clientOf(base, io).createJob({ kind, args, ...(about ? { about } : {}) });
+export async function startJob(
+  base: string,
+  kind: string,
+  args: Record<string, string>,
+  io?: Fetch,
+  about?: string,
+  place: { machine?: string; seat?: string } = {},
+): Promise<Answer<{ id: string }>> {
+  return clientOf(base, io).createJob({
+    kind,
+    args,
+    ...(about ? { about } : {}),
+    ...(place.machine ? { machine: place.machine } : {}),
+    ...(place.seat ? { seat: place.seat } : {}),
+  });
 }
 
 /** Stop one run: at once while it waits, by a flag its machine reads while it runs. */

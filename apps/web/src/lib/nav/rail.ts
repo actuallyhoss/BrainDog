@@ -1,5 +1,5 @@
 /**
- * The rail as DIRECTION §39 draws it: the places, then the things a place holds, then the rest.
+ * The rail, in three runs: the places, then the things a place holds, then the rest.
  *
  * THE PLACES ARE THE SEVEN A DAY RUNS THROUGH, Today and Decide first and then the declared sections in the order a
  * founder reaches for them (Work, a shop's Orders, Projects, Money, People, Agents), every other section after them in

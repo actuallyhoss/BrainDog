@@ -1,5 +1,5 @@
 <!--
-  A MERGE, AS ONE QUESTION ABOUT WHO IS WHO (DIRECTION §38, `merge.ts`): each name the record thinks may be one, where
+  A MERGE, AS ONE QUESTION ABOUT WHO IS WHO (`merge.ts`): each name the record thinks may be one, where
   each was seen, and the answers, Merge all, Keep apart and, where the record offers it, Pick on a name. One press each.
 
   THE ONE DECISION CARD'S LOOK, inside the gate's tile: the names as a list without boxes, each a line with its well,

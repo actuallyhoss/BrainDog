@@ -1,7 +1,7 @@
 <!--
   Decide: every open question, ranked by the COST OF BEING WRONG, as a declared page drawn by the one page reader.
 
-  A PAGE BODY LIKE ANY OTHER (DIRECTION §35). Its blocks are `views.ts` `decideHome`, drawn by the record with
+  A PAGE BODY LIKE ANY OTHER. Its blocks are `views.ts` `decideHome`, drawn by the record with
   `previewPage` and through `PageView`, as Today's are: the head says how many wait and what the first suggests, the first
   question is drawn whole with its suggestion, why and what accepting it does, the rest are cards answered where they
   are shown, and what was put off and what was decided are folded shut under them. How the calls went is the one part
@@ -9,11 +9,11 @@
 
   CALM. No group control, no Select and no key hints in the head: a card's box shows on hover or focus. `j` and `k` are
   the page reader's and move the cursor; on the question it is on, Enter accepts, Backspace declines and `e` opens it to
-  change what accepting takes (DIRECTION §37, `press.ts`). Nothing moves or fades when a key lands. A part that holds
+  change what accepting takes (`press.ts`). Nothing moves or fades when a key lands. A part that holds
   nothing is not drawn.
 
   EVERY QUESTION IS THE ONE DECISION CARD (`lib/decide/DecisionCard.svelte`, through `QueueAnswer`): why first, who
-  asked, what it moves, and one press with Undo. The suggestion is an outline with a small dot, his pick, and not drawn
+  asked, what it moves, and one press with Undo. The suggestion is an outline with a small dot, and not drawn
   at all on a card that is hard to undo or moves money. Enter answers only a card that costs nothing; one that costs
   something opens whole on its own page, where Accept names the amount.
 
@@ -253,8 +253,8 @@
   /* ── Decide's own keys ───────────────────────────────────────────────────── */
 
   /**
-   * ON THE QUESTION THE CURSOR IS ON, Enter accepts, Backspace declines and `e` opens it to change what accepting takes
-   * (DIRECTION §37). `j` and `k` stay the page reader's, and so does every other key.
+   * ON THE QUESTION THE CURSOR IS ON, Enter accepts, Backspace declines and `e` opens it to change what accepting takes.
+   * `j` and `k` stay the page reader's, and so does every other key.
    *
    * THE CARD'S OWN BUTTON IS PRESSED, so a key gives the answer a pointer gives: the same write, the same line the card
    * becomes, the same reason line where the record still asks for one. Taken before the page reader's Enter, which opens
@@ -404,7 +404,7 @@
        page with nothing at all to draw the cleared mark under it says that, once. NOTHING RED IN THE HEAD (plan of 20
        October): noting a choice to make is the rarest thing done here, so it and Select are in the "⋯", and only for
        somebody who may answer. -->
-  <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws (DIRECTION §39), and THE SIBLING BEFORE THE PAGE, as
+  <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws, and THE SIBLING BEFORE THE PAGE, as
        Home draws it: no element of its own round it and nothing between its sentence and `.page`. The sticky head
        sticks inside this screen's own box either way, and on a phone the page's menu is raised to the end of the
        sentence only where the sentence is the sibling before the page (`PageView`, look fault N). So the sheet for
@@ -634,7 +634,7 @@
     }
   }
 
-  /* EACH QUESTION IS A TILE (DIRECTION §39, "Decide reads like a form"). The page reader draws a queue as one tile with
+  /* EACH QUESTION IS A TILE ("Decide reads like a form"). The page reader draws a queue as one tile with
      its questions under hairlines, which is right for a page holding a few among other things; Decide is the questions,
      so here the queue's own tile steps back to the board and every question is a tile of its own, a tile's gap apart.
      A queue's name is kept for a screen reader and not drawn, except Money's and Quick's, which name the columns they
@@ -698,7 +698,7 @@
     white-space: nowrap;
   }
 
-  /* NOTHING MOVES OR FADES WHEN A KEY LANDS ON A CARD (DIRECTION §37). Who asked and when are always there on Decide,
+  /* NOTHING MOVES OR FADES WHEN A KEY LANDS ON A CARD. Who asked and when are always there on Decide,
      where they are half of what is decided, so `j` and `k` move the ring and nothing else: a by-line that waited for
      the cursor took a line's room as it came, and the card under it moved. The box for answering several at once
      appears without a fade. */

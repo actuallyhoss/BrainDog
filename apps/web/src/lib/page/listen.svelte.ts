@@ -6,7 +6,7 @@
  * hears a different one. This follows it from a component: call `listen` while the component initialises, and the
  * effects it makes go with the component, so it stops on unmount with no teardown of the caller's.
  *
- * THE OLD CONTENT STAYS UNTIL THE NEW READ LANDS (DIRECTION §36: no blank flash, no spinner where the old content can
+ * THE OLD CONTENT STAYS UNTIL THE NEW READ LANDS (no blank flash, no spinner where the old content can
  * stay). `reread` is the caller's read that draws over the page only once it has answered, and a read that fails draws
  * nothing, so the page as drawn stands until there is a newer one to move to (`recompose.ts` then plays the move).
  *

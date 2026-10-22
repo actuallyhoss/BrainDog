@@ -1,6 +1,6 @@
 /**
- * RUN A RULE AGAIN OVER WHAT IS ALREADY THERE (SHL-D07, his words "re-run every rule over rows a field is still empty
- * on"). A rule fires on a write, so one written today has never seen what was written before it. The record's
+ * RUN A RULE AGAIN OVER WHAT IS ALREADY THERE (SHL-D07: re-run every rule over rows a field is still empty
+ * on). A rule fires on a write, so one written today has never seen what was written before it. The record's
  * `ruleApply` walks it over the rows already there, `dry` first, and the real press is one batch one Undo takes back.
  *
  * DRY FIRST, AND IN TWO READS. `ruleApply` with `dry` says how many it would fill and how many already hold a value;

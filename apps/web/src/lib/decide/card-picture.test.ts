@@ -1,5 +1,5 @@
 /**
- * AN OPTION SHOWN AS WHAT IT IS (his D28.33; audit 69 finding 8): its colours, its figure or its picture reach the card
+ * AN OPTION SHOWN AS WHAT IT IS (audit 69 finding 8): its colours, its figure or its picture reach the card
  * as the way's `shows`, a spelling the renderer would refuse reaches nothing, and the card's markup says each one the way
  * a person hears it. Read without a DOM: the card's rules from `card.ts`, its markup from the source.
  */

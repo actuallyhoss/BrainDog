@@ -112,9 +112,9 @@ const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 const HANDLE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 
 /**
- * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("sketchpad-metrics") the same words
- * spaced and capitalised ("Sketchpad metrics"), so no key or tool is drawn in the record's own spelling (the audit of
- * 20 October: five raw key handles on his Sketchpad). Words a person wrote with a capital or a space stay as written.
+ * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("pinwheel-metrics") the same words
+ * spaced and capitalised ("Pinwheel metrics"), so no key or tool is drawn in the record's own spelling (the audit of
+ * 20 October: five raw key handles on one project page). Words a person wrote with a capital or a space stay as written.
  */
 export const thingName = (title: string): string => (HANDLE.test(title) ? humanize(title) : title);
 

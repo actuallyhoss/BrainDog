@@ -6,9 +6,11 @@
   files it and closes the sheet; there is no second confirmation, because the toast carries Put back and a hand is one
   write that one more write undoes, both fields and the state together.
 
-  TWO WAYS IN. The row menu opens it by binding `open`, and the row page's head asks for `trigger`, which draws the
-  "Hand to" button and, while an agent holds the row, the line saying so: the run working on it, or whose next session it
-  waits for. Neither is drawn for somebody who may not change the row, or on a list that does not say who holds its rows.
+  TWO WAYS IN, BOTH A MENU'S. The row menu and the row page's "…" open it by binding `open`. The row page's sentence asks
+  for `line` too, a second copy that draws no sheet: while an agent holds the row, the words saying so, the run working on
+  it as a link or whose next session it waits for. "Hand to" stood in the head beside the primary, one of five controls
+  in a row at 1440 and off the edge at 390. Neither is drawn for somebody who may not change the row, or on a list that
+  does not say who holds its rows.
 
   UNDER A THUMB IT IS A BOTTOM SHEET (`Sheet.svelte`), with one 44px row per person or agent and their face.
 
@@ -20,10 +22,14 @@
   approved kind takes an instruction or a row (`startFor`). It hands the row, tells Claude the note (or to work on the
   row), and starts a run of that kind with the instruction as its argument. Otherwise it is not drawn, and the row
   waits for Claude's next session as it always did. Nothing starts by itself.
+
+  ON A MACHINE, AS A PROFILE (migration 44): where runners are on two machines or more, "On" picks the one the run starts
+  on, and where that machine's runs were under Claude Code profiles of his, "As" picks the profile, by name
+  (`startWith`). The runner on that machine starts Claude Code under that profile's folder, which only it knows.
 -->
 <script lang="ts">
   import { page } from '$app/state';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -36,11 +42,12 @@
     noteFor,
     readHolders,
     readRunFor,
-    startFor,
     startNow,
+    startWith,
     startsOnARunner,
     type Holder,
     type Offered,
+    type StartPlace,
   } from '$lib/record/hand.ts';
   import type { JobKind, JobRow } from '$lib/record/jobs.ts';
   import { may } from '$lib/record/may.ts';
@@ -57,15 +64,15 @@
     register,
     row,
     decl,
-    trigger = false,
+    line = false,
     onhanded,
   }: {
     open?: boolean | undefined;
     register: string;
     row: Entry;
     decl: RegisterDecl;
-    /** Draw the "Hand to" button and the holder's line, as the row page's head does. */
-    trigger?: boolean | undefined;
+    /** Draw the holder's line alone, in the row page's sentence, and no sheet. */
+    line?: boolean | undefined;
     /** The row as the hand, or its put back, left it, so the caller draws what the record now holds. */
     onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
@@ -87,6 +94,11 @@
   let asking = false;
   /* THE KIND "START ONE NOW" WOULD START, read as the sheet opens; `null` draws no press. */
   let startKind = $state.raw<JobKind | null>(null);
+  /* WHERE IT MAY START ONE, and where he picked: a machine and a profile by name, `''` for any runner and its own. */
+  let startPlaces = $state.raw<StartPlace[]>([]);
+  let startMachine = $state('');
+  let startSeat = $state('');
+  const startSeats = $derived([...new Set(startPlaces.filter((p) => startMachine === '' || p.machine === startMachine).flatMap((p) => p.seats))]);
   /* WHAT HE TYPED FOR THE AGENT, kept until the sheet hands the row. */
   let note = $state('');
 
@@ -95,9 +107,12 @@
     asking = true;
     offered = null;
     startKind = null;
-    const [holders, kind] = await Promise.all([readHolders(apiBase(), hand, me, shell.names ?? {}, peopleList), hand.agent ? startFor(apiBase(), Date.now()) : Promise.resolve(null)]);
+    startPlaces = [];
+    const [holders, start] = await Promise.all([readHolders(apiBase(), hand, me, shell.names ?? {}, peopleList), hand.agent ? startWith(apiBase(), Date.now()) : Promise.resolve(null)]);
     offered = holders;
-    startKind = kind;
+    startKind = start?.kind ?? null;
+    startPlaces = start?.places ?? [];
+    if (!startPlaces.some((p) => p.machine === startMachine)) startMachine = '';
     asking = false;
   }
 
@@ -113,7 +128,7 @@
   let writer: RowWriter | undefined;
   /* ONE WRITE PER PRESS: a double press on a slow line hands the row once. */
   let writing = $state(false);
-  /* THE LAST HAND THIS TAB MADE, which the head's Put back undoes for as long as the row is the one it wrote. */
+  /* THE LAST HAND THIS TAB MADE, which the toast's Put back undoes. */
   let last = $state<{ before: Entry; patch: Fields; after: Entry } | null>(null);
 
   async function give(holder: Holder, start = false) {
@@ -149,7 +164,9 @@
     }
     const kind = startKind;
     if (!start || kind === null) return;
-    const started = await startNow(apiBase(), kind, told.id, register, row.seq);
+    const seat = startSeats.includes(startSeat) ? startSeat : '';
+    const place = { ...(startMachine ? { machine: startMachine } : {}), ...(seat ? { seat } : {}) };
+    const started = await startNow(apiBase(), kind, told.id, register, row.seq, undefined, place);
     if (started === null) toasts.push(copy.handStartFailed, { intent: 'warn' });
     else {
       toasts.push(copy.handStarted(holder.name));
@@ -187,25 +204,16 @@
     run = await readRunFor(apiBase(), register, row.seq);
   }
   $effect(() => {
-    if (trigger && agentHolds !== null) void readRun();
+    if (line && agentHolds !== null) void readRun();
   });
 </script>
 
-{#if allowed}
-  {#if trigger}
-    {#if agentHolds !== null}
-      {#if run}
-        <Button weight="quiet" href="/jobs/{run.id}">{copy.handRunning(agentHolds)}</Button>
-      {:else}
-        <span class="hand-waiting">{copy.handWaiting(agentHolds)}</span>
-      {/if}
-    {/if}
-    {#if last && last.after.version === row.version}
-      <Button weight="quiet" disabled={writing} onclick={() => void putBack()}>{copy.handPutBack}</Button>
-    {/if}
-    <Button weight="quiet" onclick={() => (open = true)}>{copy.handTo}</Button>
+{#if allowed && line}
+  {#if agentHolds !== null}
+    <!-- A SENTENCE OF THE HEAD'S, SO IT ENDS AS ONE. -->
+    {#if run}<span class="hand-line"><a class="hand-run" href={at(`/jobs/${run.id}`)}>{copy.handRunning(agentHolds)}</a>.</span>{:else}<span class="hand-line">{copy.handWaiting(agentHolds)}.</span>{/if}
   {/if}
-
+{:else if allowed}
   <Sheet bind:open title={copy.handSheetTitle(String(row.fields[decl.title] ?? ''))}>
     {#if offered === null}
       <Waiting rows={3} />
@@ -247,6 +255,28 @@
                 <Button weight="quiet" disabled={writing} onclick={() => void give(h, true)}>{copy.handStartNow}</Button>
               {/if}
             </li>
+            {#if startKind !== null && startsOnARunner(h) && (startPlaces.length > 1 || startSeats.length > 0)}
+              <li class="hand-start-at">
+                {#if startPlaces.length > 1}
+                  <label class="hand-start-pick">
+                    <span class="hand-start-key">{copy.handStartOn}</span>
+                    <select bind:value={startMachine}>
+                      <option value="">{copy.handStartAnyMachine}</option>
+                      {#each startPlaces as p (p.machine)}<option value={p.machine}>{p.machine}</option>{/each}
+                    </select>
+                  </label>
+                {/if}
+                {#if startSeats.length > 0}
+                  <label class="hand-start-pick">
+                    <span class="hand-start-key">{copy.handStartAs}</span>
+                    <select bind:value={startSeat}>
+                      <option value="">{copy.handStartOwnProfile}</option>
+                      {#each startSeats as s (s)}<option value={s}>{s}</option>{/each}
+                    </select>
+                  </label>
+                {/if}
+              </li>
+            {/if}
           {/each}
         </ul>
       {/if}
@@ -255,11 +285,23 @@
 {/if}
 
 <style>
-  .hand-waiting {
-    display: inline-flex;
-    align-items: center;
+  /* IN THE SENTENCE'S OWN WORDS, a quieter ink; the run's link says it goes somewhere when it is pointed at. */
+  .hand-line {
     color: var(--ink-2);
-    font-size: var(--fs-body);
+  }
+
+  .hand-run {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hand-run:hover {
+      color: var(--red);
+      text-decoration-color: currentColor;
+    }
   }
 
   .hand-note {
@@ -339,6 +381,22 @@
   }
 
   /* THE NOTE: a label at meta size over a two-line field. */
+  /* WHERE "START ONE NOW" STARTS: a line of its own under the agent, the platform's own selects, at the meta size. */
+  .hand-start-at {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-2) var(--sp-2);
+    font-size: var(--fs-meta);
+  }
+  .hand-start-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+  .hand-start-key {
+    color: var(--ink-2);
+  }
   .hand-with {
     display: grid;
     gap: var(--sp-1);

@@ -1,15 +1,15 @@
 <!--
   Below 900px the rail becomes a tab bar. Not a shrunken desktop (2.A.23).
 
-  FIVE PLACES, AS ON 19 OCTOBER (his call 2, 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
+  FIVE PLACES, AS ON 19 OCTOBER (chosen 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
   five the top bar draws, with the rail's glyphs and words: a place whose glyph or word differs between two shapes is a
   place learnt twice. NO MORE TAB. Work lives in Projects and on Today, and Work, People, Settings and the rest are
   under the face at the top of each screen (`PageHead.svelte`), which opens the More sheet. Search is the 44px button
   beside that face, never a tab.
 
-  FLAT, AND DOCKED TO THE BOTTOM EDGE (DIRECTION §39), on the nav's own surface with one hairline over it, as the top bar
-  is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on is ink, glyph and word;
-  the rest are the quiet ink. The only red is the count of what waits on you, the one `Count`, cut out of its glyph.
+  FLAT, AND DOCKED TO THE BOTTOM EDGE, on the nav's own surface with one hairline over it, as the top bar
+  is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on wears its glyph in an
+  ink block, the Bento boards' current tab, over its word in ink; the rest are the quiet ink. The only red is the count of what waits on you, the one `Count`, cut out of its glyph.
 
   IT HOLDS STILL WHILE A PAGE CHANGES (motion F3): named `tabbar` for the view transition, which `app.css` does not
   animate, so the page's two pictures pass under it and its labels never blink.
@@ -99,7 +99,7 @@
     transition: color var(--d-state) var(--ease-out);
   }
 
-  /* HERE IS INK, glyph and word, and the weight a step up: no fill, no pill, no accent. */
+  /* HERE IS INK, the word a step up and the glyph in an ink block, 44 by 28, in the tile's colour. */
   .tab[aria-current='page'] {
     color: var(--ink);
     font-weight: var(--fw-semi);
@@ -108,6 +108,16 @@
   .badge-slot {
     position: relative;
     display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 28px;
+    border-radius: var(--r-ctl);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .tab[aria-current='page'] .badge-slot {
+    background: var(--ink);
+    color: var(--tile);
   }
 
   /* FIVE TABS ON A 320px PHONE ARE 64px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
@@ -122,7 +132,7 @@
   .badge {
     position: absolute;
     inset-block-start: calc(-1 * var(--sp-1));
-    inset-inline-start: 14px;
+    inset-inline-start: 24px;
     display: flex;
   }
 

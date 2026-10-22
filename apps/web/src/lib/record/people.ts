@@ -6,7 +6,7 @@
  * parts of that key name its fields (`packages/kernel/src/roles.ts`): `org` the organisation a person is with, `in_touch`
  * the last day they were heard from, `met` the dated lines saying where, `keys` and `handles` what they are known by,
  * `self` the person whose record it is. A list that says `org:` is the organisations. Any record that declares them
- * gets what follows, whoever it belongs to (DIRECTION §27), and a list that declares neither draws as it always did.
+ * gets what follows, whoever it belongs to, and a list that declares neither draws as it always did.
  *
  * TWO SCREENS READ IT. The list groups its people by organisation, the group placed where its most recent person is and
  * folded below them, so twenty-four colleagues of one company read as one line and not as twenty-four; a row's page
@@ -298,7 +298,7 @@ export type Seen = { where: string; kind: 'commit' | 'mail' | 'other'; times: nu
    holds a digit and a letter both, so a word spelt in a to f ("defaced") and a plain number ("Invoice 20261001") stay. */
 const IDS = [/\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/giu, /\b[0-9A-HJKMNP-TV-Z]{26}\b/gu, /\b[a-z][a-z0-9_]*#\d+\b/giu];
 
-/* AN ADDRESS IS NOT A WORD EITHER (DIRECTION §37: names, never addresses): a mail address, bare, in angle brackets or
+/* AN ADDRESS IS NOT A WORD EITHER (names, never addresses): a mail address, bare, in angle brackets or
    behind `mailto:`, is taken out of a bank text's or an import's line as surely as out of a mail's subject. */
 const ADDRESS = /(?:mailto:)?<?[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+>?/giu;
 

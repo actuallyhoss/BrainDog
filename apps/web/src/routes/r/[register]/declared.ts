@@ -1,9 +1,9 @@
 /**
  * A LIST AS A PAGE THE RECORD COMPOSES (PGS-A23), and which of the two a visit draws.
  *
- * THE SCREEN AS IT WAS STAYS WHERE IT IS UNTIL HIS YES on the list board. Until then the composed page is reached by its
- * address and by nothing else: `/r/<list>?declared`. One key, beside whatever else the address holds, so a row open in
- * the panel (`?row=7`) is the same row on either side and a link to one is a link to that one.
+ * THE SCREEN AS IT WAS STAYS WHERE IT IS UNTIL THE LIST BOARD IS SIGNED OFF. Until then the composed page is reached
+ * by its address and by nothing else: `/r/<list>?declared`. One key, beside whatever else the address holds, so a row
+ * open in the panel (`?row=7`) is the same row on either side and a link to one is a link to that one.
  *
  * WHAT IS DRAWN IS THE KERNEL'S, NOT THIS SCREEN'S: `listPage` composes the body from the list's own declaration, the
  * same for every list of every record, and the record draws it (`DeclaredList.svelte`). Nothing here knows a list.
@@ -52,7 +52,7 @@ export function classicHref(url: URL): string {
   return keyed(url, false);
 }
 
-/** The same address on the composed page. Not linked from the screen as it was: until his yes it is typed. */
+/** The same address on the composed page. Not linked from the screen as it was: until it is signed off it is typed. */
 export function declaredHref(url: URL): string {
   return keyed(url, true);
 }

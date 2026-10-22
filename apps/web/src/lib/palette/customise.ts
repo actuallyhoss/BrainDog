@@ -1,5 +1,5 @@
 /**
- * CHANGING THE APP FROM THE PALETTE, IN WORDS (DIRECTION §35: customisable on all aspects, from the app, without code).
+ * CHANGING THE APP FROM THE PALETTE, IN WORDS (customisable on all aspects, from the app, without code).
  *
  * "Dark mode", "compact", "open on Money", "hide Inbox", "rename Money to Cash", "customise this page", "quiet hours":
  * each is a sentence somebody types at the one surface every screen has, and each used to mean a trip to a Settings

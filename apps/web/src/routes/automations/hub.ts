@@ -75,7 +75,7 @@ export const hubWords = {
   tabs: 'Kinds of thing that run by themselves',
   tab: { automations: 'Automations', scheduled: 'Scheduled', scripts: 'Scripts', doors: 'Doors', runs: 'Runs' } as Record<Tab, string>,
   /* THE KIND A RUN BELONGS TO, said after its name on the Runs tab, where the three are mixed. */
-  kind: { automation: 'Automation', scheduled: 'Scheduled action', script: 'Script' } as Record<RunKind, string>,
+  kind: { automation: 'Automation', scheduled: 'Scheduled action', script: 'Script', agent: 'Agent run', job: 'Job' } as Record<RunKind, string>,
   newAction: 'New scheduled action',
   newScript: 'New script',
   /* AN EMPTY TAB SAYS WHAT THE THING IS AND WHAT TO ASK AN AGENT, as the automations list always has.
@@ -184,7 +184,7 @@ const CHANNEL_ICONS: Record<Channel, IconName> = { pull: 'download', call: 'glob
 export const channelIcon = (channel: Channel): IconName => CHANNEL_ICONS[channel] ?? 'clock';
 
 /** A run's well on the Runs tab, by the kind of thing that ran. */
-const KIND_ICONS: Record<RunKind, IconName> = { automation: 'refresh', scheduled: 'clock', script: 'code' };
+const KIND_ICONS: Record<RunKind, IconName> = { automation: 'refresh', scheduled: 'clock', script: 'code', agent: 'session', job: 'play' };
 
 export const kindIcon = (kind: RunKind): IconName => KIND_ICONS[kind];
 
@@ -626,7 +626,7 @@ export type HubRow = {
   lastAt?: string | null | undefined;
 };
 
-export type RunKind = 'automation' | 'scheduled' | 'script';
+export type RunKind = 'automation' | 'scheduled' | 'script' | 'agent' | 'job';
 
 /** One run on the Runs tab: whose it was, when, the sentence it ended with, and where its owner's screen is. */
 export type RunLine = {
@@ -641,6 +641,10 @@ export type RunLine = {
   path: string | null;
   /** A line standing for a count the record keeps without its runs, so it is one line for many runs. */
   counted?: boolean;
+  /** An agent run's handle (`S42`) when it changed things Undo can put back, which the Agents page draws Undo for. */
+  run?: string;
+  /** An agent run's agent as the record names it (`claude`), so the line wears that agent's mark. */
+  agent?: string;
 };
 
 const BAD = new Set(['failed', 'refused']);

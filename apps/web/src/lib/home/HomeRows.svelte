@@ -1,5 +1,5 @@
 <!--
-  Today's two lists of things that fall due, in one shape (`home-rows.ts`, DIRECTION §39).
+  Today's two lists of things that fall due, in one shape (`home-rows.ts`).
 
   LATE: a line a thing, tasks and money alike. A red dot (a task only due today wears the quiet grey, since it is not
   late yet), its name as the door to its page, how late it is in the quiet ink, and its amount at the right edge in

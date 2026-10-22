@@ -42,11 +42,11 @@ test('WHO IS WORKING SAYS THE AGENT BY NAME, WITH ITS RUN FOR THE FACE, never th
 });
 
 test('WHAT IT RUNS ON IS SAID IN WORDS: a handle is spaced and capitalised, a name a person wrote is kept', () => {
-  assert.equal(thingName('sketchpad-metrics'), 'Sketchpad metrics');
+  assert.equal(thingName('pinwheel-metrics'), 'Pinwheel metrics');
   assert.equal(thingName('google_sa_roomy'), 'Google sa roomy');
   assert.equal(thingName('Fenwick deploy key'), 'Fenwick deploy key');
   assert.equal(thingName('supabase SUPABASE_ACCESS_TOKEN'), 'supabase SUPABASE_ACCESS_TOKEN');
-  assert.deepEqual(rowsOf('runs-on', [{ block: 'runs-on', rows: [{ key: '9', cells: ['sketchpad-metrics'] }] }]).map((r) => r.title), ['Sketchpad metrics']);
+  assert.deepEqual(rowsOf('runs-on', [{ block: 'runs-on', rows: [{ key: '9', cells: ['pinwheel-metrics'] }] }]).map((r) => r.title), ['Pinwheel metrics']);
 });
 
 test('MONEY DRAWS ONLY WHAT IS MORE THAN NOTHING, IN ONE CURRENCY, AS A SHARE OF THE LARGEST', () => {

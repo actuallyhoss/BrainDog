@@ -258,7 +258,7 @@ const NOT_FIELDS = new Set(['at', 'patch', 'version', 'register']);
 
 /**
  * THE ROWS A PROPOSAL WOULD CREATE (`added`), each field it would hold as a line with no before, in the order its list
- * declares them. "Add Send Jennifer the refund email to Tasks?" showed Accept and Decline over nothing: a create was
+ * declares them. "Add Send Wren the refund email to Tasks?" showed Accept and Decline over nothing: a create was
  * left to the ticks (`picked.ts`), which draw only a proposal of two or more. A field with nothing in it, or a retired
  * one, is not drawn, the title is the row's heading, and a ref is said by the row's name (`show`).
  */

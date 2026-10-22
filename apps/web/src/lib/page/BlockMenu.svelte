@@ -10,7 +10,7 @@
   columns of the rest are the record's, read once a pointer or the keyboard comes near (`ahead`) and shared by every
   block's menu on the page until a press changes it.
 
-  ON A POINTER THE MARK WAITS for the tile's hover or focus, as the source link does (DIRECTION §35), so a page at rest
+  ON A POINTER THE MARK WAITS for the tile's hover or focus, as the source link does, so a page at rest
   shows none. ON TOUCH IT IS ALWAYS THERE, the last thing in the head, 44 square.
 -->
 <script module lang="ts">

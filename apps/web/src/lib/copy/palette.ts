@@ -131,7 +131,7 @@ export const palette = {
   searchOpenQuestion: 'Open question',
 
   /**
-   * CHANGING THE APP IN WORDS (`palette/customise.ts`, DIRECTION §35). A row is drawn only when the query names it, so
+   * CHANGING THE APP IN WORDS (`palette/customise.ts`). A row is drawn only when the query names it, so
    * every title is the words somebody types, and every line under it says where the change lands. Each names the
    * person's own page by the name their nav shows.
    */

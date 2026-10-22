@@ -15,7 +15,7 @@ const proposal = (over: Record<string, unknown> = {}) => ({
   name: 'Keys',
   count: 52,
   line: '52 keys look like they belong to a project.',
-  rows: [{ title: 'Bake deploy token', project: 'Crumb.gg', reasons: ['Opened only by runs in Crumb.gg'] }],
+  rows: [{ title: 'Oxbow deploy token', project: 'Oxbow.gg', reasons: ['Opened only by runs in Oxbow.gg'] }],
   truncated: false,
   ...over,
 });
@@ -45,7 +45,7 @@ test('52 keys: the record is asked about the keys list, and the line and the but
   const found = await readScopeNote(call);
   assert.deepEqual(calls, [{ name: 'scopeProposals', args: { register: KEYS_LIST } }]);
   assert.equal(found?.count, 52);
-  assert.equal(found?.rows[0]?.project, 'Crumb.gg');
+  assert.equal(found?.rows[0]?.project, 'Oxbow.gg');
   assert.deepEqual(noteOf(found), { line: '52 keys look like they belong to a project.', button: 'Review the move' });
 });
 

@@ -1,7 +1,7 @@
 <!--
   How the list is drawn, from 640px up: the table, the board or the cards, and first, on a list of people that says who
-  is with which organisation, those people in groups. ONE SEGMENTED CONTROL at the end of the list's toolbar
-  (DIRECTION 39): one rectangle in the field's fill, and the chosen view the tile's colour on it, which slides to the
+  is with which organisation, those people in groups. ONE SEGMENTED CONTROL at the end of the list's toolbar:
+  one rectangle in the field's fill, and the chosen view the tile's colour on it, which slides to the
   view chosen next (`Segmented.svelte`, `controls.css`).
 
   THE CHOICE IS THE ADDRESS'S (`?view=`), written by the page's `setView`, so a link to a board opens on the board and

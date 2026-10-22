@@ -1,5 +1,5 @@
 <!--
-  One control, three weights, and every one of them a rectangle (DIRECTION §39, the UI pass of 20 October 2.A.1).
+  One control, three weights, and every one of them a rectangle (the UI pass of 20 October 2.A.1).
 
   PRIMARY is the red fill with white words, one per screen: `--red-fill` at rest, `--red-fill-hover` under the pointer,
   `--red-fill-press` while it is held, and `--on-red` (white) on all three, in light and in dark. QUIET, the default, is
@@ -127,7 +127,7 @@
     padding-inline-end: var(--sp-2);
   }
 
-  /* THE CAP SHOWS ON HOVER OR FOCUS ONLY (DIRECTION 35): a key hint is for the person reaching for it, not chrome at rest. */
+  /* THE CAP SHOWS ON HOVER OR FOCUS ONLY: a key hint is for the person reaching for it, not chrome at rest. */
   .btn:not(:hover, :focus-visible) > .btn-kbd {
     display: none;
   }

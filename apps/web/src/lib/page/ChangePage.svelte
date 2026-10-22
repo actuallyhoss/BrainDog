@@ -2,14 +2,14 @@
   The page menu in a declared page's head: one "⋯" beside Share, holding "Change this page", Pin this or Unpin, "How
   this is built" and Edit layout.
 
-  PIN THIS KEEPS THE PAGE AS IT IS DRAWN (DIRECTION §38: a composition is a proposal the person can pin, change or undo,
+  PIN THIS KEEPS THE PAGE AS IT IS DRAWN (a composition is a proposal the person can pin, change or undo,
   and his pins always win): every block in its place, as the person's own look (`look.ts`), so the engine stops
   arranging it. Unpin lets the engine arrange it again. Either says what it did with an Undo. Under them, in a quiet
   line, how the page came to look as it does: "Slash arranged · Mara kept", or that it is pinned. Only the owner pins,
   as only the owner sets a declaration.
 
   ONE MENU AT EVERY WIDTH. The head drew four controls side by side from 900px up (How this is built, Share, Change this
-  page, Edit layout), which is chrome a reader meets on every page and uses on few (DIRECTION §35: fewer things on
+  page, Edit layout), which is chrome a reader meets on every page and uses on few (fewer things on
   screen). Share stays out in the row, because it is the one a reader reaches for; the rest are one press away here.
   Edit layout is offered from 900px only, since authoring is a desktop surface (13 §10); a phone still changes a page
   by describing it, and still reads how it is built.
@@ -34,7 +34,6 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { apiBase } from '$lib/at.ts';
   import type { LiveLook } from '$lib/record/page-live.ts';
-  import AskPage from './AskPage.svelte';
   import { describeAsked, opensDescribe, withoutDescribe } from './change-open.ts';
   import {
     bodyOf,
@@ -270,7 +269,7 @@
   <Sheet bind:open title={words.change}>
     <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's. -->
     {#key slug}
-      <AskPage page={slug} {model} onsource={toSource} onkept={reread} />
+      {#await import('./AskPage.svelte') then { default: AskPage }}<AskPage page={slug} {model} onsource={toSource} onkept={reread} />{/await}
     {/key}
   </Sheet>
 {/if}

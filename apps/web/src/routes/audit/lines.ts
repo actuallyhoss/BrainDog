@@ -8,8 +8,8 @@
  *
  * EVERY COUNT IS OF WHAT WAS READ. `readLog` answers the newest page of the log (`LOG_PAGE`) and the screen asks for
  * older pages on demand; there is no read of a time range yet. So a window this file counts over (the last 24 hours,
- * the last 7 days) is only whole when the read reaches back past its start, and the page says so when it does not
- * (`reaches`, `historyWords.stripRead`). Nothing here fills a gap with a guess.
+ * the last 7 days) is only whole when the read reaches back past its start (`reaches`). Nothing here fills a gap with a
+ * guess.
  *
  * THE READER'S CLOCK. The bands, the times on the rows, the lanes and the heat grid are all on the reader's own wall
  * clock, the way the charts' axes are (`lib/viz/swimlanes.ts`), so "09:39" on a row and "09:00" on the axis above it
@@ -22,7 +22,7 @@
  */
 
 import { sessionDeclaration } from '@braindog/kernel';
-import { readable } from 'braindog-render';
+import { datesIn, readable } from 'braindog-render';
 import { useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
@@ -80,7 +80,6 @@ export const historyWords = {
   heatSubject: 'Changes by hour over the last 7 days',
   quietWeek: 'Nothing changed in the last 7 days.',
   evenWeek: 'Changes are spread evenly across the day.',
-  stripRead: (n: number): string => `Counted over the ${count(n)} newest entries read so far`,
   /* THE SWITCH THAT SHOWS THE RECORD'S OWN BOOKKEEPING beside the changes, and the line saying what it is hiding. */
   everything: 'Everything',
   hidden: (n: number): string =>
@@ -119,7 +118,7 @@ const STAMP_SAID = /^(?:last seen|seen) (?:set to |from |cleared$)/u;
  * when a tool was last seen. Measured on the owner's record: 154 of the newest 200 lines were the sweep alone, so the
  * changes an agent made were buried under the record noting that its runs had stopped.
  *
- * GENERIC, as every rule here is (DIRECTION §27): the runs are the kernel's own list on every record, and a stamp is
+ * GENERIC, as every rule here is: the runs are the kernel's own list on every record, and a stamp is
  * told by its field, which the line carries (`field`), or by the words `noteOf` says it in where it does not.
  *
  * A STAMP IS A RUN'S, as the record's own rule has it (`bookkeeping` in the kernel): a person who fills "Last seen" on
@@ -402,6 +401,46 @@ export function thingOf(target: string, title: string | null, nameOf: (list: str
     return { text: usecase ? copy.feedUseCase(useCaseName(usecase)) : copy.feedPack(moduleOf(pack)?.name ?? humanize(pack)), href: null, list: null };
   }
   return said === null ? null : { text: said, href: null, list: null };
+}
+
+/* ── a line as a sentence ──────────────────────────────────────────────── */
+
+/**
+ * A TITLE THAT OPENS ON WHAT WAS DONE ("Filed 2 payments under Software", "Handled the backup"): a word in capitals and
+ * then lower case ending in -ed, or one of the short past forms that do not. Put after the line's own verb it read
+ * "Closed Filed 2 payments", two verbs and no sentence.
+ */
+const DONE = /^(?:\p{Lu}\p{Ll}+ed|Paid|Sent|Made|Set|Put|Kept|Left|Got|Took|Ran|Found|Wrote|Read|Built|Held|Brought|Bought|Sold|Told)\b/u;
+
+/** The parts a line of Activity is drawn in, so it reads as one sentence. */
+export type LineSaid = {
+  /** The verb before what the line names, or `null` where the name already says what was done. */
+  verb: string | null;
+  /** Whether what it names is a question or a sentence somebody wrote, drawn in quotation marks after the verb. */
+  quoted: boolean;
+  /** The verb said after who did it, in lower case, where the title had no room for it: "A rule · closed". */
+  done: string | null;
+  /** The note, without the name the line already says, and with every stored day said as a person says it. */
+  note: string;
+};
+
+/**
+ * ONE LINE AS A SENTENCE: "Asked “Does Portage keep sending…?”", "Closed “Filed 2 payments…”" said as "Filed 2
+ * payments…" with "closed" beside who did it, and a note that does not start by saying the title again ("Noted
+ * Newsletter sending · Newsletter sending · renews 2026-09-10" is "Noted Newsletter sending · renews 10 Sep").
+ *
+ * `governed` is a line about a question or a decision, whose name is somebody's own words and so is quoted.
+ */
+export function lineSaid(word: string, thing: string | null, note: string, governed: boolean, now: number = Date.now()): LineSaid {
+  const name = thing?.trim() ?? '';
+  let rest = note.trim();
+  if (name !== '') {
+    if (rest === name) rest = '';
+    else if (rest.startsWith(`${name} · `)) rest = rest.slice(name.length + 3).trim();
+  }
+  rest = datesIn(rest, now);
+  if (name !== '' && DONE.test(name)) return { verb: null, quoted: false, done: word.toLowerCase(), note: rest };
+  return { verb: word, quoted: governed && name !== '', done: null, note: rest };
 }
 
 /* ── who suggested and who settled ─────────────────────────────────────── */

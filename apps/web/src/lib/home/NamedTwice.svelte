@@ -1,9 +1,9 @@
 <!--
-  May be one, as one tile at the end of the board (DIRECTION §39): two of his things the record may hold twice, by
+  May be one, as one tile at the end of the board: two of his things the record may hold twice, by
   name, with the record's own reason under them, at most three and a count of the rest.
 
   A DOUBTFUL PAIR WAS NEVER SEEN. The record could find two organisations or two projects with one name, and no screen
-  said so. Here it does, and a doubtful merge goes to Decide as one question (D38.56).
+  said so. Here it does, and a doubtful merge goes to Decide as one question.
 
   AN OFFER AND NEVER A FOLD. "Ask me in Needs you" only files the question; his yes there folds the pair, with one Undo.
   After the press the line reads "In Needs you", a link to that question. A press the record refuses says the record's

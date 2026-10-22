@@ -19,8 +19,9 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
-import { KPIS_KIND, MISSING, UNNAMED, integer, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import type { Bars, FxRead, MeasureSeries, Part, QueueQuestion, TargetIn } from '@braindog/kernel';
+import { COSTS, isBucket, isQuiet } from '@braindog/kernel/constants';
+import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { stopped } from '../shell/headline.ts';
@@ -297,6 +298,8 @@ type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown
 
 /** A block the page draws: the app's `BlockResult`, with what only a live answer carries. */
 export type LiveBlock = BlockResult & {
+  /** A queue of questions narrowed to the page's own by its `where`, which the clause itself never reaches the page as. */
+  narrowed?: true;
   /** The block's `{{path}}` values as the record answered them. */
   values?: Record<string, unknown>;
   /** An `actions` block's rows, in the shape "Runs on" reads. */
@@ -1214,8 +1217,7 @@ function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown;
     const at = days.get(key);
     if (typeof at !== 'number' || !Number.isFinite(at)) return '';
     const iso = new Date(at * 86_400_000).toISOString().slice(0, 10);
-    const year = new Date(now).getUTCFullYear();
-    const on = fmtDay(iso).replace(new RegExp(` ${year}$`, 'u'), '');
+    const on = dateSaid(iso, now);
     const l = left.get(key);
     const a = after.get(key);
     const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
@@ -1296,7 +1298,7 @@ function runFacesOf(
 
 /** A step's mark and a sign's state as a person says them: the kernel hands the machine's word. */
 const MARK_WORDS: Readonly<Record<string, string>> = { next: 'Next', earlier: 'Left earlier' };
-const SIGN_WORDS: Readonly<Record<string, string>> = { red: 'Needs a look', green: 'Alive', none: 'Not read yet' };
+const SIGN_WORDS: Readonly<Record<string, string>> = { red: 'Needs a look', green: 'All good', none: 'Not checked yet' };
 
 /** The cell for `field` said through `words` where the row holds one of its keys, else as `toRows` said it. */
 function wordsFor(columns: readonly { field: string }[], cells: (string | null)[], fields: Readonly<Record<string, unknown>>, field: string, words: Readonly<Record<string, string>>): (string | null)[] {
@@ -1421,6 +1423,9 @@ export function blockOf(
     ...(Array.isArray(changed) ? { changes: changed } : {}),
     kind,
     ...(source === undefined ? {} : { source }),
+    /* A QUEUE OF QUESTIONS NARROWED TO THE PAGE'S OWN (`where`), said as a mark and never the clause: a page that says
+       which questions are its own borrows no other into its suggestion slot (`PageBody.svelte`). */
+    ...(kind === 'queue' && _where !== undefined ? { narrowed: true } : {}),
     ...(span === undefined ? {} : { span }),
     ...(limit === undefined ? {} : { limit }),
     ...(tone === undefined ? {} : { tone }),
@@ -1430,7 +1435,9 @@ export function blockOf(
     ...(heading === undefined ? {} : { heading }),
     ...(where === undefined ? {} : { where }),
     ...(empty === undefined ? {} : { empty }),
-    ...(body === undefined ? {} : { body }),
+    /* A DAY THE RECORD WROTE INTO A NOTE IS SAID AS A PERSON SAYS IT (`datesIn`): a person's Seen in read
+       "2026-08-28 · mail from halden.example". Never in a document, whose words are the person's own. */
+    ...(body === undefined ? {} : { body: kind === 'note' && rest.document !== true && typeof body === 'string' ? datesIn(body, now) : body }),
     ...(target === undefined ? {} : { target }),
     ...(authored === undefined ? {} : { authored }),
     ...(cells === undefined ? {} : { cells }),
@@ -1587,8 +1594,8 @@ export function blockOf(
         row.cells[i] = scopes?.[n] ?? EVERYWHERE;
       });
     });
-    /* NAMES, NEVER HANDLES, AND NO WIRE (the audit of 20 October, his Sketchpad): a key or a tool filed as
-       `sketchpad-metrics` is said "Sketchpad metrics" (`thingName`, as the project's shape says it), and how a tool is
+    /* NAMES, NEVER HANDLES, AND NO WIRE (the audit of 20 October, on a project page): a key or a tool filed as
+       `pinwheel-metrics` is said "Pinwheel metrics" (`thingName`, as the project's shape says it), and how a tool is
        reached, `stdio` or `http`, is how an agent's machine talks to it and nothing a person acts on, so that line is
        left out and the card draws its other facts. */
     (b.columns ?? []).forEach((c, i) => {
@@ -1682,7 +1689,7 @@ export function blockOf(
       const late = due !== null && due < today;
       const cells = (b.columns ?? []).map((c) => {
         const v = r.fields[c.field];
-        if (c.field === 'day') return late ? lateSaid(due, today) : typeof v === 'string' ? fmtDay(v) : null;
+        if (c.field === 'day') return late ? lateSaid(due, today) : typeof v === 'string' ? dateSaid(v, now) : null;
         if (c.field === 'amount') {
           if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string') return null;
           const said = money(v.amount, v.currency);
@@ -2407,11 +2414,13 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const got = await actionsOf(io ?? ((url, init) => fetch(url, init)), base).actions();
         held = got.ok && Array.isArray(got.value) ? got.value : null;
       }
+      /* A PAGE ABOUT A ROW NAMED AS A SLUG IS TITLED IN WORDS (`slugWords`): a skill's page read "review-pr". */
+      const titled = param && typeof page.title === 'string' ? { ...page, title: slugWords(page.title) } : page;
       return {
         from: 'live',
         now,
         page: {
-          page: identity ? { ...page, identity } : page,
+          page: identity ? { ...titled, identity } : titled,
           blocks: footed(blocks, drawn, now, held),
         },
       };

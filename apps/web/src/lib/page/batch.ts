@@ -12,7 +12,7 @@
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { isArranging } from '../../routes/decide/[id]/arranged.ts';
+import { isArranging } from '../../routes/decide/[id]/arranging.ts';
 
 type Asked = Pick<QueueQuestion, 'id' | 'kind' | 'options'> & { body_kind?: string | undefined };
 

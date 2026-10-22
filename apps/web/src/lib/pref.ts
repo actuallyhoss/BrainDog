@@ -70,7 +70,7 @@ export type Pref = {
    * WHERE THE NAVIGATION LIVES: the rail, a top bar, or nothing but a button.
    *
    * `undefined` IS THE RAIL, the floating glass card, which `19 §3` makes the default in bold and
-   * DIRECTION 37 made the default again after a spell of the top bar leading (§35). The three
+   * which was made the default again after a spell of the top bar leading. The three
    * shapes are that section's own table: the rail, sectioned and arrangeable; a top bar, one
    * horizontal strip of spine then declared entries, overflowing into More and SAYING HOW MANY it
    * has put there; and the menu, no persistent nav at all, one button opening the whole sectioned
