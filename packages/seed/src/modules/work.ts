@@ -802,26 +802,26 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * figure that counts exactly its own tasks (Late, Today and This week over the `-yours` figures), so it is never hidden
    * while it holds one and never drawn empty.
    *
-   * CALMER, SINCE work 1.11.0 (DIRECTION §35): the line, the capture line and the five bands of what is still to do,
+   * CALMER, SINCE work 1.11.0: the line, the capture line and the five bands of what is still to do,
    * then two folds, Not this week and Done lately. Open is said once, in the line, so the figures tile went; how fast work
    * moves is a line over eight weeks under Done lately. A strip of projects narrows every band (`filters:`).
    *
    * EVEN ROWS, SINCE work 1.12.0 (the visual review of October 2nd): Today the whole width, then Late and This week side
    * by side, half each, and Done lately wears a glyph a folded heading draws.
    *
-   * ONE SENTENCE FOR AN EMPTY LIST, SINCE work 1.14.0 (DIRECTION §37): with nothing open the page is its line and the
+   * ONE SENTENCE FOR AN EMPTY LIST, SINCE work 1.14.0: with nothing open the page is its line and the
    * capture line, and only a line says what is empty. Every band said it in its own words ("Nothing due today.",
    * "Nothing waits on you."), so a record whose list held nothing, or whose project strip narrowed a band to nothing,
    * read eight tiles of white saying so. A band with nothing in it is not drawn now, under its figure or under the strip.
    *
-   * NO HALF-EMPTY TILES, SINCE work 1.15.0 (DIRECTION §39, the design review's fix 8). A row of tiles stretches to its
+   * NO HALF-EMPTY TILES, SINCE work 1.15.0 (the design review's fix 8). A row of tiles stretches to its
    * tallest, so Late beside This week was a tile 220px tall holding one line. Late is a strip the whole width, and
    * This week, With an agent and Waiting on you share the row under it, a third each; Today is the top of This week,
    * which is ordered by the day first. Over them, a strip of figures: what is open, what falls due this week, and what
    * was finished, with its last seven days. The line says counts, "1 late, 3 waiting on you", where it named a task
    * and read like one.
    *
-   * THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0 (DIRECTION §39, the second design review's fix 3), as
+   * THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0 (the second design review's fix 3), as
    * Today's is: it is declared alone and first, straight after the page's sentence, which is what a host reads to hold
    * it beside the page's name, where it spent a whole tile on one field. And every band says its own width: Late, the
    * figures and the folds write `span: 12`, a width of their own that a host does not halve beside a neighbour, so Late

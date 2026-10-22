@@ -4,8 +4,8 @@
  * `{{bad:...}}` is the one inline form that draws red, and the renderer draws it as `<span class="bad">`. The skin
  * owns how that reads, and three things hold it:
  *
- * IT IS THE DEEPER RED, BY ITS TOKEN. Late and needs-you are `--red`, a step deeper than the working accent
- * (DIRECTION §42), and `--red` is that red solved for words. The phrase is words, so it reads one of the two
+ * IT IS THE DEEPER RED, BY ITS TOKEN. Late and needs-you are `--red`, a step deeper than the working accent,
+ * and `--red` is that red solved for words. The phrase is words, so it reads one of the two
  * and never `--red-fill`, which says "chosen" and "go".
  *
  * NO COLOUR IS SPELLED OUT. A hex, an `rgb()` or a colour word here is a red no palette can move.

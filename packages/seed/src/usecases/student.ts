@@ -19,7 +19,7 @@ export const STUDENT = {
      the lists are "My lists", not "Notebooks"; and the pack plants no example course.
      1.4.0: the voice says more of the record the way a student hears it, Home's empty lines, the add verb and the
      pen's line among them. Each is a new setting a person can change at /packs, so a minor step.
-     1.5.0: calmer (DIRECTION §35). Home and Studies open on one line said from new counts, every heading wears a
+     1.5.0: calmer. Home and Studies open on one line said from new counts, every heading wears a
      glyph, each list is drawn only while it holds something, and Studies draws what is due once, on the board, where
      a table of it stood above. Only counts are added, so a minor step.
      1.5.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of

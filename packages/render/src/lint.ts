@@ -15,7 +15,7 @@
  * verbatim on purpose. Attributes: an `aria-label` repeats the cell it names, and reading both would
  * count every fault twice. Drawings: an `<svg>` holds paths, not words.
  *
- * TWO DECLARATIONS A PART CAN MAKE, and nothing about a record is special-cased (DIRECTION §27):
+ * TWO DECLARATIONS A PART CAN MAKE, and nothing about a record is special-cased:
  * - `ids`: the part prints handles on purpose, a list of runs' handles beside their names. A run's
  *   handle is then not a finding in it; a ULID, a UUID, a random id or `tools#8` still is.
  * - `theirs`: the words are the person's own, a note he wrote. The copy rules (an em dash, the words
@@ -347,7 +347,7 @@ export const BUTTON_WORDS: readonly string[] = ['Undo', 'Cancel', 'Done', 'Close
 
 /*
  * A NAME FROM THE CODE WHERE A SENTENCE STANDS: `infer.resolve could not be delivered`, `bank-card-used-sms could not
- * read account` (his Decide, 7 October). Dotted words whose end is not a site's or a file's (`crumb.gg`, `notes.md`), or
+ * read account` (seen on Decide, 7 October). Dotted words whose end is not a site's or a file's (`oxbow.gg`, `notes.md`), or
  * three hyphened words with none of English's small words in them (`up-to-date`, `pay-as-you-go` are plain).
  */
 const DOTTED_NAME = /(?<![\w.@/:-])[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+(?![\w@/-]|\.\w)/g;

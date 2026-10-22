@@ -5,7 +5,7 @@
  * Gathered by `blocks-kinds.css` with the kind sheets, because only a declared page draws it. It keeps `blocks.css`'s one
  * rule: no colour is written, every value is a role.
  *
- * CALM (DIRECTION §35): one line, no box around it. DIRECTION §39: a segmented field is one 8px rectangle with the
+ * CALM: one line, no box around it. A segmented field is one 8px rectangle with the
  * chosen value the tile's colour on it, as `controls.css` draws every segmented control; a chip field's chosen value is
  * the accent's tint, every other a word that takes the field's fill under the pointer. Counts wait for the pointer or
  * the keyboard (`data-calm`).
@@ -24,6 +24,24 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-1);
+  }
+
+  /* TWO FIELDS OF CHIPS ARE SPLIT BY A HAIRLINE in the gap between them: Activity's "All · Rules · Claude · Cursor" ran
+     into the next field's "All" as one row of words, and the second "All" read as a mistake. A segmented field is its
+     own track and needs none. */
+  .filters-group + .filters-group:not([data-control='segmented']) {
+    position: relative;
+  }
+
+  .filters-group + .filters-group:not([data-control='segmented'])::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: calc(var(--sp-5) / -2);
+    inline-size: 1px;
+    block-size: 20px;
+    background: var(--rule);
+    translate: -50% -50%;
   }
 
   /* A SEGMENTED FIELD IS ONE TRACK of the second surface with its segments cut into it, so a few values read as one
@@ -134,13 +152,22 @@
      ring's reach (2px out, 2px wide, `a11y.css`) as air inside its own scroll box, given back by its margin, so the ring
      is not clipped by it. */
   @media (width < 640px) {
+    /* AND ITS END FADES, so a strip that runs on looks like one: "Tallov" stood cut at the edge as a word nobody could
+       read. The fade sits in room kept at the end, so a strip that fits loses nothing to it, and scrolled to its end the
+       last chip clears it. A mask reads only alpha, so the opaque ink stands for "shown". */
     .filters {
       flex-wrap: nowrap;
       margin: calc(var(--sp-1) * -1);
       padding: var(--sp-1);
+      padding-inline-end: calc(var(--sp-1) + 24px);
       overflow-x: auto;
       overscroll-behavior-x: contain;
       scrollbar-width: none;
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+    }
+
+    .filters:dir(rtl) {
+      mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
     }
 
     .filters::-webkit-scrollbar {

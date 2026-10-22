@@ -16,8 +16,8 @@ const HELD = 'liquid is true, state is not closed';
 
 export const CASH_FIGURES: Record<string, SeedMetric> = {
   /**
-   * WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
-   * due/owed". Liquid accounts only, and remembered daily so the page can draw how it has moved.
+   * WHAT IS IN THE BANK, the headline: the money a person has, not the money they are due or
+   * owed. Liquid accounts only, and remembered daily so the page can draw how it has moved.
    *
    * ROLLED FORWARD, SINCE money-core 3.0.0, AND IT WAS A SUM OF WHAT WAS TYPED. An account's `balance` is what somebody
    * said it held on its `as_of`, and every payment since was a row in `transactions` this figure never read, so it

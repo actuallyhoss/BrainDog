@@ -1,4 +1,4 @@
-/* LOOK B (DIRECTION §45 d9, §47): the sheet a page imports for Look B's colours and faces.
+/* LOOK B: the sheet a page imports for Look B's colours and faces.
 
    It writes no colour of its own. The palette is in the theme package, the one place a colour may be spelled out
    (`packages/theme/look-b.css`, hand-set from the approved prototype until the generator makes Look B), and this pulls

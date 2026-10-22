@@ -31,7 +31,7 @@ export const LEDGER: Record<string, unknown>[] = [
        ITS OWN EMPTY LINE, for the one place that rule lets a tile say it: where the Ledger is the first thing a page
        has to say.
 
-       ITS WRITTEN LINE COUNTS THE DAY (REC-B20 job 3). "Agents do the legwork in view" (the owner): he cleared his
+       ITS WRITTEN LINE COUNTS THE DAY (REC-B20 job 3). Agents do the legwork in view: a person cleared their
        bank's messages into the Ledger and Money said nothing of who filed them. `filed-today` and `filed-for-you-30d`
        were installed and drawn nowhere, and this line reads both: how many entries were made today, and how many
        anything but a person made in 30 days.

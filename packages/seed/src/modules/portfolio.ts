@@ -150,12 +150,17 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
  * number is on the sample too. Marlow & Co's hours billed, which he pinned to Today, and Portage's subscribers, whose
  * day went by short of its target, so Today shows a pin, a miss and a stale number side by side. `thing` is the
  * project's place in `THINGS`, from 1. A sample's and not Portfolio's: the add-on ships the list and no row of it.
+ *
+ * MARLOW & CO LEADS WITH WHAT IT BILLED A MONTH, client work's money number (the plan's 2.7), marked to lead its card.
+ * With the hours alone its card led with them, the top of its numbers by Today's score being the pin, and a client's
+ * card led with its hours where the plan has money first. Its twelve months add up to what it earned in a year.
  */
 export const SAMPLE_KPIS: Fields[] = [
   { name: 'Revenue a month', thing: 1, measures: 'What the licences, studio deals and prints brought in each month', source: 'numbers', measure: 'Revenue a month', unit: 'GBP', kind: 'flow', every: '1m', target_amount: gbp(200_000), headline: true, owner: 'claude', order: 1 },
   { name: 'Studios licensed', thing: 1, measures: 'Studios holding a current licence', source: 'agent', measure: 'Studios licensed', unit: 'studios', kind: 'level', every: '1w', target: 60, target_by: day(90), owner: 'claude', order: 2 },
   { name: 'Specimen downloads', thing: 1, measures: 'Specimen PDFs downloaded in a week', source: 'typed', measure: 'Specimen downloads', unit: 'downloads', kind: 'level', every: '1w', owner: 'claude', order: 3 },
-  { name: 'Hours billed', thing: 2, measures: 'Hours billed to Marlow & Co each week', source: 'typed', measure: 'Hours billed', unit: 'hours', kind: 'flow', every: '1w', today: 'pinned', order: 1 },
+  { name: 'Billed a month', thing: 2, measures: 'What Marlow & Co was invoiced each month', source: 'typed', measure: 'Billed a month', unit: 'GBP', kind: 'flow', every: '1m', headline: true, order: 1 },
+  { name: 'Hours billed', thing: 2, measures: 'Hours billed to Marlow & Co each week', source: 'typed', measure: 'Hours billed', unit: 'hours', kind: 'flow', every: '1w', today: 'pinned', order: 2 },
   { name: 'Subscribers', thing: 3, measures: 'People signed up to the Portage newsletter', source: 'agent', measure: 'Subscribers', unit: 'people', kind: 'level', every: '1w', target: 500, target_by: day(-6), headline: true, owner: 'claude', order: 1 },
 ];
 
@@ -170,6 +175,8 @@ const KILN_MONTHS = [125_000, 130_000, 120_000, 140_000, 135_000, 150_000, 145_0
 const KILN_STUDIOS = [38, 39, 39, 41, 42, 42, 44, 45, 47, 48, 50, 52];
 const KILN_DOWNLOADS = [212, 240, 198, 260, 275, 251];
 const MARLOW_HOURS = [22, 18, 26, 24, 30, 21, 28, 32];
+/** Twelve months that add up to what Marlow & Co earned in a year (GBP 4,200.00), lower than the year before. */
+const MARLOW_MONTHS = [45_000, 40_000, 45_000, 35_000, 40_000, 35_000, 30_000, 35_000, 30_000, 30_000, 25_000, 30_000];
 const PORTAGE_PEOPLE = [140, 168, 190, 214, 236, 251, 270, 284, 301, 318];
 
 /** The readings behind them, in Numbers: a month's revenue on its 28th, the studios each week, the downloads until three weeks ago. */
@@ -177,6 +184,7 @@ export const SAMPLE_READINGS: Fields[] = [
   ...KILN_MONTHS.map((minor, i) => ({ name: 'Revenue a month', thing: 1, amount: gbp(minor), at: monthBack(KILN_MONTHS.length - i), source: 'reported' })),
   ...KILN_STUDIOS.map((n, i) => ({ name: 'Studios licensed', thing: 1, value: n, unit: 'studios', at: `${day(-1 - 7 * (KILN_STUDIOS.length - 1 - i))}T09:00:00.000Z`, source: 'reported' })),
   ...KILN_DOWNLOADS.map((n, i) => ({ name: 'Specimen downloads', thing: 1, value: n, unit: 'downloads', at: `${day(-21 - 7 * (KILN_DOWNLOADS.length - 1 - i))}T09:00:00.000Z`, source: 'typed' })),
+  ...MARLOW_MONTHS.map((minor, i) => ({ name: 'Billed a month', thing: 2, amount: gbp(minor), at: monthBack(MARLOW_MONTHS.length - i), source: 'typed' })),
   ...MARLOW_HOURS.map((n, i) => ({ name: 'Hours billed', thing: 2, value: n, unit: 'hours', at: `${day(-2 - 7 * (MARLOW_HOURS.length - 1 - i))}T17:00:00.000Z`, source: 'typed' })),
   ...PORTAGE_PEOPLE.map((n, i) => ({ name: 'Subscribers', thing: 3, value: n, unit: 'people', at: `${day(-1 - 7 * (PORTAGE_PEOPLE.length - 1 - i))}T09:00:00.000Z`, source: 'reported' })),
 ];
@@ -987,19 +995,19 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * are at risk or off track with who said so, every project in play as a card, what agents hold, what is coming up, and
    * the parked and finished ones folded away. Every block reads Projects alone, so it opens on any record that keeps them.
    *
-   * CALMER, SINCE portfolio 1.8.0 (DIRECTION §35): the line, then where the projects are and how they are going, what
+   * CALMER, SINCE portfolio 1.8.0: the line, then where the projects are and how they are going, what
    * needs you and the projects in play, and what each earns, what agents hold and what is coming up folded under them.
    * No figure is said twice: Need you is the line's, and the year earned is the sum of What each one earns. Every heading wears a glyph, and every tile over the projects is drawn only while it holds one.
    *
    * EACH THING ONCE, SINCE portfolio 1.11.0: the line, one track of how they are going, and the cards, with Needs you and
    * Where they are gone (the visual review of October 2nd).
    *
-   * ONLY THE LINE SAYS WHAT IS EMPTY, AND THE PARKED ARE A COUNT, SINCE portfolio 1.13.0 (DIRECTION §37). With nothing in
+   * ONLY THE LINE SAYS WHAT IS EMPTY, AND THE PARKED ARE A COUNT, SINCE portfolio 1.13.0. With nothing in
    * play the line says so and how to start, where it said every project in play was on track over a page with none,
    * and In play is drawn only while it holds one. Parked and finished is a heading that counts what is folded under
    * it, and it read every one of those projects whole, its notes included, to say one number.
    *
-   * NO FOLD OVER A SHORT LIST, SINCE portfolio 1.15.0 (DIRECTION §39, the second design review's fix 6). With three
+   * NO FOLD OVER A SHORT LIST, SINCE portfolio 1.15.0 (the second design review's fix 6). With three
    * projects in play the page ended on two folded headings, 56px each with a Show button, over 240px of empty page:
    * the fold hid less than it took to say it was there. What each earns, what agents hold and what is coming up are one
    * open tile while four projects or fewer are under it, and so are the parked and finished; past four each folds as
@@ -1138,11 +1146,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
              `project-done-by-week`, the same numbers the project's own page charts. A record without Work, or a project
              nothing was finished on, draws no line, and the card is as it was.
              ONLY WHERE THE PROJECT KEEPS NO KEY NUMBER, SINCE the KPI plan of 21 October (2.5, decided 3): a card leads
-             with its project's headline key number and draws that number's own readings (`withKpis` in the app's
-             `project-cards.ts`, over the `kpis` source `for: cards`), so this line is the card's fallback, never drawn
-             beside a key number. A card column reads a figure cut by a date and not a key number's readings, so the
-             headline is not a column here. */
-          { metric: 'project-done-by-week:{{name}}', as: 'trend' },
+             with its project's headline key number and draws that number's own readings, so this line is the card's
+             fallback, never drawn beside a key number. SINCE portfolio 1.20.0 THE COLUMN SAYS SO ITSELF (`kpi: headline`):
+             the record draws each card's line from the number its project leads with, over the `kpis` source `for:
+             cards` that the app's `withKpis` reads too (`trendsOf` in the kernel's `pages.ts`), by that number's own
+             periods, and this figure only on a card whose project keeps none with a value. */
+          { metric: 'project-done-by-week:{{name}}', kpi: 'headline', as: 'trend' },
           /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0 (W096, REC-C16): Work's `project-last-worked` for the
              card's own project, the reading the project page's Where it stands draws, said in the card's head as "Worked on 2
              days ago", or "Quiet for 40 days" in the late tone once it misses its thirty days. A project with no task reads
@@ -1224,7 +1233,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * what each costs and when it renews. Twenty-one blocks, so a use case can add three of its own under the ceiling of
    * twenty-four a page may declare (`usecases/founder.ts` adds exactly three).
    *
-   * CALMER, SINCE portfolio 1.8.0 (DIRECTION §35): the line first, then six tiles, what needs you, where it stands, how
+   * CALMER, SINCE portfolio 1.8.0: the line first, then six tiles, what needs you, where it stands, how
    * its work moved, what is open and handed back, and the plan, and everything after them folded shut: who worked on it
    * and its notes, its money, and in the rail what it runs on with what that costs. Each date is drawn once, on the
    * plan, and the month so far is the chart's newest month and not a tile beside it. Still twenty-one blocks.
@@ -1233,7 +1242,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * the rail under At a glance, one column of short tiles beside the chart, which takes the main column; What is open
    * goes, the plan drawing the same tasks; and what is handed back is drawn only while it lists one. Twenty blocks.
    *
-   * NO CHART OF ONES AND TWOS, SINCE founder 2.3.0 and team 2.18.0 (DIRECTION §39, "a chart is drawn only when it says
+   * NO CHART OF ONES AND TWOS, SINCE founder 2.3.0 and team 2.18.0 ("a chart is drawn only when it says
    * something; else the tile shows the number", and the second design review's fix 5). Done, by week was a tile 280px
    * tall, the whole of the main column, for bars of 1 and 2. What was finished this week is a figure of At a glance,
    * with how it moved as the line beside it, and the plan leads the main column. Nineteen blocks.
@@ -1343,7 +1352,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
 
            AT RISK AND OFF TRACK WEAR THEIR COLOUR, SINCE founder 2.2.0 and team 2.17.0: a card is toned by its title's
            value, and the title is the health. On track wears no mark on purpose, since colour is for what needs the
-           person (DIRECTION §39, "status colours as small dots and text"). */
+           person ("status colours as small dots and text"). */
         kind: 'cards',
         heading: 'Where it stands',
         icon: 'target',
@@ -1436,7 +1445,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No task on {{name}} has a day yet.',
       },
       {
-        /* EVERYTHING ELSE ABOUT IT, AS ONE TILE, SINCE work 1.15.0 (DIRECTION §39, the design review's fix 9). From
+        /* EVERYTHING ELSE ABOUT IT, AS ONE TILE, SINCE work 1.15.0 (the design review's fix 9). From
            1.8.0 who worked on it and its notes, its money, and what it runs on were three sections folded shut, each a
            tile 56px tall holding only its name and a Show button, which read as unfinished. Now they are one boxed tile
            under the plan, its parts on one surface, each short: the last few changes and runs, the notes, the money by

@@ -293,6 +293,58 @@
     }
   }
 
+  /* ── one line (`line`, the Agents page's lead) ───────────────────────────
+     The field, To and Send on one row at the control height; the other choices and the sentence under it once he has
+     started. The field grows with his words, never past five lines. */
+  .ins[data-line] {
+    gap: var(--sp-2);
+  }
+
+  .ins-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .ins[data-line] .ins-said {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+    max-block-size: calc(5 * 22px + 2 * var(--sp-2));
+    padding-block: calc((var(--ctl-h) - 22px) / 2);
+  }
+
+  .ins-line > .ins-pick {
+    flex: 0 1 auto;
+    max-inline-size: 40%;
+  }
+
+  /* TO AS WIDE AS WHAT IT SAYS, not as its longest choice: "Whoever's next" was a 400px chip. */
+  .ins-line .ins-select {
+    field-sizing: content;
+    padding-inline-end: var(--sp-6);
+  }
+
+  .ins-line > .ins-send {
+    flex: none;
+  }
+
+  @container (width < 560px) {
+    .ins-line {
+      flex-wrap: wrap;
+    }
+
+    .ins[data-line] .ins-said {
+      flex-basis: 100%;
+    }
+
+    .ins-line > .ins-pick {
+      flex: 1 1 auto;
+      max-inline-size: none;
+    }
+  }
+
   /* ── the threads ─────────────────────────────────────────────────────────
      Under the composer, a hairline between one and the next: what he said at the body size, to whom at the end (under
      it on a phone), the bar and its word, the trail, the reply quoted, what changed. */

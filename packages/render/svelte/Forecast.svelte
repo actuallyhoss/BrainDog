@@ -623,7 +623,7 @@
     container: forecast-plot / inline-size;
   }
 
-  /* ONE FLAT TILE, as every block is (DIRECTION 39): no glass behind the readout and no shadow under it. */
+  /* ONE FLAT TILE, as every block is: no glass behind the readout and no shadow under it. */
   :global(.forecast .forecast-readout) {
     background: var(--well);
     backdrop-filter: none;

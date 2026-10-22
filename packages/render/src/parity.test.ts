@@ -105,7 +105,7 @@ const SHAPES: Record<string, string> = {
     '```cards\ntitle: Doing | who: Agent | fact: Project | when: Seen | quiet\nAxis QA | Claude | Kiln | 3m ago | \nReconcile | Claude | Portage | 2h ago | quiet | warn\n```',
   'people, named by their faces': '```cards\nwho: Name | fact: Role | fact: Met at | when: Seen\nAmara Lee | Designer | Kiln kickoff | 2d ago\nthe assistant | Agent |  | \n```',
   'figures, trends, rings and a link':
-    '```cards\ntitle | figure: Owed to you | trend: Weekly | ring: Done\n[Kiln](/r/things/1) | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | 60%\nMarsh | USD 12.00 | 1 2 3 | nearly\n```',
+    '```cards\ntitle | figure: Owed to you | trend: Weekly | ring: Done\n[Kiln](/r/things/1) | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | 60%\nDriftwood | USD 12.00 | 1 2 3 | nearly\n```',
   'no cards at all': '```cards\ntitle | fact: Role\n```',
   'a section with a count': '```section | Working now\n | 3 | \n```',
   'a section that counts nothing': '```section | Working now\n | 0 | \n```',
@@ -214,7 +214,7 @@ const SHAPES: Record<string, string> = {
   'a progress budget with one over and a tone': '```progress budget\nGroceries | £212.40 | £300.00 | this month\nEating out | £140.00 | £120.00\nTransport | £10.00 | £100.00 |  | info\n```',
   'lines of one plain column with no numbers': '```lines | Users\nDay | Users\n1 Sep | \n```',
   /* ONE READING IS A FIGURE, under its measure's name and under none. */
-  'lines of one reading': '```lines | Aov, Crumb.gg\nDay | Aov, Crumb.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n```',
+  'lines of one reading': '```lines | Aov, Oxbow.gg\nDay | Aov, Oxbow.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n```',
   'lines of one reading under no heading': '```lines\nDay | Signups\n28 Sep | 14\n```',
   'lines of one reading on the second of two lines': '```lines | Revenue and costs\nDay | Revenue | Costs\n1 Sep |  | \n2 Sep |  | £5\n```',
   /* TWELVE NOISY READINGS HOLD NO TREND, so the chart says so under it (`lines-trend.ts`). */
@@ -240,9 +240,9 @@ const SHAPES: Record<string, string> = {
   'a timeline grouped by day': '```timeline\n1 Oct | Tesco | GBP −42.10\n1 Oct | Salary | GBP 3,100.00 | good\n30 Sep | Rent | GBP −1,200.00\n```',
   'a timeline whose days do not repeat': '```timeline\n1 Oct | Tesco\n30 Sep | Rent\n```',
   /* A CARD'S TREND FILLED BY THE RECORD, said as an array with a gap in it, beside a figure. Three known points draw
-     the line (Bake, and Nook as `String()` says an array); two are not a chart and Twice keeps its figure alone. */
+     the line (Oxbow, and Nook as `String()` says an array); two are not a chart and Twice keeps its figure alone. */
   'cards whose trend the record filled':
-    '```cards\ntitle | figure: Done | trend: By week\nBake | 12 | [3,null,5,4]\nNook |2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
+    '```cards\ntitle | figure: Done | trend: By week\nOxbow | 12 | [3,null,5,4]\nNook |2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
   /* A TREND AND NO FIGURE COLUMN. A run too short to draw prints its newest number as the card's figure (Twice, Once,
      and Flat, whose one count among noughts is a single fact); Drawn keeps its line; a run with no number says nothing. */
   'cards with a trend and no figure':
@@ -910,7 +910,7 @@ const { default: Filters } = (await import(new URL('../svelte/Filters.svelte', i
 };
 const { filtersHTML } = await import('./html.ts');
 const FILTERS = [
-  { field: 'project', label: 'Project', values: ['Bake', 'Nook', 'Kiln', 'Site', 'Marsh', 'Estate', 'Quiet'].map((label, i) => ({ value: String(i + 1), label, count: 9 - i })) },
+  { field: 'project', label: 'Project', values: ['Oxbow', 'Nook', 'Kiln', 'Site', 'Driftwood', 'Estate', 'Quiet'].map((label, i) => ({ value: String(i + 1), label, count: 9 - i })) },
   { field: 'whose', label: 'Whose', control: 'segmented' as const, values: [{ value: 'mine', label: 'Mine', count: 4 }, { value: 'agents', label: 'Agents', count: 2 }] },
   { field: 'empty', label: 'Nothing to choose', values: [{ value: 'x', label: 'Only', count: 1 }] },
 ];
@@ -922,12 +922,12 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
     assert.doesNotMatch(svelte, /<button|<select|Nothing to choose/u, 'a field with one value is not drawn');
   }
   const read = tree(filtersHTML(FILTERS, { project: '7' }));
-  assert.deepEqual([...read.matchAll(/<span class="filters-choice"( data-on)?>([^<]*)/gu)].slice(0, 7).map((m) => `${m[2]}${m[1] ? '*' : ''}`), ['All', 'Bake', 'Nook', 'Kiln', 'Site', 'Quiet*', 'All*'], 'the choice is drawn wherever it sits, and a field with none chosen is on All');
+  assert.deepEqual([...read.matchAll(/<span class="filters-choice"( data-on)?>([^<]*)/gu)].slice(0, 7).map((m) => `${m[2]}${m[1] ? '*' : ''}`), ['All', 'Oxbow', 'Nook', 'Kiln', 'Site', 'Quiet*', 'All*'], 'the choice is drawn wherever it sits, and a field with none chosen is on All');
   assert.match(read, /<span class="filters-more">2 more<\/span>/u);
 
   const live = tree(render(Filters, { props: { filters: FILTERS, chosen: { whose: 'mine' }, onfilter: () => {} } }).body);
   const pressed = [...live.matchAll(/<button aria-pressed="(true|false)" class="filters-choice" type="button">([^<]*)/gu)].map((m) => `${m[2]}${m[1] === 'true' ? '*' : ''}`);
-  assert.deepEqual(pressed, ['All*', 'Bake', 'Nook', 'Kiln', 'Site', 'Marsh', 'All', 'Mine*', 'Agents']);
+  assert.deepEqual(pressed, ['All*', 'Oxbow', 'Nook', 'Kiln', 'Site', 'Driftwood', 'All', 'Mine*', 'Agents']);
   assert.match(live, /<select aria-label="Project" class="filters-more"><option value>2 more<\/option><option value="6">Estate<\/option><option value="7">Quiet<\/option><\/select>/u);
   assert.match(live, /aria-label="Project" class="filters-group" data-control="chips"/u, 'seven values are chips');
   assert.match(live, /aria-label="Whose" class="filters-group" data-control="segmented"/u);
@@ -1074,7 +1074,7 @@ for (const [name, { src, gone, kept }] of Object.entries(NOUGHTS)) {
 /* ── a row's mark is a picture (PGS-A06) ───────────────────────────────────── */
 
 test('A CARD\'S MARK THAT NAMES A PICTURE IS THE PICTURE IN BOTH RENDERERS, and never the first letter of its name', () => {
-  const block = page('```cards\nmark: Icon | title: Project\ncake | Crumb.gg\nKiln | Kiln\nclose | Lanternfish\n```');
+  const block = page('```cards\nmark: Icon | title: Project\ncake | Oxbow.gg\nKiln | Kiln\nclose | Lanternfish\n```');
   for (const opts of [{}, { icon: (name: string) => (name === 'gift' ? 'M4 20h16' : null) }]) {
     const [svelte, html] = both(block, opts);
     assert.equal(svelte, html);
@@ -1097,7 +1097,7 @@ const PRINTS: Record<string, { src: string; has: readonly string[]; not: readonl
   'chip whose figure names nothing': { src: '```chips\ndot | {{tasks.late}} | late\ndot | {{tasks.open}} | open\n```', has: ['>7<', '>open<'], not: ['late', '{{'] },
   'chip whose figure has no value yet': { src: '```chips\ndot | {{cash.due}} | due\ndot | {{tasks.open}} | open\n```', has: ['>open<'], not: ['due', '—'] },
   'stat whose figure names nothing': { src: '```stat\nLate | {{tasks.late}} | \nOpen | {{tasks.open}} | \n```', has: ['Open', '>7<'], not: ['Late', 'tasks.late'] },
-  'card whose figure names nothing': { src: '```cards\ntitle: Project | figure: Open\nCrumb.gg | {{tasks.late}}\n```', has: ['Crumb.gg'], not: ['tasks.late', 'cards-figure'] },
+  'card whose figure names nothing': { src: '```cards\ntitle: Project | figure: Open\nOxbow.gg | {{tasks.late}}\n```', has: ['Oxbow.gg'], not: ['tasks.late', 'cards-figure'] },
   'sentence with a path that names nothing': { src: '```note\nOpen: {{tasks.open}}, late: {{tasks.late}}, due: {{cash.due}}.\n```', has: ['>7<', '<span class="unresolved">tasks.late</span>', 'class="hole"', '—'], not: ['{{'] },
   'bar whose figure names nothing': {
     src: '```bar\nOpen | {{tasks.open}} | \nLate | {{tasks.late}} | \n```',

@@ -203,6 +203,12 @@ export type InstructView = {
   onKey: string;
   /** Whether "On" can be changed: a live run is on its own project. */
   onFixed: boolean;
+  /** "Any machine", then each machine his runs are on, by name: drawn only when there are two to choose between. */
+  machine?: readonly InstructChoice[];
+  machineKey?: string;
+  /** "Any profile", then each Claude Code profile his runs are under, by name: drawn only when there are two. */
+  seat?: readonly InstructChoice[];
+  seatKey?: string;
   /** Both when a matching run is live; only the one it can be otherwise. */
   when: readonly ('now' | 'next')[];
   whenKey: 'now' | 'next';
@@ -291,4 +297,6 @@ export type PresenceView = {
   href: string | null;
   /** Pressing now. */
   busy: boolean;
+  /** How long it has run, for a row drawn on one line: "1 h 08 min". */
+  time?: string;
 };

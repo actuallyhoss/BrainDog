@@ -1,6 +1,6 @@
 /**
- * EVERY DECLARED PAGE IS CALM, as DIRECTION §35 asks of them (October 2nd: "i dont want a very 'busy' looking ui, rather
- * very tailored and to the point and easy to read"): a page opens on one line, holds at most six tiles before the rest is
+ * EVERY DECLARED PAGE IS CALM (since October 2nd: not a busy-looking UI, but one tailored, to the point and easy to
+ * read): a page opens on one line, holds at most six tiles before the rest is
  * folded shut, wears a glyph on every heading, and says none of its line's figures again in a tile beside it.
  *
  * READ OFF THE DECLARATIONS AND NOT A DRAWN PAGE, because what a record draws depends on its rows and these hold the

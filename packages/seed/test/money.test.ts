@@ -498,7 +498,7 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      the money there is and no longer with who owes whom. */
   /* NONE ON `/p/money` SINCE money-core 3.3.0: the thirty days are the bridge's there, beside the calendar of them. */
   assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 0, 'the Money page says the thirty days twice again');
-  /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0 (DIRECTION §37), which drew the walk's two under the cash
+  /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash
      Home's line had just said: the money is Home's and Money's, and the Dashboard is the numbers. */
   assert.equal(cells.filter((c) => c.where.startsWith('founder ')).length, 0, "the founder's Dashboard says Home's money again");
 
@@ -1052,7 +1052,7 @@ test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an a
 });
 
 /**
- * A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, SINCE money-core 3.8.0 (DIRECTION §37). An account at nought is no
+ * A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, SINCE money-core 3.8.0. An account at nought is no
  * part of Cash now by account, so a record whose cash all stood at nought drew Accounts as a tile saying every part was
  * zero; and a book whose last payment was last month drew Where this month's money went as a track with nothing in it.
  */

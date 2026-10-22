@@ -12,10 +12,10 @@
  * The one rule of `blocks.css` holds here too: no colour is written, every value is a role a theme
  * maps, and an intent reaches the DOM only through the map in `blocks.css`.
  *
- * THE MARKS ARE THE WORKING ACCENT AND ITS TINTS (DIRECTION §39). The first series, the one that matters, is the accent;
+ * THE MARKS ARE THE WORKING ACCENT AND ITS TINTS. The first series, the one that matters, is the accent;
  * the next two are its tints, lighter in turn; grey is only for "other" and for what is done. A colour is a meaning and
  * only one: the deeper red is for what is late or over and nothing else, and it is always striped (`--chart-late-hatch`,
- * DIRECTION §42: the working accent is BrainDog red too, so a late mark differs by its stripes and never by colour
+ * because the working accent is BrainDog red too, so a late mark differs by its stripes and never by colour
  * alone), `--warn` for a crossing below a line the owner set
  * (with its glyph, so never by colour alone), and an intent through the map. The palette is the theme's `--chart-*`
  * (`tokens.css`): `--chart-1` to `--chart-3`, `--chart-other`, `--chart-late` and `--chart-track`, so a kind names a
@@ -33,13 +33,13 @@
  */
 
 @layer components {
-  /* A LATE SERIES IS STRIPED AS WELL AS RED (DIRECTION §42). The working accent is BrainDog red and late is a deeper red
+  /* A LATE SERIES IS STRIPED AS WELL AS RED. The working accent is BrainDog red and late is a deeper red
      of the same hue, so a late bar beside a working one differs by its stripes and never by its colour alone: the late
      red, and the late red at 30% on the tile between. Opaque, so the bar still reads as one shape on its track. Every
      late mark here and in `kinds/lanes.css` (loaded beside this file by the page view) paints it, and
      `separation.test.ts` in `packages/theme` holds that. Here and not in `tokens.css`, so only a page that draws a chart
      pays for it. */
-  /* THE SERIES AFTER THE FIRST TAKE THE CATEGORY HUES (SPEC 1.3, his call on 20 Oct: charts outside a project are ink,
+  /* THE SERIES AFTER THE FIRST TAKE THE CATEGORY HUES (SPEC 1.3, decided on 20 Oct: charts outside a project are ink,
      with the category hues for the series after it, so a dark screen reads in colour and not in greys). A project's
      scope may set these to its own ramp, as it sets `--chart-1`. "Other" stays `--chart-other`. */
   :root {
@@ -220,7 +220,7 @@
     background: var(--part);
   }
 
-  /* A LATE PART'S KEY IS STRIPED like every late mark (DIRECTION §42). Its arc or segment is an SVG shape, which a CSS
+  /* A LATE PART'S KEY IS STRIPED like every late mark. Its arc or segment is an SVG shape, which a CSS
      stripe cannot reach, so the renderer paints it with a `<pattern>` of its own (`lateId` in `src/html.ts`): the band
      and its 30% ground are drawn in `currentColor`, and this is what makes that colour the late red. */
   .split-item[data-intent='bad'] > .split-dot,
@@ -431,7 +431,7 @@
     rx: 3px;
   }
 
-  /* A STANDING BAR IS THIN, NEVER WIDER THAN 24px (DIRECTION §39), and stays in the middle of its column over its
+  /* A STANDING BAR IS THIN, NEVER WIDER THAN 24px, and stays in the middle of its column over its
      label. The drawing is stretched to the tile, so a bar is six tenths of its column however wide that is: five steps
      across a wide tile were 113px slabs. The plan's bar is left as it is and narrowed about its own centre by the share
      24px is of it; `tan(atan2(a, b))` is a over b as a plain number, which a length over a length is not everywhere
@@ -977,7 +977,7 @@
     background: var(--tone-fill, var(--chart-1));
   }
 
-  /* A LATE ROW'S BAR IS STRIPED, so it is not the working red's bar with a darker shade (DIRECTION §42). */
+  /* A LATE ROW'S BAR IS STRIPED, so it is not the working red's bar with a darker shade. */
   .progress-row[data-intent='bad'] .progress-fill {
     background: var(--chart-late-hatch);
   }
@@ -987,7 +987,7 @@
     inset-block: 0;
     inset-inline: calc(var(--limit) * 100%) 0;
     border-inline-start: 2px solid var(--tile);
-    /* PAST THE LIMIT IS OVER, and over is the one thing a chart paints red (DIRECTION §39), unless the row's own tone
+    /* PAST THE LIMIT IS OVER, and over is the one thing a chart paints red, unless the row's own tone
        says otherwise. */
     background: repeating-linear-gradient(135deg, var(--tone, var(--chart-late)) 0 3px, transparent 3px 6px);
   }
@@ -2074,7 +2074,7 @@
   }
 
   /* THE FULL-SCREEN VIEW IS THE WINDOW INSIDE THE PAGE'S GUTTERS, and it read the page's width cap: a page fills the
-     window now (DIRECTION §36), so a chart opened to see it larger does too. */
+     window now, so a chart opened to see it larger does too. */
   .forecast-sheet[data-full] {
     inline-size: calc(100% - 2 * var(--gutter));
   }
@@ -2281,7 +2281,7 @@
 
   /* ── roadmap: dated work on one time axis, as a timeline ──────────────────
      A ROW A LINE: its name in the left column and its window as a bar on a track in the right, so no name lands on
-     another or on a bar (the names over a stretched drawing collided at every width, DIRECTION §39). A date is a dot on
+     another or on a bar (the names over a stretched drawing collided at every width). A date is a dot on
      its day. The axis names sit across the top, each with a hairline down every track, and today's line runs down them
      all in the ink. The bar's colour is the row's state: the accent while it is in hand, amber when it is at risk, red
      when it is late, grey when it is done, and a key under the rows says so wherever two of them are drawn. A name is one line, cut with an ellipsis and whole in its `title`, in a column no wider than 260px,
@@ -2413,7 +2413,7 @@
     background: var(--chart-1);
   }
 
-  /* LATE IS STRIPED, beside working bars of the same red family (DIRECTION §42). */
+  /* LATE IS STRIPED, beside working bars of the same red family. */
   .roadmap-item[data-intent='bad'] .roadmap-bar {
     background: var(--chart-late-hatch);
   }

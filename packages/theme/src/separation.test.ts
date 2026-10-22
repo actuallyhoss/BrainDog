@@ -82,7 +82,7 @@ for (const built of THEMES)
         }
       });
 
-/* ── the working red and the late red (DIRECTION §42) ───────────────────── */
+/* ── the working red and the late red ───────────────────── */
 
 /**
  * BrainDog red is the working accent now, and late and "needs you" are a deeper red of the same hue. The owner's word is

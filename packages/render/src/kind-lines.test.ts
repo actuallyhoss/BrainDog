@@ -14,8 +14,8 @@ import { KIND_LINES, REACH_FOR, kindLine } from './kind-lines.ts';
 
 const kinds = Object.keys(KINDS) as Kind[];
 
-test('EVERY ONE OF THE FORTY-ONE KINDS HAS A LINE, and no line is for a kind the table does not have', () => {
-  assert.equal(kinds.length, 41);
+test('EVERY ONE OF THE FORTY-TWO KINDS HAS A LINE, and no line is for a kind the table does not have', () => {
+  assert.equal(kinds.length, 42);
   for (const kind of kinds) {
     const line = KIND_LINES[kind];
     assert.ok(line, `${kind} has no line`);

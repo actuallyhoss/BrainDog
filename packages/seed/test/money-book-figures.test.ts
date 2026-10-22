@@ -307,13 +307,13 @@ test("A BOOK THAT SAYS ITS CURRENCY IS READ IN IT: a dollar book's invoices in p
   const r = await fresh();
   assert.ok(r.k.setPackConfig('money-core', { home_currency: 'EGP' }, OWNER).ok);
   value(r.k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-01' }, OWNER));
-  const quartz = value<Entry>(r.k.create('books', { name: 'Quartz', currency: 'USD' }, OWNER));
-  owed(r, 'owed_to_me', 400_000, { book: quartz.id, amount: { amount: 400_000, currency: 'USD' } });
-  owed(r, 'owed_to_me', 5_000_000, { book: quartz.id }); // E£50,000.00 at fifty pounds a dollar is $1,000.00
-  owed(r, 'owed_by_me', 2_500_000, { book: quartz.id });
+  const harbour = value<Entry>(r.k.create('books', { name: 'Harbour', currency: 'USD' }, OWNER));
+  owed(r, 'owed_to_me', 400_000, { book: harbour.id, amount: { amount: 400_000, currency: 'USD' } });
+  owed(r, 'owed_to_me', 5_000_000, { book: harbour.id }); // E£50,000.00 at fifty pounds a dollar is $1,000.00
+  owed(r, 'owed_by_me', 2_500_000, { book: harbour.id });
   owed(r, 'owed_to_me', 20_000, { amount: { amount: 20_000, currency: 'USD' } }); // Studio says no currency
-  assert.deepEqual([read(r.k, 'book-owed-to', 'Quartz').value, read(r.k, 'book-owed-to', 'Quartz').unit], [500_000, 'USD']);
-  assert.deepEqual([read(r.k, 'book-owed-by', 'Quartz').value, read(r.k, 'book-owed-by', 'Quartz').unit], [50_000, 'USD']);
+  assert.deepEqual([read(r.k, 'book-owed-to', 'Harbour').value, read(r.k, 'book-owed-to', 'Harbour').unit], [500_000, 'USD']);
+  assert.deepEqual([read(r.k, 'book-owed-by', 'Harbour').value, read(r.k, 'book-owed-by', 'Harbour').unit], [50_000, 'USD']);
   /* A BOOK THAT SAYS NOTHING is read as every figure is, in the home currency: $200.00 is E£10,000.00. */
   assert.deepEqual([read(r.k, 'book-owed-to').value, read(r.k, 'book-owed-to').unit], [1_000_000, 'EGP']);
 });

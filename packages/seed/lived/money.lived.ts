@@ -18,7 +18,7 @@
  * BrainDog's modules installed as a person installs them, planned and approved, with none of their example rows. That is
  * what `lived.mjs` does in its first hour (`setUp`).
  *
- * NOTHING HERE IS ANYBODY'S. The names and amounts are made up, and the steps are what any person does (DIRECTION 27).
+ * NOTHING HERE IS ANYBODY'S. The names and amounts are made up, and the steps are what any person does.
  */
 
 import { FIRST_PARTY, firstPartyDocument } from '../src/packs-entry.ts';

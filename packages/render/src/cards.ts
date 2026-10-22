@@ -265,7 +265,7 @@ export function initialOf(name: string): string | null {
  * `markGlyphOf` tells from a letter, or one letter, or null for none.
  *
  * NEVER A LETTER OF A GLYPH'S NAME. A value written the way icons are named (`cake`, `paw`, `close`) is a
- * picture's name, drawn or not, and its first letter says nothing about the row: Crumb.gg was drawn "C". Such a
+ * picture's name, drawn or not, and its first letter says nothing about the row: Oxbow.gg was drawn "C". Such a
  * value, and a control the frame uses (`close`, `pencil`), and a bare shape (`●`), all give way to the first
  * letter of the row's `title`, or to nothing when no title is handed. A value written as a name (`Kiln`) is a
  * name, and its own first letter is the mark, which is what the one-argument call always answered.
@@ -354,7 +354,7 @@ export function runFaceOf(cell: string, host: RunCell | null | undefined, quiet:
 /**
  * The mark a run's face wears: its maker's, where the host draws one for the run's agent (`RenderOptions.agentMark`),
  * else `null` and the face keeps its kind's glyph. A run of Claude's wore a robot and a run of Codex's a pair of
- * brackets, beside the same agents' real marks in the feed under them (DIRECTION §34).
+ * brackets, beside the same agents' real marks in the feed under them.
  */
 export const runMarkOf = (f: RunFace, agentMark: ((name: string) => AgentMark | null) | undefined): AgentMark | null => {
   const agent = (f.agent ?? '').trim();
@@ -386,7 +386,7 @@ export const helpersOf = (helpers: readonly Helpers[] | undefined, n: number): s
 /**
  * Whether a card is drawn dimmed: its `quiet` cell says so, and it is not a run the host handed. A RUN'S FACE ALREADY
  * SAYS IT, with a dashed ring once it has gone quiet, and a run that has stopped sits under Today or Earlier, which say
- * when. Dimmed as well, a stopped run's card was grey words on a grey face, which nobody could read (DIRECTION §36).
+ * when. Dimmed as well, a stopped run's card was grey words on a grey face, which nobody could read.
  */
 export const isDimmed = (L: CardLayout, cells: readonly string[], host: RunCell | null | undefined): boolean => isQuiet(L, cells) && !host;
 
@@ -422,7 +422,7 @@ export const RUN_OPEN = 'Open this run';
  * The mark an agent wears, as the host draws it: one path on a 24 grid, its fill rule, and its maker's tone, `ink` for a
  * mark its maker draws in black or white and a word such as `claude` for one drawn in its maker's colour.
  *
- * AGENTS WEAR THEIR MAKERS' REAL MARKS (DIRECTION §34), and this package ships no art (05 §3, invariant 2), so the host
+ * AGENTS WEAR THEIR MAKERS' REAL MARKS, and this package ships no art (05 §3, invariant 2), so the host
  * answers `RenderOptions.agentMark` from its own drawings for the name a cell gives (`Claude`, `Cursor`). A card's who
  * and a feed line's actor were a grey disc with a letter in it, `C`, which says neither the agent nor anything else.
  */

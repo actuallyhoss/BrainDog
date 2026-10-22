@@ -19,7 +19,7 @@
   const plan = $derived(splitPlan(values));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
   const name = $derived(splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]), share: p.share }))));
-  /* A late part is striped as well as red (DIRECTION §42), by a pattern of its own: `$props.id()` keeps two charts on
+  /* A late part is striped as well as red, by a pattern of its own: `$props.id()` keeps two charts on
      one page from painting from one another's (`lateId` in the mirror). */
   const uid = $props.id();
   const late = $derived(plan.parts.some((p) => rows[p.at]?.tone === 'bad') ? `${uid}-late` : '');

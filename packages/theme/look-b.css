@@ -1,6 +1,6 @@
-/* LOOK B'S PALETTE, as tokens (DIRECTION §45 d9, §47).
+/* LOOK B'S PALETTE, as tokens.
 
-   The owner's approved design for the site, 17 October: one flat board, BrainDog red as the one working accent, Lexend
+   The approved design for the site, 17 October: one flat board, BrainDog red as the one working accent, Lexend
    600 for page names and big figures, Geist for text and Geist Mono for code and times. The names and values are the
    prototype's own (loop/site-2026-10-17/src/site.html), verbatim, so the site's builders code against these names.
    THE UI PASS OF 20 OCTOBER (loop/ui-pass-2026-10-20/SPEC.md 1.1, 4.7) moved the reds onto the app's two tokens:

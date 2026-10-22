@@ -7,7 +7,7 @@
  * ONE DECLARATION PER NAME PER RULE. `--d-panel-out` was written twice in a row; harmless while both said the same,
  * and the first one silently dead the day they did not.
  *
- * THE BOARD IS ONE FLAT COLOUR (DIRECTION §39): the body is `--board`, and nothing lights the ground.
+ * THE BOARD IS ONE FLAT COLOUR: the body is `--board`, and nothing lights the ground.
  *
  * REDUCED MOTION REWRITES THE WHOLE SCALE. Every step `tokens.css` writes as a time is written again under the query,
  * at no more than the 120ms fade, and every older name is written as a step, so it follows.

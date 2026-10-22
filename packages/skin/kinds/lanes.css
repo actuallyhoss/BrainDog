@@ -347,6 +347,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* THE AGENT-LABELLED ROW SETS ITS OWN 20px LINE ABOVE, so its link takes the target's height here too. */
+    .lanes-item[data-who] > .lanes-title:has(a) {
+      line-height: var(--tap);
+    }
   }
 
   /* ── narrow: each name above its lane ──────────────────────────────────── */

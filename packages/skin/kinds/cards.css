@@ -82,7 +82,7 @@
   }
 
   /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. ONLY ITS FACE AND ITS FACTS
-     STEP BACK: the whole card at 0.6 put its name in grey on the tile's grey (DIRECTION §36, no grey on grey), and the
+     STEP BACK: the whole card at 0.6 put its name in grey on the tile's grey (no grey on grey), and the
      name is what a person looks for. */
   .cards-item[data-quiet] :is(.cards-face, .cards-facts) {
     opacity: 0.6;
@@ -317,7 +317,7 @@
     stroke: var(--warn);
   }
 
-  /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE (DIRECTION 42): the TRACK breaks, the part
+  /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE: the TRACK breaks, the part
      of the ring still to go, and the arc stays whole. The arc's share is its `stroke-dasharray` ATTRIBUTE, and a rule
      here would beat it: a dash on the fill drew every late card as a full broken circle, whatever its share
      (`ring-late.test.ts` holds that no rule here ever dashes the fill). */

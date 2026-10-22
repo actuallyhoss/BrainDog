@@ -15,7 +15,7 @@ import { fill, openRecord, type Kernel, type MetricDecl } from '@braindog/kernel
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY_VERSIONS, NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
-import { KPI_LIST, PORTFOLIO_REGISTERS, PROJECT_KINDS } from '../src/modules/portfolio.ts';
+import { KPI_LIST, PORTFOLIO_REGISTERS, PROJECT_KINDS, SAMPLE_KPIS, SAMPLE_READINGS, THINGS } from '../src/modules/portfolio.ts';
 import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
@@ -102,7 +102,7 @@ test('THE KEY NUMBERS LIST IS THE CONTRACT: every field and every enum value is 
 });
 
 test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and founder 3.0.0 hands Numbers to it and lays its two links', () => {
-  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.19.0');
+  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.20.0');
   const m = firstPartyManifest('portfolio');
   assert.deepEqual(m.requires, []);
   for (const id of ['register.datapoints', 'register.kpis', 'metric.kpis-held', 'metric.kpi-stale']) assert.ok(m.provides.includes(id), id);
@@ -206,4 +206,26 @@ test('A NEW FOUNDER RECORD WITH NO PEOPLE OR SERVICES TAKES THE USE CASE, with n
   assert.deepEqual(fieldsOf(k, 'datapoints').map((f) => f.id).filter((f) => f === 'organisation' || f === 'about_service'), []);
   assert.equal(k.metricDecl('service-numbers'), null);
   assert.equal(reading(k, 'datapoints-held').value, 0);
+});
+
+/**
+ * THE SAMPLE'S CLIENT LEADS WITH MONEY (the plan's 2.7, client work: billed a month first). Marlow & Co led its card with
+ * its hours, the pin being the top of its numbers by Today's score; it now marks what it billed a month to lead, the hours
+ * stay pinned to Today, and the twelve months add up to what its row says it earned in a year.
+ */
+test('MARLOW & CO LEADS WITH WHAT IT BILLED A MONTH, its hours still pinned to Today, its months adding up to its year', () => {
+  const marlow = THINGS.findIndex((t) => t.name === 'Marlow & Co') + 1;
+  const own = SAMPLE_KPIS.filter((k) => k.thing === marlow);
+  const leads = own.filter((k) => k.headline === true);
+  assert.deepEqual(
+    leads.map((k) => [k.name, k.unit, k.kind]),
+    [['Billed a month', 'GBP', 'flow']],
+  );
+  assert.equal(own.find((k) => k.name === 'Hours billed')?.today, 'pinned');
+  const billed = SAMPLE_READINGS.filter((r) => r.thing === marlow && r.name === 'Billed a month');
+  assert.equal(billed.length, 12);
+  const year = billed.reduce((n, r) => n + (r.amount as { amount: number }).amount, 0);
+  assert.equal(year, (THINGS[marlow - 1]!.revenue as { amount: number }).amount);
+  /* EVERY PROJECT OF THE SAMPLE THAT KEEPS A NUMBER MARKS ONE TO LEAD, so no card leads by the pin. */
+  for (const thing of new Set(SAMPLE_KPIS.map((k) => k.thing))) assert.equal(SAMPLE_KPIS.filter((k) => k.thing === thing && k.headline === true).length, 1, `project ${String(thing)}`);
 });

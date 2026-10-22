@@ -17,7 +17,7 @@
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
   const plan = $derived(ringPlan(block.rows.map((r) => ({ label: said(r, 0), value: said(r, 1), third: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), opts.home));
   /* The glyph only for a word `TONES` owns, as `toneGlyph` in the mirror checks. */
-  /* A late arc is striped as well as red (DIRECTION §42). Its dashes already draw its length, so the mark is a pattern
+  /* A late arc is striped as well as red. Its dashes already draw its length, so the mark is a pattern
      of its own, and `$props.id()` keeps two dials on one page from painting from one another's (`lateId` in the mirror). */
   const uid = $props.id();
   const late = $derived(plan.arcs.some((a) => a.tone === 'bad') ? `${uid}-late` : '');

@@ -1,5 +1,5 @@
 /**
- * BRAINDOG'S OWN UPDATES REACH A RECORD ON THEIR OWN WHEN NOTHING THE PERSON CHANGED WOULD BE LOST (DIRECTION §37), and
+ * BRAINDOG'S OWN UPDATES REACH A RECORD ON THEIR OWN WHEN NOTHING THE PERSON CHANGED WOULD BE LOST, and
  * otherwise come to Decide as one question.
  *
  * WHY. A record holding People 2.x had no way to People 3.0.0 but somebody opening Add-ons, finding Updates and pressing
@@ -101,7 +101,7 @@ const spelled = (id: string): string => {
 export function losses(diff: Diff, nameOf: (id: string) => string = spelled, tookOff: ReadonlySet<string> = new Set()): string[] {
   const out: string[] = [];
   /* A PACK'S OWN FIGURE RETIRED IS NO LOSS by itself: a page the person changed that reads it is still asked about, as
-     a conflict through `c.reads`, and one the pack draws goes with it (agents 1.9.0's working count, DIRECTION 42). */
+     a conflict through `c.reads`, and one the pack draws goes with it (agents 1.9.0's working count). */
   const gone = diff.retires.filter((r) => r.to === undefined && !r.id.startsWith('metric.'));
   if (gone.length > 0) out.push(`take away ${namesSaid(gone.map((r) => nameOf(r.id)))}`);
   const back = diff.adds.filter((a) => a.handed !== true && tookOff.has(a.id));

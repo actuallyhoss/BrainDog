@@ -95,7 +95,7 @@ test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
 });
 
 test('THE LINE IS SAID FROM signs-red, exactly one of three, and none at all while nothing has been read', () => {
-  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['No vital sign needs a look.']);
+  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['Nothing on this record needs a look.']);
   assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), ['One thing on this record needs a look.']);
   const three = leads(read([RED, RED, RED], { 'signs-red': 3 }));
   assert.equal(three.length, 1);
@@ -107,10 +107,10 @@ test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only th
   const unread = [NONE, { ...NONE, sign: 'tools-listed', name: 'The tools list' }, { ...NONE, sign: 'rules-ran', name: 'Rules ran this week' }];
   /* `signs-red` reads 0 here, as the kernel reads it once one sign is green (`readVitals`). */
   const blocks = read([GREEN, ...unread], { 'signs-red': 0 });
-  assert.deepEqual(leads(blocks), ['No vital sign needs a look.']);
+  assert.deepEqual(leads(blocks), ['Nothing on this record needs a look.']);
   for (const line of leads(blocks)) assert.doesNotMatch(line, /alive|healthy|everything/iu, line);
-  assert.deepEqual(under(blocks, 'Alive'), [GREEN.name]);
-  assert.deepEqual(under(blocks, 'Not read yet'), unread.map((u) => u.name), 'every unread sign is said, by its name');
+  assert.deepEqual(under(blocks, 'All good'), [GREEN.name]);
+  assert.deepEqual(under(blocks, 'Not checked yet'), unread.map((u) => u.name), 'every unread sign is said, by its name');
   for (const b of BLOCKS) if (b.kind === 'note') assert.doesNotMatch(String(b.body), /alive/iu, 'no line says alive of the record');
 });
 
@@ -119,9 +119,9 @@ test('HOW LONG IT HAS HELD is said from green-days in whole words, and not at al
     drawn(read([GREEN], { 'signs-red': 0, 'green-days': days })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
-  assert.deepEqual(lines(1), ['Every watched sign was green yesterday.']);
+  assert.deepEqual(lines(1), ['Every check passed yesterday.']);
   assert.equal(lines(4).length, 1);
-  assert.match(lines(4)[0]!, /^Every watched sign has been green for (\{\{green-days\}\}|4) days, up to yesterday\.$/u);
+  assert.match(lines(4)[0]!, /^Every check has passed for (\{\{green-days\}\}|4) days, up to yesterday\.$/u);
   /* ONLY A LEAD NOTE HAS ITS `(s)` SETTLED (`page-live.ts` `leadOf`): anywhere else it is drawn as written. */
   for (const b of BLOCKS) if (b.kind === 'note' && b.lead !== true) assert.doesNotMatch(String(b.body), /\(s\)/u, String(b.body));
 });
@@ -129,14 +129,14 @@ test('HOW LONG IT HAS HELD is said from green-days in whole words, and not at al
 test('A NONE SIGN IS NEVER DRAWN GREEN: it is under Not read yet, and Alive holds only green ones', () => {
   const blocks = read([RED, GREEN, NONE], { 'signs-red': 1, 'green-days': 0 });
   assert.deepEqual(under(blocks, 'Needs a look'), [RED.name]);
-  assert.deepEqual(under(blocks, 'Alive'), [GREEN.name]);
-  assert.deepEqual(under(blocks, 'Not read yet'), [NONE.name]);
-  const alive = BLOCKS.find((b) => b.heading === 'Alive')!;
-  const unread = BLOCKS.find((b) => b.heading === 'Not read yet')!;
+  assert.deepEqual(under(blocks, 'All good'), [GREEN.name]);
+  assert.deepEqual(under(blocks, 'Not checked yet'), [NONE.name]);
+  const alive = BLOCKS.find((b) => b.heading === 'All good')!;
+  const unread = BLOCKS.find((b) => b.heading === 'Not checked yet')!;
   assert.notEqual(unread.icon, alive.icon, 'an unread sign does not wear the green mark');
   const onlyNone = read([NONE, { ...NONE, sign: 'tools-listed', name: 'The tools list' }], { 'signs-red': null });
-  assert.deepEqual(under(onlyNone, 'Alive'), []);
-  assert.equal(drawn(onlyNone).some((b) => b.heading === 'Alive'), false, 'no empty Alive is drawn');
+  assert.deepEqual(under(onlyNone, 'All good'), []);
+  assert.equal(drawn(onlyNone).some((b) => b.heading === 'All good'), false, 'no empty All good is drawn');
 });
 
 test('RED CARRIES A WORD AND A MARK, never colour alone, and comes first', () => {
@@ -160,7 +160,7 @@ test('HOW MANY SIGNS ARE NOT READ YET is said from signs-unread, and not at all 
     drawn(read([GREEN, NONE], { 'signs-red': 0, 'signs-unread': n })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
-  assert.deepEqual(lines(1), ['One sign has not been read yet.']);
+  assert.deepEqual(lines(1), ['One check has not run yet.']);
   assert.equal(lines(3).length, 1);
-  assert.match(lines(3)[0]!, /^(\{\{signs-unread\}\}|3) signs have not been read yet\.$/u);
+  assert.match(lines(3)[0]!, /^(\{\{signs-unread\}\}|3) checks have not run yet\.$/u);
 });

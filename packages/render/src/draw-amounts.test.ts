@@ -87,10 +87,10 @@ const HOME = { home: 'EGP' } as const;
 /* ---- One way to write an amount (REC-C05, jobs 3 and 4) --------------------------------------------------- */
 
 const AMOUNTS: Record<string, { src: string; cls: string; at: number[] }> = {
-  'a stat': { src: `\`\`\`stat\nIn Cairo | ${EGP} | \nQuartz | ${USD} | \n\`\`\``, cls: 'cell-figure num', at: [0, 1] },
-  'a bar row': { src: `\`\`\`bar\nCairo | ${EGP}\nQuartz | ${USD}\n\`\`\``, cls: 'prop-value num', at: [0, 1] },
-  'a legend': { src: `\`\`\`split\nCairo | ${EGP}\nQuartz | ${USD}\n\`\`\``, cls: 'split-value num', at: [0, 1] },
-  'a cards figure': { src: `\`\`\`cards\ntitle | figure: Owed\nCairo | ${EGP}\nQuartz | ${USD}\n\`\`\``, cls: 'cards-value num', at: [0, 1] },
+  'a stat': { src: `\`\`\`stat\nIn Cairo | ${EGP} | \nHarbour | ${USD} | \n\`\`\``, cls: 'cell-figure num', at: [0, 1] },
+  'a bar row': { src: `\`\`\`bar\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'prop-value num', at: [0, 1] },
+  'a legend': { src: `\`\`\`split\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'split-value num', at: [0, 1] },
+  'a cards figure': { src: `\`\`\`cards\ntitle | figure: Owed\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'cards-value num', at: [0, 1] },
 };
 
 for (const [name, shape] of Object.entries(AMOUNTS)) {
@@ -129,7 +129,7 @@ test('A GAUGE SAYS ITS VALUE AND ITS TARGET AS THE WRITER DOES, and a bare numbe
 });
 
 test('A RECORD WITH NO HOME CURRENCY writes every sign with its code, and never two marks of one currency', () => {
-  const src = `\`\`\`stat\nQuartz | ${USD} | \nRent | GBP 1,200.00 | paid GBP 300.00 so far\n\`\`\``;
+  const src = `\`\`\`stat\nHarbour | ${USD} | \nRent | GBP 1,200.00 | paid GBP 300.00 so far\n\`\`\``;
   const html = mirror(src, { home: null });
   assert.deepEqual(said(html, 'cell-figure num'), [writer(USD, null), writer('GBP 1,200.00', null)]);
   assert.match(html, /paid £300 GBP so far/u, 'a note says its amount the same way');
@@ -183,7 +183,7 @@ test('I. ON A PHONE EVERY PART OF A LEGEND HAS ITS OWN LINE', () => {
 });
 
 test('C. A BAR ROW IS ONE NAME, ITS BAR AND ONE FIGURE, in that order in both drawers', () => {
-  const src = `\`\`\`bar | What you have, by book\nPersonal | ${EGP}\nQuartz | ${USD}\n\`\`\``;
+  const src = `\`\`\`bar | What you have, by book\nPersonal | ${EGP}\nHarbour | ${USD}\n\`\`\``;
   for (const opts of [{}, HOME]) {
     const html = mirror(src, opts);
     const rows = [...html.matchAll(/<div class="prop-row">(.*?)<\/div>/gu)].map((m) => m[1]!);

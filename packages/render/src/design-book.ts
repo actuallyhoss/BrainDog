@@ -1,5 +1,5 @@
 /**
- * THE DESIGN BOOK (DIRECTION §45, "One design language"): what the model and every agent read before designing, and what
+ * THE DESIGN BOOK ("One design language"): what the model and every agent read before designing, and what
  * the app shows at Settings > Look > Design book. One function, so the page and the MCP resource `braindog:design` can
  * never say two things.
  *
@@ -16,6 +16,7 @@
 import { KINDS, type Kind } from './kinds.ts';
 import { KIND_LINES, REACH_FOR } from './kind-lines.ts';
 import { SHEET_KINDS, specimenFor } from './sheet.ts';
+import { DRAWN_CODE_MOST, DRAWN_HEIGHT, DRAWN_ROWS_MOST, DRAWN_TOKENS } from './drawn.ts';
 
 export type BookToken = { name: string; light: string; dark: string; role: string };
 export type BookStep = { name: string; value: string };
@@ -43,6 +44,8 @@ export type DesignBook = {
   layout: Record<'desk_grid' | 'phone_stacking' | 'reserved_slot' | 'in_a_decision' | 'in_a_task' | 'in_a_card', string>;
   voice: readonly string[];
   compose: readonly string[];
+  /** How to write a `drawn` block, the second way to design, when no kind fits. */
+  draw: readonly string[];
 };
 
 /** What each named colour is for. Only the ones a design reaches for; the rest follow from these. */
@@ -97,6 +100,7 @@ const EXAMPLES: Readonly<Record<Exclude<Kind, (typeof SHEET_KINDS)[number]>, str
   embed: null,
   form: null,
   kpis: null,
+  drawn: null,
 };
 
 const decomment = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//gu, '');
@@ -161,7 +165,8 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
     layout: {
       desk_grid: 'A page is twelve columns on a desk. A block takes a span of them, never narrower than its kind allows. A side rail is 3 to 5 twelfths, and the main column takes the rest.',
       phone_stacking: 'On a phone the same list reads top to bottom, one block to a row, with the rail after the main column. Nothing is placed by coordinates, so order is the design.',
-      reserved_slot: "A page has one reserved slot, for BrainDog's own suggestions of a better visual. Nothing else is drawn there, and it is empty when there is nothing to suggest.",
+      reserved_slot:
+        "A page has one reserved slot, at its head, for BrainDog's own suggestion: a better visual for the page, or the one question a rule or BrainDog asked that it would answer first. It shows one at a time, with its suggested answer as the button and Not now beside it. Nothing else is drawn there, and it is empty when there is nothing to suggest.",
       in_a_decision: 'A visual sits under the question, above the answers, at the width of the card. It shows the figures the choice turns on and never replaces the answers.',
       in_a_task: "A visual sits in the task's panel after its facts, at the width of the panel, and is drawn only when the task has data for it.",
       in_a_card: 'A card holds one block at a time. It is drawn on the tile, takes the card hue for its mark only, and shows a quiet line when it has nothing, never an empty frame.',
@@ -175,6 +180,14 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
     compose: [
       'Arrange these kinds into a page, a card or a visual. It is native, instant, and right in both themes and on a phone.',
       'Draw a small component of your own only when no kind fits.',
+    ],
+    draw: [
+      'A drawn block is { kind: drawn, heading, source: register.<id>, columns: [{ field }], code }. The code is HTML, a style tag and a script, written as what goes inside the page.',
+      `It runs in a sandbox with no network, no storage and no reach into the page around it. Nothing is fetched: write pictures inline as SVG or data: images. Its code is at most ${DRAWN_CODE_MOST / 1024} KB.`,
+      `It is handed braindog.data, { list, columns, rows }, each entry { ref, fields } with only the fields its columns name, at most ${DRAWN_ROWS_MOST} of them, read for whoever is looking. braindog.on(fn) calls fn(data, theme) now and whenever either changes.`,
+      `The theme's colours are CSS variables of the same names: ${DRAWN_TOKENS.map((t) => `--${t}`).join(', ')} and --font. Use them, never a colour of your own, and it reads in light and dark.`,
+      `braindog.open(ref) opens one of the entries it was handed. Its height follows its content, from ${DRAWN_HEIGHT.least} to ${DRAWN_HEIGHT.most} pixels; height: on the block is where it starts.`,
+      'It fits a 390 px phone with nothing scrolling sideways, says its empty state in words, and names things, never ids.',
     ],
   };
 }

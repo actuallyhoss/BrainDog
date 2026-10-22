@@ -84,13 +84,13 @@ export type Role =
      `info`. `live` is solved as text, `live-fill` as a mark. */
   | 'live'
   | 'live-fill'
-  /* THE BOARD (DIRECTION §39): the page every tile sits on, the tile, and the fill of a control inside or beside one.
+  /* THE BOARD: the page every tile sits on, the tile, and the fill of a control inside or beside one.
      Not rungs of the ladder (check H walks `SURFACES` only): they are what the product paints, at the design's own
      values, and every word and mark is proven on them as on the five (`GROUNDS`). */
   | 'board'
   | 'tile'
   | 'field'
-  /* THE WORKING ACCENT (DIRECTION §39): selection, primary buttons, links and charts. Not the brand: `accent` stays the
+  /* THE WORKING ACCENT: selection, primary buttons, links and charts. Not the brand: `accent` stays the
      mark's red, so a red on screen means one thing. `action` is the fill, `on-action` the label on it, `action-hover`
      the fill under the pointer, the two tints a chosen thing and a stronger one, and `action-text` the accent as
      words, on any ground and on either tint. */
@@ -111,7 +111,7 @@ export const GROUNDS = [...SURFACES, 'board', 'tile', 'field'] as const satisfie
  * which the dialect refuses in a role (`parseColour`: "No alpha"), and a theme has no key for them, the same as
  * elevation. Emitted beside the palette in every scheme block.
  *
- * 2026-10-07, THE GLASS AND THE GROUND'S LIGHT ARE GONE (DIRECTION §39: "no glass, no gradients"). Six values went
+ * 2026-10-07, THE GLASS AND THE GROUND'S LIGHT ARE GONE ("no glass, no gradients"). Six values went
  * with them (`glass`, `glass-strong`, `glass-rim`, `glass-hair`, `glass-sat`, `ground-glow`); a host that still names
  * one gets the tile from the skin (`base.css`), and the light falls on nothing.
  */
@@ -241,13 +241,13 @@ export type AimRole =
  * #4A505B fell just under its 6.5 floor), ink-3 #5C626D at 4.91:1, red words #BD181E at 5.08:1, and green #067342
  * at 4.79:1, where the floor alone would have set green at exactly 4.5.
  *
- * 2026-10-08, LIGHT RED IS THE DEEPER RED, AS A MARK AND AS WORDS (DIRECTION §42). BrainDog red, #CF413A, is the working
+ * 2026-10-08, LIGHT RED IS THE DEEPER RED, AS A MARK AND AS WORDS. BrainDog red, #CF413A, is the working
  * accent now, so late and "needs you" step a shade deeper to #B3322C, the pressed red, and are one value in both jobs
  * the way dark's red already was. It is not apart from the working red by colour alone and is never asked to be: a late
  * thing carries its word or its mark, and a late bar its hatch (`separation.test.ts`). The mark keeps the logo's red;
  * a badge stopped being the logo on the day the buttons went red.
  *
- * 2026-10-07, THE BOARD AND THE TILE, AT DIRECTION §39'S OWN VALUES: light board #F3F4F6 under a white tile, dark board
+ * 2026-10-07, THE BOARD AND THE TILE, AT THE ONE-BOARD LOOK'S OWN VALUES: light board #F3F4F6 under a white tile, dark board
  * #0D1014 under #161A20. Each carries its own hue, read off the hex, so the value that ships is the value named. They
  * have no floor to be moved by: both sit inside the band the five rungs already span, so every ink solved on the
  * worst rung clears them too, and check A proves it on them.
@@ -261,7 +261,7 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
     dim: { L: 0.5362, C: 0.0159, H: 258.4 }, //  #686E77, Look B's muted
     faint: { L: 0.5362, C: 0.0159, H: 258.4 },
     line: { L: 0.9215, C: 0.0058, H: 264.5 }, // #E3E5E9, Look B's rule
-    danger: { L: 0.5137, C: 0.1667, H: 27.4 }, //    #B3322C, the deeper red (DIRECTION §42)
+    danger: { L: 0.5137, C: 0.1667, H: 27.4 }, //    #B3322C, the deeper red
     'danger-text': { L: 0.5137, C: 0.1667, H: 27.4 }, // #B3322C
     earn: { L: 0.5285, C: 0.1061, H: 154.6 }, //   #2E7D4F, Look B's good
     warn: { L: 0.5198, C: 0.133, H: 52.4 }, //     #A24E00
@@ -460,14 +460,14 @@ export type Seed = {
    * Omitted, `action` is solved from `accent`, which is what a record's own colour asks for: the person picks a
    * green and the buttons, the links, the selection and the charts go green. The house is the one seed whose working
    * colour is not solved from its accent (the accent is the mark's red, the working colour BrainDog red, #CF413A, a
-   * named pair with its pressed step since DIRECTION §42), so it names both here.
+   * named pair with its pressed step), so it names both here.
    *
    * KEYED BY `accent` BECAUSE A SEED IS SPREAD. `{ ...HOUSE_SEED, accent }` is how a look, an environment or a record
    * starts from the house, and a pin that travelled with the spread would keep the house red under every colour
    * anybody chose: the control would report success and paint the same buttons. A pin whose `accent` is not the seed's
    * is ignored, and the action is solved from the colour that is there.
    *
-   * `pressed` PINS THE FILL UNDER THE POINTER, per scheme, and only beside the same accent. 2026-10-08 (DIRECTION §42):
+   * `pressed` PINS THE FILL UNDER THE POINTER, per scheme, and only beside the same accent. 2026-10-08:
    * the house's light hover is its pressed red, #B3322C, a named colour rather than a step the generator would pick. A
    * scheme it does not name keeps the solved step, which walks away from the label.
    */
@@ -947,7 +947,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     place('live-fill', profile.intentFill, () => solveL(profile.intentFill, 0.16, LIVE_HUE, worst, dir)),
   );
 
-  /* 8 · THE BOARD (DIRECTION §39). The board and the tile at their aims, or the ground and the panel where a profile
+  /* 8 · THE BOARD. The board and the tile at their aims, or the ground and the panel where a profile
      names none; the field is the step a control sits on, one rung off the tile: `s2` in light, where the steps go
      down from a white tile, and `s3` in dark, where they go up. */
   const board = aims.board ? hex(place('board', null, () => acc)) : g.sunk;
@@ -960,7 +960,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      the colour their buttons are; in dark a lighter step of it, as light as the design's old blue was (L 0.72) and no
      more saturated, because a mid-tone fill on a near-black tile reads as a hole and its words as mud.
 
-     2026-10-08 (DIRECTION §42), THE HOUSE PIN IS RED. BrainDog red, #CF413A, in light, with #B3322C under the pointer;
+     2026-10-08, THE HOUSE PIN IS RED. BrainDog red, #CF413A, in light, with #B3322C under the pointer;
      in dark the nearest red of that hue whose label and whose hover both clear their floors (`HOUSE_SEED`, ELEVEN). */
   const pinned = seed.action && toHex(rgb(seed.action.accent)) === toHex(rgb(seed.accent)) ? seed.action : null;
   const pin = pinned ? pinned[scheme] : null;
@@ -1093,7 +1093,7 @@ function arrival(p: Palette, profile: Profile, scheme: Scheme): string {
  * The washes of one scheme.
  *
  * 2026-10-07, THE HOVER WASH IS THE INK, AND IT WAS WHITE. White at 60% lifted a row off the grey ground, which is where
- * rows sat; a row lives in a tile on the board now (DIRECTION §39), and white over a white tile is no wash at all. The
+ * rows sat; a row lives in a tile on the board now, and white over a white tile is no wash at all. The
  * ink at 5% darkens a light tile and lightens a dark one, so one rule answers both schemes, and every word on it keeps
  * its floor (`theme.test.ts`). A CHOSEN ROW IS THE ACCENT'S FIRST TINT, which every word it carries is solved to clear.
  */
@@ -1229,7 +1229,7 @@ const cats = (scheme: Scheme) =>
     ]),
   );
 
-/** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as he decided them (0.1 item 2, 0.2, C1). */
+/** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as decided (0.1 item 2, 0.2, C1). */
 export const HOUSE_FRAME: Record<Scheme, Frame> = {
   light: {
     board: '#F3F4F6',
@@ -1269,12 +1269,16 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     ...cats('light'),
   } as Frame,
   dark: {
-    board: '#0F121A',
+    /* 2026-10-22, THE BOARD A STEP DARKER AND THE BAR ON IT (UI audit of 22 October, 26). A tile measured 1.09:1 against
+       #0F121A, so in dark the tiles barely parted from the page, and the bar was a navy of its own (#171B33) that read
+       as another product's. The tile stays where every ink and intent on it was solved, and the board goes down to
+       #090B10 under it; the bar is the board, and its chosen place the well's colour, as in light. */
+    board: '#090B10',
     tile: '#181C27',
     'tile-2': '#222837',
     hover: '#1E2331',
-    nav: '#171B33',
-    'nav-selected': '#272B4A',
+    nav: '#090B10',
+    'nav-selected': '#222837',
     rule: '#2A3141',
     'rule-strong': '#384054',
     scrim: 'rgb(5 7 12 / 0.6)',

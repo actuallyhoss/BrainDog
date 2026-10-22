@@ -35,14 +35,13 @@ export { KPI_BACKFILL_SCRIPT } from './modules/portfolio/kpi-backfill.js';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
-import { BASE_PAGES, NOW, day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
+import { BASE_PAGES, NOW, day, hours, type Fields, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import {
   ACCOUNTS,
   CATEGORIES,
   INSTALLMENTS,
   MONEY_AUTOMATIONS,
   MONEY_HOME_SETTING,
-  MONEY_METRICS,
   MONEY_PAGES,
   MONEY_REGISTERS,
   MONEY_RULES,
@@ -55,11 +54,11 @@ import {
 } from './modules/money.ts';
 import { STARTER_CATEGORIES } from './modules/money/lists/categories.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
-import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
+import { ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
-import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
-import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
-import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
+import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
+import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
+import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 import { HEALTH_PAGES } from './modules/health.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
@@ -168,7 +167,9 @@ export const ROWS: Record<string, readonly Fields[]> = {
 
 
 /* ── the metrics it ships with ──────────────────────────────────── */
-export const METRICS: Record<string, SeedMetric> = { ...MONEY_METRICS, ...ESTATE_METRICS, ...PROJECT_METRICS, ...WORK_METRICS, ...PEOPLE_METRICS };
+/* Built in `metrics.ts` from the five modules' own tables, so a screen can read them without this file (`@braindog/seed/packs/metrics`). */
+import { METRICS } from './modules/metrics.ts';
+export { METRICS };
 
 
 

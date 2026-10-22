@@ -32,8 +32,8 @@ test('THE RULE LIST IS CLOSED AND SAYS ITSELF: seventeen rules, each named once,
 });
 
 test('placeholder: a figure with no answer is the hole, named by its last word', () => {
-  const f = red(lintHtml(draw('```stat\nMonthly | {{revenue.mrr}}\nChurn | {{metrics.churn30d}}\n```'), { name: 'Crumb.gg' }), 'placeholder');
-  assert.deepEqual(f, { rule: 'placeholder', part: 'Crumb.gg', said: 'Prints 2 placeholders where values go: mrr, churn30d.' });
+  const f = red(lintHtml(draw('```stat\nMonthly | {{revenue.mrr}}\nChurn | {{metrics.churn30d}}\n```'), { name: 'Oxbow.gg' }), 'placeholder');
+  assert.deepEqual(f, { rule: 'placeholder', part: 'Oxbow.gg', said: 'Prints 2 placeholders where values go: mrr, churn30d.' });
   assert.deepEqual(lintHtml(draw('```stat\nMonthly | {{revenue.mrr}}\n```', { 'revenue.mrr': '£4,200' })), []);
 });
 
@@ -150,7 +150,7 @@ test('dev-name: his Decide on 7 October, a name from the code where a sentence s
   red(lintText("infer.resolve could not be delivered after 8 attempts: No model answered for 'glm-5.3-flash'", { name: 'Decide', theirs: true }), 'dev-name');
   red(lintText('Waiting on the run of card-alerts-import-daily'), 'dev-name');
   /* A site, a file, a mail address, plain English hyphens, a name standing alone, and one in the middle of his own note. */
-  assert.deepEqual(lintText('Crumb.gg is live at crumb.gg and brain.dog; notes in plan.md and package.json, mail tima@quartz.studio'), []);
+  assert.deepEqual(lintText('Oxbow.gg is live at oxbow.gg and brain.dog; notes in plan.md and package.json, mail ines@harbour.example'), []);
   assert.deepEqual(lintText('Move kilnfonts.example off auto-renew, and keep sending from portagemail.example'), [], "the seed's sample sites");
   assert.deepEqual(lintText('An up-to-date, pay-as-you-go plan, end-to-end'), []);
   assert.deepEqual(lintText('gstack-openclaw-ceo-review'), []);
@@ -201,7 +201,7 @@ test('NO RULE READS CODE: a span in backticks or a type\'s angle brackets, in th
 
 test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sample is never read', () => {
   const src = [
-    '# Crumb.gg',
+    '# Oxbow.gg',
     '',
     'Earning **{{revenue.monthly}}** a month, and {{blockers.count}} things in the way.',
     '',
@@ -228,7 +228,7 @@ test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sa
     '```',
     '',
     '- Ship the trial page',
-    '- Ask Tima about the pricing',
+    '- Ask Ines about the pricing',
     '',
     '```code',
     'run S731 at 2026-10-06T19:07:01.610Z on tools#8 {{revenue.monthly}}',
@@ -236,16 +236,16 @@ test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sa
   ].join('\n');
   const html = draw(src, { 'revenue.monthly': '£4,200', 'blockers.count': '2', 'metrics.payers': '31' });
   assert.match(html, /S731/, 'the code sample is drawn, and the lint does not read it');
-  assert.deepEqual(lintPage({ name: 'Crumb.gg', html, parts: [{ name: 'Who is paying', text: '31 people pay, newest on 6 Oct' }] }), []);
+  assert.deepEqual(lintPage({ name: 'Oxbow.gg', html, parts: [{ name: 'Who is paying', text: '31 people pay, newest on 6 Oct' }] }), []);
   assert.deepEqual(lintPage(html), []);
 });
 
 test('A PAGE NAMES EACH PART IN ITS FINDINGS, its own HTML under its own name', () => {
   const fs = lintPage({
-    name: 'Crumb.gg',
+    name: 'Oxbow.gg',
     html: draw('```stat\nMonthly | {{revenue.mrr}}\n```'),
     parts: [{ name: 'Activity', text: 'Run S731 read the bank at 2026-10-06T19:07:01.610Z' }],
   });
-  assert.deepEqual(fs.map((f) => [f.part, f.rule]), [['Crumb.gg', 'placeholder'], ['Activity', 'raw-id'], ['Activity', 'raw-instant']]);
+  assert.deepEqual(fs.map((f) => [f.part, f.rule]), [['Oxbow.gg', 'placeholder'], ['Activity', 'raw-id'], ['Activity', 'raw-instant']]);
   assert.deepEqual(rules(lintPage({ name: 'Empty' })), []);
 });

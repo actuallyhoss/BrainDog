@@ -39,6 +39,11 @@ export type ModuleInfo = {
   registers: readonly string[];
   /** The pages it declares, by id. */
   pages: readonly string[];
+  /**
+   * Of those, the pages drawn for each row of a list (a declaration with `for`, titled `{{name}}`): a person's page, an
+   * organisation's. They are not pages a person opens by name, so a screen listing what a module adds leaves them out.
+   */
+  rowPages: readonly string[];
   /** What each of its lists and pages is called, by id. */
   titles: Readonly<Record<string, string>>;
   /** The other modules it cannot install without, read off the lists its manifest requires. */
@@ -65,6 +70,7 @@ function infoOf(id: string, doc: Body, version: string, requires: readonly strin
   const declarations = Array.isArray(doc.declarations) ? (doc.declarations as Body[]) : [];
   const registers: string[] = [];
   const pages: string[] = [];
+  const rowPages: string[] = [];
   const titles: Record<string, string> = {};
   for (const d of declarations) {
     /* A RULE, A SCRIPT OR A PATTERN may name the list it acts on with `register`, and is not a list itself. */
@@ -74,6 +80,7 @@ function infoOf(id: string, doc: Body, version: string, requires: readonly strin
       if (typeof d.name === 'string') titles[d.register] = d.name;
     } else if (typeof d.page === 'string') {
       pages.push(d.page);
+      if (typeof d.for === 'object' && d.for !== null) rowPages.push(d.page);
       if (typeof d.title === 'string') titles[d.page] = d.title;
     }
   }
@@ -85,6 +92,7 @@ function infoOf(id: string, doc: Body, version: string, requires: readonly strin
     author: typeof doc.author === 'string' ? doc.author : 'BrainDog',
     registers,
     pages,
+    rowPages,
     titles,
     leans: leansOf(id, requires),
     signals,

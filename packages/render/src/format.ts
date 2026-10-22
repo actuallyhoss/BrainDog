@@ -470,6 +470,22 @@ export function day(iso: string): string {
 }
 
 /**
+ * THE ONE WAY A DAY IS SAID TO A PERSON: "4 Sep" in the reader's year, "4 Sep 2025" in any other. The Board said
+ * "30 Aug 2026" beside a list that said "4 Sep", and a person's page said "Seen in 2026-08-28": three spellings of a
+ * day on three screens. A day this cannot read comes back as it came, as `day()` does. An instant is said by its day.
+ */
+export function dateSaid(iso: string, now: number = Date.now()): string {
+  const d = iso.slice(0, 10);
+  const t = noon(d);
+  if (t === null) return iso;
+  return d.slice(0, 4) === String(new Date(now).getFullYear()) ? dayShort(d) : day(d);
+}
+
+/** A day left in a sentence as the record keeps it ("renews 2026-09-10") said as a person says it ("renews 10 Sep"). */
+export const datesIn = (text: string, now: number = Date.now()): string =>
+  text.replace(/(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\dT:-])/gu, (d) => dateSaid(d, now));
+
+/**
  * The moment, to the minute, for the one screen where a band is not enough.
  *
  * `since()` ANSWERS "HOW LONG AGO" AND THE LEDGER IS ASKED "WHEN". Its bands are what a person
@@ -743,8 +759,24 @@ export const yesno = (v: boolean): string => (v ? 'yes' : 'no');
 /** Stored values that are initialisms, spelled the way a person writes them. */
 const INITIALISMS: Readonly<Record<string, string>> = {
   saas: 'SaaS', api: 'API', vat: 'VAT', url: 'URL', dns: 'DNS', ssl: 'SSL', tls: 'TLS', seo: 'SEO',
-  ai: 'AI', mcp: 'MCP', cli: 'CLI', paye: 'PAYE', cis: 'CIS',
+  ai: 'AI', mcp: 'MCP', cli: 'CLI', paye: 'PAYE', cis: 'CIS', pr: 'PR', ci: 'CI', ui: 'UI', ux: 'UX', qa: 'QA', sql: 'SQL',
+  css: 'CSS', html: 'HTML', pdf: 'PDF',
 };
+
+/** A name kept as a machine keeps it: lower case, its words joined by hyphens or underscores, `review-pr`. */
+const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$/u;
+
+/**
+ * A NAME KEPT AS A SLUG, SAID AS WORDS: `review-pr` is "Review PR" and `write-release-notes` is "Write release notes".
+ * A skill is named the way an agent finds it on disk, and its page was titled "review-pr". Anything that is not a slug
+ * is a person's own words and comes back as it was written.
+ */
+export function slugWords(name: string): string {
+  if (!SLUG.test(name)) return name;
+  const words = name.split(/[-_]/u).map((w) => (Object.hasOwn(INITIALISMS, w) ? INITIALISMS[w]! : w));
+  const first = words[0]!;
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...words.slice(1)].join(' ');
+}
 
 /**
  * A STORED VALUE AS A WORD. A board groups on a status and a chips block counts by a kind, and

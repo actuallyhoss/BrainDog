@@ -234,7 +234,7 @@ test('the project form draws the lead with its chart, the grid, the off-target w
 });
 
 test('with no fix given the stale line is said and nothing is pressed; Today rows wear their own colour', () => {
-  const stale = { name: 'Players', project: 'Marsh.gg', slot: 'pink', why: 'Not updated for 19 days', points: days([1, 2, 3], '2026-10-02', 2) };
+  const stale = { name: 'Players', project: 'Driftwood.gg', slot: 'pink', why: 'Not updated for 19 days', points: days([1, 2, 3], '2026-10-02', 2) };
   const body = render(Kpis, { props: { kpis: [stale], form: 'today', now: NOW } }).body;
   assert.match(body, /<div class="kpis" data-form="today">/u);
   assert.match(body, /<li class="kpi kpi-row" style="--chart-1:var\(--cat-pink\)" data-state="stale"/u);

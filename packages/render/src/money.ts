@@ -22,7 +22,7 @@
  *   `axis` (a chart's axis only)        compact                      EGP 31k
  *
  * A CURRENCY ENGLISH WRITES BY ITS CODE HAS NO SIGN, even where the runtime knows a narrow one: the Egyptian pound
- * is `EGP`, as the franc is `CHF`, never `E£` (his word, 9 October). So no figure reads `E£1,299.00 EGP`, with or
+ * is `EGP`, as the franc is `CHF`, never `E£` (settled on 9 October). So no figure reads `E£1,299.00 EGP`, with or
  * without a home currency.
  *
  * NEVER CUT, NEVER ROUNDED off an axis. The amount is a run of digits from the moment it is read to the moment it

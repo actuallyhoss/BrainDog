@@ -50,45 +50,49 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.13.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.14.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.13.0');
+  assert.equal(pack.manifest.version, '1.14.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.13.0, and it names the new page, where it opens from and the skills that changed', () => {
+test('THE NEWEST CHANGE NOTE IS 1.14.0, and it names what the page opens on and the tiles it gained', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.13.0');
+  assert.equal(newest.version, '1.14.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
-  assert.match(newest.notes, /How the brain changed/);
-  assert.match(newest.notes, /What the brain learned/);
-  assert.match(newest.notes, /Faded/);
-  assert.match(newest.notes, /how many skills changed/);
+  assert.match(newest.notes, /how many are at work, on how many machines and how many wait on you/);
+  assert.match(newest.notes, /At work/);
+  assert.match(newest.notes, /Left for the next run/);
+  assert.match(newest.notes, /Machines and profiles/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
 
 /* A VERSION SAID IS NEVER SAID AGAIN IN OTHER WORDS: 1.10.0 is on records, so its note stays as it was written, the
-   plain-text keys line and all, and 1.11.0, 1.12.0 and 1.13.0 are notes beside it, 1.11.0's and 1.12.0's as they were
-   written too. */
-test('THE 1.10.0, 1.11.0 AND 1.12.0 NOTES ARE AS THEY WERE WRITTEN, with 1.13.0 beside them and not in their place', () => {
+   plain-text keys line and all, and 1.11.0, 1.12.0, 1.13.0 and 1.14.0 are notes beside it, 1.11.0's, 1.12.0's and
+   1.13.0's as they were written too. */
+test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 5), ['1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 6), ['1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
     MODULE_CHANGES.agents[1]!.notes,
-    'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
+    'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
   );
   assert.equal(
     MODULE_CHANGES.agents[2]!.notes,
-    'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
+    'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
   );
   assert.equal(
     MODULE_CHANGES.agents[3]!.notes,
+    'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
+  );
+  assert.equal(
+    MODULE_CHANGES.agents[4]!.notes,
     'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
   );
 });
@@ -132,7 +136,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.13.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.14.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -272,7 +276,7 @@ const headed = (blocks: Drawn[], heading: string): Drawn => {
   return found;
 };
 
-test('/p/agents: the runs grouped, what a run asked first, then working, today and earlier, and what they added', async () => {
+test('/p/agents: the runs grouped, what a run asked first, then at work, today and earlier, and what they added', async () => {
   const { k, sql } = await seeded();
   /* A RUN THAT STOPPED YESTERDAY WITH A NEXT STEP, and one still marked active that nobody closed, both Earlier, beside
      the seed's two that finished yesterday (a finished run is listed since 1.12.0); and a question a run asked beside
@@ -287,11 +291,12 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   value(k.propose({ question: 'Slash asks about a page', body_kind: 'options', body: OPTIONS }, 'slash'));
   const all = opened(k, 'agents');
   for (const b of all) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
-  /* THE GROUPS OF RUNS, without the day's lanes, which stand under Today’s runs with the runs that stopped today. */
-  const blocks = all.filter((b) => b.kind !== 'lanes');
+  /* THE GROUPS OF RUNS. The page declares no lanes since 1.14.0: the day is the host's, under Today’s runs. */
+  const blocks = all;
+  assert.equal(all.filter((b) => b.kind === 'lanes').length, 0, 'the page still declares lanes of its own');
 
-  const groups = blocks.filter((b) => ['Needs you', 'Working', 'Today’s runs', 'Earlier'].includes(String(b.heading))).map((b) => b.heading);
-  assert.deepEqual(groups, ['Needs you', 'Working', 'Today’s runs', 'Earlier'], 'the runs are not grouped in the order the direction gives');
+  const groups = blocks.filter((b) => ['Needs you', 'At work', 'Today’s runs', 'Earlier'].includes(String(b.heading))).map((b) => b.heading);
+  assert.deepEqual(groups, ['Needs you', 'At work', 'Today’s runs', 'Earlier'], 'the runs are not grouped in the order the direction gives');
 
   const asked = (headed(blocks, 'Needs you') as Drawn & { queue?: { question?: string }[] }).queue ?? [];
   assert.deepEqual(asked.map((q) => q.question).sort(), ['Raise the retainer?', 'Retire the old Fenwick key?'], 'Needs you holds a question no run asked');
@@ -299,19 +304,15 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   const seen = (a: (typeof RUNS)[number], z: (typeof RUNS)[number]) => String(z.last_seen).localeCompare(String(a.last_seen));
   const today = (r: (typeof RUNS)[number]) => String(r.last_seen).slice(0, 10) === new Date(NOW).toISOString().slice(0, 10);
   const working = RUNS.filter((r) => r.state === 'active' && today(r)).sort(seen);
-  /* WORKING IS THE HOST'S LIVE PART SINCE THE CONTROL ROOM (`panel: presence`, agents and MCP plan §7.1): the runs open
-     now are read from the record's `presence`, not drawn as rows of the page, and the line counts the runs working. */
-  assert.equal((headed(blocks, 'Working') as Drawn & { panel?: string }).panel, 'presence', 'Working is not the runs open now');
+  /* AT WORK IS THE HOST'S LIVE PART SINCE THE CONTROL ROOM (`panel: presence`, agents and MCP plan §7.1): the runs open
+     now are read from the record's `presence`, not drawn as rows of the page, and the line counts the runs at work. */
+  assert.equal((headed(blocks, 'At work') as Drawn & { panel?: string }).panel, 'presence', 'At work is not the runs open now');
   assert.equal(reading(k, 'runs-working'), working.length, 'a stopped run is counted as working');
-  const stopped = RUNS.filter((r) => r.state !== 'active' && today(r)).sort(seen);
-  assert.ok(stopped.length > 0, 'the seed has no run that stopped today');
-  /* THE RUNS THAT STOPPED TODAY ARE LANES, SINCE THE UI PASS OF 20 OCTOBER (agents F7): the day's tile holds the lanes
-     alone, so no cards stand under them to say 1 where the lanes draw 3. */
-  const under = all[all.indexOf(headed(all, 'Today’s runs')) + 1]!;
-  assert.equal(under.kind, 'lanes', 'the lanes are not right under Today’s runs');
-  assert.notEqual(all[all.indexOf(under) + 1]!.kind, 'cards', 'cards still stand under the day’s lanes');
-  const laned = ((under as Drawn & { lanes?: { title: string }[] }).lanes ?? []).map((l) => l.title);
-  for (const r of stopped) assert.ok(laned.some((t) => t.includes(String(r.doing).slice(0, 12))), `${r.doing} stopped today and has no lane`);
+  /* THE RUNS OF TODAY ARE THE HOST'S, SINCE 1.14.0 (`panel: run-list`): the day as lanes a kind of agent and every run
+     under it, so no declared block stands under the heading to draw them a second time. */
+  const day = headed(all, 'Today’s runs') as Drawn & { panel?: string };
+  assert.equal(day.panel, 'run-list', 'Today’s runs is not the host’s list of runs');
+  assert.equal(all[all.indexOf(day) + 1]!.kind, 'section', 'a block stands under Today’s runs');
   /* EARLIER IS A FOLD SINCE 1.11.0: its heading counts the runs and the cards right under it are the runs. */
   const fold = headed(blocks, 'Earlier');
   const earlier = blocks[blocks.indexOf(fold) + 1]!;
@@ -342,63 +343,21 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
 });
 
 /**
- * THE DAY AS LANES, SINCE 1.8.0: the last 24 hours, one lane for each run from when it started to when it was last heard
- * from, the working ones toned, under the page's line and over the groups. Read off a seeded record's page answer, so
- * the block is declared against the field the kernel really keeps (`started`, its migration 26). A RUN AT WORK NOW (the
- * kernel's one clock: active and heard from inside fifteen minutes) has no end: its lane runs to now and says "Since".
+ * THE DAY AS LANES, SINCE 1.8.0, AND THE HOST'S SINCE 1.14.0: the declared lanes drew a lane a run, forty bars on a busy
+ * day, and stood under Today’s runs over the host's own list of the same runs. The host draws the day now, a lane a kind
+ * of agent over the list (`agentDay` in `apps/web/src/lib/record/all-runs.ts`), and the page declares none. The figure
+ * the lanes were drawn on stays, for an agent that reads it, and counts the runs heard from today.
  */
-test("TODAY'S LANES ARE THE RUNS OF THE LAST 24 HOURS, each from its start to when it was last heard from, or to now while it works", async () => {
-  const { k, sql } = await seeded();
-  type Lanes = Drawn & { lanes?: { title: string; start: string; end: string | null; tone?: string; href?: string }[]; window?: { from: string; to: string } };
-  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; lead?: boolean; heading?: string; limit?: number }[];
-  const tile = declared.findIndex((b) => b.heading === 'Today’s runs');
-  assert.ok(tile > 0 && declared[tile + 1]!.kind === 'lanes', 'the lanes are not the first thing under Today’s runs');
+test("TODAY'S RUNS IS THE HOST'S, OVER NO LANES OF THE PAGE'S OWN, and the runs heard from today are still counted", async () => {
+  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; when?: unknown; box?: boolean }[];
+  assert.equal(declared.filter((b) => b.kind === 'lanes').length, 0, 'the page still declares lanes');
+  assert.deepEqual(declared.find((b) => b.heading === 'Today’s runs'), { kind: 'section', heading: 'Today’s runs', icon: 'clock', span: 12, panel: 'run-list' });
   assert.equal(declared.filter((b) => b.heading === 'Today').length, 0, 'a second tile is headed Today');
-  assert.equal(declared.find((b) => b.kind === 'lanes')?.limit, undefined, 'lanes refuse a limit');
-
-  const block = opened(k, 'agents').find((b) => b.kind === 'lanes') as Lanes | undefined;
-  assert.ok(block, 'the agents page draws no lanes on a record with runs heard from today');
-  assert.equal(block.heading, undefined, 'the lanes carry a heading of their own over Today’s runs');
-  assert.deepEqual(block.refusals, [], JSON.stringify(block.refusals));
-  /* EVERY RUN THAT OVERLAPS THE DAY, a finished one included, in the order they started; one that ended before is out. */
-  const from = NOW - 24 * 3_600_000;
-  const inDay = RUNS.filter((r) => Date.parse(String(r.last_seen)) >= from).sort((a, z) => String(a.started).localeCompare(String(z.started)));
-  assert.ok(inDay.length >= 3 && inDay.length < RUNS.length, 'the seed needs runs inside the day and outside it');
-  assert.deepEqual(
-    block.lanes?.map((l) => ({ title: l.title, start: l.start, end: l.end, tone: l.tone })),
-    inDay.map((r) => ({
-      title: r.doing,
-      start: r.started,
-      end: r.state === 'active' && NOW - Date.parse(String(r.last_seen)) < 15 * 60_000 ? null : r.last_seen,
-      tone: r.state === 'active' ? 'info' : undefined,
-    })),
-  );
-  assert.ok((block.lanes ?? []).some((l) => l.end === null), 'the seed needs a run at work, drawn to now');
-  for (const l of block.lanes ?? []) {
-    if (l.end !== null) assert.ok(Date.parse(l.start) < Date.parse(l.end), `${l.title} ends before it starts`);
-    assert.match(String(l.href), /^\/r\/session\/\d+$/u, `${l.title} opens no run`);
-  }
-  assert.equal(Date.parse(block.window!.to) - Date.parse(block.window!.from), 24 * 3_600_000);
-  /* AND THE FIGURE IT IS DRAWN ON COUNTS THE RUNS HEARD FROM TODAY, so a day nobody worked draws no empty track. */
+  const { k, sql } = await seeded();
   const today = new Date(NOW).toISOString().slice(0, 10);
   const read = k.metric(k.metricDecl('runs-heard-today')!);
   assert.ok(read.ok, JSON.stringify(read));
   assert.equal(read.value.value, RUNS.filter((r) => String(r.last_seen).slice(0, 10) === today).length);
-  assert.deepEqual((AGENTS_PAGES.agents!.blocks as { kind: string; when?: unknown }[]).find((b) => b.kind === 'lanes')?.when, { metric: 'runs-heard-today', gt: 0 });
-  sql.close();
-});
-
-/** AND ON A DAY NO RUN WAS HEARD FROM THE TILE IS LEFT OUT, the same record read three days on: no empty track. */
-test("TODAY'S LANES ARE NOT DRAWN ON A DAY NO RUN WAS HEARD FROM", async () => {
-  const sql = openSqlite();
-  const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock);
-  value(await installSeed(k));
-  const lanes = (): Drawn & { drawn?: boolean } => opened(k, 'agents').find((b) => b.kind === 'lanes')!;
-  assert.notEqual(lanes().drawn, false, 'the sample has runs heard from today');
-  clock.advance(3 * 24 * 3_600_000);
-  assert.equal(lanes().drawn, false, 'a quiet day draws the lanes');
-  assert.deepEqual(lanes().refusals, []);
   sql.close();
 });
 
@@ -423,30 +382,36 @@ test('WORKING NOW IS THE RUNS HEARD FROM IN THE LAST FIFTEEN MINUTES, and the li
   sql.close();
 });
 
-test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: Working is the record\'s `presence` and the line `runs-working`', () => {
+test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` and the line the record\'s counts', () => {
   assert.deepEqual(Object.keys(AGENTS_MODULE).filter((name) => /WORKING/u.test(name)), [], 'the pack still exports its own clause for working');
   assert.equal(JSON.stringify(agentsPackDocument()).includes('agents-working'), false, 'the pack still declares or reads its own working figure');
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; when?: { metric?: string }; lead?: boolean; body?: string }[];
-  const working = blocks.find((b) => b.heading === 'Working') as { kind: string; panel?: string; source?: string; where?: unknown; when?: unknown } | undefined;
-  assert.deepEqual([working?.kind, working?.panel, working?.source], ['section', 'presence', undefined], 'Working is not the runs open now');
+  const working = blocks.find((b) => b.heading === 'At work') as { kind: string; panel?: string; source?: string; where?: unknown; when?: unknown } | undefined;
+  assert.deepEqual([working?.kind, working?.panel, working?.source], ['section', 'presence', undefined], 'At work is not the runs open now');
   assert.equal(working?.where, undefined, 'the working source takes no clause');
   assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
   const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
-  assert.equal(lines.length, 2);
-  for (const line of lines) assert.equal(line.when?.metric, 'runs-working', `${line.body} is not held to the record's count`);
-  assert.match(lines[0]!.body!, /^\{\{runs-working\}\} agent\(s\) working now/u);
-  /* AND WHAT WAS LEFT IS THE RECORD'S COUNT TOO, SINCE 1.11.0: the steps nobody has taken, the ones the cards draw. */
+  /* THREE SINCE 1.14.0, ON THE MACHINES AT WORK, so exactly one is drawn: many, one, or none. */
+  assert.equal(lines.length, 3);
+  assert.deepEqual(lines.map((l) => l.when), [
+    { metric: 'machines-working', gt: 1 },
+    { metric: 'machines-working', is: 1 },
+    { metric: 'machines-working', is: 0 },
+  ]);
+  /* EVERY NUMBER THE RECORD'S: at work and waiting by the rail's clock, and what was left the steps nobody has taken. */
   assert.deepEqual(lines.map((l) => l.body), [
-    '{{runs-working}} agent(s) working now, {{handoffs-open}} step(s) left for the next run',
-    'No agent is working right now, and {{handoffs-open}} step(s) left for the next run',
+    '{{runs-working}} at work on {{machines-working}} machines, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
+    '{{runs-working}} at work on one machine, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
+    'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
   ]);
 });
 
 /**
- * LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12 job c): the steps runs left and nobody has taken, as cards under Working
- * and over Today, read from the record's own `handoffs.open`, the read a new run is handed its step from. The line
- * counts the same steps (`handoffs-open`), where it counted every stopped run with a step written, taken or not.
+ * LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12 job c): the steps runs left and nobody has taken, read from the record's
+ * own `handoffs.open`, the read a new run is handed its step from. The line counts the same steps (`handoffs-open`).
+ * As 1.13.0 declared it, cards a step; the host's since 1.14.0 (`panel: left-steps`), one line a step, beside At work.
  */
+const STEPS_14 = { kind: 'section', heading: 'Left for the next run', icon: 'arrow', span: 5, panel: 'left-steps' };
 const STEPS = {
   kind: 'cards',
   heading: 'Left for the next run',
@@ -463,20 +428,17 @@ const STEPS = {
   when: { metric: 'handoffs-open', gt: 0 },
 };
 
-test('LEFT FOR THE NEXT RUN IS DECLARED over the steps nobody has taken, after Working and before Today’s runs', () => {
-  const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; order?: unknown; empty?: string }[];
+test('LEFT FOR THE NEXT RUN IS THE HOST’S over the steps nobody has taken, beside At work and before Today’s runs', () => {
+  const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; span?: number }[];
   const at = blocks.findIndex((b) => b.heading === 'Left for the next run');
   assert.ok(at > 0, 'no block is headed Left for the next run');
-  assert.deepEqual(blocks[at], STEPS);
-  assert.equal(blocks[at - 1]!.heading, 'Working', 'the steps are not right under Working');
+  assert.deepEqual(blocks[at], STEPS_14);
+  /* BESIDE AT WORK: seven parts of the row and five, so the two read as one row. */
+  assert.equal(blocks[at - 1]!.heading, 'At work', 'the steps are not right after At work');
+  assert.equal(blocks[at - 1]!.span! + blocks[at]!.span!, 12, 'At work and the steps are not one row');
   assert.deepEqual([blocks[at + 1]!.kind, blocks[at + 1]!.heading], ['section', 'Today’s runs'], 'the steps are not right over the day’s runs');
-  /* EVERY STEP, the ones passed over too, each saying which it is: no clause narrows them, and the newest comes first
-     by the source's own order, which takes none. */
-  const steps = (AGENTS_PAGES.agents!.blocks as { where?: unknown; order?: unknown; empty?: string }[])[at]!;
-  assert.equal(steps.where, undefined);
-  assert.equal(steps.order, undefined);
-  assert.equal(steps.empty, undefined, 'the steps say they are empty where the line already does');
-  assert.equal(blocks.filter((b) => b.source === 'handoffs.open').length, 1);
+  /* THE PANEL READS THE STEPS ITSELF, so no declared block reads them a second time. */
+  assert.equal(blocks.filter((b) => b.source === 'handoffs.open').length, 0);
 });
 
 /** A small list a run can write to, so the record opens a run for it as it does for any agent. */
@@ -497,10 +459,12 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
   value(await installAgentsPack(k));
   type Line = Drawn & { drawn?: boolean; lead?: boolean; values?: Record<string, unknown> };
   const lines = () => (opened(k, 'agents') as Line[]).filter((b) => b.kind === 'note' && b.lead === true);
-  const steps = () => (opened(k, 'agents') as Line[]).find((b) => b.heading === 'Left for the next run');
+  /* THE READ `panel: left-steps` MAKES (`apps/web/src/lib/page/panels/StepsPanel.svelte`): the open steps, the newest first. */
+  const steps = () =>
+    k.block({ kind: 'cards', source: 'handoffs.open', columns: [{ field: 'next', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'left_at', as: 'when' }, { field: 'mark' }], limit: 50 } as never) as unknown as Line;
 
-  /* NOTHING LEFT: no cards, and the line that is drawn reads nought, which the host leaves out of the sentence. */
-  assert.equal(steps()?.drawn, false, 'the steps are drawn over nothing');
+  /* NOTHING LEFT: no step, and the line that is drawn reads nought, which the host leaves out of the sentence. */
+  assert.equal(steps().rows.length, 0, 'a step is read where none was left');
   assert.equal(reading(k, 'handoffs-open'), 0);
 
   const leave = (client: string, agent: string, repo: string, next: string) => {
@@ -514,9 +478,8 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
   clock.advance(8 * DAY_MS);
   leave('c2', 'codex', 'portage', 'Wire the rates page');
 
-  const drawn = steps()!;
-  assert.deepEqual(drawn.refusals, []);
-  assert.notEqual(drawn.drawn, false, 'two steps wait and the cards are not drawn');
+  const drawn = steps();
+  assert.deepEqual(drawn.refusals ?? [], []);
   /* THE NEWEST FIRST, each by the agent's name and never a handle, and the one a week old says it was left earlier. */
   assert.deepEqual(
     drawn.rows.map((r) => [r.fields.next, r.fields.mark]),
@@ -530,13 +493,14 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
     assert.doesNotMatch(String(r.fields.agent), /^S\d+$|^[0-9A-HJKMNP-TV-Z]{26}$/u, 'who left a step is said as a handle');
     assert.ok(typeof r.fields.left_at === 'string' && r.fields.left_at !== '');
   }
-  /* THE LINE AND THE CARDS AGREE: one figure, the record's, and nobody is working, so the quiet line is the one drawn. */
+  /* THE LINE AND THE STEPS AGREE: one figure, the record's, and nobody is at work, so the quiet line is the one drawn. */
   assert.equal(reading(k, 'handoffs-open'), 2);
   assert.equal(drawn.matched, 2);
-  const [working, quiet] = lines();
-  assert.equal(working!.drawn, false);
+  const [many, one, quiet] = lines();
+  assert.equal(many!.drawn, false);
+  assert.equal(one!.drawn, false);
   assert.notEqual(quiet!.drawn, false);
-  assert.equal(quiet!.body, 'No agent is working right now, and {{handoffs-open}} step(s) left for the next run');
+  assert.equal(quiet!.body, 'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run');
   assert.equal(quiet!.values?.['handoffs-open'], 2);
   sql.close();
 });
@@ -581,10 +545,10 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   const group = (heading: string) => cards.find((b) => b.heading === heading)!;
   const role = (b: Card, as: string) => (b.columns ?? []).filter((c) => c.as === as).map((c) => c.field);
 
-  /* WORKING IS NO CARD SINCE THE CONTROL ROOM: the runs open now are the host's live part (`panel: presence`), which
+  /* AT WORK IS NO CARD SINCE THE CONTROL ROOM: the runs open now are the host's live part (`panel: presence`), which
      words each run from the record's `presence` (`apps/web/src/lib/record/instruct.ts`). */
-  assert.equal(group('Working'), undefined, 'Working is still drawn as cards');
-  assert.equal((page.find((b) => b.heading === 'Working') as Card & { panel?: string }).panel, 'presence');
+  assert.equal(group('At work'), undefined, 'At work is drawn as cards');
+  assert.equal((page.find((b) => b.heading === 'At work') as Card & { panel?: string }).panel, 'presence');
 
   /* TODAY IS THE LANES SINCE THE UI PASS OF 20 OCTOBER: no card of a run that stopped today, and the figure still
      counts the run that ended today and wrote, not the one that wrote nothing, nor the helper, nor a working run. */
@@ -733,6 +697,13 @@ const WORKING_CARDS = {
   limit: 12,
   when: { metric: 'runs-working', gt: 0 },
 };
+/** AND BEFORE THE RUNS LIST: Today’s runs without the host's `panel: run-list`, shut while no run was heard from today. */
+const runsListBack = (blocks: Loose[]): Loose[] =>
+  blocks.map((b) => {
+    if (b.kind !== 'section' || b.heading !== 'Today’s runs') return b;
+    const { panel: _panel, ...rest } = b;
+    return { ...rest, when: { metric: 'runs-heard-today', gt: 0 } };
+  });
 const controlRoomBack = (blocks: Loose[]): Loose[] =>
   blocks.filter((b) => b.panel !== 'instruct').map((b) => (b.panel === 'presence' ? WORKING_CARDS : b));
 const columnsBefore6 = (columns: Loose[]): Loose[] =>
@@ -761,12 +732,49 @@ const batch6Back = (blocks: Loose[]): Loose[] => {
   return out;
 };
 
+/**
+ * AND THE PAGE AS 1.13.0 DECLARED IT, put back first of all, so every mark of 1.13.0 and the versions under it is read
+ * off what the add-on declares today: the line two notes on `runs-working`, Working the whole row where At work is seven
+ * parts, the steps as cards where they are the host's `panel: left-steps`, Today’s runs a box over the declared lanes, and
+ * no Machines and profiles at the foot.
+ */
+const LINES_13 = [
+  { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', gt: 0 }, body: '{{runs-working}} agent(s) working now, {{handoffs-open}} step(s) left for the next run' },
+  { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', is: 0 }, body: 'No agent is working right now, and {{handoffs-open}} step(s) left for the next run' },
+];
+const LANES_13 = {
+  kind: 'lanes',
+  span: 12,
+  source: 'register.session',
+  where: 'last_seen is today',
+  columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
+  tones: { active: 'info' },
+  hours: 24,
+  when: { metric: 'runs-heard-today', gt: 0 },
+};
+const back14 = (blocks: Loose[]): Loose[] => {
+  const out: Loose[] = [];
+  for (const b of blocks) {
+    const metric = (b.when as { metric?: string } | undefined)?.metric;
+    if (b.lead === true && metric === 'machines-working') {
+      if ((b.when as { gt?: number }).gt === 1) out.push(...LINES_13);
+    } else if (b.kind === 'section' && b.heading === 'At work') out.push({ kind: 'section', heading: 'Working', icon: 'session', span: 12, panel: 'presence' });
+    else if (b.kind === 'section' && b.heading === 'Left for the next run') out.push(STEPS);
+    else if (b.kind === 'section' && b.heading === 'Today’s runs') out.push({ kind: 'section', heading: 'Today’s runs', icon: 'clock', span: 12, box: true, panel: 'run-list' }, LANES_13);
+    else if (b.kind === 'section' && b.heading === 'Machines and profiles') continue;
+    else out.push(b);
+  }
+  return out;
+};
+const as13 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
+  declarations.map((d) => (d.page === 'agents' ? { ...d, blocks: back14(d.blocks as Loose[]) } : d));
+
 const before13 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
-  declarations
+  as13(declarations)
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
     .map((d) =>
       d.page === 'agents'
-        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(controlRoomBack(d.blocks as Loose[]))) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
+        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(controlRoomBack(runsListBack(d.blocks as Loose[])))) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
         : d.metric === 'keys-nowhere'
           ? { ...d, where: 'state is live, value is empty, where is empty' }
           : listBefore13(d),
@@ -847,8 +855,10 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
   /* NOTHING IS FOLDED ABOVE IT, so the steps, the day and the runs of today are read as the page opens. */
   const first = blocks.findIndex((b) => b.kind === 'section' && b.fold === true);
   assert.equal(first, at, 'a fold comes before Earlier');
-  for (const open of ['Needs you', 'Working', 'Left for the next run', 'Today', 'Needs a look'])
-    assert.ok(blocks.findIndex((b) => b.heading === open) < at, `${open} is under a fold`);
+  for (const open of ['Needs you', 'At work', 'Left for the next run', 'Today’s runs', 'Needs a look']) {
+    const i = blocks.findIndex((b) => b.heading === open);
+    assert.ok(i >= 0 && i < at, `${open} is under a fold`);
+  }
   /* A RECORD WITH NO RUN FROM ANOTHER DAY DRAWS NEITHER THE HEADING NOR THE CARDS. */
   const fresh = await empty();
   value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
@@ -878,13 +888,26 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    `batch6Back` puts back, and again for the UI pass of 20 October (agents F7, SF12; it was 37af65a2925448e1): the lanes
    today's alone with no cards under them, the scope with no label, and the key lines one for one and one for many,
    which `uiPassBack` puts back, and again for the control room (agents and MCP plan §7.1; it was c616a819e2f84bb8): the
-   box to tell an agent in and Working as the host's live runs, which `controlRoomBack` puts back. */
+   box to tell an agent in and Working as the host's live runs, which `controlRoomBack` puts back, and again for the
+   runs list (it was e051523f0cd521af): Today’s runs holding every run with Undo as the host's `panel: run-list`, which
+   `runsListBack` puts back. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
-  assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), 'e051523f0cd521af', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(as13(doc.declarations)), '6d4c197a9e3586aa', 'something 1.13.0 declared is changed beside what 1.14.0 moved');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
+});
+
+/* WHAT 1.14.0 DECLARES, AS ONE MARK, and 1.13.0 under it read with what 1.14.0 moved put back (`back14`): the line on the
+   machines at work, At work beside the steps, the steps, the day and the machines as the host's. A change before 1.14.0
+   is released sets the mark again and says what moved; one after it is a version with a mark of its own. */
+const MARK_14 = '44814963f8550841';
+test('AGENTS 1.14.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.14.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_14, 'the Agents add-on changed what it declares with no new version');
+  assert.equal(as13(doc.declarations).length, doc.declarations.length, '1.14.0 put in or took out a declaration');
+  for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as13(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
 });
 
 /* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a

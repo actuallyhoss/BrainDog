@@ -37,8 +37,8 @@ export const BUSINESS_EXAMPLES = [
  * "track what my brother owed me for the holiday", which proposes nothing today, proposed Small business (measured).
  * Neither is in a pack, since Small business carries none, so the version stays.
  *
- * IT SAYS MONEY IN AND OUT, NOT WHO OWES WHOM (DIRECTION, "Money is a finance application, not a ledger of who owes
- * whom"). It read "What your clients owe you and what you owe"; typed back now it hears hosting and subscriptions,
+ * IT SAYS MONEY IN AND OUT, NOT WHO OWES WHOM (because Money is a finance application, not a ledger of who owes
+ * whom). It read "What your clients owe you and what you owe"; typed back now it hears hosting and subscriptions,
  * still two signals of its own and none of another card's, and again the signals did not move.
  */
 export const BUSINESS = {
@@ -46,9 +46,9 @@ export const BUSINESS = {
   /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step.
      1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them, each a new setting a
      person can change at /packs.
-     1.4.0: calmer (DIRECTION §35). Home opens on one line of what needs your call, every heading wears a glyph, and
+     1.4.0: calmer. Home opens on one line of what needs your call, every heading wears a glyph, and
      the questions are drawn only while one is asked.
-     1.5.0: Working now reads the runs active and heard from today (the Agents add-on's clause, DIRECTION §37), where
+     1.5.0: Working now reads the runs active and heard from today (the Agents add-on's clause), where
      every run the end hook never closed was listed as working beside the one typing now. A clause narrowed, so a minor
      step.
      1.6.0: Working now reads the record's working runs (`sessions.working`, agents 1.9.0), active and heard from in the

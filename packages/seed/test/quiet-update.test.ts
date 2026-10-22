@@ -1,10 +1,10 @@
 /**
  * BRAINDOG'S OWN UPDATES GO IN ON THEIR OWN WHEN NOTHING THE PERSON CHANGED WOULD BE LOST, and ask once otherwise
- * (DIRECTION §37, `packs/quiet.ts`).
+ * (`packs/quiet.ts`).
  *
  * THE RECORD HERE IS SHAPED AS THE OWNER'S WAS ON OCTOBER 6TH (`loop/STATUS.md`): People 2.x with no organisations and no
  * `self`, six people with him twice, Projects, Money and Work beside it. Nothing in it is his by name; any record in that
- * shape takes the same road (DIRECTION §27).
+ * shape takes the same road.
  */
 
 import { test } from 'node:test';
@@ -216,7 +216,7 @@ test('WHAT THE PERSON TOOK OFF A MODULE AT THIS VERSION STAYS OFF: the relink af
 
 /**
  * A MODULE WHOSE NEW VERSION ONLY LAYS ITS PAGES OUT AGAIN, AND ADDS A FIGURE TO DRAW ON, REACHES A RECORD ON ITS OWN.
- * Money 3.11.0 and Work 1.15.0 move their tiles (DIRECTION §39) and Work gains `tasks-this-week-yours`; Money 3.12.0
+ * Money 3.11.0 and Work 1.15.0 move their tiles and Work gains `tasks-this-week-yours`; Money 3.12.0
  * gains `runs-out-on` and draws it on Runs out; nothing is taken away, so a record holding the version before is
  * updated with no question. The version before is made here from this
  * build's document, its pages laid out differently and the new figure left out, which is the shape of the change.
@@ -1268,7 +1268,7 @@ const projectBefore = (doc: Body, id: string): Body =>
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* AND UNTIL THE KPI PLAN OF 21 OCTOBER (K3-C) no project page drew its Key numbers. */
       if (b.kind === 'kpis') return [];
-      /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
+      /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (pinwheel-60), where it now reads the project's own. */
       /* AND UNTIL BATCH 87 (project-runs-tile-87) the three were halves under More about, with no heading of their own
          and nothing said of what reaches a project from everywhere; Money by month was a half beside the bills; and
          Agents read every run placed in the project, titled by what it was doing. */

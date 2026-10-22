@@ -293,6 +293,137 @@
     }
   }
 
+  /* ── one line a run (the Agents page, `line`) ──────────────────────────────
+     The face at 24, the agent at 15/500 and what it said in the second ink on the same line, cut with an ellipsis
+     rather than wrapped, the project and the time at its end in the meta size, and one quiet More press. Rows 40 tall,
+     a hairline between them, as the board's At work tile. */
+  .pres[data-line] {
+    margin-block-start: 0;
+  }
+
+  .pres[data-line] .pres-row {
+    grid-template-columns: 24px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0 var(--sp-3);
+    min-block-size: 40px;
+    padding-block: var(--sp-1);
+  }
+
+  .pres[data-line] .pres-row:first-child {
+    padding-block-start: var(--sp-1);
+  }
+
+  .pres[data-line] .pres-face {
+    inline-size: 24px;
+    block-size: 24px;
+  }
+
+  .pres[data-line] .pres-face .agent-mark {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .pres[data-line] .pres-head {
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+  }
+
+  .pres[data-line] .pres-name {
+    flex: none;
+  }
+
+  .pres[data-line] .pres-doing {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .pres-helpers {
+    flex: none;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .pres-where {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .pres-row[data-stopped] .pres-time {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  /* MORE: a 32px quiet square with three dots, the presses behind it; 44 under a thumb. */
+  .pres-more {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+
+  .pres-more svg {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: currentColor;
+  }
+
+  .pres-more:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pres-more:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .pres-more {
+      inline-size: var(--tap, 44px);
+      block-size: var(--tap, 44px);
+    }
+  }
+
+  /* ON A PHONE the project and the time go under the words, and More keeps the row's end. */
+  @container (width < 560px) {
+    .pres[data-line] .pres-row {
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      align-items: start;
+      padding-block: var(--sp-2);
+    }
+
+    .pres[data-line] .pres-face {
+      margin-block-start: 2px;
+    }
+
+    .pres[data-line] .pres-where {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .pres[data-line] .pres-more {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .pres-btn {
       transition: none;

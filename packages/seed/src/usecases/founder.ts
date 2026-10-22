@@ -37,7 +37,7 @@ const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 's
  *
  * THE PROJECT IS THE FIFTH, SINCE 1.16.0, the field the lines are to be grouped by, so that a chart is labelled by the
  * measure and the project comes from its own row: a measure two projects both send is to be two lines and not one, and
- * an import that glued the project onto the measure's name ("Aov, Crumb.gg") is no longer the only place the project is
+ * an import that glued the project onto the measure's name ("Aov, Oxbow.gg") is no longer the only place the project is
  * said. The record reads the first four and passes over a fifth (`readBlockAsWritten` in `packages/kernel/src/pages.ts`),
  * so until it groups by it the column changes nothing a record draws, and no version has to move when it does: today
  * two projects sending Sign-ups still draw one line between them.
@@ -318,7 +318,7 @@ export const FOUNDER = {
      chart, in place of the tally of its open work by priority, which said again what the list under it says. Still
      twenty-one blocks under this page's three. 1.9.0 is on `origin/master`, so the change is a version and not a reset.
 
-     1.11.0 BECAUSE THE PAGES ARE CALMER (DIRECTION §35): Home opens on one line of the cash there is where a tile of
+     1.11.0 BECAUSE THE PAGES ARE CALMER: Home opens on one line of the cash there is where a tile of
      four figures stood, every heading wears a glyph, each list is drawn only while it holds something, the Dashboard
      folds every number and organisation under the numbers it charts, and a project's page takes portfolio 1.8.0's
      template, six tiles and then its history, money and what it runs on folded shut. 1.10.0 is on `origin/master`.
@@ -336,7 +336,7 @@ export const FOUNDER = {
      headed by how it is going with the agent last, and what is handed back is a to-do with no Changed by. No block added
      or taken away, so a minor step. 1.13.0 is live.
 
-     1.16.0 BECAUSE EVERY PAGE SAYS ONLY WHAT IS TRUE OF THIS RECORD (DIRECTION §37, "Stop the harm"). Home draws What you
+     1.16.0 BECAUSE EVERY PAGE SAYS ONLY WHAT IS TRUE OF THIS RECORD ("Stop the harm"). Home draws What you
      have, by organisation only while an organisation lists an account, Bring your money in only while no account counts
      as cash, Lapsing only within thirty days of today, and Numbers this week over a week, six lines at most, each
      declared with the project it is about; Working now reads the runs heard from today. The Dashboard stops saying Home's cash and its

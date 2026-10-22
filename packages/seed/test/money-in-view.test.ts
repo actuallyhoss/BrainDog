@@ -3,7 +3,7 @@
  * the Ledger's entries, read through the kernel on a record that installed money-core the way a person does, with no
  * example rows, and a bank add-on's pattern beside it.
  *
- * "Agents do the legwork in view" (DIRECTION, D2.17): who wrote a row has always been in the history and no figure read
+ * Agents do the legwork in view: who wrote a row has always been in the history and no figure read
  * it. `filed-for-you-30d` counts what an agent, a bank add-on or a rule made in 30 days, and `filed-today` says today's
  * by who. An import files nothing for anybody: it copies what another tool already held (audit 61, claim 8).
  *

@@ -274,7 +274,7 @@ export function amountLike(template: string, value: number, home: string | null 
 /** What a cell says around its figure, its sign aside: `£#` of `−£1,200.00`, `GBP #`, `#h`. */
 const unitOf = (cell: string): string => cell.replace(/^[+−-]\s*/u, '').replace(/[−-]?\d[\d,]*(?:\.\d+)?/u, '#').replace(/\s+/gu, ' ');
 
-/** The fewest buckets with a value that make a chart: fewer is a figure, not a trend (DIRECTION §39). */
+/** The fewest buckets with a value that make a chart: fewer is a figure, not a trend. */
 export const SERIES_POINTS = 3;
 
 /**

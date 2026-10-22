@@ -4,7 +4,7 @@ import type { MoneyRegister } from './shared.ts';
 
 /**
  * A TEXT, HOW MUCH OF IT MUST BE THERE, AND THE CATEGORY IT FILES UNDER, SINCE money-core 3.17.0 (REC-B10).
- * "Categorising rules: prefix, contains, regex, ranked, dry run" (the owner's words).
+ * Categorising rules: prefix, contains, regex, ranked, with a dry run.
  *
  * A LIST OF ITS OWN, AND IT WAS ONE FIELD ON A CATEGORY. A category held one "Matches", so a shop a bank writes two
  * ways needed two categories or a person, and nothing said which way the money had to be going. Here one category has
@@ -13,7 +13,7 @@ import type { MoneyRegister } from './shared.ts';
  * `txn-categorise` (`../rules.ts`) READS THIS LIST AND NOTHING ELSE DOES THE FILING. It finds the one rule whose text
  * fits the entry, by the record's ladder (the whole text, how it starts, anywhere in it, a pattern, and on one rung the
  * longest text), among the rules that are on, go the entry's way and name its account or none. Two rules that fit
- * equally file nothing: "no category is better than a wrong one" (the owner's words).
+ * equally file nothing, because no category is better than a wrong one.
  */
 export const FILING_RULES_REGISTER: MoneyRegister = {
   id: 'filing_rules',

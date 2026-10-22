@@ -26,7 +26,7 @@ const HAS_OPEN = { all: [HAS_PARTS, { metric: OPEN_PARTS, gte: 1 }] };
 const ALL_PAID = { all: [HAS_PARTS, { metric: OPEN_PARTS, lt: 1 }] };
 
 /**
- * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): "instalment plan's own page" (the owner). A TEMPLATE, as
+ * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): an instalment plan has its own page. A TEMPLATE, as
  * a book's page is (`book.ts`): one declaration, one page for each plan, every `{{name}}` filled from it. A record
  * that keeps no plan has none of these pages and loses nothing, and Money's own page gains no block for it.
  *

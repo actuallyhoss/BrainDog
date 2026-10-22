@@ -51,8 +51,8 @@ import { BRAND_RED, build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFI
  * `info`'s anchor, which the intent floor does not govern because the accent is not an intent:
  * `info` is only ever a glyphed word, and the accent is a control.
  *
- * SEVEN · 2026-09-20, THE CHROMA GOES BACK IN. The owner's words: the colours are pale, and the
- * accent "is not gonna be persistent". He is right, and the cause was in this file. §FIVE solved
+ * SEVEN · 2026-09-20, THE CHROMA GOES BACK IN. The colours read pale, and the
+ * accent "is not gonna be persistent". That was right, and the cause was in this file. §FIVE solved
  * "must not read as a warning" by draining saturation, and the test below it capped the accent at
  * the mark's chroma, so what shipped was 0.150, quieter than `danger` at 0.160. The brand colour
  * was the palest thing on the screen and the palest thing on a 16 pixel favicon, where half the
@@ -106,14 +106,14 @@ import { BRAND_RED, build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFI
  * (`HOUSE_PROFILE` in `build.ts`), which now carries the design system's ground, tile, inks, line, intents and `live` as aims,
  * and the radius, which is the design system's: key caps 6, fields and menus 12, tiles and the rail 22 (`tokens.css`).
  *
- * TEN · 2026-10-07, ONE WORKING ACCENT BESIDE THE MARK (DIRECTION §39: "keep BrainDog red as the brand and the late
+ * TEN · 2026-10-07, ONE WORKING ACCENT BESIDE THE MARK ("keep BrainDog red as the brand and the late
  * colour; add one working accent for selection, primary buttons, links and charts"). The accent stays the mark's red,
  * and the house pins its working colour beside it. It was the design's own blue, in light and in dark, until ELEVEN.
  * The pin holds only beside this accent (`Seed.action`), so a record, a look or an environment that brings its own
  * colour has its working accent solved from that colour instead.
  *
- * ELEVEN · 2026-10-08, THE WORKING ACCENT IS RED (DIRECTION §42: "stick with red as the working accent color"). §39's
- * "one blue working accent" is "one red working accent" now. BrainDog red (`BRAND_RED`, #CF413A) is the fill in light,
+ * ELEVEN · 2026-10-08, THE WORKING ACCENT IS RED ("stick with red as the working accent color"). The
+ * earlier "one blue working accent" is "one red working accent" now. BrainDog red (`BRAND_RED`, #CF413A) is the fill in light,
  * and the pressed red, #B3322C, is its hover. The mark keeps its own red (#DB2527) for the logo and nothing else.
  *
  * DARK IS #E05148, THE NEAREST RED OF THAT HUE THAT PASSES, found by walking #CF413A up its lightness at its own hue and

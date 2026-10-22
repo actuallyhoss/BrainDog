@@ -367,7 +367,7 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
 
 export const ESTATE_PAGES: Record<string, SeedPage> = {
   /**
-   * CALMER, SINCE estate 2.1.0 (DIRECTION §35): the line, what needs the person, two figures, the month by type and the
+   * CALMER, SINCE estate 2.1.0: the line, what needs the person, two figures, the month by type and the
    * next ninety days, and what each domain points at and every service folded shut. Every heading wears a glyph, every
    * tile is drawn only while it has something, and a fresh record reads one note of what belongs here.
    *
@@ -487,7 +487,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing renews in the next ninety days.',
       },
       {
-        /* WHAT EACH DOMAIN POINTS AT AND EVERY SERVICE, FOLDED SHUT, SINCE estate 2.1.0 (DIRECTION §35): they are looked
+        /* WHAT EACH DOMAIN POINTS AT AND EVERY SERVICE, FOLDED SHUT, SINCE estate 2.1.0: they are looked
            up, not read each time the page opens. */
         kind: 'section',
         heading: 'Everything you keep',

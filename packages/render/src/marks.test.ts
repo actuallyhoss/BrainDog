@@ -31,16 +31,16 @@ test('A GLYPH IS THE MARK, by its own name', () => {
 
 test('AN ALIAS IS THE MARK, drawn as the glyph it stands for: cake is the gift', () => {
   assert.equal(canonical('cake'), 'gift');
-  assert.equal(markOf('cake', 'Crumb.gg'), 'gift');
+  assert.equal(markOf('cake', 'Oxbow.gg'), 'gift');
   assert.equal(markOf('shop', 'Quietcart'), 'store');
-  assert.equal(markOf('site', 'Studio site'), 'globe');
-  assert.equal(markOf('cube', 'Quartz'), 'box');
+  assert.equal(markOf('site', 'Harbour site'), 'globe');
+  assert.equal(markOf('cube', 'Harbour'), 'box');
 });
 
 test("A PICTURE'S NAME WITH A CAPITAL IS STILL THE PICTURE, never its first letter", () => {
-  assert.equal(markOf('Cake', 'Crumb.gg'), 'gift');
+  assert.equal(markOf('Cake', 'Oxbow.gg'), 'gift');
   assert.equal(markOf('Music', 'Lanternfish'), 'music');
-  assert.equal(markOf('Close', 'Crumb.gg'), 'B');
+  assert.equal(markOf('Close', 'Oxbow.gg'), 'O');
   assert.equal(markOf(' Pencil '), null);
 });
 
@@ -56,28 +56,28 @@ test('NO GLYPH OR MARK WORD EVER YIELDS ITS OWN FIRST LETTER', () => {
 test('A CONTROL IS NEVER A MARK: the row wears its own letter instead', () => {
   for (const control of ['close', 'x', 'pencil', 'edit', 'trash', 'more', 'chevronDown', 'slash']) {
     assert.equal(isMark(control), false, `${control} is a control`);
-    assert.equal(markOf(control, 'Crumb.gg'), 'B', `${control} gives way to the title's letter`);
+    assert.equal(markOf(control, 'Oxbow.gg'), 'O', `${control} gives way to the title's letter`);
   }
   assert.equal(markOf('close'), null, 'and with no title, to nothing rather than to "C"');
 });
 
-test("A WORD THE SET DOES NOT DRAW IS THE TITLE'S FIRST LETTER, never the word's: B for Crumb.gg, where C was", () => {
+test("A WORD THE SET DOES NOT DRAW IS THE TITLE'S FIRST LETTER, never the word's: O for Oxbow.gg, where C was", () => {
   assert.equal(markOf('paw', 'BrainDog'), 'B');
   assert.equal(markOf('koala', 'Fernly'), 'E');
-  assert.equal(markOf('sword', 'Marsh.gg'), 'I');
+  assert.equal(markOf('sword', 'Driftwood.gg'), 'D');
   assert.equal(markOf('paw'), null);
 });
 
 test('A NAME, A LETTER OR AN EMOJI IS ITS OWN MARK, which is what the one-argument call always answered', () => {
   assert.equal(markOf('Kiln'), 'K');
   assert.equal(markOf('Kiln', 'Fix the invoice export'), 'K');
-  assert.equal(markOf('k', 'Crumb.gg'), 'K');
-  assert.equal(markOf('🎂', 'Crumb.gg'), '🎂');
+  assert.equal(markOf('k', 'Oxbow.gg'), 'K');
+  assert.equal(markOf('🎂', 'Oxbow.gg'), '🎂');
   assert.equal(markGlyphOf('K'), null);
 });
 
 test('A BARE SHAPE OR AN EMPTY CELL GIVES WAY TO THE TITLE', () => {
-  assert.equal(markOf('●', 'Crumb.gg'), 'B');
+  assert.equal(markOf('●', 'Oxbow.gg'), 'O');
   assert.equal(markOf('', 'the Studio'), 'S');
   assert.equal(markOf('  '), null);
 });
@@ -132,7 +132,7 @@ const marks = (html: string): string[] =>
     m[0].replace(/\s+/gu, ' '),
   );
 
-const CARDS = '```cards\ntitle | mark: Picture\nCrumb.gg | cake\nBrainDog | paw\nLanternfish | music\nKiln | close\nStudio | Kiln\n```';
+const CARDS = '```cards\ntitle | mark: Picture\nOxbow.gg | cake\nBrainDog | paw\nLanternfish | music\nKiln | close\nStudio | Kiln\n```';
 
 test("BOTH DRAWERS DRAW THE SAME MARKS: the picture where it names one, else the title's letter", () => {
   /* A card grid is a page's block, never one written in a note's fence, so it is read as a page reads it. */
@@ -152,14 +152,14 @@ test("BOTH DRAWERS DRAW THE SAME MARKS: the picture where it names one, else the
 });
 
 test('A CELL NAMING A PROJECT IS SAID IN THE CARD\'S META LINE: "on", the project\'s dot in its hue, and its name', () => {
-  const [block] = parse('```cards\ntitle | fact: Project\nShip the export | Crumb.gg\nFix the rail | BrainDog\nTidy | Everywhere\n```', { page: true });
+  const [block] = parse('```cards\ntitle | fact: Project\nShip the export | Oxbow.gg\nFix the rail | BrainDog\nTidy | Everywhere\n```', { page: true });
   if (block?.type !== 'block') return assert.fail('the fixture did not parse as a block');
   const scope = {
     columns: [1],
     everywhere: 'Everywhere',
     glyph: null,
     marks: new Map([
-      ['Crumb.gg', { mark: 'cake', hue: 20 }],
+      ['Oxbow.gg', { mark: 'cake', hue: 20 }],
       ['BrainDog', { mark: 'paw', hue: 200 }],
     ]),
   };
@@ -167,7 +167,7 @@ test('A CELL NAMING A PROJECT IS SAID IN THE CARD\'S META LINE: "on", the projec
   const body = render(Block, { props: { block, opts } }).body.replace(/<!--[\s\S]*?-->/gu, '');
   const lines = [...body.matchAll(/<p class="cards-scope[^"]*">(.*?)<\/p>/gu)].map((m) => m[1]!);
   assert.equal(lines.length, 3);
-  assert.match(lines[0]!, /^on <span class="cards-scope-dot[^"]*" style="--hue:20" aria-hidden="true"><\/span><span class="scope-name[^"]*">Bake\.gg<\/span>$/u);
+  assert.match(lines[0]!, /^on <span class="cards-scope-dot[^"]*" style="--hue:20" aria-hidden="true"><\/span><span class="scope-name[^"]*">Oxbow\.gg<\/span>$/u);
   assert.match(lines[1]!, /style="--hue:200"/u);
   assert.match(lines[2]!, /^<span class="scope-name[^"]*">Everywhere<\/span>$/u, 'a row for every project is not "on" one');
   assert.doesNotMatch(body, /<dt>Project<\/dt>/u, 'never a fact in the label column');

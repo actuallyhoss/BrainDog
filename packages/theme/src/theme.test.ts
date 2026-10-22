@@ -366,11 +366,11 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 292 rows per scheme, counted here and n
    * 114 UNTIL 2026-10-02, when red split in two (`INTENT_TEXT`): its words became `danger-text`, which takes `danger`'s
    * place in F, G and K, and `danger` became red as a mark, which joins the fills in D. Five surfaces, five rows.
    *
-   * 119 UNTIL 2026-10-07, when the board arrived (DIRECTION §39): every pair measured on the five rungs is measured on
+   * 119 UNTIL 2026-10-07, when the board arrived: every pair measured on the five rungs is measured on
    * the board, the tile and the field too (`GROUNDS`), eight grounds where there were five, and check S holds the
    * working accent's twenty-five pairs.
    *
-   * 204 UNTIL 2026-10-08, when the working accent went red (DIRECTION §42): its words are a link too, so check K measures
+   * 204 UNTIL 2026-10-08, when the working accent went red: its words are a link too, so check K measures
    * `action-text` against body ink and red words as it does `accent-text`. Two rows; the second is the one pair K
    * reports and does not refuse (`K_EXEMPT`).
    *
@@ -780,7 +780,7 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
      2026-10-06: light's ladder widened too, under the white tile, and its ground came down for room. Ink-2, ink-3, red
      words and green each aim a step darker to keep the room they had on the old ground (`SYSTEM_AIM`).
 
-     2026-10-08 (DIRECTION §42): light red, as a mark and as words, is the deeper red #B3322C, a step under the working
+     2026-10-08: light red, as a mark and as words, is the deeper red #B3322C, a step under the working
      accent #CF413A, and it lands exactly. */
   const exact: Record<'light' | 'dark', Partial<Record<keyof Palette, string>>> = {
     light: {
@@ -823,7 +823,7 @@ test('AND WHERE IT CANNOT, THE ROLE SITS ON ITS FLOOR RATHER THAN UNDER IT', () 
      the ground, 9.5, and no further.
 
      2026-10-08: ITS RED MARK USED TO BE THE SECOND, darkened from the logo's #DB2527 to 4.5:1. The mark is the deeper red
-     now (DIRECTION §42), which clears high contrast's 4.5 on its ground as it is, so it lands on its aim instead. */
+     now, which clears high contrast's 4.5 on its ground as it is, so it lands on its aim instead. */
   const sunk = fromHex(HIGH_CONTRAST.schemes.light.sunk);
   assert.equal(HIGH_CONTRAST.schemes.light.danger, '#B3322C', 'high-contrast light red moved off an aim that clears its floor');
   assert.ok(contrast(fromHex(HIGH_CONTRAST.schemes.light.danger), sunk) >= HIGH_CONTRAST_PROFILE.intentFill);
@@ -847,12 +847,12 @@ test('RED HAS TWO JOBS, AND EACH IS ONE VALUE', () => {
      `theme.mjs` paints from the light accent, where a badge and the logo used to be two reds a hair apart. In dark
      the words already clear AA in the mark's own red, so the two jobs share it.
 
-     2026-10-08 (DIRECTION §42), THE BADGE LEAVES THE LOGO. BrainDog red is the working accent now, so late and "needs
+     2026-10-08, THE BADGE LEAVES THE LOGO. BrainDog red is the working accent now, so late and "needs
      you" take the deeper red, #B3322C, as a mark and as words, one value in light as in dark. The logo keeps the mark's
      red, and a badge is no longer it: beside red buttons, a badge in the logo's red would be a third red a hair off the
      other two.
 
-     AND ITS 5:1 IS MEASURED ON THE BOARD AND THE TILE NOW, where words sit since DIRECTION §39: 5.60:1 and 6.16:1. On
+     AND ITS 5:1 IS MEASURED ON THE BOARD AND THE TILE NOW, where words sit since the one-board look: 5.60:1 and 6.16:1. On
      the old ground, `sunk`, the deeper red is 4.93:1, which is short of the 5 this line used to ask there by less than
      a code value would buy, and a second red two code values deeper for words alone would be the hair-apart pair this
      test was written to end. The ground still owes AA, which check G holds, and a slip toward its edge fails here. */
@@ -905,8 +905,8 @@ test('TEXT ON THE WASHES CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
     }
 });
 
-test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile', () => {
-  /* 2026-10-08 (DIRECTION §42): the working accent is BrainDog red, #CF413A in light with #B3322C under the pointer, and
+test('THE BOARD: exact colours, no glass, no light, a flat tile', () => {
+  /* 2026-10-08: the working accent is BrainDog red, #CF413A in light with #B3322C under the pointer, and
      in dark #E05148, the nearest red of that hue whose label and hover both clear (ELEVEN in `index.ts`). */
   assert.deepEqual(
     (['board', 'tile', 'action', 'action-hover'] as const).map((r) => HOUSE.schemes.light[r]),
@@ -950,7 +950,7 @@ test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile
 });
 
 test('THE FRAME (UI pass, 20 Oct): his values exactly, the two reds as decided, and high contrast re-solved', () => {
-  /* SPEC 1.1: frame 3.1's surfaces, inks and status, the reds as he decided them (fill #CF413A light and #C2362F dark,
+  /* SPEC 1.1: frame 3.1's surfaces, inks and status, the reds as decided (fill #CF413A light and #C2362F dark,
      always a white label; red as words and marks #C2362F light, C1, and #EA645B dark). */
   for (const scheme of ['light', 'dark'] as const)
     for (const [role, value] of Object.entries(HOUSE_FRAME[scheme])) assert.equal(HOUSE.frame[scheme][role as FrameRole] ?? HOUSE.frame[scheme].scrim, value, `house ${scheme} ${role}`);
@@ -1025,7 +1025,7 @@ test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () 
   /* Evenly: the two steps above tile-2 are one step, to within a code value. */
   const L = (hex: string) => rgbToLch(fromHex(hex)).L;
   assert.ok(Math.abs(L(p.s2) - L(p.s1) - (L(p.s3) - L(p.s2))) < 0.003, 's1, s2 and s3 do not step evenly');
-  /* And the tile stands off the board it sits on, by its colour alone (DIRECTION §39: no border, no shadow). */
+  /* And the tile stands off the board it sits on, by its colour alone (no border, no shadow). */
   assert.ok(dE(p.board, p.tile) >= 2.5, `a tile is ${dE(p.board, p.tile).toFixed(2)} from the board`);
   assert.deepEqual(refusals(checkElevation(HOUSE)), []);
 });

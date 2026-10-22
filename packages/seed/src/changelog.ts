@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.20.0',
+      notes: "Each project's card on Projects draws the line of the number it leads with, where it keeps one, in place of the work finished each week.",
+    },
+    {
       version: '1.19.0',
       notes:
         "Each project can keep its key numbers: what it is judged by, where each one's values come from, which way is good, a target and by when, and how often a new value should arrive. Numbers, the readings your projects report, is part of Projects now, so any record with projects can hold them. A project can say what kind it is: a business, client work, a product or content.",
@@ -84,6 +88,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '3.5.0', notes: 'Health is said in plain words: how many checks have not run yet, Needs a look, All good and Not checked yet, and how many days every check has passed.' },
     { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it. What is asked about somebody here waits on the People page to be answered, and its first line says how many. People shows how many you were in touch with in the last 30 days, with a line of the month, and what agents did to the people and organisations here. Activity can be narrowed by who, what kind of change and which list.' },
     { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
     {
@@ -264,6 +269,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.14.0',
+      notes:
+        'Agents opens on how many are at work, on how many machines and how many wait on you, the same number as the top bar. At work lists one line a run by machine, with Tell, Pause and Stop behind its menu. Tell an agent is one line, with what you told beside it. Left for the next run shows each step once, with Take and Drop. Today’s runs draws the day a lane an agent and names each run by what it did. Machines and profiles sit at the foot.',
+    },
     {
       version: '1.13.0',
       notes:

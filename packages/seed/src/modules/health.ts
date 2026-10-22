@@ -1,11 +1,11 @@
 /**
- * Health: the record's vital signs, as one page every record can open (PRF-A05 job 5, DIRECTION §40 "says so in the app
- * when one fails").
+ * Health: the record's vital signs, as one page every record can open (PRF-A05 job 5: when a check fails, the app
+ * says so).
  *
  * DRAWN FROM FOUR NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
  * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figures `signs-red`, `signs-unread`
  * and `green-days` (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
- * record that holds it can draw it, whatever else it installs. Nothing here knows whose record it is (DIRECTION §27).
+ * record that holds it can draw it, whatever else it installs. Nothing here knows whose record it is.
  *
  * IN PEOPLE, BECAUSE PEOPLE IS THE ADD-ON NEARLY EVERY RECORD HOLDS: onboarding installs it for the person's own row even
  * where the use case names no module (`usecases/student.ts`). Which add-on every record holds is still an open question
@@ -14,7 +14,7 @@
  * ONLY BLOCK KINDS THAT EXIST, AND NO LOOK OF ITS OWN (the unit's critic, rule 7): a lead sentence and three groups of
  * cards. The strip of the last seven days, and anything drawn only for Health, wait for a board he has said yes to.
  *
- * NOT ON THE RAIL. The rail is the seven places (DIRECTION §39); Health is reached from the health sentence in Settings,
+ * NOT ON THE RAIL. The rail is the seven places; Health is reached from the health sentence in Settings,
  * whose red signs link here (`apps/web/src/routes/settings/[area]/health.ts`), and from the page resource agents read.
  *
  * TODAY'S LINE IS NOT DECLARED HERE. One line on Today while a sign is red, gated on `signs-red` above 0, is `signsLine`
@@ -30,9 +30,9 @@ export const HEALTH_FIGURES = ['signs-red', 'signs-unread', 'green-days'] as con
 /**
  * A group of signs in one state: the state's word as the heading, and under it each sign by its name with its sentence.
  *
- * THE STATE IS A WORD, AND RED A WORD AND A MARK (DIRECTION §42). The source hands a sign's state as `green`, `red` or
+ * THE STATE IS A WORD, AND RED A WORD AND A MARK. The source hands a sign's state as `green`, `red` or
  * `none`, which is the machine's word and not a person's, so each state is its own block with a heading that says it
- * ("Needs a look", "Alive", "Not read yet") and a glyph beside the heading. A red sign is never told by colour alone.
+ * ("Needs a look", "All good", "Not checked yet") and a glyph beside the heading. A red sign is never told by colour alone.
  *
  * `none` IS NEVER GREEN. A sign with nothing to judge by yet is under Not read yet, with its dashed circle, and never
  * under Alive: a record nobody has read is not well, it is unread.
@@ -75,7 +75,7 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'signs-red', is: 0 },
-        body: 'No vital sign needs a look.',
+        body: 'Nothing on this record needs a look.',
       },
       {
         kind: 'note',
@@ -97,18 +97,18 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         span: 12,
         when: { metric: 'signs-unread', is: 1 },
-        body: 'One sign has not been read yet.',
+        body: 'One check has not run yet.',
       },
       {
         kind: 'note',
         span: 12,
         when: { metric: 'signs-unread', gt: 1 },
-        body: '{{signs-unread}} signs have not been read yet.',
+        body: '{{signs-unread}} checks have not run yet.',
       },
       /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
       group('red', 'Needs a look', 'octagon-alert'),
-      group('green', 'Alive', 'circle-check'),
-      group('none', 'Not read yet', 'circle-dashed'),
+      group('green', 'All good', 'circle-check'),
+      group('none', 'Not checked yet', 'circle-dashed'),
       /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with every watched sign green (the seven-day
          hold's count, `hold.ts`). NOT "NOTHING WAS RED": the hold watches ten of the signs, and a day an automation sign
          read red still counts, so "nothing has been red" was said of days with a red sign on this page. Drawn only
@@ -119,13 +119,13 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         span: 12,
         when: { metric: 'green-days', is: 1 },
-        body: 'Every watched sign was green yesterday.',
+        body: 'Every check passed yesterday.',
       },
       {
         kind: 'note',
         span: 12,
         when: { metric: 'green-days', gt: 1 },
-        body: 'Every watched sign has been green for {{green-days}} days, up to yesterday.',
+        body: 'Every check has passed for {{green-days}} days, up to yesterday.',
       },
     ],
   },

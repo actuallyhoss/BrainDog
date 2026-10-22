@@ -68,6 +68,8 @@ export const WEEKDAYS: readonly { short: string; long: string }[] = [
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WRITTEN = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{3,4})$/u;
+/** A day with no year, `3 Sep`, which `dateSaid` writes for the reader's own year. */
+const BARE = /^(\d{1,2}) ([A-Z][a-z]{2})$/u;
 const INSTANT = /^(\d{4}-\d{2}-\d{2})T/u;
 
 /** A day that no calendar holds, handed to the grid when the drawer was told no clock, so no cell is today. */
@@ -78,17 +80,20 @@ const NO_TODAY = '0001-01-01';
  *
  * NOTHING IS GUESSED. An instant is its own day as written, because the page's writer has already put it in the
  * reader's day; `12 Sep 2026` is read only in the spelling `day()` writes; and a date the calendar does not have, 30
- * February, is no day at all.
+ * February, is no day at all. A day said with no year (`3 Sep`, as `dateSaid` writes the reader's own year) is read in
+ * the year of `now`.
  */
-export function calendarDay(text: string): string | null {
+export function calendarDay(text: string, now: number = Date.now()): string | null {
   const t = text.trim();
   if (isDay(t)) return t;
   const instant = INSTANT.exec(t);
   if (instant && isDay(instant[1]!) && Number.isFinite(Date.parse(t))) return instant[1]!;
+  const bare = BARE.exec(t);
   const m = WRITTEN.exec(t);
-  const month = m ? MONTHS.indexOf(m[2]!) + 1 : 0;
-  if (!m || month === 0) return null;
-  const iso = `${m[3]!.padStart(4, '0')}-${String(month).padStart(2, '0')}-${m[1]!.padStart(2, '0')}`;
+  const [dd, mon, yyyy] = m ? [m[1]!, m[2]!, m[3]!] : bare ? [bare[1]!, bare[2]!, String(new Date(now).getFullYear())] : [];
+  const month = mon ? MONTHS.indexOf(mon) + 1 : 0;
+  if (!dd || !yyyy || month === 0) return null;
+  const iso = `${yyyy.padStart(4, '0')}-${String(month).padStart(2, '0')}-${dd.padStart(2, '0')}`;
   return isDay(iso) ? iso : null;
 }
 

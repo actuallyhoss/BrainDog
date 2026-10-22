@@ -8,9 +8,9 @@
  * THE ONE RULE OF THIS FILE: no colour is written here. Every value is a semantic role a theme maps
  * (13 §2.1), and the four intents reach the DOM only through the one mapping block below.
  *
- * The motif, stated once so it stays consistent. DIRECTION §39 makes it one board: every block is a flat tile
+ * The motif, stated once so it stays consistent. It is one board: every block is a flat tile
  * (`--tile`, radius 16, 20 in, 12 apart) on the `--board`, and a list sits INSIDE its tile. What follows was written
- * for §37's "less bento", when ROWS SAT ON THE GROUND AND ONLY A FIGURE OR A CHART WAS A TILE, and it still holds for a
+ * for the old "less bento", when ROWS SAT ON THE GROUND AND ONLY A FIGURE OR A CHART WAS A TILE, and it still holds for a
  * row wherever a host puts it. A list, a table and a run of rows are drawn straight on the page,
  * grouped under quiet headings, with a `--rule` hairline between rows and a rounded wash under the
  * pointer. `--rule` and not `--rule`, because `--rule` is tuned for a tile and all but vanishes on the
@@ -83,7 +83,7 @@
      The ONLY place an intent becomes a colour. A component cannot render `warn` without going
      through here, and the glyph is emitted by the renderer, not by a call site (13 §2.3). */
 
-  /* A STATE'S FILL IS ITS STATUS DOT'S COLOUR (DIRECTION §39, `tokens.css`): on track the good green, at risk the
+  /* A STATE'S FILL IS ITS STATUS DOT'S COLOUR (`tokens.css`): on track the good green, at risk the
      waiting amber, off track or late the red, and info the working accent. Drawn as a small dot and a word, never the
      fill of a whole row, so a colour can be the real one: the muted, greyed fills this replaced were half of why every
      screen read as black and grey. Red is the "late" colour now and the brand, and it means nothing else.
@@ -203,7 +203,7 @@
 
   /* WHERE A ROW APPLIES: drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a column `as: scope`,
      the render package's twin of `lib/ui/ScopeChip.svelte`. The project's mark in its own hue or the globe, then the
-     name, and nothing round them (DIRECTION §39: a category is its small coloured mark and its name, not a chip). */
+     name, and nothing round them (a category is its small coloured mark and its name, not a chip). */
   .scope-chip {
     display: inline-flex;
     align-items: center;
@@ -1084,7 +1084,7 @@
     }
   }
 
-  /* CALM BY DEFAULT (DIRECTION §35): a row's secondary line (when, who, a reason) waits for the pointer or the
+  /* CALM BY DEFAULT: a row's secondary line (when, who, a reason) waits for the pointer or the
      keyboard to reach its row. Only where there is a pointer that hovers: on touch there is no hover to wait for, so the
      line is always shown. It fades rather than folds, so the row keeps its height and nothing moves under the pointer. */
   @media (hover: hover) and (pointer: fine) {
@@ -1198,7 +1198,7 @@
     vertical-align: -0.125em;
   }
 
-  /* A hole is an affordance, never a tag: it is the thing that fixes it. NO DASHED CHIP (DIRECTION §39): it reads as
+  /* A hole is an affordance, never a tag: it is the thing that fixes it. NO DASHED CHIP: it reads as
      a link in the working accent, which is what it is, on the accent's first tint so it is found in running text. `font: inherit` sits it in
      the document's own type wherever it renders, and `0.92em` is deliberately relative to that
      inherited size rather than a fixed step — a `--t-*` token here would win over `font: inherit`
@@ -1216,7 +1216,7 @@
 
   /* THE RED PHRASE (`{{bad:...}}`): the words in a sentence that say something is late or wrong. It is the deeper
      red solved for words, `--red`, the same one `bad`'s `--tone` reads above, and never the working accent.
-     AND IT IS HEAVIER, because working and late are both red now (DIRECTION §42) and colour is never the only mark:
+     AND IT IS HEAVIER, because working and late are both red now and colour is never the only mark:
      the weight is what someone who cannot tell the two reds apart reads. No wash and no underline, so it is not
      taken for a hole or a link. */
   .bad {

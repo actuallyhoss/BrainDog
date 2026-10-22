@@ -75,7 +75,7 @@ test('A CELL, A TILE AND A SENTENCE OF ONE RECORD AGREE, the two currencies side
   const cell = leadingCode('USD 2,947.95', home);
   assert.deepEqual(cell, { currency: 'USD', rest: '$2,947.95', sign: '', place: 'after', text: `$2,947.95${S}USD` });
   assert.equal(read(`$2,947.95${S}USD`, home), cell.text, 'a tile handed the drawn figure');
-  assert.equal(symbolText('Quartz holds USD 2,947.95 today', false, home), `Quartz holds ${cell.text} today`);
+  assert.equal(symbolText('Harbour holds USD 2,947.95 today', false, home), `Harbour holds ${cell.text} today`);
   assert.equal(read(`EGP 702,318.00 · $2,947.95${S}USD`, home), `EGP${S}702,318 · $2,947.95${S}USD`, 'two figures on one tile');
 });
 

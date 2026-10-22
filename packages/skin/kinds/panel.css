@@ -21,17 +21,20 @@
     font-size: var(--fs-body);
   }
 
-  /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (no tile in a tile). */
-  .block-slot > .block-panel > .panel {
+  /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (no tile in a tile), and they run the
+     tile's width. A note long enough to fold sits in the fold's wrapper, and Health's "15 checks have not run yet" and a
+     person's Seen in were each a grey well half the tile wide for want of that one step in the selector. */
+  :is(.block-slot, .block-slot > .fold) > .block-panel > .panel {
+    max-inline-size: none;
     padding: 0;
     background: none;
   }
 
-  .block-slot > .block-panel > .panel[data-marked] {
+  :is(.block-slot, .block-slot > .fold) > .block-panel > .panel[data-marked] {
     padding-inline-start: calc(var(--icon-m) + var(--sp-2));
   }
 
-  .block-slot > .block-panel > .panel > .panel-glyph {
+  :is(.block-slot, .block-slot > .fold) > .block-panel > .panel > .panel-glyph {
     inset-inline-start: 0;
     inset-block-start: 0;
   }

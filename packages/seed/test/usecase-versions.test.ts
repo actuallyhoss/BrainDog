@@ -736,7 +736,7 @@ const DECLARED: Record<string, Version> = {
       "Home now speaks in your use case's own words: `setting.voice_coming_up`, `setting.voice_fills_with` and `setting.voice_nothing_due` -> 8aff433fb66740ab",
     ],
   },
-  /* THE CALM PAGES OF OCTOBER 2nd (DIRECTION §35): each use case's last version is on `origin/master`, so these are versions and not resets. */
+  /* THE CALM PAGES OF OCTOBER 2nd: each use case's last version is on `origin/master`, so these are versions and not resets. */
   'business@1.4.0': {
     holds: `
       page.home-business
@@ -1222,7 +1222,7 @@ const DECLARED: Record<string, Version> = {
       "Each list's name and one of it, `setting.label_steps` and `setting.one_steps` among them, are titled by what the list is called where they read its id, \"Label: steps\", and every name is declared before any singular -> e73b289e6932ddf2",
     ],
   },
-  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD (DIRECTION §37, "Stop the harm"): each use case's last version is
+  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD ("Stop the harm"): each use case's last version is
      on `origin/master`, so these are versions and not resets. */
   'founder@1.16.0': {
     holds: `
@@ -1541,7 +1541,7 @@ const DECLARED: Record<string, Version> = {
     declares: '8a82770e8f8c8827',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
-      "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
+      "Folded into the unreleased 2.6.0 (pinwheel-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
       "Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61; a builder wrote it as 2.7.0, and 2.6.0 was never deployed: commit 63423720 holds 2.5.0): Numbers gains `about_service`, the figure `service-numbers` is added, and Server and provider numbers is laid on Renewals (the field is `about_service` and not the builder's `service`, a word the core-names gate would then refuse in two dozen places of the core); `adds.page.estate.5` and `metric.service-numbers` gained -> 8828553c41a19dd5",
       "Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64; commit 63423720 still holds 2.5.0): `metric.service-numbers` and the block it switches on end their ninety days today (`at before tomorrow`), so a reading dated after today is neither counted nor drawn -> f9fa3e40e32ae41d",
       "Folded into the unreleased 2.6.0 (founder-bound-66; integrate 66; commit 63423720 still holds 2.5.0): `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
@@ -1653,7 +1653,7 @@ const DECLARED: Record<string, Version> = {
       "`page.project`'s Where it stands takes Last worked (`project-last-worked`) -> 358cad7996106324",
     ],
   },
-  /* TOOLS AND SERVERS LISTS A PROJECT'S OWN (sketchpad-60). 2.20.0 IS RELEASED: commit 63423720, the deployed build,
+  /* TOOLS AND SERVERS LISTS A PROJECT'S OWN (pinwheel-60). 2.20.0 IS RELEASED: commit 63423720, the deployed build,
      holds it at 358cad7996106324. Batch 60 moved that entry in place; integrate 61 put it back and gave the change
      this version. */
   'team@2.21.0': {
@@ -1676,7 +1676,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '28ca804962485e64',
     history: [
-      "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (sketchpad-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
+      "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (pinwheel-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
       "Folded into the unreleased 2.21.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.20.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
       "Inside the unreleased 2.21.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.20.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 89c71e2ca313fac9",
       "Inside the unreleased 2.21.0 (founder-home-quiet-88; integrate 88; commit 63423720 holds 2.20.0): `page.home-team` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under its line and not drawn while nothing is quiet; a block added, no id added or taken away -> 1d4ea792097cdc3f",

@@ -15,6 +15,10 @@
  * text, and building `METRICS` here from the four modules instead of re-exporting it changed no byte of any chunk. The
  * move from a namespace import of the root to this file took that chunk from 13.5 KB to 10.7 KB brotli, and all shipped
  * JavaScript from 512.3 KB to 499.4 KB. The rest is `first-party.ts` reading `index.ts`, which this file cannot change.
+ *
+ * SO A SCREEN THAT WANTS ONLY THE FIGURES, OR ONLY WHICH LISTS A MODULE BRINGS, HAS A DOOR OF ITS OWN that reaches none of
+ * it: `@braindog/seed/packs/metrics` (`modules/metrics.ts`, the very `METRICS` exported here) and `@braindog/seed/packs/lists`
+ * (`modules/lists.ts`). The app's first open reads those two and not this file.
  */
 
 export { AGENTS_PACK, agentsPackDocument, type PackManifest } from './packs/agents.ts';

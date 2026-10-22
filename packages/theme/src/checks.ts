@@ -96,7 +96,7 @@ function pairsAgainstSurfaces(
   scheme: Scheme,
 ): Finding[] {
   const out: Finding[] = [];
-  /* 2026-10-07, AND THE BOARD, THE TILE AND THE FIELD (DIRECTION §39). They are where the product now paints its
+  /* 2026-10-07, AND THE BOARD, THE TILE AND THE FIELD. They are where the product now paints its
      words and marks, so a pair proven on the five rungs alone was a pair proven somewhere nobody reads it. */
   for (const role of roles)
     for (const surface of GROUNDS) {
@@ -126,7 +126,7 @@ function pairsAgainstSurfaces(
 }
 
 /**
- * The one pair check K measures and does not refuse: the working accent's words beside red words (DIRECTION §42).
+ * The one pair check K measures and does not refuse: the working accent's words beside red words.
  * BrainDog red is the working accent and late is a deeper red of the same hue, held apart by a word, a mark or a hatch
  * rather than by colour; the reason is at K below, and `separation.test.ts` holds what carries the difference.
  */
@@ -450,7 +450,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
     } else out.push({ check: 'R', scheme, level: 'pass', measured: r2(got) });
   }
 
-  /* S · THE WORKING ACCENT (DIRECTION §39), every pair it makes, at AA.
+  /* S · THE WORKING ACCENT, every pair it makes, at AA.
      Its label on the fill at rest and under the pointer (Q's argument), the fill against the three grounds a button
      stands on (R's), the accent as words on every ground and on both of its tints (B's), and the words a chosen thing
      carries on the tint that marks it: body, second and quiet text and a row's state words on the first, body and
@@ -484,7 +484,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      be confused with: body ink, and red words (`danger-text`) — which in a theme whose accent is a
      red mark are the same hue as the link by construction.
 
-     2026-10-08, TWO LINKS, AND ONE PAIR LET THROUGH (DIRECTION §42). A link is `action-text` now, the working accent's
+     2026-10-08, TWO LINKS, AND ONE PAIR LET THROUGH. A link is `action-text` now, the working accent's
      words, as well as `accent-text`, the mark's, and both are held apart from body text. The one pair not held is the
      working accent's words against red words (`K_EXEMPT`): BrainDog red is the working accent, late and "needs you" are
      a deeper red of the same hue, and the owner's word is that the two stand apart "with a mark or a word, never the

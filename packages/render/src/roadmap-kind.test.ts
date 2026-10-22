@@ -185,7 +185,7 @@ test('toHTML draws each row on its own track, its bar, its date and today where 
 
 test('THE TIMELINE IS ONE LIST, NOT A STRETCHED DRAWING: no name is placed over another, and the list is named', () => {
   /* The names sat in a layer over a box drawn with `preserveAspectRatio="none"`, placed beside their bars, and at
-     every width some ran into a bar, a line or each other (DIRECTION §39). A row is a line of its own now, its name in
+     every width some ran into a bar, a line or each other. A row is a line of its own now, its name in
      a column, so the drawing has nothing to collide. */
   const html = toHTML(parse(FENCE), { now: NOW });
   assert.equal(html.includes('<svg'), false);

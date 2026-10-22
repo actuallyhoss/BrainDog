@@ -55,12 +55,12 @@
   }
   @media (prefers-color-scheme: dark) {
     html:not([data-scheme]) {
-      --board: #0F121A;
+      --board: #090B10;
       --tile: #181C27;
       --tile-2: #222837;
       --hover: #1E2331;
-      --nav: #171B33;
-      --nav-selected: #272B4A;
+      --nav: #090B10;
+      --nav-selected: #222837;
       --rule: #2A3141;
       --rule-strong: #384054;
       --toast: #2B3144;
@@ -162,12 +162,12 @@
     --mark-c: 0.09;
   }
   html[data-scheme='dark'] {
-    --board: #0F121A;
+    --board: #090B10;
     --tile: #181C27;
     --tile-2: #222837;
     --hover: #1E2331;
-    --nav: #171B33;
-    --nav-selected: #272B4A;
+    --nav: #090B10;
+    --nav-selected: #222837;
     --rule: #2A3141;
     --rule-strong: #384054;
     --toast: #2B3144;
@@ -273,12 +273,12 @@
     }
     @media (prefers-color-scheme: dark) {
       html:not([data-scheme]) {
-        --board: #060910;
+        --board: #040508;
         --tile: #0C101A;
         --tile-2: #131826;
         --hover: #101522;
-        --nav: #0B0E25;
-        --nav-selected: #161936;
+        --nav: #040508;
+        --nav-selected: #131826;
         --rule: #181E2D;
         --rule-strong: #727C92;
         --toast: #2B3144;
@@ -380,12 +380,12 @@
       --mark-c: 0.11;
     }
     html[data-scheme='dark'] {
-      --board: #060910;
+      --board: #040508;
       --tile: #0C101A;
       --tile-2: #131826;
       --hover: #101522;
-      --nav: #0B0E25;
-      --nav-selected: #161936;
+      --nav: #040508;
+      --nav-selected: #131826;
       --rule: #181E2D;
       --rule-strong: #727C92;
       --toast: #2B3144;
@@ -488,12 +488,12 @@
   }
   @media (prefers-color-scheme: dark) {
     html[data-theme='hc']:not([data-scheme]) {
-      --board: #060910;
+      --board: #040508;
       --tile: #0C101A;
       --tile-2: #131826;
       --hover: #101522;
-      --nav: #0B0E25;
-      --nav-selected: #161936;
+      --nav: #040508;
+      --nav-selected: #131826;
       --rule: #181E2D;
       --rule-strong: #727C92;
       --toast: #2B3144;
@@ -595,12 +595,12 @@
     --mark-c: 0.11;
   }
   html[data-theme='hc'][data-scheme='dark'] {
-    --board: #060910;
+    --board: #040508;
     --tile: #0C101A;
     --tile-2: #131826;
     --hover: #101522;
-    --nav: #0B0E25;
-    --nav-selected: #161936;
+    --nav: #040508;
+    --nav-selected: #131826;
     --rule: #181E2D;
     --rule-strong: #727C92;
     --toast: #2B3144;

@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the forty-one kinds, and the four intent words.
+ * The eight primitives, the forty-two kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -347,6 +347,10 @@ const TABLE = {
      from `src/kpis.ts`): each its figure, its chart and why it is there. Page-only, because the numbers are the record's;
      on `grid`, so a drawer that does not know the kind yet draws them as tiles. */
   kpis: { primitive: 'grid', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'figure' },
+  /* A small component somebody wrote, for a visual no kind fits (Draw; `src/drawn.ts`): its code is the
+     block's `code:` and the host draws it in a sandboxed frame, handed the block's rows and the theme. Page-only, because
+     only a host with the frame can draw it; on the panel for `embed`'s reason, one bounded thing. */
+  drawn: { primitive: 'panel', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'media' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

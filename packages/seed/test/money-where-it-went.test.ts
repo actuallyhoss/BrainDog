@@ -2,7 +2,7 @@
  * MONEY'S WHERE IT WENT (PGS-C20 job 3): a folded heading at the end of Money over this month as shares of what it was
  * for, and who was paid in what nobody has filed, read off the declaration and then off the page a fresh record draws.
  *
- * "Unfiled grouped by merchant, where, bars, share" (the owner). RED FIRST, against money.ts before this change: no
+ * Unfiled entries grouped by merchant, with bars and each one's share. RED FIRST, against money.ts before this change: no
  * block on Money was headed Where it went, and nothing on any page drew the entries with no category by who was paid.
  */
 

@@ -177,7 +177,7 @@ export const TEAM = {
      `origin/master`, so the change is a version and not a reset.
      2.9.0: a project's page draws what was finished on it each week in place of the tickets tallied by priority, and
      Work's page says "No agent holds a ticket." in the short line it now has. 2.8.0 is on `origin/master`.
-     2.10.0: calmer (DIRECTION §35). Home, Cycles and Agent work open on one line said from new counts of tickets,
+     2.10.0: calmer. Home, Cycles and Agent work open on one line said from new counts of tickets,
      every heading wears a glyph, each list is drawn only while it holds a ticket, and Home folds how the cycle is
      going under what needs the team. A project's page takes portfolio 1.8.0's template. 2.9.0 is on `origin/master`.
      2.11.0: a project's page takes portfolio 1.9.0's template, which always opens on a line, the tickets handed back
@@ -211,7 +211,7 @@ export const TEAM = {
      `project-said` counts one, else a stat of `project-moved-7d` under the same heading), and Where it stands takes Last
      worked (`project-last-worked`). 2.19.0 is live.
      2.21.0: the project page it embeds lists a project's own tools alone under Tools and servers (`kind is tool, scope
-     is project`, sketchpad-60), where it listed everybody's. Batch 60 wrote this into 2.20.0, which commit 63423720
+     is project`, pinwheel-60), where it listed everybody's. Batch 60 wrote this into 2.20.0, which commit 63423720
      had already deployed, so it is a version of its own. One `where` narrowed on a block that is there, nothing added
      or taken away, so a minor step. 2.20.0 IS LIVE. Still unreleased (commit 63423720 holds 2.20.0), it takes batch
      88's block with no version of its own: Home draws Gone quiet, what stopped reporting, straight under its line

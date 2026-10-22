@@ -1,7 +1,7 @@
 /**
  * Shop: the orders a small shop takes and the things it sells.
  *
- * WRITTEN FOR USE CASE 6 OF THE VISION (his word of 9 October, `loop/STATUS.md`): a person who says "I run a small
+ * WRITTEN FOR USE CASE 6 OF THE VISION (9 October, `loop/STATUS.md`): a person who says "I run a small
  * candle shop" sees her words mapped to Orders and Products, and neither existed anywhere. Small business carried no
  * list, so a shop was proposed a page of every list the record held and nowhere to write an order down.
  *

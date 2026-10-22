@@ -207,7 +207,7 @@
        never the pixels (13 §4.2). */
     /* The design system's heights: a one-line row 44 and a two-line row 56, a toolbar control 36, a rail place 36. */
     --row-h: 44px;
-    /* 32 UNDER A MOUSE (DIRECTION §39), and 44 under a thumb below, which is the product's target size. */
+    /* 32 UNDER A MOUSE, and 44 under a thumb below, which is the product's target size. */
     --ctl-h: 32px;
     --tap: 44px;
     /* Header and row actions, a two-line row, a table row, a rail row. */
@@ -238,7 +238,7 @@
     /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT. The head padded 24 and every page padded 32,
        so no title on any screen shared a left edge with the list it named.
 
-       FLUID, AND IT WAS 32 WITH A STEP TO 16 UNDER 900px. A page fills the window (DIRECTION §36, "use the whole
+       FLUID, AND IT WAS 32 WITH A STEP TO 16 UNDER 900px. A page fills the window ("use the whole
        screen"), so the gutter is what keeps it off the edges, and it grows with the window instead of jumping: 16 on
        a phone, about 22 at 900, 36 at the owner's 1,512 and 40 from 1,667 up. No width query, so it adds no width
        the layout gate has to draw either side of. */
@@ -246,7 +246,7 @@
     --sticky: 52px;
     /* Room for the Mac app's title bar; shell.ts sets it, 0 in a browser. */
     --shell-inset: 0px;
-    /* The rail, 240 wide (DIRECTION §39: the board's own left column, flat); the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
+    /* The rail, 240 wide (the board's own left column, flat); the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
        docked panel, and the gap between tiles; the panel is 440. */
     --rail: 240px;
     /* THE NARROW RAIL, one tap and the card's padding either side: 60. Here and not on the rail, so the toasts that
@@ -331,7 +331,7 @@
      */
     /* THE SOFT RING ROUND A FOCUSED FIELD IS GONE (frame F4): a field focuses with the one ring, on its wrapper. */
 
-    /* NO GLASS AND NO LIGHT ON THE GROUND (DIRECTION §39, SPEC 1.9). The board is one flat colour, and anything that
+    /* NO GLASS AND NO LIGHT ON THE GROUND (SPEC 1.9). The board is one flat colour, and anything that
        floats is the opaque `--tile` with a 1px `--rule-strong` edge; nothing blurs what is behind it. */
 
     /* A leading and a tracking for the top of the type scale (`--lh-3xl`, `--tr-tight`) stood here, and so did a tint
@@ -342,7 +342,7 @@
        `--tile-2`, over `--d-press`. Nothing scales and nothing dims, which read as disabled. */
 
     /**
-     * MOTION IS ONE SCALE, and every step of it is under 300ms (DIRECTION §37: fluid, and never in the way). Motion
+     * MOTION IS ONE SCALE, and every step of it is under 300ms (fluid, and never in the way). Motion
      * here answers, it does not perform.
      *
      *   press 70 · exit 90 · enter 110 · menu 120 · swap 160 · rows 180 · page 200 · recompose 220 · panel 240
@@ -355,7 +355,7 @@
      *   --d-swap       what a panel or a segment shows, changing in place (a fade with a 2px settle)
      *   --d-rows       rows settling after one is added, moved or taken away
      *   --d-page       a route's cross-fade, from one page to the next
-     *   --d-recompose  a page recomposing where it stands when the record moves (DIRECTION §38): a block that arrives,
+     *   --d-recompose  a page recomposing where it stands when the record moves: a block that arrives,
      *                  leaves or changes place as a payment, a commit or a mail lands, with no reload and no jump
      *   --d-panel      the docked panel and a sheet coming in, and what travels with them
      *

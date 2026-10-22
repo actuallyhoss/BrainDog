@@ -6,7 +6,7 @@
  * DATA, NOT A DECLARATION. The agents pack document stays as it is (agents 1.10.0 is not rehashed): a skill is an entry of
  * Skills, so it travels in the catalogue beside the pack (`usecases/catalogue.ts`), as a use case's skills already do.
  *
- * NOTHING HERE NAMES A PERSON, A PROJECT OR A RECORD (DIRECTION §27). Each step says how to find what it works on, and
+ * NOTHING HERE NAMES A PERSON, A PROJECT OR A RECORD. Each step says how to find what it works on, and
  * the session reads the names from the record it is in (`test/agents-skills.test.ts`).
  *
  * A VERB IS WRITTEN "call `verb`", and a resource "read `braindog:...`", so the test can hold every one to a tool or a

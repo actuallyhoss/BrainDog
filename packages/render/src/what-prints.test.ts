@@ -80,8 +80,8 @@ test('A TILE, A CARD\'S FIGURE AND A BAR THAT NAME NOTHING ARE LEFT OUT; the res
   const stat = draw('```stat\nLate | {{tasks.late}} | \nOpen | {{tasks.open}} | \n```');
   assert.match(stat, /style="--cells:1"/u, 'the tiles are counted after');
   assert.doesNotMatch(stat, /Late|tasks\.late/u);
-  const cards = draw('```cards\ntitle: Project | figure: Open\nCrumb.gg | {{tasks.late}}\nKiln | {{tasks.open}}\n```');
-  assert.match(cards, /<h3 class="cards-title">Bake\.gg<\/h3><\/div><\/li>/u, 'the card keeps its name and loses its figure');
+  const cards = draw('```cards\ntitle: Project | figure: Open\nOxbow.gg | {{tasks.late}}\nKiln | {{tasks.open}}\n```');
+  assert.match(cards, /<h3 class="cards-title">Oxbow\.gg<\/h3><\/div><\/li>/u, 'the card keeps its name and loses its figure');
   assert.match(cards, /<span class="cards-value num"><span class="figure num">7<\/span><\/span>/u);
   const bar = draw('```bar\nOpen | {{tasks.open}} | \nLate | {{tasks.late}} | \nDue | {{cash.due}} | \n```');
   assert.doesNotMatch(bar, /Late|tasks\.late/u);

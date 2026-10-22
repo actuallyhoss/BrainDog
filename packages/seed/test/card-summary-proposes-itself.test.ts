@@ -39,7 +39,7 @@ test('AND IS NOT HEARD BY CHANCE: each summary names a signal of its own card, a
 });
 
 test('SMALL BUSINESS SAYS MONEY IN AND MONEY OUT, never who owes whom, and is proposed on the words it always was', () => {
-  /* MONEY IS A FINANCE APPLICATION, NOT A LEDGER OF WHO OWES WHOM (DIRECTION, "Money is a finance application"): the
+  /* MONEY IS A FINANCE APPLICATION, NOT A LEDGER OF WHO OWES WHOM (Money is a finance application): the
      card a person reads first and the line an empty Home says are held to it, as whole words so "owner" is no miss. */
   const business = USE_CASES.find((u) => u.usecase === 'business')!;
   const owes = /\b(owe|owed|owes|owing)\b/i;

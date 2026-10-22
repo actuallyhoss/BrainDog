@@ -14,6 +14,11 @@
 
   IT READS NOTHING AND HOLDS NO RUN'S HANDLE AS A WORD: each row's `key` is handed back to the host's callbacks, and
   the run's page is the host's `href`. With no `ontell` the row draws no controls at all, for a reader who may not.
+
+  ONE LINE A RUN WHERE THE HOST ASKS (`line`, the Agents page): the face, the agent and what it said on one line, the
+  project and how long it has run at its end, and Tell, Pause and Stop behind one "More" press that the host opens as
+  its own menu (`onmenu`) at the button. The honest line is then the host's to say once under the list, not once a row,
+  and the menu's Pause or Stop asks here, in place, as a press on the row always did (`ask`).
 -->
 <script lang="ts">
   import { agentMarkFill } from '../src/index.ts';
@@ -25,6 +30,8 @@
     ontell,
     onstop,
     onresume,
+    line = false,
+    onmenu,
   }: {
     rows: readonly PresenceView[];
     mark?: ((agent: string) => ControlMark | null) | undefined;
@@ -33,6 +40,10 @@
     /** Stop or pause this run, with why in his words (empty when he gave none). */
     onstop?: ((key: string, kind: 'stop' | 'pause', why: string) => void) | undefined;
     onresume?: ((key: string) => void) | undefined;
+    /** One line a run, the presses behind one button. */
+    line?: boolean;
+    /** Opens the host's menu for this run at the button that asked, by the button's rect. */
+    onmenu?: ((key: string, at: { x: number; y: number; height: number }) => void) | undefined;
   } = $props();
 
   const uid = $props.id();
@@ -47,9 +58,67 @@
     why = '';
   };
 
+  /** Asks before a stop or a pause of this run, in place under its row: the host's menu presses it. */
+  export function confirm(key: string, kind: 'stop' | 'pause'): void {
+    ask(key, kind);
+  }
+
+  const rectOf = (e: MouseEvent): { x: number; y: number; height: number } => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return { x: r.left, y: r.top, height: r.height };
+  };
+
   const hue = (agent: string | null): string => (agent && /^[a-z]+$/u.test(agent) ? `--pres-c:var(--agent-${agent}, var(--ink))` : '--pres-c:var(--ink)');
 </script>
 
+{#snippet face(r: PresenceView, m: ControlMark | null)}<span class="pres-face" aria-hidden="true"
+    >{#if m}<svg class="agent-mark" data-tone={m.tone} viewBox="0 0 24 24" fill="currentColor" style={agentMarkFill(m.tone) ?? undefined}
+        ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg
+      >{:else}<span class="pres-initial">{r.name.slice(0, 1)}</span>{/if}<span class="pres-dot" data-live={r.stopped ? 'held' : r.live}></span></span
+  >{/snippet}
+
+{#snippet askForm(r: PresenceView, open: { key: string; kind: 'stop' | 'pause' })}
+  {#if onstop}
+    <form class="pres-ask" aria-label={open.kind === 'stop' ? `Stop ${r.name}` : `Pause ${r.name}`} onsubmit={(e) => (e.preventDefault(), onstop(r.key, open.kind, why.trim()), (asking = null))}>
+      <p class="pres-sure" role="status">{open.kind === 'stop' ? r.confirm.stop : r.confirm.pause}</p>
+      <label class="pres-why" for="{uid}-{r.key}-why">Why, if you want to say (it reads this)</label>
+      <input id="{uid}-{r.key}-why" class="pres-input" type="text" bind:value={why} autocomplete="off" enterkeyhint="send" maxlength="400" />
+      <div class="pres-do">
+        <button type="button" class="pres-btn" onclick={() => (asking = null)}>Keep it going</button>
+        <button type="submit" class="pres-btn" data-weight="primary">{open.kind === 'stop' ? 'Stop it' : 'Pause it'}</button>
+      </div>
+    </form>
+  {/if}
+{/snippet}
+
+{#if line}
+  <ul class="pres" data-line="" aria-label="Agents at work">
+    {#each rows as r (r.key)}
+      {@const m = r.agent && mark ? mark(r.agent) : null}
+      {@const open = asking?.key === r.key ? asking : null}
+      <li class="pres-row" data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
+        {@render face(r, m)}
+        <div class="pres-body">
+          <p class="pres-head">
+            {#if r.href}<a class="pres-name" href={r.href}>{r.name}</a>{:else}<span class="pres-name">{r.name}</span>{/if}{#if r.doing}<span class="pres-doing">{r.doing}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}
+          </p>
+          {#if r.holds}<p class="pres-holds">{r.holds}</p>{/if}
+          {#if open}{@render askForm(r, open)}{/if}
+        </div>
+        <p class="pres-where">
+          {#if r.project}<span class="pres-proj"><span class="pres-pdot" data-slot={r.project.slot}></span>{r.project.name}</span>{/if}<span class="pres-time num"
+            >{r.stopped === 'stop' ? 'Stopped by you' : r.stopped === 'pause' ? 'Paused by you' : (r.time ?? LIVE[r.live])}</span
+          >
+        </p>
+        {#if onmenu}
+          <button type="button" class="pres-more" aria-haspopup="menu" aria-label="Tell, pause or stop {r.name}" disabled={r.busy} onclick={(e) => onmenu(r.key, rectOf(e))}
+            ><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg></button
+          >
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{:else}
 <ul class="pres" aria-label="Agents working now">
   {#each rows as r (r.key)}
     {@const m = r.agent && mark ? mark(r.agent) : null}
@@ -99,3 +168,4 @@
     </li>
   {/each}
 </ul>
+{/if}

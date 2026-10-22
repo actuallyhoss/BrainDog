@@ -157,7 +157,7 @@ export type RenderOptions = InlineOptions & {
    *
    * A CHIP, A `spec` ROW, A FIGURE CELL OR A STONE WHOSE VALUE IS MISSING IS NOT DRAWN (`unvalued`), in both drawers,
    * for every reader: his project pages drew chips that were a name and a dash, and a row "Keeping it alive: lanternfish.example"
-   * over a dash (DIRECTION §35, "An empty or unused part is not drawn"). A block that has nothing left says this line
+   * over a dash ("An empty or unused part is not drawn"). A block that has nothing left says this line
    * where there is one and is not drawn where there is none. Absent, which is a write-up, an export and the mirror,
    * there is never a line: the page's lead is the page's to name, never the renderer's.
    *
@@ -322,7 +322,7 @@ const toneGlyph = (tone?: string): string => {
 };
 
 /**
- * A LATE PART IS STRIPED IN SVG TOO (DIRECTION §42). The working accent is BrainDog red and late is a deeper red of the
+ * A LATE PART IS STRIPED IN SVG TOO. The working accent is BrainDog red and late is a deeper red of the
  * same hue, so a late segment or arc beside a working one must differ by a mark and not by its shade alone. A CSS
  * stripe cannot reach an SVG shape, so the shape is painted with a `<pattern>` of its own, drawn in `--chart-late`
  * through `currentColor` (`.late-hatch` in `blocks-charts.css`) and in the block's own ink with no stylesheet. The
@@ -1129,7 +1129,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
     .slice(0, most.shown)
     .map((r, n) => {
       /* A MARK THAT NAMES A PICTURE IS THE PICTURE, and one that names none is the title's letter, never the first letter
-         of the picture's name ("C Crumb.gg"); `Cards.svelte` draws the same slot (`markOf`, `markGlyphOf`). */
+         of the picture's name ("C Oxbow.gg"); `Cards.svelte` draws the same slot (`markOf`, `markGlyphOf`). */
       const mark = L.mark >= 0 ? markOf(said(r, L.mark), said(r, L.name)) : null;
       const markGlyph = markGlyphOf(mark);
       const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), o.runs?.[n], isQuiet(L, r.cells)) : null;
@@ -1707,7 +1707,7 @@ function forecast(b: Block, o: RenderOptions): string {
 /**
  * `roadmap`: tasks on one time axis (`src/roadmap.ts`), drawn as a timeline. Each row is a line of its own, its name in
  * the left column and its window as a bar on a track in the right, so no name can land on another or on a bar: the
- * names over a stretched drawing collided at every width (DIRECTION §39). A date with no effort is a dot on its day.
+ * names over a stretched drawing collided at every width. A date with no effort is a dot on its day.
  * Across the top the axis names each Monday or each month, and today's line runs down every track.
  *
  * THE LIST IS THE CHART. It was a drawing with a lane list under it for a screen reader and a phone; now the one list

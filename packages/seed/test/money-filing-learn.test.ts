@@ -1,6 +1,6 @@
 /**
  * Filing rules that learn (REC-B10 steps 5 and 6): a new or changed rule files back what it matches, and a category set
- * by hand asks once whether the payee always goes there. "no category is better than a wrong one" (the owner's words).
+ * by hand asks once whether the payee always goes there. No category is better than a wrong one.
  *
  * MEASURED ON A RECORD, as `money-match-rule.test.ts` measures `match_payment`: Money installed from its pack document,
  * its rules started by the write, and each queued script's declared `source` run as a host's sandbox runs it, with the

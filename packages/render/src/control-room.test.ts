@@ -66,6 +66,32 @@ test('THE COMPOSER: one field, To, On and When said as words, Send never greyed,
   /* A REFUSAL IS SAID UNDER THE FIELD, in red, as an alert. */
   const refused = await draw('../svelte/Instruct.svelte', { view: { ...VIEW, fault: 'Say what the agent should do.' }, onto: noop, onon: noop, onwhen: noop, onsend: noop });
   assert.match(refused, /<p class="ins-fault" role="alert">Say what the agent should do\.<\/p>/u);
+  /* NO MACHINE OR PROFILE TO CHOOSE, none drawn. */
+  assert.doesNotMatch(html, /<span class="ins-key">(?:Machine|Profile)<\/span>/u);
+});
+
+test('MACHINE AND PROFILE ARE CHOICES ONLY WHEN THE HOST OFFERS THEM, each by name, "Any" first', async () => {
+  const view: InstructView = {
+    ...VIEW,
+    machine: [
+      { key: '', label: 'Any machine' },
+      { key: 'kiln-mbp', label: 'kiln-mbp' },
+      { key: 'kiln-studio', label: 'kiln-studio' },
+    ],
+    machineKey: 'kiln-mbp',
+    seat: [
+      { key: '', label: 'Any profile' },
+      { key: 'harbour', label: 'harbour' },
+      { key: 'default', label: 'default' },
+    ],
+    seatKey: '',
+  };
+  const html = await draw('../svelte/Instruct.svelte', { view, onto: noop, onon: noop, onwhen: noop, onmachine: noop, onseat: noop, onsend: noop });
+  assert.match(html, /<span class="ins-key">Machine<\/span>/u);
+  assert.match(html, /<option value="kiln-studio"[^>]*>kiln-studio<\/option>/u);
+  assert.match(html, /<span class="ins-key">Profile<\/span>/u);
+  assert.match(html, /<option value=""[^>]*>Any profile<\/option>/u);
+  assert.match(html, /<option value="harbour"[^>]*>harbour<\/option>/u);
 });
 
 const ROW: PresenceView = {

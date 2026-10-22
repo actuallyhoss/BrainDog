@@ -20,7 +20,7 @@ import { WHERE_IT_WENT } from './parts/where-it-went.ts';
  * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then what comes in and goes out;
  * which way an amount goes is a property of the row, never the frame of the page.
  *
- * "i want the headlines to be the money i have, not the money im due/owed" (the owner). So the hero figure is Cash
+ * THE HEADLINES ARE THE MONEY A PERSON HAS, NOT THE MONEY THEY ARE DUE OR OWED. So the hero figure is Cash
  * now, read from the accounts, and every walk on this page starts from that same figure rather than from a balance typed into the page.
  *
  * ONE PAGE, SINCE money-core 3.0.0, AND IT WAS THREE: Overview, Ledger, and the house Home. Overview looked ahead
@@ -37,7 +37,7 @@ import { WHERE_IT_WENT } from './parts/where-it-went.ts';
  * and the box to add an account, and a record with nothing late reads no word about lateness. Every tile's heading
  * wears a glyph (`icon:`), as the look asks (`loop/design/SYSTEM.md` §6).
  *
- * CALMER AGAIN, SINCE money-core 3.4.0 (DIRECTION §35): the line leads and no tile beside it says its figures again,
+ * CALMER AGAIN, SINCE money-core 3.4.0: the line leads and no tile beside it says its figures again,
  * one view of the month is kept where there were three, and everything after Accounts is folded under Coming and
  * going, so the page a person reads each morning is the line, the walk, what needs them and where the money sits.
  *
@@ -45,14 +45,14 @@ import { WHERE_IT_WENT } from './parts/where-it-went.ts';
  * money late going out are three lines of one tile under Accounts, each drawn only while it is true, where they were
  * three tiles a line tall.
  *
- * NO SPLIT THAT HOLDS NOTHING, SINCE money-core 3.8.0 (DIRECTION §37). An imported record on money-core 3.1.0 drew
+ * NO SPLIT THAT HOLDS NOTHING, SINCE money-core 3.8.0. An imported record on money-core 3.1.0 drew
  * thirteen account cards, six of them empty accounts that are not cash and sit in no book ("Welcome to Column N.A.").
  * Accounts on this page have been the parts of Cash now since 3.3.0, so such an account is never one: what is not
  * cash is left out, and a part at nought cuts no length of the track (`splitPlan` in `packages/render/src/split.ts`).
  * A split is drawn only while it has a part to cut, here and on a book's page, so a month with nothing spent and a
  * record whose accounts all stand at nought draw no empty track.
  *
- * THE PICTURE FIRST, SINCE money-core 3.11.0 (DIRECTION §39, the design review's fix 3). Money's first screen held
+ * THE PICTURE FIRST, SINCE money-core 3.11.0 (the design review's fix 3). Money's first screen held
  * three questions drawn whole and no number: Cash ahead sat about 950px down. Now the walk leads the main column, and
  * a side column of four twelfths stands beside it (`layout: { rail: 4 }`): when the money runs out, in the figure's
  * own size and in the colour of a missed target, over the accounts that hold it, then the questions, which the app
@@ -70,7 +70,7 @@ import { WHERE_IT_WENT } from './parts/where-it-went.ts';
  * lead. TWENTY-FOUR BLOCKS, THE MOST A PAGE DECLARES (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`): the line
  * took the place of the one that said no balance had been typed (`parts/cross-check.ts`).
  *
- * THAT THE MONEY LASTS THE YEAR, IN THE LINE (REC-B07, DIRECTION §42). The tile of when it runs out is drawn only while
+ * THAT THE MONEY LASTS THE YEAR, IN THE LINE (REC-B07). The tile of when it runs out is drawn only while
  * the walk has a day it goes under on, so a record whose money lasts read nothing of how long. The line for one book
  * is now two, one drawn (`HEADLINE_LASTS` in `parts/headline.ts`): what there is, and the same ending "it lasts the
  * year" while the walk reaches its last day above zero. That is a third lead note on a page at twenty-four, so one

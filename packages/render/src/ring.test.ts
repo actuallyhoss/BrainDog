@@ -134,7 +134,7 @@ test('toHTML draws a named dial with the figure in its centre, and the rows as w
   assert.match(parts, /<span class="ring-figure num" aria-hidden="true">20<\/span>/u);
 });
 
-test('A LATE ARC IS STRIPED AS WELL AS RED (DIRECTION §42): it is stroked with a pattern of its own, and the rest are not', () => {
+test('A LATE ARC IS STRIPED AS WELL AS RED: it is stroked with a pattern of its own, and the rest are not', () => {
   const html = toHTML(parse('```ring | Week\nDeep work | 12\nInvoices | 6 | | bad\n```'));
   const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="4" height="4">/u.exec(html)?.[1];
   assert.ok(id, 'a late arc drew no pattern');

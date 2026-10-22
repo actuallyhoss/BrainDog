@@ -49,7 +49,7 @@ const cell = (cells: readonly string[], i: number): string => (cells[i] ?? '').t
 /**
  * Whether a part's value is missing: no cell, a blank one, or the dash a reader prints for null (`format.ts` `MISSING`).
  * Zero is a value. Both drawers ask this of a chip, a `spec` row, a figure cell and a stone, and a part it answers yes
- * for is not drawn (DIRECTION §35: "An empty or unused part is not drawn").
+ * for is not drawn ("An empty or unused part is not drawn").
  *
  * HERE, BECAUSE THIS MODULE IMPORTS NOTHING: `html.ts` and the four Svelte drawers all reach it without a cycle. The
  * dash is spelled out rather than imported for the same reason, and a test holds it equal to `MISSING`.

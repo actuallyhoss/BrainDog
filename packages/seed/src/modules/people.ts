@@ -464,7 +464,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * first. A block with nothing to say is left off rather than drawn empty, so a record with nobody in it opens on its
    * cards' empty line alone. Every tile's heading wears a glyph (`icon:`), as the look asks.
    *
-   * WHO, AND WHEN, IN PLACE OF THE CHART, SINCE People 3.1.0 (DIRECTION §39, the second design review's fix 7). In touch,
+   * WHO, AND WHEN, IN PLACE OF THE CHART, SINCE People 3.1.0 (the second design review's fix 7). In touch,
    * 12 weeks drew a row of twelve dots a person, 48 grey and 4 blue on a record of four people: it said when, once
    * each, at the cost of a grid. Now it is two short lists side by side, each a person and the day you were last in
    * touch, the one quiet longest first: Gone quiet, whoever has been quiet three months, in the colour of what needs

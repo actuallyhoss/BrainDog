@@ -426,7 +426,7 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  * The pack's pages: the agents home at `/p/agents`, How the brain changed at `/p/brain`, a page per skill with its
  * versions, and a page per run.
  *
- * THE HOME IS THE RUNS, SINCE 1.5.0 (DIRECTION §37, "Stop the harm"): who is working now, where the stopped runs left
+ * THE HOME IS THE RUNS, SINCE 1.5.0 ("Stop the harm"): who is working now, where the stopped runs left
  * off, and what they added to the brain, in that order. Until 1.3.0 it was a grid of cards per list, each of the same
  * weight; 1.4.0 put a line over it and folded what the brain holds. 1.5.0 takes three things away. The questions
  * waiting on you were Decide's own cards drawn again, and Decide is one press away on the rail with its count. How the
@@ -434,12 +434,12 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  * heading that drew a lone "Faded 0" on a quiet record. And no part says it is empty: a block with nothing in it is
  * not drawn, and the line says the quiet half.
  *
- * THE RUNS GROUPED, SINCE 1.6.0 (DIRECTION §37, the agent directions' "runs grouped by state, the run docked beside"):
+ * THE RUNS GROUPED, SINCE 1.6.0 (the agent directions' "runs grouped by state, the run docked beside"):
  * Needs you, Working, Today and Earlier, in that order, each a heading over its own runs and drawn only while it has
  * any. Needs you is back, and it is not the Waiting on you 1.5.0 took away: that was every question Decide holds, and
  * this is only what an agent's run asked (`ASKED_BY_A_RUN`). Where they left off goes into Today and Earlier, whose
  * cards say the next step each run left. Each card opens its run in the panel docked beside the page, which is the
- * host's (DIRECTION §34), so the page declares lists of runs and no panel of its own. The word on screen stays "run".
+ * host's, so the page declares lists of runs and no panel of its own. The word on screen stays "run".
  *
  * THE DAY DRAWN OVER THEM, SINCE 1.8.0: Today's lanes, the last 24 hours of runs as spans of time, under the line.
  *
@@ -462,27 +462,38 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
     icon: 'session',
     requires: ['register.session', 'register.learnings', 'register.skills', 'register.tools', 'register.credentials'],
     blocks: [
-      /* THE PAGE'S ONE LINE, said of the runs alone since 1.5.0: who is working and what was left for the next one. Two
-         notes on the one figure, so exactly one of them draws, and a clause whose figure is nought is left out by the
-         writer, so a record where nothing is working and nothing was left says that and stops. What waits on you is
-         Decide's, and how many lessons have faded is the Learnings list's.
+      /* THE PAGE'S ONE LINE, said of the runs alone since 1.5.0: who is at work and what was left for the next one, a
+         clause whose figure is nought left out by the writer, so a record where nothing is working and nothing was left
+         says that and stops. What waits on you is Decide's, and how many lessons have faded is the Learnings list's.
 
          WHAT WAS LEFT IS THE RECORD'S COUNT SINCE 1.11.0 (AGT-C12): `handoffs-open`, the steps nobody has taken, the
          ones Left for the next run draws. Until then it read this pack's `runs-left-next`, every stopped run with a
-         step written, so a step a later run had taken was still counted and the line disagreed with the briefing. */
+         step written, so a step a later run had taken was still counted and the line disagreed with the briefing.
+
+         ON HOW MANY MACHINES, AND WHO WAITS ON YOU, SINCE 1.14.0 (the Agents page's lead, "12 at work on 4 machines, 1
+         waiting on you"): three notes on the record's `machines-working`, exactly one drawn, since nobody at work is on
+         no machine and one machine is said in words. Every number is the record's own, by the one clock the rail's
+         count is (`runs-working`, `runs-waiting`), so the line and the pill at the top cannot say two numbers. */
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'runs-working', gt: 0 },
-        body: '{{runs-working}} agent(s) working now, {{handoffs-open}} step(s) left for the next run',
+        when: { metric: 'machines-working', gt: 1 },
+        body: '{{runs-working}} at work on {{machines-working}} machines, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'runs-working', is: 0 },
-        body: 'No agent is working right now, and {{handoffs-open}} step(s) left for the next run',
+        when: { metric: 'machines-working', is: 1 },
+        body: '{{runs-working}} at work on one machine, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'machines-working', is: 0 },
+        body: 'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
       },
       /* WHAT A RUN ASKED YOU, FIRST OF THE GROUPS, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
          drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
@@ -505,7 +516,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
          UNDER NEEDS YOU AND NOT OVER IT, because a section heads the blocks after it up to the next one, and its well
          takes their tone (`sectionWell` in `apps/web/src/lib/record/blocks.ts`): over the questions, the box to tell an
-         agent wore Needs you's red. Here the next block is Working, a section of its own, so it heads nothing. */
+         agent wore Needs you's red. Here the next block is Working, a section of its own, so it heads nothing.
+
+         ONE LINE SINCE 1.14.0, AND WHAT HE TOLD BESIDE IT: the field, To and Send on one row, the other choices once he
+         starts, a sheet on a phone, and the last three things he told agents in a column beside it. */
       {
         kind: 'section',
         heading: 'Tell an agent',
@@ -534,75 +548,52 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          stop that agent: its hooks at its next tool call, or only its next BrainDog call.
 
          NO `when:`, BECAUSE A SECTION'S HIDES WHAT IT HOLDS: the steps under it would go with it on a record where
-         nobody is working. The panel leaves the tile out itself while no run is open, as `panel: seen` does. */
+         nobody is working. The panel leaves the tile out itself while no run is open, as `panel: seen` does.
+
+         AT WORK, ONE LINE A RUN, BY MACHINE, SINCE 1.14.0 (the board's At work tile): only the agents at work, the rail's
+         count of them, under the machine each is on; Tell, Pause and Stop behind one More press; what Pause and Stop
+         reach said once under the list and not once a row; and the runs open and waiting on him folded at its foot.
+         Seven parts of the row, beside Left for the next run. */
       {
         kind: 'section',
-        heading: 'Working',
+        heading: 'At work',
         icon: 'session',
-        span: 12,
+        span: 7,
         panel: 'presence',
       },
       /* WHAT WAS LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12, "Agents page with no dead runs"): the steps runs left and
          nobody has taken, from the record's own `handoffs.open`, the read a new run is handed its step from, so the
-         page never lists a step the briefing would not offer. A card leads with the step, then who left it and when,
-         and its mark, which a host says in words: Next for the one a new run is handed, Left earlier for one past a
-         week or passed over. Every step and not only the next ones, because a step passed over is the one somebody
-         has to rule on. The source comes the newest first and takes no `order:`; six are drawn and the rest counted.
-         WHO IS THE AGENT'S NAME (`agent`) and not `run`, which is a handle only a host that knows runs can say. */
+         page never lists a step the briefing would not offer.
+
+         THE HOST'S, ONE LINE A STEP, SINCE 1.14.0 (`panel: left-steps`): a card a step said "Status" and "Next" on every one and
+         the same step three times. Now the step in its words with who left it and when, a step left three times is one
+         line, the newest three drawn and the rest folded, and he can Take one (it goes to the composer, to whoever is
+         next) or Drop it with a reason. The panel leaves the tile out while no step is left. */
       {
-        kind: 'cards',
+        kind: 'section',
         heading: 'Left for the next run',
         icon: 'arrow',
-        span: 12,
-        source: 'handoffs.open',
-        columns: [
-          { field: 'next', as: 'title' },
-          { field: 'agent', label: 'Left by', as: 'who' },
-          { field: 'left_at', label: 'Left', as: 'when' },
-          { field: 'mark', label: 'Status', as: 'fact' },
-        ],
-        limit: 6,
-        when: { metric: 'handoffs-open', gt: 0 },
+        span: 5,
+        panel: 'left-steps',
       },
-      /* ONE TILE, TODAY'S RUNS, SINCE 1.14.0: the day's picture on top and the runs that ended or stopped today under it, where
-         two tiles both headed Today said the one word twice. A boxed section draws the blocks after it on one surface, up
-         to the next section, so the two sit under the heading with none of their own; each is still drawn only while it
-         has anything, and the tile goes when neither has (`emptyBoxesShut`). It stands under Working and Left for the
-         next run, because the box takes the blocks after it and Needs a look closes it. */
+      /* TODAY'S RUNS, ONE TILE, SINCE 1.14.0 AS THE HOST DRAWS IT (`panel: run-list`): the day as lanes, one a kind of agent
+         and not one a run (forty bars on a busy day), and under it every run newest first, an agent run titled by what
+         it did. NO UNDO on the list: a run's way back is on its own page. The declared lanes, a lane a run, went. NO
+         `when:`, because a section's hides what it holds and a rule may have run on a day no agent did; the panel
+         leaves the tile out itself while nothing has run. The whole row, so the day's lanes have the width to read. */
       {
         kind: 'section',
         heading: 'Today’s runs',
         icon: 'clock',
         span: 12,
-        box: true,
-        when: { metric: 'runs-heard-today', gt: 0 },
-      },
-      /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
-         it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
-         working in the accent and every other left neutral. Over the list of runs itself and not `sessions.live`, so a
-         run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
-         hours, and on a busy day the newest of them and how many more. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
-         It shares its heading with the group of runs that stopped today further down: both are today. */
-      /* TODAY'S RUNS ONLY, SINCE THE UI PASS OF 20 OCTOBER (agents F7): the runs heard from today, the window from
-         midnight to now, and each lane the run's own row, its agent and what it was doing, its bar in the agent's hue.
-         The cards of the runs that stopped today went: they were the same runs drawn twice, and said 1 where the lanes
-         drew 3. `runs-today` stays declared for an agent that reads it. */
-      {
-        kind: 'lanes',
-        span: 12,
-        source: 'register.session',
-        where: 'last_seen is today',
-        columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
-        tones: { active: 'info' },
-        hours: 24,
-        when: { metric: 'runs-heard-today', gt: 0 },
+        panel: 'run-list',
       },
       /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to four lines, as Money's Heads
          up is: a boxed section draws the blocks after it, up to the next section, on one surface, and each line is drawn
          only while its figure is above nought, so a record with nothing wrong draws no tile at all (a section over
          nothing goes with its blocks). The heading is the word and the tone the mark, never the colour alone.
 
-         UNDER THE RUNS AND NOT UNDER THE LINE, where the scope first put it: the page is the runs (DIRECTION §37), and
+         UNDER THE RUNS AND NOT UNDER THE LINE, where the scope first put it: the page is the runs, and
          a page shows at most six tiles before the rest is folded (`test/calm-pages.test.ts`), so the lanes and the four
          groups keep the top and this is the sixth. STILL THE SIXTH SINCE 1.11.0: Left for the next run is over it, and
          Earlier went under a fold of its own below it. */
@@ -705,6 +696,16 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         source: 'activity',
         where: 'list is learnings or skills or credentials or tools',
         first: 3,
+      },
+      /* THE MACHINES AND PROFILES, THE PAGE'S QUIET FOOT, SINCE 1.14.0 (`panel: machines`): each machine by name with how
+         many are at work on it and how many wait, the profiles its runs are under, and the machines with nothing open.
+         A section of its own after the folds, so it closes What the brain learned and is no seventh tile before them. */
+      {
+        kind: 'section',
+        heading: 'Machines and profiles',
+        icon: 'monitor',
+        span: 12,
+        panel: 'machines',
       },
     ],
   },
@@ -856,7 +857,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
     ],
   },
-  /* A RUN'S OWN PAGE, SINCE 1.7.0 (DIRECTION §37, "the run docked beside"): one per row of the kernel's list of runs,
+  /* A RUN'S OWN PAGE, SINCE 1.7.0 ("the run docked beside"): one per row of the kernel's list of runs,
      named by what it was doing. What it did and Undo this run are the host's (`panel: run`, `RunPanel.svelte`), drawn
      under the one section, by the run's handle and never its id. No `nav:`, so the runs never grow the rail: a run's
      card on the agents home opens it. */
@@ -889,7 +890,7 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      its new figure (`runs-left-next`, `learnings-active`, `skills-active`) has any, and Growth, Learnings and Skills are
      folded under What the brain holds; the Faded tile went into the line; the skill page leads with its trigger and
      draws the lessons that bear on it over the new `skill-learnings`.
-     1.5.0 TAKES BLOCKS AWAY AND NARROWS A CLAUSE, SO IT IS MINOR TOO: the agents home is the runs (DIRECTION §37).
+     1.5.0 TAKES BLOCKS AWAY AND NARROWS A CLAUSE, SO IT IS MINOR TOO: the agents home is the runs.
      Working now and the `agents-working` figure under its line read runs active and heard from today, where every
      active run was counted; Waiting on you goes, since it drew Decide's own cards; What
      the brain holds goes with Growth, Learnings and Skills under it, each a list with its own page; the line says
@@ -897,7 +898,7 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      nothing in it is not drawn. Every figure stays declared, for a page that draws one and for an agent that reads
      one. No list, field or figure goes.
      1.6.0 ADDS AND REGROUPS, SO IT IS MINOR: the agents home groups the runs under Needs you, Working, Today and
-     Earlier (DIRECTION §37), over the new `runs-today` and `runs-earlier`; Working now is called Working, and Where
+     Earlier, over the new `runs-today` and `runs-earlier`; Working now is called Working, and Where
      they left off goes into Today and Earlier, whose cards carry each run's next step. `runs-left-next` stays, read by
      the line. No list, field or figure goes.
      1.7.0 ONLY ADDS, SO IT IS MINOR: `page.run`, a page per run, whose one section draws what the run did and Undo this
@@ -935,8 +936,15 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      way to fold what is here twice on each of those four lists (AGT-C18). And with 1.13.0 the skill After an import
      ships its second text (REC-C17 step 3, `agents-skills.ts`): a mark that names no glyph is given the nearest one a
      host draws, in the same arrangement, and cleared only where none is near. A skill travels beside this document, not
-     in it, and takes its own `rev`, so the document and its fingerprint are as they were. */
-  manifest: { id: 'agents', version: '1.13.0', requires: ['register.things'] },
+     in it, and takes its own `rev`, so the document and its fingerprint are as they were.
+     1.14.0 TAKES NOTHING AWAY BUT A BLOCK, SO IT IS MINOR (the Agents page made calm): the line says how many are at work,
+     on how many machines and how many wait on you, from the record's `machines-working` and `runs-waiting`; Working is
+     At work, the host's one line a run by machine with the runs waiting folded at its foot; Tell an agent is one line
+     with what he told beside it; Left for the next run is the host's (`panel: left-steps`), one line a step with Take and
+     Drop; Today's runs draws the day as lanes a kind of agent and titles each run by what it did, and the declared
+     lanes, one a run, went; and Machines and profiles is a quiet tile at the foot (`panel: machines`). No list, field
+     or figure goes. */
+  manifest: { id: 'agents', version: '1.14.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

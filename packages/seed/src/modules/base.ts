@@ -231,10 +231,10 @@ export type SeedRule = { rule: string; pack?: string; register: string; when: st
  *
  * NO HEADING ON THE BLOCK. The page's name is already Calendar, and a tile headed Calendar under it says it twice.
  *
- * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (DIRECTION §39, held by `calm-pages.test.ts`): one sentence of what the
+ * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (held by `calm-pages.test.ts`): one sentence of what the
  * months hold, in plain words and with no figure, since nothing counts what falls due in three months yet.
  *
- * NOT ON THE RAIL, so no `nav:`. The rail is the seven places (DIRECTION §39), and this page is reached from a date.
+ * NOT ON THE RAIL, so no `nav:`. The rail is the seven places, and this page is reached from a date.
  *
  * IN PEOPLE, FOR THE REASON HEALTH IS (`modules/health.ts`): no add-on is held by every record, and People is the one
  * nearly every record holds. It is declared here, beside the shapes every module shares, because it belongs to no
@@ -255,14 +255,14 @@ export const CALENDAR_SOURCE = 'deadlines';
  * never called two things. Who worked is a `split`, three parts of one whole; the other two are bars. Under them, what
  * an agent asked: the fifth part the hand-built screen lacked.
  *
- * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (DIRECTION §39, held by `calm-pages.test.ts`), in plain words and with no
+ * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (held by `calm-pages.test.ts`), in plain words and with no
  * figure: nothing counts what a reader has not seen yet, nor the agents' share of it, and a sentence is not given a
  * number the record cannot read.
  *
  * EVERY BLOCK HAS A `key:`, so a tile moved in Edit layout, or by an agent's proposal, is found again when the page's
  * next version lands.
  *
- * NOT ON THE RAIL, so no `nav:`: the rail is the seven places (DIRECTION §39) and is the person's to change. IN PEOPLE,
+ * NOT ON THE RAIL, so no `nav:`: the rail is the seven places and is the person's to change. IN PEOPLE,
  * for Calendar's reason above.
  */
 

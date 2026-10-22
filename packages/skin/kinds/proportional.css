@@ -101,7 +101,7 @@
 
   /* The hole is the only row that is a button: it opens the register filtered to exactly those
      rows, because an unknown is a task somebody has to close (05 §7.5). */
-  /* A QUIET FILL MARKS IT, NOT AN EDGE (DIRECTION §39): it wore a dashed border, and nothing on the board has a
+  /* A QUIET FILL MARKS IT, NOT AN EDGE: it wore a dashed border, and nothing on the board has a
      border. The field is the step a control sits on, one rung off the tile, and a hole draws no track, so nothing of
      its own is lost against it. Its hover is the field's own, the ink washed over the field: `--hover` alone is
      see-through and would have made the row paler under the pointer. */

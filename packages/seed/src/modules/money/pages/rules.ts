@@ -7,8 +7,8 @@ const HAS_FILED = { metric: 'rule-filed', gte: 1 };
 
 /**
  * ONE PAGE, UNDER MONEY, SINCE money-core 3.17.0 (REC-B10 job 10): what the record has learnt to file by itself, rule by
- * rule. "A page Filing rules under Money: each rule, its category, how many rows it filed and the day of the last" (the
- * owner's words). It is where a person sees the rules work, and turns a wrong one off from the rule it opens.
+ * rule: a page Filing rules under Money, with each rule, its category, how many rows it filed and the day of the
+ * last. It is where a person sees the rules work, and turns a wrong one off from the rule it opens.
  *
  * EVERY COUNT IS OF ENTRIES, NEVER OF THEIR MONEY (`figures/filing.ts`), so a rule that files pounds and dollars counts
  * both and adds neither. The counts are read off the Ledger's `filed_by`, which the step that files the category writes,

@@ -130,7 +130,7 @@ export const PERSONAL = {
      Major, because two lists and a page go. No record holds Personal to lose their rows.
      2.1.0: the voice says more of the record its own way, Home's empty lines and Decide's and the Inbox's among them
     . Each is a new setting a person can change at /packs, so a minor step.
-     2.2.0: calmer (DIRECTION §35). Home opens on one line said from Money's figures where a tile of three stood, what
+     2.2.0: calmer. Home opens on one line said from Money's figures where a tile of three stood, what
      needs you comes first, Coming up is the one list of what falls due where Bills this week drew the same bills
      again, each track is drawn only while it has something, and what changed is folded shut. The Goals page and a
      project's page open on a line too, and every heading wears a glyph. Nine counts are added to draw them on, and

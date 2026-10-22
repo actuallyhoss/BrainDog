@@ -1,6 +1,6 @@
 /**
- * Who filed each line of the Ledger tile (REC-B20 job 3, `src/modules/money/pages/parts/ledger.ts`). "Agents do the
- * legwork in view" (DIRECTION, D2.17) and "per-row filed by a rule" (H.273): a person clears their bank's messages into
+ * Who filed each line of the Ledger tile (REC-B20 job 3, `src/modules/money/pages/parts/ledger.ts`). Agents do the
+ * legwork in view, and "per-row filed by a rule" (H.273): a person clears their bank's messages into
  * the Ledger and Money says nothing of who filed them.
  *
  * THREE ENTRIES, MADE TODAY, on a record that installed money-core the way a person does: one a bank add-on's pattern

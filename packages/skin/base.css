@@ -27,7 +27,7 @@
   body {
     margin: 0;
     color: var(--ink);
-    /* THE BOARD (DIRECTION §39): one flat colour under every tile, and no light falling on it. */
+    /* THE BOARD: one flat colour under every tile, and no light falling on it. */
     background: var(--board);
     font-family: var(--font-ui);
     font-size: var(--fs-body);

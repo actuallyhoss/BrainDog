@@ -15,7 +15,7 @@ a11y.css     the focus ring, forced colours, the target floor
 house.css    GENERATED — do not edit. `pnpm theme`. The palette, and beside it the glass, the ground's
              light, the row washes and the shadows
 blocks.css   the block markup contract both apps draw against; blocks-charts.css carries its chart kinds
-look-b.css   Look B (DIRECTION §45 d9, §47): the site's tokens from batch 103, the app's from 107. Its own
+look-b.css   Look B: the site's tokens from batch 103, the app's from 107. Its own
              names (--page, --red, --red-fill, --tile, --head ...), light and dark; it declares no layer order.
              It writes no colour: it imports `@braindog/theme/look-b.css`, where the palette is written
 mark.ts      the artwork, as path data

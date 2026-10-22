@@ -1,5 +1,5 @@
 /**
- * Inside a block, a part with no value is not drawn (PGS-A05, DIRECTION §35: "An empty or unused part is not drawn").
+ * Inside a block, a part with no value is not drawn (PGS-A05: an empty or unused part is not drawn, so a page stays calm).
  *
  * The answers both drawers read (`unvalued` in `path.ts`, `drawnRows` and `emptied` in `html.ts`), held here without a
  * DOM; `parity.test.ts` holds the two trees equal over the same shapes.

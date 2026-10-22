@@ -49,7 +49,7 @@ export const GUIDE = {
      keeps in step with its status, and what it comes after.
      1.4.0: the voice says more of the record its own way, Home's empty lines, the add verb and the pen's line among
      them. Each is a new setting a person can change at /packs, so a minor step.
-     1.5.0: calmer (DIRECTION §35). Home and the Guide open on one line said from the guide's figures, where the Guide
+     1.5.0: calmer. Home and the Guide open on one line said from the guide's figures, where the Guide
      had a tile of four; every heading wears a glyph; each list is drawn only while it holds something; the Guide folds
      what is done and kept under Everything so far; and a milestone's page draws its steps, choices and what helps only
      while it has them. Only counts are added, so a minor step.

@@ -4,7 +4,7 @@
  * names the site was handed, the two dark blocks, `--red-fill`'s contrast).
  *
  * THIS SHEET WRITES NO COLOUR AND ONLY PULLS ONE IN, so a value can only come from the theme. And `tokens.css` names
- * Lexend as the display face, with no Poppins face left declared (DIRECTION §47).
+ * Lexend as the display face, with no Poppins face left declared.
  */
 
 import { test } from 'node:test';

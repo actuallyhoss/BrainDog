@@ -67,7 +67,7 @@ test('A SPLIT PUTS ITS NUMBERS IN A FOLD: each part, its figure and its share, a
   assert.match(fold, /<tr><th scope="row">Uncategorised<\/th><td class="num">50<\/td><td class="num">none<\/td><\/tr><\/tbody>/u, 'the hole comes last and is not a part');
 });
 
-test('A LATE PART IS STRIPED AS WELL AS RED (DIRECTION §42): it is filled with a pattern of its own, and the rest are not', () => {
+test('A LATE PART IS STRIPED AS WELL AS RED: it is filled with a pattern of its own, and the rest are not', () => {
   const html = toHTML(parse('```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```'));
   const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="10" height="60">/u.exec(html)?.[1];
   assert.ok(id, 'a late part drew no pattern');

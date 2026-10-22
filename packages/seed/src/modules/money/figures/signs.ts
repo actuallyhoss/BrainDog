@@ -1,6 +1,6 @@
 /**
  * Money's signs of life, SINCE money-core 3.15.0 (REC-B01 job 3): figures that say whether Money is being kept, not what
- * it holds. "i see no progress" (DIRECTION 40): his Money page said the oldest balance was from 3 September and no screen
+ * it holds. "i see no progress": his Money page said the oldest balance was from 3 September and no screen
  * said the Ledger stopped on 28 September.
  *
  * `ledger-rows-7d` came first, in 3.15.0, because it was the one sentence the record could read then. THREE MORE CAME

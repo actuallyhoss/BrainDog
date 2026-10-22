@@ -111,7 +111,7 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
 });
 
 /**
- * A FOUNDER'S HOME SAYS ONLY WHAT IS TRUE OF THIS RECORD, SINCE founder 1.16.0 (DIRECTION §37): the way to bring money
+ * A FOUNDER'S HOME SAYS ONLY WHAT IS TRUE OF THIS RECORD, SINCE founder 1.16.0: the way to bring money
  * in only while no account counts as cash, and the week's numbers over the week, six lines at most and the projects they
  * are about named beside them. NO MONEY BY ORGANISATION SINCE founder 2.0.0: the organisations are People's, which names
  * no account, and What you have, by book keeps a company's money apart.

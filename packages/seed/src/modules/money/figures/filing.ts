@@ -1,6 +1,6 @@
 /**
  * Who filed the Ledger, in view (REC-B20 job 2): two figures over who MADE each Ledger entry, read from the record's
- * history (`events.<list>`, `packages/kernel/src/metrics.ts`). "Agents do the legwork in view" (DIRECTION, D2.17): who
+ * history (`events.<list>`, `packages/kernel/src/metrics.ts`). Agents do the legwork in view: who
  * wrote an entry was always in the history, and Money said none of it.
  *
  * BOTH ARE COUNTS OF WHAT WAS MADE, NEVER SUMS, so no two currencies meet in them. An entry counts once, under whoever

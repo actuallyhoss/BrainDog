@@ -24,6 +24,7 @@ test('A CALENDAR READS A DAY IN THE THREE SPELLINGS A PAGE WRITES ONE, and guess
   assert.equal(calendarDay('2026-09-12'), '2026-09-12');
   assert.equal(calendarDay('2026-09-12T23:30:00Z'), '2026-09-12', 'an instant is its own day as written');
   assert.equal(calendarDay('12 Sep 2026'), '2026-09-12', 'the spelling `day()` writes');
+  assert.equal(calendarDay('12 Sep', Date.UTC(2026, 9, 22)), '2026-09-12', 'a day with no year is the reader\'s own');
   assert.equal(calendarDay('30 Feb 2026'), null, 'a day the calendar does not have');
   assert.equal(calendarDay('Sep 12'), null);
   assert.equal(calendarDay('soon'), null);

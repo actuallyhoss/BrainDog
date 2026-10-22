@@ -59,10 +59,10 @@ test('a lines fence parses as its own kind and draws its numbers in a fold', () 
 });
 
 test('ONE READING IS A FIGURE, its value and when it was read, and not a chart of one dot over a fold of one point', () => {
-  const plan = linesPlan(rows('Day | Aov, Crumb.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n29 Sep |  | '));
-  assert.deepEqual(plan.single, { value: '£24.10', label: '28 Sep', line: 'Aov, Crumb.gg', was: false, alone: true });
+  const plan = linesPlan(rows('Day | Aov, Oxbow.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n29 Sep |  | '));
+  assert.deepEqual(plan.single, { value: '£24.10', label: '28 Sep', line: 'Aov, Oxbow.gg', was: false, alone: true });
   assert.equal(linesOnly(plan.single!, true), '28 Sep, the only reading');
-  assert.equal(linesOnly(plan.single!, false), 'Aov, Crumb.gg, 28 Sep, the only reading', 'a figure under no heading names its measure');
+  assert.equal(linesOnly(plan.single!, false), 'Aov, Oxbow.gg, 28 Sep, the only reading', 'a figure under no heading names its measure');
   const html = toHTML(parse('```lines | Aov\nDay | Aov | was: Before\n27 Sep |  | \n28 Sep | £24.10 | \n```'));
   assert.match(
     html,

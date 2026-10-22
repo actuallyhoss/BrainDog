@@ -8,6 +8,8 @@
     ".": "./src/index.ts",
     "./packs": "./src/packs-entry.ts",
     "./packs/changelog": "./src/changelog.ts",
+    "./packs/lists": "./src/modules/lists.ts",
+    "./packs/metrics": "./src/modules/metrics.ts",
     "./packs/modules": "./src/module-info.ts",
     "./packs/quiet": "./src/packs/quiet.ts",
     "./usecases": "./src/usecases/index.ts",

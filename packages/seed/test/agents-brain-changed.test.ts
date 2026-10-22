@@ -68,7 +68,9 @@ test('THE PAGE IS DECLARED: How the brain changed, with no place in the rail, an
   /* THE ADD-ON SAYS IT PROVIDES THE PAGE AND ITS TWO FIGURES. */
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   for (const id of ['page.brain', 'metric.learnings-arrived', 'metric.learnings-charted']) assert.ok(pack.manifest.provides.includes(id), `${id} is not provided`);
-  assert.equal(AGENTS_PACK.manifest.version, '1.13.0');
+  /* CAME WITH 1.13.0, so every version since holds it. */
+  const [major, minor] = AGENTS_PACK.manifest.version.split('.').map(Number);
+  assert.ok(major! > 1 || minor! >= 13, `the page came with 1.13.0 and the add-on is ${AGENTS_PACK.manifest.version}`);
 });
 
 test('THE AGENTS PAGE LINKS TO IT FROM What the brain learned', () => {
@@ -80,7 +82,8 @@ test('THE AGENTS PAGE LINKS TO IT FROM What the brain learned', () => {
   assert.equal(link.body, '[How the brain changed](/p/brain)');
   assert.equal(link.key, 'brain-link');
   assert.equal(link.when, undefined, 'the link is drawn only some of the time');
-  assert.ok(!blocks.slice(at + 1).some((b) => b.kind === 'section'), 'a section parts the link from What the brain learned');
+  /* NO SECTION BETWEEN THEM; Machines and profiles closes the fold after it, since Agents 1.14.0. */
+  assert.ok(!blocks.slice(at + 1, blocks.indexOf(link)).some((b) => b.kind === 'section'), 'a section parts the link from What the brain learned');
 });
 
 test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out', () => {

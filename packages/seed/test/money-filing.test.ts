@@ -1,7 +1,7 @@
 /**
  * Filing rules (REC-B10 job 3), read through the kernel on a record that installed Money the way a person does, with
- * no example entries. "Categorising rules: prefix, contains, regex, ranked, dry run" and "no category is better than a
- * wrong one" (the owner's words).
+ * no example entries. Categorising rules by prefix, contains, regex, ranked, with a dry run, and no category
+ * is better than a wrong one.
  *
  * WHAT WAS WRONG. One rule filed a Ledger entry by finding a category whose "Matches" was the entry's description. It
  * read neither which way the category goes nor whether it was retired, so a category for money in was put on money

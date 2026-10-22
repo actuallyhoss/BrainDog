@@ -1,6 +1,6 @@
 /**
- * Money's ledger tile (REC-B15 job 4). "Ledger, add, edit, delete" and "I hate this tabs" (the owner): what moved was
- * twelve lines folded shut inside History, and he "went looking for his transactions".
+ * Money's ledger tile (REC-B15 job 4): a ledger to add to, edit and delete from, and no tabs. What moved was
+ * twelve lines folded shut inside History, and a person went looking for their transactions.
  *
  * WHAT IS HELD HERE: the tile is on Money's page under the accounts and above the fold, it draws the six newest
  * entries of the Ledger newest first, every line is an entry of the Ledger a host can open, and a record whose Ledger
@@ -197,7 +197,7 @@ async function paidAndTyped(extra: unknown[] = []): Promise<Kernel> {
   return k;
 }
 
-/* "Strips a trailing processor reference" (the owner): he reads who he paid, and the bank's own line only where
+/* A LINE STRIPS A TRAILING PROCESSOR REFERENCE: a person reads who they paid, and the bank's own line only where
    nothing better is known. */
 test('A LINE SAYS WHO WAS PAID, and an entry a person typed, with no payee, says its description', async () => {
   const k = await paidAndTyped();

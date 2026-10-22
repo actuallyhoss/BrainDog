@@ -9,7 +9,7 @@
 @layer components {
   /* ── queue: what is waiting on you ───────────────────────────────────────
      One card a question, because a question is read whole: who asked, what they are asking, why, and
-     the ways to answer it. DIRECTION §39: it reads like a form. Who asked and when at 13 in the quiet ink, the question
+     the ways to answer it. It reads like a form. Who asked and when at 13 in the quiet ink, the question
      at 17 semibold, then the ways: a row of rectangle buttons where none carries a reason, and where one does, a
      vertical list of choices, each a full-width rectangle with its name and its one line of what it does, the
      suggested one marked "Suggested" in the accent's words. */
@@ -107,7 +107,7 @@
     white-space: nowrap;
   }
 
-  /* WHO ASKED STAYS, AND WHEN WAITS FOR THE CARD (DIRECTION §35, §37). The name on a by-line is the agent or Slash
+  /* WHO ASKED STAYS, AND WHEN WAITS FOR THE CARD. The name on a by-line is the agent or Slash
      that is asking, and which of them is asking is half of whether to say yes, so it is read at rest like the question
      under it. The time is the line's detail: it waits for the pointer or the keyboard to reach its card, then fades in
      where it already sits. Only where there is a pointer that hovers; under a thumb the whole line is always there.
@@ -143,7 +143,7 @@
      it is centred on the pill's height. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that
      shouts is a ranking that decides.
 
-     WORDS, NOT A PILL (DIRECTION §39): the band is a quiet line of 13 at the end of the ways, and the host says the
+     WORDS, NOT A PILL: the band is a quiet line of 13 at the end of the ways, and the host says the
      dearest one in its button too ("Accept, can't be undone easily").
 
      THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
@@ -191,7 +191,7 @@
     display: none;
   }
 
-  /* THE QUESTION IS 17 SEMIBOLD (DIRECTION §39), the headline step: read first on the card and never a heading's
+  /* THE QUESTION IS 17 SEMIBOLD, the headline step: read first on the card and never a heading's
      shout. */
   .queue-question {
     margin: 0;
@@ -225,7 +225,7 @@
     align-items: center;
   }
 
-  /* WHERE A REASON IS GIVEN, THE WAYS ARE A FORM'S CHOICES (DIRECTION §39): a vertical list, each a full-width
+  /* WHERE A REASON IS GIVEN, THE WAYS ARE A FORM'S CHOICES: a vertical list, each a full-width
      rectangle with the option's name on its first line, "Suggested" at that line's end in the accent's words, and the
      one line of what it does under the name. The whole rectangle answers a press (the button's `::after` covers it),
      so the reason is part of the choice and never a second column out of line with it. */
@@ -312,7 +312,7 @@
     margin-inline-start: auto;
   }
 
-  /* AN ANSWER IS A RECTANGLE BUTTON, the shape `Button.svelte` draws (DIRECTION §39: radius 8, `--btn-h`, 14 medium on
+  /* AN ANSWER IS A RECTANGLE BUTTON, the shape `Button.svelte` draws (radius 8, `--btn-h`, 14 medium on
      the `--tile-2` fill), so the read-only renderer's options and the ones on Home and Decide are one drawing. A long
      option wraps inside its rectangle rather than pushing the card sideways at 390. */
   .queue-act {
@@ -397,7 +397,7 @@
     font-weight: 500;
   }
 
-  /* "SUGGESTED", IN THE ACCENT'S WORDS (DIRECTION §39). What an agent suggests is worth saying and is not worth
+  /* "SUGGESTED", IN THE ACCENT'S WORDS. What an agent suggests is worth saying and is not worth
      pre-pressing, so this names it rather than the option reading as already chosen: inside its button after the
      words (so the button's name says it to a screen reader too), at the end of its choice's line, or beside an option
      that cannot be pressed. */
@@ -415,7 +415,7 @@
     font-size: var(--fs-meta);
   }
 
-  /* `queue lead`: THE FIRST QUESTION, READ WHOLE. The same 17 as the cards under it (DIRECTION §39 gives a question one
+  /* `queue lead`: THE FIRST QUESTION, READ WHOLE. The same 17 as the cards under it (a question has one
      size) and set apart by the air under it alone: no well, no border, no colour of its own. What accepting it changes is a short list in the quiet ink, a hairline down its
      start the only mark, so the consequences read as a part of the question and not as a second card. */
   .queue-lead {

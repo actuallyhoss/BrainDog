@@ -239,6 +239,9 @@ export {
   TYPED,
   bytes,
   dateLong,
+  dateSaid,
+  datesIn,
+  slugWords,
   day,
   dayShort,
   monthShort,
@@ -274,7 +277,7 @@ export { AMOUNT_SPACE, amountsIn, moneySet, moneyWhole, readAmount, readFigure, 
 export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, type LintPage, type LintPart, type LintRule } from './lint.ts';
 /* The look sheets (EXP-C05): fixed specimens of every chart form, the plan and the parts, drawn on one fixed day. */
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
-/* The design book (DIRECTION §45): every kind, the tokens and the layout rules, generated from the tables and the skin. */
+/* The design book: every kind, the tokens and the layout rules, generated from the tables and the skin. */
 export { designBook, type BookKind, type BookStep, type BookToken, type DesignBook } from './design-book.ts';
 /* A declared block's actions (PGS-A12): the plan Block.svelte draws them by, and the quiet line of labels without a host. */
 export * from './actions.ts';
@@ -286,3 +289,23 @@ export { GLYPH_GROUPS, GROUP_SAYS, glyphGroups, groupOf, markGlyphs, markGroups,
 export { MOST_CARDS, MOST_LEAST, MOST_MOST, isMost, mostOf, moreSaid, showAllSaid, type MostKeys } from './most.ts';
 /* A key number planned as every screen says it (`kpis`): its figure, change, stale line and chart, for a card or a hero. */
 export { kpiView, type KpiInput, type KpiView } from './kpis.ts';
+/* A drawn block (Draw): the rules its code is held to, the document and bridge it is drawn as in its
+   sandboxed frame, the data and theme handed in, and the two things the frame may ask back. */
+export {
+  DRAWN_CODE_MOST,
+  DRAWN_EXAMPLE,
+  DRAWN_HEIGHT,
+  DRAWN_LABEL,
+  DRAWN_NONE,
+  DRAWN_POLICY,
+  DRAWN_RULES,
+  DRAWN_TOKENS,
+  drawnAsk,
+  drawnDocument,
+  drawnFault,
+  drawnHeight,
+  drawnTheme,
+  type DrawnAsk,
+  type DrawnTheme,
+} from './drawn.ts';
+export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';

@@ -179,7 +179,7 @@
     stroke: var(--red);
   }
 
-  /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (DIRECTION §39: a figure is
+  /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (a figure is
      read beside its heading, never shouted over it), and the others stay the size
      they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than
      running into the next one: a balance in the millions, in pounds with its code, is wider than a quarter of the page

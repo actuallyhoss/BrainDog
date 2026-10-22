@@ -10,7 +10,7 @@
  * sandbox runs this file's text alone. The text the rule `reads` ("As the bank wrote it" or the description), the way
  * the money goes or either, the rule's account or none, and the ladder: the whole text, how it starts, anywhere in it,
  * a pattern, and on one rung the longest. AN ENTRY ANOTHER RULE WOULD FILE IS LEFT TO THAT RULE, and one two rules fit
- * equally is left with no category: "no category is better than a wrong one" (the owner's words). A rule that reads
+ * equally is left with no category, because no category is better than a wrong one. A rule that reads
  * "As the bank wrote it" wins over one on the description where both fit, as the category rule's later step does.
  *
  * ONE STEP WIDER THAN THE CATEGORY RULE, AND ONLY ON THE WHOLE TEXT: where the host hands `ctx.fold`, a rule's whole

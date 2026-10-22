@@ -6,7 +6,7 @@
  * where a field has a few values, chips where it has more. Pressing one narrows every block on the page to it; the
  * choice is the host's to keep (in the address, `?f.project=12`) and to read the page again with.
  *
- * CALM BEFORE COMPLETE (DIRECTION §35). A strip of every project is a chip cloud, so at most `FILTER_CHIPS` values are
+ * CALM BEFORE COMPLETE. A strip of every project is a chip cloud, so at most `FILTER_CHIPS` values are
  * drawn and the rest wait behind one control that says how many there are. The value chosen is always drawn, wherever
  * it sits in the order, so the strip never hides what the page is narrowed to. A field with nothing to choose between
  * (one value and none chosen) is not drawn at all. Counts are the quiet part (`data-calm`), shown on hover or focus.

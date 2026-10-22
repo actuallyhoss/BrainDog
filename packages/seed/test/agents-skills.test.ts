@@ -1,6 +1,6 @@
 /**
  * The skills the agents add-on ships (`packs/agents-skills.ts`, REC-A13 step 3, REC-A07 step 4), held to what makes them
- * safe to hand every record: they name nobody (DIRECTION §27), every verb they tell a session to call is one it can call,
+ * safe to hand every record: they name nobody, every verb they tell a session to call is one it can call,
  * each carries a version, and the catalogue offers them with the agents add-on.
  *
  * THE VERBS ARE READ FROM THE SOURCE, NOT IMPORTED: the tools an agent client lists (`packages/mcp/src/index.ts` `TOOLS`),
@@ -63,7 +63,7 @@ test('each skill files one question under its own cause, as its step says', () =
 /** The product's own words, which a skill may capitalise mid-sentence: lists, lanes, fields and itself. */
 const OWN = new Set(['BrainDog', 'Projects', 'Project', 'About', 'Stage', 'In', 'Earning', 'Building', 'Parked', 'Finished', 'On', 'At', 'Off', 'Skills', 'Tidy', 'Keep']);
 
-test('no skill names a person or a project, so what one record gets every record gets (DIRECTION 27)', () => {
+test('no skill names a person or a project, so what one record gets every record gets', () => {
   const sample = ['things', 'people', 'organisations']
     .flatMap((register) => ROWS[register] ?? [])
     .flatMap((r) => [r.name, r.who, r.display_name].filter((v): v is string => typeof v === 'string' && v.length > 2));

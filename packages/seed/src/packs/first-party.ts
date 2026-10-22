@@ -307,7 +307,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - portfolio 1.7.0: each card in play draws a line of the work finished on it each week, over Work's
  *   `project-done-by-week`, left out on a record without Work. A column added and nothing taken away, so the step is a
  *   minor one.
- * - money-core 3.4.0, work 1.11.0, estate 2.1.0 and portfolio 1.8.0: every page is calmer (DIRECTION §35). Each opens
+ * - money-core 3.4.0, work 1.11.0, estate 2.1.0 and portfolio 1.8.0: every page is calmer. Each opens
  *   on its line, shows at most six tiles before the rest is folded shut, wears a glyph on every heading, draws a tile
  *   only while its figure has any, and says none of the line's figures again: Money loses the What you have tile and
  *   two of its three views of the month, Work its Open figure, Services its Cost per year and chips by type, and the
@@ -351,7 +351,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   added, nothing taken away, so each step is a minor one. The project page moves with them, though no pack holds it
  *   (`crossPack`): its line is the next step alone, Where it stands is headed by how it is going with the agent last,
  *   and what is handed back is a to-do with no Changed by.
- * - portfolio 1.13.0, money-core 3.8.0 and work 1.14.0: each page says only what is true of the record (DIRECTION §37).
+ * - portfolio 1.13.0, money-core 3.8.0 and work 1.14.0: each page says only what is true of the record.
  *   Projects says an empty page in its line, with a third line for nothing in play, draws In play only while one is,
  *   lets no other block say it is empty, and reads one project for Parked and finished's count. Money draws Accounts
  *   only while there is cash to cut and a book's month only while something left it (`book-spent-month` added). Work
@@ -363,7 +363,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   is still what a walk may cost, whether a load walks it or a reader asks for it. Two lengths taken off a control, no
  *   list, field or figure, so the step is a minor one.
  * - people 3.0.0, money-core 3.10.0 and portfolio 1.14.0: the record understands who and what it meets
- *   (`loop/contract-17.md`, DIRECTION §38). People gains Organisations, moved from the Founder use case under the same
+ *   (`loop/contract-17.md`). People gains Organisations, moved from the Founder use case under the same
  *   id so a founder's rows stay, declared as the list `meet` writes a company into (`org:`), with a page each
  *   (`page.relation`) listing its people. A person gains every key they are known by, the organisation they are with,
  *   the other names they go by and whether they are the record's own person, all named in `meets:`, and their page
@@ -385,7 +385,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   host names no organisation, neither rule writes a subject, Everyone is grouped by organisation and leaves out a
  *   person folded into another, and an organisation's page draws its projects and money where the record holds them
  *   (`placed` in `firstPartyDocument`, which makes those two lists People's links and not its needs).
- * - money-core 3.11.0 and work 1.15.0: each page leads with its picture and no tile is half empty (DIRECTION §39, the
+ * - money-core 3.11.0 and work 1.15.0: each page leads with its picture and no tile is half empty (the
  *   design review's fixes 3 and 8). Money opens on Cash ahead with a side column beside it (`layout: { rail: 4 }`):
  *   when the money runs out, which the line no longer says, the accounts holding it and the questions; Heads up under
  *   the walk; Coming and going open as one tile, and only the months behind and what moved folded under History. Work's
@@ -400,7 +400,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   drew the count alone: a count read yesterday is a day out this morning, and the day is the one the walk's flag
  *   stands on. A figure added and one cell of a tile changed, so a minor step that reaches a record on its own.
  * - work 1.16.0, portfolio 1.15.0, people 3.1.0 and money-core 3.13.0: the second design review's fixes 2, 3, 5, 6, 7
- *   and 8, in the declarations (`loop/research-design-critic-2.md`, DIRECTION §39). EVERY VERSION BEFORE THESE IS
+ *   and 8, in the declarations (`loop/research-design-critic-2.md`). EVERY VERSION BEFORE THESE IS
  *   RELEASED, People 3.0.0 among them, so each is a version and none a reset. Work's Board loses its By status heading,
  *   and Work's line to type into is declared alone and first so a host holds it in the page's header, which is words
  *   over the declaration and moves nothing. Projects keeps its two folds only past four projects under each: while
@@ -514,7 +514,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   Network. A record that came in from a cloud account brought its own values for these with no label, and the month
  *   by type read a key. Four values added after the eight and nothing taken away, so the step is a minor one; a value a
  *   record added itself stays (laidBack). And a project's Costs a year is left out until a cost is recorded
- *   (sketchpad-60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws
+ *   (pinwheel-60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws
  *   no figure where it drew 0. One `where` narrowed inside the unreleased step, so no version of its own.
  * - portfolio 1.17.0 (seed-58, the look of 13 October, fault J): the line under What each one earns is drawn only while
  *   one project in play says what it earned (`projects-earning-said` above nought), where it was drawn while any was in
@@ -653,10 +653,18 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   retired. Projects gain `kind`, business, client work, product or content. Two figures, `kpis-held` and
  *   `kpi-stale`. PORTFOLIO 1.18.0 MAY BE RELEASED, so this is a version of its own. Two lists, a field and two figures
  *   added, nothing taken away, so a minor step.
+ * - portfolio 1.20.0 (the KPI plan of 21 October, the cards' line): `page.portfolio`'s cards draw the line of the key
+ *   number each project leads with, its trend column saying `kpi: headline` beside Work's `project-done-by-week`, which
+ *   a card whose project keeps no key number still draws. 1.19.0 IS RELEASED (origin/master holds it), so a version of
+ *   its own. A key on one column, no id added or taken away, so a minor step that reaches a record on its own.
+ * - people 3.5.0: Health is said in plain words. Its lines count checks and not signs ("15 checks have not run yet"),
+ *   nought red is "Nothing on this record needs a look", its groups are Needs a look, All good and Not checked yet, and
+ *   the run of good days says every check passed. Words inside `page.health` only, no id added or taken away, so a
+ *   minor step that reaches a record on its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.19.0',
-  people: '3.4.0',
+  portfolio: '1.20.0',
+  people: '3.5.0',
   'money-core': '3.17.0',
   estate: '2.2.0',
   work: '1.19.0',

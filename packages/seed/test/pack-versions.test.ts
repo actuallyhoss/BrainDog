@@ -890,7 +890,7 @@ const DECLARED: Record<string, Version> = {
     declares: 'c1fcbf2f04e75a76',
     history: [
       "`register.services`'s `kind` gains `server`, `database`, `storage` and `network` with their labels -> 7cccb015ec1bb242",
-      "Folded into the unreleased 2.2.0 (sketchpad-60; integrate 60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws no Costs a year where it drew 0; no id added or taken away -> a593ca243fd01b37",
+      "Folded into the unreleased 2.2.0 (pinwheel-60; integrate 60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws no Costs a year where it drew 0; no id added or taken away -> a593ca243fd01b37",
       "Folded into the unreleased 2.2.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 2.1.0): `page.estate`'s Waiting on you is gated on `questions-open-in:services`, the questions about a service, where it was gated on every open question, and its line opens on a clause saying how many; and `register.services`'s `kind` names `vm`, `edge` and `object` Virtual machine, Edge network and Object storage; a block added, nothing taken away, no id added or taken away -> ec4895c39c078fc5",
       "Folded into the unreleased 2.2.0 (services-people-five-parts-101, PGS-C18; batch 101; commit 63423720, the deployed build, holds 2.1.0): `page.estate` gains What agents did under its fold, an agents block over the log narrowed to services, first three a run; a block added, nothing taken away, no id added or taken away -> c1fcbf2f04e75a76",
     ],
@@ -1073,7 +1073,7 @@ const DECLARED: Record<string, Version> = {
       'Raised a major step because a rule now moves a live `services` row past its renewal day to lapsing and one asks before each renewal, four types join, every target becomes a setting with no default, and Services leads with what a month costs -> 04aad1e9a082907a',
     ],
   },
-  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD (DIRECTION §37, "Stop the harm"): each module's last version is
+  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD ("Stop the harm"): each module's last version is
      on `origin/master`, so these are versions and not resets. Each is current once `FIRST_PARTY_VERSIONS` names it. */
   'portfolio@1.13.0': {
     holds: `
@@ -1212,7 +1212,7 @@ const DECLARED: Record<string, Version> = {
       'Nothing is open right now comes first of the lines on `page.work` and `page.work-board`, so the nightly line is never written for the counts at nought and drawn over it -> 76e5fcf955e52544',
     ],
   },
-  /* THE PICTURE FIRST (DIRECTION §39, the design review's fixes 3 and 8): each module's last version is live, so these
+  /* THE PICTURE FIRST (the design review's fixes 3 and 8): each module's last version is live, so these
      are versions and not resets. */
   'money-core@3.11.0': {
     holds: `
@@ -1586,6 +1586,20 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 3.4.0 (the UI pass of 20 October, money F13): `page.people` draws Everyone and Organisations side by side at span 6 each, Everyone's columns are name, role and Last spoke (With is on the person's page) and Organisations' are name and kind (Website is on the organisation's page); no id added or taken away -> 081821b86f69e21d",
     ],
   },
+  /* HEALTH IN PLAIN WORDS. The same ids as 3.4.0; only the words of `page.health` moved. */
+  'people@3.5.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.activity page.calendar page.health page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '24ab659bc74c166a',
+    history: [
+      "`page.health` is said in plain words: its lines count checks that have not run yet where they counted signs not read, nought red reads 'Nothing on this record needs a look.', its groups are All good and Not checked yet where they were Alive and Not read yet, and the run of good days says every check passed; no id added or taken away -> 24ab659bc74c166a",
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `
@@ -1605,6 +1619,24 @@ const DECLARED: Record<string, Version> = {
   },
   /* EACH PROJECT'S KEY NUMBERS, AND NUMBERS TAKEN OVER FROM THE FOUNDER USE CASE (the KPI plan of 21 October, K1-A).
      1.18.0 MAY BE RELEASED, so a version of its own. Two lists, a field and two figures added. */
+  /* EACH CARD'S LINE IS THE KEY NUMBER ITS PROJECT LEADS WITH (the KPI plan of 21 October, 2.5). 1.19.0 IS RELEASED
+     (origin/master holds it), so a version of its own. A key on one column, no id added or taken away. */
+  'portfolio@1.20.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-said metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.datapoints register.kpis register.things
+      rule.project-past-aim
+    `,
+    declares: '88ed9a4e174d8bd8',
+    history: [
+      "`page.portfolio`'s cards in play read each card's line from the key number its project leads with, `kpi: headline` on the trend column over `project-done-by-week`, which a card whose project keeps none still draws; no id added or taken away -> 88ed9a4e174d8bd8",
+    ],
+  },
   'portfolio@1.19.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-said

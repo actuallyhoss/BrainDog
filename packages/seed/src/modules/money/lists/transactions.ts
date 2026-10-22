@@ -140,7 +140,7 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
     },
     /**
      * A ROW'S CURRENCY COMES FROM ITS ACCOUNT, AND STAYS, SINCE money-core 3.16.0 (REC-B04). "`currency` from the
-     * account" and "a transaction's currency" among the things that never change (the owner's words). An amount written
+     * account" and "a transaction's currency" are among the things that never change. An amount written
      * with no code takes the code of its account's balance (`currency_from`), so a bank text or an agent that sends
      * 97999 on an account kept in EGP files EGP 979.99, and an account with no balance to give refuses it in one
      * sentence. An amount sent with its own code is kept as written. Once held, the code is never changed by a write

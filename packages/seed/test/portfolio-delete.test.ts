@@ -1,7 +1,7 @@
 /**
  * A project other entries point at is not deleted out from under them (REC-C08 step 5, portfolio 1.16.0).
  *
- * HIS WORDS: "`retired` is a state, there is no delete". Projects declared no delete rule, so a project a task, a bill or
+ * `RETIRED` IS A STATE, THERE IS NO DELETE. Projects declared no delete rule, so a project a task, a bill or
  * a run named was deleted like anything else and left each of them pointing at nothing. Since 1.16.0 the list declares
  * `delete: refuse_while_referenced`, as Accounts does, and the kernel refuses the delete with a sentence that names the
  * lists still pointing at it and how many (`packages/kernel/src/referenced.ts`).
