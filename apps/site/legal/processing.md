@@ -1,8 +1,6 @@
-DRAFT for review, not in force.
-
 # Data Processing Addendum
 
-Last updated: 2026-10-17
+Last updated: 2026-10-22
 
 ## The short version
 

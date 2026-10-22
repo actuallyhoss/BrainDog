@@ -21,7 +21,7 @@ export const LAUNCH = {
   repo: false, // the GitHub repository is public (the owner)
   cli: false, // the CLI is on npm under the name the docs print
   render: false, // braindog-render is on npm
-  legal: false, // the owner's Terms, Privacy and processing texts are in apps/site/legal/
+  legal: true, // the owner's Terms, Privacy and processing texts are in force (approved 22 October)
   public: false, // the site is public: the changelog and its feed are shown
 } as const;
 
