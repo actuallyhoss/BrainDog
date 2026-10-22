@@ -1,12 +1,12 @@
 /**
  * The KEK, and the three keys a record is created with.
  *
- * WHAT IS ASSERTED HERE IS THAT A WRAPPING CANNOT BE MOVED. Every other property of this file —
- * the file mode, the length check, the fingerprint — is a precaution. The binding is the mechanism:
+ * WHAT IS ASSERTED HERE IS THAT A WRAPPING CANNOT BE MOVED. Every other property of this file
+ * (the file mode, the length check, the fingerprint) is a precaution. The binding is the mechanism:
  * `12 §6` wraps under `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)` so that a `connector` blob lifted into
  * the `signing` row does not open, and a blob copied out of another record does not open at all.
  * Both of those are a single SQL statement away for anybody with the file, and neither is visible
- * from reading the code — an AAD that is computed and not checked looks exactly like one that is.
+ * from reading the code: an AAD that is computed and not checked looks exactly like one that is.
  */
 
 import { test } from 'node:test';
@@ -58,7 +58,7 @@ test('THE KEY FILE IS MADE ONCE and read back the same', async () => {
  * real permission (`49 §4.4`).
  *
  * So a fixture written with no mode arrives 0644 under a default umask, and on Linux the MODE
- * refusal fires before the length refusal the test is about — while on Windows the same test passes,
+ * refusal fires before the length refusal the test is about, while on Windows the same test passes,
  * because the check it trips over is not run. Two tests in this file were written that way and both
  * were green here for months; CI found them on Linux, one per run, because the first one it hit
  * stopped the file.
@@ -93,7 +93,7 @@ test('A WRAPPING IS BOUND TO ITS RECORD AND ITS PURPOSE', async () => {
     assert.deepEqual([...(await unwrap(store, 'rec_A', 'connector', sealed))!], [...plain]);
 
     /* THE THREE WAYS A BLOB CAN BE MOVED, and none of them opens. A row copied between purposes, a
-       row copied between records, and a `kek_id` the store does not hold — 49 §6's WRONG_KEY. */
+       row copied between records, and a `kek_id` the store does not hold: 49 §6's WRONG_KEY. */
     assert.equal(await unwrap(store, 'rec_A', 'signing', sealed), null, 'a connector key opened as signing');
     assert.equal(await unwrap(store, 'rec_B', 'connector', sealed), null, 'a key opened under another record');
     assert.equal(
@@ -195,7 +195,7 @@ test('A KEY ANYBODY IN YOUR GROUP CAN READ IS A REFUSAL, and it names the mode',
     await openKeyStore(file);
     chmodSync(file, 0o644);
     /* `49 §9`'s gate table has a row for this and nothing exercised it. CI is Linux, so the branch
-       runs on every build — delete its body and the suite stayed green, which is the shape of every
+       runs on every build: delete its body and the suite stayed green, which is the shape of every
        defect this repository keeps finding. */
     await assert.rejects(() => openKeyStore(file), /mode 644/);
 
@@ -244,7 +244,7 @@ test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
     const file = join(dir, 'kek');
     await openKeyStore(file);
     /* `wx` makes the file EXIST before the bytes are in it, so a process killed in that gap left an
-       empty file `wx` would never rewrite — and every later boot refused "is 0 bytes" on a host
+       empty file `wx` would never rewrite, and every later boot refused "is 0 bytes" on a host
        where nothing had been created yet. Write-then-rename closes it: what carries the name always
        carries the key, and the temp file it was written to is gone. */
     assert.equal(readFileSync(file).length, 32);
@@ -252,7 +252,7 @@ test('A HALF-WRITTEN KEY FILE IS NEVER LEFT BEHIND', async () => {
 
     /* AND THE OLD FAILURE IS STILL A SENTENCE if somebody has one on disk from before.
 
-       `writeKey`, not `writeFileSync` — see the helper's own note. This one and the seven-byte
+       `writeKey`, not `writeFileSync`: see the helper's own note. This one and the seven-byte
        case above are the two that were green on Windows and red on Linux. */
     const empty = join(dir, 'empty');
     writeKey(empty, '');

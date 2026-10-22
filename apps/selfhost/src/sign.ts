@@ -7,11 +7,11 @@
  * private key. `signBrainl` takes a callback; this is the callback.
  *
  * THE PUBLIC HALF IS DERIVED, NOT STORED. `vault_key` holds one wrapped blob per purpose and the
- * signing row is the PKCS#8 private half — which carries the public key inside it, so the record has
+ * signing row is the PKCS#8 private half, which carries the public key inside it, so the record has
  * no column for one and needs none. `03 §4`'s `key_id` is a function of the public key, so both come
  * out of the same import.
  *
- * AND IT IS OPENED ONCE. Not for speed — a file is signed once per export. It is so the unwrapped
+ * AND IT IS OPENED ONCE. Not for speed: a file is signed once per export. It is so the unwrapped
  * PKCS#8 bytes exist for the length of one function rather than once per export for the life of the
  * process.
  */
@@ -33,8 +33,8 @@ type Row = { wrapped: Uint8Array; nonce: Uint8Array; kek_id: string; wrapped_by:
  * A signer for the record in this database, or `null` when it has no signing key.
  *
  * `null` RATHER THAN A THROW, AND RATHER THAN A SIGNER THAT FAILS LATER. A record restored from a
- * redacted export has no `vault_key` rows at all — `brainl.ts` drops them deliberately, because the
- * row is nothing but wrapped bytes and a salt — so "no signing key" is an ordinary state and not an
+ * redacted export has no `vault_key` rows at all (`brainl.ts` drops them deliberately, because the
+ * row is nothing but wrapped bytes and a salt) so "no signing key" is an ordinary state and not an
  * error. What it means is that this record's exports are unsigned and nothing will import them,
  * which is true, and is better said at export than at import.
  */
@@ -62,7 +62,7 @@ export async function signerFor(sql: Sql, store: KeyStore, recordId: string): Pr
   try {
     /* TWICE FROM ONE BUFFER, AND THE EXTRACTABLE ONE IS THROWN AWAY. WebCrypto will not derive a
        public key from a private one, and Node's `exportKey('pkcs8')` writes a v1 encoding that does
-       not carry the public half — so the only way to it without an ASN.1 parser in this file is a
+       not carry the public half, so the only way to it without an ASN.1 parser in this file is a
        JWK round trip, whose `x` IS the public key. The key that signs is the non-extractable one. */
     const readable = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, true, ['sign']);
     const jwk = (await crypto.subtle.exportKey('jwk', readable)) as { x?: string };
@@ -82,7 +82,7 @@ export async function signerFor(sql: Sql, store: KeyStore, recordId: string): Pr
     keyId,
     publicKey: encoded,
     sig: b64url(new Uint8Array(await crypto.subtle.sign('Ed25519', priv, bytes))),
-    /* THE TIME IS ABOUT THE ACT, not the content — which is why it lives here and not in the
+    /* THE TIME IS ABOUT THE ACT, not the content, which is why it lives here and not in the
        manifest. Two exports of an unchanged record differ in this one field and nowhere else. */
     signedAt: new Date().toISOString(),
   });

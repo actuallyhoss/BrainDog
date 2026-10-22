@@ -2,9 +2,9 @@
  * THE FIRST READ ON THE CLOUD: what `serveFirstRead` (`@braindog/host/first-read`) is handed at `/auth/signup/read`,
  * so a stranger's sentence at sign-up can be read by the included model before there is an account (USE-B05 job 3).
  *
- * OFF AS SHIPPED, AND ONLY HE SWITCHES IT ON. Each reading is a model call that costs money, and a stranger's words reach
- * a model only after his yes, so the door is `on` only where `FIRST_READ_DAILY` is a whole number above 0: that number is
- * both his yes and the day's ceiling across every stranger. Unset or 0, the door answers 501 and the page reads by rules.
+ * OFF AS SHIPPED, AND ONLY THE OPERATOR SWITCHES IT ON. Each reading is a model call that costs money, and a stranger's
+ * words reach a model only after the operator's yes, so the door is `on` only where `FIRST_READ_DAILY` is a whole number
+ * above 0: that number is both the operator's yes and the day's ceiling across every stranger. Unset or 0, the door answers 501 and the page reads by rules.
  * Even on, it reads nothing without the included model (`includedInference`), a reader (`readSetup`, handed in), a bot
  * check keyed by `TURNSTILE_SECRET` and a place to count in (`MeterStore`); any one missing is the same 501.
  *
@@ -38,7 +38,7 @@ export type ReadSetup = (ask: SetupAsk, inference: Inference) => Promise<Result<
 export type MeterStore = { hit(key: string, day: string, most: number): Promise<boolean> };
 
 export type FirstReadEnv = SlashEnv & {
-  /** The day's ceiling of readings for all strangers, and his yes to them. Unset or 0 is off. */
+  /** The day's ceiling of readings for all strangers, and the operator's yes to them. Unset or 0 is off. */
   FIRST_READ_DAILY?: string | undefined;
   TURNSTILE_SECRET?: string | undefined;
   /** The static assets, holding the catalogue bundled with the shell (`/app/catalogue/index.json`); absent in a test. */

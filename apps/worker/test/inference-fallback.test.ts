@@ -84,3 +84,29 @@ test('A MODEL THE PLATFORM DOES NOT SERVE IS NOT RETRIED', async () => {
   await assert.rejects(runModel(env, 'x', {}, { log: () => {} }));
   assert.equal(seen.length, 1);
 });
+
+test('A 5XX FROM THE GATEWAY IS THE GATEWAY: retried without it, where it was once thrown at once as the model\'s', async () => {
+  const { seen, env } = binding((o) => {
+    if (o?.gateway) throw new Error('AiError: 502 Bad Gateway');
+    return GOOD;
+  });
+  const got = await aiInference(env, { log: () => {} }).complete(ask);
+  assert.ok(got.ok);
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1]?.gateway, undefined);
+});
+
+test('A RATE LIMIT IS STILL THE MODEL\'S, and no other path is asked', async () => {
+  const { seen, env } = binding(() => {
+    throw new Error('AiError: 429 Too Many Requests');
+  });
+  await assert.rejects(runModel(env, 'x', {}, { log: () => {} }));
+  assert.equal(seen.length, 1);
+});
+
+test('AN ANSWER IN JSON MODE IS READ AS JSON: Workers AI hands `response` back as the parsed object', async () => {
+  const { env } = binding(() => ({ response: { kind: 'invoice' }, usage: { prompt_tokens: 3, completion_tokens: 3 } }));
+  const got = await aiInference(env, { log: () => {} }).complete(ask);
+  assert.ok(got.ok, JSON.stringify(got));
+  assert.deepEqual(JSON.parse(got.value.text), { kind: 'invoice' });
+});

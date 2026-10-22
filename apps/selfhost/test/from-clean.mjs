@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The self-host from a clean clone (LCH-C13 jobs 1 and 2, "The software stays self-hostable", D33.45): the README's own
+ * The self-host from a clean clone (LCH-C13 jobs 1 and 2, "The software stays self-hostable"): the README's own
  * lines, run in a scratch copy of the repository, and then the real `braindog` command built from the same tree.
  *
  *   node apps/selfhost/test/from-clean.mjs [--container] [--dry] [--after-install <script>] [--keep]

@@ -2,12 +2,12 @@
  * The client, against a real server.
  *
  * There is no mock here on purpose. A client tested against a fake is a client that agrees with the
- * fake, and the two places this one has to be right — the verb it picks and the shape it hands back —
+ * fake, and the two places this one has to be right (the verb it picks and the shape it hands back)
  * are exactly the two a fake would get wrong in the same way the client does.
  *
  * AND IT LIVES WITH THE SERVER RATHER THAN WITH THE CLIENT. It was `packages/client/test/`, which
  * gave `@braindog/client` a devDependency on `@braindog/selfhost` and a relative import that climbed
- * three directories out of the package into an app — `31 §1`: a package may name a capability, only
+ * three directories out of the package into an app, and `31 §1` says a package may name a capability, only
  * an app may name a runtime, and that package named one. The test is unchanged; the only thing that
  * moved is which side of the boundary it sits on, which is the side that has the runtime.
  */
@@ -42,7 +42,7 @@ const OBLIGATIONS = {
 };
 
 /* PORT 0, AND THE OS PICKS ONE. A counter from a fixed base fails for a reason that is not about
-   the code — a killed run still holding a socket, another checkout, a reserved range — and it fails
+   the code (a killed run still holding a socket, another checkout, a reserved range) and it fails
    on whichever test happens to land on the number, which changes every time one is inserted. */
 
 async function connected(token?: string, build?: string) {

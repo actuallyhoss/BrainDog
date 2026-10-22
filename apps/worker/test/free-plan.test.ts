@@ -1,5 +1,5 @@
 /**
- * Free, enforced (DIRECTION §35, "Free leads"): one person, and sign-up open wherever this host has an address.
+ * Free, enforced ("Free leads"): one person, and sign-up open wherever this host has an address.
  *
  * BEFORE THIS, BOTH WERE WORDS. The site and the terms said Free is one person, and an owner on Free could still mint an
  * invitation and a colleague could still spend it, because `dir_member` had no limit and nothing asked the plan. And
@@ -49,7 +49,7 @@ test('AN OWNER ON FREE CANNOT INVITE ANYBODY, and is told why and how to move on
   const held = () => Number((c.storages.get(REC)?.sql.exec('SELECT count(*) AS n FROM invitation').toArray()[0] as { n: number } | undefined)?.n ?? -1);
   assert.equal(held(), 0, 'an invitation was minted on Free');
 
-  /* CLOUD IS NOT ENOUGH EITHER: teams are Cloud Plus's (DIRECTION §42). */
+  /* CLOUD IS NOT ENOUGH EITHER: teams are Cloud Plus's. */
   await c.plan('hosted');
   assert.equal((await c.invite('bo@example.test')).status, 403);
 

@@ -135,7 +135,7 @@ async function stack(o: { open?: boolean } = {}) {
     /**
      * An agent token for `person`, minted as the host would for them. What it may do is read from the member table on every call.
      *
-     * A NEW AGENT STARTS AT ASK (DIRECTION §37), so a write it sends is filed as a question. `trusted` names the kinds it
+     * A NEW AGENT STARTS AT ASK, so a write it sends is filed as a question. `trusted` names the kinds it
      * writes at Do and tell, as `seedLadder` keeps them for a token that wrote before the ladder: these tests are about
      * the door, not the rung.
      */

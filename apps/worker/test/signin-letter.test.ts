@@ -2,7 +2,7 @@
  * Whether each sign-in letter went out, kept by the Directory (LCH-A04 job 3).
  *
  * MEASURED BEFORE THIS FILE: the letter was sent inside `waitUntil` and its failure was a log line, so the screen said a
- * link was on its way whatever happened. Sign-up is open to strangers now (DIRECTION §42), so a host whose mail has
+ * link was on its way whatever happened. Sign-up is open to strangers now, so a host whose mail has
  * stopped leaves every newcomer waiting on a letter that is not coming.
  *
  * NOW: the Directory keeps the last 20 sends and their outcome, and `lettersDown()` is true when the last five all met a

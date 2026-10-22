@@ -1,5 +1,5 @@
 /**
- * The sign-up switch and the launch answer (`src/launch.ts`, DIRECTION §42): every mode, open with no bot check staying
+ * The sign-up switch and the launch answer (`src/launch.ts`): every mode, open with no bot check staying
  * open, and the sentences `/healthz` carries.
  *
  * MEASURED BEFORE THIS FILE: sign-up was open wherever `PUBLIC_HOST` was set, so production made a person for anybody
@@ -75,7 +75,7 @@ test('BILLING IS test OR live, and anything else is off', () => {
   for (const said of [undefined, '', 'on', 'LIVE']) assert.equal(billingMode(said === undefined ? {} : { BILLING: said }), 'off');
 });
 
-test('PRODUCTION SAYS invite on his word (DIRECTION §49), and alpha open so the walk kit signs up with no code', async () => {
+test('PRODUCTION SAYS invite, as the owner chose, and alpha open so the walk kit signs up with no code', async () => {
   const checker = new URL('../scripts/provision-check.mjs', import.meta.url).href;
   const { wranglerConfig } = (await import(checker)) as {
     wranglerConfig: (root: string) => { env?: { [name: string]: { vars?: { [key: string]: string } } } };

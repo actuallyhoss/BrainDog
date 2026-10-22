@@ -3,7 +3,7 @@
  *
  * THE NAME IS THE TEST. `47 §5.1` maps the four onto three codes and three different repairs, so
  * an adapter that refused a private address with a `Network` would have a connector retried on a
- * ladder for a week for an SSRF attempt — and it would look like a provider having a bad day the
+ * ladder for a week for an SSRF attempt, and it would look like a provider having a bad day the
  * whole time.
  */
 

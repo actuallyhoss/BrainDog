@@ -20,8 +20,8 @@
  *
  * AND ON THE SAME FACTS AS EVERY ASK (ENG-A06): the engine is built with `includedRoute`, so a pattern is asked of the
  * candidates `routeFor('pattern', includedCandidates(env))` names, which today is the included model alone: the operator's
- * second provider is on the answering route only. A digest's prose is not walked at all, because `digestProse` calls its
- * own model (`PROSE`, `llama-3.2-1b`) outside `core.run`, as it always did.
+ * second provider is on the answering route only. A digest's prose is walked by `digestProse` itself, outside `core.run`:
+ * `routeFor('prose')` names the flash model and the second model after it.
  *
  * THE PACKAGE IS STILL IMPORTED ONLY BEHIND THE REFUSAL (`46 §5.1`): `workerSlashEngine` imports it, and nothing here
  * calls that before a job is leased.

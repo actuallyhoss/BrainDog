@@ -1,5 +1,5 @@
 /**
- * Free's Slash credits on the Worker (DIRECTION §35), and the first run's two asks under this host's wrappers.
+ * Free's Slash credits on the Worker, and the first run's two asks under this host's wrappers.
  *
  * FREE STARTED AT CLOUD'S ASKS. `ASK_CAP_FREE` was named and held to the site's Free card, but a free record was made at
  * `ASK_CAP_DEFAULT`, and its owner could type any number up to the operator's ceiling. Now the record is lowered to it when

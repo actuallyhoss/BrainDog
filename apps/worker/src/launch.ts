@@ -1,13 +1,13 @@
 /**
  * Who may make an account on this host, and what the launch looks like from outside: one switch and one answer.
  *
- * ONE SWITCH, `SIGNUP` (DIRECTION §42, "open to strangers now"). `open` lets anybody sign up, `invite` lets a new
+ * ONE SWITCH, `SIGNUP` ("open to strangers now"). `open` lets anybody sign up, `invite` lets a new
  * address in only with a code the operator minted (`/account/ops/invite`), and anything else, empty and unknown
  * included, is `closed`. Before this, sign-up was open wherever `PUBLIC_HOST` was set, so the one setting that said where
  * the app lives also said who could make an account there, and nobody had decided the second.
  *
  * OPEN STAYS OPEN WITHOUT THE BOT CHECK, and is narrower until it has one. The scope first had `open` fall back to
- * `invite` while `TURNSTILE_SECRET` was unset; his word was to open now, so instead the Directory is told on every
+ * `invite` while `TURNSTILE_SECRET` was unset; the owner's choice was to open now, so instead the Directory is told on every
  * `start` whether the check ran, and the two sign-up strikes take `SIGNUP_UNCHECKED` until it does
  * (`packages/record/src/identity.ts`). `launchDetail` says so in a sentence for the owner; `/healthz` carries `launchState`,
  * which tells a stranger only whether he can sign up.
@@ -117,7 +117,7 @@ function stops(env: LaunchEnv): string[] {
 /**
  * The launch as the owner reads it, with a plain sentence for each thing that is not yet as it will be: each setting
  * that stops sign-up, the exact strike limit while the bot check is not keyed, and billing's mode. NEVER EMPTY WHILE
- * BILLING IS OFF OR IN TEST, which his word keeps it (DIRECTION §42: a live charge is a separate word), so an empty `why`
+ * BILLING IS OFF OR IN TEST, where it stays (a live charge is a separate decision), so an empty `why`
  * here is not something this host reaches today.
  *
  * `signup` IS WHAT A STRANGER MEETS, NOT ONLY WHAT `SIGNUP` SAYS. A switch that is on while anything in `STOPPING` holds

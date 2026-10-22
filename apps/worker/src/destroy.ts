@@ -25,10 +25,11 @@
  */
 
 import { filesPrefix } from './files.ts';
+import { sealedPrefix } from './sealed.ts';
 import { prefixOf, type Blobs } from './snapshots.ts';
 
 /**
- * How long a deleted record's final copy is kept, in days. HIS CALL AND NOT YET ANSWERED.
+ * How long a deleted record's final copy is kept, in days. THE OWNER'S CHOICE, NOT YET MADE.
  *
  * The choice is none, a day, or thirty, because it is a promise to customers and the
  * sentence Settings shows before a delete (`deleteCosts` in `apps/web/src/lib/copy.ts`) must say the same number.
@@ -127,8 +128,9 @@ async function sweep(blobs: Pick<Blobs, 'list' | 'delete'>, prefix: string, keep
  */
 export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record: string): Promise<number> {
   /* AND ITS FILES, for the same measured reason: a record deleted before the file store's prefix was swept at delete
-     left its files at `<record>/a/`, and a closed record's prefix is the one place anybody will find them. */
-  return (await sweep(blobs, prefixOf(record), null)) + (await sweep(blobs, filesPrefix(record), null));
+     left its files at `<record>/a/`, and a closed record's prefix is the one place anybody will find them. Its sealed
+     files' parts likewise, at `<record>/sealed/`. */
+  return (await sweep(blobs, prefixOf(record), null)) + (await sweep(blobs, filesPrefix(record), null)) + (await sweep(blobs, sealedPrefix(record), null));
 }
 
 /**
@@ -161,6 +163,9 @@ export async function destroyRecord(storage: Wipe, close: Close, record: string 
        record is still whole. None is kept: the final copy holds each file's name and not its bytes, so a record put
        back from it within the thirty days comes back with its facts and without its files. */
     removed += await sweep(copies.blobs, filesPrefix(record), null);
+    /* AND ITS SEALED FILES, which nothing but the record names and the final copy names without their bytes. A record put
+       back from that copy lists them as not whole, and the owner's machines put them again. */
+    removed += await sweep(copies.blobs, sealedPrefix(record), null);
     answer = { kept, removed };
   }
   await storage.deleteAlarm();

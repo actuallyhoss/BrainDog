@@ -201,7 +201,7 @@ test('THE FILE IS PUSH B2: both environments on the site name through its bindin
        Editor token was enough and no route write could fail under the flipped vars. This and the RP ID below are what
        the test of a staged flip held while one was staged. With both landed it had no fragment to read, and a check with
        nothing to read is the same silence as no check, so it went with push 4. Production also holds admin.brain.dog, the
-       owner's admin page (DIRECTION §49, src/admin.ts), a name the site never binds. */
+       owner's admin page (src/admin.ts), a name the site never binds. */
     assert.deepEqual(customDomains(block), name === 'production' ? [flip.old, `admin.${flip.host}`] : [flip.old], `${name}: this Worker's Custom Domains`);
     /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, and a flip does not move it, so a passkey made on the old name is
        offered on the new one. */

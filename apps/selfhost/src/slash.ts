@@ -242,7 +242,7 @@ export type SlashEngineDeps = {
 /**
  * The route `createSlash` walks on this host (ENG-A06): `routeFor` over `selfhostFacts`, as the package's candidates.
  *
- * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When this host's endpoint does not answer, the ask goes to the second
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE". When this host's endpoint does not answer, the ask goes to the second
  * endpoint before Slash's rules speak. The first candidate carries no `inference`, so it is asked on the adapter the caller
  * handed in, which is this host's endpoint as it always was; the second carries its own, on the same wire (`wireOf`'s
  * `send`) with the operator's `SLASH_FALLBACK_KEY`. It opens no vault key, so no `grant.read` is signed for it.

@@ -56,6 +56,7 @@ import { grantNamed, holdingScript, readOnlyExecute, scriptProposals, scriptRead
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { serveFirstRead } from '@braindog/host/first-read';
 import { pagedRunner } from '@braindog/host/connector';
+import { drawnFrame, isDrawnFrame } from '@braindog/host/drawn-frame';
 import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/host/slash-answers';
 import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
 
@@ -76,6 +77,7 @@ import { cloudSnapshots, type Pitr } from './copies.ts';
 import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer } from './restore-point.ts';
 import { drillAnswer, drillNote, olderDrill, readDrill } from './drill-door.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
+import { cloudSealed } from './sealed.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
@@ -87,7 +89,7 @@ import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@brain
 import { shareKeyOf, sharesOf } from './share.ts';
 import { firstReadDoorOf } from './first-read.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
+import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { withSignedIn } from './signed-in.ts';
@@ -348,7 +350,7 @@ type Env = {
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
-  /** The day's ceiling of sign-up readings by the included model for all strangers (`first-read.ts`), and his yes to them. Unset is off. */
+  /** The day's ceiling of sign-up readings by the included model for all strangers (`first-read.ts`), and the operator's yes to them. Unset is off. */
   FIRST_READ_DAILY?: string;
   /**
    * The Google OAuth client sign-in with Google runs as (`google.ts`), both put with `wrangler secret put`. The id is
@@ -710,7 +712,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * Free's one person (DIRECTION §35), at the record's own `invite`, which every door reaches it through: the app's call,
+   * Free's one person, at the record's own `invite`, which every door reaches it through: the app's call,
    * an agent's tool and the CLI alike. A free record takes an invitation to nobody, and a change to somebody already on
    * it is let through, since that is its owner. The sentence offers the way on, which is Cloud.
    *
@@ -967,6 +969,21 @@ export class Record$ extends DurableObject<Env> {
         /* AN AGENT'S TRIALS TODAY, from the Directory's ledger, which every metered trial already writes to (`script-try-cap.ts`). */
         trialsToday: (r) => this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).trialsToday(r, Date.now()) as unknown as Promise<number>,
         ...(copies === undefined ? {} : { snapshots: copies }),
+        /* SEALED FILES' BYTES, IN THE BUCKET THE FILES ARE IN AND UNDER THE RECORD'S OWN ID (`sealed.ts`), each new part
+           counted against the record's day of bytes as a file is. No `BLOBS` and the record keeps none, and says so. */
+        ...(blobs === undefined
+          ? {}
+          : {
+              sealed: cloudSealed(
+                blobs,
+                () => {
+                  const record = api.kernel.identity()?.id;
+                  if (!record) throw new Error('This record has not been created yet, so it keeps no sealed files.');
+                  return record;
+                },
+                (bytes) => abuseWait(this.env, 'uploadDay', api.kernel.identity()?.id ?? '', bytes),
+              ),
+            }),
         /* DELETION, `51 §5.13`, in this order: a final copy, every other object under the
            record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed
            name, and no request is answered in between. Measured before the bucket was passed: 2 objects under the prefix
@@ -2094,7 +2111,13 @@ export class Record$ extends DurableObject<Env> {
     /* The context arrives from the Worker, which did the authentication. The record does the
        AUTHORISATION — every permission check is inside `createRecordApi`, one place, so the CLI and
        the MCP server answer to the same ladder as the browser. */
-    const ctx = JSON.parse(request.headers.get('x-braindog-ctx') ?? 'null') as CallContext | null;
+    /* A CONTEXT PAST THE CAP IS REFUSED IN ITS OWN SENTENCE BEFORE ANYTHING PARSES IT (`ctxOversize`, T13). */
+    const over = ctxOversize(request.headers);
+    if (over) {
+      const out = { ok: false as const, refusal: over };
+      return json(out, httpStatus(out));
+    }
+    const ctx = JSON.parse(request.headers.get(CTX_HEADER) ?? 'null') as CallContext | null;
     if (!ctx) return saidUnauthorized('record', 'This record needs a caller.');
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
@@ -2966,7 +2989,7 @@ const unauthorized = (env: Env): Response =>
   saidUnauthorized('bearer', (env.SESSION_SECRET ?? '').length >= 32 ? 'a bearer this record does not know, sign-in on' : 'a bearer this record does not know, sign-in off');
 
 /**
- * THE ONE 401 BODY (LCH-C08 job 2, his words "A `401` says only `unauthorized`.", P.154): every 401 this Worker answers
+ * THE ONE 401 BODY (LCH-C08 job 2, the rule "A `401` says only `unauthorized`.", P.154): every 401 this Worker answers
  * itself carries `{ code: 'UNAUTHORIZED', fix: 'unauthorized' }` and nothing else, and the reason goes to one
  * `op: 'unauthorized'` line, so a stranger learns nothing of which door or why (`scripts/fence.mjs` checks it).
  */
@@ -3105,7 +3128,7 @@ export default {
          and 503 is what a client waits on and asks again. */
       answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
-    /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`, DIRECTION §48). */
+    /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`). */
     answer = withSignedIn(answer, request);
     /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
        caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */
@@ -3407,6 +3430,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        included, and production answered `GET https://app.brain.dog/app/` with 200 `text/html`.
        An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
        only of `brain.dog`, where the site's assets answer first. */
+    /* THE FRAME A DRAWN BLOCK IS DRAWN IN, before `appPath`, which would read `drawn-frame` as a record's name. It is
+       answered from code under its own policy and never through `asPage` (`@braindog/host/drawn-frame`). */
+    if (isDrawnFrame(url.pathname)) return drawnFrame(request.method);
     const app = appPath(url.pathname);
     /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
     if (app !== null && app.slug !== null && servesKey(app.rest)) return recordKey(request, env, app.slug);
@@ -4516,7 +4542,7 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
  * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, in `invite` as in `open`, against the address
  * Cloudflare wrote (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset,
  * the Directory's lockouts (`signup:<ip>`, `signup-email:<address>`, `email:<address>`) are the whole of the brake, and
- * the Directory is told so (`checked`), which tightens the first two to `SIGNUP_UNCHECKED` (DIRECTION §42).
+ * the Directory is told so (`checked`), which tightens the first two to `SIGNUP_UNCHECKED`.
  *
  * THE MAIL GOES OUT WITHOUT BEING WAITED FOR, through `sendMail` inside `waitUntil`, as every `/auth` letter does, so an
  * address that already has an account answers in the time a new one does. A known address is sent a sign-in link
@@ -4535,7 +4561,7 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   /* THE RPC STUB'S TYPE IS A CAST, as `serveAuth`'s door is: the Directory answers `AuthResult` over the wire. */
   const ask = ((call: SignupCall) => directory.auth(call)) as unknown as (call: SignupCall) => Promise<AuthResult>;
   const ip = request.headers.get('cf-connecting-ip') ?? '';
-  /* ONE SWITCH, `SIGNUP` (`launch.ts`, DIRECTION §42). Free needs no payment (DIRECTION §35), so a record is made at no
+  /* ONE SWITCH, `SIGNUP` (`launch.ts`). Free needs no payment, so a record is made at no
      charge wherever sign-up is not closed, and the paid plans are offered where billing is on. */
   const allowed = signupMode(env);
   const open = allowed !== 'closed';

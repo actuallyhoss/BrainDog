@@ -1,5 +1,5 @@
 /**
- * The Cloud's route (ENG-A06 job 5): "Rules are the fallback, not the engine." (D35.43)
+ * The Cloud's route (ENG-A06 job 5): "Rules are the fallback, not the engine."
  *
  * `includedCandidates` says what the Cloud may try for an ask on the included model, and `workerSlashEngine` hands
  * `routeFor`'s answer to the engine, so when the included model fails the next model the operator set is asked before the
@@ -83,10 +83,10 @@ test('THE INCLUDED MODEL ALONE: flash answers and nothing else is on the answeri
   assert.equal(facts.models.provider, undefined);
   assert.deepEqual([facts.large, facts.machine], [false, false]);
   assert.deepEqual(ids(included()), ['flash']);
-  /* THE ROUTER PUTS THE SMALL ROW FIRST FOR PROSE, and flash after it. The engine walks no prose today (`digestProse` asks
-     `PROSE`'s own model outside `core.run`), so this is the order a walk would take, and a pattern stays on flash alone. */
+  /* PROSE IS ON FLASH, as a pattern is: the small model holds no JSON schema, so it is no longer on the route
+     `digestProse` walks (`core.routeOf`). */
   assert.deepEqual(ids(included(), 'pattern'), ['flash']);
-  assert.deepEqual(ids(included(), 'prose'), ['small', 'flash']);
+  assert.deepEqual(ids(included(), 'prose'), ['flash']);
 });
 
 test("THE OPERATOR'S SECOND PROVIDER IS SECOND, only when its three settings and its secret are all set", () => {
@@ -102,7 +102,7 @@ test("THE OPERATOR'S SECOND PROVIDER IS SECOND, only when its three settings and
   assert.doesNotMatch(JSON.stringify(includedCandidates(env)), new RegExp(FALLBACK_KEY, 'u'));
 });
 
-test('SLASH_LARGE yes IS HIS YES AND STILL NAMES NO LARGER MODEL, because the table carries no large row', () => {
+test("SLASH_LARGE yes IS THE OPERATOR'S YES AND STILL NAMES NO LARGER MODEL, because the table carries no large row", () => {
   const facts = includedCandidates({ ...included(), ...FALLBACK, SLASH_LARGE: 'yes' });
   assert.equal(facts?.large, true);
   assert.equal(facts?.models.large, undefined);

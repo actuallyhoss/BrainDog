@@ -1,7 +1,7 @@
 /**
  * `fenceChecks`: the public fence, asked of the canary on every deploy (LCH-C08 job 4).
  *
- * His words: "A `401` says only `unauthorized`." (P.154) and "`noindex`, the URL is the capability" (P.166). Each
+ * The rules: "A `401` says only `unauthorized`." (P.154) and "`noindex`, the URL is the capability" (P.166). Each
  * check below is one line of the smoke, in the shape `smoke.mjs` asks (`method`, `url`, `expects`, `judge`), and
  * says one fact about the fence: a wrong bearer is 401 with exactly that body; no door answers a page on another
  * site; every JSON answer is `no-store`; a picture is kept by its SHA-256 and served sandboxed, `nosniff` and

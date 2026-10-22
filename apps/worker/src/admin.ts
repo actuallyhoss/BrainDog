@@ -1,5 +1,5 @@
 /**
- * admin.brain.dog, the owner's page (DIRECTION §49: "i can invite through admin.brain.dog"): applications with Invite
+ * admin.brain.dog, the owner's page ("i can invite through admin.brain.dog"): applications with Invite
  * and Decline, an invite to anyone by email, and the sign-up codes with End.
  *
  * ONE PAGE, ONE SCRIPT AND ONE STYLE, ALL FROM THIS WORKER, and the operator doors it calls (`/account/ops/*`) are the

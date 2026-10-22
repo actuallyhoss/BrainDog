@@ -20,6 +20,8 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { extname, join, resolve, sep } from 'node:path';
 
+import { drawnFrame, isDrawnFrame } from '@braindog/host/drawn-frame';
+
 const TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -118,6 +120,9 @@ export function shellOf(dir: string): (request: Request) => Response {
     throw new Error(`${dir} has no app/index.html, so it is not a built app. Build apps/web, or point BRAINDOG_SHELL at its build directory.`);
 
   return (request) => {
+    /* THE FRAME A DRAWN BLOCK IS DRAWN IN is answered from code under its own policy, as the Worker answers it, and is
+       never a file of the build (`@braindog/host/drawn-frame`). */
+    if (isDrawnFrame(new URL(request.url).pathname)) return drawnFrame(request.method);
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
       'content-security-policy': "frame-ancestors 'none'",

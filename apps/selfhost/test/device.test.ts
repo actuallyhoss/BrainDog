@@ -117,7 +117,7 @@ test('START, APPROVE FROM A SESSION, AND POLL TO A BEARER THAT READS THE RECORD,
   try {
     const code = await s.begin();
     assert.match(code.user_code, /^\d{6}$/);
-    assert.equal(code.verification_uri, `${s.origin}/app/settings/agents`);
+    assert.equal(code.verification_uri, `${s.origin}/app/connect/approve`);
     assert.equal(code.expires_in, 600);
     assert.equal(code.interval, 5);
 

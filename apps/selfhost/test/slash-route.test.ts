@@ -1,6 +1,6 @@
 /**
  * A self-host's second endpoint (`src/slash.ts` `slashFromEnv`, `selfhostFacts`, `slashEngineFor`'s route; ENG-A06 and
- * ENG-A07): "Rules are the fallback, not the engine." (D35.43)
+ * ENG-A07): "Rules are the fallback, not the engine."
  *
  * BEFORE THIS, ONE MODEL AND THEN THE RULES. `SLASH_FALLBACK_ENDPOINT` was read nowhere and `createSlash` was handed no
  * route, so when this host's endpoint did not answer, Slash's rules spoke. Now the three variables, all of them or none,

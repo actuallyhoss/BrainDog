@@ -22,8 +22,8 @@
  *
  * THE INCLUDED MODEL IS SWITCHED ON BY `SLASH_INCLUDED`, NOT BY THE BINDING. `AI` is bound in both environments already
  * (`wrangler.jsonc`, since `src/inference.ts` was written) and `deploy.yml` deploys production on every green `ci`, so a
- * model keyed on the binding alone would have started spending his account at the first deploy of the commit that built it.
- * Spending it is his call, so it takes a var.
+ * model keyed on the binding alone would have started spending the operator's account at the first deploy of the commit that built it.
+ * Spending it is the operator's choice, so it takes a var.
  *
  * TWO FEATURES SHARE THE NAME AND THIS FILE BUILDS BOTH. `workerSlashModel` is the model behind the RECORD's Slash, which
  * proposes how a BrainDog is ARRANGED; `workerSlashEngine` is `@braindog/slash`, `docs/46`'s engine, which answers a typed
@@ -85,7 +85,7 @@ export type SlashEnv = {
   SLASH_INCLUDED?: string | undefined;
   /** The most one record's asks may spend of the included model in a UTC month, in neurons. See `INCLUDED_MONTH_NEURONS`. */
   SLASH_INCLUDED_MONTH_NEURONS?: string | undefined;
-  /** `yes` where he said yes to the larger model's cost (HD.463). Unset, and today, the larger model is on no route. */
+  /** `yes` where the operator said yes to the larger model's cost (HD.463). Unset, and today, the larger model is on no route. */
   SLASH_LARGE?: string | undefined;
   /** The operator's second provider (`includedCandidates`): its https address, its model, `openai` or `anthropic`. */
   SLASH_FALLBACK_URL?: string | undefined;
@@ -639,12 +639,12 @@ const fallbackOf = (env: SlashEnv): { url: string; model: string; provider: 'ope
 /**
  * What the Cloud may try for an ask on the included model, in `routeFor`'s terms, or `undefined` where that model is off.
  *
- * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When the included model fails, the next model the operator set is
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE". When the included model fails, the next model the operator set is
  * asked before the rules speak. The table has two rows and no second chat row: which model would be second is the model
  * checks' to choose (`tools/model-checks/run.mjs --routes`), so today the answering route is flash alone, and the operator's
  * provider after it once he sets all four of its settings.
  *
- * THE LARGER MODEL STAYS OFF. `large` carries his yes (`SLASH_LARGE`), and the table holds no large row, so even a yes
+ * THE LARGER MODEL STAYS OFF. `large` carries the operator's yes (`SLASH_LARGE`), and the table holds no large row, so even a yes
  * names none: the row is added beside the model checks that price it, never here.
  *
  * HIS OWN KEY IS NOT ON IT. A record set to his key is a route of one in the package (`core.run` walks nothing on tier
@@ -775,7 +775,7 @@ const planCapOf = (sql: Sql): number | null => {
 };
 
 /**
- * A record's Slash asks, moved with its plan (DIRECTION §35, "Free leads"): on Free the month's asks are `ASK_CAP_FREE`,
+ * A record's Slash asks, moved with its plan ("Free leads"): on Free the month's asks are `ASK_CAP_FREE`,
  * and paid for they are `ASK_CAP_DEFAULT` again.
  *
  * ON FREE THE CAP IS LOWERED AND NEVER RAISED, so an owner who set fewer keeps fewer, and the ceiling is kept beside it for

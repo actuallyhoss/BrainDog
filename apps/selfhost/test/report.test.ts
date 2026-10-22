@@ -36,7 +36,7 @@ const SERVER_KEY = 'fake-server-key-for-tests';
 
 test('A PROJECT REPORTS WITH ITS KEY OVER HTTP, AND THE KEY OPENS NOTHING ELSE', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-report-'));
-  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, token: SERVER_KEY });
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, token: SERVER_KEY, limits: null });
   const port = (running.server.address() as { port: number }).port;
   const post = async (name: string, body: unknown, bearer: string) => {
     const res = await fetch(`http://127.0.0.1:${port}/api/${name}`, {

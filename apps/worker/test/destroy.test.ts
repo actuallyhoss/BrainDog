@@ -12,8 +12,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FINAL_KEPT_DAYS, destroyRecord, type Swept } from '../src/destroy.ts';
+import { FINAL_KEPT_DAYS, destroyRecord, expireFinal, type Swept } from '../src/destroy.ts';
 import { fileKey } from '../src/files.ts';
+import { sealedPrefix } from '../src/sealed.ts';
 import { prefixOf } from '../src/snapshots.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -119,6 +120,21 @@ test('THE DELETE ANSWERS WHAT IT KEPT AND WHAT IT TOOK: the final copy by its ke
   assert.equal([...blobs.held].filter((k) => k.startsWith(prefixOf(REC))).length, 1);
 });
 
+test('A DELETED RECORD TAKES ITS SEALED FILES WITH IT, and the night takes a closed record\'s that were left', async () => {
+  const { calls, storage, close } = fakes();
+  const part = `${sealedPrefix(REC)}${'b'.repeat(64)}.${'c'.repeat(64)}.0`;
+  const theirs = `${sealedPrefix(OTHER)}${'b'.repeat(64)}.${'c'.repeat(64)}.0`;
+  const blobs = bucket([...nightly(REC), part, theirs]);
+  const said = await destroyRecord(storage, close, REC, { blobs, final: finalInto(blobs, calls) });
+  assert.deepEqual(said, { kept: FINAL, removed: 3 });
+  assert.ok(!blobs.held.has(part), 'a sealed part outlived its record');
+  assert.ok(blobs.held.has(theirs), 'another record lost a sealed part');
+
+  const left = bucket([part]);
+  assert.equal(await expireFinal(left, REC), 1);
+  assert.equal(left.held.size, 0);
+});
+
 test('WITHOUT A BUCKET THE DELETE KEEPS NOTHING AND SAYS NOTHING KEPT, and a record with nothing else answers 0 removed', async () => {
   const bare = fakes();
   assert.equal(await destroyRecord(bare.storage, bare.close, REC), undefined, 'a delete with no bucket said it kept a copy');
@@ -199,8 +215,8 @@ test('A FINAL COPY THE BUCKET DOES NOT HOLD STOPS THE DELETE BEFORE A NIGHT GOES
   assert.deepEqual([...blobs.held].sort(), nightly(REC).sort());
 });
 
-test('THE FINAL COPY IS KEPT THIRTY DAYS UNTIL HE SAYS OTHERWISE', () => {
-  // None, a day or thirty is his call and unanswered. Pinned so that changing it is a
+test('THE FINAL COPY IS KEPT THIRTY DAYS UNTIL THE OWNER DECIDES OTHERWISE', () => {
+  // None, a day or thirty is the owner's choice and not yet made. Pinned so that changing it is a
   // decision somebody makes in this file and its test, and `deleteCosts` in the web copy is changed with it.
   assert.equal(FINAL_KEPT_DAYS, 30);
 });

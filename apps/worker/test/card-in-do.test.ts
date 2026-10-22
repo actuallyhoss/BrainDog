@@ -35,7 +35,7 @@
  * (`card-next-lines`, `card-stale`, `card-lived`), which read `CARD_MOST`.
  *
  * WHAT IT FOUND AT HEAD: the three said one card, 51 words, and the step eight days old was no Next line. The card on a
- * record set up with Solo founder and nothing else carried a Signs line, "1 read red: Pages print clean. 2 pages print
+ * record set up with Solo founder and nothing else carried a Signs line, "1 read red: Pages draw without errors. 2 pages print
  * something raw: Overview, Money.", so a fresh record's card is line one, Signs and More, not line one and More as the
  * scope's "Done when" says. The sign is not this file's to judge, so no case pins it either way. And a task handed to the
  * agent never reached its Next line on a real record, until the briefing carried the field the list's hand.agent names.

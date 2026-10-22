@@ -87,6 +87,8 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesKennel: ['/api/kennel/v1/index.json'],
   servesOAuth: ['/oauth/token', '/oauth/authorize'],
   servesOAuthMeta: ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'],
+  /* The drawn components' frame document, under `/app` like the app's own pages. */
+  isDrawnFrame: ['/app/drawn-frame'],
   appPath: ['/app', '/app/', '/app/acme/r/tasks', '/app/acme/api/boot'],
   servesApi: ['/api/boot'],
 };

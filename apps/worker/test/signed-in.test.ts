@@ -1,5 +1,5 @@
 /**
- * The readable `bd_in` cookie beside the session (`src/signed-in.ts`, DIRECTION §48): set when the session is set,
+ * The readable `bd_in` cookie beside the session (`src/signed-in.ts`): set when the session is set,
  * taught the record's address by `GET /app`, cleared when the session is, and nothing else touched.
  *
  * THE ANSWERS ARE THE HOST'S OWN COOKIES, from `sessionCookie` and `clearCookie`, so a change to how the session is

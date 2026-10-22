@@ -1,5 +1,5 @@
 /**
- * admin.brain.dog (`src/admin.ts`, DIRECTION §49): which name is the admin host, what each path answers, the five
+ * admin.brain.dog (`src/admin.ts`): which name is the admin host, what each path answers, the five
  * headers on every answer, and what the page and its script may and may not do with the operator key.
  */
 

@@ -2,7 +2,7 @@
  * The `Http` port, on a Node host. `37 §2.2`, `33 §1` port 7, `47 §8`.
  *
  * FOUR CONSTRAINTS AND NONE OF THEM IS THE CALLER'S TO RELAX. A connector is a URL a stranger's
- * declaration named, so the adapter — not `@braindog/connect` — holds the address check, the
+ * declaration named, so the adapter (not `@braindog/connect`) holds the address check, the
  * redirect refusal, the byte ceiling and the timeout. `HttpInit` carries no flag that could turn
  * any of them off, which is what makes the port a port rather than a thin alias for `fetch`.
  *
@@ -13,7 +13,7 @@
  * AND THE ADDRESS IS PINNED, which is the part a plain `fetch` cannot do. A name can answer a
  * public address to the check and `127.0.0.1` to the connection a moment later, so the check and
  * the socket share one lookup: `pinnedSend` hands the socket a `lookup` that answers only the
- * address that was checked. This is `actions.ts`'s machinery, reused rather than rewritten — two
+ * address that was checked. This is `actions.ts`'s machinery, reused rather than rewritten: two
  * address checks on one host is one check and a memory of it.
  *
  * FOUR NAMES ON AN `Error` AND NOTHING ELSE (`47 §13` D14). A class would be an import pointing the

@@ -379,7 +379,7 @@
            BACKGROUND ASKS APART, each to this number of asks, AND THE TWO TOGETHER TO THIS NUMBER OF NEURONS, so neither
            spends the other's and one record never costs more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
-        /* THE ROUTE (ENG-A06): SLASH_LARGE is his yes to the larger model's cost, and empty is no. The three after it name
+        /* THE ROUTE (ENG-A06): SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
            the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
            one empty is no second provider, and they stay empty until the published legal text names it. */
         "SLASH_LARGE": "",
@@ -426,15 +426,15 @@
         "STRIPE_PRICE_PACK_500": "",
         /* WHO MAY MAKE AN ACCOUNT, AND THIS IS ITS ONE SWITCH (`src/launch.ts`). `open` is anybody, `invite` is a new
            address with a code from `/account/ops/invite`, and anything else, empty included, is closed. Open here as in
-           production (DIRECTION §42), so the walk kit signs up with no code, as a stranger does. */
+           production, so the walk kit signs up with no code, as a stranger does. */
         "SIGNUP": "open",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET. Empty, and sign-up runs on the Directory's lockouts alone, tightened to
            three an hour from one address until the secret half, `TURNSTILE_SECRET` (named at the end of this file),
            is set; `/healthz` says so in its `launch` sentence. */
         "TURNSTILE_SITE_KEY": "",
-        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and his yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); his to set. */
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); the operator sets it. */
         /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
-        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, his word. */
+        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, the owner's choice. */
         /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere and
            `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING (PRF-A09, the
            ten minutes in `loop/scope/area-proof-a.md` section 5, item 1): `tools/canary/enrol.mjs`, run by him, makes
@@ -521,8 +521,8 @@
          these namespaces is account-global.
 
          `analytics_engine_datasets` IS THE ONE THE CODE ALREADY READS, and it stays drafted on purpose until the owner
-         decides: one point per request is his money once Analytics Engine bills for it, so
-         binding it is his call and not a deploy's. `src/telemetry.ts` writes nothing while it is unbound, and with it
+         decides: one point per request is the owner's money once Analytics Engine bills for it, so
+         binding it is the owner's choice and not a deploy's. `src/telemetry.ts` writes nothing while it is unbound, and with it
          bound writes one point per request once `SESSION_SECRET` is set too, because the record's hash is keyed off
          that secret. There is no account resource to create first: a dataset exists from its first write.
          "analytics_engine_datasets": [
@@ -575,8 +575,8 @@
          follow one, and a 301 or 302 turns a POST into a GET. It stays for at least the 90 days a token
          lives and until every `/in/` address handed out on it is re-minted.
 
-         `admin.brain.dog` IS THE OWNER'S ADMIN PAGE (DIRECTION §49, `src/admin.ts`), its own Custom Domain, made by
-         the next deploy on his word; Cloudflare Access can be put in front of it later with no code change. */
+         `admin.brain.dog` IS THE OWNER'S ADMIN PAGE (`src/admin.ts`), its own Custom Domain, made by
+         the next deploy once the owner chose it; Cloudflare Access can be put in front of it later with no code change. */
       "routes": [
         { "pattern": "app.brain.dog", "custom_domain": true },
         { "pattern": "admin.brain.dog", "custom_domain": true }
@@ -619,7 +619,7 @@
            apart, each to this number of asks, and the two together to this number of neurons, so one record never costs
            more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
-        /* THE ROUTE (ENG-A06): SLASH_LARGE is his yes to the larger model's cost, and empty is no. The three after it name
+        /* THE ROUTE (ENG-A06): SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
            the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
            one empty is no second provider, and they stay empty until the published legal text names it. */
         "SLASH_LARGE": "",
@@ -653,25 +653,25 @@
            one pair per environment; the private half lives only in the Worker secret and in his secrets
            folder, never in this repository. */
         "VAPID_PUBLIC": "BDFva-xw8GzY6aZWJ56lUpaec3IFwe545q2VcuYgEW6QgWkXeGiBUn2WPouNTuJx-_6lPyAcd9KezHlV8DbOE1k",
-        /* BILLING IS OFF, AND THIS IS ITS SWITCH, as alpha's comment says. `live` here takes real cards, and is his call
+        /* BILLING IS OFF, AND THIS IS ITS SWITCH, as alpha's comment says. `live` here takes real cards, and is the owner's choice
            alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal. */
         "BILLING": "",
-        /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of his Stripe account. */
+        /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of the owner's Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
         "STRIPE_PRICE_PLUS": "",
         "STRIPE_PRICE_PACK_100": "",
         "STRIPE_PRICE_PACK_500": "",
-        /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS ON HIS WORD (DIRECTION §42, 8 October):
+        /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS FROM 8 OCTOBER:
            with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,
            and a site test holds them equal and fails when this line is missing.
-           INVITE ONLY FROM 17 OCTOBER (DIRECTION §49, "make it invite only"): a new address needs a code, minted at
-           admin.brain.dog or by an application he invites, and the site still says "Start free". */
+           INVITE ONLY FROM 17 OCTOBER: a new address needs a code, minted at
+           admin.brain.dog or by an application the owner invites, and the site still says "Start free". */
         "SIGNUP": "invite",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
-        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and his yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); his to set. */
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); the operator sets it. */
         /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
-        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, his word. */
+        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, the owner's choice. */
         /* THE OPERATOR'S CANARY RECORD, as alpha's comment says, and empty until the same sitting: the line
            `tools/canary/enrol.mjs` prints goes here, in the commit after his sitting, and from then the sandbox smoke
            and `after-deploy.yml` both run on it. */
@@ -793,7 +793,7 @@
 
      `STRIPE_SECRET_KEY` AND `STRIPE_WEBHOOK_SECRET` ARE BILLING'S TWO, and `TURNSTILE_SECRET` IS SIGN-UP'S.
      The first is Stripe's secret key, `sk_test_...` while `BILLING` is `test` and
-     `sk_live_...` only once he says so; the second is the signing secret Stripe shows for the endpoint
+     `sk_live_...` only once the owner turns billing live; the second is the signing secret Stripe shows for the endpoint
      `https://<PUBLIC_HOST>/account/billing/webhook`, which the webhook checks every event against (`verifyStripe` in
      `packages/host/src/stripe-sign.ts`); the third is the secret half of `TURNSTILE_SITE_KEY`. Each is put with
      `wrangler secret put <NAME> --env <environment>`, a different value per environment. Unset, billing answers

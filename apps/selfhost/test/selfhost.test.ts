@@ -2,7 +2,7 @@
  * The whole stack, over a socket.
  *
  * Every other test in this repo holds one package still and checks it. This one starts a server,
- * makes real HTTP requests, and reads a real file — because the thing that has never been checked
+ * makes real HTTP requests, and reads a real file, because the thing that has never been checked
  * until now is whether the seven packages fit together, and the answer to that is not a unit test.
  */
 
@@ -40,8 +40,8 @@ type Answer = { ok: boolean; value?: unknown; refusal?: { code: string; fix: str
  * PORT 0, AND THE OS PICKS ONE.
  *
  * A COUNTER FROM A FIXED BASE IS A TEST THAT FAILS FOR A REASON THAT IS NOT ABOUT THE CODE. Anything
- * else on the machine holding one of the numbers in the run — a previous run that was killed rather
- * than closed, another checkout, Windows' own reserved ranges — is `EADDRINUSE` on whichever test
+ * else on the machine holding one of the numbers in the run (a previous run that was killed rather
+ * than closed, another checkout, Windows' own reserved ranges) is `EADDRINUSE` on whichever test
  * happens to land on it, which changes every time a test is inserted above it. None of these tests
  * cares what the number is; every one of them needs to know the number it got.
  */
@@ -69,7 +69,7 @@ async function server(token?: string) {
     dir,
     port: at,
     /* `close` stops the server and leaves the FILE, because one test below is about the file
-       outliving the process — a close that deleted it would make that test unwritable. */
+       outliving the process: a close that deleted it would make that test unwritable. */
     close: () => running.close(),
     clean() {
       rmSync(dir, { recursive: true, force: true });
@@ -125,7 +125,7 @@ test('a record is a FILE, and it is still there when the process is not', async 
 test('EVERY ROUTE IN THE SHARED TABLE IS WIRED HERE TOO', async () => {
   // A route in one host and not the other is a product that behaves differently depending on where
   // a customer runs it, and nobody finds out until a record moves between them. The server refuses
-  // to start rather than serve a partial surface — this asserts it answers all of them.
+  // to start rather than serve a partial surface: this asserts it answers all of them.
   const s = await server();
   try {
     for (const route of ROUTES) {
@@ -133,7 +133,7 @@ test('EVERY ROUTE IN THE SHARED TABLE IS WIRED HERE TOO', async () => {
         ? await s.call(route.name, { register: 'obligations', fields: { what: 'x' }, spoken: 'obligations#1', patch: {}, note: 'x' })
         : await s.call(`${route.name}?register=obligations&seq=1`);
       /* THE CODE, NOT THE STATUS. `page?slug=nonsense` is a legitimate 404 from a route that IS
-         served, and asserting on the status could not tell that from a route that is not — which is
+         served, and asserting on the status could not tell that from a route that is not, which is
          the whole thing this test exists to catch. `ROUTE_UNKNOWN` is the one signal that means it. */
       assert.notEqual(res.body.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and not served`);
       assert.notEqual(res.status, 405, `${route.name} disagrees with the table about its method`);
@@ -146,7 +146,7 @@ test('EVERY ROUTE IN THE SHARED TABLE IS WIRED HERE TOO', async () => {
 
 test('A HANDLER THAT THROWS IS A 500 WITH A SENTENCE, not a request that never ends', async () => {
   /* This escaped `serveApi` and the caller never wrote a response at all: the socket stayed open,
-     the request hung, and the server then never closed either — one bad argument taking the whole
+     the request hung, and the server then never closed either: one bad argument taking the whole
      process with it. A crash is an answer here like everything else is. */
   const s = await server();
   try {
@@ -210,15 +210,15 @@ test('with a token set, a request without it is refused before it reaches the re
     const ok = await s.call('boot');
     assert.equal(ok.status, 200);
 
-    /* 401 AND NOT 403, and the Worker says the same — which is the parity this assertion was always
+    /* 401 AND NOT 403, and the Worker says the same, which is the parity this assertion was always
        about, at the value both hosts now hold. `49 §5.4` step 1: a credential this record does not
-       know, or none where one is needed, is `UNAUTHORIZED`. `FORBIDDEN` is the other fact — a
-       credential it knows, belonging to somebody who is not on the record — and answering one status
+       know, or none where one is needed, is `UNAUTHORIZED`. `FORBIDDEN` is the other fact (a
+       credential it knows, belonging to somebody who is not on the record) and answering one status
        for both left a client unable to tell which of the two to do something about. */
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
     assert.equal(res.status, 401);
     const none = ((await res.json()) as Answer).refusal;
-    /* AND IT SAYS ONLY `unauthorized` (LCH-C08 job 2, his words "A `401` says only `unauthorized`."), the Worker's one
+    /* AND IT SAYS ONLY `unauthorized` (LCH-C08 job 2), the Worker's one
        401 body: which of the two it was, nothing sent or a credential nobody issued, goes to the log. */
     assert.deepEqual(none, { code: 'UNAUTHORIZED', fix: 'unauthorized' });
 
@@ -311,7 +311,7 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
 
 test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting for a request', async () => {
   // The failure this is about: a self-host switched off over a weekend, whose Monday reminders wait
-  // until somebody happens to touch the record — and then arrive stamped Monday, three days late.
+  // until somebody happens to touch the record, and then arrive stamped Monday, three days late.
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
   const file = join(dir, 'record.sqlite');
   const first = await start({ file, port: 0, pollMs: 0 });
@@ -320,7 +320,7 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     await first.api.create({ register: 'renewals', fields: { what: 'brain.dog', on: day(30) } }, owner);
     assert.ok((await first.scheduler.get()) !== null);
     /* The weekend, as one statement: the REMINDER's time came while nothing was running. Only that
-       row — dragging the weekly analysis back too would make this a test about the analyser. */
+       row: dragging the weekly analysis back too would make this a test about the analyser. */
     first.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'reminder'", new Date(Date.now() - 60_000).toISOString());
   } finally {
     await first.close();
@@ -349,7 +349,7 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
 
 test('A KIND THIS DEPLOYMENT CANNOT DELIVER IS NEVER LEASED, and never dead-letters', async () => {
   /* 49 §5.12 note 1, and it is the whole of the rule: "a kind not in `kinds` is never leased, so it
-     waits in `pending` until the host can serve it — a self-host with no model never dead-letters an
+     waits in `pending` until the host can serve it: a self-host with no model never dead-letters an
      `infer.embed` row." This leased all nine and threw "nothing in this deployment delivers a
      infer.embed" at each one eight times, ending in a `dead` row and a suggestion asking somebody to
      decide about work they had never asked for. Waiting is the honest answer: the day a model is
@@ -358,7 +358,7 @@ test('A KIND THIS DEPLOYMENT CANNOT DELIVER IS NEVER LEASED, and never dead-lett
   const seen: string[] = [];
   const running = await start({
     file: join(dir, 'record.sqlite'),
-    /* PORT 0: THE OS PICKS ONE. This test never speaks HTTP — it is about what the poller leases —
+    /* PORT 0: THE OS PICKS ONE. This test never speaks HTTP (it is about what the poller leases)
        so a number out of the shared counter is a collision waiting for the day a neighbour is slow
        to release its socket. */
     port: 0,
@@ -409,12 +409,12 @@ test('THE DOORBELL DELIVERS, AND A FAILED DELIVERY WALKS THE RECORD\'S LADDER AN
     running.api.kernel.outbox('notify.email', { to: 'p_self', subject: 'Invoice 41' });
     await running.scheduler.wake();
 
-    // The delivery failed, so nothing was sent and a retry is armed — in the record's schedule.
+    // The delivery failed, so nothing was sent and a retry is armed, in the record's schedule.
     assert.deepEqual(sent, []);
     assert.ok(running.api.kernel.pending().nextDueMs !== null, 'a failed delivery armed no retry');
 
     // The retry fires, the job goes back to `pending`, and this time it lands. Its two minutes are
-    // wound forward here rather than waited out — a test that sleeps is slow and flaky in one move.
+    // wound forward here rather than waited out: a test that sleeps is slow and flaky in one move.
     fail = false;
     running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'retry'", new Date(Date.now() - 1_000).toISOString());
     await running.api.kernel.drain(running.scheduler);
@@ -427,15 +427,15 @@ test('THE DOORBELL DELIVERS, AND A FAILED DELIVERY WALKS THE RECORD\'S LADDER AN
   }
 });
 
-test('with no deliverer, jobs queue and wait — which is honest rather than lossy', async () => {
+test('with no deliverer, jobs queue and wait, which is honest rather than lossy', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-'));
   const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
   try {
     running.api.kernel.outbox('notify.email', {});
     await running.scheduler.wake();
     await running.poll();
-    /* THE ROW IS KEPT AND THE BELL IS SILENT. A job with no deliverer waits — that is honest, and
-       it is still there when one arrives — but ringing about it on every write afterwards is a
+    /* THE ROW IS KEPT AND THE BELL IS SILENT. A job with no deliverer waits (that is honest, and
+       it is still there when one arrives) but ringing about it on every write afterwards is a
        queue message and a lease pass that claims nothing, for the life of the record. */
     assert.equal(running.api.kernel.pending().queued, true, 'a job vanished with nothing to deliver it');
     assert.equal(running.api.kernel.pending().outboxPending, false, 'the doorbell rang about work nobody can do');
@@ -449,10 +449,10 @@ test('NOTHING A REQUEST CAN DO ENDS THE PROCESS', async () => {
   /* `void answer(…)` discarded the promise and `answer` had no `catch`, so one throw was an
      unhandled rejection and Node exited. The first throw is BEFORE any authentication:
      `new Request(url, { body })` refuses a body on a GET, so a `GET /api/boot` carrying a
-     Content-Length killed the server — and with a token set it binds every interface. */
+     Content-Length killed the server, and with a token set it binds every interface. */
   const s = await server();
   try {
-    /* A RAW SOCKET, because `fetch` refuses to SEND a GET with a body — which is the same rule that
+    /* A RAW SOCKET, because `fetch` refuses to SEND a GET with a body, which is the same rule that
        made `new Request(url, { body })` throw inside the server. The bytes have to go over the wire
        for the server to meet them. */
     await new Promise<void>((done) => {
@@ -473,7 +473,7 @@ test('NOTHING A REQUEST CAN DO ENDS THE PROCESS', async () => {
 
 test('and a shared secret with a dot in it is still a shared secret', async () => {
   /* `includes('.')` is how this tells an agent token from the one shared secret, and a secret like
-     `s3cr3t.v2` took the agent branch, failed `verifyToken`, and refused — locking the owner out of
+     `s3cr3t.v2` took the agent branch, failed `verifyToken`, and refused, locking the owner out of
      their own machine with a 401 that explains nothing. */
   const s = await server('s3cr3t.v2');
   try {

@@ -1,5 +1,5 @@
 /**
- * Free on the Worker's billing doors (DIRECTION §35): checkout with `plan: 'free'` makes a record on the Directory's
+ * Free on the Worker's billing doors: checkout with `plan: 'free'` makes a record on the Directory's
  * `free` plan with no Stripe call and no billing row, one a person; the list names it; and a free record is upgraded by
  * paying for it, which the webhook turns into its first row and its paid plan. A paid plan cancelled goes back to Free
  * when the record fits it, and lapses when it does not.

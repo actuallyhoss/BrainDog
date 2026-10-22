@@ -10,7 +10,7 @@
  * is paid for on one of them, and its allowance follows the plan it pays for. A switch is confirmed on Stripe's own page
  * and takes effect when it is confirmed; the webhook moves the record's plan when Stripe says the subscription changed.
  *
- * AND FREE BESIDE THEM, WHICH NOTHING SELLS (DIRECTION §35, "Free leads"). Checkout with `plan: 'free'` for a new name
+ * AND FREE BESIDE THEM, WHICH NOTHING SELLS ("Free leads"). Checkout with `plan: 'free'` for a new name
  * makes the record there and then, with no Stripe call and no billing row, on the Directory's `free` allowance; one free
  * record a person. A free record is upgraded by paying for it on Cloud or Cloud Plus, which is checkout with its `record`.
  *
@@ -18,10 +18,10 @@
  * theirs. It stays writable and leaves the delete ladder alone; its row keeps the Stripe customer and loses the
  * subscription, which is how the list, checkout and the portal tell it apart. A record with colleagues, or an owner who
  * already has a free record, goes read-only and onto the ladder as before. This is a DEFAULT TAKEN FOR THE OWNER
- * (DIRECTION §35, "Free leads"): he has not ruled on it, and `fitsFree` below is the one place to change it.
+ * ("Free leads"): he has not ruled on it, and `fitsFree` below is the one place to change it.
  *
  * PACKS OF SLASH CREDITS ARE SOLD BESIDE THE PLANS (LCH-A10, "more is bought as credit packs rather than priced by the
- * ask", D33.34): paid once, for any record its owner is signed in to, Free included. A pack makes no subscription and
+ * ask"): paid once, for any record its owner is signed in to, Free included. A pack makes no subscription and
  * writes no billing row; the webhook adds its credits to the Directory's ledger once, and a refund takes back the rest.
  *
  * A GIFT (`comp`, LCH-A12) IS A ROW NO STRIPE EVENT MOVES: it has no customer and no subscription, never lapses, is
@@ -1005,7 +1005,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
 
   /**
    * A paid plan cancelled, for a record that fits Free: back on Free, writable, and off the ladder. DEFAULT TAKEN FOR THE
-   * OWNER (DIRECTION §35): a person who stops paying keeps what Free gives them instead of losing it in ninety days.
+   * OWNER: a person who stops paying keeps what Free gives them instead of losing it in ninety days.
    *
    * IN THE WEBHOOK'S ORDER: the lapse switch (off, for a record already lapsed by an unpaid card), then the plan, then
    * the row last. The row keeps its customer, so the upgrade pays as the same Stripe customer, and loses its

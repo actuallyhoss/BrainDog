@@ -4,7 +4,7 @@
  * THE VAULT CANNOT HOLD ITS OWN KEY. `12 §6` states it as the reason this file is in the host and
  * not in the kernel: reading the vault needs the KEK, so the safe cannot hold what opens it. The
  * record holds sealed bytes and the fingerprint of what wrapped them, and has no way to open
- * either — `vault.ts` performs no crypto at all, deliberately. `secret-grep` is red on a key that
+ * either: `vault.ts` performs no crypto at all, deliberately. `secret-grep` is red on a key that
  * reaches a log, and now on the names THIS file uses: it looked only for `plaintext`, `plainText`,
  * `decrypted` and `secretValue`, none of which appears here, so the claim in this header was true of
  * a vocabulary nothing in the repository speaks.
@@ -20,14 +20,14 @@
  * heap snapshot for the life of the process.
  *
  * AND THE WRAPPING IS BOUND TO WHAT IT WRAPS. AES-256-GCM with the record id and the purpose as
- * additional data — `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`, `12 §6` and `47 §4.6` byte for byte —
+ * additional data (`utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`, `12 §6` and `47 §4.6` byte for byte),
  * so a `connector` key lifted into the `signing` row does not open, and a key copied from another
  * record does not open at all. A wrapping that is not bound is a wrapping that can be moved.
  */
 
 import { randomBytes } from 'node:crypto';
 /* THE TYPE NAMES COME FROM NODE, NOT FROM THE DOM. `tsconfig.base.json` sets `lib: ["es2024"]` and no
-   `dom`, deliberately — a package that can name `document` is a package that can reach for it. So
+   `dom`, deliberately: a package that can name `document` is a package that can reach for it. So
    `crypto.subtle` is there as a value on `globalThis` while `CryptoKey` and `CryptoKeyPair` are types
    only `node:crypto` declares, and this is a type-only import that erases to nothing. */
 import type { webcrypto } from 'node:crypto';
@@ -62,7 +62,7 @@ export type { KeyStore };
 const KEK_BYTES = 32;
 const NONCE_BYTES = 12;
 
-/** `0x1F`, the unit separator — a byte no identifier contains, so the two halves cannot run together. */
+/** `0x1F`, the unit separator: a byte no identifier contains, so the two halves cannot run together. */
 const SEP = 0x1f;
 
 /**
@@ -92,7 +92,7 @@ function keyBytes(file: string, say: (line: string) => void): Uint8Array {
  * nothing, and minting one would put a second root key on the disk for no row to use.
  */
 function heldBytes(file: string, say: (line: string) => void): Uint8Array {
-  /* STAT BEFORE READ, AND IT MUST BE A FILE. `readFileSync` on a FIFO blocks for ever — `init`
+  /* STAT BEFORE READ, AND IT MUST BE A FILE. `readFileSync` on a FIFO blocks for ever: `init`
      hangs with no output, no timeout and no sentence, which is the one failure mode worse than a
      refusal. A directory throws `EISDIR` from three frames down. Both are one `isFile()` away. */
   const stat = statSync(file);
@@ -101,7 +101,7 @@ function heldBytes(file: string, say: (line: string) => void): Uint8Array {
 
   /* THE MODE IS CHECKED WHERE IT MEANS SOMETHING. On POSIX a group- or world-readable key file is
      the key being readable, and `49 §4.4` refuses to boot. On Windows the bit is advisory and the
-     ACL is the real permission, so a refusal there would be about nothing — `49 §4.4` says the check
+     ACL is the real permission, so a refusal there would be about nothing: `49 §4.4` says the check
      is skipped AND LOGGED ONCE, and it used to claim that in a comment while printing nothing. */
   if (process.platform === 'win32') say(`  key file mode is not checked on Windows; ${file} is protected by its ACL`);
   else {
@@ -119,7 +119,7 @@ function heldBytes(file: string, say: (line: string) => void): Uint8Array {
   }
 
   /* THE BUFFER THAT CAME OFF DISK IS THE ONE THAT HAS TO GO. `new Uint8Array(buffer)` COPIES, so
-     zero-filling the copy left the original untouched — and `readFileSync` of a 32-byte file
+     zero-filling the copy left the original untouched, and `readFileSync` of a 32-byte file
      allocates out of Node's shared 8 KiB pool, so the root key stayed in memory that
      `Buffer.allocUnsafe` hands to the next caller. `49 §8`'s "read once" was true of the wrong
      array. */
@@ -187,7 +187,7 @@ function mint(file: string): void {
   }
 }
 
-/** The first 18 hex of SHA-256 — `34 §5`, and 72 bits is a fingerprint rather than a name. */
+/** The first 18 hex of SHA-256, `34 §5`, and 72 bits is a fingerprint rather than a name. */
 async function fingerprint(raw: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', raw);
   return [...new Uint8Array(digest)]
@@ -280,7 +280,7 @@ export async function offeredId(store: KeyStore, wrapping: string | null): Promi
   return (await store.current()).kekId;
 }
 
-/** `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)` — `12 §6`, `47 §4.6`. */
+/** `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`, `12 §6`, `47 §4.6`. */
 export function aad(record: string, purpose: Purpose): Uint8Array {
   const id = new TextEncoder().encode(record);
   const what = new TextEncoder().encode(purpose);
@@ -295,7 +295,7 @@ export function aad(record: string, purpose: Purpose): Uint8Array {
  * Wrap one key for one record and one purpose.
  *
  * A FRESH NONCE EVERY TIME. AES-GCM with a repeated nonce under one key leaks the XOR of the two
- * plaintexts and the authentication key with it — it is the one way to use this cipher that is worse
+ * plaintexts and the authentication key with it: it is the one way to use this cipher that is worse
  * than not using it, and twelve random bytes per wrap is what stops it.
  */
 export async function wrap(store: KeyStore, record: string, purpose: Purpose, plain: Uint8Array): Promise<WrappedKey> {
@@ -310,8 +310,8 @@ export async function wrap(store: KeyStore, record: string, purpose: Purpose, pl
 }
 
 /**
- * And back. `null` rather than a throw, because every way this fails is one fact — these bytes do
- * not open under this key — and the caller's answer to all of them is the same refusal.
+ * And back. `null` rather than a throw, because every way this fails is one fact (these bytes do
+ * not open under this key) and the caller's answer to all of them is the same refusal.
  */
 export async function unwrap(store: KeyStore, record: string, purpose: Purpose, sealed: WrappedKey): Promise<Uint8Array | null> {
   const key = await store.byId(sealed.kek_id);
@@ -362,7 +362,7 @@ export function rootKeysOf(store: KeyStore, record: string): RootKeys {
  *
  * NARROWED, NOT CAST. The same call makes a symmetric key for one algorithm name and a keypair for
  * another, so its type is the union of both and `Ed25519` is the caller's knowledge rather than the
- * compiler's. A cast would be telling the compiler; this is showing it — and if a future Node ever
+ * compiler's. A cast would be telling the compiler; this is showing it, and if a future Node ever
  * returns something else for this name, the refusal is a sentence rather than a `TypeError` three
  * frames away in `exportKey`.
  */
@@ -373,12 +373,12 @@ function isPair(k: webcrypto.CryptoKeyPair | webcrypto.CryptoKey): k is webcrypt
 /**
  * The three a record is created with. `49 §5.22` step 4, `12 §6`, `03 §4`.
  *
- * TWO RANDOM AND ONE GENERATED. The record and connector DEKs are 32 random bytes — they encrypt
+ * TWO RANDOM AND ONE GENERATED. The record and connector DEKs are 32 random bytes: they encrypt
  * and nothing verifies them, so there is nothing to generate. The signing key is Ed25519 and is a
  * KEYPAIR, of which only the private half is stored: `03 §4` computes `key_id` from the public half
  * and `dog_sig` carries it in the file, and both are derivable from PKCS#8 at the moment of signing.
- * Returning it here would be handing back a value with nowhere to go — the record has no column for
- * it and nothing signs yet — and a returned value nobody stores is the shape of a thing that looks
+ * Returning it here would be handing back a value with nowhere to go (the record has no column for
+ * it and nothing signs yet) and a returned value nobody stores is the shape of a thing that looks
  * finished and is not.
  *
  * ALL THREE AT CREATION, not on first use. `12 §6`: "sign-up generates all three keys". A key made
@@ -399,7 +399,7 @@ export async function recordKeys(
   const pair = generated;
   const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
 
-  /* THE TWO DEKS ARE ZERO-FILLED TOO. They are wrapped and then nothing here needs them again — the
+  /* THE TWO DEKS ARE ZERO-FILLED TOO. They are wrapped and then nothing here needs them again: the
      record opens them through the vault, under the KEK, when it has something to seal. */
   const dekRecord = new Uint8Array(randomBytes(KEK_BYTES));
   const dekConnector = new Uint8Array(randomBytes(KEK_BYTES));
@@ -419,8 +419,8 @@ export async function recordKeys(
  * `0600` on a file SQLite or somebody else made. Advisory on Windows, and not worth refusing over.
  *
  * IT SWALLOWED EVERYTHING, INCLUDING THE CASES THAT ARE THIS COMMAND'S FAULT. Both call sites are
- * files `init` has just made, and a `chmod` that failed left `directory.sqlite` — every person on
- * the installation, by address — at `0666 & ~umask` with nothing said and exit 0. `EPERM` on a file
+ * files `init` has just made, and a `chmod` that failed left `directory.sqlite` (every person on
+ * the installation, by address) at `0666 & ~umask` with nothing said and exit 0. `EPERM` on a file
  * somebody else owns is theirs to permission; anything else is worth one line.
  */
 export function lockDown(file: string, say: (line: string) => void = () => {}): void {

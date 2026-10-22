@@ -1,5 +1,5 @@
 /**
- * The site knows you are signed in (LAUNCH 103 job 9, DIRECTION §48): a small cookie a page can read, set beside the
+ * The site knows you are signed in (LAUNCH 103 job 9): a small cookie a page can read, set beside the
  * session and cleared with it, so `brain.dog` draws "Open BrainDog" in place of "Start free" and "Sign in" before it
  * paints (`/signed-in.js` reads it and sets `html[data-in]`).
  *

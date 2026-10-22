@@ -13,7 +13,7 @@
  *
  * READS ARE PUBLIC AND CARRY NO CORS HEADER: the index, a published file, its preview and the install counts are what a
  * self-host and the command line fetch, and the site reads them on its own origin, so no answer here opens itself to a
- * page on another one (his rule, no CORS anywhere). A PUBLISHED FILE IS THE ONE ANSWER A CACHE MAY KEEP. A version
+ * page on another one (the rule: no CORS anywhere). A PUBLISHED FILE IS THE ONE ANSWER A CACHE MAY KEEP. A version
  * is published once and never changes, so it is served `immutable`; everything else this file answers, the index and
  * every refusal included, is `no-store`, as every other answer from this Worker is.
  *

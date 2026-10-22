@@ -3,12 +3,12 @@
  *
  * EVERY OTHER TEST OF THIS PATH STUBS THE HALF IT IS NOT TESTING. `packages/connect` runs against a
  * recorder that accepts any page, and `packages/kernel` writes pages a test typed out by hand. Both
- * suites can be green while the seam between them is wrong — a page shaped one way and a writer
+ * suites can be green while the seam between them is wrong: a page shaped one way and a writer
  * expecting another, an extractor that returns minor units to a register that wants major ones.
  * This is the one test where a scripted provider's bytes reach an actual register through both.
  *
- * THE RUNNER NOW EXISTS AND THIS FILE PREDATES IT. `src/connector.ts` leases nothing itself — the
- * kernel does that and hands a `Paged` across — but it is what turns one into a `runPull` call. The
+ * THE RUNNER NOW EXISTS AND THIS FILE PREDATES IT. `src/connector.ts` leases nothing itself (the
+ * kernel does that and hands a `Paged` across) but it is what turns one into a `runPull` call. The
  * hand-wiring below is kept deliberately: it drives `runPull` with a payload typed out in full, so
  * a change to `PullPayload` that the real runner silently satisfies still fails here.
  */
@@ -78,11 +78,11 @@ const DECL = {
 };
 
 /**
- * The same connector, answered in CSV — `42 §4.7`'s `format`, which had no reader anywhere.
+ * The same connector, answered in CSV: `42 §4.7`'s `format`, which had no reader anywhere.
  *
  * NO `expect:`, NO CURSOR AND NO `more:`, and that is the rule rather than this test being small: a
  * CSV page has rows and no document, so `declare` refuses those keys beside a non-JSON format. What
- * is left — `page_number`, which stops on an empty page — is what a CSV export can actually answer.
+ * is left (`page_number`, which stops on an empty page) is what a CSV export can actually answer.
  */
 const CSV_DECL = {
   ...DECL,
@@ -133,7 +133,7 @@ const charge = (id: string, amount: number, created: number): Record<string, unk
 /* ── The wiring the runner will do ───────────────────────────────────────────────────────────── */
 
 /**
- * `42 §4.7`'s four non-JSON formats, read — the same line `pagedRunner` hands down.
+ * `42 §4.7`'s four non-JSON formats, read: the same line `pagedRunner` hands down.
  *
  * WRITTEN OUT HERE BECAUSE THE WIRING BELOW IS. This file drives `runPull` by hand on purpose, so
  * anything the real runner supplies has to be supplied here too or the hand-wiring stops being a
@@ -219,7 +219,7 @@ test('a provider answers two pages and the register holds three rows, in the mon
   assert.equal(out.rows, 3);
 
   /* MINOR UNITS ALL THE WAY THROUGH. The provider sends piastres, the mapper keeps piastres and the
-     register stores piastres — and a conversion quietly applied at any one of the three seams is a
+     register stores piastres, and a conversion quietly applied at any one of the three seams is a
      figure wrong by a factor of a hundred, in the direction nobody checks. */
   assert.deepEqual(
     rows(sql).map((r) => [r.ref, JSON.parse(r.paid) as unknown]),
@@ -280,7 +280,7 @@ test('the same window run twice writes its rows once', async () => {
  * THE WHOLE PATH, WITH NOBODY HOLDING IT TOGETHER BY HAND.
  *
  * Every test above calls `runPull` directly with a payload typed out in this file. This one starts
- * where a real pass starts — a due schedule row — and asserts that the register filled. Between the
+ * where a real pass starts (a due schedule row) and asserts that the register filled. Between the
  * two are the parts no other test covers together: the kernel firing the schedule, leasing the row
  * and deciding it is a connector rather than one request; `pagedRunner` turning that decision into
  * a `runPull` call with this host's socket; and the record metering what came back.
@@ -335,7 +335,7 @@ test('A DUE CONNECTOR FILLS ITS REGISTER through the host runner, and the pass c
  *
  * `holding` wraps the EXECUTOR, and the connector runner is not the executor: the pass hands a
  * `Paged` straight to it. So for one pass this allowance had a hole exactly the shape of the
- * expensive kind — a record at its monthly limit was held for `call`, `poll` and a one-request
+ * expensive kind: a record at its monthly limit was held for `call`, `poll` and a one-request
  * `pull`, and its paging connectors, which make more requests than anything else, ran on.
  */
 test('A HELD RECORD FETCHES NOTHING, and the row goes back rather than staying leased', async () => {
@@ -434,7 +434,7 @@ test('A CSV PROVIDER REACHES THE REGISTER, through both halves and in the money 
   /* THE WHOLE CHAIN, WHICH IS THE POINT OF THIS FILE. `42 §4.7` has given `fetch.read` a `format`
      since it was written and no half of the repository read one: `connect` parsed every body as
      JSON at step 6.5, and the record's extractor answered *not JSON* if anything got past it. A
-     bank that exports CSV — which is most of them — could be declared, installed, fetched, and
+     bank that exports CSV (which is most of them) could be declared, installed, fetched, and
      never read a row. */
   const { k, sql } = await record();
   const acked: Acked = {};

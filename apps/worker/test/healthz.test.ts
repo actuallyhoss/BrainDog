@@ -36,7 +36,7 @@ const touched: string[] = [];
 const trap = (name: string) =>
   new Proxy({}, { get: (_, key) => { touched.push(`${name}.${String(key)}`); throw new Error(`${name} was reached for /healthz`); } });
 
-/* PRODUCTION'S SHAPE ON 8 OCTOBER: open, no bot check keyed, billing off (DIRECTION §42), and what `signUp()` needs
+/* PRODUCTION'S SHAPE ON 8 OCTOBER: open, no bot check keyed, billing off, and what `signUp()` needs
    before the switch is asked: a 32-character session key, the public address, a sending address and the mail binding. */
 const LAUNCH_ENV = {
   SIGNUP: 'open',

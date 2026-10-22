@@ -486,10 +486,47 @@ export function inward(request: Request, ctx: CallContext): Request {
   const inner = new Request(request);
   /* AND WHAT AN AGENT SAYS ABOUT ITS RUN, checked here, on every door: the record reads the hints of a
      token's call and ignores anybody else's, so a person is never a run whichever door they used. */
-  inner.headers.set('x-braindog-ctx', JSON.stringify(withSession(ctx, sessionOf(request.headers))));
+  const text = JSON.stringify(withSession(ctx, sessionOf(request.headers)));
+  /* A CONTEXT PAST THE CAP IS NOT SENT AT ALL (sharing plan §2.13, T13). Its size rides on its own header, and the
+     record answers it with `CTX_TOO_LARGE` rather than a caller it could not read. */
+  const bytes = bytesOf(text);
+  if (bytes > CTX_HEADER_MOST) {
+    inner.headers.delete(CTX_HEADER);
+    inner.headers.set(CTX_OVER_HEADER, String(bytes));
+  } else {
+    inner.headers.set(CTX_HEADER, text);
+    inner.headers.delete(CTX_OVER_HEADER);
+  }
   inner.headers.delete('authorization');
   return inner;
 }
+
+/** The header the caller's context rides on from this Worker to the record. */
+export const CTX_HEADER = 'x-braindog-ctx';
+/** The header saying a context was too large to send, with its size in bytes. A caller's own copy is overwritten. */
+export const CTX_OVER_HEADER = 'x-braindog-ctx-over';
+
+/**
+ * THE MOST BYTES A CALLER'S CONTEXT TAKES ON THE HOP (sharing plan §2.13: at most 8 KB for the largest template set,
+ * refused above 32 KB). Every list a lens names travels in it, with its rule and its hidden fields, so a person held by
+ * many narrow shares is the one who reaches it. Past it the record answers this sentence and reads nothing.
+ */
+export const CTX_HEADER_MOST = 32 * 1024;
+export const CTX_TOO_LARGE = 'This is more than one person\'s sharing can hold. Ask an owner to join some of these shares.';
+
+/**
+ * Why the context on this request cannot be read, or `null` when it can: too large on the hop, or past the cap as it
+ * arrived. Asked by the record before it parses the header, so a header nobody capped is never parsed.
+ */
+export function ctxOversize(headers: Headers): { code: 'OUT_OF_BOUNDS'; fix: string; at: string } | null {
+  const said = headers.get(CTX_OVER_HEADER);
+  const text = headers.get(CTX_HEADER);
+  if (said === null && (text === null || text.length <= CTX_HEADER_MOST)) return null;
+  if (said === null && text !== null && bytesOf(text) <= CTX_HEADER_MOST) return null;
+  return { code: 'OUT_OF_BOUNDS', fix: CTX_TOO_LARGE, at: 'share' };
+}
+
+const bytesOf = (text: string): number => new TextEncoder().encode(text).length;
 
 /**
  * What one ingest path may spend in a minute, and how many distinct paths are counted at once.

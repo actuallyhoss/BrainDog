@@ -94,7 +94,7 @@ async function stack() {
     run: (spoken: string) => read<Row | null>(`/api/get?spoken=${spoken}`),
     runs: () => running.sql.all<{ seq: number }>("SELECT seq FROM entry WHERE register = 'session' ORDER BY seq").map((r) => r.seq),
     /**
-     * A write token of the owner's. A new agent starts at Ask (DIRECTION §37), so its writes are filed as questions;
+     * A write token of the owner's. A new agent starts at Ask, so its writes are filed as questions;
      * `trusted` names the kinds it writes at Do and tell, as `seedLadder` keeps them for a token that wrote before the
      * ladder, for the tests that are about the run and not the rung.
      */
@@ -162,7 +162,7 @@ test('AN AGENT’S FIRST WRITE THROUGH THE SELF-HOST IS SIGNED S1, and its next 
 test('A NEW AGENT’S FIRST WRITE ASKS, and the question is still signed by the run it opens, S1', async () => {
   const s = await stack();
   try {
-    /* Nothing seeded: a token minted now starts at Ask for every kind (DIRECTION §37). */
+    /* Nothing seeded: a token minted now starts at Ask for every kind. */
     const token = await s.mint();
     const said = { ...HERE, 'x-braindog-client': 'claude-run-1' };
     const out = await s.post(s.bearer(token), 'create', { register: 'tasks', fields: { what: 'One' } }, said);

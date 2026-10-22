@@ -1,7 +1,7 @@
 /**
- * Asking for an invitation, and the operator's three doors that answer it (the owner, 17 October: "make it invite
- * only, and i can invite through admin.brain.dog (you only know it's invite only when you click sign up, and you can
- * apply)").
+ * Asking for an invitation, and the operator's three doors that answer it (since 17 October sign-up is invite only:
+ * the owner invites through admin.brain.dog, a person only learns it is invite only on pressing sign up, and anyone
+ * can apply).
  *
  * `POST /auth/apply` IS A STRANGER'S, and is answered only while sign-up is by invitation: `{ name, email, use?, link?,
  * turnstile? }` keeps one application per address in the Directory (`apply.submit`) and answers `{}` whether it was new,

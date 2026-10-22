@@ -17,6 +17,7 @@ export function capFor(pathname: string): number | null {
   const rest = app !== null && /^\/+api(?:\/|$)/.test(app.rest) ? app.rest : pathname;
   if (/^\/+api\/+files(?:\/|$)/.test(rest)) return null;
   if (/^\/+api\/+import\/*$/.test(rest)) return BODY_MOST.import.bytes;
+  if (/^\/+api\/+sealedPut\/*$/.test(rest)) return BODY_MOST.sealed.bytes;
   if (/^\/+api\/+seen\/*$/.test(rest)) return BODY_MOST.seen.bytes;
   if (/^\/+api\/+vault(?:\/|$)/.test(rest)) return BODY_MOST.vault.bytes;
   if (/^\/+api\/+[^/]/.test(rest)) return BODY_MOST.api.bytes;

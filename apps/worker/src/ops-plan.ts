@@ -12,7 +12,7 @@
  * at all, as a record nobody paid for. When it does not fit, nothing changes and the answer says why in one sentence.
  * The plan moves first and the row goes last, so a call cut between the two leaves a gift that is still marked as one.
  *
- * IT MAILS NOBODY AND FILES NOTHING. A gift is the operator's word to the owner, said however he says it; the record
+ * IT MAILS NOBODY AND FILES NOTHING. A gift is the operator's word to the owner, said however the operator says it; the record
  * learns its new plan as any plan change reaches it (`Record$.planMoved`, inside `setPlan`).
  *
  * GUARDED AS `/account/ops/invite` IS: 404 with no `PROVISION_KEY`, 401 naming the header on a wrong key or none, the

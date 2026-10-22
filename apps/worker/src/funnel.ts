@@ -1,6 +1,6 @@
 /**
  * `GET /account/ops/funnel`: the last eight weeks of the way in, a week to a line, for the Funnel section of
- * admin.brain.dog (DIRECTION §47, LAUNCH 103 job 9).
+ * admin.brain.dog (LAUNCH 103 job 9).
  *
  * SIX STEPS, EACH READ WHERE IT IS ALREADY KEPT. Visits, applications, invites used, people and records made are the
  * Directory's, answered as week totals by `funnel.read`. A record's first agent and first brief are the record's own

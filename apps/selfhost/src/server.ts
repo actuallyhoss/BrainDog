@@ -2,7 +2,7 @@
  * The self-host: one Node process, one file, the same record.
  *
  * IT IS NOT A CUT-DOWN VERSION. `01-ARCHITECTURE` §4 makes the self-host the same code as the hosted
- * product with a different storage adapter underneath — the packages are identical, and everything
+ * product with a different storage adapter underneath: the packages are identical, and everything
  * in this file is the two things a platform actually differs on: where the bytes live, and how a
  * request arrives. If a route ever appears here and not in the Worker, one of them is a different
  * product.
@@ -56,6 +56,7 @@ import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
 import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
+import { diskSealed } from './sealed.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, leavesAsked, leftBy, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
@@ -145,7 +146,7 @@ export function openSqlite(path: string): Sql & { close(): void } {
 /** The `Sql` port over `node:sqlite`, as the driver answers it. `openSqlite` puts the guard in front. */
 function openDriver(path: string): Sql & { close(): void } {
   /* FOREIGN KEYS OFF, and it is not a preference. `node:sqlite` defaults this ON and a Durable
-     Object leaves SQLite's default OFF — so `decision.supersedes REFERENCES decision(id)` is
+     Object leaves SQLite's default OFF, so `decision.supersedes REFERENCES decision(id)` is
      enforced here and nowhere else, which is a behavioural fork between the two hosts on the write
      path. The DDL's own comment beside that column says "documentary; not enforced".
      DEFENSIVE OFF, pinned for the same reason: Node 26 turns it on by default and 24.13 does not, and under it the
@@ -220,7 +221,7 @@ function slashLedger(dir: string): string {
  * permission check below this line is the same code. `contextFor`, further down, is the order.
  */
 /**
- * THE ONE 401 BODY (LCH-C08 job 2, his words "A `401` says only `unauthorized`.", P.154), the Worker's exactly: a
+ * THE ONE 401 BODY (LCH-C08 job 2, P.154): a `401` says only `unauthorized`, the Worker's body exactly. A
  * credential this record does not know (`49 §5.4` step 1) and none at all where one is needed answer the same, and which
  * of the two it was goes to the log.
  */
@@ -248,19 +249,19 @@ const endedOf = (ended: { owner: string | null } | null): Refusal | null => (end
  *
  * IT IS NOT THE CALLER'S FAULT AND THE SENTENCE SAYS SO. Answering 403 "this credential does not
  * reach this record" to an operator holding the right shared secret, on loopback, is the least
- * actionable thing this server can say — the credential is perfect and the record is the problem.
+ * actionable thing this server can say: the credential is perfect and the record is the problem.
  * `49 §5.1` step 5.3 calls a record that cannot be brought up `sick`, with a `{ code, fix }`, at 503.
  */
 /**
  * `RECORD_UNAVAILABLE`, AND THE NAME IT REPLACES WAS ANSWERING THE WRONG QUESTION AT THE WRONG STATUS.
  *
- * This said `SCHEMA_UNAVAILABLE`, which was never about a schema — no migration is involved, no
+ * This said `SCHEMA_UNAVAILABLE`, which was never about a schema: no migration is involved, no
  * checksum, no `user_version`. The word was borrowed from `SCHEMA_MISMATCH` and `SCHEMA_NEWER`
  * because those two are the codes `httpStatus` maps to 503, and a name chosen to look like a
  * neighbour is a name that teaches the wrong thing (`10 §7`).
  *
  * AND IT DID NOT EVEN GET THE STATUS. `SCHEMA_UNAVAILABLE` was in no registry and therefore in no
- * row of `host`'s `NOT_422`, so this answered **422** — *fix your input* — to a caller whose input
+ * row of `host`'s `NOT_422`, so this answered **422** (*fix your input*) to a caller whose input
  * was perfect and whose record was the problem. `49 §5.1` step 5.3 says 503 in as many words, and
  * the sentence above about "the same function the Worker uses" was true and was reading a table
  * with no row for this. `30 §6` now carries the code and `NOT_422` carries the 503 with it.
@@ -410,7 +411,7 @@ function forged(request: Request, origins: ReadonlySet<string>): boolean {
 /**
  * WHAT WAS ACTUALLY PRESENTED, and `undefined` when that is nothing.
  *
- * `headers.get` RETURNS `''` FOR A HEADER WITH NO VALUE, and `'' !== undefined` — so a bare
+ * `headers.get` RETURNS `''` FOR A HEADER WITH NO VALUE, and `'' !== undefined`, so a bare
  * `Authorization:` line read as a credential. That is one byte, and it walked straight through the
  * check that had just been added to stop exactly this: a request carrying nothing minted an owner
  * bearer that works from anywhere for thirty days. `Authorization: Bearer` did it too, because the
@@ -642,7 +643,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
 /**
  * What delivers one outbox job. The self-host's whole outbound surface, in one function.
  *
- * A record makes no outbound call, so somebody has to — and on a self-host that somebody is this
+ * A record makes no outbound call, so somebody has to, and on a self-host that somebody is this
  * process, after the transaction committed. It returns nothing on success and throws on failure,
  * because the retry ladder is the record's and a deliverer that decided its own retries would be the
  * second ladder [09-ALARMS] spends a paragraph forbidding.
@@ -1002,8 +1003,8 @@ export type Started = Awaited<ReturnType<typeof start>>;
  * the earliest pending row or not set at all. The Worker gets that from the platform and this gets
  * it from a timer, and the code above the port cannot tell.
  *
- * `wake()` IS NOT A NO-OP HERE. An earlier way of thinking about this made it one — the poller
- * shares the process, so what is there to wake? — and that is exactly wrong: sharing a process is
+ * `wake()` IS NOT A NO-OP HERE. An earlier way of thinking about this made it one (the poller
+ * shares the process, so what is there to wake?) and that is exactly wrong: sharing a process is
  * not being woken, and a job that waits fifteen seconds for the next tick when the record already
  * knows it is there is fifteen seconds of latency nobody chose.
  */
@@ -1070,7 +1071,7 @@ export async function start(options: {
   token?: string | undefined;
   /**
    * Which interface to listen on. Defaults to loopback when there is no token, `0.0.0.0` when there
-   * is — because "no token" means "one person on one machine", and one machine is `127.0.0.1`.
+   * is, because "no token" means "one person on one machine", and one machine is `127.0.0.1`.
    */
   host?: string | undefined;
   /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
@@ -1078,7 +1079,7 @@ export async function start(options: {
   /**
    * The host's key store. `33 §1` port 8, `49 §2`'s `HostDeps.keys`.
    *
-   * WITHOUT IT THIS RECORD'S EXPORTS ARE UNSIGNED, and `41 §5.11` step 3 will not import one —
+   * WITHOUT IT THIS RECORD'S EXPORTS ARE UNSIGNED, and `41 §5.11` step 3 will not import one,
    * which is exactly what the state was: `init` wrote three `vault_key` rows and no running process
    * ever opened the KEK, so the rows existed and nothing could use them. Optional, because a test
    * that only wants the routes should not have to mint a key file.
@@ -1221,23 +1222,23 @@ export async function start(options: {
          * What this deployment can actually deliver, and the deliverer that does it.
          *
          * THE TWO TRAVEL TOGETHER BECAUSE THE LIST IS A PROPERTY OF THE DELIVERER. This leased all
-         * nine kinds and handed each row to whatever function it was given — so a self-host with no
+         * nine kinds and handed each row to whatever function it was given, so a self-host with no
          * model leased its `infer.embed` rows, threw "nothing in this deployment delivers a
          * infer.embed" at each of them eight times, and dead-lettered them into a fault about work
          * they never asked for. 49 §5.12 note 1 says the opposite in
          * as many words: "a kind not in `kinds` is never leased, so it waits in `pending` until the
-         * host can serve it — a self-host with no model never dead-letters an `infer.embed` row",
+         * host can serve it: a self-host with no model never dead-letters an `infer.embed` row",
          * and §9 has the test.
          *
-         * A LIST THAT COULD BE OMITTED WOULD DEFAULT TO ONE OF THE TWO FAILURES — deliver nothing
-         * silently, or dead-letter everything loudly — so it cannot be omitted. The Worker states
+         * A LIST THAT COULD BE OMITTED WOULD DEFAULT TO ONE OF THE TWO FAILURES: deliver nothing
+         * silently, or dead-letter everything loudly, so it cannot be omitted. The Worker states
          * the same list as `DELIVERS` and has always leased only that.
          */
         delivers: readonly OutboxKind[];
         deliver: Deliver;
       }
     | {
-        /** Omit both and nothing is delivered — jobs queue and wait, which is honest rather than lossy. */
+        /** Omit both and nothing is delivered: jobs queue and wait, which is honest rather than lossy. */
         delivers?: undefined;
         deliver?: undefined;
       }
@@ -1303,7 +1304,7 @@ export async function start(options: {
     const at = dirOf(options.file);
     /* EITHER NAME IS THE RECORD'S OWN. `record.dog` is what an installation made before the
        whole-record file was called `record.brain` still holds, and its directory is as much its own
-       as a new one's — so removing the record removes the directory in both cases, or a self-host
+       as a new one's, so removing the record removes the directory in both cases, or a self-host
        that predates the rename leaks a directory nothing will ever open again. */
     const own =
       ['record.brain', 'record.dog'].includes(baseOf(options.file)) &&
@@ -1557,7 +1558,7 @@ export async function start(options: {
   /**
    * Lease, deliver, ack. One pass.
    *
-   * ONE PASS AND NOT A LOOP, because the ack rings the doorbell again when anything is left — so a
+   * ONE PASS AND NOT A LOOP, because the ack rings the doorbell again when anything is left, so a
    * queue that keeps filling is drained by the doorbell rather than by a `while` nobody can stop.
    */
   const poll = async (): Promise<void> => {
@@ -1644,13 +1645,13 @@ export async function start(options: {
   };
 
   const scheduler = nodeScheduler(run, poll);
-  /* WHAT THIS PROCESS CAN ACTUALLY DELIVER. With no `deliver`, nothing leaves — jobs queue and
-     wait, which is honest — and the doorbell should not ring about them on every write. */
+  /* WHAT THIS PROCESS CAN ACTUALLY DELIVER. With no `deliver`, nothing leaves (jobs queue and
+     wait, which is honest) and the doorbell should not ring about them on every write. */
   /**
    * The signer, resolved THE FIRST TIME SOMETHING EXPORTS and not before.
    *
    * IT CANNOT BE BUILT HERE. It needs the record's own id, and `record` is a table the migration
-   * makes — which happens inside `createRecordApi`, three lines down. Reading it first threw
+   * makes, which happens inside `createRecordApi`, three lines down. Reading it first threw
    * `no such table: record` on any file this process was the first to open.
    *
    * AND LAZY IS THE BETTER SHAPE ANYWAY, not a workaround: it means the KEK unwraps the record's
@@ -1679,6 +1680,8 @@ export async function start(options: {
   const buildApp = options.build ?? env.BRAINDOG_BUILD ?? '';
   /* THE CATALOGUE NAMED, or the one bundled in the built shell when none is. */
   const catalogueDir = catalogueFolder(options.catalogue, options.shell);
+  /* WHERE THE RECORD'S FILES ARE KEPT, and its sealed files in `sealed/` inside: `null` for a record held in memory. */
+  const blobs = blobsFolder(options.file);
   api = await createRecordApi({
     sql,
     clock,
@@ -1758,6 +1761,9 @@ export async function start(options: {
     catalogueShelf: catalogueShelfFrom(catalogueDir, options.kennel),
     snapshots: kept,
     destroy,
+    /* SEALED FILES' BYTES, IN `blobs/sealed/` BESIDE THE RECORD'S FILES (`sealed.ts`). A record held in memory has no
+       folder, so it keeps none and says so. */
+    ...(blobs === null ? {} : { sealed: diskSealed(blobs) }),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
@@ -1814,7 +1820,7 @@ export async function start(options: {
   );
 
   /* THE BELT UNDER THE DOORBELL. A lost wake costs latency and never a job, because the row is still
-     `pending` — and this tick is what makes that true. It is also what recovers a lease abandoned by
+     `pending`, and this tick is what makes that true. It is also what recovers a lease abandoned by
      a process that died holding it. */
   const ticker = options.pollMs === 0 ? null : setInterval(() => void poll(), options.pollMs ?? 15_000);
   ticker?.unref?.();
@@ -1856,20 +1862,20 @@ export async function start(options: {
   await api.kernel.tail(scheduler);
 
   /* LOOPBACK UNLESS THERE IS A TOKEN. `listen(port)` with no host binds every interface, and the
-     no-token case above hands `p_self` at `owner` to whoever asks — so a self-host started with no
+     no-token case above hands `p_self` at `owner` to whoever asks, so a self-host started with no
      `BRAINDOG_TOKEN`, which is the documented way to start one, served the credential index and the
      whole export to anything that could reach the machine. The two decisions are only safe
      together: no token means one person on one machine, and one machine is `127.0.0.1`.
 
      A deployment that wants a wider bind says so by setting a token, which is the same sentence
-     read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between — a
+     read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between: a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
   const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
   const trustProxy = options.trustProxy === true;
   /* SET THE MOMENT THE PORT IS KNOWN, and nothing is answered before: see below. */
   let site: Site | null = null;
   /* NOTHING A REQUEST CAN DO ENDS THE PROCESS. `void answer(…)` discarded the promise and `answer`
-     had no `catch`, so one throw was an unhandled rejection and Node exited — and the first throw is
+     had no `catch`, so one throw was an unhandled rejection and Node exited, and the first throw is
      before any authentication: `new Request(url, { body })` refuses a body on a GET, so a `GET
      /api/boot` with a `Content-Length` killed the server. A client aborting mid-body did the same.
      The Worker never had this: workerd turns a throw into a 500.
@@ -2531,9 +2537,9 @@ async function answer(
     if (leaving && out.status === 200) for (const person of leftBy(await out.clone().json().catch(() => null))) site.leave(person);
     return write(res, out, seen.cookie);
   }
-  /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
+  /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts:
      a credential nobody minted, a credential belonging to somebody who is not on the record, and a
-     record with no owner who may act — so a client could not tell which of the three to do something
+     record with no owner who may act, so a client could not tell which of the three to do something
      about. `httpStatus` is the same function the Worker uses, which is what keeps one record from
      behaving differently depending on where it runs. */
   if ('refused' in seen) {

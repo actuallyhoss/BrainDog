@@ -13,8 +13,8 @@
  * schema is the right one, and the difference is not a rounding error. At `11 §3`'s catalogue
  * prices, read 2026-08-31, per million tokens:
  *
- *   `llama-3.2-1b`   $0.027 in / $0.201 out   triage, digest prose
- *   `glm-5.3-flash`  $0.150 in / $0.500 out   anything that emits structure over a projection
+ *   `llama-3.2-1b`   $0.027 in / $0.201 out   triage
+ *   `glm-5.3-flash`  $0.150 in / $0.500 out   anything that emits structure over a projection, digest prose
  *   `glm-5.3`        $1.400 in / $4.400 out   NOT CARRIED HERE
  *
  * `glm-5.3` is 9.3 times the input price and 8.8 times the output price of `glm-5.3-flash`, for
@@ -162,8 +162,15 @@ const tokensIn = (text: string): number => Math.ceil(new TextEncoder().encode(te
  */
 const NO_SUCH_MODEL = /no such model|model not found|not a valid model|unknown model/iu;
 
-/** A throw the model itself gave (overloaded, rate limited, a 5xx): another route to the same model would say the same, so none is tried. */
-const MODEL_SIDE = /\b(?:429|50\d)\b|overload|capacity|rate.?limit/iu;
+/**
+ * A throw the model itself gave (overloaded, rate limited): another route to the same model would say the same, so none
+ * is tried.
+ *
+ * A 5XX IS NOT ONE OF THEM. It was, and a gateway answering 502 or 504 is the gateway, which is the one failure the two
+ * later paths exist for: the call was thrown at once and the binding without the gateway, and REST, were never asked.
+ * A 5xx that was the model's after all costs one more call that fails the same way.
+ */
+const MODEL_SIDE = /\b429\b|overload|capacity|rate.?limit/iu;
 
 const sayOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -347,9 +354,15 @@ const readAnswer = (shape: Shape, raw: unknown): Read => {
   const tokens = (reported !== null && typeof reported === 'object' ? reported : {}) as Record<string, unknown>;
   const usage: Usage = { in: count(tokens['prompt_tokens']), out: count(tokens['completion_tokens']), neurons: null };
 
+  /* `response` IS AN OBJECT, NOT A STRING, WHEN THE PLATFORM HONOURED `response_format`: Workers AI's JSON mode hands the
+     parsed value back (its own example answers `"response": { "name": "India", ... }`). Read as a string only, every
+     schema-pinned answer on this shape became `''` and was refused as "not JSON at all", so a digest's prose on
+     `llama-3.2-1b` was set aside on every call the model answered. Written back as JSON here, it is parsed and checked
+     below like any other answer. */
   if (shape === 'text') {
     const response = answer['response'];
-    return { text: typeof response === 'string' ? response : '', usage, cutOff: null };
+    const text = typeof response === 'string' ? response : response !== null && typeof response === 'object' ? JSON.stringify(response) : '';
+    return { text, usage, cutOff: null };
   }
 
   const choices = answer['choices'];

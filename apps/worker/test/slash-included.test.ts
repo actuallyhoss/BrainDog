@@ -5,10 +5,10 @@
  * and `SLASH_ENDPOINT` empty a probe answered `"no model"`: `/api/version` said `slash: false` on the Cloud and
  * the palette drew no Slash row, while the binding sat declared in both environments.
  *
- * DARK UNTIL HE SAYS SO, AND THE BINDING IS NOT THE SWITCH. It is easy to read `ai` as still to be bound,
+ * DARK UNTIL THE OPERATOR SAYS SO, AND THE BINDING IS NOT THE SWITCH. It is easy to read `ai` as still to be bound,
  * and it is not: `wrangler.jsonc` binds `AI` in alpha and in production, and `deploy.yml` deploys production on every green
- * `ci` on `master`. Keyed on the binding alone, the commit carrying this file would have started spending his account's
- * Workers AI at its first deploy. So the included model needs `SLASH_INCLUDED` set to `yes` as well, a var no environment
+ * `ci` on `master`. Keyed on the binding alone, the commit carrying this file would have started spending the operator's
+ * account's Workers AI at its first deploy. So the included model needs `SLASH_INCLUDED` set to `yes` as well, a var no environment
  * declares, and the first case below is the state `wrangler.jsonc` ships.
  *
  * THE BINDING IS A LOCAL FUNCTION AND SO IS THE ENDPOINT. No test here spends a neuron or leaves the machine.

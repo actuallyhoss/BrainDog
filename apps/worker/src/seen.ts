@@ -1,6 +1,6 @@
 /**
  * `POST /api/seen`: one visit to a page of the site, counted by the day, the page and where the visitor came from, and
- * nothing else (DIRECTION §47, LAUNCH 103 job 9).
+ * nothing else (LAUNCH 103 job 9).
  *
  * THE SITE SENDS IT, AND ONLY THE SITE. `apps/site/static/seen.js` posts `{ p: location.pathname, r: <referrer host> }`
  * with `credentials: 'omit'`, so no cookie comes with it, and sends nothing at all under Global Privacy Control.
