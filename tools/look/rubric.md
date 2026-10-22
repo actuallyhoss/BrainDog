@@ -1,8 +1,8 @@
 # Reading a look
 
 What the reading agent checks on every picture of a look, and how it writes `read.json` (the shape is
-`read.schema.json`). The loop's integrator reads the same pictures again and signs. Those two readings are DIRECTION
-36's "looked at by an agent" and "by the loop".
+`read.schema.json`). The integrator reads the same pictures again and signs. A look counts as read only once both
+readings are in.
 
 ## Before the pictures
 

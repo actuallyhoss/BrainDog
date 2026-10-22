@@ -1,6 +1,6 @@
 /**
  * The plans and the credit packs, made in Stripe from the one table (LCH-A10 job 5, `loop/scope/area-launch-a.md:698-738`;
- * "include the credits/usages offered on the plans", D33.8).
+ * "include the credits/usages offered on the plans").
  *
  *   pbpaste | node tools/ops/stripe-setup.mjs [--live-ok]
  *
@@ -20,8 +20,8 @@
  * (`stripeOf` in `apps/worker/src/stripe.ts`) and nowhere else. The one line that names it says its mode and its last
  * four characters, and a failure is Stripe's status, type and code, never its message.
  *
- * TEST MODE ONLY UNTIL HE SAYS (DIRECTION §42: "charging money is a separate word"). A live key is refused with nothing
- * sent unless `--live-ok` is given, and that flag is his to type in the one live sitting (LCH-A14).
+ * TEST MODE ONLY: charging money is a separate decision. A live key is refused with nothing sent unless `--live-ok`
+ * is given, and that flag is the owner's to type in the one live sitting (LCH-A14).
  */
 
 import { fileURLToPath } from 'node:url';

@@ -111,7 +111,7 @@ test('a yes is taken from a drawing only while the board and what it governs are
     assert.deepEqual(yes.images, images);
     assert.deepEqual(Object.keys(yes.paths), ['packages/skin/house.css']);
     assert.ok(Object.hasOwn(yes.drawn, 'stand-ins/timeline.json'));
-    assert.throws(() => yesOf(root, 'today', drawing, { said: ' ' }), /holds his words/u);
+    assert.throws(() => yesOf(root, 'today', drawing, { said: ' ' }), /holds the words said/u);
     assert.throws(() => yesOf(root, 'frame', drawing, { said: 'yes' }), /of the today board/u);
     put(root, 'packages/skin/house.css', ':root { --x: 1; }\n');
     assert.throws(() => yesOf(root, 'today', drawing, { said: 'yes' }), /packages\/skin\/house\.css changed since this drawing/u);

@@ -32,7 +32,7 @@ import { answers } from '../gates/record.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(here, '..', '..');
 
-/** The three sets of screens `screens.mjs` names: his six, section 39's nine, and every route. */
+/** The three sets of screens `screens.mjs` names: the walk's six, the acceptance nine, and every route. */
 export const SETS = ['six', 'nine', 'all'];
 
 /** Where a look writes when `--out` is not given, and the only place a source that counts as seen may write. */

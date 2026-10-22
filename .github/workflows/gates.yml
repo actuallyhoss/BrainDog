@@ -224,19 +224,19 @@ jobs:
         id: browser-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-${{ steps.browser.outputs.version }}
+          key: ms-playwright-chromium-webkit-${{ runner.os }}-${{ steps.browser.outputs.version }}
 
-      # CHROMIUM ONLY: the browser gates ask for `chromium` and nothing else, and installing
-      # the other two is 300 MB nothing opens (52 §10 records the deliberate ceiling). A skipped
+      # CHROMIUM AND WEBKIT: layout and a11y run both (the Mac app draws with Safari's engine); firefox
+      # is not opened (52 §10 records the ceiling). A skipped
       # cache step has no `cache-hit` output, so on the self-hosted runner this is the step that runs.
       - if: steps.browser-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       # The cache holds the browser, never the system libraries it links against: those live in
       # the image, and a restored cache with no `install-deps` is a browser that exits before it
       # renders a page.
       - if: steps.browser-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium webkit
 
       # THE ONE BUILD, AFTER THE CHECKOUT, AND THE ORDER IS LOAD-BEARING. `run.mjs` and `bundle`
       # refuse a build older than the newest source by file time, so the build has to be newer than

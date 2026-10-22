@@ -172,7 +172,7 @@ test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still ow
   const green = expect.offer(seen, MARIAM);
   assert.equal(green.pass, true, green.saw);
   assert.match(green.saw, /Orders says "6 orders this month/u);
-  /* THE HEAD WRITES EGP AS EVERY OTHER PLACE DOES, "EGP 1,350", never "E£1,350" (his word, 9 October). */
+  /* THE HEAD WRITES EGP AS EVERY OTHER PLACE DOES, "EGP 1,350", never "E£1,350" (the house rule since 9 October). */
   assert.equal(expect.offer({ ...seen, lead: lead.replace('EGP ', 'E£') }, MARIAM).pass, false);
 
   const red = expect.offer({ ...seen, early: [offer], late: [], weeks: 2, thisWeek: 3 }, MARIAM);

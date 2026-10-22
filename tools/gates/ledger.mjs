@@ -4,19 +4,19 @@
  *   node tools/gates/ledger.mjs [root]
  *
  * THE ENTRY SCRIPT'S NUMBER WAS RAISED TWELVE TIMES WITH A SENTENCE EACH, AND NOTHING CHECKED THE SENTENCE. The gate
- * failed above a second number in `budgets.json`, and every re-record added a paragraph to one comment string. His words
- * were "Don't raise gate budgets" (HD.549) and "don't change gates to make them pass" (HD.550). `ledger.json` now holds
+ * failed above a second number in `budgets.json`, and every re-record added a paragraph to one comment string. The rules
+ * are that gate budgets are not raised (HD.549) and gates are not changed to make them pass (HD.550). `ledger.json` now holds
  * every number a gate is held to, with a dated line for each change, and this gate reads it:
  *
  *   - BUDGETS. Every number in `budgets.json` equals the newest line of its entry (a budget, or a debt that names the
  *     key). A `ceiling` line higher than the one before, or a `floor` line lower, is red unless `by` quotes the owner:
- *     a passage in double quotes that stands word for word in `loop/DIRECTION.md`.
+ *     a passage in double quotes that stands word for word in the owner's untracked notes (`loop/DIRECTION.md`).
  *   - DEBTS. A debt's newest line higher than the one before is red. A debt owed against a budget prints the budget,
  *     what is owed, and the newest reason.
  *   - HELD LISTS. Each is `<gate>.<EXPORT>`, read off the gate's own module. Larger than its newest line is red; smaller
  *     is red too, until a line records the fall. A line higher than the one before is red unless `by` quotes the owner,
- *     as a ceiling's is: on 16 October he was asked whether to hold or rename what three gates found, and answered
- *     "Hold them, deploy tonight" (DIRECTION 44), and a held list had no way to take his word. A gate that does not
+ *     as a ceiling's is: on 16 October what three gates found was held rather than renamed ("Hold them, deploy
+ *     tonight"), and a held list had no way to take that word. A gate that does not
  *     export the list yet is counted as a debt and said, never red.
  *   - NUMBERS IN A GATE FILE. A number above 1 written in `tools/gates/*.mjs` or a gate's parts one level down, and not read from `budgets.json`, is a
  *     finding. Today's are debts, one per file, written up front: more than the newest line is red, fewer is said.
@@ -138,12 +138,12 @@ const filled = (s) => typeof s === 'string' && s.trim() !== '';
 const valueOf = (line) => line.at ?? line.count;
 
 /**
- * The passages `by` quotes, in straight or curly double quotes, of four words or more. TWO WORDS FOUND ANYWHERE IN HIS
- * DIRECTION, "the gate", let any ceiling rise and stayed green (gates-ledger-43 checker, P5): a quote is a sentence of his.
+ * The passages `by` quotes, in straight or curly double quotes, of four words or more. TWO WORDS FOUND ANYWHERE IN THE
+ * OWNER'S NOTES, "the gate", let any ceiling rise and stayed green (gates-ledger-43 checker, P5): a quote is a whole sentence.
  */
 const FOUR_WORDS = /\S+\s+\S+\s+\S+\s+\S/u;
 const quotesOf = (by) => [...String(by ?? '').matchAll(/["“]([^"”]+)["”]/gu)].map((m) => m[1].trim()).filter((q) => FOUR_WORDS.test(q));
-/** Whether `by` quotes the owner: a passage that stands word for word in his direction. */
+/** Whether `by` quotes the owner: a passage that stands word for word in the owner's notes. */
 export const quotesOwner = (by, direction) => quotesOf(by).some((q) => direction.includes(q));
 
 /** A line's shape, said in one sentence each. Lines are dated, in date order, each with its number and its reason. */
@@ -209,7 +209,7 @@ export function judge(book, budgets, measured, direction = '') {
       for (const [before, line] of moves(entry, opened, KINDS[entry.kind]))
         if (!quotesOwner(line.by, direction))
           findings.push(
-            `  ${name}: the ${entry.kind} moved from ${valueOf(before)} to ${valueOf(line)} on ${line.on}, and \`by\` quotes no words of the owner's. "Don't raise gate budgets" (HD.549).`,
+            `  ${name}: the ${entry.kind} moved from ${valueOf(before)} to ${valueOf(line)} on ${line.on}, and \`by\` quotes no words of the owner's. Gate budgets are not raised (HD.549).`,
           );
   }
 
@@ -220,7 +220,7 @@ export function judge(book, budgets, measured, direction = '') {
     if (!filled(debt.owes)) findings.push(`  ${name}: a debt says which area owes it, in \`owes\`.`);
     if (filled(debt.key) === filled(debt.file)) findings.push(`  ${name}: a debt names one budgets.json \`key\` or one gate \`file\`, not ${filled(debt.key) ? 'both' : 'neither'}.`);
     for (const [before, line] of moves(debt, opened, UP))
-      findings.push(`  ${name}: the debt rose from ${valueOf(before)} to ${valueOf(line)} on ${line.on}. A debt only falls; "Don't raise gate budgets" (HD.549).`);
+      findings.push(`  ${name}: the debt rose from ${valueOf(before)} to ${valueOf(line)} on ${line.on}. A debt only falls; gate budgets are not raised (HD.549).`);
     if (filled(debt.file)) {
       counted.add(debt.file);
       const count = measured.literals.get(debt.file);
@@ -319,8 +319,8 @@ export default async function ledger(root = process.env.BRAINDOG_GATE_ROOT ?? RE
   for (const f of [...new Set(findings)]) console.error(f);
   console.error(
     `\n  ledger: ${tally}, ${findings.length} finding(s).\n` +
-      '  A budget never rises and a held list only shrinks. His words: "Don\'t raise gate budgets" (HD.549),\n' +
-      '  "don\'t change gates to make them pass" (HD.550).',
+      '  A budget never rises and a held list only shrinks: gate budgets are not raised (HD.549),\n' +
+      '  and gates are not changed to make them pass (HD.550).',
   );
   return 1;
 }

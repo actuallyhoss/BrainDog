@@ -107,7 +107,7 @@ test('secret-grep reads a pack script', () => {
 
 /**
  * A PACK SITS ABOVE THE WHOLE ORDER AND IS NOT A ROW OF IT. The core importing a pack is the core
- * knowing a use case by name, which section 22 refuses; a pack reaching into a package through a
+ * knowing a use case by name, which the core never does; a pack reaching into a package through a
  * relative path is the escape layer 3 exists for, whoever does it. And a pack needs no rank in
  * `31 §2`, so asking for one would have been a finding per pack with no repair but a table row
  * that means nothing.

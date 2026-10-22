@@ -3,7 +3,7 @@
  *
  *   node tools/gates/no-transcript.mjs [root]
  *
- * HIS WORD WAS "transcripts never read". Every hook event Claude Code sends names the session's transcript in
+ * TRANSCRIPTS ARE NEVER READ. Every hook event Claude Code sends names the session's transcript in
  * `transcript_path`, a file holding every word of the conversation and every file the agent opened, and the hooks
  * are handed it after every tool call now that the beat runs there (`apps/cli/src/beat.ts`). Nothing reads it today
  * (`eventOf` takes the session and the folder alone), and nothing failed if something started to. This is that failure.

@@ -34,9 +34,9 @@ Written, not run on his record. It opens a restored copy of a record, never the 
 `performance.mark` and `performance.measure`, so the cost can be read per phase. No phase marks exist in `briefing()`
 yet; add them there before this reports phases.
 
-It refuses without `--approved`. That flag means he said yes in the app to restoring a copy. The copy comes from the
-migration-rehearsal path (`apps/cli/scripts/migration-rehearsal.mjs`, `restore-drill.mjs`). Do not run it on his record,
-and do not point it at a file that is his live database.
+It refuses without `--approved`. That flag means the owner said yes in the app to restoring a copy. The copy comes from the
+migration-rehearsal path (`apps/cli/scripts/migration-rehearsal.mjs`, `restore-drill.mjs`). Do not run it on the owner's record,
+and do not point it at a file that is a live database.
 
 ## Targets
 

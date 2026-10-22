@@ -25,7 +25,7 @@ const put = (root, f, text) => {
 };
 
 const HEAD = '| Ruling | The question | The ruling | Why | Taken | Whose | Meets | Held by |\n|---|---|---|---|---|---|---|---|\n';
-const line = (id, held) => `| ${id} | Q? | R. | W. | 9 October 2026 | the loop's call | no | ${held} |\n`;
+const line = (id, held) => `| ${id} | Q? | R. | W. | 9 October 2026 | by default | no | ${held} |\n`;
 const page = (lines) => `# 04 · Packs\n\n## 8 · Before\n\ntext\n\n## 9 · Rulings\n\nWords.\n\n${HEAD}${lines.join('')}\n---\n\n*Next*\n`;
 
 /** A tree whose page writes 438 and 441, each held by a passing test. */

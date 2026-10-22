@@ -208,10 +208,10 @@ const GATES = [
      every version in the catalogue of the released commit is still there once, with its checksum, size and date, and
      no file of one moved. A new version is cut beside it. It reads history, so a shallow checkout is red. */
   ['catalogue-immutable', call(join(here, 'catalogue-immutable.mjs'))],
-  /* AND A DRAWN BOARD SHIPS ONLY WITH HIS YES (EXP-A02): a page, specimen, variant, stand-in or pick changed after his
-     yes needs it again, and a yes that misses a width, a theme or a pick is red. */
+  /* AND A DRAWN BOARD SHIPS ONLY WITH ITS YES (EXP-A02): a page, specimen, variant, stand-in or pick changed after its
+     yes needs a new one, and a yes that misses a width, a theme or a pick is red. */
   ['board-yes', call(join(here, 'board-yes.mjs'))],
-  /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10, his "transcripts never read"): a hook or package naming transcript_path or opening a client's session folder. */
+  /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10: transcripts are never read): a hook or package naming transcript_path or opening a client's session folder. */
   ['no-transcript', call(join(here, 'no-transcript.mjs'))],
   /* AND NO AGENT APP'S LOGIN IS NAMED (docs/48 §8): Claude Code's keychain item or file, the claude.ai login, or Codex's
      file, anywhere but a refusal list the gate names. */
@@ -268,6 +268,10 @@ const GATES = [
      self-host and judges the drawn rail and Today (no tour, nobody in People but them, no empty place, one "New page").
      No browser and no build: the walk draws the web's own source. It judges nothing itself; the command does. */
   ['first-screen', call(join(here, 'first-screen.mjs'))],
+  /* HOW FAST NINE SCREENS DRAW (PRF perf): first paint, drawn, from the kept copy and a revisit, at 390 and 1440, on the
+     gates' record with no wait added, each the middle of a few opens and held to the ceilings in budgets.json. Its own
+     ephemeral port, for the reason passkey has one. */
+  ['perf', call(join(here, 'perf.mjs'))],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The thirty above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to

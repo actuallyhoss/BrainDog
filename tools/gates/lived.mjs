@@ -14,7 +14,7 @@
  * TWO PROFILES, ONE BUILDER. `fixtures/shapes/default.json` is a record left untended, and its vital signs read red for
  * the reasons a real one's do; `lived-well.json` is the same weeks tended, and they read green
  * (`test/lived.test.mjs`). A profile is round counts and switches only. No value in either comes from a real record, and
- * nothing here names one: what the default profile gets wrong, any record can get wrong (DIRECTION 27).
+ * nothing here names one: what the default profile gets wrong, any record can get wrong.
  *
  * CACHED BY WHAT MAKES IT. The file is kept under a hash of the profile's bytes, the documents it installs, the source
  * of the packages it runs through and this builder, so a second run with nothing changed opens the file and builds

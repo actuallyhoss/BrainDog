@@ -324,7 +324,7 @@ export async function projectFor(r, folder, name, maker) {
   if (!list) return { refused: 'the record keeps no projects, so a run has nowhere to be placed' };
   const got = await r.ask('create', { register: list.register, fields: { [list.title]: name, [list.folders]: [folder] } }, { client_id: maker });
   if (got.refused !== undefined) return { refused: `the record refused the folder's project: ${lastLine(got.refused).slice(0, 160)}` };
-  /* A KEY AT ASK FILES THE PROJECT AS A QUESTION (DIRECTION 37), and a check never answers its own question: the
+  /* A KEY AT ASK FILES THE PROJECT AS A QUESTION, and a check never answers its own question: the
      placing and the write read "not run" with the reason, never a failure of the rule and never green. */
   if (got.value?.filed)
     return { refused: 'the key asks before it adds a project, and its question waits on Decide, so the folder has no project; hand the check a key the record trusts to add projects', asked: true };

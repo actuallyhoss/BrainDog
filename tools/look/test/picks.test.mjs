@@ -36,7 +36,7 @@ test('every pick of the frame reads, with its default one of its options and eve
   assert.deepEqual(Object.keys(drawn).sort(), ['size-12/thirteen', 'status/fill', 'tile-heading/seventeen']);
   assert.deepEqual(slots.filter((s) => s.shown).map((s) => s.pick), ['frame', 'red', 'size-12', 'status', 'tile-heading']);
   assert.equal(slots.find((s) => s.pick === 'frame').taken, 'DIRECTION 42');
-  assert.ok(!slots.some((s) => s.pick === 'blue' || s.pick === 'site-accent'), 'DIRECTION 42 took red, so no blue pick is asked');
+  assert.ok(!slots.some((s) => s.pick === 'blue' || s.pick === 'site-accent'), 'red was taken, so no blue pick is asked');
 });
 
 test('each sheet drawn on the specimen reaches a part the renderer draws, so its pictures differ from the look as it stands', () => {
@@ -72,7 +72,7 @@ test('a slot that does not read is refused by its file, never dropped from the p
   }
 });
 
-test('a pick left blank takes its default and says so; a choice is his; one DIRECTION took is said as taken', () => {
+test('a pick left blank takes its default and says so; a choice is the owner\'s; one taken elsewhere is said as taken', () => {
   const slots = [
     { pick: 'status', default: 'dot', options: [{ id: 'dot' }, { id: 'fill' }], taken: null },
     { pick: 'red', default: 'late-over-error', options: [{ id: 'late-over-error' }, { id: 'late-only' }], taken: null },
@@ -179,7 +179,7 @@ test('the specimen goes in through the record\'s own door and every block draws'
   }
 });
 
-test('his yes carries every pick beside the hashes, and is refused for a drawing of code that moved', async () => {
+test('the yes carries every pick beside the hashes, and is refused for a drawing of code that moved', async () => {
   const root = mkdtempSync(join(tmpdir(), 'picks-yes-'));
   try {
     put(root, 'packages/skin/house.css', ':root {}\n');
@@ -208,7 +208,7 @@ test('it takes dark, draw, page and yes, and refuses a yes with no words or no d
   assert.deepEqual(parseArgs(['dark']), { command: 'dark', picks: [], seen: false });
   assert.deepEqual(parseArgs(['yes', 'yes to it', '--from', 'd', '--pick', 'status=fill', '--seen']), { command: 'yes', picks: ['status=fill'], seen: true, said: 'yes to it', from: 'd' });
   assert.equal(parseArgs(['draw', '--source=seed']).source, 'seed');
-  assert.throws(() => parseArgs(['yes', '--from', 'd']), /holds his words/u);
+  assert.throws(() => parseArgs(['yes', '--from', 'd']), /holds the words said/u);
   assert.throws(() => parseArgs(['page']), /needs --from/u);
   assert.throws(() => parseArgs(['draw', '--pick', 'a=b']), /does not take --pick/u);
   assert.throws(() => parseArgs(['blue']), /takes dark, draw, page or yes/u);

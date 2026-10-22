@@ -1,20 +1,20 @@
 /**
- * `board-yes`: a screen is not restyled without a board he said yes to (EXP-A01, rule 7 of the experience area).
+ * `board-yes`: a screen is not restyled without a board with a yes (EXP-A01, rule 7 of the experience area).
  *
  *   node tools/gates/board-yes.mjs [root]
  *
- * SECTION 39 WAS BUILT WITH NO PICTURE ANYBODY SAID YES TO (DIRECTION 1190), and nothing could have stopped it: the
+ * THE LOOK WAS BUILT WITH NO PICTURE ANYBODY SAID YES TO, and nothing could have stopped it: the
  * boards were eleven static files outside the repository. A board is now a folder, `design/boards/<board>/`, drawn by
- * the product's own renderer (`tools/look/board.mjs`), and its `yes.json` holds his words and the hashes of what he
- * saw. This gate reads every board folder and holds three things:
+ * the product's own renderer (`tools/look/board.mjs`), and its `yes.json` holds the words of the yes and the hashes of
+ * what was seen. This gate reads every board folder and holds three things:
  *
  *   * A GOVERNED PATH THAT CHANGED. `paths.json` names the source the board governs (globs). `yes.json`'s `paths` holds
  *     each governed file's sha256 as it was when the board was drawn. A governed file whose hash is not that one, or
- *     that his yes never named, changed without a board he said yes to, and that is red.
- *   * A YES WITH NO PICTURES. `yes.json` names one image hash for each width and theme it says he saw. Fewer is a yes
+ *     that its yes never named, changed without a board with a yes, and that is red.
+ *   * A YES WITH NO PICTURES. `yes.json` names one image hash for each width and theme it says were seen. Fewer is a yes
  *     to something nobody can point at, and that is red too.
  *   * A BOARD THAT DRIFTED. `drawn` holds the hash of each of the board's own files (`page.dog`, `skin.css`,
- *     `variants/*`, `stand-ins/*`). One edited after his yes is not the board he said yes to.
+ *     `variants/*`, `stand-ins/*`). One edited after its yes is not the board the yes was given to.
  *
  * A BOARD WITH NO `yes.json` GOVERNS NOTHING YET, so the gate starts quiet and tightens board by board. A board with a
  * `yes.json` and no `paths.json` holds only its own drift. `board`, `units` and `said` are what `loop/tools/plan.mjs`
@@ -41,8 +41,8 @@ export const WIDTHS = [390, 1440, 1512, 1728];
 export const THEMES = ['light', 'dark'];
 
 /**
- * A board's own files, which are what he saw drawn: the page, the sample page, the skin patch, the variants, the
- * stand-ins and each pick's slot and sheets, so a sample page or a pick edited after his yes needs his yes again.
+ * A board's own files, which are what was seen drawn: the page, the sample page, the skin patch, the variants, the
+ * stand-ins and each pick's slot and sheets, so a sample page or a pick edited after its yes needs a new yes.
  */
 export const DRAWN = /^(?:page\.dog|specimen\.dog|skin\.css|variants\/[^/]+\.(?:css|dog)|stand-ins\/[^/]+\.json|picks\/[^/]+\/(?:slot\.json|[^/]+\.css))$/u;
 
@@ -158,7 +158,7 @@ export function judge(root, board, files) {
   const dir = join(root, at);
   const said = readJson(join(dir, 'yes.json'));
   if (said.fix === 'is missing') return { governs: 0, findings: [] };
-  if (said.value === undefined) return { governs: 0, findings: [`  ${at}/yes.json  ${said.fix}, so this screen has no board he said yes to.`] };
+  if (said.value === undefined) return { governs: 0, findings: [`  ${at}/yes.json  ${said.fix}, so this screen has no board with a yes.`] };
   const yes = said.value ?? {};
   const findings = [];
   const pathsRead = readJson(join(dir, 'paths.json'));
@@ -168,43 +168,43 @@ export function judge(root, board, files) {
   const now = standing(root, board, files);
   const governs = Object.keys(now.paths).length;
   const nowords = typeof yes.said !== 'string' || yes.said.trim() === '';
-  if (nowords) findings.push(`  ${at}/yes.json  holds no words of his in said, so this screen has no board he said yes to.`);
+  if (nowords) findings.push(`  ${at}/yes.json  holds no words in said, so this screen has no board with a yes.`);
   /* `board` AND `units` ARE WHAT THE PLANNER COUNTS (`loop/tools/plan.mjs` `readYes`): a yes that names neither holds
      every unit waiting on it for good, so it is said here rather than found a batch later. */
   if (typeof yes.board !== 'string' || yes.board.trim() === '' || !Array.isArray(yes.units) || yes.units.some((u) => typeof u !== 'string'))
     findings.push(`  ${at}/yes.json  names no board or no list of units, so the planner cannot count this yes. Take it again with board.mjs --yes.`);
   if (yes.seen !== undefined && typeof yes.seen !== 'boolean')
-    findings.push(`  ${at}/yes.json  says seen is ${JSON.stringify(yes.seen)}, and seen is true once he has looked at the pictures, false until then.`);
+    findings.push(`  ${at}/yes.json  says seen is ${JSON.stringify(yes.seen)}, and seen is true once the pictures have been looked at, false until then.`);
   const widths = Array.isArray(yes.widths) && yes.widths.length > 0 ? yes.widths : WIDTHS;
   const themes = Array.isArray(yes.themes) && yes.themes.length > 0 ? yes.themes : THEMES;
   /* EVERY WIDTH AND BOTH THEMES A BOARD IS DRAWN AT: a yes that says it saw fewer would need fewer pictures, and a yes
      to the laptop alone is no yes to the phone. */
   const short = [...WIDTHS.filter((w) => !widths.includes(w)), ...THEMES.filter((t) => !themes.includes(t))];
   if (short.length > 0)
-    findings.push(`  ${at}/yes.json  was not taken at ${short.join(', ')}, so this screen has no board he said yes to: draw it at every width in both themes and take the yes from the drawing.`);
+    findings.push(`  ${at}/yes.json  was not taken at ${short.join(', ')}, so this screen has no board with a yes: draw it at every width in both themes and take the yes from the drawing.`);
   const need = widths.length * themes.length;
   const have = imagesNamed(yes.images);
   if (have < need)
-    findings.push(`  ${at}/yes.json  names ${have} image hash(es) for ${widths.length} width(s) and ${themes.length} theme(s), so this screen has no board he said yes to: draw it and take the yes from the drawing.`);
+    findings.push(`  ${at}/yes.json  names ${have} image hash(es) for ${widths.length} width(s) and ${themes.length} theme(s), so this screen has no board with a yes: draw it and take the yes from the drawing.`);
   const hashes = yes.paths !== null && typeof yes.paths === 'object' ? yes.paths : {};
   for (const [file, hash] of Object.entries(now.paths)) {
     if (hashes[file] === hash) continue;
-    const how = hashes[file] === undefined ? 'is governed by it and his yes never named it' : 'changed since he said yes to it';
+    const how = hashes[file] === undefined ? 'is governed by it and its yes never named it' : 'changed since its yes';
     findings.push(
-      `  ${file}  ${how} (the ${board} board), so this screen has no board he said yes to. ` +
-        `Draw it with node tools/look/board.mjs ${board} and take his yes, which writes the new hashes to ${at}/yes.json.`,
+      `  ${file}  ${how} (the ${board} board), so this screen has no board with a yes. ` +
+        `Draw it with node tools/look/board.mjs ${board} and take the yes again, which writes the new hashes to ${at}/yes.json.`,
     );
   }
-  /* A FILE HIS YES NAMED THAT IS GONE is a change to the screen as much as an edit is. */
+  /* A FILE ITS YES NAMED THAT IS GONE is a change to the screen as much as an edit is. */
   for (const file of Object.keys(hashes)) {
     if (Object.hasOwn(now.paths, file) || !now.patterns.some((p) => globRe(p).test(file))) continue;
-    findings.push(`  ${file}  is gone, and his yes to the ${board} board named it, so this screen has no board he said yes to.`);
+    findings.push(`  ${file}  is gone, and the yes to the ${board} board named it, so this screen has no board with a yes.`);
   }
   const was = yes.drawn !== null && typeof yes.drawn === 'object' ? yes.drawn : {};
   for (const file of new Set([...Object.keys(now.drawn), ...Object.keys(was)])) {
     if (was[file] === now.drawn[file]) continue;
-    const how = now.drawn[file] === undefined ? 'is gone, and his yes named it' : was[file] === undefined ? 'was added after his yes' : 'was edited after his yes';
-    findings.push(`  ${at}/${file}  ${how}, so it is not the board he said yes to. A board changed after its yes needs his yes again.`);
+    const how = now.drawn[file] === undefined ? 'is gone, and its yes named it' : was[file] === undefined ? 'was added after its yes' : 'was edited after its yes';
+    findings.push(`  ${at}/${file}  ${how}, so it is not the board the yes was given to. A board changed after its yes needs a new yes.`);
   }
   /* EVERY PICK HAS ITS ANSWER IN THE YES, chosen or left at its default: a yes missing one is a yes to a screen with a
      choice nobody made (look-sheet-50, the scope's Done line). */
@@ -215,7 +215,7 @@ export function judge(root, board, files) {
       const s = readJson(join(slotDir, p, 'slot.json')).value;
       const got = yes.picks?.[p];
       if (!got || !Array.isArray(s?.options) || !s.options.some((o) => o.id === got.option))
-        findings.push(`  ${at}/yes.json  holds no pick for ${p}, chosen or defaulted, so this screen has no board he said yes to. Take it again with node tools/look/picks.mjs yes.`);
+        findings.push(`  ${at}/yes.json  holds no pick for ${p}, chosen or defaulted, so this screen has no board with a yes. Take it again with node tools/look/picks.mjs yes.`);
     }
   return { governs, findings };
 }
@@ -241,7 +241,7 @@ export default function boardYes(root = process.env.BRAINDOG_GATE_ROOT ?? join(f
     governs += r.governs;
     findings.push(...r.findings);
   }
-  const where = `${boards.length} board(s), ${held} with his yes, governing ${governs} file(s)`;
+  const where = `${boards.length} board(s), ${held} with a yes, governing ${governs} file(s)`;
   if (findings.length === 0) {
     console.log(`  board-yes: ${where}, 0 finding(s)`);
     return;
@@ -249,8 +249,8 @@ export default function boardYes(root = process.env.BRAINDOG_GATE_ROOT ?? join(f
   for (const f of findings) console.error(f);
   console.error(
     `\n  board-yes: ${where}, ${findings.length} finding(s).\n` +
-      '  A screen a board governs changes only with a board he said yes to: draw it with tools/look/board.mjs, show him\n' +
-      '  the sheet, and take his yes with board.mjs --yes, which writes the hashes this gate reads.',
+      '  A screen a board governs changes only with a board with a yes: draw it with tools/look/board.mjs, show the\n' +
+      '  sheet, and take the yes with board.mjs --yes, which writes the hashes this gate reads.',
   );
   return 1;
 }

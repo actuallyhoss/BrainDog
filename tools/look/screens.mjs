@@ -2,8 +2,8 @@
  * Which screens a look draws, and which row, question and project each one shows (`loop/scope/area-proof-a.md` 2.4,
  * PRF-A02 job 3).
  *
- * THREE SETS. `six` is the walk the loop makes before a push and after a deploy (Today, Decide, Money, Projects, one
- * project, Agents). `nine` is DIRECTION 39's acceptance (Today, Decide, a question, Work, Money, a project, a list, a
+ * THREE SETS. `six` is the walk made before a push and after a deploy (Today, Decide, Money, Projects, one
+ * project, Agents). `nine` is the acceptance set of the look (Today, Decide, a question, Work, Money, a project, a list, a
  * row, People). `all` is both and then every route of the app, one address each.
  *
  * EVERY SAMPLE IS PICKED FROM THE RECORD'S OWN ANSWERS, never from an id somebody typed: the oldest open question,

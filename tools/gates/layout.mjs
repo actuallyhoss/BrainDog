@@ -19,7 +19,7 @@
  * A floor of real sizes goes on top, because the narrowest phone still in use is narrower than any
  * breakpoint anyone writes, and the laptop a person reads on is wider than all of them. Past the
  * widest breakpoint every width is the one desktop layout, only wider, and the floor is the only thing
- * that draws it at the size the owner judges it at (1512 and 1728, DIRECTION 37).
+ * that draws it at the size the owner judges it at (1512 and 1728).
  *
  * WHAT COUNTS AS AN OVERFLOW is deliberately narrow, or a gate cries wolf and gets deleted. A table
  * wider than the viewport is CORRECT: it lives in `.table-region`, which scrolls, which is the
@@ -46,7 +46,7 @@ import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 
-import { chromium } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 
 import { dock } from './layout/dock.mjs';
 import { full } from './layout/full.mjs';
@@ -300,6 +300,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
   let record = null;
   let server = null;
   let browser = null;
+  const spent = [];
   try {
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
@@ -317,7 +318,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * over 627 page-runs of chrome and exited 0. Built from `ROOT` because the contract is a property
      * of the record app's shell and every variant of it is the same shell.
      */
-    const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT);
+    const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
     /* AND THE SAME WAIT FOR A PRESS THAT OPENS SOMETHING, so the docked pass spells no number of its own. */
     const ACT_MS = budget('ready').settleTimeoutMs;
 
@@ -379,6 +380,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
        operating system hands out free at the moment of the bind, and every URL below is built from
        what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
        `::`, which is what `localhost` reaches first on this machine. */
+    /* LONGER THAN WEBKIT KEEPS A CONNECTION: node closes an idle one after 5s, and WebKit reusing it then fails a whole
+       page's first fetches at once, which the gate read as the app's. */
+    server.keepAliveTimeout = budget('ready').settleTimeoutMs;
     await new Promise((r) => server.listen(0, r));
     const PORT = server.address().port;
     await answers(`http://localhost:${PORT}`);
@@ -391,7 +395,6 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           `\`pnpm --filter @braindog/site build\` measures the page a stranger sees first.`,
       );
 
-    browser = await chromium.launch();
 
     const findings = [];
 
@@ -463,71 +466,97 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       }
     }
 
-    /* WHAT EVERY PASS IS HANDED (`layout/shared.mjs` says what each part is for). The address and the record are asked
-       for each time, because the variant pass points the port at another build and another record under them. */
-    const run = {
-      browser,
-      ready,
-      findings,
-      checked: 0,
-      missing,
-      asked,
-      origin: `http://localhost:${PORT}`,
-      at: (route) => `http://localhost:${PORT}${base}${route}`,
-      serve: (v) => {
-        serving = v.root;
-        base = v.prerendered ? '' : APP_BASE;
-        asking = v.record ?? null;
-      },
-      actMs: ACT_MS,
-      budgets: {
-        settleMs: L.settleMs,
-        widthTolerancePx: L.widthTolerancePx,
-        fullWidthShare: L.fullWidthShare,
-        dockArrivalMs: L.dockArrivalMs,
-        dockBlankShare: L.dockBlankShare,
-      },
-    };
+    /* BOTH ENGINES, ONE LAUNCH EACH: the Mac app draws with Safari's engine (55 §4), so WebKit meets the same rules as
+       Chromium, at its own widths (`webkitWidths`): the Mac window and the phone, dealt over the parts as the sweep's are.
+       Chromium draws every breakpoint; WebKit is here for what the engine draws differently, and the whole sweep twice
+       would be a part past its ceiling. A seeded run is a negative of the rules and stays on Chromium. A missing install
+       throws here. */
+    const webkitAt = Array.from(L.webkitWidths).sort((a, b) => a - b).filter((_, i) => i % of === part - 1);
+    /* THE PAGES THAT LOADED ONLY ON A SECOND TRY (`openPage`'s `again`), by why, for the summary. */
+    const again = { lost: 0, unreached: 0 };
+    let checked = 0;
+    for (const [engine, kind] of [['chromium', chromium], ['webkit', webkit]]) {
+      if (seeds && engine !== 'chromium') continue;
+      const chrome = engine === 'chromium';
+      /* THE FIRST ENGINE'S BROWSER STAYS OPEN UNTIL THE `finally`, which closes every one, so a throw cannot skip a close. */
+      if (browser) spent.push(browser);
+      browser = await kind.launch();
+      const mine = [];
+      /* WHAT EVERY PASS IS HANDED (`layout/shared.mjs` says what each part is for). The address and the record are asked
+         for each time, because the variant pass points the port at another build and another record under them. */
+      const run = {
+        browser,
+        ready,
+        findings: mine,
+        checked: 0,
+        missing,
+        asked,
+        origin: `http://localhost:${PORT}`,
+        at: (route) => `http://localhost:${PORT}${base}${route}`,
+        serve: (v) => {
+          serving = v.root;
+          base = v.prerendered ? '' : APP_BASE;
+          asking = v.record ?? null;
+        },
+        actMs: ACT_MS,
+        /* A LOAD LOST UNDER A FULL RUN'S LOAD IS OPENED ONCE MORE before it is a finding (`lib.mjs` `openPage`). */
+        again: { ms: budget('ready').againMs, said: (why) => again[why]++ },
+        budgets: {
+          settleMs: L.settleMs,
+          widthTolerancePx: L.widthTolerancePx,
+          fullWidthShare: L.fullWidthShare,
+          dockArrivalMs: L.dockArrivalMs,
+          dockBlankShare: L.dockBlankShare,
+        },
+      };
 
-    /* THE SWEEP: every route at every width of this part, at rest and in each state an act opens (`layout/sweep.mjs`). */
-    await sweep(run, { widths, routes: ROUTES, seeds: sweepSeeds, floor: FLOOR, desktop });
+      /* THE SWEEP: every route at every width of this part, at rest and in each state an act opens (`layout/sweep.mjs`). */
+      await sweep(run, { widths: chrome ? widths : webkitAt, routes: ROUTES, seeds: sweepSeeds, floor: FLOOR, desktop });
 
-    /* AND THE MAIN SCREENS FILL THE WINDOW, which nothing above can say (`layout/full.mjs`). */
-    /* THE WIDTHS THIS PART DRAWS, AND ANY NO PART DRAWS, in the first part, so a width named in the budget is never
-       judged by nobody. NOT UNDER THE OTHER SEEDS for the full-width pass: a 2000px heading proves nothing about a narrow
-       page. Its own seed caps `#main` on one page, the first width, the rail and Today, in the first part. */
-    const ours = (list) => (seeds ? [] : list.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w))));
-    const fullSeed = plants('layout-full');
-    const fullAt = fullSeed ? (part === 1 ? L.fullWidthAtPx.slice(0, 1) : []) : ours(L.fullWidthAtPx);
-    await full(run, { at: fullAt, seed: fullSeed });
+      /* AND THE MAIN SCREENS FILL THE WINDOW, which nothing above can say (`layout/full.mjs`). */
+      /* THE WIDTHS THIS PART DRAWS, AND ANY NO PART DRAWS, in the first part, so a width named in the budget is never
+         judged by nobody. NOT UNDER THE OTHER SEEDS for the full-width pass: a 2000px heading proves nothing about a narrow
+         page. Its own seed caps `#main` on one page, the first width, the rail and Today, in the first part. WebKit's are
+         its own desktop widths, here and for the docked pass. */
+      const ours = (list) => (seeds ? [] : list.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w))));
+      const fullSeed = plants('layout-full');
+      const fullAt = fullSeed ? (part === 1 ? L.fullWidthAtPx.slice(0, 1) : []) : chrome ? ours(L.fullWidthAtPx) : webkitAt.filter(desktop);
+      await full(run, { at: fullAt, seed: fullSeed });
 
-    /* AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened (`layout/dock.mjs`). Under the seeds, one
-       page with the panel open for each seed, at the first width, in the first part only. */
-    const seeded = seeds !== null;
-    const dockSeeds = plantedIn('dock');
-    const dockAt = seeded ? (part === 1 && dockSeeds.length ? L.dockedAtPx.slice(0, 1) : []) : ours(L.dockedAtPx);
-    await dock(run, { at: dockAt, seeds: seeded ? dockSeeds : null });
+      /* AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened (`layout/dock.mjs`). Under the seeds, one
+         page with the panel open for each seed, at the first width, in the first part only. */
+      const seeded = seeds !== null;
+      const dockSeeds = plantedIn('dock');
+      const dockAt = seeded ? (part === 1 && dockSeeds.length ? L.dockedAtPx.slice(0, 1) : []) : chrome ? ours(L.dockedAtPx) : webkitAt.filter(desktop);
+      await dock(run, { at: dockAt, seeds: seeded ? dockSeeds : null });
 
-    /* The floor and a desktop. `FLOOR` is the gate's own. A numeric literal here would be the
-       thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for.
+      /* The floor and a desktop. `FLOOR` is the gate's own. A numeric literal here would be the
+         thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for.
 
-       THE FLOOR CARRIES ITS OWN DESKTOPS NOW, the owner's two laptop widths, so the widest breakpoint is
-       added only when no floor width reaches it. Added anyway, every variant route would be drawn at three
-       widths past the last breakpoint, where all three draw the one layout. */
-    const variantWidths = FLOOR.some(desktop) ? [...FLOOR] : [...FLOOR, bps[bps.length - 1] ?? 1_200];
-    /* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
-       what every one of them proves, and the rest are browser contexts on every `pnpm gates`. */
-    if (seeds) variantWidths.length = 1;
+         THE FLOOR CARRIES ITS OWN DESKTOPS NOW, the owner's two laptop widths, so the widest breakpoint is
+         added only when no floor width reaches it. Added anyway, every variant route would be drawn at three
+         widths past the last breakpoint, where all three draw the one layout. WebKit draws them at its own widths. */
+      const variantWidths = !chrome ? Array.from(L.webkitWidths) : FLOOR.some(desktop) ? [...FLOOR] : [...FLOOR, bps[bps.length - 1] ?? 1_200];
+      /* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
+         what every one of them proves, and the rest are browser contexts on every `pnpm gates`. */
+      if (seeds) variantWidths.length = 1;
 
-    /* THE VARIANTS ONCE, IN THE FIRST PART, because they do not depend on the width list above. */
-    if (part === 1) await variants(run, { runs: variantRuns, widths: variantWidths });
-    serving = ROOT;
-    asking = null;
+      /* THE VARIANTS ONCE, IN THE FIRST PART, because they do not depend on the width list above. */
+      if (part === 1) await variants(run, { runs: variantRuns, widths: variantWidths });
+      serving = ROOT;
+      asking = null;
+      checked += run.checked;
+      /* THE ENGINE IS NAMED ON EVERY FINDING, except under a seed, whose tags `self-test` reads from the front. */
+      findings.push(...mine.map((f) => (seeds ? f : `${engine}: ${f}`)));
+    }
 
     console.log(
-      `  layout: ${run.checked} page-runs over ${widths.length} widths ` +
-        `(${of === 1 ? `${bps.join(', ')} + floor` : `${widths.join(', ')}, part ${part} of ${of}`}), ${findings.length} finding(s)`,
+      `  layout: ${checked} page-runs over ${widths.length} widths ` +
+        `(${of === 1 ? `${bps.join(', ')} + floor` : `${widths.join(', ')}, part ${part} of ${of}`})` +
+        `${seeds ? '' : `, WebKit at ${webkitAt.join(' and ') || 'none in this part'}`}, ${findings.length} finding(s)`,
     );
+    if (again.lost + again.unreached)
+      console.log(`  ${again.lost + again.unreached} page(s) loaded only on a second try: ${again.lost} lost a module, ${again.unreached} found the port not answering`);
 
     /* EVERY FINDING OF A SEEDED RUN, because `self-test` reads them for each seed's name and a cut would hide a seed's. */
     const shown = seeds ? findings.length : L.findingsShown;
@@ -574,6 +603,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * dies. Driven on 21 September.
      */
     await browser?.close().catch(() => {});
+    for (const b of spent) await b.close().catch(() => {});
     /* AWAITED, unlike the bare `server.close()` this replaces: the callback is the moment the listening
        socket is actually gone. The port is ephemeral, so no later gate is waiting on this number, but a
        socket still listening is a handle that keeps the runner from exiting. */

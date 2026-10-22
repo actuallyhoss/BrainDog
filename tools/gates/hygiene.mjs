@@ -3,9 +3,9 @@
  *
  *   node tools/gates/hygiene.mjs [root]
  *
- * HIS WORDS: a clean commit history that names neither the old system nor his other projects (W.26), and his rule
- * that agent notes and directions stay local and out of git. `.gitignore` says so, and a
- * pattern only stops `git add`: `git add -f`, or a line taken out of `.gitignore`, and the loop's notes are public.
+ * THE RULE: a clean commit history that names neither the old system nor other projects (W.26), and working notes
+ * and directions stay local and out of git. `.gitignore` says so, and a
+ * pattern only stops `git add`: `git add -f`, or a line taken out of `.gitignore`, and the private notes are public.
  * This gate reads what is tracked, `git ls-files`, so a path that got in by any door is red.
  *
  * THE RULES, over every tracked path:

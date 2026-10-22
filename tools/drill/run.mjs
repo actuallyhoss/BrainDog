@@ -14,7 +14,7 @@
  *
  * `--lapse` ADDS THE LAPSE STEP (`lapsed.mjs`, LCH-C04): once the record exists and before `erase`, its billing is marked
  * lapsed through the host's own payment door in Stripe test mode, an export and a read still answer and a write is
- * refused, then billing resumes. OFF BY DEFAULT, so the lane after a deploy runs what it ran until he says. It reads
+ * refused, then billing resumes. OFF BY DEFAULT, so the lane after a deploy runs what it ran until the lapse step is switched on. It reads
  * `DRILL_LAPSE_SECRET` and `DRILL_LAPSE_SUBSCRIPTION` by name and never prints them.
  *
  * `--pay` WALKS THE MONEY AFTERWARDS (`pay.mjs`, loaded only then, since it reads the record's plans and imports this

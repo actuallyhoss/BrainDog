@@ -113,7 +113,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
    * for the screen to settle first is the whole of the repair: `before` is then taken after the
    * response, and the only thing left that can move the length is the key.
    */
-  const ready = readiness('keys', budget('ready').settleTimeoutMs, ROOT);
+  const ready = readiness('keys', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
 
   const TYPES = {
     '.html': 'text/html; charset=utf-8',

@@ -6,6 +6,10 @@
  * waits for is the entry chunk and everything statically reachable from it. Adding a screen must
  * not be able to move this number.
  *
+ * AND THE FIRST LOAD BESIDE IT: the entry with the root layout and Today, which is what a cold open
+ * of the app waits for before it draws. Adding a screen cannot move that number either; putting a
+ * package on Today's path can, and that is the one it is there to catch.
+ *
  * Budgets are 22 §9 and 50 §7. `--report` prints the rows without failing.
  *
  *   node tools/gates/bundle.mjs [--report]
@@ -230,6 +234,40 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   for (const e of entries) for (const k of reach(e)) reachable.add(k);
 
   /**
+   * AND THE FIRST LOAD: KIT'S ENTRY, THE ROOT LAYOUT AND TODAY, WHICH A COLD OPEN OF THE APP WAITS FOR BEFORE IT DRAWS.
+   *
+   * The entry row above is Kit's runtime, and it was the only number here, so the first open grew to 734 KB of script
+   * while this gate printed 33. Kit numbers its route nodes and node 0 is the root layout, which every screen waits for;
+   * Today is the node the route table (`dictionary` in the app entry) names for `/`, which is the screen the app opens
+   * on. A node is drawn once it and everything it imports statically have loaded, so the row is the entry's chunks, the
+   * two nodes', and everything any of them imports. A dynamic import is not in it: it is asked when the screen asks,
+   * and nothing waits for it to draw.
+   *
+   * A BUILD WITH A ROOT LAYOUT AND NO TODAY IS A FINDING, because the row would be smaller than a first open and say so
+   * in green. A tree with neither (the planted ones under `negative/`) is Kit's entry alone, and the row says that.
+   */
+  const nodeKey = (n) => Object.keys(manifest).find((k) => (manifest[k].file ?? '').startsWith(`_app/immutable/nodes/${n}.`) && manifest[k].file.endsWith('.js'));
+  const rootLayout = nodeKey('0');
+  let today;
+  if (rootLayout !== undefined) {
+    for (const e of entries) {
+      const at = join(CLIENT, manifest[e].file ?? '');
+      if (!/\/entry\/app\.[^/]*\.js$/.test(manifest[e].file ?? '') || !existsSync(at)) continue;
+      const leaf = /"\/":\[~?(\d+)/.exec(await readFile(at, 'utf8'))?.[1];
+      if (leaf !== undefined) today = nodeKey(leaf);
+    }
+    if (today === undefined) {
+      console.error(
+        "\n  bundle: the build has a root layout and no route for `/` in the app entry's route table, so Today's chunks\n" +
+          '  cannot be found. The first-load row would be smaller than a first open, so nothing was measured.\n',
+      );
+      return 1;
+    }
+  }
+  const firstLoad = new Set(reachable);
+  for (const node of [rootLayout, today]) if (node !== undefined) for (const k of reach(node)) firstLoad.add(k);
+
+  /**
    * A FILE THE MANIFEST NAMES AND THE BUILD DID NOT EMIT, WHICH IS A FINDING AND WAS A STACK TRACE.
    *
    * Every byte below is read by name out of `.vite/manifest.json`, and until now each of those reads
@@ -263,9 +301,13 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   }
 
   let js = 0;
-  for (const key of reachable) {
+  let firstJs = 0;
+  for (const key of firstLoad) {
     const node = manifest[key];
-    if (node.file?.endsWith('.js')) js += await measure(node.file, key);
+    if (!node.file?.endsWith('.js')) continue;
+    const size = await measure(node.file, key);
+    firstJs += size;
+    if (reachable.has(key)) js += size;
   }
 
   /**
@@ -371,6 +413,19 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     return 1;
   }
 
+  /* EVERY SCRIPT THE SHELL PRELOADS IS ONE THE FIRST-LOAD ROW COUNTED. The row is summed from the manifest, and the
+     shell is what a browser actually fetches first, so a preload line naming a chunk outside that sum would be a first
+     load this gate reports as smaller than it is. */
+  const counted = new Set([...firstLoad].map((k) => manifest[k].file));
+  const preloaded = [...shellHtml.matchAll(/<link\b[^>]*\bhref="[^"]*?(_app\/[^"]+\.js)"[^>]*\brel="modulepreload"|<link\b[^>]*\brel="modulepreload"[^>]*\bhref="[^"]*?(_app\/[^"]+\.js)"/g)].map((m) => m[1] ?? m[2]);
+  const uncounted = preloaded.filter((f) => !counted.has(f));
+  if (uncounted.length > 0) {
+    console.error(`\n  bundle: the shell preloads ${uncounted.length} script(s) the first-load row did not count.\n`);
+    for (const f of uncounted) console.error(`    ${f}`);
+    console.error('\n  The row is the entry, the root layout and Today with everything they import. A preload from anywhere\n  else is waited for on every first open, so it must be counted before any number is printed.\n');
+    return 1;
+  }
+
   const shell = brotli(Buffer.from(shellHtml, 'utf8'));
 
   const font = async (f) => (await stat(join(BUILD, 'fonts', f))).size;
@@ -380,7 +435,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
    *
    * 22 §9 budgets "≤ 45 KB total, 2 files", assuming ONE Latin face plus Arabic. This ships two Latin
    * faces on purpose: a workhorse that has to hold up at 11px with tabular figures, and a display face
-   * used only above 20px because it is the wordmark's own (Lexend since 17 October, DIRECTION §47).
+   * used only above 20px because it is the wordmark's own (Lexend since 17 October).
    * So the workhorse keeps the original 45 KB and the display face gets its own small budget, which is
    * the honest way to say "we chose to spend fifteen more kilobytes" instead of quietly widening one
    * number to 60.
@@ -413,6 +468,9 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
       baseline: debt.at + B.mainJsNoise,
       note: "Kit's runtime alone; the interpreter is 19.3 of it",
     },
+    /* A CEILING AND NO DEBT: the number a first open of Today was measured at once the kernel and the seed left it, which
+       only falls (`ledger.json`). What it holds is said in the summary line below. */
+    { name: 'first load JS, brotli', size: firstJs, budget: B.firstLoadJsBrotli, note: 'the entry, the root layout and Today' },
     { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
     { name: 'index.html, brotli', size: shell, budget: B.htmlBrotli, note: 'it carries no record state' },
     { name: 'UI face (Geist)', size: await font('geist.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
@@ -434,6 +492,9 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   console.log(`\n  ${debtLine(B, debt)}`);
   console.log(
     `\n  ${entries.length} entry chunks, ${reachable.size} statically reachable.` +
+      (rootLayout === undefined
+        ? ' No root layout in this build, so the first load is the entry alone.'
+        : ` The first load is ${firstLoad.size} with the root layout and Today (${manifest[today].file}), ${preloaded.length} preloaded by the shell.`) +
       ` ${KB(routeCss)} more CSS arrives with the routes that need it.\n`,
   );
 

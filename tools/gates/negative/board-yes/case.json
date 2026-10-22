@@ -1,8 +1,8 @@
 {
   "gate": "board-yes",
-  "rule": "a governed file changed after his yes to its board",
-  "expect": "changed since he said yes",
+  "rule": "a governed file changed after the yes to its board",
+  "expect": "changed since its yes",
   "findings": 1,
   "total": 1,
-  "why": "ONE BOARD WITH A YES AND ONE WITHOUT. The frame's yes names every picture at four widths and two themes, his words, its board and its units, so the only thing wrong is the governed file: its text is not the text whose hash the yes holds. The quiet board governs the same file and has no yes, and stays quiet, which is the other half of the rule: a board with no yes governs nothing yet. A gate that read the quiet board as red would count two."
+  "why": "ONE BOARD WITH A YES AND ONE WITHOUT. The frame's yes names every picture at four widths and two themes, the words of the yes, its board and its units, so the only thing wrong is the governed file: its text is not the text whose hash the yes holds. The quiet board governs the same file and has no yes, and stays quiet, which is the other half of the rule: a board with no yes governs nothing yet. A gate that read the quiet board as red would count two."
 }

@@ -4,5 +4,5 @@
   "expect": "the loop's working notes",
   "findings": 1,
   "total": 1,
-  "why": "HIS DIRECTION, ADDED BY FORCE: `git add -f loop/DIRECTION.md` passes `.gitignore`, and only a read of what is tracked sees it."
+  "why": "A PRIVATE NOTES FILE, ADDED BY FORCE: `git add -f loop/DIRECTION.md` passes `.gitignore`, and only a read of what is tracked sees it."
 }

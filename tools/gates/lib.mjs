@@ -348,7 +348,7 @@ const screenOf = () => document.querySelector('main#main')?.getAttribute('data-s
  * the helper and forget to say that it measured less than it claims. There is no environment
  * variable in it: a switch that defaults to skipping is how a check stops being one.
  */
-export function readiness(gate, timeoutMs, root) {
+export function readiness(gate, timeoutMs, root, { quietMs = 0 } = {}) {
   /* A missing build is a different sentence, and each gate already prints its own before exiting 3. */
   const built = existsSync(root);
   const contract = built && emitsContract(root);
@@ -408,6 +408,14 @@ export function readiness(gate, timeoutMs, root) {
         state = again;
       }
       if (state === 'ready') anyReady = true;
+      /* THEN WAIT FOR THE PAGE TO BE AT REST. A screen drawn from the tab's kept copy is settled before the reads behind it
+         land, and a gate that moves on with those in flight has WebKit print each as refused. `html[data-quiet]` is the
+         app saying no call is out and none is promised; it only changes WHEN the screen is looked at. The cap is short and
+         its expiry is not a finding: a screen that never goes quiet was already measured on what it drew. `perf` passes
+         no `quietMs` and measures drawn, as it always has. */
+      if (quietMs > 0 && live && state !== null) {
+        await page.waitForSelector('html[data-quiet]', { state: 'attached', timeout: Math.min(timeoutMs, quietMs) }).catch(() => null);
+      }
       return state;
     },
 
@@ -510,6 +518,15 @@ export function pagePlan(
   };
 }
 
+/**
+ * A PAGE THAT LOST ONE OF ITS OWN MODULES, in each engine's words: Chromium's, WebKit's and Firefox's. The known flake
+ * under a full run's load, and the runner's, not the screen's.
+ */
+export const LOST = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/u;
+
+/** A LOAD THAT NEVER REACHED THE GATE'S PORT, in each engine's words: the server, or the record behind it, not up yet. */
+export const UNREACHED = /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|Could not connect|Connection refused|network connection was lost|NS_ERROR_CONNECTION_REFUSED/u;
+
 /** The settings `openPage` kept on each record, by its base, each with what the record held before it was kept. */
 const KEPT = new Map();
 
@@ -554,10 +571,13 @@ async function keepPrefs(record, prefs) {
  * THE CLOCK IS PINNED ON THE CONTEXT BEFORE THE PAGE EXISTS (`clock.setFixedTime`), so the first script that reads the
  * date reads the record's. Timers still run, so a screen that settles on a timer still settles.
  *
+ * `again: { ms, said }` opens a load once more when the load itself was lost, not the screen (`LOST`, `UNREACHED`), and
+ * is what `layout` passes; a gate that leaves it out sees every load once, as before.
+ *
  * A THROW HANDS THE CONTEXT BACK FIRST: a caller holds no handle to a context it was never given.
  */
 export async function openPage(browser, url, options = {}) {
-  const { ready, record } = options;
+  const { ready, record, again } = options;
   if (typeof ready?.settled !== 'function') throw new Error(`openPage ${url}: no readiness, so nothing would wait for the screen to settle.`);
   const plan = pagePlan(url, options);
   await keepPrefs(record, plan.prefs);
@@ -595,11 +615,39 @@ export async function openPage(browser, url, options = {}) {
         return true;
       };
       const open = () => page.goto(to, { waitUntil: plan.waitUntil }).then(() => false, timedOut);
-      if (await open()) {
-        afresh();
-        if (await open()) return null;
+      const look = async () => {
+        if (await open()) {
+          afresh();
+          if (await open()) return null;
+        }
+        return ready.settled(page, plan.prerendered, afresh);
+      };
+      if (again === undefined) return look();
+      /* `again`: ONE MORE LOOK WHEN THE LOAD ITSELF WAS LOST, before what it drew is a finding. Under a full run's load
+         a page can settle and still have lost one of its own modules (`LOST`), so the printed rule read the runner's
+         failure as the screen's; or the gate's port, or the record behind it, was not answering yet (`UNREACHED`),
+         which threw and ended the whole gate. Either is opened again, afresh, the second after `again.ms`. A second
+         loss is the answer: a lost module is read as the screen's, and a port still not answering is a page that
+         never settled. `again.said` is told why, for the gate's summary. */
+      let why = null;
+      let state = null;
+      try {
+        state = await look();
+        if (errors.some((e) => LOST.test(e.text))) why = 'lost';
+      } catch (e) {
+        if (!UNREACHED.test(String(e?.message ?? e))) throw e;
+        why = 'unreached';
       }
-      return ready.settled(page, plan.prerendered, afresh);
+      if (why === null) return state;
+      again.said?.(why);
+      afresh();
+      if (why === 'unreached') await new Promise((r) => setTimeout(r, again.ms));
+      try {
+        return await look();
+      } catch (e) {
+        if (!UNREACHED.test(String(e?.message ?? e))) throw e;
+        return null;
+      }
     };
     const state = await goto(url);
     return { context, page, state, errors, failed, plan, goto };

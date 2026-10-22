@@ -4,10 +4,10 @@
  *
  *   node tools/gates/commits.mjs [root]
  *
- * HIS WORDS: "NEVER EVER include "co-authored by claude' in any of the commit messages" (W.23), "stop making overly
- * detailed git commits" (W.25), "no fresh start though" (HD.24). Before this gate nothing read a commit: since 2
- * October the median subject was 96 characters and 29 of 110 commits carried a body, and the harness asked every
- * session for a session link that only his instruction file kept out.
+ * THE RULES OF THE HISTORY: no co-author trailer naming a tool in any commit message (W.23), no overly detailed
+ * commits (W.25), and no fresh start (HD.24). Before this gate nothing read a commit: since 2 October the median
+ * subject was 96 characters and 29 of 110 commits carried a body, and the harness asked every session for a session
+ * link that only a local instruction file kept out.
  *
  * THE RULES, each printed with a fixed example when it is broken:
  *   - a subject of 1 to `commits.subjectMax` characters, and one sentence;
@@ -47,7 +47,7 @@ const COULD_NOT_RUN = 3;
 /**
  * The commits made before the first push this gate guarded, exempt by sha. ONLY EVER SHRINKS, and `ledger.json` holds
  * its count: these seven were on the Mac and not on GitHub on 9 October 2026, every subject past 72 characters, and
- * rewording them waits for his word. Once they are pushed no range reaches them again and the list can go.
+ * rewording them is a separate decision. Once they are pushed no range reaches them again and the list can go.
  */
 export const EXEMPT = [
   '49a1942bde406a2cfe9684c64c4da6a4ecf02c6f',

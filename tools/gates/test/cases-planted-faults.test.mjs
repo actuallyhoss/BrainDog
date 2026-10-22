@@ -1,7 +1,7 @@
 /**
  * The planted faults PRF-B02 jobs 4 to 6 add, each run against its gate the way `self-test` runs it, and each red.
  *
- *   node --test tools/gates/test/cases-45.test.mjs
+ *   node --test tools/gates/test/cases-planted-faults.test.mjs
  *
  * `negative/passkey-left/` is a seed over a real browser and a real build, so it is read and not run here: what is
  * run is the gate refusing a seed it does not know, which happens before any browser is launched.

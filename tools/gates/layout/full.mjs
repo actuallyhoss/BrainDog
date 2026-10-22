@@ -12,10 +12,10 @@ import { mark, openFor, reach, SHAPES } from './shared.mjs';
 /**
  * AND THE MAIN SCREENS FILL THE WINDOW, which nothing above can say.
  *
- * DIRECTION 36: "it's not even filling fully horizontally on my macbook". Every check in this file is about a page
- * that is too WIDE, and a page held to a narrow column in the middle of a laptop scrolls nowhere and has nothing to
- * press under 44px, so it sweeps clean at every width. 37 asks for full width with fluid gutters, judged at the
- * owner's two MacBook widths, and this is the half of that the sweep could not see.
+ * A main screen that does not fill the window horizontally on a laptop is wrong. Every check in this file is about a
+ * page that is too WIDE, and a page held to a narrow column in the middle of a laptop scrolls nowhere and has nothing
+ * to press under 44px, so it sweeps clean at every width. The rule is full width with fluid gutters, judged at the
+ * two MacBook widths, and this is the half of that the sweep could not see.
  *
  * THE WIDEST CONTENT BOX IN `#main`, NOT `#main` ITSELF. `#main` is the shell's grid column and always takes the room
  * beside the rail; a page that caps itself inside it is the defect. So every element drawn in `#main` is read, less

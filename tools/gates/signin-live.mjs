@@ -7,7 +7,7 @@
  * WHY THIS EXISTS. The `passkey` gate proves the ceremony on a record it made a minute ago on localhost. After a deploy
  * nothing signed in anywhere: a Worker that answered every smoke question and refused every passkey on `brain.dog`
  * (an RP ID moved by the one-domain move, a challenge store that lost its binding, a cookie scoped to the old name)
- * was green. This opens the live sign-in, signs in to the canary with the passkey its owner made in his sitting,
+ * was green. This opens the live sign-in, signs in to the canary with the passkey its owner made in that sitting,
  * waits for Today to settle, and signs out. Any of the four not true is red, and the lane after a deploy reads a red
  * here as it reads a red smoke: it starts the rollback that exists (`.github/workflows/after-deploy.yml`).
  *
@@ -23,7 +23,7 @@
  * rise between any two runs, fit the four bytes the count has until 2106, and are above any count a fresh passkey
  * reaches by hand.
  *
- * NO CREDENTIAL, SELF-HOST ONLY, AND IT SAYS SO. Until his sitting (`loop/scope/area-proof-a.md` section 5, item 1)
+ * NO CREDENTIAL, SELF-HOST ONLY, AND IT SAYS SO. Until the owner's sitting (`loop/scope/area-proof-a.md` section 5, item 1)
  * there is no canary, and this runs the same four steps against a fresh self-host in the job: in by the server key,
  * a passkey added on the device and read back, then a second browser with that credential alone. Its last line
  * starts `signin-live: self-host only`, which the lane reads as "not proven on brain.dog", never as green there.

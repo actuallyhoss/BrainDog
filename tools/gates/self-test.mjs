@@ -326,6 +326,18 @@ export const BROWSER = [
     blind: 'PASSED a heading that never opened. Where it went could stay shut and nothing would say.',
     red: 'red on a folded heading that stays shut when pressed',
   },
+  /**
+   * `perf`: `BRAINDOG_GATE_SEED=perf` holds every script of the build back before it is served, on Today at the phone's
+   * width, which is what a bundle that suddenly weighs a second looks like from outside, and the gate must say the first
+   * paint is over its budget.
+   */
+  {
+    gate: 'perf',
+    seed: 'perf',
+    names: 'over its budget',
+    blind: 'PASSED a build whose scripts arrive a second late. A screen could get slow and nothing would say.',
+    red: 'red on every script held back before it is served',
+  },
 ];
 
 /* A STALE BUILD IS AN ABSENT ONE, and this asked only whether `apps/web/build` existed until
@@ -446,7 +458,7 @@ async function walkRules(gate) {
 /**
  * THE GATES THAT DO NOT LIVE HERE AS `<gate>.mjs`, run the way `run.mjs` runs them (PRF-B02 jobs 4 and 5).
  * `typecheck` is `pnpm -r run typecheck` in the tree, which is a workspace of its own, and `theme` is the skin's
- * script with `--check` and the tree's token file. `test/cases-45.test.mjs` holds these to `run.mjs`'s own two lines.
+ * script with `--check` and the tree's token file. `test/cases-planted-faults.test.mjs` holds these to `run.mjs`'s own two lines.
  */
 export const ELSEWHERE = new Map([
   ['typecheck', () => ['pnpm -r run typecheck', [], { shell: true }]],

@@ -1,7 +1,7 @@
 # People
 
 Made-up people who sign up and use BrainDog the way a stranger would, and the checks that say whether what they see
-is right. This folder holds data and checks only. Use case 6 of the vision mockup (his word of 9 October) is walked
+is right. This folder holds data and checks only. Use case 6 of the vision mockup (settled on 9 October) is walked
 here for one person, Mariam. The other seven people of USE-B01 and their nightly use come in later batches.
 
 ## Files

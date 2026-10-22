@@ -3,7 +3,7 @@
  *
  * THE SAME RECORD EVERY BROWSER GATE DRAWS (`tools/gates/record.mjs`), started and forwarded to by the gates' own
  * code, so a look and a gate never disagree about what the seed holds. It may be pressed, and it never counts as seen:
- * an invented record is for the gates and for nothing else (DIRECTION 40).
+ * an invented record is for the gates and for nothing else.
  */
 
 import { forward, forwards, recordsAnswer, startRecord } from '../../gates/record.mjs';

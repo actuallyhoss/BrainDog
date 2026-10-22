@@ -13,7 +13,7 @@ import { mark, openFor, reach, SHAPES, UNFOLD } from './shared.mjs';
 /**
  * AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened (research-audit-16 L12).
  *
- * DIRECTION 37's docked right panel takes a column of its own from 1,280 up, and every screen that opens a task or a
+ * The docked right panel takes a column of its own from 1,280 up, and every screen that opens a task or a
  * row narrows beside it. Every pass above measures a screen at rest, so the three things that go wrong only while a
  * panel is open swept green: the work squeezed under the panel or scrolling sideways beside it, blocks paired into
  * halves by the window's width when the panel has taken a third of it (H2), and the column opening in one frame while

@@ -169,7 +169,7 @@ const ALLOWED_LINES = [/^\s*--brand:\s*#[0-9a-fA-F]{6};\s*$/, /^\s*@property\s+-
  *                          the expected half of a comparison, a value asserted on, and nothing
  *                          paints with it. Only that key: another colour in the file is caught.
  *   harbour-look, two      the look add-on's `seed` accent, in its pack file and the catalogue's copy,
- *                          held at his word on 16 October (below).
+ *                          held by the owner's choice on 16 October (below).
  */
 const HEX = String.raw`#[0-9a-fA-F]{6}`;
 const ALLOWED_IN = [
@@ -185,9 +185,9 @@ const ALLOWED_IN = [
     file: 'apps/site/scripts/live-bounds.json',
     lines: [new RegExp(String.raw`^\s*"colours": \["${HEX}"(?:, "${HEX}")*\],?\s*$`)],
   },
-  /* THE HARBOUR LOOK'S ACCENT, HELD AT HIS WORD, 16 OCTOBER: the one hex a look add-on hands the theme as its seed, in the
-     pack's file and in the copy the catalogue publishes. Asked whether to hold or rename what this gate, core-names and
-     web-lists found, he answered "Hold them, deploy tonight" (DIRECTION 44). Only the `seed` line, so another colour in
+  /* THE HARBOUR LOOK'S ACCENT, HELD ON 16 OCTOBER: the one hex a look add-on hands the theme as its seed, in the
+     pack's file and in the copy the catalogue publishes. What this gate, core-names and web-lists found that day was
+     held rather than renamed ("Hold them, deploy tonight"). Only the `seed` line, so another colour in
      either file is still caught. */
   ...['packs/harbour-look/harbour-look.pack.json', 'apps/web/static/catalogue/packs/harbour-look/1.0.0.pack.json'].map((file) => ({
     file,

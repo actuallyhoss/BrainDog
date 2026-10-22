@@ -63,7 +63,7 @@ export async function startSeedHost({ port = 0 } = {}) {
   });
   try {
     /* THE SEED'S OWN OWNER, `p_seed`, who wrote its rows: owned by anyone else, every row an agent read would be
-       another person's words, and the run would drop to Ask at its first read (DIRECTION §37). */
+       another person's words, and the run would drop to Ask at its first read. */
     const named = running.api.kernel.createRecord({ ...IDENTITY, owner: { id: 'p_seed' } });
     if (!named.ok) throw new Error(`the seed host could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
     const seeded = await installSeed(running.api.kernel);

@@ -3,7 +3,7 @@
  * Ship in one go: the full CI, then push, the deploy (its own dry run, parity and smoke included) and a look at the
  * live pages. Stops at the first red and prints only what matters, so one run needs one read.
  *
- *   node tools/ship/ship.mjs            run it all (deploy only on his word: `loop/tools/state.mjs hear "deploy"`)
+ *   node tools/ship/ship.mjs            run it all (deploy only on the owner's word: `loop/tools/state.mjs hear "deploy"`)
  *   node tools/ship/ship.mjs --no-deploy    CI and push only
  */
 import { spawnSync } from 'node:child_process';

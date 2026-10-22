@@ -1,17 +1,17 @@
 /**
- * What every part of the canary shares: which record it is on, how it reaches it, and the two things his sitting
+ * What every part of the canary shares: which record it is on, how it reaches it, and the two things the owner's sitting
  * makes (`loop/scope/area-proof-a.md`, PRF-A09).
  *
- * TWO PLACES, ONE SWITCH. Until his sitting there is no canary on brain.dog, so every step stands up a fresh self-host
+ * TWO PLACES, ONE SWITCH. Until the owner's sitting there is no canary on brain.dog, so every step stands up a fresh self-host
  * in its own process (the gates' record, `tools/gates/record.mjs`) and says "self-host only" on its first line. The
- * switch is `SMOKE_SLUG`, the variable his sitting sets: unset, self-host only; set, the canary on `CANARY_ORIGIN`
+ * switch is `SMOKE_SLUG`, the variable the owner's sitting sets: unset, self-host only; set, the canary on `CANARY_ORIGIN`
  * (brain.dog unless told otherwise), and from then a missing secret or a missing session is red, never a skip.
  *
  * THE SESSION IS A FILE, NAMED BY `CANARY_SESSION`: the browser state `signin-live` keeps once it has signed in to the
  * canary (Playwright's `storageState`). The look and the weekly reset read the cookie for the canary's own origin out
  * of it and send it nowhere else. No line any part of the canary prints holds it.
  *
- * THE PASSKEY IS `CANARY_PASSKEY`: the credential Chrome's virtual authenticator made in his sitting, exactly as
+ * THE PASSKEY IS `CANARY_PASSKEY`: the credential Chrome's virtual authenticator made in the owner's sitting, exactly as
  * `WebAuthn.getCredentials` hands it back and `WebAuthn.addCredential` takes it, as base64url JSON. `packCredential` and
  * `unpackCredential` are the one place its shape is written, so `enrol.mjs` and `signin-live` cannot disagree.
  */

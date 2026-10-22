@@ -214,7 +214,7 @@ function tryBefore(code, at) {
 const HANDLES = [
   { what: 'the seeded record', open: /\bstartRecord\s*\(/gu, close: /\brecord\s*\??\.\s*close\s*\(/gu },
   { what: 'the HTTP server on its own port', open: /\bcreateServer\s*\(/gu, close: /\bserver\s*\??\.\s*close\s*\(/gu },
-  { what: 'the browser', open: /\bchromium\s*\.\s*launch\s*\(/gu, close: /\bbrowser\s*\??\.\s*close\s*\(/gu },
+  { what: 'the browser', open: /\b(?:chromium|webkit|kind)\s*\.\s*launch\s*\(/gu, close: /\bbrowser\s*\??\.\s*close\s*\(/gu },
 ];
 
 const lineOf = (source, index) => source.slice(0, index).split('\n').length;

@@ -32,8 +32,8 @@ function measuredAsWritten(book) {
   );
   return { held, literals };
 }
-/* HIS DIRECTION, AS THE GATE READS IT, so a line that rose at his quoted word is judged on it: the ledger as written holds
-   two (16 October, "Hold them, deploy tonight"). A test that needs a rise to be red passes a direction of its own. */
+/* THE OWNER'S NOTES, AS THE GATE READS THEM, so a line that rose at a quoted word is judged on it: the ledger as written holds
+   two (16 October, "Hold them, deploy tonight"). A test that needs a rise to be red passes notes of its own. */
 const WORDS = join(repo, 'loop', 'DIRECTION.md');
 const DIRECTION = existsSync(WORDS) ? readFileSync(WORDS, 'utf8') : '';
 const run = (book, budgets, measured = measuredAsWritten(book), direction = DIRECTION) => judge(book, budgets, measured, direction);
@@ -103,11 +103,11 @@ test('a ceiling that rises is red unless `by` quotes the owner, word for word', 
   lines.push({ at: 13000, on: day, why: 'More rules.', by: 'the builder' });
   assert.match(run(book, budgets).findings.join('\n'), /the ceiling moved from 12288 to 13000/u);
   lines.at(-1).by = 'HD.900: "let the stylesheet grow"';
-  const direction = `${DIRECTION}\nHe said: let the stylesheet grow, once.`;
+  const direction = `${DIRECTION}\nThe ruling: let the stylesheet grow, once.`;
   assert.deepEqual(run(book, budgets, undefined, direction).findings, []);
   assert.equal(quotesOwner('"let the stylesheet grow"', 'nothing like it'), false);
   assert.equal(quotesOwner('"grow"', direction), false, 'one word is not a quote');
-  assert.equal(quotesOwner('He said "the gate"', 'run the gate twice'), false, 'two common words are not his sentence');
+  assert.equal(quotesOwner('The ruling: "the gate"', 'run the gate twice'), false, 'two common words are not a sentence of the owner\'s');
 });
 
 test('a floor that falls is red, and a setting moves with a line and no quote', () => {
@@ -146,10 +146,10 @@ test('a held list larger than its line is red, smaller is red until a line recor
   book.held['web-lists.HELD'].lines.push({ count: n + 2, on, why: 'Grew.' });
   m.held.set('web-lists.HELD', { size: n + 2 });
   assert.match(run(book, budgets, m).findings.join('\n'), new RegExp(`its line rose from ${n - 1} to ${n + 2}`, 'u'));
-  /* A RISE THE OWNER ASKED FOR, in words that stand in his direction, is green; the same quote he never said is not. */
-  book.held['web-lists.HELD'].lines.at(-1).by = 'DIRECTION 44: "Hold them, deploy tonight"';
+  /* A RISE THE OWNER ASKED FOR, in words that stand in the owner's notes, is green; the same quote not found there is not. */
+  book.held['web-lists.HELD'].lines.at(-1).by = '"Hold them, deploy tonight"';
   assert.match(run(book, budgets, m, 'nothing like it').findings.join('\n'), /its line rose .* quotes no words of the owner's/u);
-  assert.deepEqual(run(book, budgets, m, 'he answered "Hold them, deploy tonight".').findings, []);
+  assert.deepEqual(run(book, budgets, m, 'the answer was "Hold them, deploy tonight".').findings, []);
 });
 
 test('a held list a gate exports and the ledger has no line for is red, and the export is found in the text', () => {

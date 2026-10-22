@@ -239,8 +239,8 @@ export const HELD = {
     why: 'the settings areas called `people` and `agents` that only an owner is shown.',
   },
 
-  /* HELD AT HIS WORD, 16 OCTOBER. Asked whether to hold or rename what this gate, core-names and colour-grep found, he
-     answered "Hold them, deploy tonight" (DIRECTION 44). Each says what its id is, so the change that renames it knows. */
+  /* HELD ON 16 OCTOBER. What this gate, core-names and colour-grep found that day was held rather than renamed
+     ("Hold them, deploy tonight"). Each says what its id is, so the change that renames it knows. */
   'apps/web/src/lib/flow/try-step.ts': {
     ids: ['steps'],
     why: "an automation's `steps:` key, which the try sheet walks to place each step, and not the guide's list.",

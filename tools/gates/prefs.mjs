@@ -143,7 +143,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * permanently vacuous. So an unsettled or refused load is reported as what it is, and its case is not
    * compared at all.
    */
-  const ready = readiness('prefs', budget('ready').settleTimeoutMs, ROOT);
+  const ready = readiness('prefs', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
 
   const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -247,7 +247,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
          tab bar stays below 900px whatever the shape says, so the same three values there are one
          answer three times, correctly. */
-      /* `undefined` IS THE TOP BAR, the default again (his call 1, 20 October: the bar of 19 October), so the first value
+      /* `undefined` IS THE TOP BAR, the default again (the owner's choice 1, 20 October: the bar of 19 October), so the first value
          is "unset" rather than `'bar'`. A device's own `'bar'` is not a value here: older builds wrote it into the cookie
          on every boot, so `deviceChose` (nav-prefs.svelte.ts) reads it as nobody's choice, which draws the bar twice, and
          this case is red on any two values that agree. The rail and the menu are a device's own choices. */
@@ -361,8 +361,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        * the cookie and a menu in the record, so a build that still read the cookie as the truth comes back with the top
        * bar twice and goes red.
        *
-       * `side` IN THE MIDDLE, the record's word for the rail somebody chose. With the top bar the default again (his call 1,
-       * 20 October), a record that keeps nothing draws the bar, and a `bar` here would be one answer twice. The record's
+       * `side` IN THE MIDDLE, the record's word for the rail somebody chose. With the top bar the default again (the owner's
+       * choice 1, 20 October), a record that keeps nothing draws the bar, and a `bar` here would be one answer twice. The record's
        * legacy `rail` reads as no choice, which `nav-prefs.svelte.test.ts` holds.
        */
       name: 'nav.shape',
@@ -598,6 +598,24 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       route: '/',
       values: [{ '@record': {} }, { '@record': { 'look.theme': 'house' } }],
       probe: () => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim() || 'no accent',
+    },
+    {
+      /** `agents.answer_in_chat`: the Answer from inside chat apps switch as the record keeps it (Settings > Agents). */
+      name: 'agents.answer_in_chat',
+      record: true,
+      what: 'the Answer from inside chat apps switch, as the record keeps it',
+      route: '/settings/agents',
+      values: [{ '@record': {} }, { '@record': { 'agents.answer_in_chat': true } }],
+      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer from inside chat apps"]')?.getAttribute('aria-checked') ?? 'none',
+    },
+    {
+      /** `agents.answer_in_chat`: the Answer from inside chat apps switch as the record keeps it (Settings > Agents). */
+      name: 'agents.answer_in_chat',
+      record: true,
+      what: 'the Answer from inside chat apps switch, as the record keeps it',
+      route: '/settings/agents',
+      values: [{ '@record': {} }, { '@record': { 'agents.answer_in_chat': true } }],
+      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer from inside chat apps"]')?.getAttribute('aria-checked') ?? 'none',
     },
   ];
 

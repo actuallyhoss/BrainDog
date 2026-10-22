@@ -45,7 +45,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
-import { chromium } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 
 import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
 import { answers, forward, forwards, recordAt, startRecord, VARIANTS as RECORDS } from './record.mjs';
@@ -301,7 +301,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
    * From `APPS[0]`, the record app, because that is the shell the contract belongs to. The marketing
    * site is `spa: false` and is passed as prerendered below.
    */
-  const ready = readiness('a11y', budget('ready').settleTimeoutMs, APPS[0].root);
+  const ready = readiness('a11y', budget('ready').settleTimeoutMs, APPS[0].root, { quietMs: budget('ready').quietMs });
 
   /* BOTH DERIVATIONS ANSWERED FOR BEFORE A PORT IS BOUND OR A BROWSER LAUNCHED. A coverage hole is a
      fact about the tree, and two full runs of this gate on this machine took 380s and 340s, so a
@@ -439,6 +439,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
   let record = null;
   let server = null;
   let browser = null;
+  const spent = [];
   try {
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
@@ -488,11 +489,13 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
        operating system hands out free at the moment of the bind, and every URL below is built from
        what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
        `::`, which is what `localhost` reaches first on this machine. */
+    /* LONGER THAN WEBKIT KEEPS A CONNECTION: node closes an idle one after 5s, and WebKit reusing it then fails a whole
+       page's first fetches at once, which the gate read as the app's. */
+    server.keepAliveTimeout = budget('ready').settleTimeoutMs;
     await new Promise((r) => server.listen(0, r));
     const PORT = server.address().port;
     await answers(`http://localhost:${PORT}`);
 
-    browser = await chromium.launch();
     /** `id -> { help, nodes: Set<'route scheme@width  target'> }`, so one bug is one line however often it repeats. */
     const found = new Map();
     /** Apps this run did not look at. A skip is not a pass. See the exit at the bottom. */
@@ -531,7 +534,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * exactly where the 244 left them: holding a total with no way to see which surfaces are inside it,
      * and a missing surface is the reading that costs the most.
      */
-    const per = new Map(APPS.map((a) => [a.name, { runs: 0, routes: new Set(), states: new Set(), built: true }]));
+    const ENGINES = [['chromium', chromium], ['webkit', webkit]];
+    const perEngine = new Map(ENGINES.map(([e]) => [e, new Map(APPS.map((a) => [a.name, { runs: 0, routes: new Set(), states: new Set(), built: true }]))]));
 
     /**
      * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE. The same argument as `layout.mjs`'s:
@@ -549,316 +553,327 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     const SEEDED = SEEDS.size > 0 || unplanted;
     const SCHEMES = SEEDED ? ['dark'] : ['dark', 'light'];
     const WIDTHS = SEEDED ? A.widths.slice(0, 1) : A.widths;
+    /* AND WEBKIT'S OWN, the Mac window and the phone (`webkitWidths`), so each engine's line says the widths it drew. */
+    const widthsOf = (engine) => (engine === 'chromium' ? WIDTHS : A.webkitWidths);
 
-    for (const app of APPS) {
-      if (!(await stat(app.root).catch(() => null))) {
-        /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
-           build it, and the gate still printed its own green line.
+    /* BOTH ENGINES, ONE LAUNCH EACH: the Mac app draws with Safari's engine (55 §4), so WebKit is held to the same rules
+       and schemes as Chromium, at its own widths. A seeded run is a negative of the rules and stays on Chromium. */
+    for (const [engine, kind] of ENGINES) {
+      if (SEEDED && engine !== 'chromium') continue;
+      /* THE FIRST ENGINE'S BROWSER STAYS OPEN UNTIL THE `finally`, which closes every one, so a throw cannot skip a close. */
+      if (browser) spent.push(browser);
+      browser = await kind.launch();
+      const per = perEngine.get(engine);
+      for (const app of APPS) {
+        if (!(await stat(app.root).catch(() => null))) {
+          /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
+             build it, and the gate still printed its own green line.
 
-           A VARIANT RECORD IS SERVED FROM THE MAIN BUILD, so it is missing exactly when the record app is, and
-           that is already the skip above it in `APPS`. */
-        console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
-        skipped.push(app.name);
-        per.get(app.name).built = false;
-        continue;
-      }
-      current = app;
-      /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS AUDITED ON IT, as `answers` proved of the gates' own record
-         above: a pass whose forward still pointed at that record would audit it a second time under another name. */
-      if (app.record !== undefined) await answers(`http://localhost:${PORT}`);
+             A VARIANT RECORD IS SERVED FROM THE MAIN BUILD, so it is missing exactly when the record app is, and
+             that is already the skip above it in `APPS`. */
+          console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
+          if (!skipped.includes(app.name)) skipped.push(app.name);
+          per.get(app.name).built = false;
+          continue;
+        }
+        current = app;
+        /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS AUDITED ON IT, as `answers` proved of the gates' own record
+           above: a pass whose forward still pointed at that record would audit it a second time under another name. */
+        if (app.record !== undefined) await answers(`http://localhost:${PORT}`);
 
-      for (const scheme of SCHEMES) {
-        for (const width of WIDTHS) {
-          /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): on the record's clock, the variant's own for
-             a variant pass, with motion off (axe reads a mid-animation opacity as the real one) and the CSP bypassed
-             (axe goes in as an inline script; that changes what the audit can run, not what the page is). */
-          const pass = app.record !== undefined && record.variants[app.record] ? recordAt(record.variants[app.record]) : record;
-          const opened = await openPage(browser, `http://localhost:${PORT}${app.spa ? APP_BASE : ''}${app.routes[0] ?? '/'}`, {
-            width,
-            scheme,
-            record: pass,
-            ready,
-            waitUntil: 'networkidle',
-            prerendered: !app.spa,
-          });
-          const { context, page } = opened;
-          /* A gate that runs a browser over sixty-eight pages and prints nothing for four minutes is a
-             gate people learn to kill. One line per pass, flushed as it goes. */
-
-
-          /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
-          const open = async (route) => {
-            /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `MAY_REFUSE` is
-               written in those words. The site is prerendered at the root. */
-            /* The one readiness site in this gate, because every load goes through here (`opened.goto` waits for the
-               screen as `openPage` does, and collects the load's errors afresh). */
-            const state = await opened.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`);
-            /* Two things, and the second is about the gate being TRUSTWORTHY rather than about the app.
-               An un-laid-out rowgroup has no colours to measure, which is why the screenshots do it too.
-               And every transition is killed outright: `reducedMotion` suppresses the animations that
-               honour the media query, but a `transition` on a hover or focus colour is not covered by it,
-               and axe measuring a colour halfway through one is a contrast finding that appears and
-               disappears between runs. A gate that fails one run in ten is a gate people re-run until it
-               passes, which is the same as not having one. It does not reach a transition the app forces
-               `!important` inside a layer, and `audit` waits those out. */
-            await page.addStyleTag({
-              content:
-                '.rowgroup{content-visibility:visible !important}' +
-                '*,*::before,*::after{transition:none !important;animation:none !important}',
+        for (const scheme of SCHEMES) {
+          for (const width of widthsOf(engine)) {
+            /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): on the record's clock, the variant's own for
+               a variant pass, with motion off (axe reads a mid-animation opacity as the real one) and the CSP bypassed
+               (axe goes in as an inline script; that changes what the audit can run, not what the page is). */
+            const pass = app.record !== undefined && record.variants[app.record] ? recordAt(record.variants[app.record]) : record;
+            const opened = await openPage(browser, `http://localhost:${PORT}${app.spa ? APP_BASE : ''}${app.routes[0] ?? '/'}`, {
+              width,
+              scheme,
+              record: pass,
+              ready,
+              waitUntil: 'networkidle',
+              prerendered: !app.spa,
             });
-            /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `a11y-intent` (or `intent`)
-               a row wearing an intent and carrying no name for it is put into `#main` (the exact bug the
-               rule is for), and the run must go red. Here rather than in a fixture tree for the same
-               reason the layout gate's is: the thing under test is a real browser over a real build. */
-            if (SEEDS.has('a11y-intent'))
-              await page.evaluate(() => {
-                /* AN ANCHOR, NOT A `div`, and that is the whole of what the negative is worth.
-               
-                   The first version seeded a bare `<div>`, which the old exemption did not cover. So the
-                   gate proved itself against the one shape that could not slip through, while every phone
-                   card, being `<a class="card" href=…>`, was exempt. A negative that cannot fail the way
-                   the rule fails is a negative that certifies nothing. */
-                const el = document.createElement('a');
-                el.className = 'seeded';
-                el.href = '#seeded';
-                el.dataset.intent = 'bad';
-                el.textContent = 'a meaning carried by colour and nothing else';
-                document.getElementById('main')?.prepend(el);
+            const { context, page } = opened;
+            /* A gate that runs a browser over sixty-eight pages and prints nothing for four minutes is a
+               gate people learn to kill. One line per pass, flushed as it goes. */
+
+
+            /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
+            const open = async (route) => {
+              /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `MAY_REFUSE` is
+                 written in those words. The site is prerendered at the root. */
+              /* The one readiness site in this gate, because every load goes through here (`opened.goto` waits for the
+                 screen as `openPage` does, and collects the load's errors afresh). */
+              const state = await opened.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`);
+              /* Two things, and the second is about the gate being TRUSTWORTHY rather than about the app.
+                 An un-laid-out rowgroup has no colours to measure, which is why the screenshots do it too.
+                 And every transition is killed outright: `reducedMotion` suppresses the animations that
+                 honour the media query, but a `transition` on a hover or focus colour is not covered by it,
+                 and axe measuring a colour halfway through one is a contrast finding that appears and
+                 disappears between runs. A gate that fails one run in ten is a gate people re-run until it
+                 passes, which is the same as not having one. It does not reach a transition the app forces
+                 `!important` inside a layer, and `audit` waits those out. */
+              await page.addStyleTag({
+                content:
+                  '.rowgroup{content-visibility:visible !important}' +
+                  '*,*::before,*::after{transition:none !important;animation:none !important}',
               });
-            /* `a11y-site`: A BUTTON WITH NO NAME ON THE MARKETING SITE, and only there, so the red can only
-               come from the surface the seed is about. One of `button-name`'s plain cases on purpose: the
-               rule is axe's, and what is under test is that the shop window is in front of it at all. */
-            if (SEEDS.has('a11y-site') && app.name === 'site')
-              await page.evaluate(() => {
-                const el = document.createElement('button');
-                el.id = 'seeded-site';
-                el.type = 'button';
-                el.style.cssText = 'width:44px;height:44px;position:relative;z-index:2147483647';
-                (document.querySelector('main') ?? document.body).prepend(el);
-              });
-            await page.addScriptTag({ content: axeSource });
-            /* `a11y-contrast`: A LINE AT `seedContrastRatio` TO 1 ON THE BOARD ITSELF, worked out from the
-               colour the board is in this scheme rather than written down, so a retuned token cannot make
-               the plant pass. Measured with axe's own `getContrast`, the arithmetic the rule then judges it
-               by, which is why it comes after axe is in the page; the ink is the board walked towards white,
-               or towards black where white cannot reach the ratio, until it stands at it. The board's colour
-               goes through a canvas because a computed `oklch()` is not an `rgb()` axe can parse. Its own
-               background is the board's, opaque and on top, so axe can measure it rather than file it under
-               "needs review", which this gate does not ask for and would read as a pass. */
-            if (SEEDS.has('a11y-contrast') && app.spa)
-              await page.evaluate((ratio) => {
-                const main = document.getElementById('main');
-                if (!main) return;
-                let at = main;
-                while (at && getComputedStyle(at).backgroundColor.replace(/\s/g, '').match(/^(transparent|rgba\(0,0,0,0\))$/)) at = at.parentElement;
-                const ctx = document.createElement('canvas').getContext('2d');
-                const pixel = (css) => {
-                  ctx.fillStyle = css;
-                  ctx.fillRect(0, 0, 1, 1);
-                  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-                  return [r, g, b];
-                };
+              /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `a11y-intent` (or `intent`)
+                 a row wearing an intent and carrying no name for it is put into `#main` (the exact bug the
+                 rule is for), and the run must go red. Here rather than in a fixture tree for the same
+                 reason the layout gate's is: the thing under test is a real browser over a real build. */
+              if (SEEDS.has('a11y-intent'))
+                await page.evaluate(() => {
+                  /* AN ANCHOR, NOT A `div`, and that is the whole of what the negative is worth.
+                 
+                     The first version seeded a bare `<div>`, which the old exemption did not cover. So the
+                     gate proved itself against the one shape that could not slip through, while every phone
+                     card, being `<a class="card" href=…>`, was exempt. A negative that cannot fail the way
+                     the rule fails is a negative that certifies nothing. */
+                  const el = document.createElement('a');
+                  el.className = 'seeded';
+                  el.href = '#seeded';
+                  el.dataset.intent = 'bad';
+                  el.textContent = 'a meaning carried by colour and nothing else';
+                  document.getElementById('main')?.prepend(el);
+                });
+              /* `a11y-site`: A BUTTON WITH NO NAME ON THE MARKETING SITE, and only there, so the red can only
+                 come from the surface the seed is about. One of `button-name`'s plain cases on purpose: the
+                 rule is axe's, and what is under test is that the shop window is in front of it at all. */
+              if (SEEDS.has('a11y-site') && app.name === 'site')
+                await page.evaluate(() => {
+                  const el = document.createElement('button');
+                  el.id = 'seeded-site';
+                  el.type = 'button';
+                  el.style.cssText = 'width:44px;height:44px;position:relative;z-index:2147483647';
+                  (document.querySelector('main') ?? document.body).prepend(el);
+                });
+              await page.addScriptTag({ content: axeSource });
+              /* `a11y-contrast`: A LINE AT `seedContrastRatio` TO 1 ON THE BOARD ITSELF, worked out from the
+                 colour the board is in this scheme rather than written down, so a retuned token cannot make
+                 the plant pass. Measured with axe's own `getContrast`, the arithmetic the rule then judges it
+                 by, which is why it comes after axe is in the page; the ink is the board walked towards white,
+                 or towards black where white cannot reach the ratio, until it stands at it. The board's colour
+                 goes through a canvas because a computed `oklch()` is not an `rgb()` axe can parse. Its own
+                 background is the board's, opaque and on top, so axe can measure it rather than file it under
+                 "needs review", which this gate does not ask for and would read as a pass. */
+              if (SEEDS.has('a11y-contrast') && app.spa)
+                await page.evaluate((ratio) => {
+                  const main = document.getElementById('main');
+                  if (!main) return;
+                  let at = main;
+                  while (at && getComputedStyle(at).backgroundColor.replace(/\s/g, '').match(/^(transparent|rgba\(0,0,0,0\))$/)) at = at.parentElement;
+                  const ctx = document.createElement('canvas').getContext('2d');
+                  const pixel = (css) => {
+                    ctx.fillStyle = css;
+                    ctx.fillRect(0, 0, 1, 1);
+                    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                    return [r, g, b];
+                  };
+                  // @ts-expect-error injected
+                  const { Color, getContrast } = window.axe.commons.color;
+                  const color = (rgb) => {
+                    const c = new Color();
+                    c.parseString(`rgb(${rgb.map(Math.round).join(', ')})`);
+                    return c;
+                  };
+                  const board = pixel(at ? getComputedStyle(at).backgroundColor : 'white');
+                  const white = pixel('white');
+                  const end = getContrast(color(board), color(white)) >= ratio ? white : pixel('black');
+                  const towards = (t) => board.map((v, i) => v + (end[i] - v) * t);
+                  let lo = 0;
+                  let hi = 1;
+                  while (hi - lo > 1e-4) {
+                    const mid = lo + (hi - lo) * 0.5;
+                    if (getContrast(color(board), color(towards(mid))) < ratio) lo = mid;
+                    else hi = mid;
+                  }
+                  const el = document.createElement('p');
+                  el.id = 'seeded-contrast';
+                  el.textContent = 'a line nobody can read on the board';
+                  el.style.cssText =
+                    `color:rgb(${towards(lo).map(Math.round).join(',')});background:rgb(${board.join(',')});` +
+                    'font-size:15px;position:relative;z-index:2147483647';
+                  main.prepend(el);
+                }, A.seedContrastRatio);
+              return state;
+            };
+
+            const audit = async (where) => {
+              /* AND WHAT THE KILL ABOVE CANNOT REACH, IT WAITS OUT. `a11y.css` keeps a 120ms fade under reduced motion,
+                 written `!important` inside `@layer a11y`, and an important declaration in a layer outranks an
+                 unlayered important one, so the `transition:none` this gate injects loses to it. A menu or a sheet
+                 opened by a click is audited the instant it is open, at 0.6 of its opacity, and axe measures every
+                 word on it blended into the ground: dim at 2.6:1 and ink-2 at 3.7:1 in dark, colours no token
+                 has. So every finite animation still running is let finish first, and the page is measured as a
+                 reader sees it once it has arrived. Bounded by the readiness wait, so a stuck one cannot hang a run. */
+              await page.evaluate(
+                (cap) =>
+                  Promise.race([
+                    Promise.all(
+                      document
+                        .getAnimations()
+                        .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime))
+                        .map((a) => a.finished.catch(() => {})),
+                    ),
+                    new Promise((r) => setTimeout(r, cap)),
+                  ]),
+                budget('ready').settleTimeoutMs,
+              );
+              const result = await page.evaluate(async () => {
                 // @ts-expect-error injected
-                const { Color, getContrast } = window.axe.commons.color;
-                const color = (rgb) => {
-                  const c = new Color();
-                  c.parseString(`rgb(${rgb.map(Math.round).join(', ')})`);
-                  return c;
-                };
-                const board = pixel(at ? getComputedStyle(at).backgroundColor : 'white');
-                const white = pixel('white');
-                const end = getContrast(color(board), color(white)) >= ratio ? white : pixel('black');
-                const towards = (t) => board.map((v, i) => v + (end[i] - v) * t);
-                let lo = 0;
-                let hi = 1;
-                while (hi - lo > 1e-4) {
-                  const mid = lo + (hi - lo) * 0.5;
-                  if (getContrast(color(board), color(towards(mid))) < ratio) lo = mid;
-                  else hi = mid;
-                }
-                const el = document.createElement('p');
-                el.id = 'seeded-contrast';
-                el.textContent = 'a line nobody can read on the board';
-                el.style.cssText =
-                  `color:rgb(${towards(lo).map(Math.round).join(',')});background:rgb(${board.join(',')});` +
-                  'font-size:15px;position:relative;z-index:2147483647';
-                main.prepend(el);
-              }, A.seedContrastRatio);
-            return state;
-          };
-
-          const audit = async (where) => {
-            /* AND WHAT THE KILL ABOVE CANNOT REACH, IT WAITS OUT. `a11y.css` keeps a 120ms fade under reduced motion,
-               written `!important` inside `@layer a11y`, and an important declaration in a layer outranks an
-               unlayered important one, so the `transition:none` this gate injects loses to it. A menu or a sheet
-               opened by a click is audited the instant it is open, at 0.6 of its opacity, and axe measures every
-               word on it blended into the ground: dim at 2.6:1 and ink-2 at 3.7:1 in dark, colours no token
-               has. So every finite animation still running is let finish first, and the page is measured as a
-               reader sees it once it has arrived. Bounded by the readiness wait, so a stuck one cannot hang a run. */
-            await page.evaluate(
-              (cap) =>
-                Promise.race([
-                  Promise.all(
-                    document
-                      .getAnimations()
-                      .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime))
-                      .map((a) => a.finished.catch(() => {})),
-                  ),
-                  new Promise((r) => setTimeout(r, cap)),
-                ]),
-              budget('ready').settleTimeoutMs,
-            );
-            const result = await page.evaluate(async () => {
-              // @ts-expect-error injected
-              return await window.axe.run(document, {
-                runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
-                resultTypes: ['violations'],
+                return await window.axe.run(document, {
+                  runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
+                  resultTypes: ['violations'],
+                });
               });
-            });
-            /**
-             * COLOUR NEVER CARRIES MEANING ALONE (`13 §5.1`), and axe cannot decide it.
-             *
-             * "The glyph is part of the intent token, not a choice at the call site. There is exactly one
-             * table mapping intent → (role, glyph), and it is the only path by which an intent reaches the
-             * DOM. A component cannot render `warn` without its glyph because there is no API that lets
-             * it." There WAS such a path: `data-intent` is an attribute, and four components set it and
-             * drew a coloured edge and nothing else. Measured on `/r/obligations`: sixteen rows carrying
-             * an intent, zero elements naming one. So an overdue invoice and a paid one were the same
-             * row to a screen reader and the same row to anybody who does not see red.
-             *
-             * WHAT COUNTS AS NAMED. The intent's own glyph, `role="img"` with the `TONES` label, anywhere
-             * inside the element. That is the shape every primitive that got it right already emits, so
-             * the rule is "do what `List` does" rather than a new contract.
-             *
-             * WHAT IS EXEMPT: an element whose own TEXT is the meaning, and the list is named rather
-             * than described. A `.btn` reading `Uninstall` or `Stop the run` is not telling you it is
-             * destructive with colour. It is telling you with the verb. A `.count` or `.badge` is a
-             * number, and the tint is emphasis on a fact already written out. A `.toast` is a whole
-             * sentence in a live region: "Nothing was written" says what happened, and the amber agrees.
-             *
-             * IT WAS WRITTEN AS `button, a[href], .count, .badge` AND EXEMPTED THE SURFACE IT WAS FOR.
-             * Every phone card is `<a class="card" href=… data-intent=…>`, so all sixteen rows on
-             * `/r/obligations` at 390 were exempt. That is one of the four components the rule was
-             * written to protect, and stripping every glyph out of them left the gate green. Being a
-             * link is not being a sentence. The exemption is by class now, and each class is here with
-             * its reason.
-             *
-             * The guard was also written `el.closest(sel)?.contains(el) && el.matches(sel)`, and an
-             * element always contains itself, so the first half could never decide anything. Dead code
-             * inside the test that decides whether the rule applies.
-             */
-            const unnamed = await page.evaluate(() => {
-              const out = [];
-              for (const el of document.querySelectorAll('[data-intent]')) {
-                if (el.matches('.btn, .count, .badge, .toast')) continue;
-                if (el.querySelector('[role="img"][aria-label]')) continue;
-                /* A NESTED INTENT IS ONE INTENT. `Block` puts `data-intent` on the figure AND on its own
-                   figcaption; the glyph is in the caption, so the figure is named through it. */
-                if (el.querySelector('[data-intent] [role="img"][aria-label]')) continue;
-                out.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}[${el.getAttribute('data-intent')}]`);
+              /**
+               * COLOUR NEVER CARRIES MEANING ALONE (`13 §5.1`), and axe cannot decide it.
+               *
+               * "The glyph is part of the intent token, not a choice at the call site. There is exactly one
+               * table mapping intent → (role, glyph), and it is the only path by which an intent reaches the
+               * DOM. A component cannot render `warn` without its glyph because there is no API that lets
+               * it." There WAS such a path: `data-intent` is an attribute, and four components set it and
+               * drew a coloured edge and nothing else. Measured on `/r/obligations`: sixteen rows carrying
+               * an intent, zero elements naming one. So an overdue invoice and a paid one were the same
+               * row to a screen reader and the same row to anybody who does not see red.
+               *
+               * WHAT COUNTS AS NAMED. The intent's own glyph, `role="img"` with the `TONES` label, anywhere
+               * inside the element. That is the shape every primitive that got it right already emits, so
+               * the rule is "do what `List` does" rather than a new contract.
+               *
+               * WHAT IS EXEMPT: an element whose own TEXT is the meaning, and the list is named rather
+               * than described. A `.btn` reading `Uninstall` or `Stop the run` is not telling you it is
+               * destructive with colour. It is telling you with the verb. A `.count` or `.badge` is a
+               * number, and the tint is emphasis on a fact already written out. A `.toast` is a whole
+               * sentence in a live region: "Nothing was written" says what happened, and the amber agrees.
+               *
+               * IT WAS WRITTEN AS `button, a[href], .count, .badge` AND EXEMPTED THE SURFACE IT WAS FOR.
+               * Every phone card is `<a class="card" href=… data-intent=…>`, so all sixteen rows on
+               * `/r/obligations` at 390 were exempt. That is one of the four components the rule was
+               * written to protect, and stripping every glyph out of them left the gate green. Being a
+               * link is not being a sentence. The exemption is by class now, and each class is here with
+               * its reason.
+               *
+               * The guard was also written `el.closest(sel)?.contains(el) && el.matches(sel)`, and an
+               * element always contains itself, so the first half could never decide anything. Dead code
+               * inside the test that decides whether the rule applies.
+               */
+              const unnamed = await page.evaluate(() => {
+                const out = [];
+                for (const el of document.querySelectorAll('[data-intent]')) {
+                  if (el.matches('.btn, .count, .badge, .toast')) continue;
+                  if (el.querySelector('[role="img"][aria-label]')) continue;
+                  /* A NESTED INTENT IS ONE INTENT. `Block` puts `data-intent` on the figure AND on its own
+                     figcaption; the glyph is in the caption, so the figure is named through it. */
+                  if (el.querySelector('[data-intent] [role="img"][aria-label]')) continue;
+                  out.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}[${el.getAttribute('data-intent')}]`);
+                }
+                return [...new Set(out)];
+              });
+              for (const u of unnamed) {
+                const at = mute.get(u) ?? new Set();
+                at.add(`${app.name} ${where} ${engine} ${scheme}@${width}`);
+                mute.set(u, at);
               }
-              return [...new Set(out)];
-            });
-            for (const u of unnamed) {
-              const at = mute.get(u) ?? new Set();
-              at.add(`${app.name} ${where} ${scheme}@${width}`);
-              mute.set(u, at);
+
+              checked++;
+              /* THE SAME RUN, COUNTED TWICE ON PURPOSE: once for the total and once against the surface it
+                 was on. `where` is an address for a page at rest and a scenario's name otherwise, which is
+                 the distinction the node labels below already rest on. */
+              const p = per.get(app.name);
+              p.runs++;
+              (where.startsWith('/') ? p.routes : p.states).add(where);
+              process.stdout.write(result.violations.length || unnamed.length ? '!' : '.');
+              for (const v of result.violations) {
+                const entry = found.get(v.id) ?? { help: v.help, impact: v.impact, nodes: new Set() };
+                for (const n of v.nodes) entry.nodes.add(`${app.name}${where.startsWith('/') ? '' : ' '}${where} ${engine} ${scheme}@${width}  ${n.target.join(' ')}`);
+                found.set(v.id, entry);
+              }
+            };
+
+            process.stdout.write(`    ${(app.name + '     ').slice(0, 5)} ${(scheme + '@' + width + '   ').slice(0, 11)} `);
+            for (const route of app.routes) {
+              const where = `${app.name} ${route} ${engine} ${scheme}@${width}`;
+              const unmeasured = ready.check(where, route, await open(route));
+              /* AUDITING AN UNSETTLED PAGE IS THE FAILURE, NOT THE FALLBACK. Axe over a document with no
+                 `h1` fails `page-has-heading-one` on every route, which is the sixty-four-findings-that-say-
+                 nothing failure the SPA fallback comment above already records happening once. A red that
+                 blames the app for the gate's timing is a red somebody widens the rule to silence. */
+              if (unmeasured) {
+                unsettled.push(unmeasured);
+                process.stdout.write('~');
+                continue;
+              }
+              await audit(route);
             }
 
-            checked++;
-            /* THE SAME RUN, COUNTED TWICE ON PURPOSE: once for the total and once against the surface it
-               was on. `where` is an address for a page at rest and a scenario's name otherwise, which is
-               the distinction the node labels below already rest on. */
-            const p = per.get(app.name);
-            p.runs++;
-            (where.startsWith('/') ? p.routes : p.states).add(where);
-            process.stdout.write(result.violations.length || unnamed.length ? '!' : '.');
-            for (const v of result.violations) {
-              const entry = found.get(v.id) ?? { help: v.help, impact: v.impact, nodes: new Set() };
-              for (const n of v.nodes) entry.nodes.add(`${app.name}${where.startsWith('/') ? '' : ' '}${where} ${scheme}@${width}  ${n.target.join(' ')}`);
-              found.set(v.id, entry);
-            }
-          };
-
-          process.stdout.write(`    ${(app.name + '     ').slice(0, 5)} ${(scheme + '@' + width + '   ').slice(0, 11)} `);
-          for (const route of app.routes) {
-            const where = `${app.name} ${route} ${scheme}@${width}`;
-            const unmeasured = ready.check(where, route, await open(route));
-            /* AUDITING AN UNSETTLED PAGE IS THE FAILURE, NOT THE FALLBACK. Axe over a document with no
-               `h1` fails `page-has-heading-one` on every route, which is the sixty-four-findings-that-say-
-               nothing failure the SPA fallback comment above already records happening once. A red that
-               blames the app for the gate's timing is a red somebody widens the rule to silence. */
-            if (unmeasured) {
-              unsettled.push(unmeasured);
-              process.stdout.write('~');
+            /* States are the record app's. The site is five prerendered pages with nothing to drive, and a
+               variant's record changes none of the routes the scenarios stand on. */
+            if (!app.states) {
+              process.stdout.write('\n');
+              await context.close();
               continue;
             }
-            await audit(route);
-          }
 
-          /* States are the record app's. The site is five prerendered pages with nothing to drive, and a
-             variant's record changes none of the routes the scenarios stand on. */
-          if (!app.states) {
+            process.stdout.write(' ');
+            for (const st of STATES) {
+              if (st.desktop && width < 900) continue;
+              /* A LIST IS CARDS BELOW 640 (`packages/render/svelte/cards.svelte.ts`), and the filter control changes with it. */
+              if ((st.wide && width < 640) || (st.narrow && width >= 640)) continue;
+              const unmeasured = ready.check(`${app.name} ${st.name} ${engine} ${scheme}@${width}`, st.route, await open(st.route));
+              /* THE ROUTE BEFORE THE KEYSTROKE. A scenario whose page never settled has no grid for the key
+                 to act on, and reporting that as `no dialog[open]` is the gate accusing the app of its own
+                 timing. `/r/nope` is in `MAY_REFUSE`, so `empty: not found` still runs on a refusal, which
+                 is the state it exists to audit. */
+              if (unmeasured) {
+                unsettled.push(unmeasured);
+                process.stdout.write('~');
+                continue;
+              }
+              // Focus the grid first: bare letters act only inside one, which is the point of the rule.
+              /* SHORT timeouts, and they matter. Both of these clicks are speculative (a page surface has
+                 no `[role="row"]` at all), and Playwright's default is to wait thirty seconds before
+                 admitting it. Fourteen scenarios times four passes times thirty seconds is twenty-eight
+                 minutes, against the six the whole gate takes today: the difference between a gate that
+                 runs and a gate nobody waits for. `Nine` was the count when this was written, and `STATES`
+                 holds fourteen. */
+              await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
+              /* AND WHAT THAT CLICK STARTED HAS LANDED. The first row is the header, and since the tables were redrawn its
+                 middle is a column's sort: the list is read again in that order, and a key pressed while it arrives acts
+                 on a row the answer then replaces. */
+              await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+              for (const sel of [st.click].flat().filter(Boolean)) await page.locator(sel).first().click({ timeout: 1200 }).catch(() => {});
+              for (const k of st.keys ?? []) {
+                await page.keyboard.press(k);
+                await page.waitForTimeout(120);
+              }
+              /* TWO SECONDS TO ARRIVE, since a toast or a sheet follows a write and a loaded runner takes longer than a key's
+                 120ms to answer one. A state that is there is found at once. */
+              if (!(await page.locator(st.expect).first().waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false))) {
+                broken.push(`${app.name} ${st.name} ${engine} ${scheme}@${width}: after ${st.click ? [st.click].flat().join(' then ') : st.keys.join(' ')}, no ${st.expect}`);
+                process.stdout.write('?');
+                continue;
+              }
+              /* `a11y-state`: THE SHEET THAT OPENED LOSES ITS NAME, in the state it can only be in after a key.
+                 `role="dialog"` is written out because axe's `aria-dialog-name` reads the explicit role and not
+                 the element, and every name a dialog can carry is taken away. Only on a scenario that opened
+                 one, so the red names a state this pass reached rather than a page at rest. */
+              if (SEEDS.has('a11y-state'))
+                await page.evaluate(() => {
+                  const el = document.querySelector('dialog[open]');
+                  if (!el) return;
+                  el.setAttribute('role', 'dialog');
+                  el.id = 'seeded-dialog';
+                  for (const a of ['aria-label', 'aria-labelledby', 'title']) el.removeAttribute(a);
+                });
+              await audit(st.name);
+            }
             process.stdout.write('\n');
             await context.close();
-            continue;
           }
-
-          process.stdout.write(' ');
-          for (const st of STATES) {
-            if (st.desktop && width < 900) continue;
-            /* A LIST IS CARDS BELOW 640 (`packages/render/svelte/cards.svelte.ts`), and the filter control changes with it. */
-            if ((st.wide && width < 640) || (st.narrow && width >= 640)) continue;
-            const unmeasured = ready.check(`${app.name} ${st.name} ${scheme}@${width}`, st.route, await open(st.route));
-            /* THE ROUTE BEFORE THE KEYSTROKE. A scenario whose page never settled has no grid for the key
-               to act on, and reporting that as `no dialog[open]` is the gate accusing the app of its own
-               timing. `/r/nope` is in `MAY_REFUSE`, so `empty: not found` still runs on a refusal, which
-               is the state it exists to audit. */
-            if (unmeasured) {
-              unsettled.push(unmeasured);
-              process.stdout.write('~');
-              continue;
-            }
-            // Focus the grid first: bare letters act only inside one, which is the point of the rule.
-            /* SHORT timeouts, and they matter. Both of these clicks are speculative (a page surface has
-               no `[role="row"]` at all), and Playwright's default is to wait thirty seconds before
-               admitting it. Fourteen scenarios times four passes times thirty seconds is twenty-eight
-               minutes, against the six the whole gate takes today: the difference between a gate that
-               runs and a gate nobody waits for. `Nine` was the count when this was written, and `STATES`
-               holds fourteen. */
-            await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
-            /* AND WHAT THAT CLICK STARTED HAS LANDED. The first row is the header, and since the tables were redrawn its
-               middle is a column's sort: the list is read again in that order, and a key pressed while it arrives acts
-               on a row the answer then replaces. */
-            await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-            for (const sel of [st.click].flat().filter(Boolean)) await page.locator(sel).first().click({ timeout: 1200 }).catch(() => {});
-            for (const k of st.keys ?? []) {
-              await page.keyboard.press(k);
-              await page.waitForTimeout(120);
-            }
-            /* TWO SECONDS TO ARRIVE, since a toast or a sheet follows a write and a loaded runner takes longer than a key's
-               120ms to answer one. A state that is there is found at once. */
-            if (!(await page.locator(st.expect).first().waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false))) {
-              broken.push(`${app.name} ${st.name} ${scheme}@${width}: after ${st.click ? [st.click].flat().join(' then ') : st.keys.join(' ')}, no ${st.expect}`);
-              process.stdout.write('?');
-              continue;
-            }
-            /* `a11y-state`: THE SHEET THAT OPENED LOSES ITS NAME, in the state it can only be in after a key.
-               `role="dialog"` is written out because axe's `aria-dialog-name` reads the explicit role and not
-               the element, and every name a dialog can carry is taken away. Only on a scenario that opened
-               one, so the red names a state this pass reached rather than a page at rest. */
-            if (SEEDS.has('a11y-state'))
-              await page.evaluate(() => {
-                const el = document.querySelector('dialog[open]');
-                if (!el) return;
-                el.setAttribute('role', 'dialog');
-                el.id = 'seeded-dialog';
-                for (const a of ['aria-label', 'aria-labelledby', 'title']) el.removeAttribute(a);
-              });
-            await audit(st.name);
-          }
-          process.stdout.write('\n');
-          await context.close();
         }
       }
     }
@@ -870,7 +885,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
     /* `n OF m SURFACES` AND NOT `m`, because a run on a tree with no marketing site built would otherwise
        claim five surfaces in the same breath as the five lines below saying it looked at four. */
-    const audited = [...per.values()].filter((p) => p.built).length;
+    const audited = [...perEngine.get('chromium').values()].filter((p) => p.built).length;
     console.log(
       `  a11y: ${checked} page-runs over ${audited} of ${APPS.length} surface(s), ` +
         `${found.size + (contrast ? 1 : 0) + (mute.size ? 1 : 0)} rule(s) with findings`,
@@ -894,15 +909,18 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * a scenario this run drove, and dropping it from the row would understate the coverage to make the
      * multiplication come out.
      */
-    for (const app of APPS) {
-      const p = per.get(app.name);
-      console.log(
-        p.built
-          ? `      ${app.name}: ${p.runs} page-runs over ${p.routes.size} route(s)` +
-              `${p.states.size ? ` and ${p.states.size} state scenario(s)` : ''}, ` +
-              `${SCHEMES.join(' and ')}, at ${WIDTHS.join(' and ')}`
-          : `      ${app.name}: 0 page-runs. Not built, so nothing on it was audited.`,
-      );
+    for (const [engine, per] of perEngine) {
+      if (SEEDED && engine !== 'chromium') continue;
+      for (const app of APPS) {
+        const p = per.get(app.name);
+        console.log(
+          p.built
+            ? `      ${engine} ${app.name}: ${p.runs} page-runs over ${p.routes.size} route(s)` +
+                `${p.states.size ? ` and ${p.states.size} state scenario(s)` : ''}, ` +
+                `${SCHEMES.join(' and ')}, at ${widthsOf(engine).join(' and ')}`
+            : `      ${engine} ${app.name}: 0 page-runs. Not built, so nothing on it was audited.`,
+        );
+      }
     }
     /* NOT SEEN WITH DATA (`routesFor`'s `unseen`): an address the record held nothing for, audited as not found. Said,
        never dropped, so a sweep that quietly stopped reaching a screen with the record on it reads as one. */
@@ -979,6 +997,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * has anything to hand back and neither may grow a close of its own.
      */
     await browser?.close().catch(() => {});
+    for (const b of spent) await b.close().catch(() => {});
     /* AWAITED, unlike the bare `server.close()` this replaces: the callback is the moment the listening
        socket is actually gone. The port is ephemeral, so no later gate is waiting on this number, but a
        socket still listening is a handle that keeps the runner from exiting. */

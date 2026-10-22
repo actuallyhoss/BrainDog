@@ -3,7 +3,7 @@
  *
  *   node tools/gates/core-names.mjs [root]
  *
- * THE DIRECTION'S WORDS (D29.52): nothing in `packages/` or `apps/` names one person's bank, their Shortcut or the
+ * THE DIRECTION'S WORDS: nothing in `packages/` or `apps/` names one person's bank, their Shortcut or the
  * tools of their own record. The unit is SHL-A01 in `loop/scope/area-shell-a.md`.
  *
  * IT READS THE NAMES, NOT A LIST OF WORDS. `shell-words` holds a list somebody wrote, and a list somebody wrote knows
@@ -245,6 +245,14 @@ const GRAMMAR = ['packages/kernel/src/declare.ts', 'packages/kernel/src/block-ke
 const VALUE_KINDS = ['packages/kernel/src/fx.ts'];
 
 /**
+ * ONE LIST BY NAME FROM A FILE THAT IS NOT ALL GRAMMAR. `govern.ts` declares the kinds of body a suggestion may carry
+ * (`BODY_KINDS`: a choice among `options`, a `rowset`, a `pack` and four more), which the kernel checks every question
+ * against, so `kind === 'options'` in a reader names the kernel's question and nobody's field. The rest of that file is
+ * code and its other lists are its own keys, so only this one list is read, and not the file.
+ */
+const NAMED_LISTS = { 'packages/kernel/src/govern.ts': ['BODY_KINDS'] };
+
+/**
  * THE WORDS THE KERNEL DECLARES FOR ITSELF, folded, read off its own source under one root. From a grammar file,
  * every one-word string in a list or a set a module-level constant in capitals is given (`const BLOCK_KINDS = [`,
  * `export const FIELD_TYPES = [`, `new Set([`), nested lists and spreads included, to the bracket that closes it. From
@@ -264,6 +272,13 @@ export function kernelWords(root) {
     }
   }
   for (const path of VALUE_KINDS) for (const q of textOf(path).matchAll(/\bkind: '([a-z][a-z0-9_-]*)'/g)) words.add(fold(q[1]));
+  for (const [path, lists] of Object.entries(NAMED_LISTS)) {
+    const text = textOf(path);
+    for (const name of lists) {
+      const m = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\[([^\\]]*)\\]`, 'm').exec(text);
+      for (const q of (m?.[1] ?? '').matchAll(/'([A-Za-z][A-Za-z0-9_-]*)'/g)) words.add(fold(q[1]));
+    }
+  }
   return words;
 }
 

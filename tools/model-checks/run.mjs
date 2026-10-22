@@ -19,7 +19,7 @@
  *
  * THE TOKEN IS READ FROM THE ENVIRONMENT AND NEVER PRINTED, and the account is cut out of every message kept. With no
  * token the run says not-measured in one warning line, writes its report and exits 0: that is the default until the
- * owner sets the two names (DIRECTION 42). It exits 1 on `measured-below` alone, the only red.
+ * owner sets the two names. It exits 1 on `measured-below` alone, the only red.
  *
  * The rules are in `lib.mjs`; this file is the network and the files.
  */

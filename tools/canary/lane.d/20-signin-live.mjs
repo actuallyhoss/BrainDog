@@ -4,7 +4,7 @@
  * `tools/gates/signin-live.mjs`, as the runner calls it, with one thing added: where the session it keeps for the look
  * goes. A green live run signs in once more and leaves that browser state at `sessionPath` (`../lib.mjs`), in the
  * runner's temporary folder and never under `LANE_OUT`, which is hung on the run. The look (`30-look.mjs`) reads it
- * and ends it. Until his sitting there is no canary, the gate signs in on a fresh self-host, keeps nothing, and its
+ * and ends it. Until the owner's sitting there is no canary, the gate signs in on a fresh self-host, keeps nothing, and its
  * line says "self-host only".
  *
  * A RED HERE STARTS THE ROLLBACK THAT EXISTS (`.github/workflows/after-deploy.yml`).

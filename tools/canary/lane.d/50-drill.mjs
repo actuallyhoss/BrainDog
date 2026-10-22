@@ -14,8 +14,8 @@
  * past midnight); the hold is read through `metric green-days` and the arrivals are cleared through `archiveArrival`,
  * each over HTTP with the self-host's key, as an owner would.
  *
- * ON THE CANARY IT WAITS on his sitting (PRF-A09, a drill door on the canary and its address kept as the secret
- * `CANARY_DRILL_DOOR`) and on his call on a weekly production run (B25). Until the weekly run sets `CANARY_DRILL=weekly`,
+ * ON THE CANARY IT WAITS on the owner's sitting (PRF-A09, a drill door on the canary and its address kept as the secret
+ * `CANARY_DRILL_DOOR`) and on a decision for a weekly production run (B25). Until the weekly run sets `CANARY_DRILL=weekly`,
  * a deploy drills a fresh self-host and says so. Once it does: on a Monday (UTC) the three arrivals go to the canary's
  * drill door; on a Tuesday the hold is read with the smoke's key and must be 0, and the lane signs in by itself (the look
  * ended the session it kept, `30-look.mjs`) to clear the three, then signs out. Any other day it has nothing to do.
@@ -39,7 +39,7 @@ export const ARRIVALS = 3;
 /** Words every drill arrival carries, so clearing takes the drill's own and nothing else. */
 export const MARK = 'BrainDog fire drill';
 
-/** The door the drill's arrivals come in at, on the self-host and, after his sitting, on the canary. */
+/** The door the drill's arrivals come in at, on the self-host and, after the owner's sitting, on the canary. */
 export const DOOR = 'fire-drill';
 
 /** The list the door would file into, were anything to match. */
@@ -53,7 +53,7 @@ const DAY = 86_400_000;
 /**
  * The drill door and the list it would file into. Its pattern asks for words no drill message holds, so every arrival
  * at it is stored and waits, which is exactly an arrival that cannot file. Nothing here names a bank, a list of his or a
- * record (DIRECTION §27).
+ * record.
  */
 export const DECLS = [
   { id: `register.${LIST}`, kind: 'register', body: { id: LIST, name: 'Fire drill', title: 'body', fields: [{ id: 'body', type: 'text', required: true }] } },
@@ -212,7 +212,7 @@ export function canaryStep(ms) {
 }
 
 /**
- * The weekly drill on the canary, once his sitting made its door and B25 made the weekly run. Monday lets the three in;
+ * The weekly drill on the canary, once the owner's sitting made its door and B25 made the weekly run. Monday lets the three in;
  * Tuesday reads the hold with the smoke's key, then signs in by itself to clear them and signs out. `io` holds `signIn`
  * (the passkey sign-in, `tools/gates/signin-live.mjs`), stubbed in the tests. Answers `{ code, lines }`.
  */
@@ -258,7 +258,7 @@ async function main(env = process.env) {
     for (const l of out.lines) (out.code ? console.error : console.log)(`  drill, on the canary ${place.slug}: ${l}`);
     return out.code;
   }
-  if (place.live) console.log(`  drill, on the canary ${place.slug}: waits on his sitting and on his call on a weekly production run (B25), so this deploy drills a fresh self-host.`);
+  if (place.live) console.log(`  drill, on the canary ${place.slug}: waits on the owner's sitting and on a decision for a weekly production run (B25), so this deploy drills a fresh self-host.`);
   const lines = [];
   const wrong = await selfHostDrill({ say: (l) => lines.push(l) });
   for (const l of lines) console.log(`  drill, ${SELF_HOST_ONLY}: ${l}`);

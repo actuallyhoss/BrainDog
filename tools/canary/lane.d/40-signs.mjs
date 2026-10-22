@@ -12,7 +12,7 @@
  * it (twelve hours behind UTC, and never after now): a reading this calls old is old in every zone. `CANARY_TZ`, when
  * set, makes it exact.
  *
- * ASKED WITH THE SMOKE'S KEY, `GET /app/<canary>/api/signs`, a read that files nothing. Until his sitting, a fresh
+ * ASKED WITH THE SMOKE'S KEY, `GET /app/<canary>/api/signs`, a read that files nothing. Until the owner's sitting, a fresh
  * self-host is asked with its server key: the route answers and every sign is there, and a record made a minute ago
  * has had no night, so the age is asked only of the canary, and the line says "self-host only".
  *

@@ -3,7 +3,7 @@
  *
  *   node tools/gates/audit-append-only.mjs [root]
  *
- * HIS WORDS ARE "append-only audit" (W.525), AND THE LOG IS A TABLE ANYBODY CAN `UPDATE`. On 9 October six statements
+ * THE AUDIT IS APPEND-ONLY (W.525), AND THE LOG IS A TABLE ANYBODY CAN `UPDATE`. On 9 October six statements
  * under `packages/*\/src` rewrote or reordered a line of `event`, and nothing failed on a seventh. The brief counted
  * four, the planner five: a count written down by hand is out of date by the next batch, which is why this list is a
  * list and its size is read off it, never written.

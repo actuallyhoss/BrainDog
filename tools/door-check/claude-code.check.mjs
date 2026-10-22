@@ -14,7 +14,7 @@
  *
  * WHAT IT NEEDS FROM OUTSIDE, AND NEVER WRITES DOWN. `ANTHROPIC_API_KEY` for Claude Code: without it the command is
  * still installed, since that needs no key, and then the row reads "not run: no key" and the night exits 0 with that
- * warning (DIRECTION 42 over the brief's exit 1); an install that fails is red either way. A sign-in for the
+ * warning (a missing key is news, not a failure, so not the brief's exit 1); an install that fails is red either way. A sign-in for the
  * record: `DOOR_TOKEN`, a key for that record which a harness or a person made, handed to the command as
  * `BRAINDOG_TOKEN` in its environment and to nothing else; without one, `setup` prints six digits and waits for a
  * person to approve them in the app, which in CI nobody can, so CI without one reads "not run" as well.

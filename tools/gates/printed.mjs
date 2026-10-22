@@ -12,8 +12,8 @@
  *   ULID, a key-shaped random string), a raw time (an ISO instant, seconds since 1970), a key where a value goes
  *   (`nav_shape`, `navShape`), a figure in double braces, an icon's name as a word, an amount cut off.
  *
- * His words: his pages "print no placeholder, raw id or raw timestamp" (DIRECTION 40), and "Gate must never invent data
- * it checks" (HD.221). So the screens are the record's, at the record's own addresses (`routes.mjs` `routesFor`), on
+ * The rules: a page prints no placeholder, raw id or raw timestamp, and a gate never invents the data it checks
+ * (HD.221). So the screens are the record's, at the record's own addresses (`routes.mjs` `routesFor`), on
  * the record's clock (`lib.mjs` `openPage`), and nothing here writes an answer.
  *
  * THE COPY RULES ARE NOT READ HERE. An em dash and the words row, list item and entity are the product's copy, held in
@@ -212,7 +212,7 @@ async function drawn(root) {
     const ORIGIN = `http://127.0.0.1:${server.address().port}`;
     await answers(ORIGIN);
 
-    const ready = readiness('printed', budget('ready').settleTimeoutMs, ROOT);
+    const ready = readiness('printed', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
     const { routes, unsampled, unseen, missing } = await routesFor(join(root, 'apps', 'web'), record);
     findings.push(...unsampled.map((u) => `${u}, so it was never drawn`));
     const width = Math.min(...budget('a11y').widths);

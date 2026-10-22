@@ -13,7 +13,7 @@
  * as a dashed tile with the block it needs, counted in the sheet's opening line, so the pages area reads its work off
  * the board.
  *
- * DRAWN ON THE PRODUCT'S OWN BOARD (DIRECTION 39 and 42): flat tiles on a flat ground, radius 16, no border and no
+ * DRAWN ON THE PRODUCT'S OWN BOARD: flat tiles on a flat ground, radius 16, no border and no
  * shadow, colours read from the theme's own sheet so `colour-grep` finds no literal here, and a fault carries a mark
  * and a word as well as the red.
  */

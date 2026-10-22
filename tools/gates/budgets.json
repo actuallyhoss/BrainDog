@@ -6,6 +6,8 @@
     "mainJsBrotli": 30720,
     "//mainJsNoise": "The recorded number is measured on a chunk that is 99% Svelte's runtime and Kit's client, and brotli over it does not respond linearly to source: on 2026-09-07, REMOVING an icon and a title attribute from a component moved the total UP by two bytes, and a second removal by two more. A byte-exact tripwire over that fires on legitimate work and can only be answered by re-recording, which makes the number mean nothing. 64 bytes is two orders of magnitude below the smallest regression worth catching — importing a module into the shell is hundreds of bytes to kilobytes — and one above the noise. The 30 KB budget above is unchanged and still prints.",
     "mainJsNoise": 64,
+    "//firstLoadJsBrotli": "22 §9. What a cold open of Today waits for: Kit's entry, the root layout and Today's node with everything they import statically. Measured at 639,093 on macOS on 2026-10-22, once the kernel, the seed's documents and the decision card left that path (it was 759,591), with under a kilobyte of room for brotli's noise and CI's Linux build. A ceiling with no debt: it only falls.",
+    "firstLoadJsBrotli": 640000,
     "mainCssBrotli": 12288,
     "htmlBrotli": 25600,
     "//fonts": "22 §9 budgets 45 KB over 2 files for one Latin face plus Arabic. This ships two Latin faces, so the workhorse keeps the original number and the display face — used only above 20px — gets its own. A recorded deviation, not a moved goalpost.",
@@ -14,7 +16,7 @@
   },
   "layout": {
     "//": "13 §8, 22 §10. The widths a page is drawn at, and what counts as overflowing.",
-    "//floorWidths": "Real sizes, on top of both sides of every breakpoint. 320 is the narrowest phone still in use, 360 and 390 the phones most people hold (390 is the phone `a11y` audits and every batch is looked at on), 768 a common tablet. 1512 and 1728 are the two widths DIRECTION 37 judges every batch at, the default scaling of a 14-inch and a 16-inch MacBook Pro, and both are past the widest breakpoint, so without them the sweep never drew the desktop at the size it is read. `layout.mjs` runs no acts at either, and its variant pass takes them in place of the breakpoint desktop it used to add rather than beside it.",
+    "//floorWidths": "Real sizes, on top of both sides of every breakpoint. 320 is the narrowest phone still in use, 360 and 390 the phones most people hold (390 is the phone `a11y` audits and every batch is looked at on), 768 a common tablet. 1512 and 1728 are the two widths every batch is judged at, the default scaling of a 14-inch and a 16-inch MacBook Pro, and both are past the widest breakpoint, so without them the sweep never drew the desktop at the size it is read. `layout.mjs` runs no acts at either, and its variant pass takes them in place of the breakpoint desktop it used to add rather than beside it.",
     "floorWidths": [
       320,
       360,
@@ -23,11 +25,11 @@
       1512,
       1728
     ],
-    "//fullWidthAtPx": "DIRECTION 36, \"it's not even filling fully horizontally on my macbook\", and 37's full width with fluid gutters, judged at the owner's two MacBook widths. The widths the main screens are asked to fill, beside the rail. Both are floor widths, so the sweep draws them anyway and the pass adds six screens to the part that holds each; a width no part draws is taken by the first part.",
+    "//fullWidthAtPx": "A main screen fills the window, full width with fluid gutters and never a narrow column in the middle, judged at the two MacBook widths. The widths the main screens are asked to fill, beside the rail. Both are floor widths, so the sweep draws them anyway and the pass adds six screens to the part that holds each; a width no part draws is taken by the first part.",
     "fullWidthAtPx": [1512, 1728],
     "//fullWidthShare": "The least share of the room the shell gives the work (the grid track `#main` stands in, so the rail card's column on the rail and the docked panel's column when one is open are both outside it, and on the top bar and the menu it is the window less any panel) that a main screen's widest content box may take. 0.85 leaves room for the page's fluid gutters (at most 40 a side) and a scrollbar, and not for a page held to a column: a 1280 cap at 1728 is about 80%.",
     "fullWidthShare": 0.85,
-    "//dockedAtPx": "DIRECTION 37's docked right panel, and research-audit-16 L12: no pass opened one, so a page squeezed under it, blocks paired by the window's width with a third of it gone (H2) and a column bare while the panel arrives (M1) all swept green. 1280 is where the panel first docks (`panel.ts` DOCKS), 1440 the window whose work column beside the rail first reaches `layout.ts` PAIR_FROM, so blocks pair with the panel shut, and 1728 the owner's wider laptop. Each is drawn on all three shapes with the panel open on Work and on a list.",
+    "//dockedAtPx": "The docked right panel, and research-audit-16 L12: no pass opened one, so a page squeezed under it, blocks paired by the window's width with a third of it gone (H2) and a column bare while the panel arrives (M1) all swept green. 1280 is where the panel first docks (`panel.ts` DOCKS), 1440 the window whose work column beside the rail first reaches `layout.ts` PAIR_FROM, so blocks pair with the panel shut, and 1728 the wider laptop. Each is drawn on all three shapes with the panel open on Work and on a list.",
     "dockedAtPx": [1280, 1440, 1728],
     "//dockArrivalMs": "How long the docked pass watches, from the press, for a panel to arrive and come to rest. The panel's step is 240 (`--d-panel`), and a list's peek is a navigation within the page first, so this is that with room for a slow runner, and a panel still not docked by then is a finding.",
     "dockArrivalMs": 1500,
@@ -37,22 +39,26 @@
     "//widthTolerancePx": "52 §4 records 0. One pixel is the recorded deviation, and it is sub-pixel rounding rather than a widened budget: `scrollWidth` is an integer rounded up from a fractional layout, so a page laid out to exactly the viewport reports one more than it. At 0 the gate is red on every route for a rounding mode.",
     "widthTolerancePx": 1,
     "settleMs": 60,
+    "//webkitWidths": "The widths WebKit draws, because the Mac app draws with Safari's engine (55 §4). 1440 the Mac window, past the widest breakpoint so it is the desktop layout, and on `dockedAtPx`; 390 the phone. Each takes the sweep, and 1440 the full-width and docked passes too. Two and not the whole sweep, because Chromium already draws every breakpoint and WebKit is here for what the engine draws differently.",
+    "webkitWidths": [1440, 390],
     "//readyTimeoutMs": "GONE, and it is `ready.settleTimeoutMs` below. It was this gate's private name for a wait all four browser gates make, and the other three spelt the number as a bare literal 5000 in the script, which is the thing lib.mjs opens by forbidding. One wait, one number, one section, and the same expiry rule for every gate that opens a page.",
     "findingsShown": 40
   },
   "a11y": {
     "//": "13 §9. Both schemes at both ends, because half of a contrast failure is invisible in one.",
-    "//widths": "1512 replaced 1440 on October 2nd: it is the narrower of the two widths DIRECTION 37 judges every batch at, where the desktop is tightest at the owner's own scale. 390 is the phone. Two and not three, because every width here is both schemes over every route and state scenario, and `layout` already draws 1728.",
+    "//widths": "1512 replaced 1440 on October 2nd: it is the narrower of the two widths every batch is judged at, where the desktop is tightest at a MacBook's default scale. 390 is the phone. Two and not three, because every width here is both schemes over every route and state scenario, and `layout` already draws 1728.",
     "widths": [
       1512,
       390
     ],
+    "//webkitWidths": "The widths WebKit audits, both schemes, because the Mac app draws with Safari's engine (55 §4): 1440 the Mac window and 390 the phone.",
+    "webkitWidths": [1440, 390],
     "//seedContrastRatio": "The ratio the a11y-contrast seed plants a line of text at on the board (PRF-B02 2.4: text at 2 to 1). Far under 4.5, so axe's color-contrast must call it.",
     "seedContrastRatio": 2
   },
   "look": {
     "//": "`tools/look/capture.mjs`, the real screens of a record (`loop/scope/area-proof-a.md` 2.4, PRF-A02). Its height is `layout.viewportHeightPx` and its wait `ready.settleTimeoutMs`, so a look and a gate agree on what drawn means.",
-    "//widths": "Named once: 390 the phone, 1512 the laptop and 1728 the owner's MacBook window, the widths DIRECTION 37 and 39 judge every batch at, each light and dark. 1440 is retired from looks and stays only in `layout.dockedAtPx`. The brief's \"390 and 1440\" is read as 390 and 1512, after section 39.",
+    "//widths": "Named once: 390 the phone, 1512 the laptop and 1728 the larger MacBook window, the widths every batch is judged at, each light and dark. 1440 is retired from looks and stays only in `layout.dockedAtPx`. The brief's \"390 and 1440\" is read as 390 and 1512.",
     "widths": [
       390,
       1512,
@@ -66,7 +72,11 @@
   "ready": {
     "//": "How long a screen has to say what it settled into, shared by the four gates that open a browser. Absence past it is a FINDING and never a skip: the wait this replaces ended in `.catch(() => {})`, so a page that had drawn nothing was measured anyway and the gate reported green over it.",
     "//settleTimeoutMs": "Ten seconds, which is twice the 5000 it replaces, and the extra five cost nothing on a healthy run: a settled screen ends the wait the moment `data-screen` appears, so the budget is only ever spent by a page that is already a finding. It has to cover a cold entry chunk plus a serial boot() then list() on a loaded CI runner, because a budget that fires on a slow runner is a red somebody widens rather than reads.",
-    "settleTimeoutMs": 10000
+    "settleTimeoutMs": 10000,
+    "//againMs": "How long `layout` waits before it opens a page a second time when the first could not reach the gate's own port: the server or the record was not answering yet, under a full run's load. One wait and one more try, then it is a finding.",
+    "againMs": 1000,
+    "//quietMs": "How long a drawn screen is given to finish the reads it started before a gate moves on (the app's `data-quiet` mark). Running out is not a finding: it only keeps a gate from leaving while calls are still out, which WebKit reports as errors on the next page. Four seconds covers Today's tiles, asked up to two seconds after the screen draws.",
+    "quietMs": 4000
   },
   "cssRules": {
     "//": "13 §8. How far back a `focus-ok:` waiver may sit from the rule it excuses.",
@@ -94,7 +104,7 @@
   },
   "history": {
     "//": "WAY-B02, his \"no fresh start though\" (HD.24). `commits.mjs` reads it.",
-    "//floor": "The least number of commits reachable from HEAD. 1,849 is the count the scope measured; the history may be rewritten clean, and it is never restarted, so a count under this is red by itself. A floor only falls with his words.",
+    "//floor": "The least number of commits reachable from HEAD. 1,849 is the count the scope measured; the history may be rewritten clean, and it is never restarted, so a count under this is red by itself. A floor only falls with the owner's quoted word.",
     "floor": 1849
   },
   "commits": {
@@ -106,5 +116,24 @@
     "//": "`first-screen.mjs`, which runs `tools/people/expect/first-screen.mjs` once a person.",
     "//walkTimeoutMs": "How long one person's walk through the first run may take before it is a finding and not a wait. A walk takes about three seconds on a quiet machine; two minutes is room for a loaded runner, and a walk that is still going by then is hung.",
     "walkTimeoutMs": 120000
+  },
+  "perf": {
+    "//": "`perf.mjs`: nine screens at two widths on the gates' record, each time the middle of `samples` opens, with no wait added, so what is timed is the app and not a network. Measured on 2026-10-22 on the Mac, two full runs, built from master at c65f70ed7. A ceiling is about twice the slowest figure seen, since a hosted runner is slower and noisier than the desk; it only falls. The roadmap's targets (a visited page under 0.1 s, Today from the kept copy under 0.3 s) are met everywhere, and held below.",
+    "//widths": "A phone and the desk: 390 is the phone every batch is looked at on, 1440 the desktop width the rule sheet reads.",
+    "widths": [390, 1440],
+    "//samples": "Each time is the middle of this many fresh opens, because one run of a time is a fact about a moment.",
+    "samples": 3,
+    "//seedDelayMs": "How long `BRAINDOG_GATE_SEED=perf` holds every script back, so `self-test` can see this gate go red on a build that suddenly weighs far more. A build fetches its modules many levels deep, so a hold this short added to each one took Today's first paint from about 150 ms to about 2 s, and long enough a hold keeps the screen from settling at all.",
+    "seedDelayMs": 50,
+    "//paintMs": "First contentful paint of a cold open. Measured 108 to 252 ms (348 once, Settings at 390). Ceiling 600.",
+    "paintMs": 600,
+    "//drawnMs": "From the open until the screen is drawn and nothing visible is waiting. Measured 170 to 324 ms (474 once, Today at 1440). Ceiling 900.",
+    "drawnMs": 900,
+    "//copyMs": "A reload with the record's copy already kept, any screen. Measured 175 to 418 ms. Ceiling 900.",
+    "copyMs": 900,
+    "//todayCopyMs": "The roadmap puts Today from the kept copy under 300 ms, and it is met: measured 219 to 291 ms over five full runs on a loaded Mac (it was 306 to 550). The screen settles when the copy is drawn and the record is asked quietly behind it, and the page is asked once and not twice. Ceiling 300.",
+    "todayCopyMs": 300,
+    "//revisitMs": "The roadmap puts a revisit (Back to a screen the page already holds) under 100 ms, and every screen meets it: 18 to 56 ms over five full runs (Money was 93 to 160, now 30 to 36). A page drawn from what the tab kept settles when it is drawn, the read behind it lands over it. Ceiling 100.",
+    "revisitMs": 100
   }
 }

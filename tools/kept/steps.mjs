@@ -1,12 +1,12 @@
 /**
  * The kept lane's steps: a fresh founder's record, made by sign-up, the add-ons installed from the catalogue, fed from a
  * stand-in the lane owns, one schedule turn, and the rows read back (SHL-A19 jobs 1 and 2,
- * `loop/scope/area-shell-a.md:996-1044`; "how do things happen autonoumously and dynamically?", D22.1).
+ * `loop/scope/area-shell-a.md:996-1044`; "how do things happen autonoumously and dynamically?").
  *
  * NOTHING HERE IS HIS. The record is a stranger's, signed up through the public path by the drill's own steps
  * (`tools/drill/steps.mjs`, imported and never written again), and every add-on goes in through the record's own
  * install door with the file the catalogue publishes (`apps/web/static/catalogue`), never a document `packages/seed`
- * builds. What a stranger gets is what he gets (DIRECTION §27).
+ * builds. What a stranger gets is what he gets.
  *
  * A LANE IS A DRILL WITH MORE STATE. `kept()` makes one with `drill()` and adds the catalogue it reads, the harness it
  * may be on, and its stand-in; `ask`, `api`, `hide`, `ok`, `red` and `skip` are the drill's, so a line here holds no

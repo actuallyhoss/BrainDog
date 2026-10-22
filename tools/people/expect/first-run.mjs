@@ -1,5 +1,5 @@
 /**
- * Use case 6, walked: the seven steps of the onboarding target (his word of 9 October, `loop/progress/planner-45.md`
+ * Use case 6, walked: the seven steps of the onboarding target (settled on 9 October, `loop/progress/planner-45.md`
  * "The onboarding target"), for one person, through the doors a browser uses, each said as one line, green or red with
  * what it saw.
  *
@@ -27,7 +27,8 @@ import { browserCurrencyEnv, zoneCurrency } from '../../../apps/web/src/routes/s
 import { accept } from '../../../apps/web/src/routes/start/accept.ts';
 import { accepting, nameSent, titleSent } from '../../../apps/web/src/routes/signup/build.ts';
 import { tellRead } from '../../../apps/web/src/lib/tell/read.ts';
-import { countWord, readyRows, showTell, wantMore } from '../../../apps/web/src/lib/home/first-today.ts';
+import { countWord, readyRows, showTell } from '../../../apps/web/src/lib/home/first-today.ts';
+import { wantMore } from '../../../apps/web/src/lib/home/want-more.ts';
 import { MONEY_WEEK, homeDrawn, todayHome } from '../../../apps/web/src/lib/home/default-home.ts';
 import { holdsOf, weekHeld } from '../../../apps/web/src/lib/page/home-arrange.ts';
 import { layoutOf } from '../../../apps/web/src/lib/record/boot-live.ts';

@@ -7,12 +7,12 @@
  * WHAT THE LIVE LOOK CANNOT DRAW, THIS DRAWS. `live.mjs` hands on a token, and a token never opens `/account/*` or the
  * ADMIN group, so Usage, Billing and Settings' agents and devices are screens it says it cannot draw. A session can, so
  * the canary is where those screens are seen on a Cloud record after every deploy. Its data is invented, so its
- * pictures never count as seen (DIRECTION 40) and its sheet is kept as the run's artefact.
+ * pictures never count as seen and its sheet is kept as the run's artefact.
  *
- * A SESSION, NEVER A KEY. `signin-live` signs in to the canary with the passkey from his sitting and keeps the browser's
+ * A SESSION, NEVER A KEY. `signin-live` signs in to the canary with the passkey from the owner's sitting and keeps the browser's
  * state in the file `CANARY_SESSION` names; this reads the cookie for the canary's own origin out of it and sends it
  * there and nowhere else, with the `Origin` the record checks. No answer brings a cookie back. With no session it
- * refuses to start, in one sentence. On a self-host, before his sitting, the session is the self-host's own key spent
+ * refuses to start, in one sentence. On a self-host, before the owner's sitting, the session is the self-host's own key spent
  * at its sign-in door, and the record's reads go with that key, since the gates' record's one person is on no record.
  *
  * IT CANNOT PRESS. A read goes on: a route the host's table marks `writes: false` or `postRead`, any GET under `/account`, and the

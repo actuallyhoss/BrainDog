@@ -2,9 +2,9 @@
  * A board, drawn by the product's own renderer from a record (EXP-A01; the folder contract is `design/boards/README.md`).
  *
  *   node tools/look/board.mjs <board> [--source lived|seed|file:<path>|shape:<path>] [--out <folder>]
- *   node tools/look/board.mjs <board> --yes "<his words>" --from <drawing folder> [--taken <where>] [--seen] [--units A,B]
+ *   node tools/look/board.mjs <board> --yes "<the words of the yes>" --from <drawing folder> [--taken <where>] [--seen] [--units A,B]
  *
- * THE BOARDS WERE ELEVEN STATIC FILES OUTSIDE THE REPOSITORY, with a data sheet that did not add up, and section 39 was
+ * THE BOARDS WERE ELEVEN STATIC FILES OUTSIDE THE REPOSITORY, with a data sheet that did not add up, and the look was
  * built with no picture anybody said yes to. Here a board is drawn the way the look draws a screen (`run.mjs`,
  * `capture.mjs`): the built app served over a copy of a record, the board's `page.dog` installed on the copy through
  * the one door a page goes in by (`setDeclaration`, as the source view writes one), its `skin.css` put after the
@@ -183,14 +183,14 @@ export async function install(origin, body, held = new Map()) {
 
 /** The yes `--yes` writes, from a drawing, or a refusal when the board or its governed files moved since. */
 export function yesOf(root, board, drawing, { said, taken, seen = false, units, at = new Date() }) {
-  if (typeof said !== 'string' || said.trim() === '') throw new Error('A yes holds his words: --yes "<what he said>".');
+  if (typeof said !== 'string' || said.trim() === '') throw new Error('A yes holds the words said: --yes "<the words of the yes>".');
   if (drawing.board !== board) throw new Error(`That drawing is of the ${drawing.board} board, not ${board}.`);
   const now = standing(root, board);
   const moved = [
     ...Object.keys({ ...now.paths, ...drawing.paths }).filter((f) => now.paths[f] !== drawing.paths?.[f]),
     ...Object.keys({ ...now.drawn, ...drawing.drawn }).filter((f) => now.drawn[f] !== drawing.drawn?.[f]).map((f) => `${BOARDS}/${board}/${f}`),
   ];
-  if (moved.length > 0) throw new Error(`${moved.slice(0, 5).join(', ')} changed since this drawing, so it is not what he would be saying yes to. Draw the board again.`);
+  if (moved.length > 0) throw new Error(`${moved.slice(0, 5).join(', ')} changed since this drawing, so it is not what the yes would be given to. Draw the board again.`);
   const candidate = drawing.drawings?.find((d) => d.id === 'candidate');
   if (!candidate || Object.keys(candidate.images ?? {}).length === 0) throw new Error('That drawing holds no pictures of the candidate.');
   const was = readJson(join(root, BOARDS, board, 'yes.json')).value ?? {};
@@ -198,7 +198,7 @@ export function yesOf(root, board, drawing, { said, taken, seen = false, units, 
     board,
     units: units ?? (Array.isArray(was.units) ? was.units : []),
     said: said.trim(),
-    taken: { on: at.toISOString().slice(0, 10), from: taken ?? 'his word' },
+    taken: { on: at.toISOString().slice(0, 10), from: taken ?? 'the owner\'s word' },
     seen: seen === true,
     source: drawing.source,
     images: candidate.images,
@@ -292,7 +292,7 @@ async function main() {
     const yes = yesOf(ROOT, asked.board, drawing, { said: asked.yes, taken: asked.taken, seen: asked.seen, units: asked.units });
     const file = join(ROOT, BOARDS, asked.board, 'yes.json');
     writeFileSync(file, `${JSON.stringify(yes, null, 2)}\n`);
-    console.log(`  board ${asked.board}: his yes is kept in ${BOARDS}/${asked.board}/yes.json, naming ${Object.keys(yes.images).length} pictures and ${Object.keys(yes.paths).length} governed files.`);
+    console.log(`  board ${asked.board}: the yes is kept in ${BOARDS}/${asked.board}/yes.json, naming ${Object.keys(yes.images).length} pictures and ${Object.keys(yes.paths).length} governed files.`);
     return;
   }
   const { out, drawing } = await draw(asked);

@@ -56,7 +56,7 @@ export const NAMES = [
  */
 export const ALLOWED = [
   { file: 'apps/cli/src/sync.ts', name: 'SIGN_IN_FILE', why: 'the files sync inventory refuses to carry, a sign-in among them, by name alone' },
-  { file: 'apps/cli/src/sync.ts', name: 'SIGN_INS', why: "a Claude Code profile's and Codex's sign-in, which sync inventory sizes by stat and refuses, never opened" },
+  { file: 'apps/cli/src/sync.ts', name: 'SIGN_INS', why: "the agent apps' own logins (a profile's file, Codex's file, Claude Code's keychain item and the claude.ai login), which sync inventory sizes by stat and refuses and every setup sync verb refuses by name, never opened" },
 ];
 
 /** A declaration at the top of a module, by its keyword and name. */

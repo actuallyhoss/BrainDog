@@ -5,8 +5,8 @@
  *   node tools/canary/enrol.mjs            on his Mac, by him, once: brain.dog, the record `ops`
  *   node tools/canary/enrol.mjs --dry      every step against a fresh local self-host, and what it would set
  *
- * RUN BY HIM, NEVER BY AN AGENT. The loop mints nothing: every credential here is made in his sitting, in a browser
- * window he watches, and goes from this process straight into `gh` on its standard input. Nothing here prints one,
+ * RUN BY THE OWNER, NEVER BY AN AGENT. No agent mints anything: every credential here is made in the owner's sitting,
+ * in a browser window the owner watches, and goes from this process straight into `gh` on its standard input. Nothing here prints one,
  * whole or in part, and nothing writes one to a file.
  *
  * WHAT HAPPENS, IN ORDER:

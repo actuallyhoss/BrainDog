@@ -34,6 +34,7 @@ export async function variants(run, { runs: variantRuns, widths: variantWidths }
         record: run.asked(),
         ready,
         prerendered: v.prerendered === true,
+        again: run.again,
       });
       const { context, page } = opened;
       process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);

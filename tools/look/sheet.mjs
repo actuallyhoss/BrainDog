@@ -6,8 +6,8 @@
  * its address, what it settled into and anything raw `said.json` counted in its text, so a fault is named before the
  * picture is looked at. A screen the look did not draw is listed under the pictures with the reason, never left out.
  *
- * DRAWN ON THE PRODUCT'S OWN BOARD (DIRECTION 39): flat tiles on a flat ground, radius 16, no border and no shadow, and
- * a screen that did not settle carries a mark and a word as well as the red (DIRECTION 42).
+ * DRAWN ON THE PRODUCT'S OWN BOARD: flat tiles on a flat ground, radius 16, no border and no shadow, and
+ * a screen that did not settle carries a mark and a word as well as the red.
  *
  *   node tools/look/sheet.mjs <look folder>      draws the sheets again from its said.json
  */

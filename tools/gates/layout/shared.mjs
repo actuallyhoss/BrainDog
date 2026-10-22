@@ -9,6 +9,7 @@
  *   `asked()`                         the record `/api` reaches on this pass, as `openPage` reads it
  *   `findings`, `checked`, `missing`  what the run found, how many page-runs it measured, the routes drawn as not found
  *   `budgets`, `actMs`                the gate's numbers out of `budgets.json`, read in the entry so `self-test` sees them
+ *   `again`                           a lost load opened once more before it is a finding (`lib.mjs` `openPage`)
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -48,7 +49,7 @@ export async function breakpoints(root) {
 }
 
 /* THE THREE SHAPES `19 §3` OFFERS, by what the shell writes on `.shell[data-shape]` and what the record keeps to ask
-   for each. The top bar is the default (his call 1, 20 October) and asks for nothing; the record's word for the side
+   for each. The top bar is the default (the owner's choice 1, 20 October) and asks for nothing; the record's word for the side
    rail is `side`, not the shell's. The default comes first, as the one a seeded pass draws. */
 export const SHAPES = [
   { name: 'the top bar', drawn: 'bar', keeps: null },
@@ -71,7 +72,7 @@ export const printedOn = async (run, opened, where, planted, route) => {
  * unless the pass is watching something move.
  */
 export const openFor = (run, width, shape, route, reducedMotion = 'reduce') =>
-  openPage(run.browser, run.at(route), { width, record: run.asked(), prefs: shape.keeps ?? {}, reducedMotion, ready: run.ready });
+  openPage(run.browser, run.at(route), { width, record: run.asked(), prefs: shape.keeps ?? {}, reducedMotion, ready: run.ready, again: run.again });
 
 /**
  * Opens a screen and waits for it to settle; `false`, with the finding written, when it never did. A screen that

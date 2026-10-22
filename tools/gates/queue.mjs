@@ -14,7 +14,7 @@
  * agents 1.5.0 took its queue away, because it repeated Decide.
  *
  * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. `QueueAnswer.svelte` never sends a pressed
- * option to `/decide/[id]`, and since DIRECTION §37 the record takes a decision without a reason,
+ * option to `/decide/[id]`, and the record takes a decision without a reason,
  * so one press is one request: the card becomes one line naming what was chosen, `.qa-done` and not
  * `.queue-card`, so it never breaks the ranking. An older record still asks for a reason, and there
  * the card opens one line under itself, focused, and Enter sends it. So a run of this gate presses
@@ -193,7 +193,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
        would draw a queue too and pass silently over a broken record. */
     await answers(ORIGIN);
 
-    const ready = readiness('queue', budget('ready').settleTimeoutMs, ROOT);
+    const ready = readiness('queue', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
 
     /* THE RECORD'S OWN RANKING, loaded from source the way `slash-actor.mjs` loads its module: the gate
        asserts the ORDER a person sees matches the function that decided it, so it must be that function
@@ -305,7 +305,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
              cards with none: the check still holds on whichever card is drawn, because it presses
              whatever that card offers rather than a card this run assumes exists. */
           /* A SUGGESTION IS MARKED ON ITS OPTION IN THE FORM'S LIST, and on the button itself in a row of answers
-             (`DecisionCard.svelte`, DIRECTION §39: two or three answers with no line of what each does are buttons). */
+             (`DecisionCard.svelte`: two or three answers with no line of what each does are buttons). */
           const withRec = block.locator('.queue-card:has(.queue-option[data-recommended], button.queue-act[data-recommended])').first();
           const card = (await withRec.count()) > 0 ? withRec : cards.first();
           const questionText = (await card.locator('.queue-question').innerText()).trim();

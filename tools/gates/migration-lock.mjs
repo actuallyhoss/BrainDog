@@ -45,9 +45,9 @@ export const passed = (r) =>
   r !== null && typeof r === 'object' && typeof r.at === 'string' && Number.isInteger(r.records) && r.records > 0 && Number.isInteger(r.rows) && r.rows >= 0 && r.pass === true;
 
 /**
- * THE OWNER'S WAIVER, the one other way a new migration ships: a date, the word `owner`, and why, written when he says
- * to ship without a rehearsal because no copy of a real record could be had. It is his call (LCH-C06 is his rule), so
- * the gate takes it only in that shape, and a rehearsal that later passes writes its receipt beside it.
+ * THE OWNER'S WAIVER, the one other way a new migration ships: a date, the word `owner`, and why, written when the
+ * owner chooses to ship without a rehearsal because no copy of a real record could be had. It is the owner's choice
+ * (LCH-C06), so the gate takes it only in that shape, and a rehearsal that later passes writes its receipt beside it.
  */
 export const waived = (w) =>
   w !== null && typeof w === 'object' && typeof w.at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.at) && w.by === 'owner' && typeof w.why === 'string' && w.why.trim().length > 0;

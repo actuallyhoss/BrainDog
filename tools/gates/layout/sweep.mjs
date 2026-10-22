@@ -27,7 +27,7 @@ export async function sweep(run, { widths, routes: ROUTES, seeds: sweepSeeds, fl
        */
       /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): the record's clock, and a coarse pointer at a
          phone's width. The mark is taken off after the first load, so every route below is loaded with it gone. */
-      const opened = await openPage(browser, run.at(ROUTES[0]), { width, touch: width < 640, record: run.asked(), ready });
+      const opened = await openPage(browser, run.at(ROUTES[0]), { width, touch: width < 640, record: run.asked(), ready, again: run.again });
       const { context, page } = opened;
       if (planted?.id === 'layout-settle') await takeMark(context);
       process.stdout.write(`    ${String(width).padStart(4)}px ${planted ? `${planted.id} ` : ''}`);

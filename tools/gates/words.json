@@ -6,7 +6,7 @@
       "shape": "\\brows?\\b",
       "say": "the thing's own name: a bill, a task, a person",
       "page": "plain-words",
-      "why": "A row is how the database holds a thing, not what the person calls it (D35.35)."
+      "why": "A row is how the database holds a thing, not what the person calls it."
     },
     {
       "name": "list item",
@@ -55,7 +55,7 @@
       "shape": "\\bschemas?\\b",
       "say": "the fields a list holds",
       "page": "system-word",
-      "why": "Developer vocabulary in visible copy (D1.32)."
+      "why": "Developer vocabulary in visible copy."
     },
     {
       "name": "declaration",
@@ -85,7 +85,7 @@
       "case": true,
       "say": "Slash",
       "page": "system-word",
-      "why": "The assistant was renamed Slash, everywhere (DIRECTION 31)."
+      "why": "The assistant was renamed Slash, everywhere."
     },
     {
       "name": "recommended",

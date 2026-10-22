@@ -1,5 +1,5 @@
 /**
- * `board-yes`: a governed screen changes only with a board he said yes to (EXP-A01 job 5).
+ * `board-yes`: a governed screen changes only with a board with a yes (EXP-A01 job 5).
  *
  *   node --test tools/gates/test/board-yes.test.mjs
  *
@@ -43,10 +43,10 @@ function planted() {
   return root;
 }
 
-/** His yes as `board.mjs --yes` writes it, from the board as it stands. */
+/** A yes as `board.mjs --yes` writes it, from the board as it stands. */
 const takeYes = (root, over = {}) => {
   const now = standing(root, 'frame');
-  const yes = { board: 'frame', units: ['EXP-A01'], said: 'yes', taken: { on: '2026-10-08', from: 'DIRECTION 42' }, seen: false, images: IMAGES, widths: [390, 1440, 1512, 1728], themes: ['light', 'dark'], commit: null, paths: now.paths, drawn: now.drawn, ...over };
+  const yes = { board: 'frame', units: ['EXP-A01'], said: 'yes', taken: { on: '2026-10-08', from: 'the owner\'s word' }, seen: false, images: IMAGES, widths: [390, 1440, 1512, 1728], themes: ['light', 'dark'], commit: null, paths: now.paths, drawn: now.drawn, ...over };
   put(root, 'design/boards/frame/yes.json', json(yes));
 };
 
@@ -66,7 +66,7 @@ test('a root with no boards folder is skipped, and a board with no yes governs n
     assert.equal(run(empty).status, 3);
     const r = run(root);
     assert.equal(r.status, 0, r.out);
-    assert.match(r.out, /1 board\(s\), 0 with his yes, governing 0 file\(s\), 0 finding\(s\)/u);
+    assert.match(r.out, /1 board\(s\), 0 with a yes, governing 0 file\(s\), 0 finding\(s\)/u);
   } finally {
     rmSync(empty, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
@@ -79,29 +79,29 @@ test('a yes taken from the board as it stands is green, and each way it stops be
     takeYes(root);
     const green = run(root);
     assert.equal(green.status, 0, green.out);
-    assert.match(green.out, /1 with his yes, governing 1 file\(s\), 0 finding\(s\)/u);
+    assert.match(green.out, /1 with a yes, governing 1 file\(s\), 0 finding\(s\)/u);
 
     put(root, 'packages/skin/house.css', ':root { --tile: glass; }\n');
     let found = judge(root, 'frame', ['packages/skin/house.css']).findings;
     assert.equal(found.length, 1);
-    assert.match(found[0], /packages\/skin\/house\.css {2}changed since he said yes/u);
+    assert.match(found[0], /packages\/skin\/house\.css {2}changed since its yes/u);
     takeYes(root);
     assert.equal(run(root).status, 0);
 
     put(root, 'packages/skin/new.css', 'new\n');
     found = judge(root, 'frame', ['packages/skin/house.css', 'packages/skin/new.css']).findings;
     assert.deepEqual(found.length, 1);
-    assert.match(found[0], /new\.css {2}is governed by it and his yes never named it/u);
+    assert.match(found[0], /new\.css {2}is governed by it and its yes never named it/u);
     rmSync(join(root, 'packages/skin/new.css'));
 
     put(root, 'design/boards/frame/page.dog', 'page: frame\ntitle: Hero\n');
     found = judge(root, 'frame', ['packages/skin/house.css']).findings;
     assert.equal(found.length, 1);
-    assert.match(found[0], /page\.dog {2}was edited after his yes/u);
+    assert.match(found[0], /page\.dog {2}was edited after its yes/u);
     takeYes(root);
 
     put(root, 'design/boards/frame/skin.css', '.tile { box-shadow: none; }\n');
-    assert.match(judge(root, 'frame', ['packages/skin/house.css']).findings.join('\n'), /skin\.css {2}was added after his yes/u);
+    assert.match(judge(root, 'frame', ['packages/skin/house.css']).findings.join('\n'), /skin\.css {2}was added after its yes/u);
     takeYes(root);
 
     rmSync(join(root, 'packages/skin/house.css'));
@@ -116,13 +116,13 @@ test('a yes with no words, too few pictures, or no board and units is red', () =
   const files = ['packages/skin/house.css'];
   try {
     takeYes(root, { said: ' ' });
-    assert.match(judge(root, 'frame', files).findings.join('\n'), /holds no words of his/u);
+    assert.match(judge(root, 'frame', files).findings.join('\n'), /holds no words in said/u);
     takeYes(root, { images: Object.fromEntries(Object.entries(IMAGES).slice(0, 3)) });
     assert.match(judge(root, 'frame', files).findings.join('\n'), /names 3 image hash\(es\) for 4 width\(s\) and 2 theme\(s\)/u);
     takeYes(root, { units: undefined });
     assert.match(judge(root, 'frame', files).findings.join('\n'), /names no board or no list of units/u);
     takeYes(root, { seen: 'yes' });
-    assert.match(judge(root, 'frame', files).findings.join('\n'), /seen is true once he has looked/u);
+    assert.match(judge(root, 'frame', files).findings.join('\n'), /seen is true once the pictures have been looked at/u);
     takeYes(root, { widths: [1440], images: Object.fromEntries(Object.entries(IMAGES).slice(0, 2)) });
     assert.match(judge(root, 'frame', files).findings.join('\n'), /was not taken at 390, 1512, 1728/u);
     put(root, 'design/boards/frame/yes.json', '{ not json');
@@ -136,13 +136,13 @@ test('the gate reads hashes and never dates, and a yes not yet seen still holds 
   const root = planted();
   const files = ['packages/skin/house.css'];
   try {
-    takeYes(root, { seen: false, taken: { on: '1999-01-01', from: 'a yes taken for him' } });
+    takeYes(root, { seen: false, taken: { on: '1999-01-01', from: 'a yes taken by default' } });
     assert.deepEqual(judge(root, 'frame', files).findings, []);
     put(root, 'packages/skin/house.css', ':root { --tile: glass; }\n');
-    takeYes(root, { seen: false, taken: { on: '2099-12-31', from: 'a yes taken for him' }, paths: { 'packages/skin/house.css': sha256(':root { --tile: white; }\n') } });
+    takeYes(root, { seen: false, taken: { on: '2099-12-31', from: 'a yes taken by default' }, paths: { 'packages/skin/house.css': sha256(':root { --tile: white; }\n') } });
     const found = judge(root, 'frame', files).findings;
     assert.equal(found.length, 1);
-    assert.match(found[0], /house\.css {2}changed since he said yes/u);
+    assert.match(found[0], /house\.css {2}changed since its yes/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -163,10 +163,10 @@ test("a board's own folder is never governed source, so a wide glob does not hol
 test('the two planted negatives are red for their one fault each', () => {
   const yes = run(join(gates, 'negative', 'board-yes'));
   assert.equal(yes.status, 1, yes.out);
-  assert.match(yes.out, /packages\/skin\/board\.txt {2}changed since he said yes/u);
+  assert.match(yes.out, /packages\/skin\/board\.txt {2}changed since its yes/u);
   assert.match(yes.out, / 1 finding\(s\)/u);
   const drift = run(join(gates, 'negative', 'board-yes-drift'));
   assert.equal(drift.status, 1, drift.out);
-  assert.match(drift.out, /design\/boards\/today\/page\.dog {2}was edited after his yes/u);
+  assert.match(drift.out, /design\/boards\/today\/page\.dog {2}was edited after its yes/u);
   assert.match(drift.out, / 1 finding\(s\)/u);
 });

@@ -59,7 +59,7 @@ const HEAD = git('rev-parse', 'HEAD').out;
 const dirtyAtStart = git('status', '--porcelain').out;
 const diffAtStart = git('diff').out;
 
-/* SELF-TEST ONLY WHEN THE GATES CHANGED (his yes, 18 Oct). It plants a fault for every gate and takes ~7 min; when
+/* SELF-TEST ONLY WHEN THE GATES CHANGED (the owner's choice, 18 Oct). It plants a fault for every gate and takes ~7 min; when
    nothing under tools/gates moved since the last green full run, its answer cannot have changed. */
 const lastGreen = (() => {
   try {
@@ -174,6 +174,11 @@ if (!QUICK) {
   }
   const shard = gatesWf.jobs.get('gates-shard');
   for (const step of shard.steps) {
+    /* THE BROWSERS THE PARTS OPEN, which ci.yml's own install does not cover: `layout` and `a11y` open WebKit as well. */
+    if (/playwright install /.test(step.run ?? '')) {
+      add({ title: `setup: ${step.run}`, script: step.run, timeoutMin: shard.timeout });
+      continue;
+    }
     if (!isGateRun(step.run)) continue;
     gateLines.push(`gates.yml gates-shard (${step.if}): ${step.run}`);
     if (step.if === "github.event_name != 'push'") allowSkip = /--allow-skip (\S+)/.exec(step.run)?.[1].split(',') ?? [];
@@ -253,7 +258,7 @@ console.log('');
 
 const logOf = (n, entry) => join(LOGS, `${String(n + 1).padStart(width, '0')}-${entry.title.replace(/[^\w.-]+/g, '-').slice(0, 60)}.log`);
 
-/* THE STEPS RUN IN A POOL, NOT ONE AFTER ANOTHER (his yes, 19 Oct): the run was 35 minutes of steps that share nothing. A
+/* THE STEPS RUN IN A POOL, NOT ONE AFTER ANOTHER (the owner's choice, 19 Oct): the run was 35 minutes of steps that share nothing. A
    step starts when every step it reads from is done and no step it would trample is running; the lines still print in
    plan order. TIMED STEPS (the tests, and the gates that measure milliseconds) RUN ONE AT A TIME AND AT FULL PRIORITY, everything
    else at a lower one, because a p99 ceiling is a fact about a quiet machine. What reads what: everything waits for the setup; a built gate, the build job's own tests and the deploy
@@ -263,7 +268,7 @@ const JOBS = Number(process.env.CI_JOBS) || 12;
 const SHARDS = { layout: 2 };
 /* The longest first, so the run's last minutes are not one slow gate started late. */
 const FIRST = new Set(['layout', 'a11y', 'self-test']);
-const TIMED_GATES = new Set(['graph', 'slash-actor']);
+const TIMED_GATES = new Set(['graph', 'slash-actor', 'perf']);
 const unbuilt = new Set(
   QUICK
     ? listed.stdout.split('\n').map((s) => s.trim()).filter(Boolean)

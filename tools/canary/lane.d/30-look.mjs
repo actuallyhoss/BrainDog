@@ -3,7 +3,7 @@
  *
  * `tools/look/run.mjs --source canary --set all`, drawn through the session `20-signin-live.mjs` kept, into
  * `LANE_OUT/look`, which the workflow hangs on the run as the canary's sheet. The canary's data is invented, so the
- * sheet is never counted as seen (DIRECTION 40); it is how an agent sees the screens after each deploy.
+ * sheet is never counted as seen; it is how an agent sees the screens after each deploy.
  *
  * RED ON THREE THINGS, read off the look's own `said.json`: a screen that refused or never settled, an error the product
  * said in the console (the look's own refusals are not the product's), or a lint finding (the look's `lint`, and an id or a raw value where a person reads a name, its `raw`). A

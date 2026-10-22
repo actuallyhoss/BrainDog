@@ -28,14 +28,20 @@ function fakeRecord(log) {
 }
 
 /** A stand-in browser, context and page that write down what was asked of them. */
-function fakeBrowser(log, { gotoThrows = false, timeouts = 0 } = {}) {
+function fakeBrowser(log, { gotoThrows = false, timeouts = 0, refused = 0, lost = 0, lostAs = 'Failed to fetch dynamically imported module' } = {}) {
   const handlers = {};
   let quiet = 0;
+  let loads = 0;
   const page = {
     on: (name, fn) => (handlers[name] = fn),
     goto: async (to, opts) => {
       log.push(['goto', to, opts.waitUntil]);
-      if (gotoThrows) throw new Error('net::ERR_CONNECTION_REFUSED');
+      if (gotoThrows || loads < refused) {
+        loads++;
+        throw new Error('page.goto: net::ERR_CONNECTION_REFUSED');
+      }
+      /* A LOAD THAT LOST ONE OF ITS OWN MODULES and settled anyway, as a loaded runner's first look can. */
+      if (loads++ < refused + lost) handlers.pageerror?.(new Error(`${lostAs}: http://localhost:1/app/_app/immutable/nodes/3.js`));
       if (quiet++ < timeouts) {
         handlers.pageerror?.(new Error('Failed to fetch dynamically imported module'));
         throw Object.assign(new Error('page.goto: Timeout 30000ms exceeded.'), { name: 'TimeoutError' });
@@ -199,6 +205,63 @@ test('a load that never goes quiet twice is a page never settled, null, and the 
   const opened = await openPage(fakeBrowser(log, { timeouts: 2 }), URL_, { width: 390, clock: NOW, waitUntil: 'networkidle', ready: ready(log) });
   assert.equal(opened.state, null);
   assert.equal(log.some((l) => l[0] === 'settled'), false);
+});
+
+/* ── `again`: a load lost under a full run's load is opened once more (layout) ── */
+
+const again = (why) => ({ ms: 0, said: (w) => why.push(w) });
+
+test('a load that lost one of its modules is opened once more, afresh, when the gate asks', async () => {
+  const log = [];
+  const why = [];
+  const opened = await openPage(fakeBrowser(log, { lost: 1 }), URL_, { width: 390, clock: NOW, ready: ready(log), again: again(why) });
+  assert.deepEqual(log.filter((l) => l[0] === 'goto' || l[0] === 'settled').map((l) => l[0]), ['goto', 'settled', 'goto', 'settled']);
+  assert.deepEqual(why, ['lost']);
+  assert.equal(opened.state, 'ready');
+  assert.equal(opened.errors.some((e) => /dynamically imported/.test(e.text)), false, 'the lost load said nothing about the screen');
+});
+
+test("WebKit's words for a lost module are a lost module too", async () => {
+  const why = [];
+  await openPage(fakeBrowser([], { lost: 1, lostAs: 'Importing a module script failed.' }), URL_, { width: 390, clock: NOW, ready: ready([]), again: again(why) });
+  assert.deepEqual(why, ['lost']);
+});
+
+test('a module lost twice is the answer, and the printed rule reads it', async () => {
+  const why = [];
+  const opened = await openPage(fakeBrowser([], { lost: 2 }), URL_, { width: 390, clock: NOW, ready: ready([]), again: again(why) });
+  assert.deepEqual(why, ['lost'], 'one more look and no third');
+  assert.ok(opened.errors.some((e) => /dynamically imported/.test(e.text)));
+});
+
+test('a port not answering yet is opened once more, after the wait, and not thrown', async () => {
+  const log = [];
+  const why = [];
+  const opened = await openPage(fakeBrowser(log, { refused: 1 }), URL_, { width: 390, clock: NOW, ready: ready(log), again: again(why) });
+  assert.deepEqual(why, ['unreached']);
+  assert.equal(opened.state, 'ready');
+  assert.deepEqual(log.filter((l) => l[0] === 'goto' || l[0] === 'settled').map((l) => l[0]), ['goto', 'goto', 'settled']);
+});
+
+test('a port still not answering on the second try is a page never settled, null, and the gate goes on', async () => {
+  const opened = await openPage(fakeBrowser([], { refused: 2 }), URL_, { width: 390, clock: NOW, ready: ready([]), again: again([]) });
+  assert.equal(opened.state, null);
+});
+
+test('without `again` a lost module is read on the first look and a refused port still throws', async () => {
+  const opened = await openPage(fakeBrowser([], { lost: 1 }), URL_, { width: 390, clock: NOW, ready: ready([]) });
+  assert.ok(opened.errors.some((e) => /dynamically imported/.test(e.text)));
+  await assert.rejects(openPage(fakeBrowser([], { refused: 1 }), URL_, { width: 390, clock: NOW, ready: ready([]) }), /ERR_CONNECTION_REFUSED/);
+});
+
+test('a load that failed for any other reason is thrown, retry or not', async () => {
+  const browser = fakeBrowser([]);
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  page.goto = async () => {
+    throw new Error('page.goto: net::ERR_ABORTED');
+  };
+  await assert.rejects(openPage(browser, URL_, { width: 390, clock: NOW, ready: ready([]), again: again([]) }), /ERR_ABORTED/);
 });
 
 test("a screen settled on its second look reports that look's errors, not the first's", async () => {

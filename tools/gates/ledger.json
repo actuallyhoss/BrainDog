@@ -23,6 +23,12 @@
         { "at": 64, "on": "2026-10-09", "why": "The day the ledger began, at the same number.", "by": "budgets.json, 2026-09-07" }
       ]
     },
+    "bundle.firstLoadJsBrotli": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 640000, "on": "2026-10-22", "why": "What a cold open of Today waits for, measured at 639,093 brotli once the kernel, the seed's documents and the decision card left its path (759,591 before), with under a kilobyte of room. It only falls.", "by": "22 section 9" }
+      ]
+    },
     "bundle.mainCssBrotli": {
       "kind": "ceiling",
       "lines": [
@@ -50,7 +56,7 @@
     "layout.fullWidthShare": {
       "kind": "floor",
       "lines": [
-        { "at": 0.85, "on": "2026-10-09", "why": "The least share of the work column a main screen fills at 1512 and 1728: room for fluid gutters and a scrollbar, not for a page held to a column.", "by": "DIRECTION 36 and 37" }
+        { "at": 0.85, "on": "2026-10-09", "why": "The least share of the work column a main screen fills at 1512 and 1728: room for fluid gutters and a scrollbar, not for a page held to a column.", "by": "the owner's choice" }
       ]
     },
     "layout.dockArrivalMs": {
@@ -101,10 +107,66 @@
         { "at": 10000, "on": "2026-10-09", "why": "How long a screen has to say what it settled into; absence past it is a finding, never a skip.", "by": "52 section 5" }
       ]
     },
+    "ready.quietMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 4000, "on": "2026-10-22", "why": "How long a drawn screen is given to finish the reads it started before a browser gate moves on, so WebKit does not report the cut calls on the next page; running out is not a finding.", "by": "lib.mjs" }
+      ]
+    },
+    "ready.againMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 1000, "on": "2026-10-22", "why": "How long layout waits before it opens a page a second time when the first could not reach the gate's own port under a full run's load: one wait and one more try, then it is a finding.", "by": "layout.mjs" }
+      ]
+    },
     "firstScreen.walkTimeoutMs": {
       "kind": "ceiling",
       "lines": [
         { "at": 120000, "on": "2026-10-14", "why": "How long one person's walk through the first run may take before it is a finding: about three seconds on a quiet machine, with room for a loaded runner.", "by": "first-screen.mjs" }
+      ]
+    },
+    "perf.samples": {
+      "kind": "setting",
+      "lines": [
+        { "at": 3, "on": "2026-10-22", "why": "How many fresh opens of a screen the perf gate takes the middle of.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.seedDelayMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 50, "on": "2026-10-22", "why": "How long the planted fault holds every script back, so self-test sees the gate go red.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.paintMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 600, "on": "2026-10-22", "why": "First contentful paint of a cold open: measured 108 to 252 ms on 2026-10-22 (348 once), about twice the slowest for a hosted runner.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.drawnMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 900, "on": "2026-10-22", "why": "A screen drawn from a cold open: measured 170 to 324 ms (474 once), room for a hosted runner.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.copyMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 900, "on": "2026-10-22", "why": "A screen opened from the kept copy of the record: measured 175 to 418 ms, room for a hosted runner.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.todayCopyMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 700, "on": "2026-10-22", "why": "Today from the kept copy. The roadmap target of 300 ms is missed: measured 306 to 550 ms, so the ceiling is the measured figure with room and falls when Today does.", "by": "perf.mjs" },
+        { "at": 300, "on": "2026-10-22", "why": "Today from the kept copy now meets the roadmap target: measured 219 to 291 ms, the screen settling when the copy is drawn and the page asked once.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.revisitMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 250, "on": "2026-10-22", "why": "A revisit by Back. The roadmap target of 100 ms is missed by Money alone: measured 93 to 160 ms (every other screen 21 to 76), so the ceiling is the measured figure with room and falls when Money does.", "by": "perf.mjs" },
+        { "at": 100, "on": "2026-10-22", "why": "A revisit by Back now meets the roadmap target on every screen: measured 18 to 56 ms, Money 30 to 36, a kept page settling when it is drawn.", "by": "perf.mjs" }
       ]
     },
     "cssRules.waiverLookbehindChars": {
@@ -170,7 +232,7 @@
         { "at": 32827, "on": "2026-09-23", "why": "+67: the one-domain move, a reroute hook SvelteKit loads in its client entry." },
         { "at": 32862, "on": "2026-09-27", "why": "+35: one screen, /connect, the OAuth consent screen; recorded on paper from the per-route figure, not measured." },
         { "at": 33600, "on": "2026-09-30", "why": "+738: seven screens arrived together and the redesign gave its shared parts stylesheets of their own, each a row in the preload table." },
-        { "at": 33800, "on": "2026-10-06", "why": "Measured at 33655 on macOS (+55) with room for CI's Linux build: onNavigate from Kit's client for the route cross-fade (DIRECTION 38) and the top bar by a dynamic import. The 30 KB budget does not move." },
+        { "at": 33800, "on": "2026-10-06", "why": "Measured at 33655 on macOS (+55) with room for CI's Linux build: onNavigate from Kit's client for the route cross-fade and the top bar by a dynamic import. The 30 KB budget does not move." },
         { "at": 33800, "on": "2026-10-09", "why": "The day the ledger began, at the same number. It only falls from here." }
       ]
     },
@@ -480,6 +542,7 @@
     "tools/gates/sight.mjs": { "owes": "sharing", "file": "tools/gates/sight.mjs", "lines": [ { "at": 1, "on": "2026-10-20", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/no-login.mjs": { "owes": "agents", "file": "tools/gates/no-login.mjs", "lines": [ { "at": 1, "on": "2026-10-22", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/catalogue-immutable.mjs": { "owes": "proof", "file": "tools/gates/catalogue-immutable.mjs", "lines": [ { "at": 1, "on": "2026-10-13", "why": "The twelve characters of a checksum a finding says, enough to tell the released one from the one in the tree. No budget holds it." } ] },
+    "tools/gates/perf.mjs": { "owes": "proof", "file": "tools/gates/perf.mjs", "lines": [ { "at": 1, "on": "2026-10-22", "why": "The exit 3 for a tree with no build, as layout.mjs writes it.", "by": "perf.mjs" } ] },
     "tools/gates/first-screen.mjs": { "owes": "proof", "file": "tools/gates/first-screen.mjs", "lines": [ { "at": 2, "on": "2026-10-14", "why": "The 1000 that says the walk's wait in seconds in a finding, and exit 3 for a tree that holds no people, as no-transcript.mjs writes it." } ] },
     "tools/gates/no-shape-files.mjs": { "owes": "proof", "file": "tools/gates/no-shape-files.mjs", "lines": [ { "at": 7, "on": "2026-10-09", "why": "The 4096 bytes of a file's head the mark is looked for in, the 8000 bytes read to tell a binary file, the four lines the mark may sit on, git's 64 MiB listing buffer, and exit 3 for a gate that read nothing." } ] },
     "tools/gates/rulings.mjs": { "owes": "proof", "file": "tools/gates/rulings.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "The two characters of the section heading's line break the page is sliced past." } ] },
@@ -494,12 +557,12 @@
     "tools/gates/core-names.mjs": { "owes": "shell", "file": "tools/gates/core-names.mjs", "lines": [ { "at": 2, "on": "2026-10-13", "why": "The five letters a field id must be longer than, which the unit SHL-A01 gives, and exit 3 for a gate that read nothing." } ] }
   },
   "held": {
-    "commits.EXEMPT": { "lines": [ { "count": 7, "on": "2026-10-09", "why": "Local commits made before the first push the commits gate guards, each subject past 72 characters; exempt by sha until his word to reword them." } ] },
+    "commits.EXEMPT": { "lines": [ { "count": 7, "on": "2026-10-09", "why": "Local commits made before the first push the commits gate guards, each subject past 72 characters; exempt by sha until rewording them is decided." } ] },
     "web-lists.HELD": {
       "lines": [
         { "count": 43, "on": "2026-10-09", "why": "Files of the web app that still name a first-party list, each with its ids and why. 43 on the day the ledger began; the brief counted 42." },
         { "count": 42, "on": "2026-10-14", "why": "One entry came out with nothing put in its place: apps/web/src/lib/design/pen.ts held for people. Batch 96 (pen-web-count-96) moved the glyph off the pen, so the file names no people in a string and the gate reported the entry as held for nothing. 43 less 1 is 42." },
-        { "count": 46, "on": "2026-10-16", "why": "Four files went in, each with its ids and why, for the eight places the gate found after batches 101 and 102: apps/web/src/lib/flow/try-step.ts for steps, apps/web/src/lib/home/imported-rules.ts for categories and filing_rules, apps/web/src/lib/record/page-write.ts for agents and steps, and apps/web/src/lib/signup.ts for things. He was asked whether to hold them or rename them, and said to hold them and deploy. 42 and 4 more is 46.", "by": "The owner, 16 October (DIRECTION 44), asked whether to hold or rename what core-names, web-lists and colour-grep found: \"Hold them, deploy tonight\"" },
+        { "count": 46, "on": "2026-10-16", "why": "Four files went in, each with its ids and why, for the eight places the gate found after batches 101 and 102: apps/web/src/lib/flow/try-step.ts for steps, apps/web/src/lib/home/imported-rules.ts for categories and filing_rules, apps/web/src/lib/record/page-write.ts for agents and steps, and apps/web/src/lib/signup.ts for things. They were held rather than renamed, and deployed. 42 and 4 more is 46.", "by": "16 October, what core-names, web-lists and colour-grep found was held rather than renamed: \"Hold them, deploy tonight\"" },
         { "count": 45, "on": "2026-10-20", "why": "One entry came out with nothing put in its place: apps/web/src/routes/packs/+page.svelte held for updates. The UI pass of 20 October (agents F8) took the Updates tab off Add-ons, whose updates now lead the Installed half, so the file names no updates in a string and the gate reported the entry as held for nothing. 46 less 1 is 45." }
       ]
     },
@@ -514,7 +577,7 @@
       ]
     },
     "shell-words.HELD": { "lines": [ { "count": 6, "on": "2026-10-13", "why": "Files that spell one of the nine public words of one country the gate took on with SHL-A01, each held until a unit takes the word out: five until SHL-A07, the site's changelog until SHL-A20. A list of its own from its first line, so EXEMPT did not rise." } ] },
-    "core-names.HELD": { "lines": [ { "count": 1277, "on": "2026-10-13", "why": "Names an add-on or a use case declares that a core file still spells, one entry for each file and name, generated once from the gate's own reading the day SHL-A01 landed: 1274 in 519 files. Three more the same day, before the list was first committed, for two files written beside it: orders-late in the shop use case (shop 1.1.0), and work and people in the site's icons script, where they are the app's names for two glyphs. 1277 is the first number held; each entry names the unit that takes it out." }, { "count": 861, "on": "2026-10-13", "why": "The gate learnt what is not a use case's name, and 423 entries held for nothing came out: 311 for a word the kernel's own grammar declares (a block kind, a key of a list or of an answer, a value kind: source, lines, steps, parts, progress and seven more), which the gate now reads off the kernel and still reports after register., and 112 for a class, an id or a role in a page's markup (status, 82 of them, is the browser's own word for a live line). Seven went in the same day for batches 53 and 54, each with its own reason: making in three files of the first run and picked in the design sheet's controls, which are the screens' own names, status in the model ledger's row type, and Orders and points in the design sheet's specimens. 1277 less 423 and 7 more is 861." }, { "count": 563, "on": "2026-10-13", "why": "The gate stopped reading an add-on's or a use case's own declaration as the core, and 304 entries held for nothing came out, in 49 files: 137 under the seed's modules, 162 under its use cases and 5 under its packs. Each of those files says whose it is (pack or usecase with an id) or sits in the folder of one that does, and is to the seed what a pack file under packs/ is, which this gate never read for names either. What is still held in the seed is the code beside the declarations that says neither key (the installer, the table of names, the first-party list), read like the kernel. Six went in the same day, before the fall was committed, for one file of the same batch: packages/kernel/src/marks.ts gained MARK_GLYPHS, the kernel's copy of the drawer's glyph names, and people, work, shop, milestone, question (in circle-question-mark) and checks (in list-checks) are pictures there and nobody's add-on, as they are in the drawer's own names.ts. 861 less 304 and 6 more is 563." }, { "count": 562, "on": "2026-10-14", "why": "One entry came out with nothing put in its place: packages/host/src/model-jobs.ts held for options (SHL-A20). Batch 92 deleted findingQuestion there, the one place the file spelled options, so the gate reported the entry as held for nothing. 563 less 1 is 562." }, { "count": 559, "on": "2026-10-14", "why": "Three entries came out with nothing put in their place, each reported by the gate as held for nothing: apps/web/src/lib/design/pen.ts held for checks and for people (batch 96, pen-web-count-96, the pen no longer spells either), and packages/host/src/slash.ts held for orders (SHL-A20; batch 96, slash-host-limits-96, took out the two places it spelled orders). 562 less 3 is 559." }, { "count": 558, "on": "2026-10-14", "why": "One entry came out with nothing put in its place: apps/cli/src/brief.ts held for lesson (SHL-A20). Batch 97, card-one-composer-97, shrank the brief to a cleaner of the card the record draws, so the file no longer spells lesson and the gate reported the entry as held for nothing. 559 less 1 is 558." }, { "count": 554, "on": "2026-10-15", "why": "Four entries came out with nothing put in their place, each reported by the gate as held for nothing: packages/seed/src/usecases/links.ts held for choices, milestone, milestones and resources (SHL-A17). Batch 99, personal-and-guide-99, took the guide's example rows out, and with them the guide's entry in the example links, so the file no longer spells those four names. 558 less 4 is 554." }, { "count": 569, "on": "2026-10-16", "why": "Fifteen entries went in, one for each file and name among the 25 places the gate found after batches 101 and 102: guide's question, options, choices and passed, founder's organisation, things (a list of business, founder and 3 more) and launch-desk's price, in seven files under packages and three of the web's and the site's, each under the unit that takes it out (SHL-A07 for the kernel, SHL-A18 for the web, SHL-A20 for the rest). He was asked whether to hold the 25 words or rename them, and said to hold them and deploy. 554 and 15 more is 569.", "by": "The owner, 16 October (DIRECTION 44), asked whether to hold or rename what core-names, web-lists and colour-grep found: \"Hold them, deploy tonight\"" }, { "count": 562, "on": "2026-10-17", "why": "Seven entries came out with nothing put in their place, each reported by the gate as held for nothing after batch 103: apps/site/src/lib/claims.ts for counted and mercury, apps/site/src/lib/copy/agents.ts for people, apps/site/src/routes/agents/+page.svelte for people and work, apps/site/src/routes/pricing/+page.svelte for people, and apps/site/src/routes/slash/+page.svelte for work. 569 less 7 is 562." }, { "count": 561, "on": "2026-10-17", "why": "One entry came out with nothing in its place: apps/site/src/routes/for/Person.svelte for work, which the page no longer spells since batch 103b redrew the use-case pages. 562 less 1 is 561." }, { "count": 553, "on": "2026-10-20", "why": "Eight entries came out with nothing put in their place, each reported by the gate as held for nothing: minutes in apps/web/src/lib/copy/account.ts, apps/web/src/lib/flow/flow.ts, apps/web/src/lib/record/field-words.ts, apps/web/src/lib/record/packs.ts and packages/slash/src/health.ts, done_on in apps/web/src/lib/page/tile-head.ts, and course in packages/declare/src/usecase.ts and packages/seed/src/usecases/guide-kinds.ts. 561 less 8 is 553." }, {"count": 539, "on": "2026-10-22", "why": "Fourteen entries held for personal came out with nothing put in their place, each reported by the gate as held for nothing: personal is now a key a list may declare (personal: true, a list only the owner reads), so it is a word of the kernel's own grammar, read off REGISTER_KEYS as owner_only is. The gate no longer tells a use case's id of that name from the key, which is the price its own note gives for an id that is also a kernel word. 553 less 14 is 539."} ] },
+    "core-names.HELD": { "lines": [ { "count": 1277, "on": "2026-10-13", "why": "Names an add-on or a use case declares that a core file still spells, one entry for each file and name, generated once from the gate's own reading the day SHL-A01 landed: 1274 in 519 files. Three more the same day, before the list was first committed, for two files written beside it: orders-late in the shop use case (shop 1.1.0), and work and people in the site's icons script, where they are the app's names for two glyphs. 1277 is the first number held; each entry names the unit that takes it out." }, { "count": 861, "on": "2026-10-13", "why": "The gate learnt what is not a use case's name, and 423 entries held for nothing came out: 311 for a word the kernel's own grammar declares (a block kind, a key of a list or of an answer, a value kind: source, lines, steps, parts, progress and seven more), which the gate now reads off the kernel and still reports after register., and 112 for a class, an id or a role in a page's markup (status, 82 of them, is the browser's own word for a live line). Seven went in the same day for batches 53 and 54, each with its own reason: making in three files of the first run and picked in the design sheet's controls, which are the screens' own names, status in the model ledger's row type, and Orders and points in the design sheet's specimens. 1277 less 423 and 7 more is 861." }, { "count": 563, "on": "2026-10-13", "why": "The gate stopped reading an add-on's or a use case's own declaration as the core, and 304 entries held for nothing came out, in 49 files: 137 under the seed's modules, 162 under its use cases and 5 under its packs. Each of those files says whose it is (pack or usecase with an id) or sits in the folder of one that does, and is to the seed what a pack file under packs/ is, which this gate never read for names either. What is still held in the seed is the code beside the declarations that says neither key (the installer, the table of names, the first-party list), read like the kernel. Six went in the same day, before the fall was committed, for one file of the same batch: packages/kernel/src/marks.ts gained MARK_GLYPHS, the kernel's copy of the drawer's glyph names, and people, work, shop, milestone, question (in circle-question-mark) and checks (in list-checks) are pictures there and nobody's add-on, as they are in the drawer's own names.ts. 861 less 304 and 6 more is 563." }, { "count": 562, "on": "2026-10-14", "why": "One entry came out with nothing put in its place: packages/host/src/model-jobs.ts held for options (SHL-A20). Batch 92 deleted findingQuestion there, the one place the file spelled options, so the gate reported the entry as held for nothing. 563 less 1 is 562." }, { "count": 559, "on": "2026-10-14", "why": "Three entries came out with nothing put in their place, each reported by the gate as held for nothing: apps/web/src/lib/design/pen.ts held for checks and for people (batch 96, pen-web-count-96, the pen no longer spells either), and packages/host/src/slash.ts held for orders (SHL-A20; batch 96, slash-host-limits-96, took out the two places it spelled orders). 562 less 3 is 559." }, { "count": 558, "on": "2026-10-14", "why": "One entry came out with nothing put in its place: apps/cli/src/brief.ts held for lesson (SHL-A20). Batch 97, card-one-composer-97, shrank the brief to a cleaner of the card the record draws, so the file no longer spells lesson and the gate reported the entry as held for nothing. 559 less 1 is 558." }, { "count": 554, "on": "2026-10-15", "why": "Four entries came out with nothing put in their place, each reported by the gate as held for nothing: packages/seed/src/usecases/links.ts held for choices, milestone, milestones and resources (SHL-A17). Batch 99, personal-and-guide-99, took the guide's example rows out, and with them the guide's entry in the example links, so the file no longer spells those four names. 558 less 4 is 554." }, { "count": 569, "on": "2026-10-16", "why": "Fifteen entries went in, one for each file and name among the 25 places the gate found after batches 101 and 102: guide's question, options, choices and passed, founder's organisation, things (a list of business, founder and 3 more) and launch-desk's price, in seven files under packages and three of the web's and the site's, each under the unit that takes it out (SHL-A07 for the kernel, SHL-A18 for the web, SHL-A20 for the rest). He was asked whether to hold the 25 words or rename them, and said to hold them and deploy. 554 and 15 more is 569.", "by": "16 October, what core-names, web-lists and colour-grep found was held rather than renamed: \"Hold them, deploy tonight\"" }, { "count": 562, "on": "2026-10-17", "why": "Seven entries came out with nothing put in their place, each reported by the gate as held for nothing after batch 103: apps/site/src/lib/claims.ts for counted and mercury, apps/site/src/lib/copy/agents.ts for people, apps/site/src/routes/agents/+page.svelte for people and work, apps/site/src/routes/pricing/+page.svelte for people, and apps/site/src/routes/slash/+page.svelte for work. 569 less 7 is 562." }, { "count": 561, "on": "2026-10-17", "why": "One entry came out with nothing in its place: apps/site/src/routes/for/Person.svelte for work, which the page no longer spells since batch 103b redrew the use-case pages. 562 less 1 is 561." }, { "count": 553, "on": "2026-10-20", "why": "Eight entries came out with nothing put in their place, each reported by the gate as held for nothing: minutes in apps/web/src/lib/copy/account.ts, apps/web/src/lib/flow/flow.ts, apps/web/src/lib/record/field-words.ts, apps/web/src/lib/record/packs.ts and packages/slash/src/health.ts, done_on in apps/web/src/lib/page/tile-head.ts, and course in packages/declare/src/usecase.ts and packages/seed/src/usecases/guide-kinds.ts. 561 less 8 is 553." }, {"count": 539, "on": "2026-10-22", "why": "Fourteen entries held for personal came out with nothing put in their place, each reported by the gate as held for nothing: personal is now a key a list may declare (personal: true, a list only the owner reads), so it is a word of the kernel's own grammar, read off REGISTER_KEYS as owner_only is. The gate no longer tells a use case's id of that name from the key, which is the price its own note gives for an id that is also a kernel word. 553 less 14 is 539."}, {"count": 483, "on": "2026-10-22", "why": "Fifty-six entries held for options came out with nothing put in their place, each reported by the gate as held for nothing: options is one of the kinds of body a suggestion may carry (BODY_KINDS in packages/kernel/src/govern.ts, a choice among options, beside rowset, pack and four more), so it is a word of the kernel's own grammar, and the gate now reads that one list off govern.ts as it reads the lists of declare.ts. 539 less 56 is 483."} ] },
     "dead-copy.ALLOWED": {
       "lines": [
         { "count": 8, "on": "2026-10-09", "why": "Sentences in the copy file that nothing renders yet, each correct or unbuilt by its own reason." },
@@ -552,12 +615,14 @@
     },
     "sight.ALLOWED": {
       "lines": [
-        { "count": 46, "on": "2026-10-20", "why": "The record's reads of rows that sit behind no sight check, each with its reason by file and function: the sight module itself, the record's own nightly and Slash paths read as NOBODY, the owner's and the decider's, reads that answer no row, and two write paths not yet held to the row. Sharing slice 3 completed the list and turned the gate on; an entry goes when its site is gated." }
+        { "count": 46, "on": "2026-10-20", "why": "The record's reads of rows that sit behind no sight check, each with its reason by file and function: the sight module itself, the record's own nightly and Slash paths read as NOBODY, the owner's and the decider's, reads that answer no row, and two write paths not yet held to the row. Sharing slice 3 completed the list and turned the gate on; an entry goes when its site is gated." },
+        { "count": 44, "on": "2026-10-22", "why": "Two entries came out with nothing put in their place, each reported by the gate as excusing a function with no ungated read of rows left: newest in packages/record/src/index.ts and usedBy in packages/record/src/methods/agents.ts. 46 less 2 is 44." }
       ]
     },
     "no-login.ALLOWED": {
       "lines": [
-        { "count": 2, "on": "2026-10-22", "why": "The refusal lists that may name an agent app's login, each a const of data by file and name: sync.ts's SIGN_IN_FILE, the file names sync inventory refuses to carry, and SIGN_INS, the two sign-ins it sizes by stat and refuses. A list goes when its file stops naming one." }
+        { "count": 2, "on": "2026-10-22", "why": "The refusal lists that may name an agent app's login, each a const of data by file and name: sync.ts's SIGN_IN_FILE, the file names sync inventory refuses to carry, and SIGN_INS, the two sign-ins it sizes by stat and refuses. A list goes when its file stops naming one." },
+        { "count": 2, "on": "2026-10-22", "why": "Still the two lists. SIGN_INS also names Claude Code's keychain item and the claude.ai login now, so the setup sync verbs (carry.ts, secret-store.ts) refuse all four logins by name from the one list rather than from a list of their own." }
       ]
     }
   },

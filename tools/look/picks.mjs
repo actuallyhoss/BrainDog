@@ -1,12 +1,12 @@
 /**
  * The picks page of the frame (EXP-A02): every open choice of the look on one page, each option drawn on the frame's
  * specimen at 390 and 1440, dark then light, the recommendation marked, and one press for "yes to every
- * recommendation". It also writes `design/boards/frame/dark.md` and, from his answer, `design/boards/frame/yes.json`.
+ * recommendation". It also writes `design/boards/frame/dark.md` and, from the answer, `design/boards/frame/yes.json`.
  *
  *   node tools/look/picks.mjs dark                       write dark.md from the theme's own build
  *   node tools/look/picks.mjs draw [--source lived] [--out <folder>]
  *   node tools/look/picks.mjs page --from <picks drawing folder>
- *   node tools/look/picks.mjs yes "<his words>" --from <board drawing folder> [--taken <where>] [--seen] [--pick slot=option]...
+ *   node tools/look/picks.mjs yes "<the words of the yes>" --from <board drawing folder> [--taken <where>] [--seen] [--pick slot=option]...
  *
  * A PICK IS A FOLDER, so a part that brings a choice adds one and changes nothing here: `picks/<pick>/slot.json` says the
  * question, its options and the default, and `picks/<pick>/<option>.css` is the option drawn, put after the product's
@@ -14,8 +14,8 @@
  * sheet is the look as it stands (`live`). A pick about a screen the specimen does not hold is said in words, and its
  * sheet, if it has one, waits for that screen's board.
  *
- * A PICK HE LEAVES BLANK TAKES ITS DEFAULT and is listed "default, not chosen", never as his choice. One a section of
- * DIRECTION took for him is listed as taken there.
+ * A PICK LEFT BLANK TAKES ITS DEFAULT and is listed "default, not chosen", never as a choice. One taken by default
+ * elsewhere (its slot's `taken`) is listed as taken there.
  *
  * `yes` NEVER DRAWS. It reads a drawing of the frame board made by `board.mjs`, takes the yes through `board.mjs`'s own
  * `yesOf` (which refuses a drawing of code that has moved since), and adds the picks. So yes.json is written by a tool
@@ -38,14 +38,14 @@ export const PICKS = join(BOARDS, BOARD, 'picks');
 export const SPECIMEN = join(BOARDS, BOARD, 'specimen.dog');
 export const DARK = join(BOARDS, BOARD, 'dark.md');
 
-/** The page draws each option at the phone and the laptop, dark first: he runs dark. */
+/** The page draws each option at the phone and the laptop, dark first: dark is the theme looked at most. */
 export const PICK_WIDTHS = [390, 1440];
 export const PICK_THEMES = ['dark', 'light'];
 
 /** The units a yes to the frame closes, as the planner counts them. */
 export const UNITS = ['EXP-A01', 'EXP-A02'];
 
-/** How a pick is listed: his own choice, the default he left, or one a section of DIRECTION took for him. */
+/** How a pick is listed: the owner's own choice, the default left in place, or one taken by default elsewhere. */
 export const CHOSEN = 'chosen';
 export const DEFAULTED = 'default, not chosen';
 
@@ -106,8 +106,8 @@ export function chosenOf(pairs = []) {
 }
 
 /**
- * Each slot's answer: his choice where he made one, else the marked default, listed as "default, not chosen" (or as
- * taken in the section of DIRECTION that took it). A choice of an option the slot does not offer, or of a slot that is
+ * Each slot's answer: the owner's choice where one was made, else the marked default, listed as "default, not chosen"
+ * (or as taken where its slot's `taken` says). A choice of an option the slot does not offer, or of a slot that is
  * not there, is refused by name.
  */
 export function answersOf(slots, chosen = {}) {
@@ -410,7 +410,7 @@ export async function writePage(out, root = ROOT) {
 }
 
 /**
- * His yes to the frame, with his picks: `board.mjs`'s `yesOf` over a drawing of the frame board (it refuses one of code
+ * The yes to the frame, with its picks: `board.mjs`'s `yesOf` over a drawing of the frame board (it refuses one of code
  * that has moved since), the units the planner counts, and each pick as chosen, defaulted or taken. Returns the yes.
  */
 export async function yesWithPicks(root, drawing, { said, taken, seen = false, chosen = {}, at = new Date() }) {
@@ -444,7 +444,7 @@ export function parseArgs(args) {
     else out[m[1]] = value;
   }
   if ((command === 'page' || command === 'yes') && out.from === undefined) throw new Error(`picks.mjs ${command} needs --from <the drawing folder>.`);
-  if (command === 'yes' && (out.said ?? '').trim() === '') throw new Error('A yes holds his words: picks.mjs yes "<what he said>" --from <the frame drawing>.');
+  if (command === 'yes' && (out.said ?? '').trim() === '') throw new Error('A yes holds the words said: picks.mjs yes "<the words of the yes>" --from <the frame drawing>.');
   return out;
 }
 
@@ -464,7 +464,7 @@ async function main() {
     const yes = await yesWithPicks(ROOT, drawing, { said: asked.said, taken: asked.taken, seen: asked.seen, chosen: chosenOf(asked.picks) });
     writeFileSync(join(ROOT, BOARDS, BOARD, 'yes.json'), `${JSON.stringify(yes, null, 2)}\n`);
     const left = Object.values(yes.picks).filter((p) => p.how === DEFAULTED).length;
-    console.log(`  picks: his yes to the ${BOARD} board is kept, naming ${Object.keys(yes.images).length} pictures, ${Object.keys(yes.picks).length} picks (${left} default, not chosen).`);
+    console.log(`  picks: the yes to the ${BOARD} board is kept, naming ${Object.keys(yes.images).length} pictures, ${Object.keys(yes.picks).length} picks (${left} default, not chosen).`);
     return;
   }
   const { sourceOf } = await import('./board.mjs');

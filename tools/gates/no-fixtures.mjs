@@ -8,12 +8,12 @@
  * live in `apps/web/src/lib/record/fixtures/`, and this is what keeps them there: any file in one of `PLACES` that is
  * not a test and not in a `fixtures/` directory, and imports a module through a `fixtures/` path, is a finding.
  *
- * A LIST AND NOT ONE FOLDER (PRF-A07, `DIRECTION.md` 40: the invented record is for the gates and for nothing else).
+ * A LIST AND NOT ONE FOLDER (PRF-A07: the invented record is for the gates and for nothing else).
  * This read `apps/web/src` alone, so the command's scratch record imported its three product parts from the seed's
  * root and no gate said so (`apps/cli/src/scratch.ts`, until 9 October). Everything that runs a record for somebody
  * is on the list: the web app, the worker, the self-host, the command, and the host, record and agent-door packages.
  *
- * WHY A GATE AND NOT A TEST BESIDE THE OTHERS. `no-sample-b2.test.ts` already walks the app for one directory, and it
+ * WHY A GATE AND NOT A TEST BESIDE THE OTHERS. `no-sample-render-helpers.test.ts` already walks the app for one directory, and it
  * ran green while shipped files imported `data.ts`, the fixture before it moved, because the rule it held was about a
  * directory the fixture was not yet in. Measured on 25 September before the move: `api.ts`, `blocks.ts`,
  * `boot-live.ts`, `metrics.ts`, `seed.ts`, the two `/packs` screens, `packs/sharing.ts` and `/start` (and two files
