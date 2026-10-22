@@ -86,16 +86,20 @@ export async function weekHeld(shell: Pick<Shell, 'lists'>): Promise<Week | unde
   );
 }
 
-/** Today's headings in the voice that speaks, as Home asks for them. */
+/**
+ * Today's headings in the voice that speaks, as Home asks for them. NEEDS YOU IS ONE OF THE FIVE PLACES AND KEEPS ITS
+ * NAME, and its calm line with it (the audit of 22 October, U1): a use case words new things and never renames a place,
+ * and "Needs your call" over the tile named a place the bar and the rail call Needs you.
+ */
 export function voiceOf(said: (key: VoiceKey) => string): HomeVoice {
   return {
     rightNow: said('right_now'),
-    needsYou: said('needs_you'),
+    needsYou: VOICE_LINES.needs_you,
     sinceAway: said('since_away'),
     workingNow: said('working_now'),
     comingUp: said('coming_up'),
     overdue: said('overdue'),
-    nothingWaiting: said('nothing_waiting'),
+    nothingWaiting: VOICE_LINES.nothing_waiting,
     nothingDue: said('nothing_due'),
   };
 }
@@ -106,9 +110,12 @@ const plainBody = (body: unknown): PageBody => JSON.parse(JSON.stringify(body)) 
 /** Today's headings as the house says them, which a kept body carries and the reader says in the voice that speaks. */
 export const HOUSE_VOICE: HomeVoice = voiceOf((key) => VOICE_LINES[key]);
 
-/** The voice keys a kept heading may be, and the keys a kept empty line may be: the ones `todayHome` asks the voice for. */
-const HEADINGS: readonly VoiceKey[] = ['right_now', 'needs_you', 'since_away', 'working_now', 'coming_up', 'overdue'];
-const EMPTIES: readonly VoiceKey[] = ['nothing_waiting', 'nothing_due'];
+/**
+ * The voice keys a kept heading may be, and the keys a kept empty line may be: the ones `todayHome` asks the voice for,
+ * less Needs you's heading and calm line, which are a place's and are never said another way (U1).
+ */
+const HEADINGS: readonly VoiceKey[] = ['right_now', 'since_away', 'working_now', 'coming_up', 'overdue'];
+const EMPTIES: readonly VoiceKey[] = ['nothing_due'];
 
 /** The key whose house line `line` is, among `keys`, or `null`. */
 const keyOf = (line: unknown, keys: readonly VoiceKey[]): VoiceKey | null =>

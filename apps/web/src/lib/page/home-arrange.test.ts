@@ -88,11 +88,14 @@ test('the line a task is typed into is named by the tasks list as the record wor
   assert.equal(holdsOf({ ...shell, lists: [] }, { 'tasks:one': 'job' }).one, undefined, 'no tasks list, no word for one');
 });
 
-test('the headings are asked of the voice that speaks', () => {
+test('the headings are asked of the voice that speaks, and Needs you keeps its name and its calm line (U1)', () => {
   const asked: string[] = [];
   const voice = voiceOf((key: VoiceKey) => (asked.push(key), `said ${key}`));
-  assert.equal(voice.needsYou, 'said needs_you');
+  assert.equal(voice.comingUp, 'said coming_up');
   assert.equal(voice.nothingDue, 'said nothing_due');
+  assert.equal(voice.needsYou, VOICE_LINES.needs_you);
+  assert.equal(voice.nothingWaiting, VOICE_LINES.nothing_waiting);
+  assert.ok(!asked.includes('needs_you') && !asked.includes('nothing_waiting'));
   assert.ok(asked.every((k) => k in VOICE_LINES));
 });
 
@@ -146,19 +149,22 @@ test('a stat that already says when it draws keeps its own when, and a block wit
   assert.deepEqual(whileHeld(body).blocks, body.blocks);
 });
 
-test('a kept heading is said in the voice that speaks, and words somebody wrote are left as written', () => {
-  const said = (key: VoiceKey) => (key === 'needs_you' ? 'Waiting on you' : key === 'nothing_due' ? 'Clear ahead.' : VOICE_LINES[key]);
+test('a kept heading is said in the voice that speaks, words somebody wrote are left as written, and Needs you is a place', () => {
+  const said = (key: VoiceKey) =>
+    key === 'needs_you' ? 'Needs your call' : key === 'nothing_waiting' ? 'No call is waiting on you.' : key === 'coming_up' ? 'Due soon' : key === 'nothing_due' ? 'Clear ahead.' : VOICE_LINES[key];
   const blocks = [
     { kind: 'queue', heading: VOICE_LINES.needs_you, empty: VOICE_LINES.nothing_waiting },
     { kind: 'timeline', heading: 'Next at the kiln', empty: VOICE_LINES.nothing_due },
+    { kind: 'timeline', heading: VOICE_LINES.coming_up },
     { kind: 'note' },
   ];
   const out = inVoice(blocks, said);
-  assert.equal(out[0]?.heading, 'Waiting on you');
-  assert.equal(out[0]?.empty, VOICE_LINES.nothing_waiting);
+  /* ONE OF THE FIVE PLACES IS NEVER RENAMED (U1): the tile says Needs you, as the bar and the rail do. */
+  assert.equal(out[0], blocks[0]);
   assert.equal(out[1]?.heading, 'Next at the kiln');
   assert.equal(out[1]?.empty, 'Clear ahead.');
-  assert.equal(out[2], blocks[2], 'a block with nothing to say again is the same block');
+  assert.equal(out[2]?.heading, 'Due soon');
+  assert.equal(out[3], blocks[3], 'a block with nothing to say again is the same block');
   assert.deepEqual(inVoice(out, said), out, 'twice is once');
 });
 
