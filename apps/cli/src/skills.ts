@@ -366,7 +366,7 @@ export type SkillSync = {
   leave?: ReadonlySet<string> | undefined;
 };
 
-type Got = { kind: Kind; text: string; managed: boolean; state: string | null };
+type Got = { kind: Kind; text: string; managed: boolean; state: string | null; name: unknown };
 
 /**
  * Sync once, and the lines that say what happened: one per file written, deleted, kept, proposed or registered.
@@ -389,6 +389,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   const bases = [s.configDir, ...(projectBase === null ? [] : [projectBase])];
   const folders = bases.flatMap((b) => [resolve(b, 'skills'), resolve(b, 'commands')]);
   const inside = (path: string, base: string) => [resolve(base, 'skills'), resolve(base, 'commands')].some((f) => resolve(path).startsWith(f + sep));
+  const nameAt = (path: string) => (path.endsWith('SKILL.md') ? basename(dirname(path)) : basename(path, '.md'));
   const synced = (path: string) => folders.some((f) => resolve(path).startsWith(f + sep));
   const where = (path: string) => (projectBase !== null && inside(path, projectBase) ? `${path} (in the repository, not committed)` : path);
   const tell = (done: string, would: string) => lines.push(s.dryRun ? would : done);
@@ -412,7 +413,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     const row = valueOf(await s.client.get('skills', seq));
     if (!isObject(row) || !isObject(row.fields) || typeof row.fields.body !== 'string') return null;
     const kind: Kind = row.fields.kind === 'command' ? 'command' : 'skill';
-    return { kind, text: render(kind, name, trigger, row.fields.body), managed: row.fields.managed !== false, state: typeof row.state === 'string' ? row.state : null };
+    return { kind, text: render(kind, name, trigger, row.fields.body), managed: row.fields.managed !== false, state: typeof row.state === 'string' ? row.state : null, name: row.fields.name };
   };
 
   /* THE QUESTION NAMES THE SKILL AND "THIS MAC", AND THE DETAILS SAY WHERE. It read "Take the edit to kiln-release made
@@ -549,6 +550,19 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     const listedSpoken = new Set(listed.map((r) => r.spoken));
     if (read.late) lines.push('The record holds more skills than there was time to read, so the rest wait for the next sync.');
 
+    /* A LOCK ENTRY IS HONOURED ONLY FOR THE SKILL IT WAS MADE FOR: the row it names must exist and carry the skill's
+       name. Otherwise the entry is dropped and the skill is matched by name, as if the lock had never held it. */
+    const dropLock = (path: string) => {
+      delete lock[path];
+      lines.push(`${nameAt(path)}: the lock pointed at another row, so it was matched again by name.`);
+    };
+    for (const [path, entry] of Object.entries(lock)) {
+      if (entry.spoken === null || !synced(path)) continue;
+      const at = listed.find((r) => r.spoken === entry.spoken);
+      const named = at !== undefined ? at.name : (await fetchRow(entry.spoken, nameAt(path), ''))?.name;
+      if (named !== nameAt(path)) dropLock(path);
+    }
+
     for (const listedRow of listed) {
       if (s.leave?.has(listedRow.spoken)) continue;
       let row = listedRow;
@@ -657,7 +671,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     /* Retired: an unchanged file is deleted, an edited one left. */
     for (const [path, entry] of Object.entries(lock)) {
       if (entry.spoken === null || listedSpoken.has(entry.spoken) || !synced(path)) continue;
-      const name = path.endsWith('SKILL.md') ? basename(dirname(path)) : basename(path, '.md');
+      const name = nameAt(path);
       const got = await fetchRow(entry.spoken, name, '');
       if (got === null || got.state !== 'retired') continue;
       if (!existsSync(path)) {

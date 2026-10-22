@@ -576,6 +576,33 @@ test('A DRY RUN writes no file and no lock, and proposes and creates nothing', a
   assert.deepEqual(h.seen.filter((s) => s.method !== 'context' && s.method !== 'get'), []);
 });
 
+test('A LOCK ENTRY FOR ANOTHER SKILL\'S ROW, OR A ROW THAT IS GONE, is dropped and the skill is matched again by name', async (t) => {
+  const h = await setup(t);
+  const debt = h.add({ name: 'ponytail-debt', trigger: 'When debt is named', body: 'Debt body.\n' });
+  const editing = h.add({ name: 'copy-editing', trigger: 'When copy is edited', body: 'Editing body.\n' });
+  const review = h.add({ name: 'review-pr', trigger: 'Before a merge', body: 'Review body.\n' });
+  const editingPath = h.global('copy-editing');
+  const reviewPath = h.global('review-pr');
+  const own = (r: typeof debt) => render('skill', String(r.fields.name), String(r.fields.trigger), String(r.fields.body));
+  for (const [path, r] of [[editingPath, editing], [reviewPath, review]] as const) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, own(r));
+  }
+  /* copy-editing is locked to the ponytail-debt row, and review-pr to a row the record no longer has. */
+  mkdirSync(dirname(h.lockFile), { recursive: true });
+  writeFileSync(h.lockFile, JSON.stringify({ [editingPath]: { spoken: 'skills#1', version: 1, sha256: 'x' }, [reviewPath]: { spoken: 'skills#44', version: 1, sha256: 'x' } }));
+
+  const lines = await h.sync();
+  assert.ok(lines.includes('copy-editing: the lock pointed at another row, so it was matched again by name.'));
+  assert.ok(lines.includes('review-pr: the lock pointed at another row, so it was matched again by name.'));
+  assert.equal(debt.fields.body, 'Debt body.\n', 'the ponytail-debt row was not written with another skill\'s text');
+  assert.equal(h.seen.filter((s) => s.method === 'update' || s.method === 'propose').length, 0);
+  assert.equal(h.lock()[editingPath]?.spoken, 'skills#2');
+  assert.equal(h.lock()[reviewPath]?.spoken, 'skills#3');
+  assert.equal(readFileSync(editingPath, 'utf8'), own(editing));
+  assert.ok(!lines.some((l) => l.includes('Editing body') || l.includes('Review body')), 'no body is printed');
+});
+
 test('A BROKEN LOCK FILE stops the sync with one line and is left for a person to delete', async (t) => {
   const h = await setup(t);
   h.add(RELEASE);
