@@ -69,7 +69,8 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
   },
   /* THE REST UNDER MORE, SEVEN SINCE THE UI PASS OF 20 OCTOBER (agents F14) less Delete: signing in (who you are, passkeys, where you
      are signed in and the records you can open, which were three half-empty areas), sharing, what comes in, the keys, and what
-     the record keeps and costs. Pages is Navigation's now: the phone bar, the order and every page. */
+     the record keeps and costs. Pages is Navigation's now: the phone bar, the order and every page. Eight since Health
+     came off Today (23 October). */
   {
     title: 'More',
     icon: 'archive',
@@ -82,6 +83,9 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
+      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY (the audit of 22 October, U3): what it found wrong in its own pages
+         and notes, what went stale, what it matched and learned. Read only when it is opened. */
+      area('/settings/health', 'Health', 'heart-pulse', 'What the record found to tidy in itself'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
       area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
     ],
