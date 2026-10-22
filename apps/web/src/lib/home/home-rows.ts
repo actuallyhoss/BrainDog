@@ -27,6 +27,10 @@ export type HomeLine = {
   when?: string;
   /** Its amount as the record said it, and which way the money goes. */
   amount?: { text: string; dir: 'in' | 'out' };
+  /** The same amount as the record holds it, in minor units, where it carries one: Today's Late tile says it whole. */
+  money?: { minor: number; currency: string };
+  /** The day it fell due, `YYYY-MM-DD`, on a late line: "due 9 Oct" under its name. */
+  day?: string;
   /** Its page, an app path. */
   href?: string;
   /** Whether it is past its day; a line due today is not, and its dot says so. */
@@ -128,11 +132,14 @@ export function lateLines(blocks: readonly LiveBlock[], today: string): HomeLine
       const due = dueOf(b, n);
       const amount = amountOf(b, n);
       const href = hrefOf(b, n);
+      const held = ((b.entries[n]?.fields ?? {}) as Record<string, unknown>).amount as { amount?: unknown; currency?: unknown } | null | undefined;
+      const money = amount && held && Number.isSafeInteger(held.amount) && typeof held.currency === 'string' ? { minor: held.amount as number, currency: held.currency } : null;
       out.push({
         key: keyOf(b, n),
         title: titleOf(b, n),
-        ...(due === null ? {} : { when: due < today ? lateSaid(due, today) : DUE_TODAY }),
+        ...(due === null ? {} : { when: due < today ? lateSaid(due, today) : DUE_TODAY, day: due }),
         ...(amount ? { amount } : {}),
+        ...(money ? { money } : {}),
         ...(href ? { href } : {}),
         late: due === null || due < today,
         ...(b.kind === 'todo' && typeof b.entries[n]?.seq === 'number' ? { tick: b.entries[n]!.seq } : {}),
