@@ -47,7 +47,7 @@ const listOf = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(',
 
 /**
  * What a screen's pictures say against it, one line a fault with the widths it was seen at: never settled, refused,
- * still busy, sideways overflow, writes blocked, console errors, raw text.
+ * still busy, sideways overflow, writes blocked, console errors, raw text, an old number that says nothing of its age.
  */
 export function flags(shots) {
   const at = new Map();
@@ -60,6 +60,7 @@ export function flags(shots) {
     if (s.writesBlocked > 0) add(`${plural(s.writesBlocked, 'write')} blocked`, s.width);
     if (s.consoleErrors?.length > 0) add(plural(s.consoleErrors.length, 'console error'), s.width);
     for (const [kind, { count }] of Object.entries(s.raw ?? {})) add(plural(count, KIND_NAMES[kind] ?? `raw ${kind}`), s.width);
+    for (const f of s.ages?.old ?? []) if (!f.shown) add(`${f.name} is ${plural(f.days, 'day')} old with no age`, s.width);
   }
   return [...at].map(([said, ws]) => `${said} at ${listOf([...new Set(ws)])}`);
 }

@@ -17,6 +17,11 @@
  * `{ origin, app, set, out, source }` and the look closes when it returns. Until then the look serves and says where,
  * so a person or an agent can point a browser at it, and stops on Ctrl+C. Either way `run.json` in `--out` says which
  * source, which set, and what the source refused.
+ *
+ * EVERY LOOK ENDS WITH ONE LINE FROM THE THREE QUICK CHECKS (`checks.mjs`): record words on the screens, counts that
+ * disagree between screens, and old numbers that say nothing of their age. It is printed, kept in `said.json` as
+ * `checks`, and any finding fails the look. `--source planted` is the seed with one of each fault put in, which the
+ * checks must find and `--source seed` must not give them.
  */
 
 import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';

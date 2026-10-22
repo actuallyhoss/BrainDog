@@ -10,9 +10,15 @@ readings are in.
 2. Read `missing` and `cannot`. Each is a screen of the set that was not drawn. Copy every one into `notDrawn` with its
    reason. A screen that was not drawn is not seen. It never passes.
 3. Read each line of `shots` for what is already counted: `settled` other than `ready` or `empty`, `waited.busy` still
-   busy, `overflowPx` above 1, `writesBlocked` above 0, `consoleErrors`, `failedRequests`, and anything under `raw`.
-   Each of those is a fault before a picture is opened. Find it on the picture and quote it.
-4. Open the sheet of each theme (`sheet-<set>-light.png`, `sheet-<set>-dark.png`), then each first screen
+   busy, `overflowPx` above 1, `writesBlocked` above 0, `consoleErrors`, `failedRequests`, anything under `raw` (record
+   words: ids, handles, templates, codes, paths, machine words), and any figure under `ages.old` whose `shown` is
+   false (an old number that says nothing of its age). Each of those is a fault before a picture is opened. Find it on
+   the picture and quote it.
+4. Read `checks` in `said.json`. Its `summary` is the one line a batch is judged on: `words`, whether the `counts` of
+   projects in play and of what needs you agree across screens, and `old numbers without age`. Any finding there is a
+   fault, and the look has already failed on it. Its `read` counts say how much each check saw, so a check that read
+   nothing is not a pass, and its `cannot` says what no picture shows it. The checks never replace the table below.
+5. Open the sheet of each theme (`sheet-<set>-light.png`, `sheet-<set>-dark.png`), then each first screen
    (`<screen>-<width>-<theme>.png`) and, where the first screen cuts something off, its `-full.png`.
 
 ## The checks, on every screen

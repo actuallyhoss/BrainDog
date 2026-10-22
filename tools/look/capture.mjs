@@ -18,6 +18,10 @@
  *
  * IMAGES ARE NAMED `<screen>-<width>-<theme>.png` for the first screen and `...-full.png` for the whole page, so the
  * six of a live look are 36 first screens by fixed names whatever the record holds, and the sheet can lay them out.
+ *
+ * THE THREE QUICK CHECKS READ THESE SAME PICTURES (`words.mjs`, `checks.mjs`): each line keeps the record words its text
+ * holds (`raw`), the counts it says (`counts`) and the ages of the figures it draws (`ages`), and `said.json` ends with
+ * `checks`, the one line a batch is judged on. Any finding fails the look, as text crossing text does.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -26,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from '../gates/lib.mjs';
+import { agesOf, countsIn, judge, pageFactsIn } from './checks.mjs';
 import { pick, screensOf } from './screens.mjs';
 import { sheets } from './sheet.mjs';
 import { RAW, rawIn, slugsOf } from './words.mjs';
@@ -33,7 +38,7 @@ import { RAW, rawIn, slugsOf } from './words.mjs';
 /* THE RAW COUNTING MOVED TO `words.mjs` AND IS STILL THIS FILE'S EXPORT, so the people's walks (`rawIn`) read it where they did. */
 export { RAW, rawIn };
 
-const ROOT =resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export const THEMES = ['light', 'dark'];
 
@@ -170,7 +175,7 @@ export const since = (before, after) => {
 };
 
 /** One picture of one screen at one width and theme, and its line of `said.json`. */
-async function shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known }) {
+async function shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known, now }) {
   heard.errors.length = 0;
   heard.failed.length = 0;
   const before = source.counts();
@@ -221,6 +226,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
       })),
     }))
     .catch(() => ({ overflow: 0, text: '', marked: [] }));
+  /* WHAT THE THREE QUICK CHECKS NEED THAT TEXT DOES NOT HOLD (`checks.mjs`): the badge, the More sheet, the key numbers' sentences and the charts' points. */
+  const seen = await page.evaluate(pageFactsIn).catch(() => ({ badges: [], more: [], sentences: [], charts: [], decor: [] }));
   /* TEXT THAT CROSSES TEXT, over the whole page and not only the first screen: a fault the look fails on. */
   const crossed = crossings(await page.evaluate(textBoxesIn).catch(() => []));
   const base = `${screen.key}-${width}-${theme}`;
@@ -260,6 +267,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),
     raw: rawIn(facts.text, { all: true, slugs: known.slugs }),
+    counts: countsIn(facts.text, seen),
+    ages: agesOf(seen, now),
     overlaps: { count: crossed.length, e: crossed.slice(0, 5) },
     marked: facts.marked,
     lint: null,
@@ -272,7 +281,11 @@ export default async function capture({ origin, app, set, out, source }) {
   const height = budget('layout').viewportHeightPx;
   const settleMs = budget('layout').settleMs;
   const ready = readiness('look', timeoutMs, join(ROOT, 'apps', 'web', 'build'));
-  const picked = await pick(asker(origin));
+  const ask = asker(origin);
+  const picked = await pick(ask);
+  /* THE RECORD'S OWN CLOCK is what "today" means to the ages (`boot.now`: the seed's is pinned, a live record's is the host's). */
+  const booted = Date.parse((await ask('boot'))?.now ?? '');
+  const now = Number.isFinite(booted) ? booted : Date.now();
   const known = { slugs: slugsOf(picked.pages) };
   const { screens, missing } = Array.isArray(source.screens) ? await namedScreens(source.screens, picked) : await screensOf(set, picked);
   const cannot = [];
@@ -317,7 +330,7 @@ export default async function capture({ origin, app, set, out, source }) {
         page.on('requestfailed', (r) => heard.failed.push(`${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText ?? 'failed'}`));
         page.on('response', (r) => r.status() >= 400 && heard.failed.push(`${r.request().method()} ${new URL(r.url()).pathname}: ${r.status()}`));
         for (const screen of drawn) {
-          said.shots.push(await shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known }));
+          said.shots.push(await shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known, now }));
           console.log(`  ${screen.key} ${width} ${theme}: ${said.shots.at(-1).settled ?? 'never settled'}`);
           write();
         }
@@ -330,13 +343,19 @@ export default async function capture({ origin, app, set, out, source }) {
   said.look.closed = new Date().toISOString();
   const stuck = said.shots.filter((s) => s.settled === null || s.settled === 'refused');
   const crossing = said.shots.filter((s) => s.overlaps.count > 0);
+  /* THE THREE QUICK CHECKS, ONE LINE (`checks.mjs`): record words, counts that disagree, old numbers with no age. */
+  said.checks = judge(said.shots);
   said.look.verdict = [
     stuck.length === 0 ? 'every screen drew' : `${stuck.length} of ${said.shots.length} pictures show a screen that never settled or refused`,
     ...(crossing.length > 0 ? [`${crossing.length} show text crossing text (${crossing.map((s) => `${s.screen} ${s.width} ${s.theme}`).join(', ')})`] : []),
+    ...(said.checks.found ? [said.checks.summary] : []),
   ].join('; ');
   write();
   for (const s of crossing) console.log(`  text crosses text on ${s.screen} ${s.width} ${s.theme}: ${s.overlaps.e.map((o) => `"${o.a}" and "${o.b}"`).join('; ')}`);
   console.log(`  look: ${said.shots.length} pictures, ${said.missing.length + cannot.length} screens not drawn, in ${out}`);
-  if (stuck.length > 0 || crossing.length > 0 || ready.nothingDrawn() !== null) process.exitCode = 1;
+  console.log(`  checks: ${said.checks.summary}`);
+  for (const line of said.checks.lines) console.log(`    ${line}`);
+  console.log(`  checks do not see: ${said.checks.cannot.join('; ')}`);
+  if (stuck.length > 0 || crossing.length > 0 || said.checks.found || ready.nothingDrawn() !== null) process.exitCode = 1;
   return said;
 }
