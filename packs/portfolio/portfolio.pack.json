@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Each project can keep its key numbers: what it is judged by, where each one's values come from, which way is good, a target and by when, and how often a new value should arrive. Numbers, the readings your projects report, is part of Projects now, so any record with projects can hold them. A project can say what kind it is: a business, client work, a product or content.",
+  "changes": "Each project's card on Projects draws the line of the number it leads with, where it keeps one, in place of the work finished each week.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -241,7 +241,7 @@
             { "field": "revenue", "as": "fact" },
             { "field": "next", "label": "Next step", "as": "fact" },
             { "field": "agent", "label": "Agent", "as": "who" },
-            { "metric": "project-done-by-week:{{name}}", "as": "trend", "when": { "holds": [ "tasks" ] } },
+            { "metric": "project-done-by-week:{{name}}", "kpi": "headline", "as": "trend", "when": { "holds": [ "tasks" ] } },
             { "metric": "project-last-worked:{{name}}", "as": "when", "label": "Worked on", "when": { "holds": [ "tasks" ] } }
           ],
           "order": [ { "field": "name", "dir": "asc" } ],

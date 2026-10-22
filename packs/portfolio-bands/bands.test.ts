@@ -314,23 +314,23 @@ test('ONE AMOUNT PER CURRENCY, headroom never below zero, and a base in another 
 });
 
 test('A READING THAT IS MONEY IS COUNTED AS IT STANDS, in minor units, beside the older readings that carry a currency as their unit', async () => {
-  const bake = row('things', { name: 'Bake', lane: 'earning' });
+  const oxbow = row('things', { name: 'Oxbow', lane: 'earning' });
   const kiln = row('things', { name: 'Kiln', lane: 'parked' });
   const money = (amount: number, currency: string): Json => ({ amount, currency });
   const datapoints = [
     /* An older decimal reading and a newer money one under one name: the newer is today, with no value at all. */
-    row('datapoints', { name: 'Takings a month, Bake', value: 40, unit: 'USD', thing: bake.id, at: '2026-09-10T10:00:00.000Z', source: 'typed' }),
-    row('datapoints', { name: 'Takings a month, Bake', amount: money(4_815, 'USD'), thing: bake.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
+    row('datapoints', { name: 'Takings a month, Oxbow', value: 40, unit: 'USD', thing: oxbow.id, at: '2026-09-10T10:00:00.000Z', source: 'typed' }),
+    row('datapoints', { name: 'Takings a month, Oxbow', amount: money(4_815, 'USD'), thing: oxbow.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
     /* Money wins over a value written beside it, and its currency over the unit. */
-    row('datapoints', { name: 'Takings a month in a year, Bake', value: 1, unit: 'EUR', amount: money(10_000, 'usd'), thing: bake.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
+    row('datapoints', { name: 'Takings a month in a year, Oxbow', value: 1, unit: 'EUR', amount: money(10_000, 'usd'), thing: oxbow.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
     /* JPY has no decimals: 4,815 yen is 4815 as money and as a decimal alike. */
     row('datapoints', { name: 'Takings a month, Kiln', amount: money(4_815, 'JPY'), thing: kiln.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
     row('datapoints', { name: 'Takings a month in a year, Kiln', value: 10_000, unit: 'JPY', thing: kiln.id, at: '2026-09-20T10:00:00.000Z', source: 'typed' }),
     /* An amount that is not money, and an example row, are not counted. */
     row('datapoints', { name: 'Takings a month, Kiln', amount: 999, thing: kiln.id, at: '2026-09-22T10:00:00.000Z', source: 'typed' }),
-    row('datapoints', { name: 'Takings a month, Bake', amount: money(999_999, 'USD'), thing: bake.id, at: '2026-09-23T10:00:00.000Z', source: 'example' }),
+    row('datapoints', { name: 'Takings a month, Oxbow', amount: money(999_999, 'USD'), thing: oxbow.id, at: '2026-09-23T10:00:00.000Z', source: 'example' }),
   ];
-  const a = await runInQuickJs(declOf(), hostOf({ things: [bake, kiln], datapoints, revenue_bands: [] }));
+  const a = await runInQuickJs(declOf(), hostOf({ things: [oxbow, kiln], datapoints, revenue_bands: [] }));
   assert.deepEqual(writesOf(a), [
     created('now', 4_815, 'JPY'),
     created('next', 0, 'JPY'),

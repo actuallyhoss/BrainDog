@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "The People page says how many people may be on this record twice and opens the list at them, and what is asked about somebody here waits on the page to be answered. Calendar shows this month and the next two with everything that has a day it is due, and Activity shows what changed a day at a time. Which projects a person or an organisation was met in, and an organisation's projects and money, wait until Projects and Money are there.",
+  "changes": "Health is said in plain words: how many checks have not run yet, Needs a look, All good and Not checked yet, and how many days every check has passed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -332,7 +332,7 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "signs-red", "is": 0 },
-          "body": "No vital sign needs a look."
+          "body": "Nothing on this record needs a look."
         },
         {
           "kind": "note",
@@ -352,13 +352,13 @@
           "kind": "note",
           "span": 12,
           "when": { "metric": "signs-unread", "is": 1 },
-          "body": "One sign has not been read yet."
+          "body": "One check has not run yet."
         },
         {
           "kind": "note",
           "span": 12,
           "when": { "metric": "signs-unread", "gt": 1 },
-          "body": "{{signs-unread}} signs have not been read yet."
+          "body": "{{signs-unread}} checks have not run yet."
         },
         {
           "kind": "cards",
@@ -371,7 +371,7 @@
         },
         {
           "kind": "cards",
-          "heading": "Alive",
+          "heading": "All good",
           "icon": "circle-check",
           "span": 12,
           "source": "signs",
@@ -380,7 +380,7 @@
         },
         {
           "kind": "cards",
-          "heading": "Not read yet",
+          "heading": "Not checked yet",
           "icon": "circle-dashed",
           "span": 12,
           "source": "signs",
@@ -391,13 +391,13 @@
           "kind": "note",
           "span": 12,
           "when": { "metric": "green-days", "is": 1 },
-          "body": "Every watched sign was green yesterday."
+          "body": "Every check passed yesterday."
         },
         {
           "kind": "note",
           "span": 12,
           "when": { "metric": "green-days", "gt": 1 },
-          "body": "Every watched sign has been green for {{green-days}} days, up to yesterday."
+          "body": "Every check has passed for {{green-days}} days, up to yesterday."
         }
       ]
     },

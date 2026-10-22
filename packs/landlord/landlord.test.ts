@@ -293,7 +293,7 @@ test('EACH PROPERTY HAS A PAGE UNDER PROPERTIES IN THE RAIL: its rent due, its t
   assert.equal(pence(cell(here, 'rent-due-at:Elm Court 1')), 950 * 100);
   assert.equal(cell(here, 'repairs-open-at:Elm Court 1')?.value, 1);
   assert.deepEqual((under(elm, 'Tenancies').rows ?? []).map((r) => r.fields.name), ['Elm Court 1 to Ines Marlow']);
-  /* NOBODY UNPAID IS NOTHING DRAWN, as every empty part of a page is (DIRECTION 35). */
+  /* NOBODY UNPAID IS NOTHING DRAWN, as every empty part of a page is. */
   const paid = elm.blocks.find((b) => b.heading === 'Not paid this month')!;
   assert.deepEqual([paid.rows ?? [], paid.why], [[], 'when'], 'Ines paid on the 1st');
   assert.deepEqual((under(elm, 'Repairs').rows ?? []).map((r) => r.fields.what), ['Boiler pressure keeps dropping']);

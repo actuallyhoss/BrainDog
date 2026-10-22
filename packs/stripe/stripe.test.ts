@@ -243,7 +243,7 @@ function holds(row: Row, where: Json): boolean {
 }
 
 /** The books a host double holds, by the number a setting names. */
-const BOOKS: Record<string, Json> = { 'books#2': { id: '01K5BOOK000000000000000002', register: 'books', seq: 2, fields: { name: 'Quartz' }, version: 1 } };
+const BOOKS: Record<string, Json> = { 'books#2': { id: '01K5BOOK000000000000000002', register: 'books', seq: 2, fields: { name: 'Harbour' }, version: 1 } };
 
 /**
  * A host double that answers Stripe's two addresses, records every request, lists `accounts` by the filter the script
@@ -458,10 +458,10 @@ test('A KEY STRIPE REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING, whi
 test('THE KEY IS THE ONE ITS SETTING NAMES, read on every run, and nothing is asked with none set', async () => {
   /* A LABEL THE OWNER SET, filled into the declaration's `keys` at install and read by the source from `ctx.config`, so
      the key the script asks with is the key it declares. Before 1.4.0 the label was "stripe" in the source itself. */
-  const h = stripeHost({ balance: { available: [], pending: [] }, payouts: { data: [] } }, [], { grant: 'Quartz Stripe' });
-  const a = await runInQuickJs(declOf({ grant: 'Quartz Stripe' }), h);
+  const h = stripeHost({ balance: { available: [], pending: [] }, payouts: { data: [] } }, [], { grant: 'Harbour Stripe' });
+  const a = await runInQuickJs(declOf({ grant: 'Harbour Stripe' }), h);
   assert.ok('writes' in a, JSON.stringify(a));
-  assert.ok(h.asked.length === 3 && h.asked.every((r) => r.key === 'Quartz Stripe'), JSON.stringify(h.asked));
+  assert.ok(h.asked.length === 3 && h.asked.every((r) => r.key === 'Harbour Stripe'), JSON.stringify(h.asked));
 
   const none = stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY }, [], { grant: '  ' });
   const refused = await runInQuickJs(declOf(), none);
@@ -492,7 +492,7 @@ test('THE BOOK IS THE ONE ITS SETTING NAMES ON THIS RUN: new rows are filed in i
 });
 
 test('A ROW IS FOUND BY ITS KIND AND CURRENCY, NOT ITS NAME: one a person renamed is still kept, and nothing is written beside it', async () => {
-  const renamed = held('Quartz on Stripe', 1_800_000, 'USD', '2026-09-24', { stripe_kind: 'available' });
+  const renamed = held('Harbour on Stripe', 1_800_000, 'USD', '2026-09-24', { stripe_kind: 'available' });
   const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [renamed]));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${renamed.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY }, version: 3 }]);
 });

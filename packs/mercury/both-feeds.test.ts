@@ -1,7 +1,7 @@
 /**
  * Mercury and Stripe on one record, each refused in turn.
  *
- * HIS WORDS: "per-provider partial failure (a Mercury outage keeps the last Mercury rows)". Two feeds write into the
+ * PER-PROVIDER PARTIAL FAILURE: a Mercury outage keeps the last Mercury rows. Two feeds write into the
  * same Accounts, and each finds its own accounts by a field of its own (`mercury_account`, `stripe_kind`), never by a
  * name. So one feed's bad hour has nothing to touch in the other's: a key Stripe refuses stops Stripe's run and writes
  * nothing, Mercury's run that hour is good, and Stripe's last figures stand as they were. And the other way round.

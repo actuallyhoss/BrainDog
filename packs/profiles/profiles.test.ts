@@ -7,6 +7,10 @@
  * `profiles` by declaring it, and Tools and Skills each gain a Profiles field (left empty, every profile gets it), with
  * `plugin` laid on Tools' kinds.
  *
+ * SINCE 1.1.0: Tools and Keys gain Belongs to, a person, for an account that is someone else's; the page draws the runs
+ * of the last day under each Claude Code profile (migration 44's `seat`), for the owner alone; and the Agents page gets
+ * a line while a machine is out of step and the profiles folded at its foot, for the owner alone too.
+ *
  * Installed here as it ships, after Projects, People and Agents, through the add-on door a person presses, on a fixed
  * clock that the tests move to let a day pass. Every name here is invented.
  */
@@ -77,14 +81,16 @@ test('BEFORE THE ADD-ON: no profiles, no places, and Tools and Skills have no Pr
   for (const list of ['profiles', 'profile_places']) assert.equal(api.kernel.register(list), undefined, list);
   assert.equal(agentLists(api.kernel.registers()).profiles, undefined);
   for (const list of ['tools', 'skills']) assert.ok(!fieldsOf(api, list).some((f) => f.id === 'profiles'), list);
+  for (const list of ['tools', 'credentials']) assert.ok(!fieldsOf(api, list).some((f) => f.id === 'belongs_to'), list);
   assert.ok(!fieldsOf(api, 'tools').find((f) => f.id === 'kind')!.values!.includes('plugin'));
   sql.close();
 });
 
-test('THE FILE: profiles 1.0.0 on Agents 1.13, two personal lists, one figure, two automations and a page', () => {
-  const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Record<string, unknown>[]; seeds: unknown[] };
-  assert.deepEqual([doc.pack, doc.version], ['profiles', '1.0.0']);
-  assert.deepEqual(doc.requires.packs, { agents: '^1.13.0' });
+test('THE FILE: profiles 1.2.0 on Agents 1.13 and People 3, two personal lists, two figures, two automations, a page and four additions to Agents', () => {
+  const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Record<string, unknown>[]; seeds: unknown[]; adds: { page: string }[] };
+  assert.deepEqual([doc.pack, doc.version], ['profiles', '1.2.0']);
+  assert.deepEqual(doc.requires.packs, { agents: '^1.13.0', people: '>=3.3.0 <4.0.0' });
+  assert.deepEqual(doc.adds.map((a) => a.page), ['page.agents', 'page.agents', 'page.agents', 'page.agents']);
   const lists = doc.declarations.filter((d) => d.register !== undefined && d.rule === undefined);
   assert.deepEqual(lists.map((d) => [d.register, d.personal]), [['profiles', true], ['profile_places', true]]);
   assert.deepEqual(doc.declarations.filter((d) => d.rule !== undefined).map((d) => d.rule), ['profile-drifted', 'place-quiet']);
@@ -150,7 +156,7 @@ test('THE PAGE: a card for each profile, and each machine under the profile it c
   const page = said<{ blocks: { kind: string; heading?: string; rows?: Row[]; refusals?: unknown[]; readings?: { value: number }[] }[] }>(await api.page({ slug: 'profiles' } as never, owner));
   for (const b of page.blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading ?? b.kind} was refused`);
   const cards = page.blocks.filter((b) => b.kind === 'cards');
-  assert.deepEqual(cards.map((b) => b.heading), ['Profiles', 'Where each one is set up']);
+  assert.deepEqual(cards.map((b) => b.heading), ['Profiles', 'Where each one is set up', 'Runs under each profile']);
   assert.equal(cards[0]!.rows!.length, 2);
   assert.deepEqual(cards[1]!.rows!.map((r) => r.fields.host).sort(), ['bench-laptop', 'studio-tower']);
   assert.equal(said<{ value: number }>(await api.metric({ metric: 'profiles-out-of-step' } as never, owner)).value, 1, 'one machine is out of step');
@@ -192,5 +198,116 @@ test('A MACHINE OUT OF STEP FOR TWO DAYS IS ASKED ABOUT ONCE, and one quiet for 
   const state = async (seq: number) => said<Row>(await api.get({ register: 'profile_places', seq } as never, owner)).fields.state;
   assert.equal(await state(quiet.seq), 'stale');
   assert.equal(await state(drifted.seq), 'live');
+  sql.close();
+});
+
+/** An Admin on the record, as the owner invites one: every list but the personal ones. */
+async function adminOf(api: Api): Promise<CallContext> {
+  said(await api.invite({ person: 'p_2', name: 'Sasha', level: 'decide' }, owner));
+  const held = api.kernel.access('p_2')!;
+  return { principal: { kind: 'person', id: 'p_2', level: held.level }, ...(held.registers === null ? {} : { registers: held.registers }), levels: held.levels };
+}
+
+/** A Claude Code session's call from a machine under a profile, with the headers the bridge sends (migration 44). */
+const session = (client: string, where: { host: string; seat?: string }): CallContext =>
+  ({ principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' }, session: { agent: 'claude', client_id: client, ...where } }) as CallContext;
+
+/* A BLOCK WHOSE `when:` DOES NOT HOLD FOR THIS READER IS ANSWERED UNDRAWN (`drawn: false`), with nothing read under it. */
+type Block = { kind: string; heading?: string; added?: string; rows?: Row[]; refusals?: unknown[]; drawn?: boolean };
+const blocksOf = async (api: Api, slug: string, ctx: CallContext): Promise<Block[]> => said<{ blocks: Block[] }>(await api.page({ slug } as never, ctx)).blocks;
+
+test('BELONGS TO: a tool and a key may name the person whose account it is', async () => {
+  const { api, sql } = await record();
+  for (const list of ['tools', 'credentials']) {
+    const f = fieldsOf(api, list).find((x) => x.id === 'belongs_to');
+    assert.ok(f, `${list} has no Belongs to field`);
+    assert.deepEqual([f.type, f.to], ['ref', 'people'], list);
+  }
+  const joaquin = said<Row>(await api.create({ register: 'people', fields: { name: 'Joaquin Example' } } as never, owner));
+  const tool = said<Row>(await api.create({ register: 'tools', fields: { name: 'Scraper account', kind: 'integration', belongs_to: joaquin.id } } as never, owner));
+  assert.equal(tool.fields.belongs_to, joaquin.id);
+  const key = said<Row>(await api.create({ register: 'credentials', fields: { label: 'Scraper key', opens: 'the scraper account of a client', kind: 'api_token', where: 'his own machine', belongs_to: joaquin.id } } as never, owner));
+  assert.equal(key.fields.belongs_to, joaquin.id);
+  sql.close();
+});
+
+test('THE RUNS UNDER EACH PROFILE: the last day of runs that say a profile, on the page for the owner alone', async () => {
+  const { api, sql, clock } = await record();
+  const open = async (ctx: CallContext) => said<{ spoken: string }>(await api.attach({ source: 'startup', doing: 'Shipping the invoice page' } as never, ctx)).spoken;
+  await open(session('c-harbour', { host: 'bench-laptop', seat: 'harbour' }));
+  await open(session('c-garden', { host: 'studio-tower', seat: 'garden' }));
+  await open(session('c-none', { host: 'bench-laptop' }));
+  const runs = async (ctx: CallContext) => (await blocksOf(api, 'profiles', ctx)).find((b) => b.heading === 'Runs under each profile' && b.drawn !== false);
+  const mine = await runs(owner);
+  assert.ok(mine, 'the page draws no runs');
+  assert.deepEqual(mine.refusals ?? [], []);
+  assert.deepEqual(mine.rows!.map((r) => r.fields.seat).sort(), ['garden', 'harbour'], 'a run that says no profile is not drawn');
+  assert.ok(mine.rows!.some((r) => r.fields.host === 'bench-laptop' && r.fields.seat === 'harbour'));
+
+  /* NOT FOR AN ADMIN, who reads the runs on the Agents page and is never shown them here. */
+  const admin = await adminOf(api);
+  const page = JSON.stringify(await api.page({ slug: 'profiles' } as never, admin));
+  for (const word of ['harbour', 'garden']) assert.ok(!page.includes(word), `the page showed ${word} to an Admin`);
+
+  /* A DAY AND A HALF ON, the runs have gone from it. */
+  clock.advance(DAY + DAY / 2);
+  /* A block with no row to show is left undrawn, so the runs are gone from it either way. */
+  assert.deepEqual((await runs(owner))?.rows ?? [], []);
+  sql.close();
+});
+
+test('THE AGENTS PAGE: a line while a machine is out of step and the profiles at its foot, for the owner and nobody else', async () => {
+  const { api, sql } = await record();
+  const everyday = (await rows(api, 'profiles')).find((r) => r.fields.name === 'Everyday')!;
+  const added = async (ctx: CallContext) => (await blocksOf(api, 'agents', ctx)).filter((b) => b.added === 'profiles' && b.drawn !== false);
+  const quiet = await added(owner);
+  assert.ok(!quiet.some((b) => b.kind === 'note' && b.heading === undefined && JSON.stringify(b).includes('out of step')), 'a line about nothing out of step');
+  assert.ok(quiet.some((b) => b.kind === 'section' && b.heading === 'Profiles'));
+  const cards = quiet.find((b) => b.kind === 'cards');
+  assert.deepEqual(cards?.rows?.map((r) => r.fields.name), ['Everyday'], 'only the profiles in use');
+  for (const b of quiet) assert.deepEqual(b.refusals ?? [], [], `${b.heading ?? b.kind} was refused`);
+
+  await place(api, everyday.id, { host: 'bench-laptop', drift: ['review-helper'], since: day(NOW), heard: new Date(NOW).toISOString() });
+  assert.ok((await added(owner)).some((b) => b.kind === 'note' && JSON.stringify(b).includes('out of step')), 'no line while a machine is out of step');
+
+  const admin = await adminOf(api);
+  /* A BLOCK HER LISTS HOLD BACK IS ANSWERED AS ITS REFUSAL, whatever its own `when:` said for the owner (`shellOf` drops
+     `drawn`), and the app leaves refused tiles out for her. What matters here is that each carries a refusal and no row. */
+  for (const b of await added(admin)) assert.ok((b.refusals ?? []).length > 0 && (b.rows ?? []).length === 0, `${b.heading ?? b.kind} is drawn for an Admin`);
+  const page = JSON.stringify(await api.page({ slug: 'agents' } as never, admin));
+  for (const word of ['Everyday', 'bench-laptop']) assert.ok(!page.includes(word), `Agents showed ${word} to an Admin`);
+  sql.close();
+});
+
+test('HIS COMPOSER IS OFFERED HIS PROFILES AND MACHINES BY NAME, and a profile whose name no run could say is not offered', async () => {
+  const { api, sql } = await record();
+  const everyday = (await rows(api, 'profiles')).find((r) => r.fields.name === 'Everyday')!;
+  await place(api, everyday.id, { host: 'bench-laptop', heard: new Date(NOW).toISOString() });
+  const { places } = said<{ places: { machines: string[]; seats: string[] } }>(await api.instructionList({} as never, owner));
+  assert.ok(places.seats.includes('Everyday'), places.seats.join(', '));
+  assert.ok(!places.seats.includes('Second account'), 'a name with a space is no profile a run says');
+  assert.ok(places.machines.includes('bench-laptop'), places.machines.join(', '));
+  sql.close();
+});
+
+test('LIMIT METERS: a profile holds its two figures and reset time, the page shows them, and one near its week limit is counted', async () => {
+  const { api, sql } = await record();
+  const all = await rows(api, 'profiles');
+  const everyday = all.find((r) => r.fields.name === 'Everyday')!;
+  const second = all.find((r) => r.fields.name === 'Second account')!;
+  const fields = fieldsOf(api, 'profiles').map((f) => f.id);
+  for (const id of ['five_hour_pct', 'seven_day_pct', 'resets_at', 'beat_at']) assert.ok(fields.includes(id), id);
+  /* NOTHING SENT YET: no profile is near a limit. */
+  assert.equal(said<{ value: number }>(await api.metric({ metric: 'profiles-near-limit' } as never, owner)).value, 0);
+  const beat = new Date(NOW).toISOString();
+  said(await api.update({ register: 'profiles', seq: everyday.seq, patch: { five_hour_pct: 42, seven_day_pct: 83, resets_at: new Date(NOW + 3_600_000).toISOString(), beat_at: beat } } as never, owner));
+  said(await api.update({ register: 'profiles', seq: second.seq, patch: { five_hour_pct: 10, seven_day_pct: 79, beat_at: beat } } as never, owner));
+  assert.equal(said<{ value: number }>(await api.metric({ metric: 'profiles-near-limit' } as never, owner)).value, 1, '83 is near a limit and 79 is not');
+  const page = said<{ blocks: { kind: string; heading?: string; refusals?: unknown[]; rows?: Row[] }[] }>(await api.page({ slug: 'profiles' } as never, owner));
+  for (const b of page.blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading ?? b.kind} was refused`);
+  const card = page.blocks.find((b) => b.heading === 'Profiles')!.rows!.find((r) => r.fields.name === 'Everyday')!;
+  assert.deepEqual([card.fields.five_hour_pct, card.fields.seven_day_pct], [42, 83]);
+  /* A FIGURE PAST A HUNDRED IS REFUSED. */
+  refused(await api.update({ register: 'profiles', seq: everyday.seq, patch: { seven_day_pct: 140 } } as never, owner));
   sql.close();
 });
