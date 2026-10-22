@@ -164,6 +164,41 @@ The UI layer matters as much as the model layer: untrusted content is visually m
 wherever it appears, and a proposal derived from it says so at the point of approval. A human who
 does not know they are approving a stranger's instruction is not a control either.
 
+### 5.1 · A press on the decision card inside Claude or ChatGPT
+
+Agents suggest and the person decides, and no token reaches `decide` (ADR-060). The decision card that BrainDog draws
+inside Claude and ChatGPT can still answer a question, but only as the person's own press. It is off until the owner
+turns on **Answer from inside chat apps** in Settings › Agents. While it is off, the card's buttons open BrainDog.
+
+**Why a press counts.** The card and the model share one key, the chat app's. What tells them apart is what each one is
+shown. The model reads a tool answer's text and its `structuredContent`. The card is also handed the answer's `_meta`,
+which both apps keep from the model: MCP Apps gives the view the whole result, and ChatGPT puts `_meta` on
+`window.openai.toolResponseMetadata` and never shows it to the model. Beside each decision card, the MCP door asks the
+record for a one-time **answer grant** (`chatAnswerMint`, INTERNAL) and puts it in `_meta` only. The card's button sends
+the grant back with the option the person pressed (`answer`). The grant is the press's only standing.
+
+**Why the model cannot press.**
+
+| Control | Kind |
+|---|---|
+| `answer` with no grant is refused at the door before the record is asked (`LEVEL_REQUIRED`), and the refusal tells the model to show the card | architectural |
+| The grant is never in the text or the JSON the model reads, only in `_meta` | architectural |
+| `answer` is listed for the card and hidden from the model (`_meta.ui.visibility: ["app"]`, `openai/visibility: private`). An app that shows it anyway shows a tool the model cannot use | defence in depth |
+| A grant is sealed (AES-GCM, under a key the record instance draws and keeps in memory), so nobody can write one. It names the person, the key, the question, the options shown and a hash of the question's body and state | architectural |
+| One press spends it. It lapses in fifteen minutes. A restart of the instance ends every grant | enforced in the record |
+| It is minted only for a key that Claude or ChatGPT holds after the person signed in to it (`client_kind` `cimd` or `dcr`, at `claude.ai`, `claude.com`, `chatgpt.com` or `openai.com`). That key lives on the app's servers, and the model never holds it. A key on a machine (`device`, `key`) is never minted a grant, because an agent with a shell could read the key, ask for a grant itself and press | enforced in the record |
+| The three record methods (`chatApp`, `chatAnswerMint`, `chatAnswer`) are INTERNAL: no `/api` route reaches them, so a key cannot ask for a grant except through the door that hides it. `answer` is listed only to a key a chat app holds | architectural |
+| The person must own the record, and the switch must be on when the card is drawn and again when it is pressed | enforced in the record |
+| Only a choice of options or a set of rows can be pressed. A pack, settings, an arrangement, a pattern or a change installs, and is answered in BrainDog | enforced in the record |
+| The press runs the record's own `decide` as the person, with `pressedIn` set. `admin` and `vault` refuse `pressedIn`, so a press never installs, changes what runs unattended or opens a key | enforced in the record |
+| An option that is hard to undo is pressed twice on the card, as in Decide | UI |
+| Each decision keeps where it was pressed: a `note` on the decision, `field` `answered_in`, the app in `to_v`, and "Answered in Claude, on the card." in History | audit |
+
+**What is trusted.** The chat app is trusted to keep `_meta` from the model and to draw the card only from the tool's
+answer, which is what both apps specify. A person who connects an app at another address gets cards that link to
+BrainDog. If an app were found to show `_meta` to its model, the remedy is to take its address off the list in
+`packages/record/src/methods/chat-answer.ts` (`appOf`).
+
 ---
 
 ## 6 · The credential vault
@@ -441,7 +476,7 @@ never opened the vault all ask the same way.
 | **One row, two lives**: pending → approved → active | two tables would mean delete-and-reinsert at approval, and a crash between them loses the approval he just gave |
 | Approval is **the owner's, from a sign-in proved in the last 15 minutes**. A bearer gets `403 NEEDS_BROWSER_SESSION` (it is authenticated, so it is forbidden, and the `401` rule in §8 stays true), and an older sign-in is asked to sign in again. The self-host's server key is proved on the request that presents it | an agent may not approve its own request, and an approval hands out a 90-day bearer that works from anywhere, so it asks what `openGrant` asks |
 | **Starts are counted per address**: ten in 15 minutes, then `429` with `Retry-After` for 15 minutes, in the `auth_fail` table sign-in already counts in. A count that cannot be read refuses | a start costs nothing to send, and a list of codes nobody asked for hides the one somebody did |
-| **The address to approve at is the host's own**: `verification_uri` is always on `<origin>`: `<origin>/app/<slug>/settings/agents` on the Cloud when the start named a slug, `<origin>/app/settings/agents` otherwise and on the self-host (since push A of the one-domain move, September 23rd 2026). A start that reached the host by another name, or that a page on another origin sent, is `403`, and the CLI refuses a `verification_uri` on another origin before it prints a digit | six digits typed into a page somebody else runs are an approval they can spend |
+| **The address to approve at is the host's own**: `verification_uri` is always on `<origin>`: `<origin>/app/<slug>/connect/approve` on the Cloud when the start named a slug, `<origin>/app/connect/approve` otherwise and on the self-host (under `/app` since push A of the one-domain move, September 23rd 2026, and on its own page rather than `/settings/agents` since October 2026, which still takes a code). A start that reached the host by another name, or that a page on another origin sent, is `403`, and the CLI refuses a `verification_uri` on another origin before it prints a digit | six digits typed into a page somebody else runs are an approval they can spend |
 | **Neither route logs a code, a poll id or a bearer** | more people read a log than read the record |
 | A wrong code bumps `tries` on *every* pending row; five → `denied` (`DEVICE_CODE_TRIES`). A malformed entry spends no try | a guesser cannot spread guesses across waiting requests to stay under the count, and a typo should not spend somebody else's enrolment |
 | **The poll id is never shown.** A listing, an event and a revoke name a row by a handle, the first 16 hex of `sha256('device:' ‖ id)` | between approval and exchange, whoever holds the id can take the bearer |
@@ -458,9 +493,21 @@ and every other guard in the record refuses a principal of that kind. Starting a
 a browser, as ADMIN is, so no agent token starts one. Each claim mints the job its own bearer: an ordinary token of
 scope `propose`, labelled `job:<id>`, for one day, the run's deadline, and revoked when the job ends. The runner hands
 it to Claude Code only inside a `0600` `mcp.json` that reaches the record's `/mcp` on the enrolled host's origin, and
-removes the file when the job ends. A runner silent for 14 days is moved to `expired` by the hourly sweep, as a login
+removes the file when the job ends. A kind that says `agent: codex` hands it to Codex in one variable of the child's
+environment, `BRAINDOG_JOB_BEARER`, which the run's config names (`bearer_token_env_var`), never in an argument, and
+replaces Codex's own servers for that run with the record's door alone. Codex's login (`auth.json`) is never read: Codex
+uses it itself. A runner silent for 14 days is moved to `expired` by the hourly sweep, as a login
 is. What a job may do on the machine is a `job.<id>` declaration the owner approved in Decide, and each machine pins
 a kind by its SHA-256 before its first run, so a host that forged one could not run it on a machine that never allowed it.
+
+*(Since kernel migration 44.)* A job may name the machine it runs on and the Claude Code profile it runs under, by
+name. A claim says the runner's machine and its profiles by name and never by folder, and the record hands it only a
+job placed nowhere or placed there. The runner alone turns a profile's name into a folder, from this machine's own
+profiles, and refuses a job under a name no folder or two folders answer to, saying the name and never a folder, since
+the wrong folder is another login. The profile changes whose subscription and settings the run uses, not what
+it may do: the kind's tools, permission mode and pin hold under every profile, and `--strict-mcp-config` keeps the
+profile's own MCP servers out of the run. A profile's name and a machine's name on a run are read only where runs are
+already read; the Profiles add-on's lists stay personal.
 
 Four more rows on the vault itself, each answering a specific way the earlier design would have
 failed:
@@ -563,6 +610,7 @@ implied.
 | Your rows | **we can read them** — the object runs on our account | no |
 | Your credentials, vault passphrase **off** | **we could decrypt them** | no |
 | Your credentials, vault passphrase **on** | no | no |
+| Your sealed files (Setup sync) | no: your machines seal them under a key we never hold, and the host keeps bytes it cannot open (§8) | no |
 | Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Slash's `call` table ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
 | Telemetry | off until the operator binds it; then one point per request: the door, the kind of client, the method, the refusal code or status class and the milliseconds, with the record id hashed under a key that changes every month, kept three months ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.18) | none |
 | Our logs | one JSON line per event, carrying a code, an id and a shape, never a value, an address or a prompt: which door refused, which job failed, which letter did not go ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §2.3) | the container's own output, on your machine |
@@ -684,6 +732,28 @@ not built*: the install line does not say which host each key goes to, and a key
 script's origins is refused only when the script runs. The Cloud's memory ceiling is the platform's, and no deploy
 smoke has yet run a busy loop against the production `cpuMs`.
 
+### A drawn component: the frame and what crosses it
+
+*Added October 22nd 2026, checked against `packages/render/src/drawn.ts`, `packages/kernel/src/kinds/drawn.ts`,
+`packages/host/src/drawn-frame.ts` and `apps/web/src/lib/page/DrawnFrame.svelte`.* A `drawn` block is a small
+component somebody wrote (a person, Slash, or an agent through `propose`), held as `code:` on the page's declaration.
+The record never runs it. The app draws it in a frame, and the argument is the same as a script's: everything it can
+reach is listed, and each limit is held outside it.
+
+| Held | How |
+|---|---|
+| No origin of its own to use | `<iframe sandbox="allow-scripts">`, never `allow-same-origin`, `allow-popups`, `allow-forms` or `allow-top-navigation`. The frame's document sends `sandbox allow-scripts` in its own policy header too, so it has an opaque origin even if it is opened on its own in a tab: no cookie, no storage, no reach into the app |
+| No network | the frame document's policy is `default-src 'none'`, with inline script and style, and `data:` pictures, fonts and media; `connect-src 'none'`, `form-action 'none'`, `base-uri 'none'`. The document written into it carries the same policy as a meta tag, so a host that served the frame without its header still holds it |
+| Framed only by BrainDog | `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` on the frame. The app's `frame-src` names `'self'` for it; every other page of the origin still sends `frame-ancestors 'none'`, so naming `'self'` frames nothing else |
+| Not `srcdoc` | a `srcdoc` frame inherits the policy of the page around it, and the app's runs no inline script but its shell's own, so the component would never run; the fix is not to loosen the app's `script-src`. Both hosts answer `/app/drawn-frame` from code (`@braindog/host/drawn-frame`), before any path is read as a record's name |
+| What goes in | one `draw` message, then new data and new themes, only from the page that holds it. The data is the block's rows as the record read them for this reader, through the same lens as every block, and only the fields its `columns:` name: the record cuts each row to them before it answers, and the app cuts them again (`drawnData`). The theme is the page's colour tokens, each value checked to be one that cannot end its declaration. Never a key, a token, a session or sharing |
+| What comes out | two messages, counted only from the frame's own window: its height, clamped to 48 to 1,600 pixels, and a request to open a row, honoured only for a row the app handed it (`drawnAsk`). Anything else is dropped |
+| Its code | at most 64 KB, and refused at install, in words, when it names an address off the page (a scheme and host, a protocol-relative `//`, a `url()` that is not inline data), imports a stylesheet or a module, holds a link, meta, frame, object or form tag, is a whole document, calls the network, uses storage, or reaches for the page around it. The frame's policy stops each of these anyway; the refusal is so its author hears it. An agent's component goes through `propose` and the same check, and nothing it proposes is drawn on a page until the owner keeps it |
+
+The frame loads when it nears the screen, so a page holding one opens as fast as one without. **What is not built:**
+a picture of the component drawn first, before it comes alive on touch; and the shelf
+does not yet keep a drawn component's version and who made it beside it.
+
 ### Refusals that do not leak
 
 Carried from the predecessor, where each was earned:
@@ -698,6 +768,13 @@ Carried from the predecessor, where each was earned:
 | Passkey registration requires an authenticated session **in place of attestation** | *"behind the gate… is the security model in one line"* |
 | **Two fleet-wide levers, both the host's**: the Directory's session, link and challenge hashes are HMAC-SHA-256 under the host's session key (`SESSION_SECRET` on the Worker; on a self-host, HKDF over the key file with the info `braindog/session`, or `BRAINDOG_SESSION_SECRET`), and `TOKENS_VALID_FROM` refuses anything minted before it | rotate one secret and every session is gone; set one date and every token is gone — an incident response that walks no rows ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.11) |
 | **Fixtures carry no real data**: generated names, `.example` hosts, dates in 2030–2031, amounts under 10^7 minor, no ULID or hash on disk | a test corpus is the one copy of a record that is committed in clear ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md)) |
+| **A read across the whole record goes through its reader's lens, line by line.** A feed, the questions waiting and decided, what went quiet and a digest shown on screen are drawn for one reader: each line, question and list is asked what `recentHistory`, `governance` and `list` ask of her (`seesFor` in `packages/record/src/index.ts`, `PageSees` in the kernel), so the owner's own lists (his runs, what he told them) and a personal list are left out of them for a Viewer or an Admin, and the rest is drawn. A digest's sections are held as their blocks are: what agents did and the questions to whoever a page draws them for, the runs and their steps to whoever reads the runs | a feed read for nobody in particular named a run's work and the owner's words to his agents to every reader of the record; and refusing the whole feed while any personal list was kept took Activity and Decide from every Admin |
+| **Amounts written in text are hidden with the amounts.** Once any money field is hidden from a caller (a share's Hide amounts, or one naming the field), every amount written in the text she is answered is taken out with its currency kept, "Paid £… for clay", in a note, a title, a comment or a line of the log, by one wrapper round every record method (`sight.maskMoney`, read by the kernel's `maskMoneyText`). A text field holding such an amount is hers to read and not to change, so a save never writes "£…" over it. A search she makes for a figure finds a row, a count or a comment only where the figure is still in its words once those amounts are taken out (`maskedMatched` in `packages/kernel/src/fts.ts`), and asks nothing by meaning | hiding the field and leaving its value in the notes beside it hid nothing; and "923.47" typed into search named the row that said it |
+| **His words to his agents go to his agents.** An instruction to whoever is next, any Claude or a task is handed only to a key that reads the instructions list; anybody else's agent is handed only what was sent to its own run by name, and marks nothing else seen (`toldTo`) | `context`, `attach`, `pulse` and `instructionsMine` handed a member's agent every broadcast whole, while `list` refused it the list |
+| **Nobody is counted what they cannot open.** The rail's and Home's count of agents working is nought to a reader who may not read the runs, a Viewer or a guest of a project among them. The engine's readings, which count questions, folds and Slash's offers over every list, are refused to anybody who does not read the whole record; and a page version applied by an agent is signed "An agent" to whoever may not read the runs | "2 working" over an Agents place she cannot open is a count of the owner's own list; "Claude Code" under a version said which app he works with |
+| **A colleague's automation runs as far as that colleague reaches, never as the owner.** A rule whose live version was put in by a person who is not an owner now (an owner moved down) reads and writes through their lens: a row they may not see does not start it, a field hidden from them is not on its row and cannot be written, every write is checked against the rows they may change on both sides of it, and it takes no step that reaches past those rows (a call, a script, a job, a question to Slash, a meet) and fills no figure. Once they reach nothing here it stops, "Stopped: Otto, who turned this on, can no longer reach this record." The maker is read off the rule's `declare` line, at every firing and every turn of a run (`makerOf` in `packages/kernel/src/index.ts`, `forRule` in `rules.ts`, `boundTo` in `flow.ts`) | a rule kept running with the owner's whole reach after the person who turned it on was moved down or removed |
+| **The caller's context is capped on the hop to the record.** At most 32 KB (the largest template set takes under 8 KB); past it the Worker sends no context and the record answers "This is more than one person's sharing can hold. Ask an owner to join some of these shares." before it parses anything, and a share that would take somebody past it is refused at save (`CTX_HEADER_MOST` in `apps/worker/src/route.ts`, `SHARE_CTX_MOST` in `packages/record/src/methods/sharing.ts`) | the header had no size cap, and the record trusted whatever it carried |
+| **A brief a model wrote is shown only through the lens it was written through.** The ticks gather facts as the whole record is read, and keep that lens beside the brief; anybody narrower, or with fields hidden, is answered the rules' cards, even when their facts happen to match (`briefLensOf` in `packages/record/src/brief-write.ts`) | a guest whose facts equalled the owner's was handed the owner's written brief |
 
 **An audit row is drawn on another screen.** The predecessor logged `Credential indexed: <name> — opens
 <opens>` on the reasoning that an audit row is read in a briefing and should be useful — and that reasoning is
@@ -736,6 +813,63 @@ The rules for `file` and the `/a/<sha256>` route, all from the predecessor and a
   puts back any that is still in the bucket. Deleting a record sweeps its `a/` prefix before its
   bytes go.
 
+### Sealed files
+
+*(Built October 22nd 2026, for Setup sync.)* A store for bytes the host keeps and cannot read. The owner's machines
+seal each file before it leaves them, and the record keeps it as it came.
+
+- **The host never sees what is in them.** A file is sealed on the owner's machine with AES-256-GCM under a sync key of
+  32 random bytes that only his machines hold, each in its own secret store, with the file's key as its additional
+  data. The record checks a part's length and the whole file's SHA-256 and parses none of it. A copy of the sync key is
+  kept as a sealed file too, under his sync passphrase (PBKDF2-SHA-256, 600,000 rounds, as the vault's passphrase), so a
+  new machine can join; the passphrase and the key never leave his machines.
+- **Symmetric on purpose, so the host cannot forge one.** With a public sealing key, anybody holding the public half, a
+  host somebody broke into among them, could seal a file for his machines to place. With a key only his machines
+  hold, a file the host made up does not open, and his machines place nothing that does not.
+- **The owner's alone.** `sealedPut`, `sealedGet`, `sealedList` and `sealedDelete` are reached by his own session, his
+  own key and the key `braindog login` makes for a machine. An Admin, a member, a share, a link, a runner, an app
+  signed in through OAuth and its child keys, a key narrowed to less than him, a report key, a job's key, "See as" and
+  an operation grant are refused, as a personal list refuses them. None is an MCP tool.
+- **Kept where large bytes are kept, never where a page reads.** R2 at `rec_<id>/sealed/` on the Cloud,
+  `<data>/<slug>/blobs/sealed/` on a self-host. A part is named by the hash of its key, the file's hash and its number,
+  so no key a caller chose is ever a path or an object's name. The file door serves `a/<sha256>` and `blobs/<sha256>`
+  and nothing else, and no block, source or page reads this store.
+- **Its sizes.** A key is 1 to 200 characters of a to z, 0 to 9, dot, dash, underscore and slash, starting with a
+  letter or a digit. A file is at most 25 MiB, in at most 8 parts of at most 4 MiB each; a part travels as base64 in a
+  body of at most 6 MiB, the one `/api` body allowed past a mebibyte. Past any of these it is refused at `bytes` or
+  `size`.
+- **Whole only when it hashes right.** A file is whole once every part is here and, read back together, they hash to
+  what each part said. Parts that hash to anything else are dropped and refused `CHECKSUM_MISMATCH`. Part 0 under
+  another hash replaces the file and lets its parts go.
+- **Counted against the record's storage.** On the Cloud each new part's bytes are counted against the record's day of
+  bytes, the budget a file spends (`uploadDay`, 200 MiB), and past it a part is refused `RATE_LIMITED` with
+  `Retry-After`. A self-host counts nothing: the disk is the owner's.
+- **In the log by name, and to the owner only.** One line a file kept whole, `grant.add` or `grant.rotate` over an
+  older file, and one a delete, `grant.revoke`, each on `sealed:<key>` and naming the key, its parts and its size,
+  never a byte. Every feed and history anybody else reads leaves those kinds out.
+- **In a copy by name, and the bytes stay with the host.** `sealed_file` travels in `data` with each file's hash, and
+  which parts a host holds (`sealed_part`) is `local`. A record put back from a file on a host that holds no parts of
+  them lists its sealed files as not whole, and the owner's machines put them again. Deleting the record deletes its
+  sealed parts; a self-host's cold copy carries them with its files.
+
+The honest trade, as the vault's passphrase has it:
+
+| | We can read your sealed files | You can lose them |
+|---|---|---|
+| Setup sync | **no** | **yes**: lose the sync passphrase and every machine that holds the sync key, and the sync is gone |
+
+**On the machine** ([48-SPEC-CLI](48-SPEC-CLI.md) §5.20). The command line holds its own lines, whatever the Carry list
+says. It never reads, holds or moves an agent app's own login (Claude Code's keychain item and login file, the claude.ai
+login, Codex's login file), and never lists or reads a session transcript, so auto memory, which sits beside them,
+waits on the owner's yes. The sync key sits in each machine's own secret store (the Keychain, Credential Manager or the
+secret service) and is handed to it on standard input, never on a command line; a Keychain item of tool sign-ins too
+long for one line of `security -i` goes on `security`'s own command line for the moment it runs, as ccenv writes the
+same item. A program a pull would place is shown whole and asked about at a terminal, and pinned by the hash of its
+bytes and mode, so a changed one is asked about again. Tool sign-ins move and are never shared: they are placed only
+from a machine that has been retired. The verbs call the record as the machine's own login, never as an agent app's
+token. What leaves a machine in the clear is names, sizes, counts, times and hashes; what a file holds is only ever in
+the sealed bytes.
+
 ### The export, and what it leaves out
 
 `export` excludes every table in the `local` section of `dog_section` — `token`, `device_grant`,
@@ -743,7 +877,8 @@ The rules for `file` and the `/a/<sha256>` route, all from the predecessor and a
 ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3, [33-CONTRACTS](33-CONTRACTS.md) §9). **`grant` rows travel
 sealed by default**, and so does the wrapped DEK in `vault_key` — which opens nothing without the root KEK, a
 Worker secret that is never in any file — so a leaked export is
-bytes. `--redact-grants` drops the ciphertext too. *An earlier draft said the export excludes every
+bytes. `--redact-grants` drops the ciphertext too. **Sealed files travel by name**: `sealed_file` carries each one's key,
+parts, size and hash, and its bytes stay with the host that holds them (Sealed files, above). *An earlier draft said the export excludes every
 vault table; that contradicted [03-DOG-FORMAT](03-DOG-FORMAT.md) §5's three export modes and rule 6
 above, and it is withdrawn.* **A snapshot is not an export.** On a self-host a snapshot is a full copy
 that keeps the six `local` tables and never leaves the host — disaster recovery; on Cloud the nightly

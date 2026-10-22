@@ -11,18 +11,18 @@ declares; the page lint reads what a page prints on a real record, and Health sh
 
 | Never | Say | Why | On a page |
 |---|---|---|---|
-| row | the thing's own name: a bill, a task, a person | A row is how the database holds a thing, not what the person calls it (D35.35). | `plain-words` |
+| row | the thing's own name: a bill, a task, a person | A row is how the database holds a thing, not what the person calls it. | `plain-words` |
 | list item | the thing's own name | The machinery's word for whatever the list holds. | `plain-words` |
 | entity | the thing's own name | An engineer's word for a thing; nobody keeps an entity. | `plain-words` |
 | credential | key | The product calls them keys, and the Keys page is where they live. | `plain-words` |
 | register | list | Register as a noun is the kernel's word for a list. To register, the verb, is plain and is not matched. | `plain-words` |
 | pack | add-on | Say add-ons, not packs, on screen (W.48). To pack and send an order, the verb, is plain and is not matched. | `system-word` |
 | slug | address | A developer's word for the end of an address. | `system-word` |
-| schema | the fields a list holds | Developer vocabulary in visible copy (D1.32). | `system-word` |
+| schema | the fields a list holds | Developer vocabulary in visible copy. | `system-word` |
 | declaration | what an add-on sets up | How the engine is built, not what the person sees. | `system-word` |
 | MCP | the agent app by its name, such as Claude Code or Cursor | A protocol's initials; the person knows the app they use. | `system-word` |
 | snapshot | backup | The Backups page holds copies of the record, and a backup is the word for one. | `system-word` |
-| Spark | Slash | The assistant was renamed Slash, everywhere (DIRECTION 31). | `system-word` |
+| Spark | Slash | The assistant was renamed Slash, everywhere. | `system-word` |
 | recommended | suggested | Suggested is the one word (RQ-EXP-412). | `system-word` |
 | Submit | a verb and its object, such as Save the bill | A button says what it does to what (RQ-EXP-408). | the source only |
 | OK | Done, or a verb and its object | A button says what it does to what (RQ-EXP-408). | the source only |

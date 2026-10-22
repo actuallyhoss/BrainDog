@@ -62,6 +62,11 @@ export type RecordApi = {
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
   // PEOPLE: 1, added with the agents pack
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
+  // SEALED: 4, added October 22nd 2026 with Setup sync; the owner's alone, no MCP tool (§5.2, 12 §8)
+  sealedPut(args: { key: string; part: number; parts: number; bytes: string; sha256: string; size: number }, ctx: CallContext): Promise<Result<{ key: string; part: number; parts: number; complete: boolean }>>;
+  sealedGet(args: { key: string; part: number }, ctx: CallContext): Promise<Result<{ key: string; part: number; parts: number; size: number; sha256: string; bytes: string }>>;
+  sealedList(args: { prefix?: string }, ctx: CallContext): Promise<Result<{ files: { key: string; parts: number; size: number; sha256: string; complete: boolean; at: string }[] }>>;
+  sealedDelete(args: { key: string }, ctx: CallContext): Promise<Result<{ key: string; deleted: boolean }>>;
   // READ+ — 16
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   previewPage(args: { body: Record<string, unknown> }, ctx: CallContext): Promise<Result<PageData>>;   // added September 24th 2026: a body installed nowhere, drawn as `page` draws one; writes nothing
@@ -144,14 +149,14 @@ export const DIALECT: readonly DialectLine[];                                   
 export type { CallContext, Result, Refusal, Entry, Level, Scope, Projection, ProjectedRow, /* every args and value type above */ };
 ```
 
-Seventy-five methods: 12 · 16 · 4 · 6 · 24 · 13 — the forty-four of 30 §5, the eleven of §13 #1, and the twenty added since,
-each noted where it is declared; DATA's twelve are its nine plus the two RUNS and the one PEOPLE method above; `test/groups.test.ts`
+Seventy-nine methods: 16 · 16 · 4 · 6 · 24 · 13 — the forty-four of 30 §5, the eleven of §13 #1, and the twenty-four added since,
+each noted where it is declared; DATA's sixteen are its nine plus the two RUNS, the one PEOPLE and the four SEALED methods above; `test/groups.test.ts`
 counts `GROUPS`. *(An earlier draft of this spec said forty-four; the hosts' specs 47, 49 and 51 each named a method
 the record had to have. Recounted September 16th 2026, when the sentence still claimed fifty-five against seventy declarations.)*
 
 | Group | Reachable by (`principal.kind`, then §5.1's checks) | Where the gate runs |
 |---|---|---|
-| DATA | `person` · `token` — never `share`; `slash` on `propose` only; `markRead` is `person` only | `auth.ts`, step 1 of every method |
+| DATA | `person` · `token` — never `share`; `slash` on `propose` only; `markRead` is `person` only; the four sealed methods the owner himself only, in his session or with his own key, as a personal list (§5.2) | `auth.ts`, step 1 of every method |
 | READ+ | `person` · `token`; `share` reaches `page` for its one slug and nothing else | `auth.ts` |
 | VAULT | `person` with level `owner`, no `op`; a bearer of any kind is `NEEDS_BROWSER_SESSION` | `auth.ts` |
 | JOBS | `createJob` `cancelJob` `listJobs`: `person` `owner`; `claimJob` `postJobEvent` `readCancel`: `runner` | `auth.ts` |
@@ -532,6 +537,41 @@ Steps 4–6 are `tail()`; every method that writes through the kernel ends with 
 3. `null` takes the key away. Kept in `pref` (migration 9) against the person; not an event.
    `value: { key, value }` as kept. `boot` answers every key on `me.prefs`.
 
+**`sealedPut` · `sealedGet` · `sealedList` · `sealedDelete`** *(as built, October 22nd 2026; `methods/sealed.ts`)*
+
+The owner's store for bytes the host cannot read ([12-SECURITY](12-SECURITY.md) §8, "Sealed files"). The bytes go to
+the host's `SealedStore` (`RecordDeps.sealed`: R2 on the Cloud, `blobs/sealed/` on a self-host); the record keeps the
+index, `sealed_file` (`data`) and `sealed_part` (`local`), from kernel migration 45.
+
+1. `guard(ctx, 'write')` for a put or a delete, `guard(ctx, 'read')` for a get or a list, then `sealedStop`: the
+   owner himself (`personalStop`'s rule), and no `preview`, `operation`, `grant`, `wheres` or `registers` short of
+   every list; a token also by its own row, refused when it is an app's (`client_kind` `cimd` or `dcr`), has a
+   `token_lens` row (a child or a narrowed key), or is a job's or a report key (`job:`, `report:`). `FORBIDDEN` at
+   `principal`, or at `preview`.
+2. `key` 1 to 200 characters matching `[a-z0-9][a-z0-9._/-]*`: absent `REQUIRED_MISSING`, too long `OUT_OF_BOUNDS`,
+   any other shape `VALUE_MALFORMED`, each at `key`.
+3. A put: `parts` 1 to 8 and `part` 0 to `parts - 1` (`OUT_OF_BOUNDS` at each); `size` a whole number, at most
+   25 MiB and at most `parts` times 4 MiB (`OUT_OF_BOUNDS` at `size`); `sha256` 64 lower-case hex (`VALUE_MALFORMED` at
+   `sha256`); `bytes` base64, weighed before it is decoded and at most 4 MiB after (`OUT_OF_BOUNDS` at `bytes`), and
+   the parts held under this hash plus this one at most `size` (`OUT_OF_BOUNDS` at `bytes`). No store: `NOT_IN_THIS_BUILD`.
+4. A part of a file held under another hash, count or size is refused `OUT_OF_BOUNDS` unless it is part 0, which
+   replaces the file: one transaction drops every `sealed_part` row of the key and writes the new `sealed_file` row,
+   `complete = 0`, then the old parts are dropped from the store. A file already whole answers `complete: true` and
+   writes nothing. A host's `spend` is asked for a part not held under this hash, and its wait is `RATE_LIMITED` with
+   `retry_after` at `bytes`.
+5. The part goes to the store, then one transaction names it in `sealed_part` if its file is still the one held, or
+   the bytes are dropped and the caller is told to put part 0 again. When every part is held and their lengths add up,
+   they are read back and hashed: a different hash drops the file and every part, `CHECKSUM_MISMATCH` at `sha256`; the
+   right one sets `complete = 1` and writes one event, `grant.add` the first time the key is kept and `grant.rotate`
+   after, on `sealed:<key>` with `target_kind = 'sealed'` and a note naming the key, its parts and its size. `tail()`.
+6. A get: no file `NOT_FOUND` at `key`; a part past the last, not put, or not in the store `NOT_FOUND` at `part`, the
+   last of these also taking the part off the index and the file's `complete` down. A list: `prefix` compared with
+   `substr`, never `LIKE`, by key; `at` is `updated_at`. A delete: one transaction drops the rows and writes
+   `grant.revoke` when a file was there, then the store's parts go; a second delete answers `deleted: false`.
+
+The kernel's `import` counts `complete` again from `sealed_part` after every import (`settleSealed`), so a record put
+back on a host that holds none of its parts lists its sealed files as not whole.
+
 ### 5.3 · READ+
 
 **`page(slug)`**
@@ -557,7 +597,30 @@ may not import `render`; the `closed-lists` gate diffs it against `packages/rend
 3. `same_repo` = non-stale sessions whose `repo = ctx.session?.repo`, minus `ctx.session?.spoken`.
 
 **`context()`**: where the caller stands, in one call. A read, scoped as `boot`
-is: it needs `read`, never writes, and opens no run. Every part is held to what the caller may read.
+is: it needs `read`, never writes, and opens no run, except for `topic` below. Every part is held to what the caller
+may read.
+
+`topic` is what the person is working on, in a few words, at most 60 characters (`TOPIC_MAX`): "Kiln works". An agent
+with no folder sends it on its first call. Claude.ai, ChatGPT and any remote MCP client send no repository, remote or
+folder, so it is the one thing that can place their run. When the caller is a token that may keep its own run
+(`propose` on its run) and says nothing of where it is, `kernel.topicRun` settles it in one transaction:
+
+- a run already in a project stays where it is;
+- otherwise the one live project with that name, case and spaces aside, is where the run goes;
+- on a record that has never had a project, the first project is formed from the topic as a draft, exactly as one
+  is formed from a folder (`first-project.ts`): the name with its first letter raised, `lane` building, `draft` set,
+  for the person to keep with one press or turn away;
+- on a record that has projects, a topic never forms one, as a one-off folder never does;
+- the run is placed there in place, or opened there when the caller has none (`opened: said what it works on`).
+
+A topic that names nothing ("nothing", "general", "help") or one longer than 60 characters places nothing. A topic that
+is not text, or too long, is refused at `topic`. A caller that may not keep its own run is briefed as if it sent none.
+A caller with no folder then stands where its run was placed, so a later `context` without `topic` still finds the
+project.
+
+`ask` is one line for the agent to put to the person. It is sent to a token with no folder that stands in no project.
+With no topic it says to ask what the person is working on and send it back as `topic`. With a topic that names no
+project it says no project is called that, and to ask which one this is.
 
 1. **The run.** For a token, the run the ladder finds from its hints (30 §3), without opening one: `session` is its
    `{ spoken, state }`, and `null` for a person or for a token with no run yet.

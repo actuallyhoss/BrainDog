@@ -357,6 +357,23 @@ Two consequences for this format:
 | A `.brain` stays a text database | the 2 MB row ceiling is never in play, and `sqlite3` output stays readable |
 | An erasure ([02-DATA-MODEL](02-DATA-MODEL.md) §10) deletes the R2 key **and** the `file` field still names the digest | a missing attachment is already detectable rather than silent, which turns out to be exactly the behaviour a lawful deletion needs |
 
+### Sealed files, the same rule for bytes the host cannot read
+
+*(Added October 22nd 2026, kernel migration 45.)* A sealed file ([12-SECURITY](12-SECURITY.md) §8) is bytes the
+owner's machines sealed, kept where attachments are kept: R2 at `rec_<id>/sealed/` on the Cloud,
+`<data>/<slug>/blobs/sealed/` on a self-host. The file carries their names and not their bytes, for the attachments'
+reason and one more: a part is four mebibytes and a file twenty-five, and a copy is read whole into the record's
+object.
+
+| Table | Section | What a copy carries |
+|---|---|---|
+| `sealed_file` | `data` | each file's key, parts, size, SHA-256, whether it was whole, when it was made and last written and by whom, signed with the rest of the manifest |
+| `sealed_part` | `local` | nothing: which parts this host holds is a fact about this installation, as a token is |
+
+So a copy says what was kept and the hash each file must have, and a reader holding the bytes beside it can check them
+against a signed line. A record put back on a host holding none of its parts lists its sealed files as not whole
+(the kernel counts `complete` again after every import), and the owner's machines put them again.
+
 ---
 
 *Next: [04-PACKS](04-PACKS.md) — the extension format, and why no code ever runs.*

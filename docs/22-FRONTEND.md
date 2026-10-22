@@ -590,6 +590,7 @@ not silently change what an existing page renders, and an agent can read back ex
 | Metric | Target |
 |---|---|
 | Main JS, brotli | **≤ 30 KB** (today: 19.3) |
+| First load JS, brotli: the entry, the root layout and Today | **≤ 640,000 bytes**, and it only falls (624.1 KB on 22 October 2026, 741.8 before) |
 | Main CSS, brotli | ≤ 12 KB |
 | Editor chunk | ≤ 80 KB gzip, **and CI asserts it is unreachable from the entry chunk** — as is the theme editor's chunk, the one place `@braindog/theme` is imported at runtime (§7) |
 | Fonts | ≤ 45 KB total, 2 files |

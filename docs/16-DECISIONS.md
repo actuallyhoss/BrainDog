@@ -1093,7 +1093,7 @@ twelve packs is theatre, and a platform with a moderation queue is a company bef
 refunds, and is a company decision, not a format one.
 
 **Amended September 28th 2026, as built, on a default that holds
-until the owner rules.** The Kennel is built now, before gate 2, because the direction asks for a
+until the owner rules.** The Kennel is built now, before gate 2, because the product asks for a
 registry and for publishing your own packs. It is the same format (an `index.json` over immutable
 files, each held to its checksum and, when signed, to its author's key) with a publish door in
 place of pull requests: `POST /api/kennel/v1/submit` on the app's own host, taking a file signed by
@@ -1413,6 +1413,17 @@ stay a browser session. A stolen `hosts.json` therefore cannot export or install
 [30-BLUEPRINT](30-BLUEPRINT.md) §10; the `router-groups` gate asserts it
 ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D1; [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §13 #3).
 
+**Amended 22 October 2026: the press on a decision card, an addendum and not a reversal.** A
+question may be answered inside Claude or ChatGPT, on the person's own press on the decision card,
+while the owner has "Answer from inside chat apps" on. No token reaches `decide` still: the press is
+carried by a one-time grant the MCP door mints beside the card and hides in the answer's `_meta`,
+which the app hands the card and never the model. It names the person, the key, the question, the
+options shown and the question's version, is spent once, lapses in fifteen minutes, and is minted
+only for a key a chat app holds after the person signed in to it. The press runs `decide` as the
+person with `pressedIn`, which `admin` and `vault` refuse, so it never installs or opens a key, and
+the decision keeps the app it was pressed in. A model calling `answer` without a grant is refused
+and told to show the card ([12-SECURITY](12-SECURITY.md) §5.1, [44-SPEC-MCP](44-SPEC-MCP.md) §15.12).
+
 **Rejected:** an `admin` scope, off by default. A scope that exists can be minted, leaked and
 replayed; a group no token can reach cannot.
 
@@ -1630,12 +1641,10 @@ rows in `apps/site/src/lib/plans.ts` and ADR-071's figures in the same change, e
 
 ---
 
-## ADR-070 · The assistant is called Slash, on the owner's word
+## ADR-070 · The assistant is called Slash, by the owner's choice
 
 **Decided.** The assistant is **Slash**. It was called Spark until September 25th 2026, when the
-owner asked for the change:
-
-> "hey, i want you to rename Spark to Slash. update ALL references please"
+owner chose the new name and asked for every reference to change.
 
 **Every reference, not only the words on screen.** The package (`packages/slash`), the routes
 (`/api/slash/*`), the flow step (`ask_slash`), the vault key label, the host settings (`SLASH_*`),
@@ -1652,7 +1661,7 @@ than fails.
 **Not renamed.** `sparkline`, which is a kind of chart and not the name. The uses of "slash" that
 mean the `/` character: an identifier that means the character takes a `-key` or `Key` suffix, so
 `slash` alone only ever means the assistant. Other companies' products:
-GitHub Spark and Gemini Spark. His words where they are quoted. And history: earlier records
+GitHub Spark and Gemini Spark. Quoted words, which stay as they were said. And history: earlier records
 say what was true on their day.
 
 **Kept from ADR-017, because they were never about the word.** The governance sentence:
@@ -1700,9 +1709,9 @@ The Directory's `ALLOWANCE` and `PLANS` read the table, the checkout takes its n
 
 **Why.** The same figures lived in four files, and Cloud Plus was 75,000 runs in the code and 60,000 in the
 roadmap. Cloud, the packs and extra usage are the owner's (26 September); Free's figures are the default taken
-for him on 2 October (DIRECTION §35). Cloud Plus at five times
+for him on 2 October. Cloud Plus at five times
 Cloud on every figure, agents at 3, 15 and 75, and no yearly price are the defaults taken for him on
-8 October (DIRECTION §42).
+8 October.
 
 **Rejected:** the roadmap's 60,000 runs for Cloud Plus, because its card says five times Cloud and the code
 already held that; a yearly price, until he names one; a second table on the site, because a figure typed
@@ -1730,7 +1739,7 @@ model's score in its note. Slash signs no fold.
 [30-BLUEPRINT](30-BLUEPRINT.md) §3 states the invariant as a query with this one exception, the `slash-actor`
 gate reads the query from there, and [46-SPEC-SLASH](46-SPEC-SLASH.md) says the same list.
 
-**Why.** The owner's words: "Model (spark) may only write suggest/propose/predict events; enforced in kernel."
+**Why.** The rule: "Model (spark) may only write suggest/propose/predict events; enforced in kernel."
 A model arranges a page, and that install was signed `slash` with a plain insert the guard never saw, so the
 first look a model wrote broke the invariant with nothing saying so, and a page installed as Slash would have
 been written the same way.

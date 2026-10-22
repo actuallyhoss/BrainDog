@@ -272,6 +272,12 @@ packages/kernel/
 └── test/                           §9
 ```
 
+*(Amended October 22nd 2026.)* **`./constants` is a second entry, `src/constants.ts`:** the constants and small rules a
+screen reads (`PEOPLE`, `COSTS`, `REDUCES`, `ROW_TEXT_MOST`, `railRoom`, the presence clock's words), defined there and
+exported again from the root, so the app's first open does not load the modules they used to live in. It imports
+nothing but four small files that import only types, and `test/constants.test.ts` holds that. The registered kinds' keys are a
+table of their own for the same reason (`kinds/keys.ts`), which `drawn.ts` and `block-keys.ts` read instead of the kinds' code.
+
 Ten modules and two migrations, counted. Two over the template's "about eight": `schedule.ts` and `erase.ts` are
 each a page of logic with its own test file and share nothing with `write.ts` but a transaction, and `session.ts`
 holds what the kernel knows about the one register it declares (§5.4 step 1.4).

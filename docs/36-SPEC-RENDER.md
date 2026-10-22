@@ -178,6 +178,7 @@ interface KindSpec {
 | `link` | list | title · url · note (optional) | 3 | no | none | the url `https:`, `mailto:` or a path of this BrainDog, anything else degrades; the host under the title, nothing fetched |
 | `gallery` | grid | caption · file (`file:<list>#<seq>/<field>` or a file's name) | 2 | no | none | a picture only through `RenderOptions.file` and only at a path of the host's own |
 | `embed` | panel | url · title · aspect (the last two optional) | 3 | no | 1 | pageOnly; the url one of `EMBED_PROVIDERS`, framed at the provider's own embed address; a facade in both drawers, and the frame only after the Svelte drawer's Load is pressed |
+| `drawn` | panel | none: a host draws its `code` in a sandboxed frame and never through a fence | 0 | no | none | pageOnly; `drawn.ts` holds its rules (`drawnFault`), the document it is drawn as (`drawnDocument`: the policy, the start data, the bridge, then the code), the data and theme handed in (`drawnData`, `drawnTheme`) and the two things the frame may ask (`drawnAsk`). Neither drawer draws it |
 | `inputs` | rows | field · label · type · value, a row a field of one record row | 4 | no | — | pageOnly; the control follows the field's declared type (text, url and email as themselves; money, number, share and duration as text with the decimal keypad; day as a date; yes or no as a checkbox handing the host `true` or `false`; `enum:a,b` as a select); a bad field id, a field twice, or a type nobody types into degrades; the controls only with `RenderOptions.oninput`, and without it a `spec` of the values |
 
 ```ts
@@ -487,7 +488,7 @@ results** (record values — untrusted as markup); **link targets** (author text
 | A resolved value is inserted as text and never re-tokenised: a value holding `\|`, `**`, `{{`, `<` or a backtick changes nothing | §5.5 |
 | No colour, font, spacing or `style` from content; the only `style` attributes carry `--cells` or `--magnitude` with a renderer-formatted number matching `^\d+(\.\d{1,2})?$` | §5.9; test 34 in §9 asserts it over every `style=` in the corpus output |
 | Links are `https:`, `mailto:`, `/path`, `#anchor` only; the first two carry `rel="noreferrer"`; none carries `target` | §5.8 |
-| No images, no iframes, no remote assets, no `http:` (04 §7) | §5.7, §5.8 |
+| No images, no iframes, no remote assets, no `http:` (04 §7). A `drawn` block is the host's to frame, in a sandbox with no network; this package only builds the document and checks what the frame says back (`drawn.ts`, [12-SECURITY](12-SECURITY.md) §8) | §5.7, §5.8 |
 | No network, no filesystem, no clock but `opts.now` | §1 |
 | Every class name comes from a closed list; every `data-*` value is escaped author text or a closed-list word | §5.9 |
 | Logging: the package logs nothing | — |

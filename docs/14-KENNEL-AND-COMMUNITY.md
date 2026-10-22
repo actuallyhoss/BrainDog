@@ -53,7 +53,7 @@ per-minute write budget the record doors use, before its body is read.
 public repository. The Kennel as built follows this default until the
 owner rules:
 
-- **Now, not after gate 2**, because the direction asks for a registry and for publishing your own packs.
+- **Now, not after gate 2**, because the product asks for a registry and for publishing your own packs.
 - **A publish door, not pull requests.** The index format is the same either way, so only the door would
   change if the owner prefers pull requests.
 - **Anyone with an author key or a BrainDog account may submit, and nothing from outside is listed until

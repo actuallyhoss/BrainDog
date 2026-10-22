@@ -333,7 +333,7 @@ names pages, and a page appears when its row does.
 
 > **Since 21 October 2026 the list holds sixteen tools.** `instructions` is new (§15). `schema` is folded into
 > `record_index {register}` and `history` into `get {history: true}`. Both old names stay callable until 20 December
-> 2026 (`FOLDED_UNTIL`) and are not listed. `context` also takes `task`, `project` and `depth`. `handoff` takes `task`
+> 2026 (`FOLDED_UNTIL`) and are not listed. `context` also takes `task`, `project`, `topic` and `depth`. `handoff` takes `task`
 > and `done`. The table below is the earlier surface; §15 says what changed.
 
 | Tool | Reaches | Arguments | Writes |
@@ -449,7 +449,9 @@ What the tools do to an answer, which is the other thing this layer does. Each i
 - **`governance`** lists each question without its `body` and without its empty fields; one asked for by `id` is
   whole.
 - **`context`** carries `teach`, one to three sentences on where a loose note goes, what a task's lane is and how to
-  list one project's tasks (`teaching.test.ts`). The resource `braindog:context` carries the same.
+  list one project's tasks (`teaching.test.ts`). The resource `braindog:context` carries the same. An agent acting for
+  somebody who is not an owner is also told, in one `Reach` line beside May and never cut, what it can reach: "You act
+  for Sam: Kiln, view; amounts hidden" (`reach`, from `packages/record/src/acts-for.ts`); an owner's agent is told none.
 
 And what `propose` does before and after it files:
 
@@ -614,7 +616,7 @@ appears.
 
 `resources/templates/list` returns rows 14 to 19 as templates.
 
-**Cards are resources of their own kind, and are never listed.** `resources/read` of `ui://braindog/project.html`, `decision.html` or `rule.html` (`text/html;profile=mcp-app`), or of the `.skybridge.html` twin (`text/html+skybridge`), answers the card's page with `ttlMs` an hour and `cacheScope` `public`, since it reads nothing of the record. `get` carries the project card and `governance` the decision card, by `_meta` on the tool; the page draws what the tool answered, and a button on it is only a press the person made.
+**Cards are resources of their own kind, and are never listed.** `resources/read` of `ui://braindog/project.html`, `decision.html` or `rule.html` (`text/html;profile=mcp-app`), or of the `.skybridge.html` twin (`text/html+skybridge`), answers the card's page with `ttlMs` an hour and `cacheScope` `public`, since it reads nothing of the record. `get` carries the project card and `governance` the decision card, by `_meta` on the tool; the page draws what the tool answered, and a button on it is only a press the person made. Each option on the decision card carries its picture, what choosing it would change (§15.12), and its buttons answer in the chat only when the door handed the card a grant; otherwise they open BrainDog.
 
 **Receipts.** `create`, `update`, `log`, `triage`, `handoff`, `propose` and `meet` end their answer in a receipt line, and `structuredContent.receipt` carries the same line: what was done in names, then `undo` with the write's batch. No credential is in it. `undo` has none (`RECEIPTED` in `index.ts`). The arguments are checked against a grammar before
 they are arguments: `{register}`, `{slug}` and `{id}` match `^[a-z][a-z0-9_-]{0,63}$`, and `{name}` matches
@@ -994,7 +996,7 @@ level.
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
 | Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its vault label |
-| Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10) |
+| Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10). The one way a question is answered through this door is the person's press on the decision card, carried by a one-time grant the model is never shown (§15.12, [12-SECURITY](12-SECURITY.md) §5.1) |
 | Completeness | the tool list is fixed at seventeen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
 **What never travels:** a plaintext credential, a stack trace, an exception message, a SQL string, a file path, a
@@ -1110,7 +1112,7 @@ until then.
 | `4da40586`, `ed4d421c` | the `money` tool, and `list_rows`: sixteen tools |
 | `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
 | not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
-| not a commit of its own | `understand` (DIRECTION §38): seventeen tools |
+| not a commit of its own | `understand`: seventeen tools |
 | AGT-B05 | `understand` becomes `braindog:understand`, and `op_id` on `create` and `update`: sixteen tools again |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
@@ -1165,7 +1167,9 @@ what was built, and where it differs from the plan, it says so.
 The person writes an instruction in the app. It is one row of the kernel's `instructions` register, spoken `IN4`, and
 only a person writes it: `instruct` refuses a token, so no agent instructs another.
 
-- **To:** a run (`S883`), an agent kind on a project or repository, whoever is next on a project, or a task.
+- **To:** a run (`S883`), an agent kind on a project or repository, whoever is next on a project, or a task. Any of
+  these but a run may also name a machine and a Claude Code profile, each by name (`machine`, `seat`, §15.13), and
+  then reaches only runs on that machine under that profile.
 - **When:** `now` reaches the live runs that match. `next` reaches the next run that starts there. A `now` for a run that
   ends first falls back to `next`.
 - **Kind:** `tell`, `stop`, `pause`, `resume` or `redirect`.
@@ -1189,8 +1193,16 @@ only a person writes it: `instruct` refuses a token, so no agent instructs anoth
 
 ### 15.3 · `context`
 
-`context` takes `task`, `project`, `depth` (`card`, `brief`, `task`, `full`) and `since`. Only `task` and `project` are
-listed; `depth` and `since` are taken and not listed, to hold the token ceiling. The answer is planned by
+`context` takes `task`, `project`, `topic`, `depth` (`card`, `brief`, `task`, `full`) and `since`. Only `task`,
+`project` and `topic` are listed; `depth` and `since` are taken and not listed, to hold the token ceiling.
+
+`topic` is for an agent with no folder: Claude.ai, ChatGPT, any remote client. It says what the person is working on in
+a few words, "No folder: what they work on" in the schema, and the `start` prompt asks for it on the first call. It is
+the one thing that can place such a run: in the project of that name, or, on a record with no project yet, in the
+first project formed from it as a draft the person keeps with one press (45-SPEC-RECORD, `context()`). An agent with no
+folder that stands in no project and sent no topic is asked in one line, after the card: "You have no folder, so no
+project yet. Ask what they are working on, then call context with topic set to its name." The line is `ask` in the
+answer, and is kept when the plan replaces the rest. The answer is planned by
 `planContext` (`packages/record/src/context-plan.ts`) in this order: stop or pause, what he told you, the card, what you
 may do, rules and brief, who else is working here, your lane, decided lately, learned here. The first two are never cut.
 Every cut section ends `and N more: <call>`. The default budget is 700 tokens, set per agent. The four teaching lines
@@ -1213,8 +1225,11 @@ is stopped only at its next BrainDog call.
 ### 15.6 · Settings rows
 
 One row of `agent_profile` per kind of agent (`claude`, `codex`, `cursor`, `runner`, `script`), optionally bound to a
-token or a machine, and a `default` row for any agent no row matches. The nearest match wins: token, machine and kind,
-kind, then default.
+token, a machine or a Claude Code profile, and a `default` row for any agent no row matches. The nearest match wins:
+token; kind with machine and profile; kind with profile; kind with machine; kind; then default. A row on a profile
+names its kind too (`match: { kind, seat }`, `VALUE_MALFORMED` at `match.seat` for a profile alone or a name that is
+a path), and says the profiles it was heard under (`seats`). Settings › Agents draws one row per profile a kind was
+heard under but `default`, which follows its kind's row until he saves it.
 
 | Setting | Enforced |
 |---|---|
@@ -1242,6 +1257,13 @@ every 5 s while a stop or a pause is pending, and writes the answer to `sessions
 folder. The hooks read only that file, so they cost no network. This replaces the WebSocket of ADR-044 for live updates
 (ADR-075).
 
+The record keeps the first way a run saw an instruction. So before the bridge sends a tool call, it sends the pulse that
+reports what the hooks showed since the last one, when one waits, and waits for it up to 2 seconds. A run that takes an
+instruction its prompt hook just showed is then recorded as seen "on its prompt", not "when it asked".
+
+A Codex session says no session id. Its bridge names its file `codex-<pid>`, by the Codex process that started it, and
+pulses with no `x-braindog-client`, so the record finds the run as it finds every Codex call.
+
 ### 15.8 · The hooks, the channel and the tokens
 
 `braindog setup` writes the hooks:
@@ -1252,6 +1274,24 @@ folder. The hooks read only that file, so they cost no network. This replaces th
 | `tool` (PreToolUse) | Denies the call while the run is stopped or paused, except `mcp__braindog__*` and `ToolSearch` |
 | `stop` (Stop) | Blocks once per taken instruction that has no reply, and respects `stop_hook_active` |
 | `watch` (async Stop, `asyncRewake`) | Off. `braindog install --rewake` turns it on. Not tried on a signed-in session |
+
+A hook with nothing to do ends in the shell script after reading the flags file, in about 5 ms. A hook with something to
+say starts Node on the inbox reader alone, which imports only Node's own modules: the published command writes it beside
+its hook scripts as `braindog-inbox.mjs`. Every script also sets `NODE_COMPILE_CACHE` (to `~/.braindog/cache/node`,
+unless set), so Node does not compile it again. Measured on an M-series Mac, from the script's start: 92 ms before, 30
+ms after, against a target of 50.
+
+**Codex** has no hook that adds words to a prompt or denies a tool. `braindog setup` and `env apply` write three things:
+
+| What | Where | Does |
+|---|---|---|
+| The MCP server | `[mcp_servers.braindog]` in `~/.codex/config.toml` | `braindog mcp --agent codex`, so its runs read as Codex |
+| The turn end | `notify` in a marked block at the top of `config.toml` | After each turn, when the run has not taken something he told it, one notice on this machine, once per instruction. Of the event only `type` is read. A `notify` of his own is left, and the turn end stays off |
+| The instructions | A marked block at the end of `~/.codex/AGENTS.md` | Asks each session to call `context` first and `instructions` at the start of every turn, and to act on a line from him first |
+
+A Codex session hears him at its first `context`, in the line added to any BrainDog answer, and on its own
+`instructions` call. A stop holds at the record, which refuses a stopped run's writes. Codex's own hook settings are not
+confirmed, so nothing is written for them.
 
 The channel is opt-in: `BRAINDOG_CHANNEL=1`, and not switched off in his settings. The bridge declares
 `experimental['claude/channel']` and sends the instruction as a notification. It asks for protocol 2025-11-25.
@@ -1282,6 +1322,78 @@ are still readable by address. `serverInfo.version` is the build; the self-host 
 The model receiving `context` as built, the PreToolUse and Stop hooks in a signed-in session, the channel and
 `asyncRewake` all wait for wave 4 with a real client. A "next start" instruction does not reach a live run, and the
 app sends "now". Reply receipts do not yet list row names.
+
+### 15.12 · Answering on the decision card
+
+Built on 22 October 2026. The decision card inside Claude and ChatGPT draws each option with its picture and, when the
+owner turned on **Answer from inside chat apps** (Settings › Agents, the owner's `agents.answer_in_chat`, off by
+default), answers the question on the person's press. [12-SECURITY](12-SECURITY.md) §5.1 is the trust model.
+
+**The pictures** (`option-visual.ts`) are the web question page's (`apps/web/src/lib/decide/option-visual.ts`), kind
+for kind: a merge (the names and the one they become), money against the account's balance, a due day against today,
+a figure filed into its list, and a field from what it holds to what it will. The door reads the ground as the caller:
+the row the question is about, its account's balance and what it is filed under, three `get`s at most, never waited on
+past 400 ms (`answer.ts` `groundOf`). The month's spend is not read, so money is drawn against the balance or not at all.
+A set of rows has Accept and Decline, and a merge question has the merge's own answers. A due day needs today, which the
+door hands in.
+
+**The grant.** For each decision card it draws, the door asks the record `chatAnswerMint({ id, options })`, an INTERNAL
+method no route reaches. On a yes the card's `answerTool` is `answer`, the options the record weighs as hard to undo
+are marked `hard`, and `_meta['braindog/answer'] = { grant, until }` rides on the tool answer, never in its text or
+`structuredContent`. On a no (the switch off, a key no chat app holds, a question that installs, an owner who is not one)
+the card is drawn as before and its buttons open BrainDog. A grant names the person, the key, the question, the options
+the card showed and a hash of the question's body and state. It is sealed, spent by one press, and lapses in 15 minutes.
+
+**`answer`** is the eighteenth listed name, and only to a key Claude or ChatGPT holds, from a door whose record has the
+three methods: the door asks `chatApp` first, so it is never listed over stdio, to a key on a machine, or from a stub. It takes `{ grant, option }`. Its `_meta` is `ui.visibility: ["app"]`, `openai/visibility: "private"`
+and `openai/widgetAccessible: true`, so the card may call it and the model is not shown it. A call without a grant is
+refused at the door, before the record is asked:
+
+| Code | At | When |
+|---|---|---|
+| `LEVEL_REQUIRED` | `grant` | No grant, a grant nobody made, or one drawn for another key. "Only the person answers, by pressing an option on the decision card. Show them the card: call governance with the question's id." |
+| `VERSION_STALE` | `grant` | The card is older than 15 minutes, or the question changed since |
+| `TRANSITION_ILLEGAL` | `grant` | The card was already pressed, or the question was answered meanwhile |
+| `ENUM_VALUE_UNKNOWN` | `option` | An option the card did not show |
+| `FORBIDDEN` | `principal` | The switch was turned off, or the key no longer carries a card |
+
+A press is the record's own `decide`, run as the owner with `pressedIn` set, so every check a press in the app meets it
+meets too, and `admin` and `vault` refuse it. The answer's text is the card's line: "Answered: Wait a week. BrainDog
+keeps it as answered in Claude." The decision keeps where it was pressed: a `note` on `decision:<id>`, `field`
+`answered_in`, the app in `to_v`, "Answered in Claude, on the card." in History (`kernel.answeredInOf`). The card asks
+for a second press on a hard option, and says a refusal's sentence with the way to BrainDog kept.
+
+**Not yet verified:** the card's press in a signed-in Claude and ChatGPT, that both hosts deliver `_meta` to the view
+as specified, and that ChatGPT's `callTool` reaches a tool marked private.
+
+### 15.13 · A run's profile and machine
+
+Built on 22 October 2026, with kernel migration 44 (`0044_seat.ts`). Names only, never a folder, and seen only where
+runs are already seen: the Profiles add-on's lists stay personal.
+
+- **The run says its profile.** In Claude Code the bridge sends `x-braindog-profile`, the profile's name from
+  `CLAUDE_CONFIG_DIR` (`profileNameOf`, [48-SPEC-CLI](48-SPEC-CLI.md) Environment). Both hosts read it as the session
+  hint `seat`, held to `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` with no `..`, and drop anything else with the call's other
+  hints kept. The run keeps it as `seat` (labelled Profile), which the record alone writes: stamped as the run opens,
+  learned once from a later call or a pulse while it is empty, and never written by a caller. The field is not called
+  `profile`, which already names the settings row a run's agent follows.
+- **Instructions aim at it.** Migration 44 adds `machine` and `seat` to `instructions`. `instruct` takes both, each a
+  name (`VALUE_MALFORMED` at the field otherwise), and keeps them on every target but `to: run`, which names its run
+  already. An instruction that holds them reaches a run only while the run's `host` and `seat` match (`reaches`), now
+  and at the next start alike.
+- **The composer is offered names.** `instructionList` answers `places: { machines, seats }`: the machines and profiles
+  of the runs the caller is shown from the last 30 days, newest first, then the profile names and machines on the
+  Profiles add-on's two lists where the caller reads them, which only their owner does. Only names `instruct` takes,
+  20 of each at most, and the app offers a choice only where there are two names or more.
+- **Presence says it.** Each `presence` row carries `seat`. The app's run row says "as studio" for any profile but
+  `default`, and an agent hears a run as "Claude Code as studio on <machine>" (`runnerOf`).
+- **A job may be placed.** `createJob { machine, seat }` keeps the job's place beside it in `job_place` (`job_id`,
+  `machine`, `seat`, `ran_on`, a local table). `claimJob { host, seats }` hands a runner only a job placed nowhere, or
+  placed on its machine under a profile it names, and keeps the machine it was taken on as `ran_on`, from which "Start
+  one now" offers the machines a runner listened on within the day and the profiles their runs were under. The runner
+  turns the profile's name into a folder of its own (48 §5.13). A runner that says neither takes only jobs placed
+  nowhere, as before.
+- **The `instructions` tool is unchanged.** An agent reads, takes and replies; only a person aims an instruction.
 
 ---
 

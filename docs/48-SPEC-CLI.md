@@ -40,7 +40,7 @@ of four codes (§4.4).
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
-| `setup <host>` | `<host>` = `https://origin[/slug]` · `--dry-run` · `--yes` | in order, stopping at the first step that fails (§5.15): `login <host>` unless a live login for it is held; `install --apply` into the user profile, its plan printed first and, on a terminal, `Write these changes? [y/N]` asked before it is written (`--yes` writes without asking; off a terminal without `--yes` it stops after the plan with exit 1); `claude mcp add-json braindog <json> --scope user` unless that entry is already there; `tools write --scope user`; `skills sync`, the last two as if outside any repository | one line per step on stdout with its command's own lines indented under it, and the six digits on stderr; last, `Nothing changed: this machine was already set up from <host>.` when no step changed anything. `--dry-run` asks for no login, writes no file, runs no `claude`, and reads the record only with a login already held | 0 · 1 · 3 |
+| `setup <host>` | `<host>` = `https://origin[/slug]` · `--dry-run` · `--yes` | in order, stopping at the first step that fails (§5.15): `login <host>` unless a live login for it is held; `install --apply` into the user profile, its plan printed first and, on a terminal, `Write these changes? [y/N]` asked before it is written (`--yes` writes without asking; off a terminal without `--yes` it stops after the plan with exit 1); where Codex is, its turn end (`notify`) in a marked block at the top of `~/.codex/config.toml` and BrainDog's block at the end of `~/.codex/AGENTS.md`, shown and asked the same way (`clients/codex-hooks.ts`); `claude mcp add-json braindog <json> --scope user` unless that entry is already there; `tools write --scope user`; `skills sync`, the last two as if outside any repository | one line per step on stdout with its command's own lines indented under it, and the six digits on stderr; last, `Nothing changed: this machine was already set up from <host>.` when no step changed anything. `--dry-run` asks for no login, writes no file, runs no `claude`, and reads the record only with a login already held | 0 · 1 · 3 |
 | `login <host>` | `<host>` = `https://origin[/slug]` · `--vault <project\|*>` | `POST /auth/device` then `POST /auth/device/token` until approved; with `--vault`, `reach: 'vault'` and `scope` | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`, or with `--vault` `vault grant for <scope> on <host> kept as <label> · expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
 | `logout [<host>]` | `<host>` = `https://origin[/slug]`, or `--host <host>`; both together only when they name the same host. There is no `--all` | nothing, on the network or off it. Reads the hosts file and rewrites it with `saveHosts`: for every key that names the host (`sameHost`, so a hand-written trailing slash goes too), `token`, `runner` and the whole `vault` map, then the entry once nothing is left in it, then `default` when it named that host. The host is never told, so the token stays live there until it expires or the owner revokes it in the app | `signed out of <host> · a token, a runner token and N vault grants removed`, and ` · no default host is set now` when the default named it; `No login to <host> is kept on this machine, so there was nothing to remove.` when there was nothing, which is 0; never a token, a label or a vault scope | 0 · 1 |
 | `keys list` | `--project <name>` · `--everywhere` · `--json` · `--host <host>` | under the login, with no vault grant and no session headers: `schema` of the keys list and of projects, then `list` of both in pages of fifty, followed to the end, and one more read of the keys list filtered by `<deadline field> before today`, which says on the record's own clock which keys are past their day; when that answer holds every dated key and one of those days is a day old or less, one further read filtered by `<deadline field> after today`, which tells a record that answered from a host that ignores the filter; and when that read comes back empty, which is the true answer and also what a host gives that reads nothing by `after`, a last read filtered by `<deadline field> after -3d`, believed only when it holds every one of those near keys and no key without a day; and when that holds, one more filtered by `<deadline field> before +3d`, believed the same way, which tells a host that compares the word after the field as text (to it every day is before `today` and after `-3d`, and none is before `+3d`). A host that refuses any of these reads, or leaves a near key out, has the keys printed by this machine's date with a line saying the record did not say. Reads only, and opens no key | the keys your record holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. In the `--json` document each key also holds `expired`, true when its day is past on the record's own clock. Never a value, a grant's id or a row's id | 0 · 1 · 3 |
@@ -54,10 +54,17 @@ of four codes (§4.4).
 | `skills sync` | `--host <host>` · `--dry-run` | `GET /api/context`; `GET /api/get` for each skill it writes or checks; `POST /api/propose` with a rowset update of `body` and `rev` for a local edit; `POST /api/create` with `managed: false` for a file found by hand. Writes `<CLAUDE_CONFIG_DIR or ~/.claude>/skills/<name>/SKILL.md` or `commands/<name>.md`, a project's under `<top-level>/.claude/`, and the lock at `~/.braindog/skills-lock.json` | one line per file written, updated, deleted, kept and proposed, or registered, a file in a repository marked `(in the repository, not committed)`; `Skills are in sync.` when there was nothing to do | 0 · 1 · 3 |
 | `doctor` | `--replaced <replace.json>` · `--under <folder>` · `--config-dir <folder>` · `--json` | nothing on the network. Reads each profile's settings and servers file, every other agent app's servers file through the clients table, the folders named by `--under`, `crontab -l` and `ps -A`, and writes none of them (§5.18) | one line per profile and per other app, then up to three headings (`Still naming <tool>:`, `Shaped like a key, and the value is never shown here:`, `Not as braindog install leaves a profile:`), each place by its file and its entry, then one `Started before this command was updated: restart <app>.` line per app, then `<n> places to fix.` or `Nothing to fix.`; never a value | 0 · 1 |
 | `env diff` | `--config-dir <folder>` · `--host <host>` · `--json` | on the network only when this machine holds a login: `list` of the tools and the skills lists, in pages of fifty, under the login and with no session headers, so it opens no run. Reads each profile's settings, servers file, skills folder and CLAUDE.md, the profiles `doctor` finds, ccenv's under `CCENV_HOME` among them, and writes none of them | one line per profile with how many servers, plugins, hook events and skills it holds and its CLAUDE.md's hash; then `Missing beside the other profiles:`, `Not the same in every profile:` (a server's entry or CLAUDE.md, by hash) and `Against the record's <n> tools and <n> skills that apply everywhere:`, the profiles that lack the same names on one line; then `<n> differences, by name and hash only.` or `Nothing differs.`. A name shaped like a key is `[hidden name <n>]`; never a value | 0 · 1 |
-| `env apply` | `--profile <name>`, repeatable · `--dry-run` · `--yes-data` · `--host <host>` | in each profile `doctor` finds, or each named, `setup`'s steps 2 to 5 (§5.19): `install --apply` over that profile, `claude mcp add-json braindog` and each tool's `claude mcp add-json` with its `CLAUDE_CONFIG_DIR`, `skills sync` into its folder, and with a list in the role `profiles` its rules in a marked block of its CLAUDE.md. The record by `schemas`, `list`, `get` and `context` under the login with no session headers. An entry that runs a program is asked y/N at a terminal and pinned in `~/.braindog/pins.json` before it is placed | a line per step and profile with its command's own lines under it, each program entry whole with whether it is approved here; then what was left out for want of approval, and `Applied to <profiles>.` or `Nothing changed: every profile already holds what the record applies to it.`. `--dry-run` writes, runs, asks and pins nothing | 0 · 1 |
+| `env apply` | `--profile <name>`, repeatable · `--dry-run` · `--yes-data` · `--host <host>` | in each profile `doctor` finds, or each named, `setup`'s steps 2 to 5 (§5.19): `install --apply` over that profile, `claude mcp add-json braindog` and each tool's `claude mcp add-json` with its `CLAUDE_CONFIG_DIR`, `skills sync` into its folder, and with a list in the role `profiles` its rules in a marked block of its CLAUDE.md. Then, where Codex is and no `--profile` was named, Codex's turn end and AGENTS.md block and BrainDog's server in its config.toml, each program pinned as Claude Code's are. The record by `schemas`, `list`, `get` and `context` under the login with no session headers. An entry that runs a program is asked y/N at a terminal and pinned in `~/.braindog/pins.json` before it is placed | a line per step and profile with its command's own lines under it, each program entry whole with whether it is approved here; then what was left out for want of approval, and `Applied to <profiles>.` or `Nothing changed: every profile already holds what the record applies to it.`. `--dry-run` writes, runs, asks and pins nothing | 0 · 1 |
+| `statusline` | `--statusline` on `setup` and `env apply` places it | reads Claude Code's status JSON on stdin and prints one line; no network on the print path, and the placed command starts Node on `braindog-statusline.mjs` alone (about 35 ms a draw on an M-series Mac, 103 through the whole command). At most every five minutes for each profile (`~/.braindog/statusline/<profile>`, stamped first) it starts a detached `statusline --beat` that sends the profile's name, the machine, the 5 hour and 7 day percentages and the reset time to the Profiles add-on's row (`keepMeters`, `profile-place.ts`); nothing else leaves, and a record without the add-on does nothing | one short line | 0 |
 | `env pins` | `--forget <name>` · `--json` | nothing on the network: `~/.braindog/pins.json`, which `--forget` alone writes | one line per approved entry, oldest first: its name, its kind, the profiles it was placed in, the first twelve of its hash and the day it was approved; with `--forget`, how many pins of that name went | 0 · 1 |
 | `env check` | `--profile <name>`, repeatable · `--json` | no request of its own: `claude mcp list` once a profile, with that profile's `CLAUDE_CONFIG_DIR` and with none for the default one, in the home folder, three at once and thirty seconds each. The `claude` found on the path is asked y/N at a terminal and pinned before its first run (§5.19) | a line per profile with how many servers stand how, then a line per status naming its servers; last, how many need a sign-in or failed, or `Nothing waits on a sign-in and nothing failed.`. A server by its name alone, and a name shaped like a key as `[hidden name <n>]` | 0 · 1 |
-| `sync inventory` | `--under <folder>` · `--host <host>` · `--json` | on the network only when this machine holds a login: `list` of the skills list, as `env diff` reads it. Names and sizes by `stat`, and no file it lists is opened; the skills lock is read when the record is not. In each repository under `--under`, `git --no-optional-locks status --porcelain=v1 -z --ignored`, `git rev-list --count --branches --not --remotes` and `git rev-parse --git-common-dir`, and nothing that writes | each group by name and size: auto memory (`projects/<project>/memory/` alone), the context folder, the programs in `~/.local/bin`, ccenv's shared files, the skills the record does not hold, the `.env` files git ignores by repository; each repository's commits on no remote and changes not committed, a linked worktree as one of its checkout; then `It would refuse:` with why (a sign-in, session transcripts, a plugin cache, a cache, a link, a name that says it may hold a key); then `It would carry <n> files, <size>, and refuse <n> things.` | 0 · 1 |
+| `sync inventory` | `--under <folder>` · `--host <host>` · `--json` | on the network only when this machine holds a login: `list` of the skills list, as `env diff` reads it, and on a machine that has joined setup sync one `sealedList` within the command's budget. Names and sizes by `stat`, and no file it lists is opened; the skills lock is read when the record is not. In each repository under `--under`, `git --no-optional-locks status --porcelain=v1 -z --ignored`, `git rev-list --count --branches --not --remotes` and `git rev-parse --git-common-dir`, and nothing that writes | each group by name and size: auto memory (`projects/<project>/memory/` alone), the context folder, the programs in `~/.local/bin`, ccenv's shared files, the skills the record does not hold, the `.env` files git ignores by repository; each repository's commits on no remote and changes not committed, a linked worktree as one of its checkout; then `It would refuse:` with why (a sign-in, session transcripts, a plugin cache, a cache, a link, a name that says it may hold a key); then `It would carry <n> files, <size>, and refuse <n> things.`; on a machine that has joined, `Sealed already:` with the sealed files by count and size and each machine's bundles and newest time, read off their keys, nothing opened | 0 · 1 |
+| `sync join` | `--name <machine>` · `--new-key` · `--host <host>`; the passphrase typed at the terminal, never an argument | under this machine's own login, never an agent app's token, and with no session headers (§5.20): `schemas { every: true }` and `packs` to find the list playing `role: carry`, `boot` for the record's address, `sealedGet { key: 'sync/key' }`, `sealedList`; on a record with no `sync/key`, a new key and `sealedPut` of its copy, read back; otherwise the copy opened with the passphrase and the retired machines' notes read. The key is written to the Keychain, Credential Manager or the secret service (`secret-store.ts`) and the machine's note to `~/.braindog/sync.json` | `Joined setup sync on <host> as <machine>. The sync key is kept in <store> on this machine.`, the honesty line on the first machine, and what to run next; a wrong passphrase three times, a retired name, a name another machine sends under without a yes, a record with sealed files and no copy of the key without `--new-key`, and no terminal are one sentence each | 0 · 1 · 3 |
+| `sync push` | `--dry-run` · `--host <host>` | as `join` finds the lists, then `list` of Carry, `sealedList`, a `sealedPut` for each thing whose sealed version is not kept yet, a sealed manifest, `create` of a Bundles entry and `update` of this machine's older ones; with nothing changed, one `update` of the latest entry's Last checked time (`heard`). Reads each thing's place on this system, `git` for `.env` files and unpushed work, and the Keychain for an item of tool sign-ins; takes `~/.braindog/locks/sync.lock` | the machine and system, then one line per thing in Carry: off, refused and why, no place here, nothing there, sealed already, or sealed and sent, by files and size, with what was left out under it; then `Sealed one bundle from <machine>: …` or `Nothing changed since the last bundle`. Never a byte of what is sealed | 0 · 1 · 3 |
+| `sync pull` | `--from <machine>` · `--dry-run` · `--yes-data` · `--host <host>` | as `push` finds them, then the newest bundle from another machine or the one named: its sealed manifest and each thing's sealed file by `sealedGet`, each opened here; `list` of the people list for a thing that belongs to someone else; `update` of Carry's `waits`. Writes each file at its place on this system, a replaced one copied first to `~/.braindog/sync-kept/<when>/`; pins in `~/.braindog/pins.json`; the Keychain item of tool sign-ins on a Mac | one line per thing: placed, already here, left and why, waiting for a yes; each program shown whole before `Place <path> on this machine? It runs a program. [y/N]`, a thing that is someone else's asked by their name, tool sign-ins asked before they move; then where replaced files were kept and `Placed what <machine> sent.` | 0 · 1 · 3 |
+| `sync patches` | `--from <machine>` · `--dry-run` · `--host <host>` | as `pull` reads a bundle, the things of kind unpushed work alone; then `git clone`, `git fetch`, `git bundle verify`, `git checkout -B` and `git apply` in each repository under this system's place, never asking at the terminal | one line per repository: what it holds against which base and whether it applied, or why not; each key-shaped file left for the vault with the `keys put` command for it | 0 · 1 · 3 |
+| `sync drill` | `--from <machine>` · `--host <host>` | as `pull` reads a bundle, from any machine, this one included; writes each file into a scratch folder of its own and removes it after; `create` of a Drills entry and `update` of the one before | one line per thing with its files and whether every hash matched, then `Passed: …` or `Failed: …` with what failed | 0 · 1 · 3 |
+| `sync retire <machine>` | `--yes` · `--host <host>` | as `push` finds the lists, then `sealedPut` of the machine's sealed note at `machine/<name>/retired` and `update` of its latest Bundles entry to retired, or `create` of one; on this machine, its key removed from the store and its note from `sync.json` | `Retired <machine>. …`; on this machine, its key gone and each item or file of tool sign-ins asked y/N before it is removed | 0 · 1 · 3 |
 | `tools scan` | `--host <host>` · `--dry-run` | reads `<top-level>/.mcp.json` and `~/.claude.json` (`mcpServers`, and `projects[<path>].mcpServers`) and writes neither; `GET /api/context` and `/api/get`; `POST /api/create` for a new server, `POST /api/update` of `hosts` and `seen` for a matching row, `POST /api/propose` with a rowset for one that differs, asked as `Change how <name> starts?`; a server with no row of its name is matched to the row of its scope that starts the same way (the same command and arguments, or the same address), which is stamped as seen with nothing added or asked; each key through `keys put` | one line per server recorded, proposed or skipped, and one sentence when keys were recorded by name only for want of a vault grant, which the start hook says once per host until a grant is kept; never a value | 0 · 1 · 3 |
 | `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value. A stdio tool's key is wrapped in `keys exec`, and an HTTP tool's header key is named by a `headersHelper` that runs `keys headers` (§5.16) | 0 · 1 · 3 |
 | `session show\|next\|tried\|note\|end` | `show` takes no argument; `next`, `tried` and `note` take one line of text in quotes; `end` takes `--state idle\|handoff\|done` (`idle` by default) · `--next <text>` · `--host <host>`. No verb names a run, because the session file for this folder does and a token that named one would be refused | `GET /api/context` for every verb, then for all but `show` `POST /api/handoff` with one of `{ next }`, `{ tried }`, `{ note }` or `{ state, next?, branch?, head? }`, as the run the session headers name | `show`: the run and its state, the last handoff left here with the last three things tried, and who else is live in this repository. The rest: one line naming the run. A folder with no session file, a `--state` outside the three, and a missing or unquoted line are one sentence each, before any request | 0 · 1 · 3 |
@@ -71,8 +78,9 @@ of four codes (§4.4).
 | `page pull <slug>` | `--out <file>` · `--host <host>` | `GET /api/context`, then `GET /api/arrangement { page }`: READ+, the page's stored declaration as the caller may read it; for a page made from a template, the template's. The answer is read with `storedOf` from `@braindog/dog`, the reader the app's source view shares | writes `dogText` of the stored body to `<page>.dog` (or `--out`), the same bytes the app's source view shows and downloads, and prints `<page> written to <file>.`, or for a template's page `<slug> is one of the pages <template> makes, one for each row, so <template>'s source was written to <file>.`; the value is `{ page, file, version }`, with `template` for a template's page. A refusal is the record's sentence | 0 · 1 · 3 |
 | `page push <file>` | `--host <host>` | reads the file with `parseDog`, then `POST /api/setDeclaration { body }` with the body exactly as read, which an owner's session applies. ADMIN, and the record's `admin()` refuses every token before it reads the arguments (ADR-060). On that one refusal, `NEEDS_BROWSER_SESSION`, it reads `governance { register: 'suggestion' }` for an open change with the same `declaration_id` and `to`, and otherwise `POST /api/propose { question, body_kind: 'change', body: { declaration_id: 'page.<name>', to: { id, kind: 'page', body } } }`. Nothing is applied until the question is accepted on Decide. Any other refusal is shown as the record said it. A file the parser refuses is never sent | `<page> pushed to <host>.` with the value `{ page, host }` where it was applied; `<name> asked as SG<n>. It waits on Decide.` where it was asked, and `<name> is already waiting as SG<n>. It waits on Decide.` where the same change is open, with the value `{ page, waits, asked, question? }`; a change the person already answered prints the record's sentence and files nothing. A parse failure prints `<file>, line <n>: <sentence>` | 0 · 1 · 3 |
 | `page check <file>` | none | nothing on the network. Reads the file with `parseDog`, then the kernel's `validateDeclaration` on `page.<page>` with no installed state, so a `requires` naming a list nobody installed is not asked about | `<page> reads as a page. Nothing was sent.`; the value is `{ page, blocks }`. A parse failure prints `<file>, line <n>: <sentence>`; a declaration the kernel refuses prints the kernel's sentence | 0 · 1 |
-| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and sends it to the host's own `POST /mcp` with the bearer and the session headers, inside a 20-second budget (`bridge.ts`, AGT-A03); with the host away, the cached list answers and a tool call refuses. In Claude Code the session headers name the profile, `x-braindog-profile` (Environment, `CLAUDE_CONFIG_DIR`). After its first `pulse` that finds a run, at most once a day for each profile on each machine (`~/.braindog/places.json`, claimed before it asks and given back when the host is away), it keeps the profile's place where the Profiles add-on is on (`profile-place.ts`): `POST /api/schemas { every: true }` and `POST /api/packs` find the list playing `role: profiles` and the list of the same add-on that links each row to one profile, `POST /api/list` reads both, and one `POST /api/create` or `POST /api/update` writes the machine, the build, whether both hooks are there and when it was heard, as the session's run, a place marked stale going back to live. A profile no row is named for, a place he retired and a session already closing write nothing; without the add-on the `schemas` read is all | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7. A `create` or `update` carries an `op_id`, the app's or one the bridge makes when the host lists the argument, and a lost answer sends it once more with the same id, so it is one entry (AGT-B05). A read is never sent twice | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
-| `hook start` · `hook end` · `hook beat` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source` or `reason`; what each event sends is the measured table under "The session hooks") | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds, and last writes how long it took into the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/end { branch, head }` (`POST /api/handoff { state: 'idle', branch, head }` only where the host has no `end`), all as the run the session file names. The start hook's time is sent as `POST /api/heard { kind: 'hook', ms, build }` by the next hook of the same session, sent beside the call it makes anyway, the next `attach` or the `end`: a small request of its own in parallel with that call, never waited for before it, and never one the start hook makes | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing. `beat`: Claude Code runs it after every tool call; it reads the age of `~/.braindog/beats/<session>` and stops unless 5 minutes have passed, otherwise `POST /api/beat` as the run the session file names, inside 2 seconds; it prints nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and sends it to the host's own `POST /mcp` with the bearer and the session headers, inside a 20-second budget (`bridge.ts`, AGT-A03); with the host away, the cached list answers and a tool call refuses. In Claude Code the session headers name the profile, `x-braindog-profile` (Environment, `CLAUDE_CONFIG_DIR`), which the record keeps as the run's `seat` (kernel migration 44): stamped as the run opens, or learned once from a later call or pulse, and never written after. After its first `pulse` that finds a run, at most once a day for each profile on each machine (`~/.braindog/places.json`, claimed before it asks and given back when the host is away), it keeps the profile's place where the Profiles add-on is on (`profile-place.ts`): `POST /api/schemas { every: true }` and `POST /api/packs` find the list playing `role: profiles` and the list of the same add-on that links each row to one profile, `POST /api/list` reads both, and one `POST /api/create` or `POST /api/update` writes the machine, the build, whether both hooks are there and when it was heard, as the session's run, a place marked stale going back to live. A profile no row is named for, a place he retired and a session already closing write nothing; without the add-on the `schemas` read is all | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7. A `create` or `update` carries an `op_id`, the app's or one the bridge makes when the host lists the argument, and a lost answer sends it once more with the same id, so it is one entry (AGT-B05). A read is never sent twice | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
+| `hook notify <json>` | Codex's event as its last argument, of which only `type` is read | nothing on the network: the inbox file the bridge keeps for the Codex process that started it (`codex-<pid>`) | nothing printed; when a turn ends and the run has not taken something he told it, one system notice on this machine, once per instruction (`notifyHook`) | 0, always |
+| `hook start` · `hook end` · `hook beat` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source` or `reason`; what each event sends is the measured table under "The session hooks") | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds, and last writes how long it took into the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/end { branch, head }` (`POST /api/handoff { state: 'idle', branch, head }` only where the host has no `end`), all as the run the session file names. The start hook's time is sent as `POST /api/heard { kind: 'hook', ms, build }` by the next hook of the same session, sent beside the call it makes anyway, the next `attach` or the `end`: a small request of its own in parallel with that call, never waited for before it, and never one the start hook makes. On a machine that has joined setup sync, `end` and the day's first `start` then start `sync push --auto end` or `--auto day` as a process of its own and never wait for it (§5.20) | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing. `beat`: Claude Code runs it after every tool call; it reads the age of `~/.braindog/beats/<session>` and stops unless 5 minutes have passed, otherwise `POST /api/beat` as the run the session file names, inside 2 seconds; it prints nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`: three hooks, SessionStart and SessionEnd with the status line `Connecting to BrainDog...` and PostToolUse (the beat) with none, each with a 10 second timeout, and an older BrainDog entry replaced in place as a `~` line; then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
@@ -93,7 +101,7 @@ of four codes (§4.4).
 | `runner enrol <host>` | — | `claude --version` and `--help` first, then `POST /auth/device` with `reach: 'runner'` (§5.13) | the six digits; `enrolled on <host> as <label> · runner expires <date>`, never the bearer | 0 · 1 · 3 |
 | `runner repos add <name> <folder>` · `runner repos list` | — | nothing: this machine's own map in `~/.braindog/runner.json` | the map | 0 · 1 |
 | `runner allow <kind>` | — | nothing: the kind as the last refused job carried it, kept in `waiting` | the kind whole, and one question at the terminal | 0 · 1 |
-| `runner run` | `--once` · `--host <host>` | `claimJob { wait: 20 }` · `postJobEvent` · `readCancel` under the runner's own bearer; spawns `claude` in the kind's repository folder or an empty one | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
+| `runner run` | `--once` · `--host <host>` | `claimJob { wait: 20, host, seats }` · `postJobEvent` · `readCancel` under the runner's own bearer; spawns `claude` in the kind's repository folder or an empty one, under the Claude Code profile the job names | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
 Thirty commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
@@ -108,6 +116,8 @@ their rows above.
 would carry from it, and have their rows above.
 `keys helper`, `env apply`, `env pins` and `env check` came after those, for what each of those profiles is given
 and the programs placed in it, and have their rows above.
+`sync join`, `sync push`, `sync pull`, `sync patches`, `sync drill` and `sync retire` came after those, for setup sync
+(§5.20), and have their rows above.
 `--json` **is built.** Exactly one JSON document on stdout, every progress line moved to stderr, and the flag is
 taken out of the arguments before dispatch so no command's own `parseArgs` has to know a global exists
 (`apps/cli/src/json.ts`). `mcp` is excluded, because its stdout is the protocol; §4.5 lists the other six.
@@ -285,7 +295,7 @@ the hash of each server's shape `tools scan` proposed, made from names only. Nei
 | `BRAINDOG_TOKEN` | every remote command | the bearer, as-is: an agent token on Cloud, the owner bearer of 33 §6 on a self-host |
 | `XDG_CONFIG_HOME` | config | the directory above `braindog/hosts.json` and `braindog/sessions/` |
 | `BRAINDOG_TIMEOUT_MS` | `mcp`, `hook` | for `mcp`, the budget of one tool call, in milliseconds; 20,000 when unset or not a whole number. For `hook`, the whole hook's budget, which it may shorten below 8,000 and never lengthen |
-| `CLAUDE_CONFIG_DIR` | `install`, `skills sync`, `hook`, `mcp`, and any command run inside Claude Code | the Claude Code profile folder when no `--config-dir` is given, and where global skills are written; `~/.claude` when unset. Also the profile's name every call from Claude Code sends as `x-braindog-profile` (`profileNameOf`): `default` when unset or `~/.claude`, `<name>` for `~/.claude-<name>`, a ccenv profile's folder name under `.ccenv/profiles/` or `CCENV_HOME`'s `profiles/`, else the folder's own name without its leading dots. A name outside the repository's grammar is not sent, and the path never is. Another agent sends none |
+| `CLAUDE_CONFIG_DIR` | `install`, `skills sync`, `hook`, `mcp`, and any command run inside Claude Code | the Claude Code profile folder when no `--config-dir` is given, and where global skills are written; `~/.claude` when unset. Also the profile's name every call from Claude Code sends as `x-braindog-profile` (`profileNameOf`): `default` when unset or `~/.claude`, `<name>` for `~/.claude-<name>`, a ccenv profile's folder name under `.ccenv/profiles/` or `CCENV_HOME`'s `profiles/`, else the folder's own name without its leading dots. A name outside the repository's grammar is not sent, and the path never is. Another agent sends none. `runner run` names this machine's profiles in each claim by the same name, and starts a job that names one with `CLAUDE_CONFIG_DIR` set to its folder (§5.13) |
 | `BRAINDOG_SELFHOST` | `init`, `serve`, `dev` | the path of the self-host entry file (§5.14) |
 | `BRAINDOG_DATA`, `PORT` | `init`, `serve`, `dev` | passed through to the spawned self-host, unread by the CLI |
 
@@ -320,7 +330,9 @@ apps/cli/
 Six source files in the first design, counted. The agent path adds `position.ts`, `stdio.ts` and `surface.ts`
 for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the briefing) and `install.ts` for the
 hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the scan and the write; and
-`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` and `dist/braindog.mjs.build` (the one
+`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Setup sync adds `sealer.ts`,
+`secret-store.ts`, `carry.ts`, `sync-record.ts`, `sync-join.ts`, `sync-push.ts`, `sync-pull.ts` and `sync-patches.ts`
+(§5.20). Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` and `dist/braindog.mjs.build` (the one
 line `braindog update` reads, §5.17) beside it, built by
 `scripts/bundle.mjs` (`pnpm --filter braindog-cli build`): esbuild with `src/main.ts --bundle --platform=node
 --format=esm --target=node24 --define:__BUILD__="<yyyy.mm.dd>+<sha7>" --outfile=dist/braindog.mjs`, keeping the
@@ -488,7 +500,8 @@ off the flag rather than made to refuse it, so the command's own strict `parseAr
 words. `keys headers`, `keys helper`, `setup` and `env apply` are left off it for the same reason: the first two
 print the one header document or the one key a program reads from stdout, `setup` prints for a person while its first
 step may wait for six digits, and `env apply` prints for a person while it asks y/N at the terminal (§5.15, §5.16,
-§5.19).
+§5.19). The sync verbs but `inventory` are left off it as `env apply` is: each prints for a person as it goes, and
+`join`, `pull` and `retire` ask at the terminal (§5.20).
 
 **No token is ever in this document**, on any path. It carries only lines a command already wrote to stdout,
 sentences it already wrote to stderr, refusals a host sent, and values a command handed over by name; the bearer is
@@ -782,8 +795,13 @@ folder it lives in and `Read`, `Grep` and `Glob`, so what a run may do is now a 
 by the owner in Decide, installed by an ordinary `change`, and pinned once on each machine that runs it. The host
 sends a repository's name and never a path.
 
-`enrol <host>`: Claude Code is checked first (below), so a machine that could never run a job is not enrolled to
-hold one. Then the device flow of §5.2 with `reach: 'runner'` and the label `<machine name> · braindog-cli · runner`,
+*(Since kernel migration 44.)* A job may also name the machine it runs on and the Claude Code profile it runs under,
+each by name, as runs name them (`createJob { machine, seat }`, "Start one now" in the app). A claim says where the
+runner is, and the record hands it only a job placed nowhere or placed here. The profile's folder is this machine's
+own business, as a repository's is: the host sends the name, and only this machine turns it into a folder.
+
+`enrol <host>`: Claude Code and Codex are checked first (below), so a machine that could never run a job is not
+enrolled to hold one; either is enough. Then the device flow of §5.2 with `reach: 'runner'` and the label `<machine name> · braindog-cli · runner`,
 and the bearer is kept as `hosts[key].runner = { value, expires, label }`, beside the login and never in its place
 (`keepRunner` in `http.ts`). It prints the six digits and `enrolled on <host> as <label> · runner expires <date>`,
 and never the bearer.
@@ -802,18 +820,29 @@ is found through PATH and PATHEXT and started through `cmd.exe`, as `keys exec` 
 
 1. **Host.** `--host`, then `BRAINDOG_HOST`, then the one host this machine is enrolled on, then the default
    (`runnerTarget`). The enrolment is the bearer; the login token and `BRAINDOG_TOKEN` are never read.
-2. **Wait.** `claimJob { wait: 20 }`, aborted 10 s after the wait, because a far end that vanishes without closing
-   the socket would otherwise hold the loop for ever. A claim the host held is asked again at once. One answered at
+2. **Wait.** `claimJob { wait: 20, host, seats }`, aborted 10 s after the wait, because a far end that vanishes
+   without closing the socket would otherwise hold the loop for ever. `host` is this machine as its runs name it
+   (`os.hostname()`, sent only when it fits `^[A-Za-z0-9._-]{1,128}$`) and `seats` the Claude Code profiles it can
+   start a job under, at most 32, by the name `profileNameOf` gives each folder (`claimArgs`, `seatsHere`): the
+   folders `~/.braindog/profiles.json` lists, else every profile `doctor` finds (`profilesIn`), and always the
+   runner's own, read again before every claim. One folder reached two ways is one profile. A job placed on another
+   machine, or under a profile not named, stays for a runner that can run it, and a host older than migration 44
+   reads neither and hands over only jobs placed nowhere. A claim the host held is asked again at once. One answered at
    once with `{ job: null, idle_ms }` is asked again after `idle_ms`, doubling to 30 s, for a proxy that cannot hold
    twenty seconds (46 §5). A host that does not answer is one line, then a claim every 30 s. Any other refusal ends
    the command with its sentence.
-3. **Check.** The claim, `{ job: { id, kind, title, prompt, tools, turns, permission, repo, args, seq }, lease_until,
-   bearer, mcp: { url } }`, is read field by field, and the kernel's own lint (`jobBody`) runs again over what it
+3. **Check.** The claim, `{ job: { id, kind, title, prompt, tools, turns, permission, repo, args, seat, seq },
+   lease_until, bearer, mcp: { url } }`, is read field by field (a `seat` in another shape than a profile's name is
+   refused, never dropped, since dropping it would run the job under this runner's own login), and the kernel's own lint (`jobBody`) runs again over what it
    carries, so a tool, a permission mode or a prompt the record would refuse at install is refused here too. Each
    argument is at most 64 characters and one line. `mcp.url` is resolved against the enrolled host and must stay on
    its origin, so the job's bearer goes nowhere else. A kind that names a repository needs that name in `repos`, and
    its folder must still be there. When the installed help lists the permission modes, the kind's must be among them.
-   Any failure posts `error { text }` and `end { status: 'refused', error }`, and Claude Code never starts.
+   A job that names a profile needs exactly one folder here that answers to it (`seatEnv`): none, or two (such as
+   `~/.claude-studio` and ccenv's `studio` as separate folders), is refused by the profile's name, never a folder, with
+   the way to list the one meant in `~/.braindog/profiles.json`, because the wrong folder is another login. These run
+   before the pin, so nobody is asked about a job that could not have run. Any failure posts `error { text }` and
+   `end { status: 'refused', error }`, and Claude Code never starts.
 4. **Pin.** The first time this machine sees a kind, by the SHA-256 of `{ kind, title, prompt, tools, turns,
    permission, repo }` with the prompt's `%arg%` slots unfilled, it prints the kind whole to stderr (where it works,
    what it may use, how it asks, its turns and its prompt) and asks `Allow <kind> to run on this machine? [y/N]`. Yes
@@ -823,11 +852,15 @@ is found through PATH and PATHEXT and started through `cmd.exe`, as `keys exec` 
    item 13). The lease is renewed while the person reads, and a Cancel in the app ends the question.
 5. **Prepare.** The working folder is the repository's mapped folder, or an empty `mkdtemp('braindog-job-')` of its
    own when the kind names none. `mcp.json`, at mode 0600 in a `mkdtemp('braindog-mcp-')` of its own, is
-   `{ mcpServers: { braindog: { type: 'http', url, headers: { Authorization: 'Bearer <the job bearer>' } } } }`.
+   `{ mcpServers: { braindog: { type: 'http', url, headers: { Authorization: 'Bearer <the job bearer>', … } } } }`,
+   the headers also carrying `x-braindog-host` and `x-braindog-profile` (the job's profile, or this runner's own), each
+   only when it fits its grammar, so the job's run says where it ran as a session's does.
 6. **Spawn.** `claude -p [--restricted] [--disable-slash-commands] --output-format stream-json --verbose
    --strict-mcp-config --mcp-config <mcp.json> --allowedTools <each of the kind's tools> --permission-mode <the
    kind's> --max-turns <the kind's turns>`, in that folder, with no shell and without `BRAINDOG_TOKEN` in its
-   environment. The two bracketed flags are passed only where `claude --help` lists them. `--verbose` is there
+   environment. A job under a profile runs with `CLAUDE_CONFIG_DIR` naming that profile's folder (`envFor`), left
+   unset for `~/.claude`, because Claude Code keeps the default profile's servers in `~/.claude.json` only when the
+   variable is unset; a job under none runs in this runner's own environment. The two bracketed flags are passed only where `claude --help` lists them. `--verbose` is there
    because `stream-json` under `-p` is refused without it. Each tool is its own argument, so a named command holding
    a comma or a space is never split. The prompt, filled once by `fillPrompt` and never re-scanned, goes on standard
    input, so it is in no process list and needs no escaping for `cmd.exe`. `--json-schema` went with the fixed kinds,
@@ -867,6 +900,34 @@ is found through PATH and PATHEXT and started through `cmd.exe`, as `keys exec` 
 | the runner's own refusal (steps 3 and 4) | `error` | `{ text }`, then `end { status: 'refused', error }` |
 
 The kinds are the `job_event.kind` CHECK (`JOB_EVENT_KINDS`). The raw stream is never relayed (26 §5).
+
+**A Codex job.** A kind may say `agent: codex` (`JOB_AGENTS` in the kernel); a kind that says none is Claude Code's,
+and the claim carries `agent` either way. `enrol` and `run` need Claude Code or Codex, not both: `codex --version` must
+parse to at least `0.46.0` (`CODEX_LEAST`, not confirmed against an installed Codex), and a job for an agent the
+machine lacks is refused in step 3 with the sentence saying which. The pin's hash includes `agent` only when it is
+`codex`, so a Claude Code kind allowed before keeps its pin. Codex cannot hold a run to named commands, so the kernel
+refuses a Codex kind that names any (`Bash(...)`), and the card says what its sandbox allows instead.
+
+Steps 5 and 6 for Codex: no `mcp.json`. The job's bearer is put in the child's environment as `BRAINDOG_JOB_BEARER`,
+and Codex is started as `codex exec --json --skip-git-repo-check --sandbox <read-only for dontAsk, workspace-write for
+acceptEdits> -c approval_policy="never" -c mcp_servers={braindog = {url, bearer_token_env_var = "BRAINDOG_JOB_BEARER",
+http_headers = {"x-braindog-agent" = "codex"}, enabled_tools = [the kind's record tools]}} -`, the prompt on standard
+input. `mcp_servers` set whole replaces his own servers for the run, as `--strict-mcp-config` does. Codex has no
+`--max-turns`, so the runner counts its calls and stops it past the kind's turns, which ends as `limit`.
+
+| `codex exec --json` line | event | body |
+|---|---|---|
+| `thread.started` | `start` | `{ model: null, tools: 0 }`; its `thread_id` is the end's `claude_session` |
+| `item.completed`, `agent_message` | `say` | `{ text: head(2000), len }`; the last one is the result's text |
+| `item.completed`, `reasoning` | `think` | `{ text: head(500), len }` |
+| `item.started` or `item.completed`, `command_execution`, `mcp_tool_call`, `file_change`, `web_search` | `tool` | once per item: `{ call, name, input, len }`, named `Bash`, `mcp__<server>__<tool>`, `Edit` or `WebSearch` |
+| `item.completed` of a call | `out` | `{ call, text, len, error? }`; a `propose` answer's id is kept as for Claude Code |
+| `turn.completed` | `end` | step 9, `ok` or `needs_decision` |
+| `turn.failed` | `error` | `{ subtype: 'error', text }`, then `end { status: 'error' }` |
+| `error`, or an `error` item | `note` | `{ text }` |
+| a type this table does not name | `note` | once per type |
+
+The stream is read as Codex's documents describe it: no Codex was on the machine this was written on.
 
 ### 5.14 · `init <slug>` · `dev` (spawn the self-host)
 
@@ -1043,6 +1104,8 @@ each profile, with setup's own code:
    is the person's, and a copy of the file is kept before its first change. A start with no end, or rules holding a
    marker line, change nothing and are said.
 
+**The status line.** `braindog statusline` is what Claude Code runs to draw its status line: the model, the folder's name, how much of the 5 hour and 7 day limits is used and when they reset, each only if the event had it. Its beat to the Profiles add-on (`five_hour_pct`, `seven_day_pct`, `resets_at`, `beat_at` on the profile's row) carries a profile name, the machine and those figures, never a path, a word or a session, and the page only shows them: nothing rotates or switches a profile. `setup --statusline` and `env apply --statusline` set `statusLine: { "type": "command", "command": "node \"<hooks folder>/braindog-statusline.mjs\"" }` (the small entry the bundle writes beside the hook scripts, `statusline-entry.ts`, which loads `statusline.ts` alone; a checkout runs `src/statusline-entry.ts`) only in a profile with no `statusLine` of its own, after a copy of its settings, asked y/N like any program and pinned as kind `statusline`.
+
 **Which profile gets what.** The add-on is a list whose declaration plays the role `profiles`, found through `schemas`.
 A record with none says `Install the Profiles add-on to choose per profile; applying what applies everywhere.` once,
 and every profile gets what applies everywhere. With one, a row is a Claude Code profile when its `app` is empty or
@@ -1081,6 +1144,153 @@ with no terminal and no pin it does not run, and not on the path it is one sente
 its mark alone (connected, needs a sign-in, failed, waits for approval in a session, turned off), never by the words
 Claude Code prints after the mark, which may quote an error. It changes nothing but the pin a yes keeps, and exits 1
 when a server needs a sign-in or failed, or a profile's list was not read.
+
+### 5.20 · Setup sync: `sync join`, `push`, `pull`, `patches`, `drill` and `retire` (`sync-*.ts`, `carry.ts`, `sealer.ts`, `secret-store.ts`)
+
+Each machine seals what it carries before it leaves the machine, and keeps it in the record, where the host holds bytes
+it cannot open. A new machine, or a wiped one, joins with the sync passphrase and places what another machine sent. The
+verbs work only with the Setup sync add-on installed (`packs/setup-sync`), and say `Install the Setup sync add-on
+first` otherwise.
+
+**The lists, found as `env apply` finds Profiles.** Carry is the list that plays `role: carry`; the add-on that holds it
+names its other lists in `packs`, and of those Bundles is the one with live `host` and `sealed` fields and Drills the
+one with `host` and `grade` (`findLists`). All three are personal, so only the owner's own session or his own plain
+or device key reaches them. Every verb therefore calls the record as this machine's own login, never the token `setup`
+made for an agent app (`BRAINDOG_AGENT` and `CLAUDECODE` are dropped before the host is read), and with no session
+headers, so a sync names no run and opens none. Each thing in Carry has a name, a kind (files, `.env` files git ignores,
+unpushed work, tool sign-ins, auto memory), a place on a Mac, on Windows and on Linux, names to leave out, whether it runs
+a program, whose account it is when it is somebody else's (a ref to People), the machines where it waits for a yes, and
+whether it is on. The fields these verbs read and write by name are short ids, `mac`, `win`, `linux`, `whose`, `waits`,
+`host`, `ref`, `heard`, `kept`, `grade` and `fails` among them, and `host` names a machine as the Profiles add-on names
+one, so no word the code uses for itself is also an id of this add-on's (`core-names`).
+
+**The sealed files are four record methods** (the contract with the host): `sealedPut { key, part, parts, bytes, sha256,
+size }`, `sealedGet { key, part }`, `sealedList { prefix? }` and `sealedDelete { key }`, each reached only by the owner's
+own session or key, never by MCP, a page, a share or a child token. `sealedGet` and `sealedList` are reads and the other
+two writes. A file goes in parts of at most 4 MiB, at most eight and 25 MiB in all, part 0 first, each part naming the
+SHA-256 of the whole sealed file; the last part's answer says `complete` once the host has hashed every part, a
+`CHECKSUM_MISMATCH` is put again from part 0 once, and a file read back is held to the same hash. `NOT_FOUND` is a file
+not there. A host without the methods answers `ROUTE_UNKNOWN`, and every verb says `<host> does not keep sealed files
+yet. Update it, then try again.`; a self-host with nowhere to keep them (`NOT_IN_THIS_BUILD`) and a day's upload allowance
+used up (`RATE_LIMITED`, shared with attachments) are said in the record's words, and a sign-in that is not this
+machine's own (`FORBIDDEN`, `LEVEL_REQUIRED`) is told to log in on this machine. The keys: `sync/key`, the sync key's copy; `carry/<n>/<version>`, what thing `n` held; `bundle/<machine>.<yyyymmddhhmmss>.<random>/manifest`, each bundle's list of what it holds, so bundles are found by machine
+and time from the list of keys alone; `machine/<machine>/retired`, a retired machine's note.
+
+**Sealing** (`sealer.ts`). One sync key, 32 random bytes, made on the first machine that joins. Each file is AES-256-GCM
+under it with a fresh 12-byte IV and its own key as additional data, written `BDS1 | iv | ciphertext and tag`, so a file
+moved to another key, another thing or another version does not open. The key's copy in the record is
+`{ v: 1, kdf: "pbkdf2-sha256", rounds: 600000, salt, iv, ct }`, sealed under the key PBKDF2-SHA-256 derives from the sync
+passphrase in NFC, with `braindog-sync-key:<record>` as additional data; a copy asking for fewer than 100,000 or more
+than 10,000,000 rounds is no copy. Symmetric on purpose: with a public half, a compromised host could seal a file for
+his machines to place. A thing's version is 24 hex characters of an HMAC-SHA-256 of its archive under a key derived from
+the sync key, so the same bytes are the same version on every machine, nothing is sent twice, and the host cannot guess
+what a version holds. The manifest and the retired notes are sealed too, so a host cannot change what a machine is told
+to place, nor retire a machine.
+
+**The secret store** (`secret-store.ts`) keeps the key on each machine as 64 hex characters, never on a command line: a
+Mac's Keychain (service `braindog-sync-key`, account the record's address), typed into `security -i` on standard input
+and read back to be sure, since `add-generic-password` takes a value only as an argument; Windows' Credential Manager
+(target `braindog-sync-key:<record>`), through a small PowerShell helper over `CredReadW`, `CredWriteW` and
+`CredDeleteW` handed as `-EncodedCommand`, the value on standard input, UTF-8 with no byte-order mark both ways; Linux's
+secret service through `secret-tool`, attributes `service` and `slug`, the value on standard input. A line of
+`security -i` holds 4,096 bytes, so a Keychain item of tool sign-ins over about 1,900 bytes goes as `-X <hex>` on
+`security`'s own command line for the moment it runs, as ccenv writes the same item; the sync key never does. An item
+naming Claude Code's keychain item or the claude.ai login is refused before any program runs, and a store's own output is
+never relayed.
+
+1. **`sync join [--name <machine>] [--new-key]`.** Names the machine (`--name`, else the name typed at the prompt, else
+   the name `deviceName` gives), one line of at most 64 characters. On a record with no `sync/key` it makes the key, asks
+   for a new sync passphrase twice, hidden, at least twelve characters, asks the record again just before putting the
+   copy so one made meanwhile is not overwritten, and reads the copy back. A record holding sealed files with no copy is
+   given a new key only with `--new-key`, since a new key opens none of them; a machine that holds the key puts the copy
+   back by running `join` again, choosing a passphrase. Otherwise it asks for the passphrase, up to three times, and
+   opens the copy. A retired name is never joined again, and a name another machine sends bundles under is taken only on
+   a yes. The key goes into this machine's store, and `~/.braindog/sync.json` (0600) keeps, for each record by its host,
+   its address, the machine's name, when it joined, pushed and last tried, the day claimed, its last bundle by the
+   sealed key of each thing, and the bundle last placed from each other machine. Never a value and never the key.
+2. **Every other verb starts the same way** (`ready`): a host and a login, this machine joined, the key in its store,
+   the add-on installed, and this machine not retired. A machine that finds its own sealed note removes its key and its
+   note at once, says so, and does nothing more.
+3. **`sync push [--dry-run]`.** Each thing in Carry in order. An off one and auto memory are said and passed over, auto
+   memory as `waits on your yes`; a thing with no place on this system is skipped and said, so a bash tool with no
+   Windows place never lands on a PC. The rest are gathered within the hard lines below: files and folders read whole,
+   names left out by Leave out (a name, or `*<ending>`), links named and left; the `.env` files git ignores in each
+   repository under the place (`git status --porcelain=v1 -z --ignored`, so nothing under an ignored folder is read);
+   unpushed work (step 5); or a Keychain item of tool sign-ins. A file that another thing carries as tool sign-ins is
+   left out of every other thing. One thing is one archive (`BDA1`, a JSON head naming each file's place, size, mode and
+   SHA-256, then the bytes), at most 25 MiB; a larger one is refused with the advice to leave some of it out. An archive
+   whose version is kept already is not sent again. Then one sealed manifest and one Bundles entry, this machine's
+   latest, its machine, its time, what each thing held by files and size, the sealed files by key and hash, and whether
+   everything went; the entry before it becomes older once this one is written. A push that changed nothing sends no
+   bundle and moves the latest entry's Last checked time. `~/.braindog/locks/sync.lock` keeps two pushes, pulls or
+   patches from running at once, and one left by a run that died is taken over after thirty minutes.
+4. **When a session ends, and once a day.** The end hook and the start hook call `startPush`, which reads
+   `sync.json` and, on a machine that has joined, starts `braindog sync push --auto end` or `--auto day` as a detached
+   process and returns: the hook waits for none of it. The day and the time of the try are kept in `sync.json` before
+   the push starts, as `profile-place.ts` claims its own, and the day is given back when the record did not answer; an
+   end-of-session push waits ten minutes after the last try, so a dozen sessions closing together send once. Under
+   `--auto` every line goes to `~/.braindog/sync.log`, nothing is asked, and the exit is 0.
+5. **Unpushed work** (`sync-patches.ts`). For each repository under the place: `repo.json` (its remote with no name or
+   password in it, and only an `https`, `http`, `ssh`, `git` or `user@host:path` address; its branch, base and head),
+   `commits.bundle`, a git bundle of `<branch> --not --remotes` or the whole history when no remote holds any of it,
+   `staged.patch` and `unstaged.patch`, `git diff --binary` a file at a time, and `new/<path>` for each file git does
+   not ignore and does not track. A changed or new file named as a key (`.env`, `.npmrc`, `.pem`, `id_rsa` and their
+   kind) or holding an issuer's key shape is left out and named, with the `braindog keys put` line that puts it in the
+   vault. Every reading `git` runs with `--no-optional-locks`, and the bundle is written in a scratch folder and removed.
+   **`sync patches [--from <machine>] [--dry-run]`** puts it back: a repository that is not here is cloned from its
+   remote, or from its own bundle when it has none and the bundle holds its whole history; one that is here is used
+   only with no changes of its own, and its branch only when it has not moved past what comes. Then `git bundle verify`,
+   `git fetch` of the bundle, `git checkout -B <branch>`, `git apply --index` of the staged changes and `git apply` of
+   the unstaged ones, and each new file that is not here already. `GIT_TERMINAL_PROMPT=0`, so nothing waits for a
+   password. A repository stops at its first failure and says why; no other waits on it.
+6. **`sync pull [--from <machine>] [--dry-run] [--yes-data]`.** The newest bundle from another machine, or from the one
+   named; a machine's bundles are tried newest first until one opens under this machine's key. Each thing in it is
+   placed where Carry says it lives on this system, and only while Carry still holds it and it is on; a thing this
+   machine sent a newer copy of is left unless `--from` names the machine. A file here that differs is copied first to
+   `~/.braindog/sync-kept/<when>/`, never beside itself; a `.env` file that differs is left and said, since the live one
+   is likelier right. Placed bytes are exactly the bytes sealed, so line endings stay as found and no byte-order mark is
+   added; files are written beside themselves and renamed over. At a terminal, each asked y/N:
+   - **A program**: a file of a thing that runs one, or any file whose mode lets it run, is shown whole and asked
+     `Place <path> on this machine? It runs a program. [y/N]`, and a yes is pinned in `~/.braindog/pins.json` by the
+     SHA-256 of its bytes and mode, kind `carry` (§5.19), so the same file is not asked about again and a changed one
+     is. A program that holds what looks like a key is not shown and not placed.
+   - **Somebody else's account**: a thing that belongs to another person is asked about by their name from People, with
+     the advice to sign in again on this machine instead, since an account may tie a sign-in to the machine it was
+     made on.
+   - **Tool sign-ins** move and are never live on two machines: placed only from a machine that is retired, never over
+     sign-ins this machine holds already, and only to their own Keychain item or file, never to an agent app's login.
+     Each app reads them at its next start; ccenv's own script spreads them into each profile.
+   With no terminal, `--yes-data` places the plain data and the programs already pinned and asks nothing; without it the
+   run is its plan and exits 1. `--dry-run` places, asks and pins nothing. What waits for a yes is written on its thing
+   in Carry, by this machine's name, for the page to show.
+7. **`sync drill [--from <machine>]`.** The newest bundle from any machine, this one included, opened and written into a
+   scratch folder of its own, each file read back against the hash its archive gives, tool sign-ins checked in memory
+   and never written, and the folder removed whatever happened. Nothing is placed, run or pinned. The outcome, the
+   counts and what failed go into Drills as the latest drill, and the one before becomes older once it is written.
+8. **`sync retire <machine> [--yes]`.** Asks at a terminal, or takes `--yes`, then seals the machine's note at
+   `machine/<name>/retired` and marks its latest Bundles entry retired, or writes one saying so. That machine sends and
+   places nothing more and removes its own key the next time it runs a sync verb; its tool sign-ins may then move to
+   another machine, which is how setup sync never keeps two machines on one refresh token: move, then retire. Retiring
+   this machine removes its key and its note now, and asks before removing each item or file of tool sign-ins it holds.
+   The copies each app keeps of its own sign-ins are the app's, never opened, and the person is told to sign out of them.
+
+**The hard lines, held in code and not left to Carry** (`carry.ts`). No agent app's login: a place, a file or a Keychain
+item naming Claude Code's login file, Codex's, Claude Code's keychain item or the claude.ai login is refused, and a file
+whose bytes hold the claude.ai login under another name is dropped before it is sealed and said by its place alone. No
+transcript: below an agent app's folder (`.claude`, `.claude-<name>`, `.codex`, ccenv's, and each profile and Codex's
+folder by where it is), a `projects`, `transcripts` or `sessions` folder and any `.jsonl` is refused by its name and
+never listed. That refuses auto memory too, which sits inside `projects/`; its kind is refused whatever its place says,
+until the owner says yes to carrying it. No link is followed. A sign-in moves only as tool sign-ins.
+
+**Windows.** `~` is `%USERPROFILE%` and `%NAME%` in a place is read from the environment without case; a place that is
+not a full path once read is refused. Paths compare without case on Windows and on a Mac, and as written on Linux.
+Bytes are carried and placed exactly, so a file keeps its line endings and gains no byte-order mark; the PowerShell
+helper reads and writes UTF-8 with none. Tool sign-ins on Windows are a file (ccenv's `mcp-auth.json`), since only a
+Mac has a Keychain, and a thing whose place on a system is a Keychain item is refused there.
+
+**What leaves the machine in the clear**: names, sizes, counts, times and hashes, in the lines, the log and the Bundles
+and Drills entries. What a file holds is only ever in the sealed bytes. A refusal from the record is said in its own
+sentence; one from a program is said in fixed words.
 
 ## 6 · Refusals and errors
 
@@ -1138,6 +1348,8 @@ refusal: a sentence, exit 1, no code, because the only codes are the corpus's.
 | Import body | one request, ≤ 100 MB — the Worker's request ceiling; the record reads it whole (41 §5.11) | `ponytail:` §10 |
 | Device poll | every 5 s (the reply's `interval`), ten minutes | §5.2 |
 | Runner claim | `wait: 20`, abort at 30 s; `idle_ms` 1,500 → 30,000 | §5.13 |
+| A prompt, tool or stop hook | ≤ 50 ms with something to say; about 5 ms with nothing | the script reads the flags file and stops, or starts Node on `braindog-inbox.mjs` alone with `NODE_COMPILE_CACHE`; measured 30 ms (92 before) on an M-series Mac, `inbox-file.test.ts` holds the shell path under 50 |
+| A status line draw | ≤ 50 ms | Node on `braindog-statusline.mjs` alone, which imports `statusline.ts` and `position.ts` only; measured 35 ms (103 before), 22 of it Node starting; `statusline.test.ts` holds the import list |
 | Attachment fetch | 4 concurrent | §5.4 step 6 |
 
 Startup has nothing to load but one file: no dependency resolution, no `node_modules` walk.
@@ -1155,10 +1367,10 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `verify` | no network: the file, the key, WebCrypto. `--key <url>` is the one explicit fetch |
 | `export` · `import` | the `.brainl` is verified after it arrives and before it is sent; the `.brain` and `.brainl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
-| The runner | `--strict-mcp-config`, and `--allowedTools`, `--permission-mode` (`dontAsk` or `acceptEdits`) and `--max-turns` from the approved kind and nothing wider; `--restricted` and `--disable-slash-commands` only where the installed help lists them; the kind's repository folder from this machine's own map, or an empty folder it owns; the kernel's `jobBody` lint run again on the claim, one-line arguments of at most 64 characters, a kind pinned on each machine by its SHA-256 before its first run, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
+| The runner | `--strict-mcp-config`, and `--allowedTools`, `--permission-mode` (`dontAsk` or `acceptEdits`) and `--max-turns` from the approved kind and nothing wider; `--restricted` and `--disable-slash-commands` only where the installed help lists them; the kind's repository folder from this machine's own map, or an empty folder it owns; a job's profile from this machine's own profiles, by name, refused when no folder or two answer to it, the folder never sent; the kernel's `jobBody` lint run again on the claim, one-line arguments of at most 64 characters, a kind pinned on each machine by its SHA-256 before its first run, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
 | `keys` | the value is read from stdin, never an argument, and one function prints a key, behind `keys headers` and `keys helper`, to a program and never to a terminal (§5.16): `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
-| The profile | its name alone leaves the machine, in `x-braindog-profile` and in a Places row: the last part of `CLAUDE_CONFIG_DIR`, held to `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` with no `..`, or nothing. Never the folders above it, and a Places row this command writes holds no folder at all |
+| The profile | its name alone leaves the machine, in `x-braindog-profile`, in a runner's claim and in a Places row: the last part of `CLAUDE_CONFIG_DIR`, held to `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` with no `..`, or nothing. Never the folders above it, and a Places row this command writes holds no folder at all |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
 | `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |
 | `skills sync` | a name matching `^[a-z0-9][a-z0-9-]{0,63}$`, whose path resolves inside the skills or commands folder, or nothing is written; a file is overwritten or deleted only while its SHA-256 is still the lock's, so a local edit is never lost; a row with `managed: false` is never written; a file in a repository is reported and never committed; the lock holds paths, spoken ids, versions and hashes |
@@ -1166,7 +1378,8 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is named by a `headersHelper` that runs `keys headers`, one per entry, and a second is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
 | `env apply` | a program entry (BrainDog's hooks, its server, a tool's `command` or `headersHelper`) is printed whole and placed only after a person at this machine says yes to it, pinned by SHA-256 in `~/.braindog/pins.json`, which holds a name, a kind, profile names, a hash and a time and never an entry; with no terminal one not pinned is left out and named; no key is written, and an entry or rules that look like one are left out and not printed; a CLAUDE.md changes only inside its marked block, after a copy is kept; `claude` runs with no shell and its output is not relayed (§5.19) |
 | `env check` | runs the `claude` found on the path, pinned by its path before the first run, with no shell; a server is said by its name and its mark, and nothing Claude Code prints after the mark is relayed |
-| Agent apps' logins | nothing that runs on the machine names Claude Code's keychain item (`Claude Code-credentials`), the claude.ai login in it (`claudeAiOauth`), a profile's `.credentials.json` or Codex's `auth.json`, except in a list that refuses them, so none is read, held or moved (26 §3: *"may not collect, store, or intermediate"*). `sync inventory` sizes a sign-in by `stat` and refuses it. The `no-login` gate reads the command, its hook scripts, every package's source and the packs, and finds a name anywhere but a refusal list it names by file and `const` |
+| Agent apps' logins | nothing that runs on the machine names Claude Code's keychain item (`Claude Code-credentials`), the claude.ai login in it (`claudeAiOauth`), a profile's `.credentials.json` or Codex's `auth.json`, except in a list that refuses them, so none is read, held or moved (26 §3: *"may not collect, store, or intermediate"*). `sync inventory` sizes a sign-in by `stat` and refuses it, and every setup sync verb refuses a place, a file or a Keychain item naming one, and drops a file whose bytes hold the claude.ai login, before anything is read or sealed (§5.20). The four names live in one list, `SIGN_INS` in `sync.ts`. The `no-login` gate reads the command, its hook scripts, every package's source and the packs, and finds a name anywhere but a refusal list it names by file and `const` |
+| Setup sync | every file sealed on the machine with AES-256-GCM under a sync key the host never holds, its own key as additional data, so the record keeps bytes it cannot open and a file a host made does not open; the key's copy sealed under the sync passphrase (PBKDF2-SHA-256, 600,000 rounds), which is typed hidden at a terminal and never an argument, kept or sent. The key on each machine only in its secret store, written on standard input and never on a command line; only an item of tool sign-ins too long for `security -i` goes on `security`'s command line, never the key. The record reached only as this machine's own login with no session headers. No session transcript is listed or read, no link followed, and auto memory waits on the owner's yes. A program placed by a pull, a file of a thing that runs one or one whose mode lets it run, is shown whole and pinned by SHA-256 before it is placed; somebody else's account is asked about by their name; tool sign-ins move only from a retired machine and never over sign-ins held here; a replaced file is copied to `~/.braindog/sync-kept/`, never beside itself. Lines, the log and the Bundles and Drills entries hold names, counts, sizes, times and hashes, never a byte of what is sealed (§5.20) |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
 | Input | `parseArgs` in strict mode; a `.brainl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.brain` build runs is the kernel's own |
 

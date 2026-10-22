@@ -106,7 +106,7 @@ Error contract: every method returns `Result<T>` (33 §2). `ok` carries `version
 |---|---|---|---|---|---|
 | `triage(raw)` | `triage` | `llama-3.2-1b` | 64 | 1,500 | A |
 | `proposePattern(samples)` | `pattern` | `glm-5.3-flash` | 2,048 | 8,000 | A |
-| `digestProse(sections)` | `prose` | `llama-3.2-1b` | 120 | 4,000 | A |
+| `digestProse(sections)` | `prose` | `glm-5.3-flash` | 120 | 4,000 | A |
 | `embed(texts)` | — | `bge-m3` | — | 100 texts × 8,000 bytes | A |
 | `analyseDraft(signal)` | `change` | `glm-5.3-flash` | 1,024 | 6,000 | A (Phase C) |
 | `read(question)` — the predicate | `predicate` | `glm-5.3-flash` | 200 | 1,200 | A, or B/BYO |
@@ -690,6 +690,9 @@ Returns `{ shape, register, actionable, model }`. The ingest Workflow writes `in
 
 **`digestProse(digest)`** (09 §6): reads the assembled digest's `name` and its rendered `text`, never the sections, because the text and not the sections is what is sent. Answers `{ text }`, at most two sentences, and names no figure: `sendDigest` prints these sentences above the digest exactly as they are and resolves no brace, so a figure in them would reach the owner's mail as a literal path.
 5a. A reply that is not the schema, that says nothing, or that types a figure answers `{ text: '' }`, which the kernel's ack reads as "ship the figures"; **never retried** (retrying bills twice for one payload, 07 §7).
+5b. A model **not reached** (a throw with no `answered` mark: a gateway's 5xx, a timeout) is asked twice more, after 1 s and then 4 s, and the ask stays one ledger row. A call never sent, a ceiling's no and a model its provider does not serve are not retried.
+5c. Where the host hands a route, the prose walks `route('prose')` (on the Cloud the flash model, then the second model; the small model holds no JSON schema): a candidate still not reached after its retries is a row of its own spending nothing, and the next is asked. No route, or his own key, is `PROSE`'s model alone.
+5d. The host's half-hourly test of a silent model is a digest marked `probe: true`: asked once, its row purpose `probe`, spending nothing, and never counted as an ask by the vital sign `model-answers`.
 Returns `{ text }`; the host returns it to the record through `ackOutbox(id, 'done', { text })` (§13 #6).
 
 **`embed(texts)`**:

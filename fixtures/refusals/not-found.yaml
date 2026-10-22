@@ -1,0 +1,11 @@
+code:      NOT_FOUND
+via:       rpc
+raises:    packages/record/src/methods/sealed.ts
+at:        key
+fix:       There is no sealed file called sync/key here.
+call:      { "method": "sealedGet", "args": { "key": "sync/key", "part": 0 } }
+principal: { "kind": "person", "level": "owner" }
+
+# THE OWNER, ON A RECORD THAT HOLDS NO SEALED FILE. The runner's self-host keeps its record in a folder, so it has a
+# store for sealed bytes, and the answer is about the name rather than the host. A part past the file's last, or one
+# never put, is the same code at `part`.

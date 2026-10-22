@@ -726,6 +726,7 @@ only — 29 §7) · *That will not mean anything in six weeks. Keep it anyway?* 
 | Metric | Budget | Measured how |
 |---|---|---|
 | Entry JS, brotli | **≤ 30 KB** — the interpreter was 19.3 (22 §1); SvelteKit's client runtime is inside this number, and §10 names the fallback if it does not fit | `bundle` gate: brotli of every chunk reachable from the entry |
+| First load JS, brotli | **≤ 640,000 bytes**, a ceiling that only falls: what a cold open of Today waits for, measured at 624.1 KB on 22 October 2026 (741.8 before the kernel, the seed's documents and the decision card left that path) | `bundle` gate: brotli of Kit's entry, the root layout and Today's node, with everything they import statically; every script the shell preloads must be among them |
 | Main CSS, brotli | ≤ 12 KB | `bundle` gate over `app.css` + component CSS (`css: 'external'`) |
 | Editor and allow-list chunks | editor ≤ 80 KB gzip; both **unreachable from the entry chunk** | `bundle` gate walks the import graph of the build manifest |
 | Fonts | ≤ 45 KB total, exactly 2 files (`latin.woff2`, `arabic.woff2`), one `wght` axis each, `unicode-range` split, `font-display: swap`; mono is the system stack | `bundle` gate; an English-only fixture makes one font request |

@@ -41,7 +41,7 @@ drift from the real one and every count on a board is computed. The hand-drawn b
 {
   "board": "frame",
   "units": ["EXP-A01", "EXP-A02"],
-  "said": "his words, or the line of DIRECTION that takes the yes for him",
+  "said": "the words of the yes, or the decision that takes it",
   "taken": { "on": "2026-10-08", "from": "DIRECTION 42" },
   "seen": false,
   "images": { "candidate/board-frame-390-light.png": "<sha256>" },
@@ -53,8 +53,8 @@ drift from the real one and every count on a board is computed. The hand-drawn b
 }
 ```
 
-`board` and `units` are what the planner counts (`loop/tools/plan.mjs`). `seen` is true once he has looked at the
-pictures and false while the yes is one taken for him. `paths` holds each governed file's hash, and `drawn` each of
+`board` and `units` are what the planner counts (`loop/tools/plan.mjs`). `seen` is true once the pictures have been
+looked at and false while the yes is one taken without them. `paths` holds each governed file's hash, and `drawn` each of
 the board's own files' hash, as they were when the pictures were drawn. This is the area's one sign-off file: parts
 C, D and E write here, never to a file of their own.
 
@@ -63,7 +63,7 @@ C, D and E write here, never to a file of their own.
 ```
 node tools/look/board.mjs <board> [--source lived|seed|file:<path>|shape:<path>] [--out <folder>]
 node tools/look/board-sheet.mjs <drawing folder>
-node tools/look/board.mjs <board> --yes "<his words>" --from <drawing folder> [--taken "DIRECTION 42"] [--seen] [--units EXP-A01,EXP-A02]
+node tools/look/board.mjs <board> --yes "<the words of the yes>" --from <drawing folder> [--taken "DIRECTION 42"] [--seen] [--units EXP-A01,EXP-A02]
 ```
 
 The board is drawn at 390, 1440, 1512 and 1728, light and dark, on a copy of the record; it never draws `live`.
@@ -74,7 +74,7 @@ governed files are still as they were drawn.
 ## The gate
 
 `tools/gates/board-yes.mjs` reads every board, by hashes and never by dates. A board with a `yes.json` holds, whether
-or not he has seen it yet: a governed file that changed since the yes, a board file edited after it, or a yes taken
+or not it has been seen yet: a governed file that changed since the yes, a board file edited after it, or a yes taken
 at fewer widths or themes or naming fewer pictures than it was taken at, is red with
-"this screen has no board he said yes to". A board with no `yes.json` governs nothing yet, so the gate tightens
-board by board. To change a governed screen: change the board, draw it, show him the sheet, take his yes.
+"this screen has no board with a yes". A board with no `yes.json` governs nothing yet, so the gate tightens
+board by board. To change a governed screen: change the board, draw it, show the sheet, take its yes.

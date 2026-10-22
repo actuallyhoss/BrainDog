@@ -191,6 +191,7 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
 | Queue message | `{ "record": "rec_…" }` | the id and nothing else — 01 §2; a redelivery is a no-op |
 | R2 attachment key | `rec_<id>/<sha256>` via `blobKey(recordId, sha256)` — the only constructor | 12 §2, 03 §8 |
 | R2 snapshot key | `rec_<id>/snapshots/<label>-<YYYY-MM-DD>.brainl.age` and `…/snapshots/latest.brainl.age` | written through the binding, not `Blobs`; `customMetadata { bookmark, rows, bytes, at }` — 12 §8 |
+| R2 sealed part key | `rec_<id>/sealed/<sha256 of the key>.<sha256 of the file>.<part>` via `cloudSealed` (`src/sealed.ts`), the name checked before it is used | written and read only by the record's four sealed methods, never by the file door; swept with the record — 12 §8 "Sealed files" |
 | Runner attachment | `{ runner_id, record_id }` ≤ 16,384 bytes | 26 §2.3; job bodies stay in `job` |
 | Telemetry point | blobs `[kind, surface, tool, outcome, sha256(rec ‖ month-salt)[:16]]`, doubles `[ms, rows, neurons, bytes]` | 08 §5; never a field value — the `telemetry-allowlist` gate |
 
@@ -374,6 +375,12 @@ Erasure and deletion: an `erase.r2` job's `key` is a file's hash, and the pump d
 (`src/deliver.ts`). Deleting a record sweeps `rec_<id>/a/` with its copies (`src/destroy.ts`), and the night that
 expires a closed record's final copy sweeps it again. The self-host keeps the same files at `<data>/<slug>/blobs/`
 (`apps/selfhost/src/files.ts`), under the same rules.
+
+Sealed files (12 §8) are kept in the same bucket at `rec_<id>/sealed/`, by the record's object through `cloudSealed`
+(`src/sealed.ts`) and never through this door, which serves `a/<sha256>` alone. Each new part's bytes are counted
+against the record's `uploadDay` before it is kept, deleting the record sweeps the prefix with `a/`, and the night's
+expiry of a closed record sweeps it again. `sealedPut` is the one `/api` body allowed past a mebibyte: six, in
+`BODY_MOST.sealed` here and `SEALED_BODY_MOST_BYTES` in `@braindog/host`.
 
 ### 5.6 · A shared link: `/app/s#<token>` and `Authorization: Share <token>`
 

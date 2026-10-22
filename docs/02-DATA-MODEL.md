@@ -69,6 +69,12 @@ agent_profile -- one settings row per kind of agent, or per token or machine, an
 job           -- id, kind CHECK (four), args, status CHECK (nine), runner_id, claimed_at, lease_until, seq (event high-water
               -- mark), cancel, session, created_at, expires, claude_session, result, error, cost_minor, turns, ms
 job_event     -- (job_id, seq) PK, kind CHECK (start|say|think|tool|out|limit|note|end|error), body, ts
+job_place     -- job_id PK, machine, seat, ran_on: the machine and Claude Code profile a job must run on and under, by
+              -- name, and the machine it was taken on. Migration 0044. Local
+
+-- SEALED FILES (migration 0045) -------------------------------------------------
+sealed_file   -- the owner's sealed files, by key: parts, size, sha256, complete, made_at, updated_at, made_by. Travels in data
+sealed_part   -- (key, part) PK: which parts this host holds, under which file hash, how long. Local. The bytes are never here
 ```
 
 **And four header tables, which are not the kernel's but are in every live record.** Migration 0001
@@ -174,6 +180,13 @@ declaration except `register.session` and `register.instructions`, each with `pa
 `no-declarations-in-kernel` reads both from one list. The same migration adds two tables, `instruction_seen` (which run
 was shown which instruction, and how) and `agent_profile` (one settings row per kind of agent, ADR-074). The first is
 `local` and the second is `governance` in the `.brain`'s sections.
+
+**Migration 0044 (22 October 2026) places a run, an instruction and a job.** It seats a new version of each kernel
+register: `session` gains `seat`, the Claude Code profile a run is under, by name (`studio`, `default`), which the
+kernel writes alone, stamped as the run opens or learned once from a later call or pulse; `instructions` gains
+`machine` and `seat`, where an instruction must land. The field is `seat` because `profile` already names a run's
+settings row. It adds one table, `job_place`, beside `job` rather than a column in it, so the migration can run again
+and a job placed nowhere has no row. Names only: no folder is held anywhere ([44-SPEC-MCP](44-SPEC-MCP.md) §15.13).
 
 ### `state` is the one promoted field, and an earlier draft never said so
 

@@ -131,6 +131,10 @@ Two dated pricing notes that will need re-checking:
 >   of its own. Its tools may be `Read`, `Grep`, `Glob`, named commands written `Bash(<pattern>)`, and the record's
 >   `mcp__braindog__` tools. Its mode is `dontAsk`, or `acceptEdits` for a kind that says `writes: true`, which Decide
 >   shows in red before anybody approves it. Such a kind turns on [C] in §4.4 by the owner's approval, and not by a flag.
+> - **A kind may run on Codex** *(added October 22nd 2026)*. `agent: codex` runs it with `codex exec` under the owner's
+>   own Codex sign-in, in a sandbox for its mode (read-only for `dontAsk`, its folder for `acceptEdits`), with the
+>   record's door as its one server. Codex holds a run to no list of commands, so a Codex kind names none, and its card
+>   says what the sandbox allows. A machine runs the kinds of the agents it has.
 > - **Arguments are one line of at most 64 characters**, not only ids and enums.
 > - **The verb is `enrol`**, and the transport is long-poll only: `claimJob { wait: 20 }`. `/ws/runner`, the doorbell
 >   of §2.2, is not built.

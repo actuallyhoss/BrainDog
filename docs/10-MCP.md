@@ -282,6 +282,12 @@ repository's name, matched against the one register that declares `scopes:` and 
 about itself. The predecessor sends this on every call as a header. Here the command line sends it as the session
 headers, and an HTTP client sends it in `_meta.session` ([44-SPEC-MCP](44-SPEC-MCP.md) §4.2).
 
+An agent with no folder has none of the three. Claude.ai, ChatGPT and any remote client say instead what the person
+is working on, as `context`'s `topic` on their first call: "Kiln works". That places the run in the project of that
+name, or, on a record with no project yet, in the first project formed from it as a draft the person keeps with one
+press. One with no folder and no topic is asked, in one line of the answer, to find out
+([44-SPEC-MCP](44-SPEC-MCP.md) §15.3).
+
 ### `boot`, and the read mark
 
 `boot()`, a READ+ method and a resource, returns the index, the live sessions and the open

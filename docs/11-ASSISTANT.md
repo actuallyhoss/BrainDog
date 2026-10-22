@@ -10,7 +10,7 @@ Its **interface** is in [13-UI](13-UI.md).
 > ### **Slash**
 
 **The owner named it Slash on September 25th 2026** ([ADR-070](16-DECISIONS.md)). It had carried an earlier name since the first drafts, kept
-twice at his word over *Pointer*, which a draft of this section recommended. This section records
+twice by the owner's choice over *Pointer*, which a draft of this section recommended. This section records
 what a name costs here, and leaves the register question open rather than settled.
 
 **The precedent for the cost.** The earlier name sat in a crowded field: GitHub Spark is

@@ -44,12 +44,12 @@ has it. **Pack** means a first-party pack declares it and a new user does not se
 | Brain | Brain id | BrainDog | Where |
 |---|---|---|---|
 | The document (`db`) with `rev` | — | the record; row-level writes, no whole-document CAS | kernel |
-| Entity (product / project) | `bake` | `register.entities` — fields below | **pack: portfolio** |
+| Entity (product / project) | `oxbow` | `register.entities` — fields below | **pack: portfolio** |
 | Portfolio lane `earn·ship·explore·maintain·retired` | — | `enum`, with `transitions:`; `retired` is a state, **there is no delete** | pack: portfolio |
 | Status `live·building·ready·blocked·raw·parked·retired` | — | `enum` — **the brain's live data already drifts** (`designed`, `researched`, `idea` appear in rows but not the contract); an enum makes drift a refusal | pack: portfolio |
 | Outlook `{rev12:[low,base,high], confidence, ceiling}` | — | `list<money>` of three + `enum` + `document` | pack: portfolio |
 | `plan[]` — the ordered queue, position is priority | — | `register.plan_steps` with `ref: entity`, `order: int`, optional `ref: task` \| `ref: track` | pack: portfolio |
-| Track — a named line of work inside a project | `bake:ugc` | `register.tracks`, `ref: entity`, `transitions:` over `idea·planned·building·shipped·parked·cut`, `target: day`, `doc: document` | **pack: work** |
+| Track — a named line of work inside a project | `oxbow:ugc` | `register.tracks`, `ref: entity`, `transitions:` over `idea·planned·building·shipped·parked·cut`, `target: day`, `doc: document` | **pack: work** |
 | Task, two lanes | `#125` | `register.tasks`; the lane is **`for: person\|agent`** — not `lane`, see §7 | pack: work |
 | Tier composed from four judgements | — | four `int` fields + **`derive:`** — §3 | pack: work |
 | `tier_why` required when tier is set | — | **`required_when:`** — §3 | pack: work |
@@ -298,7 +298,7 @@ the workhorse, and nothing in BrainDog's writing guide said so.
 | a field on this row | `{{status}}` `{{effortDays}}` |
 | a metric | `{{due-30d}}` |
 | a row by spoken id, then a field | `{{tasks#125.state}}` — the register is required, because every register has a `#1` |
-| a row by spoken id, then a nested path | `{{entities#3.revenue.monthly}}` — `bake` is that row's `title`, not its id, and a bare row id is not a form |
+| a row by spoken id, then a nested path | `{{entities#3.revenue.monthly}}` — `oxbow` is that row's `title`, not its id, and a bare row id is not a form |
 | a **count**, never the contents | `{{tasks.count}}` `{{tasks.open}}` — `register.count`, or `register.<state value>` for the rows in that state |
 | the whole record | `{{portfolio.revenue}}` — a metric with `source: *` |
 

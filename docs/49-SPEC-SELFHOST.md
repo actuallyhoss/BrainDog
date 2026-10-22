@@ -176,6 +176,7 @@ $BRAINDOG_DATA/
   <slug>/
     record.brain                the live record (+ -wal, -shm) — a .brain because migration 0001 made it one
     blobs/<sha256>            attachment bytes, content-addressed; mime is sniffed at read, bytes is stat.size
+    blobs/sealed/<name>       sealed files' parts (12 §8), mode 0600, named <sha256 of key>.<sha256 of file>.<part>; never served by the file door
     snapshots/<YYYYMMDDTHHMMSSZ>-<label>.brain    signed exports: 25 travelling tables, six local tables empty
 ```
 
@@ -273,8 +274,8 @@ type DevicePoll    = { pending: true; interval: number } | { token: string; expi
 ```
 
 `device_grant.reach` is the column 48 §13 D1 adds to 30 §1; `label` is stored in `label` and `subject` in `ua` —
-48 sends no user agent, and the approver reads both (§13 #14). `verification_uri` is `${origin}/app/settings/agents`
-since push A of the one-domain move: this host holds one record, so the address names no slug, where the Cloud's
+48 sends no user agent, and the approver reads both (§13 #14). `verification_uri` is `${origin}/app/connect/approve`
+(under `/app` since push A of the one-domain move, on its own page since October 2026): this host holds one record, so the address names no slug, where the Cloud's
 names the one the start asked for (`packages/host/src/device.ts`).
 What each reach mints is §5.9 step 3.
 
@@ -407,11 +408,11 @@ passkey is registered (12 §8: registration needs a session in place of attestat
 
 ### 5.9 · Device grant — RFC 8628, 12 §6.1
 
-1. `POST /auth/device { slug?, reach, label, subject? }` (48 §4.2): resolve the record — `slug`, else the host's only record (§5.3); reserve `device:<ip>` in the record's `auth_fail`; `device_code = base64url(randomBytes(32))`; `user_code = String(randomInt(0, 1_000_000)).padStart(6, '0')`; `INSERT INTO device_grant (id, code_hash, status, reach, label, ua, tries, expires) VALUES (device_code, hmac(k_code, user_code), 'pending', reach, label, subject, 0, now + 10 min)`; 200 `{ ok: true, value: { device_code, user_code, verification_uri: `${origin}/app/settings/agents`, expires_in: 600, interval: 5 }, version }`. The device keeps `device_code`; the code is never sent by the device again.
+1. `POST /auth/device { slug?, reach, label, subject? }` (48 §4.2): resolve the record — `slug`, else the host's only record (§5.3); reserve `device:<ip>` in the record's `auth_fail`; `device_code = base64url(randomBytes(32))`; `user_code = String(randomInt(0, 1_000_000)).padStart(6, '0')`; `INSERT INTO device_grant (id, code_hash, status, reach, label, ua, tries, expires) VALUES (device_code, hmac(k_code, user_code), 'pending', reach, label, subject, 0, now + 10 min)`; 200 `{ ok: true, value: { device_code, user_code, verification_uri: `${origin}/app/connect/approve`, expires_in: 600, interval: 5 }, version }`. The device keeps `device_code`; the code is never sent by the device again.
 2. `POST /auth/device/approve { user_code }` (cookie; a `token` bearer → 403 `NEEDS_BROWSER_SESSION`): reserve `device:<ip>`; then one `transactionSync`:
    1. `UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending' AND expires > ?` — every pending row pays for a wrong guess.
    2. `SELECT id, reach, label, ua FROM device_grant WHERE status = 'pending' AND expires > ? AND code_hash = ?`.
-   3. Match → `UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?`; 200 `{ approved: { reach, label, subject: ua } }` — the screen said what it was about to grant before the click (50 draws it at `/settings/agents`).
+   3. Match → `UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?`; 200 `{ approved: { reach, label, subject: ua } }` — the screen said what it was about to grant before the click (50 draws it at `/connect/approve`, and `/settings/agents` still takes a code).
    4. No match → `UPDATE device_grant SET status = 'denied' WHERE status = 'pending' AND tries >= 5`; changed rows > 0 → 422 `{ refusals: [{ code: 'DEVICE_CODE_TRIES', at: 'user_code', fix: 'Ask the device to start again' }] }`; else 404 bare. Denied rows are kept.
 3. `POST /auth/device/token { device_code }`: reserve `device:<ip>`; `SELECT status, reach, label, approved_by, expires FROM device_grant WHERE id = ?`:
    - `pending`, `expires > now` → 200 `{ ok: true, value: { pending: true, interval: 5 }, version }`; `pending`, expired → `UPDATE … status = 'expired'`; 422 `DEVICE_CODE_EXPIRED`.
@@ -923,7 +924,7 @@ and captures `DATA`).
 | Input | Expected |
 |---|---|
 | `POST /auth/device { reach: 'login' }` → approve with cookie → `/auth/device/token` | `{ token, expires, reach: 'login' }` once; a `token` row with `scope: 'write'`, `expires_at` ≈ +90 d; the grant row `active` with the same hash; a second `/auth/device/token` → 401 |
-| `verification_uri` in the start reply | equals `${origin}/app/settings/agents` — 48 §5.2 refuses any other origin |
+| `verification_uri` in the start reply | equals `${origin}/app/connect/approve` — 48 §5.2 refuses any other origin |
 | approve with a bearer | 403 `NEEDS_BROWSER_SESSION` |
 | five wrong codes | rows `denied`; fifth → 422 `DEVICE_CODE_TRIES`; the denied row still exists; polling it → 422 `DEVICE_CODE_TRIES` |
 | poll at +11 min while pending | 422 `DEVICE_CODE_EXPIRED`; row `expired` |
@@ -1094,7 +1095,7 @@ so its row is what this spec needs from it:
 | 11 | `POST /a` uploads (the table listed only the GET); `POST /api/snapshot`, `GET /api/snapshots[/:id]` are the two owner routes 12 §8 names | 33 §4 (three rows) |
 | 12 | `invite` is the **acceptance-time** record write, called with the owner principal from `record_dir.owner_person`; minting is a Directory write and an email by the host | 33 §10 Invite row; 30 §5 ADMIN note |
 | 13 | A share recipient is a principal: `{ kind: 'share'; id; slug }`; tokens are HMAC-signed with `HKDF(KEK, 'braindog/share')`, stateless, terminally revoked by `share.close` | 33 §2 `CallContext.principal`; 30 §10 share row |
-| 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/app/settings/agents` (`${origin}/settings/agents` before push A of the one-domain move) | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (a code-entry control at `/settings/agents`) |
+| 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/app/connect/approve` (`${origin}/app/settings/agents` until October 2026, and `${origin}/settings/agents` before push A of the one-domain move) | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (the code-entry page at `/connect/approve`) |
 | 15 | **Sign-up is closed on a self-host**: persons come from `braindog init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail | 33 §10 Sign up row: "Cloud; self-host: `init` and invitations" |
 | 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; VAULT requires it within 15 minutes | 33 §10 `session` row |
 | 17 | Lockout constants: ten compared and the eleventh refused, fifteen minutes, a capped counter, a count forgotten fifteen minutes after its first strike, an address cleared by a success; keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |

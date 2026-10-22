@@ -423,7 +423,7 @@ without changing them. That is the test for whether something belongs in this li
 > credits and 3 agents, at $0; on Cloud 15,000 runs, 150,000 requests, 1 GB and 50 hours, with 80
 > credits and 15 agents, at $12 a month; and on Cloud Plus five times Cloud, 75,000 runs, 750,000
 > requests, 5 GB and 250 hours, with 400 credits and 75 agents, at $29 a month. No plan is sold by the
-> year. These are the owner's figures and the defaults taken for him (DIRECTION §42), his to change with
+> year. These are the owner's figures and the defaults taken for him, his to change with
 > a word. At the limit an action waits for the next month and says so in one sentence, and an
 > automation's run that has not started waits with it. A self-host is counted and never limited.
 > Changing a figure starts in `PLAN_TABLE`, and the site's copy of its rows (`apps/site/src/lib/plans.ts`),

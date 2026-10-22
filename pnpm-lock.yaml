@@ -477,6 +477,8 @@ importers:
 
   packs/rule-sheet: {}
 
+  packs/setup-sync: {}
+
   packs/slash-desk: {}
 
   packs/standup: {}
