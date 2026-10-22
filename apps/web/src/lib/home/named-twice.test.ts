@@ -158,16 +158,18 @@ test('THE TILE IS FLAT, HAS NO BORDER OR SHADOW, ITS WORDS ARE 15 OR MORE, AND I
 });
 
 const home = bare(readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8'));
+const health = bare(readFileSync(new URL('../../routes/settings/[area]/areas/Health.svelte', import.meta.url), 'utf8'));
 
-test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, last, after what the answers taught', () => {
+test('SETTINGS › HEALTH REACHES THE PART BY A DYNAMIC IMPORT ONLY, after what the answers taught, and Today not at all', () => {
   for (const name of ['named-twice', 'NamedTwice']) {
-    assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);
+    assert.doesNotMatch(health, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with Settings`);
+    assert.doesNotMatch(home, new RegExp(`/${name}(\\.svelte|\\.ts)'`, 'u'), `Today reaches ${name}`);
   }
-  assert.match(home, /import\('\.\/named-twice\.ts'\)/u);
-  assert.match(home, /import\('\.\/NamedTwice\.svelte'\)/u);
-  assert.match(home, /const found = await tileOnce\('named', base, ver, \(\) => m\.loadNamedTwice\(base, io\)\);\s*if \(here\) named = found && \(found\.lines\.length > 0 \|\| found\.people > 0\) \? \{ found, Part: part\.default \} : null;/u);
-  assert.equal(home.split('<named.Part').length - 1, 1, 'the tile is drawn once');
-  assert.ok(home.indexOf('<named.Part') > home.indexOf('<learned.Part'), 'it comes after what the answers taught');
+  assert.match(health, /import\('\$lib\/home\/named-twice\.ts'\)/u);
+  assert.match(health, /import\('\$lib\/home\/NamedTwice\.svelte'\)/u);
+  assert.match(health, /const found = await m\.loadNamedTwice\(base, io\);\s*if \(here\) named = found && \(found\.lines\.length > 0 \|\| found\.people > 0\) \? \{ found, Part: part\.default \} : null;/u);
+  assert.equal(health.split('<named.Part').length - 1, 1, 'the part is drawn once');
+  assert.ok(health.indexOf('<named.Part') > health.indexOf('<learned.Part'), 'it comes after what the answers taught');
 });
 
 /* ── people listed twice ──────────────────────────────────────────────────── */

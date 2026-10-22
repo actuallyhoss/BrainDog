@@ -82,16 +82,18 @@ test('THROUGH THE CLIENT: a host without the read draws nothing, and a host with
 
 const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 const home = bare(readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8'));
+const health = bare(readFileSync(new URL('../../routes/settings/[area]/areas/Health.svelte', import.meta.url), 'utf8'));
 
-test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, last, after what the record found wrong', () => {
+test('SETTINGS › HEALTH REACHES THE PART BY A DYNAMIC IMPORT ONLY, after what the record found wrong, and Today not at all', () => {
   for (const name of ['learned', 'Learned']) {
-    assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);
+    assert.doesNotMatch(health, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with Settings`);
+    assert.doesNotMatch(home, new RegExp(`/${name}(\\.svelte|\\.ts)'`, 'u'), `Today reaches ${name}`);
   }
-  assert.match(home, /import\('\.\/learned\.ts'\)/u);
-  assert.match(home, /import\('\.\/Learned\.svelte'\)/u);
-  assert.match(home, /const found = await tileOnce\('learned', base, ver, \(\) => m\.loadLearned\(base, io\)\);\s*if \(here\) learned = found && found\.rows\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
-  assert.equal(home.split('<learned.Part').length - 1, 1, 'the tile is drawn once');
-  assert.ok(home.indexOf('<learned.Part') > home.indexOf('<faults.Part'), 'it comes after what the record found wrong');
+  assert.match(health, /import\('\$lib\/home\/learned\.ts'\)/u);
+  assert.match(health, /import\('\$lib\/home\/Learned\.svelte'\)/u);
+  assert.match(health, /const found = await m\.loadLearned\(base, io\);\s*if \(here\) learned = found && found\.rows\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.equal(health.split('<learned.Part').length - 1, 1, 'the part is drawn once');
+  assert.ok(health.indexOf('<learned.Part') > health.indexOf('<faults.Part'), 'it comes after what the record found wrong');
 });
 
 test('THE TILE IS FLAT, HAS NO BORDER OR SHADOW, AND ITS WORDS ARE 15 OR MORE', () => {

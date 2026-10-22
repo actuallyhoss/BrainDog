@@ -1,7 +1,8 @@
 /**
- * What the record found wrong in its own pages and notes, on Home: the record's `textFaults` as what a person reads,
- * each fault by its place's own name with the fix and one press to the place, the sentence that heads them, and
- * nothing at all at nought or on a host that does not answer the read.
+ * What the record found wrong in its own pages and notes, in Settings › Health: the record's `textFaults` as what a
+ * person reads, each fault by its place's own name with the fix and one press to the place, the sentence that heads
+ * them, nothing at all at nought or on a host that does not answer the read, and "not checked yet" before the record's
+ * first night pass has walked its words.
  */
 
 import assert from 'node:assert/strict';
@@ -17,6 +18,7 @@ import {
   knownOf,
   loadTextFaults,
   more,
+  notChecked,
   placeOf,
   readTextFaults,
   textFaultsOf,
@@ -59,6 +61,22 @@ test('NOUGHT DRAWS NOTHING: no rows, no heading, no count of the rest', () => {
   assert.deepEqual(faultRows(null), []);
   assert.equal(faultLine(null), null);
   assert.equal(more(null), '');
+});
+
+test('BEFORE THE FIRST NIGHT PASS IT IS NOT CHECKED YET, never clean: `computedAt` null is kept, and a night\'s is read', () => {
+  const night = (computedAt: unknown) => ({ ok: true as const, value: { count: 0, line: '', faults: [], truncated: false, computedAt } });
+  const before = textFaultsOf(night(null));
+  assert.deepEqual(before, { count: 0, line: '', faults: [], truncated: false, computedAt: null });
+  assert.equal(notChecked(before), true);
+  /* NOUGHT STILL DRAWS NO TILE: what is not checked is said in its own words, not as a fault. */
+  assert.equal(faultLine(before), null);
+  const walked = textFaultsOf(night('2026-10-23T01:00:00.000Z'));
+  assert.equal(walked?.computedAt, '2026-10-23T01:00:00.000Z');
+  assert.equal(notChecked(walked), false);
+  /* A HOST BUILT BEFORE THE NIGHT PASS SENDS NO `computedAt`: it walked as it was asked, and that is checked. */
+  assert.equal(notChecked(textFaultsOf(answer([], 0, ''))), false);
+  assert.equal(notChecked(textFaultsOf(night(42))), false);
+  assert.equal(notChecked(null), false);
 });
 
 test('A FAULT IS ITS PLACE BY NAME, WHAT IS WRONG, THE FIX AND WHERE IT OPENS; the heading is the record\'s own sentence', () => {
@@ -216,28 +234,34 @@ test('NONE IS NOT KEPT: a host that refused is asked again at the next visit', a
 const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 const home = bare(readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8'));
 
-test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, after the board\'s reads, only above nought', () => {
+const health = bare(readFileSync(new URL('../../routes/settings/[area]/areas/Health.svelte', import.meta.url), 'utf8'));
+
+test('SETTINGS › HEALTH REACHES THE PART BY A DYNAMIC IMPORT ONLY, draws it once and only above nought; Today never', () => {
   for (const name of ['text-faults', 'TextFaults']) {
-    assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);
+    assert.doesNotMatch(health, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with Settings`);
+    assert.doesNotMatch(home, new RegExp(`/${name}(\\.svelte|\\.ts)'`, 'u'), `Today reaches ${name}`);
   }
-  assert.match(home, /import\('\.\/text-faults\.ts'\)/u);
-  assert.match(home, /import\('\.\/TextFaults\.svelte'\)/u);
-  assert.match(home, /const found = await m\.textFaultsOnce\(base, io\);\s*if \(here\) faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
-  assert.equal(home.split('<faults.Part').length - 1, 1, 'the tile is drawn once');
-  assert.match(home, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{data\.lists\} \/>\{\/if\}/u);
-  /* AFTER THE BOARD'S READS: past the each that draws the briefing, the page, what went stale and who was matched. */
-  assert.ok(home.indexOf('<faults.Part') > home.indexOf('<stale.Part'));
-  assert.ok(home.indexOf('<faults.Part') > home.indexOf('{/each}', home.indexOf('<matched.Part')));
+  assert.match(health, /import\('\$lib\/home\/text-faults\.ts'\)/u);
+  assert.match(health, /import\('\$lib\/home\/TextFaults\.svelte'\)/u);
+  assert.match(health, /const found = await m\.textFaultsOnce\(base, io\);\s*if \(!here\) return;\s*unchecked = m\.notChecked\(found\);\s*faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.equal(health.split('<faults.Part').length - 1, 1, 'the part is drawn once');
+  assert.match(health, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{shell\.lists\} \/>\{\/if\}/u);
 });
 
-test('THE BOARD\'S LAST TILES ARE ASKED ONCE THE PAGE HAS ANSWERED, never beside the page read or in the bracket', () => {
-  const effects = home.split('$effect(').slice(1);
-  const late = effects.filter((e) => e.includes('textFaultsOnce(base, io)'));
-  assert.equal(late.length, 1, 'one effect asks for the walk');
-  assert.match(late[0]!, /^\(\) => \{\s*if \(data\.refused \|\| !settled\) return;/u);
-  for (const tile of ['loadLearned(base, io)', 'loadNamedTwice(base, io)']) assert.ok(late[0]!.includes(tile), `${tile} waits for the page too`);
-  assert.doesNotMatch(late[0]!.slice(0, late[0]!.indexOf('return () =>')), /opened|closed\(/u);
-  assert.doesNotMatch(home, /loadTextFaults\(/u);
+test('TODAY NEVER ASKS FOR THE WALK (U3), and Health asks it with the rest, one at a time, each when the tab is idle', () => {
+  assert.doesNotMatch(home, /textFaultsOnce\(|loadTextFaults\(|readTextFaults\(/u);
+  assert.doesNotMatch(health, /loadTextFaults\(/u);
+  assert.equal(health.match(/\(\) =>\s*Promise\.all\(\[import\(/gu)?.length, 7, 'every part waits its turn');
+  assert.doesNotMatch(health, /void Promise\.all\(/u, 'a part asked at once beside the others');
+  assert.match(health, /for \(const part of parts\) \{\s*await idle\(\);\s*if \(!here \|\| leaving\.signal\.aborted\) break;/u);
+});
+
+test('NOT CHECKED YET IS SAID IN HEALTH, and the calm line then vouches for nothing it did not read', () => {
+  const raw = readFileSync(new URL('../../routes/settings/[area]/areas/Health.svelte', import.meta.url), 'utf8');
+  assert.match(raw, /notYet: 'Not checked yet, it runs at night\.'/u);
+  assert.match(health, /\{#if unchecked\}[\s\S]*?\{words\.notYet\}[\s\S]*?\{\/if\}/u);
+  assert.match(health, /body=\{unchecked \? words\.clearBodyUnchecked : words\.clearBody\}/u);
+  assert.doesNotMatch(/clearBodyUnchecked: '([^']*)'/u.exec(raw)?.[1] ?? 'missing', /page|note/iu);
 });
 
 test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB', () => {
@@ -251,10 +275,3 @@ test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB
   assert.doesNotMatch(bare(part), /\u2014/u);
 });
 
-test('THE LAST TILES ARE ASKED ONE AT A TIME, each when the tab is idle, so none queues ahead of the next screen', () => {
-  const late = home.split('$effect(').slice(1).find((e) => e.includes('textFaultsOnce(base, io)'))!;
-  const body = late.slice(0, late.indexOf('return () =>'));
-  assert.equal(body.match(/tiles\.push\(\(\) => Promise\.all\(/gu)?.length, 5, 'every tile waits its turn');
-  assert.doesNotMatch(body, /void Promise\.all\(/u, 'a tile asked at once beside the others');
-  assert.match(body, /for \(const tile of tiles\) \{\s*await idle\(\);\s*if \(!here \|\| leaving\.signal\.aborted\) break;/u);
-});
