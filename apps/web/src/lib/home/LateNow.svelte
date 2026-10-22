@@ -20,7 +20,6 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { exponentOf, writeAmount } from 'braindog-render';
-  import { daySaid } from '$lib/work/board.ts';
   import { finishOf } from '../../routes/r/[register]/[seq]/lead.ts';
   import type { HomeLine } from './home-rows.ts';
 
@@ -47,8 +46,7 @@
   } = $props();
 
   const words = {
-    /* THE DOT AFTER HOW LATE IS IN THE WORDS, since a space at a tag's edge is not kept. */
-    due: (day: string, after: boolean) => `${after ? ' · ' : ''}due ${day}`,
+    due: (day: string) => `due ${day}`,
     open: 'Open',
     more: (n: number) => `${n.toLocaleString('en-GB')} more`,
     fewer: 'Show fewer',
@@ -82,8 +80,13 @@
     return writeAmount({ minor: whole, currency }, homeCurrency(), 'read')?.text ?? null;
   }
 
-  /** "9 Oct", the day without its weekday. */
-  const dayWords = (day: string): string => daySaid(day).replace(/^\S+ /u, '');
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+  /** "9 Oct", the day it fell due, from its `YYYY-MM-DD`. */
+  function dayWords(day: string): string {
+    const [, m, d] = day.split('-').map(Number);
+    return m !== undefined && d !== undefined && m >= 1 && m <= 12 && d >= 1 ? `${String(d)} ${MONTHS[m - 1]!}` : day;
+  }
 
   async function finish(line: HomeLine): Promise<void> {
     if (busy.has(line.key) || done.has(line.key)) return;
@@ -110,7 +113,7 @@
         {#if line.href}<a class="ln-title" href={at(line.href)}>{line.title}</a>{:else}<span class="ln-title">{line.title}</span>{/if}
         {#if amount}<span class="ln-amount num">{amount}</span>{/if}
         <p class="ln-when">
-          {#if line.when}<span data-late={line.late ? '' : undefined}>{line.when}</span>{/if}{#if line.day && line.late}<span class="ln-day">{words.due(dayWords(line.day), Boolean(line.when))}</span>{/if}
+          {#if line.when}<span data-late={line.late ? '' : undefined}>{line.when}</span>{/if}{#if line.day && line.late}{#if line.when}<span class="sep">{' · '}</span>{/if}<span class="ln-day">{words.due(dayWords(line.day))}</span>{/if}
         </p>
         <span class="ln-acts">
           {#if verb}
