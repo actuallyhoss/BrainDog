@@ -1,5 +1,5 @@
 /**
- * A handoff is an object that closes (D40.49): the next step a run left in a place, and how that step ended.
+ * A handoff is an object that closes: the next step a run left in a place, and how that step ended.
  *
  * A STEP IS OPEN WHILE ITS RUN WAITS IN `handoff`, and it closes one of three ways, each written on the run that left
  * it: `taken` by the run that picks it up (`taken_by`, and the taker gets `took`), `dropped` by an agent or a person

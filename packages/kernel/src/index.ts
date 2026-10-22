@@ -26,7 +26,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivateLine, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivateLine, type Compiled, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -56,8 +56,9 @@ import {
 } from './declare.ts';
 import { commitAuthors } from './commit-authors.ts';
 import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './run-reads.ts';
-import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace } from './first-project.ts';
-import { containsMatched, project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, searchWords, type Hit, type Searched } from './fts.ts';
+import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace, noPlace, topicName } from './first-project.ts';
+import { maskMoneyText } from './mail-read.ts';
+import { containsMatched, maskedMatched, project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, searchWords, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
@@ -83,6 +84,7 @@ import {
   type Taken,
 } from './handoff.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
+import { settleSealed } from './sealed.ts';
 import {
   drainSchedule,
   due,
@@ -141,6 +143,8 @@ import {
   getGovernance,
   listGovernance,
   handQuestion as handQuestionIn,
+  answeredIn as answeredInIn,
+  answeredInOf,
   deciderOf as deciderOfIn,
   deciderFault as deciderFaultIn,
   countGovernance,
@@ -168,7 +172,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -281,7 +285,7 @@ import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
-import { beatRun, presentRuns, pulseRun, workingRuns } from './presence.ts';
+import { beatRun, presentRuns, pulseRun, seatRun, workingRuns } from './presence.ts';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */
 import {
   INSTRUCTIONS,
@@ -308,7 +312,7 @@ import {
   type SeenHow,
   type Stop,
 } from './instruction.ts';
-import { profileById, profileFor as profileMatching, readProfiles, setProfile as writeProfile, type Profile, type ProfileRow } from './agent-profile.ts';
+import { profileById, profileFor as profileMatching, readProfiles, setProfile as writeProfile, type Profile, type ProfileRow, type ProfileWho } from './agent-profile.ts';
 import { agentsDataSteps } from './migrations/0042_agents.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
@@ -379,7 +383,7 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 
 /** The `field` of the line `setPrivate` writes on a row, kept private or shared again (leak matrix N1). */
 export const PRIVATE_NOTE = 'private';
-export { DRAFT_FIELD, cleanName, firstProjectFields, firstProjectName } from './first-project.ts';
+export { DRAFT_FIELD, TOPIC_MAX, cleanName, firstProjectFields, firstProjectName, noPlace, topicName } from './first-project.ts';
 export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS (SHL-B18): its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
@@ -432,7 +436,7 @@ export {
   type WorkingRun,
 } from './presence.ts';
 /* LIVE PRESENCE (plan §4.4): the finer words for a session open now, read with the bridge's pulse. */
-export { CALL_MS, GONE_MS, PULSE_MIN_MS, THINKING_MS, isPresent, liveStateOf, presentRuns, type LiveState } from './presence.ts';
+export { CALL_MS, GONE_MS, PULSE_MIN_MS, THINKING_MS, isPresent, liveStateOf, placesHeard, presentRuns, type LiveState } from './presence.ts';
 /* INSTRUCTIONS AND SETTINGS ROWS (agents and MCP plan §8.3), the kernel's half of what wave 2 builds on. The functions
    take the record's `Sql` first; the kernel's own methods of the same names (`instructionFor`, `takeInstruction`, …)
    are bound to the record's clock and write path. */
@@ -445,9 +449,11 @@ export {
   INSTRUCTION_STATES,
   INSTRUCTION_TO,
   INSTRUCTION_WHEN,
+  MACHINE_NAME,
   OPEN_STATES as INSTRUCTION_OPEN_STATES,
   REPLY_STATES,
   SAID_MOST,
+  SEAT_NAME,
   SEEN_HOW,
   WAIT_MS as INSTRUCTION_WAIT_MS,
   instructionOf,
@@ -484,6 +490,7 @@ export {
   type ProfileNotify,
   type ProfileQuiet,
   type ProfileRow,
+  type ProfileWho,
 } from './agent-profile.ts';
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type VaultGrant, type Waiting } from './device.ts';
 export { shapeGrant };
@@ -573,7 +580,7 @@ export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, lead
 export { flowGrammar, type FlowGrammar, type GrammarStep, type Arg as FlowGrammarArg } from './flow-grammar.ts';
 export { ANSWER_KEYS, BLOCK_INSTALLS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 export { WHEN_READERS, actionsFault, declaredActions, type WhenReader } from './block-keys.ts';
-/* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
+/* THE LOOK OVERLAY (`compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, lookPlacesFault, mergeLook, questionsLead, queuesKept, LOOK_AREAS, LOOK_BY, LOOK_SPANS, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
 /* A LOOK'S GROUPING (ENG-B10, `compose.ts`): which kinds a look may group, how many, and over how many values. */
 export { GROUPED_BY_FIELD, GROUP_ROWS_OVER, GROUP_VALUES_LEAST, GROUP_VALUES_MOST, LOOK_GROUPS_MOST, groupsWell, valuesShown } from './compose.ts';
@@ -618,7 +625,7 @@ export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { LIST_PAGE_COLUMNS, LIST_PAGE_ROWS, listPage, type ListPage, type ListPageBlock, type ListPageColumn, type ListPageFilter, type ListPageSaid, type ListPageShape, type ListPageField } from './default-pages.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
-export { ARRANGING, BODY_KINDS, GOVERNANCE, HANDLED_PREF, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
+export { ANSWERED_IN, ARRANGING, BODY_KINDS, GOVERNANCE, HANDLED_PREF, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -692,12 +699,13 @@ export type { Accepted as InviteAccepted, InvitationRow, InviteArgs, Invited } f
 export type { ChildArgs, ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
 /* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
    already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
-export { JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
+export { JOB_AGENTS, JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
 export type {
   CancelRead,
   Cancelled,
   ClaimedJob,
   CreateJobArgs,
+  JobAgent,
   JobBody,
   JobEvent,
   JobEvents,
@@ -706,6 +714,7 @@ export type {
   JobsPage,
   PostJobEventArgs,
   Posted,
+  RunnerPlace,
 } from './jobs.ts';
 export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Remembered, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export type { Prediction } from './govern.ts';
@@ -717,6 +726,7 @@ export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as in
 export { SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, slashBrake } from './observe.ts';
 /* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
+export { MONEY_MASK, maskMoneyText } from './mail-read.ts';
 /* THE SHAPES OWED A PATTERN (ENG-B07): which arrivals wait on a draft, and the cause their one question is filed under. */
 export { owedShapes, patternCause, UNVERIFIED, type Owed } from './ingest.ts';
 export { runPlace } from './handoff.ts';
@@ -777,7 +787,7 @@ export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extra
 export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, HeldNotice, Level, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
+export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, PageSees, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -2106,8 +2116,46 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const scopeClause = (register: string, rule: Json): { sql: string; params: (string | number)[] } => {
     if (!registers.has(register)) return { sql: '0', params: [] };
-    const c = ruleOf(rule, schemaOf(register), evalContext());
+    const c = ruleCompiled(register, rule);
     return c.bad.length ? { sql: '0', params: [] } : { sql: c.sql, params: c.params as (string | number)[] };
+  };
+
+  /**
+   * A GRANT'S RULE COMPILED ONCE AND KEPT (sharing plan §2.13, "compiled conditions are cached"): by the declaration
+   * revision, the record's version, the minute, the list and the rule's own text, `RULES_KEPT` of them, the one used
+   * longest ago going first. Every read a narrowed caller makes compiles their rule for each list it touches, and a
+   * rule written as a sentence looks its names up as it compiles; a page of reads between two writes asks it once.
+   *
+   * THE VERSION IS IN THE KEY because a sentence's names are read from rows (`thing is Kiln`), and the minute because a
+   * relative day (`-30d`) is read from the clock; the revision, because a field retired changes what compiles. Asking
+   * the version is one `MAX(rowid)`, which SQLite answers from the end of the index. Always against the list's whole
+   * schema, as a read with no hop compiles it (`readerSchemaOf`).
+   */
+  /**
+   * `register = '<id>'`, THE LIST'S ID WRITTEN INTO THE STATEMENT (sharing plan §2.13, R5). A field declared `index: true`
+   * is indexed only on its own list's live rows (`entry_i_<list>__<field> … WHERE register = '<list>'`), and SQLite uses
+   * such a partial index only where it can see the statement holds that list, which a bound `?` does not show it. So a
+   * read held to one project by a grant on an indexed field walked every live row of the list. An id is the grammar's
+   * (`^[a-z][a-z0-9_]{0,31}$`), checked here before it is written in; anything else is bound as before.
+   */
+  const LIST_ID = /^[a-z][a-z0-9_]{0,31}$/u;
+  const onList = (register: string): { sql: string; params: string[] } =>
+    LIST_ID.test(register) ? { sql: `register = '${register}'`, params: [] } : { sql: 'register = ?', params: [register] };
+
+  const RULES_KEPT = 512;
+  const rulesKept = new Map<string, Compiled>();
+  const ruleCompiled = (register: string, rule: Json): Compiled => {
+    const key = [revision, version(), Math.floor(clock.now() / 60_000), register, JSON.stringify(rule)].join('\u0000');
+    const hit = rulesKept.get(key);
+    if (hit !== undefined) {
+      rulesKept.delete(key);
+      rulesKept.set(key, hit);
+      return hit;
+    }
+    const c = ruleOf(rule, readerSchemaOf()(register) ?? schemaOf(register), evalContext());
+    rulesKept.set(key, c);
+    while (rulesKept.size > RULES_KEPT) rulesKept.delete(rulesKept.keys().next().value as string);
+    return c;
   };
 
   /** How many ids `admittedIds` asks about in one statement: the walk's own batch (sharing plan §2.13). */
@@ -2254,9 +2302,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* `grant` IS THE CALLER'S RULE ON THIS LIST (`whereFor(ctx.wheres, register)`), so a narrowed member counts only the
      rows they reach; one that cannot be read counts none (`narrowed` in `members.ts`). Absent, every live row. */
   const count = (register: string, grant?: Json): number => {
-    const c = narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext()));
+    const c = narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleCompiled(register, grant));
+    const on = onList(register);
     return Number(
-      sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`, register, ...c.params)?.n ?? 0,
+      sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${on.sql} AND deleted_at IS NULL AND (${c.sql})`, ...on.params, ...c.params)?.n ?? 0,
     );
   };
 
@@ -3751,7 +3800,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE CALLER'S GRANT, when theirs is narrowed to the rows matching one `where` (`CallContext.wheres`): the page,
        its cursor and `matched` all come from the one clause, so a narrowed member is never told how many rows they
        cannot see. */
-    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, whole, evalContext()));
+    /* THE GRANT FROM THE KEPT COMPILE when it compiles against the list's own schema, as every read with no hop does. */
+    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : q.hops === undefined && q.reads === undefined ? ruleCompiled(q.register, grant) : ruleOf(grant, whole, evalContext()));
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -3918,6 +3968,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       sort = `ORDER BY ${parts.join(', ')}, id DESC`;
     }
 
+    /* THE LIST BY ITS ID AS A LITERAL (`onList`), so a partial index on a field of it answers a narrowed read. */
+    const on = onList(q.register);
     const [at, afterId] = (sortedCursor ? '' : cursorText).split('|');
     /* A CURSOR THIS RECORD DID NOT MINT IS REFUSED, AS THE SORTED ONE ALREADY WAS. `cursor=junk` compared
        `updated_at < 'junk'`, which every ISO instant is, so the answer was the first page again with a
@@ -3926,16 +3978,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with. Start from the first page.', { at: 'cursor' });
     const page = sortedCursor
       ? sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql})${after} ${sort} LIMIT ?`,
-          q.register,
+          `SELECT ${COLUMNS} FROM entry WHERE ${on.sql}${deleted} AND (${c.sql})${after} ${sort} LIMIT ?`,
+          ...on.params,
           ...c.params,
           ...afterParams,
           limit + 1,
         )
       : at
       ? sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (created_at < ? OR (created_at = ? AND id < ?)) ${sort} LIMIT ?`,
-          q.register,
+          `SELECT ${COLUMNS} FROM entry WHERE ${on.sql}${deleted} AND (${c.sql}) AND (created_at < ? OR (created_at = ? AND id < ?)) ${sort} LIMIT ?`,
+          ...on.params,
           ...c.params,
           at,
           at,
@@ -3943,8 +3995,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           limit + 1,
         )
       : sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) ${sort} LIMIT ?`,
-          q.register,
+          `SELECT ${COLUMNS} FROM entry WHERE ${on.sql}${deleted} AND (${c.sql}) ${sort} LIMIT ?`,
+          ...on.params,
           ...c.params,
           limit + 1,
         );
@@ -3953,8 +4005,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        filter admitted cannot tell a short list from a narrow one. */
     const matched = Number(
       sql.one<{ n: number }>(
-        `SELECT count(*) AS n FROM entry WHERE register = ?${deleted} AND (${c.sql})`,
-        q.register,
+        `SELECT count(*) AS n FROM entry WHERE ${on.sql}${deleted} AND (${c.sql})`,
+        ...on.params,
         ...c.params,
       )?.n ?? 0,
     );
@@ -5163,10 +5215,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const found = findSession(sql, hints, clock.now(), w.principal?.token ?? null);
     if (found?.foreign) return { found, place: false, project: null };
     const resolve = (where: Whereabouts): Resolved => resolveProject(sql, registers, where);
-    if (!found) return { found, place: true, project: resolve(hints).project ?? parentProject(hints) };
+    if (!found) return { found, place: true, project: resolve(hints).project ?? parentProject(hints) ?? topicProject(hints) };
     /* PLACED ONCE AND NEVER MOVED (`placeOnce`): a run with a project keeps it wherever it is re-attached from, and one
-       with none takes the first place a hint settles on, or its parent run's. */
-    const placed = placeOnce(found.project, hints, resolve) ?? (found.project ? null : parentProject(hints));
+       with none takes the first place a hint settles on, or its parent run's, or the project its topic names. */
+    const placed = placeOnce(found.project, hints, resolve) ?? (found.project ? null : (parentProject(hints) ?? topicProject(hints)));
     if (placed) return { found, place: true, project: placed };
     const row = found.project ? get(found.project) : null;
     return { found, place: false, project: row && found.project ? { id: row.id, spoken: found.project } : null };
@@ -5184,6 +5236,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (typeof spoken !== 'string' || spoken === '') return null;
     const row = get(spoken);
     return row ? { id: row.id, spoken } : null;
+  }
+
+  /**
+   * The one live project called what a session with no folder says it is working on (`topic`), case and spaces aside,
+   * or `null`: none or more than one is. A topic is only ever a name, so a session that says where it is is placed by
+   * that and never by its topic.
+   */
+  function topicProject(hints: SessionHints): { id: string; spoken: string } | null {
+    const name = noPlace(hints) ? topicName(hints.topic) : null;
+    const list = [...registers.values()].find((r) => r.scopes !== undefined);
+    if (name === null || !list) return null;
+    const rows = sql.all<{ id: string }>(
+      `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(?) LIMIT 2`,
+      list.id,
+      `$."${list.title ?? 'name'}"`,
+      name,
+    );
+    const [one] = rows;
+    return rows.length === 1 && one ? { id: one.id, spoken: nameOf(one.id) } : null;
   }
 
   /** The names of every live project, which a run's old record-given names may have been made from. */
@@ -5209,7 +5280,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const name = firstProjectName(hints);
     if (name === null || nobodysPlace(hints)) return null;
     /* A RECORD WITH PROJECTS FORMS A DRAFT ONLY FROM A REPOSITORY SEEN BEFORE: the second session out of it, so a one-off
-       folder spawns nothing. A name the record has ever held (a draft the person turned away included) is not formed again. */
+       folder spawns nothing, and a topic, which no repository stands behind, never does (`topicProject` finds one by its
+       name instead). A name the record has ever held (a draft the person turned away included) is not formed again. */
     if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? LIMIT 1', list.id)) {
       const earlier =
         sql.one<{ n: number }>(
@@ -5228,6 +5300,43 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (!made.ok || made.value.seq === null) return null;
     const said = list.seq_prefix && list.seq_prefix !== '#' ? list.seq_prefix : `${list.id}#`;
     return `${said}${made.value.seq}`;
+  }
+
+  /**
+   * WHAT A SESSION WITH NO FOLDER SAYS IT IS WORKING ON (`topic`, on its `context` call), and the run it places. Claude.ai,
+   * ChatGPT and any remote client send no repository, remote or folder, and send the topic once, so it is settled here
+   * rather than on a later write that will not carry it: the project of that name, or on a record with no project yet
+   * the first one formed from it as a draft (`formFirstProject`), and the caller's run placed there, opened when it has
+   * none. A run already in a project stays where it is (`placeOnce`).
+   *
+   * `project: null` when nothing came of it: a caller that is no agent or says where it is, a topic that names nothing,
+   * a run another key opened, or a record with projects and none called that, where a topic never forms a draft.
+   */
+  function topicRun(w: WriteContext): Result<{ project: string | null; run: string | null; formed: boolean }> {
+    type Settled = { project: string | null; run: string | null; formed: boolean };
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
+    const hints = w.session ?? {};
+    const nothing: Settled = { project: null, run: null, formed: false };
+    if (w.principal?.kind !== 'token' || hints.parent !== undefined || !noPlace(hints) || topicName(hints.topic) === null) return ok(nothing);
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    return transaction((): Result<Settled> => {
+      const at = locateRun(w);
+      if (at.found?.foreign) return ok(nothing);
+      const run = at.found ? `${prefix}${String(at.found.seq)}` : null;
+      if (at.found?.project) return ok({ project: at.found.project, run, formed: false });
+      const found = at.project?.spoken ?? null;
+      const project = found ?? formFirstProject(w);
+      if (project === null) return ok({ ...nothing, run });
+      /* PLACED IN PLACE, as `attribute` places a run it re-attached: where the record found the run is not an edit. */
+      if (at.found) {
+        sql.exec("UPDATE entry SET fields = json_set(fields, '$.project', ?) WHERE id = ?", project, at.found.id);
+        return ok({ project, run, formed: found === null });
+      }
+      const opened = openRun(w, project, instant(clock.now()), 'opened: said what it works on');
+      if (!opened.ok) return opened as Result<never>;
+      return ok({ project, run: `${prefix}${String(opened.value.seq)}`, formed: found === null });
+    });
   }
 
   /**
@@ -7105,7 +7214,57 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     };
   };
 
-  const pageDeps = (viewer?: string): PageDeps => ({
+  /**
+   * `declaredOnce` KEPT ACROSS CALLS, for the one question that is only about declarations: which lists a block reads.
+   * A `<module>.<figure>` path asks every figure and the add-on each came with, a query apiece, and the record asks it
+   * of every block it holds from a reader, so the Money page read about 1,460 packs for one look. The figures, the packs
+   * and the figure behind an id are kept for a declaration revision (an install or a removal reloads it), and a figure
+   * is the declaration whole without its live target, since a target names no list.
+   */
+  let declKept: { revision: number; deps: PageDeps } | null = null;
+  const declaredKept = (): PageDeps => {
+    if (declKept !== null && declKept.revision === revision) return declKept.deps;
+    const base = pageDeps();
+    const { packOf } = base;
+    let figures: readonly MetricDecl[] | undefined;
+    const packs = new Map<string, string | null>();
+    const metrics = new Map<string, MetricDecl | null>();
+    const deps: PageDeps = {
+      ...base,
+      metric: (id) => {
+        if (!metrics.has(id)) metrics.set(id, base.metric(id));
+        return metrics.get(id) ?? null;
+      },
+      metrics: () =>
+        (figures ??= sql
+          .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+          .map((r) => JSON.parse(r.body) as MetricDecl)),
+      ...(packOf
+        ? {
+            packOf: (id: string) => {
+              if (!packs.has(id)) packs.set(id, packOf(id));
+              return packs.get(id) ?? null;
+            },
+          }
+        : {}),
+    };
+    declKept = { revision, deps };
+    return deps;
+  };
+
+  /* `sees` IS THE READER'S LENS OVER WHAT READS ACROSS THE RECORD (`PageSees`): the log's lines, the questions and the
+     lists what went quiet is read over, each left out when the host says she is not shown it. */
+  const pageDeps = (viewer?: string, sees?: PageSees): PageDeps => {
+    /* A WALK AHEAD IS WORKED OUT ONCE FOR A READ: every figure and block over the same legs walked the rows again, one
+       row at a time, and a page of figures read the same walk some thirty times. These deps last one read, so the rows
+       cannot change under it. */
+    const walked = new Map<string, ReturnType<NonNullable<PageDeps['runway']>>>();
+    const walks = new Map<string, unknown>();
+    const readings = new Map<string, ReturnType<typeof evaluateMetric>>();
+    /* AND THE READ'S CLOCK, ZONE AND RATES BUILT ONCE (each figure read built them again: the record's row and the home
+       currency, a query apiece). */
+    const here = { ...evalContext([], viewer), walks };
+    return {
     pages: () =>
       sql
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0")
@@ -7117,9 +7276,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       /* A DECLARED FIGURE FIRST, and the record's own figures after (`built-in-figures.ts`), so a page can gate on
          how many questions are waiting without a pack declaring the count. */
-      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl, evalContext()) : builtInFigure(id);
+      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl, here) : builtInFigure(id);
     },
-    read: (decl) => evaluateMetric(sql, decl, evalContext([], viewer)),
+    /* A FIGURE IS READ ONCE FOR A READ, by its declaration whole (a parameter filled in is another figure): a page asks
+       the same figure for a cell, a condition and a note, and nothing changes under one read. */
+    read: (decl) => {
+      const key = JSON.stringify(decl);
+      let got = readings.get(key);
+      if (got === undefined) {
+        got = evaluateMetric(sql, decl, here);
+        readings.set(key, got);
+      }
+      return structuredClone(got);
+    },
     list: (q) => {
       /* AND THE ORDER GOES THROUGH. It was dropped here, silently, which is the one place a
          forwarded query can be wrong without anybody seeing it: the block asked, `list` could
@@ -7140,7 +7309,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
        what it adds to this page's declaration id. */
     adds: (page) => additionsOf(sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id'), page),
-    /* AND THIS LINE TURNS THE ENGINE ON (DIRECTION §38): every page is read under its live `look.<page>`, or the rules'
+    /* AND THIS LINE TURNS THE ENGINE ON: every page is read under its live `look.<page>`, or the rules'
        look when none is stored (`compose.ts`, `lookedAt` in `pages.ts`). */
     look: (page) => {
       const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'look' AND superseded_at IS NULL AND retired = 0", `look.${page}`);
@@ -7154,12 +7323,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     handoffs: (project) => openSteps(sql, clock.now(), project, viewer),
     /* WHAT WENT QUIET (`openExceptions`, ENG-B13), over every list this record declares but the kernel's own list of
        runs, so an `exceptions` block draws them. Without this line the block refuses as not in this build. */
-    exceptions: () => openExceptions(sql, clock.now(), watchedLists().filter((l) => !anyHiddenFrom(viewer, l.id))),
+    exceptions: () => openExceptions(sql, clock.now(), watchedLists().filter((l) => !anyHiddenFrom(viewer, l.id) && (sees?.list(l.id) ?? true))),
     /* BLOCKING READS DECLARED ACTIONS AND THEIR SCHEDULE, NOT ROWS: owner-level bookkeeping by design, so no private-row clause. */
     blocking: (project) => actionsBlocking(sql, clock.now(), project, recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
+      const key = JSON.stringify([opening, legs, horizon, only, into]);
+      if (walked.has(key)) return structuredClone(walked.get(key)!);
       const out = runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
@@ -7168,9 +7339,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         only,
         into,
       );
-      return out.ok ? out.value : null;
+      const answer = out.ok ? out.value : null;
+      walked.set(key, answer);
+      return structuredClone(answer);
     },
-    ctx: evalContext([], viewer),
+    ctx: here,
     tz: recordIdentity(sql)?.tz ?? 'UTC',
     /* THE FOUR FIELDS A MEASURE NEEDS AND NOTHING ELSE, by the same expressions an index on them is built from, and the
        newest reading of each measure beside them so a measure that went quiet still says when it last spoke. */
@@ -7352,7 +7525,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                 .map((r) => [String(r.id), r]),
         );
       const open = countOpenQuestions({ sql, nowMs });
-      if (!keep) {
+      if (!keep && !sees) {
         /* A STABLE ORDER: how long it can wait first (`weigh.ts` `WAIT_RANK_SQL`, AGT-C08: due inside two days or moving
            money, then open past three days, then new), then the band, then the oldest first within it, since the
            expensive question that has been sitting is the one worth meeting, and the id when two were asked in the same
@@ -7393,7 +7566,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           at: String(r.opened_at ?? ''),
           facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: r.cost as Cost, about: r.about !== null && r.about !== '' ? r.about : null },
         }));
-      const kept = lean.filter((q) => keep(q.facts));
+      /* AND ONLY THE QUESTIONS THE READER IS SHOWN (`PageSees`), asked before anything is counted, so every count is hers. */
+      const hers = sees ? lean.filter((q) => sees.question('suggestion', q.id)) : lean;
+      const kept = keep ? hers.filter((q) => keep(q.facts)) : hers;
       kept.sort((a, b) => waitRank(a.wait) - waitRank(b.wait) || costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       const ids = kept.slice(0, drawn).map((q) => q.id);
       const rows = whole(ids);
@@ -7403,7 +7578,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       });
       const stale = kept.filter((q) => staleAt(q.at, nowMs)).length;
       const hardToUndo = kept.filter((q) => q.facts.cost === 'undo').length;
-      return { questions, open, matched: kept.length, stale, hardToUndo };
+      return { questions, open: sees ? hers.length : open, matched: kept.length, stale, hardToUndo };
     },
     /*
      * THE QUESTIONS PUT OFF, for a page's Later: still open, with a day to come back that has not come, soonest back
@@ -7416,13 +7591,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         `SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s
          WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?`,
         now,
-        Math.min(Math.max(1, Math.floor(limit)), 200),
+        sees ? -1 : Math.min(Math.max(1, Math.floor(limit)), 200),
       );
-      const questions = rows.map((r) => {
+      /* THE READER'S OWN (`PageSees`): every one put off is read, hers kept, then cut, so her count is of hers. */
+      const shown = sees ? rows.filter((r) => sees.question('suggestion', String(r.id))) : rows;
+      const questions = shown.slice(0, Math.min(Math.max(1, Math.floor(limit)), 200)).map((r) => {
         const one = questionFrom(r);
         return { ...one, until: String(r.defer_until ?? ''), until_why: typeof r.defer_why === 'string' ? r.defer_why : '' };
       });
-      const later = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND defer_until > ?", now)?.n ?? 0;
+      const later = sees ? shown.length : (sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND defer_until > ?", now)?.n ?? 0);
       return { questions, later };
     },
     /*
@@ -7431,8 +7608,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * suggestion the decision settled, and a chosen option is named by its own label.
      */
     decisions: (limit) => {
-      const said = listGovernance({ sql, nowMs: clock.now() }, 'decision', { limit });
-      const decisions = (said.ok ? said.value : []).map((d) => {
+      /* THE READER'S OWN (`PageSees`): every decision is read, hers kept, then cut, so `total` is of hers. */
+      const said = listGovernance({ sql, nowMs: clock.now() }, 'decision', sees ? { every: true } : { limit });
+      const read = said.ok ? said.value : [];
+      const hers = sees ? read.filter((d) => sees.question('decision', String(d.id))) : read;
+      const decisions = (sees ? hers.slice(0, Math.max(1, Math.floor(limit))) : hers).map((d) => {
         const settled = typeof d.suggestion === 'string' ? getGovernance(sql, 'suggestion', d.suggestion) : null;
         const body = settled && settled.body !== null && typeof settled.body === 'object' && !Array.isArray(settled.body) ? (settled.body as Record<string, unknown>) : {};
         const answer = String(d.answer ?? '');
@@ -7452,7 +7632,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
         };
       });
-      return { decisions, total: countGovernance(sql, 'decision') };
+      return { decisions, total: sees ? hers.length : countGovernance(sql, 'decision') };
     },
     /* HOW MANY ROWS HOLD EACH VALUE OF ONE FIELD, for a page's reader filters, by the expression an index on the field
        is built from and in one query, so a strip of chips over a long list does not read the list. */
@@ -7515,7 +7695,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,
      * `tickets#3`, with its title beside it, so a reader is never handed an entry id.
      *
-     * NOT THE OWNER'S LINES. Keys, access, shares and members belong to the owner's own screens (the record's
+     * NOT THE OWNER'S LINES. Keys, access, shares, members and sealed files belong to the owner's own screens (the record's
      * `lineOf` holds them to an owner), and a page is read by whoever may open it, so they are left out here.
      * The read mark is a person's, and the kernel does not know who is reading, so it is `null` here and the record's `page` puts the reader's own in.
      *
@@ -7526,6 +7706,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     activity: (limit) => {
       type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null };
       const lines: Raw[] = [];
+      /* AND A LINE THE READER IS NOT SHOWN IS NOT IN IT EITHER (`PageSees`), asked with the row it is about, as
+         `recentHistory` asks it: a run's or an instruction's line, a personal list's, a question held from her. */
+      const seen = (e: Raw): boolean => {
+        if (!sees) return true;
+        const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
+        return sees.line({ kind: e.kind, target: e.target, target_kind: e.target_kind, field: e.field, row: id === null ? null : byId(id, true) });
+      };
       /* A LINE ABOUT A ROW SOMEBODY ELSE KEPT PRIVATE IS NOT IN THE FEED (migration 40), whoever the feed is drawn for. */
       const kept = viewer === undefined ? '' : ` AND ${unprivateLine()}`;
       let before = Number.MAX_SAFE_INTEGER;
@@ -7533,7 +7720,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const batch = sql.all<Raw>(
           `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
             WHERE rowid < ? AND kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
-              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')${kept}
+              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed')${kept}
             ORDER BY rowid DESC LIMIT ?`,
           before,
           ...(viewer === undefined ? [] : [viewer]),
@@ -7542,7 +7729,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         for (const e of batch) {
           before = Number(e.rowid);
           walked += 1;
-          if (!bookkeeping({ ...e, from: read(e.from_v), to: read(e.to_v) })) lines.push(e);
+          if (!bookkeeping({ ...e, from: read(e.from_v), to: read(e.to_v) }) && seen(e)) lines.push(e);
           if (lines.length >= limit) break;
         }
         if (batch.length < FEED_BATCH) break;
@@ -7612,7 +7799,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         seen: null,
       };
     },
-  });
+    };
+  };
 
   /**
    * What a digest reads through.
@@ -7620,9 +7808,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * The same callbacks the page layer takes, plus the two things only a record can answer: who the
    * owners are, and what time it is where the customer is.
    */
-  const digestDeps = (): DigestDeps => {
-    /* A DIGEST GOES BY MAIL AND PUSH TO THE OWNERS, so it is read as NOBODY: no private row of anyone is in it. */
-    const deps = pageDeps(NOBODY);
+  const digestDeps = (sees?: PageSees): DigestDeps => {
+    /* A DIGEST GOES BY MAIL AND PUSH TO THE OWNERS, so it is read as NOBODY: no private row of anyone is in it. A digest
+       shown on a screen to somebody else is read through her lens too (`sees`), so its feed and queue are hers. */
+    const deps = pageDeps(NOBODY, sees);
     return {
       metric: deps.metric,
       read: deps.read,
@@ -7737,7 +7926,126 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * `write` IS THE SAME WRITE PATH, re-entered. That is the whole design: a rule is a caller like
    * any other, wearing its own name, and every check a person's write answers to it answers to too.
    */
+  /* ── who a rule acts for (sharing plan §2.12) ─────────────────────────── */
+
+  /** The person a rule acts for, by their lens, when that is not the record: their name, their lens and its read scope. */
+  type Maker = { name: string; held: Held; ctx: { principal: { kind: 'person'; id: string }; wheres?: Readonly<Wheres> | undefined; writes?: Readonly<Wheres> | undefined } };
+
+  /** The rungs that read a list: every one but `append`, which adds to a list it does not read. */
+  const READING_RUNGS: ReadonlySet<string> = new Set(['read', 'comment', 'write', 'decide', 'owner']);
+  /** The rungs that change a row already there, and those that add one. */
+  const CHANGING_RUNGS: ReadonlySet<string> = new Set(['write', 'decide', 'owner']);
+  const ADDING_RUNGS: ReadonlySet<string> = new Set(['append', 'write', 'decide', 'owner']);
+
+  /**
+   * WHO A RULE ACTS FOR: the person whose `declare` line put its live version in, read from the log as the plan says
+   * ("the actor of the decide or install event that put it in force"), so no column is needed. `null` where that is an
+   * owner, nobody (setup signs none) or no person (an add-on's install, the record itself); `stop` with the sentence a
+   * rule is held by once its maker reaches nothing here (removed, suspended, every share ended); else their lens.
+   *
+   * ONLY AN OWNER ACCEPTS WHAT RUNS UNATTENDED, so a maker who is not one now is an owner who was moved down, or a
+   * colleague whose rule an operation grant let in. Either way the rule runs as far as they reach today, and never as the
+   * owner. Asked at every firing and every turn of a run, through the lens cache, so a revoke stops it at its next.
+   */
+  /* WHO PUT EACH RULE IN, read once a declaration revision (an install reloads it), since the inline pass asks at every
+     write: the person and their name, or `null` for nobody a lens is read for. What they hold is asked every time. */
+  const makersKept = new Map<string, { revision: number; who: { id: string; name: string } | null }>();
+  const makerWho = (rule: string): { id: string; name: string } | null => {
+    const kept = makersKept.get(rule);
+    if (kept !== undefined && kept.revision === revision) return kept.who;
+    const actor = sql.one<{ actor: string }>("SELECT actor FROM event WHERE kind = 'declare' AND target = ? ORDER BY rowid DESC LIMIT 1", `declaration:rule.${rule}`)?.actor;
+    const person = actor === undefined ? undefined : sql.one<{ name: string | null; email: string | null }>('SELECT name, email FROM person WHERE id = ?', actor);
+    const who = actor === undefined || person === undefined ? null : { id: actor, name: person.name?.trim() || person.email?.trim() || 'The person who turned it on' };
+    makersKept.set(rule, { revision, who });
+    return who;
+  };
+
+  const makerOf = (rule: string): { stop: string } | Maker | null => {
+    const who = makerWho(rule);
+    if (who === null) return null;
+    const { id: actor, name } = who;
+    const held = access(sql, actor, null, accessLens());
+    if (held === null) return { stop: `Stopped: ${name}, who turned this on, can no longer reach this record.` };
+    if (held.level === 'owner') return null;
+    return { name, held, ctx: { principal: { kind: 'person', id: actor }, ...(held.wheres ? { wheres: held.wheres } : {}), ...(held.writes ? { writes: held.writes } : {}) } };
+  };
+
+  /** The rung a maker holds on one list: their list's own, else their role, and none past their ceiling or on a personal list. */
+  const makerRung = (m: Maker, register: string): string | null => {
+    if (personalListsNow().includes(register)) return null;
+    if (m.held.registers !== null && !m.held.registers.includes(register)) return null;
+    return m.held.levels[register] ?? m.held.level;
+  };
+
+  /** Whether a row is one a maker's lens shows them: its list read, and the row inside their scope (private rows left out). */
+  const makerSees = (m: Maker, e: Entry): boolean => {
+    if (!READING_RUNGS.has(makerRung(m, e.register) ?? '')) return false;
+    const within = scope(m.ctx, e.register);
+    return within === undefined || admits(e.register, within, e.id);
+  };
+
+  /** A row as a maker's lens shows it: the fields hidden from them taken off. */
+  const makerMasked = (m: Maker, e: Entry): Entry => {
+    const hidden = m.held.hides?.[e.register] ?? [];
+    if (hidden.length === 0) return e;
+    return { ...e, fields: Object.fromEntries(Object.entries(e.fields).filter(([k]) => !hidden.includes(k))) };
+  };
+
+  /** Why a maker may not make this write, or `null`: the list's rung, and a field hidden from them, which does not exist for them. */
+  const makerWriteStop = (m: Maker, register: string, ref: string | null, patch: Patch): Refusal | null => {
+    const rung = makerRung(m, register) ?? '';
+    const listName = registers.get(register)?.name ?? register;
+    if (!(ref === null ? ADDING_RUNGS : CHANGING_RUNGS).has(rung))
+      return { code: 'FORBIDDEN', fix: `${m.name} cannot ${ref === null ? 'add to' : 'change'} ${listName}, and this automation acts for ${m.name}.`, at: 'register' };
+    const hidden = m.held.hides?.[register] ?? [];
+    const named = Object.keys(patch).find((k) => hidden.includes(k));
+    if (named !== undefined) return { code: 'FIELD_UNKNOWN', fix: `${listName} has no field ${named} that ${m.name} can change.`, at: named };
+    return null;
+  };
+
+  /** The sentence a step that reaches past a maker's rows is refused in. */
+  const boundSaid = (m: Maker): string => `${m.name} turned this on, so it reads and writes only what ${m.name} can, and does not reach past those rows.`;
+
+  /**
+   * The rules pass's dependencies held to a maker's lens: a row they may not see is no row, a field hidden from them is
+   * not on it, and every write is checked against the rows they may change on both sides of it (`WriteContext.within`),
+   * as a person's own write is. A call out is refused in `boundSaid`'s sentence.
+   */
+  const boundRules = (base: RulesDeps, m: Maker): RulesDeps => ({
+    ...base,
+    forRule: undefined,
+    bounded: boundSaid(m),
+    entry: (id) => {
+      const e = base.entry(id);
+      return e !== null && makerSees(m, e) ? makerMasked(m, e) : null;
+    },
+    write: (register, ref, patch, actor, batch) => {
+      const stop = makerWriteStop(m, register, ref, patch);
+      if (stop) return { ok: false, refusal: stop };
+      return write(register, ref, patch, { actor, batch, cascade: false, within: writeScope(m.ctx, register) });
+    },
+    generate: (register, patch, actor, batch, stamp) => {
+      const stop = makerWriteStop(m, register, null, patch);
+      if (stop) return { ok: false, refusal: stop };
+      return write(register, null, patch, { actor, batch, cascade: false, stamp, within: writeScope(m.ctx, register) });
+    },
+    note: (entry, actor, text, batch) => {
+      if (makerSees(m, entry)) base.note(entry, actor, text, batch);
+    },
+    call: (ingest) => ({ ingest, outcome: 'unknown', say: boundSaid(m) }),
+  });
+
+  /** Whether a rule acts for somebody's lens, for the inline pass (`RulesDeps.forRule`). */
+  const ruleFor = (rule: string): ReturnType<NonNullable<RulesDeps['forRule']>> => {
+    const m = makerOf(rule);
+    if (m === null || 'stop' in m) return m;
+    /* THE INLINE PASS WRITES ON THE ROW AS IT CAME, so a list with a field hidden from the maker is not one their rule
+       runs on: nothing could keep that field out of what the rule reads. */
+    return { deps: boundRules(rulesDeps(), m), sees: (e) => makerSees(m, e) && (m.held.hides?.[e.register] ?? []).length === 0 };
+  };
+
   const rulesDeps = (): RulesDeps => ({
+    forRule: ruleFor,
     sql,
     /* THE ONE ROUTER. A rule that declares `urgent` shows in the install diff as "interrupts you",
        and until now that diff was the only reader of the key — 09 §4 is what it should have meant. */
@@ -7825,7 +8133,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** What the automation runner reads and writes through: the rule pass's own dependencies, and a row's project. */
   /** The hold the host's ledger last put on this record's automations (`holdRuns`); `null` is none. */
   let runsHeld: { until: number; say: string } | null = null;
+  /** Whether a run acts for somebody's lens (`FlowDeps.boundTo`): the run path's dependencies held to it, or why it stops. */
+  const runActsFor = (rule: string): ReturnType<NonNullable<FlowDeps['boundTo']>> => {
+    const m = makerOf(rule);
+    if (m === null || 'stop' in m) return m;
+    const rules = boundRules(rulesDeps(), m);
+    return {
+      deps: { ...flowDeps(), boundTo: undefined, bounded: boundSaid(m), rules: () => rules, entry: rules.entry },
+      unseen: `Skipped: the row it started for is not one ${m.name} can see.`,
+    };
+  };
+
   const flowDeps = (): FlowDeps => ({
+    boundTo: runActsFor,
     sql,
     mint,
     nowMs: clock.now(),
@@ -8105,7 +8425,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     mint,
     allocate,
-    /* BRAINDOG'S OWN ARRANGING (d3): answered as it is filed, in a savepoint so a refusal leaves the question open. */
+    /* BRAINDOG'S OWN ARRANGING, small and reversible: answered as it is filed, in a savepoint so a refusal leaves
+       the question open. */
     settle: (id) =>
       handledOn(sql) ? attempt(sql, transaction, () => decide(governDeps(), id, { rule: 'handled' }, HANDLED_RULE)) : no('TRANSITION_ILLEGAL', 'BrainDog is not arranging for itself.', { at: 'rule' }),
     hasRegister: (register) => registers.has(register),
@@ -8368,7 +8689,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
        `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
-    /* AND WHAT STILL WAITS AND IS SMALL SETTLES ITSELF (DIRECTION d3, `settleWaiting`): a question asked again is closed,
+    /* AND WHAT STILL WAITS AND IS SMALL SETTLES ITSELF (`settleWaiting`), small and reversible: a question asked again is closed,
        and an arrangement of the owner's own rows that BrainDog or his agent filed is answered as `rule:handled`, one
        line in Handled today with its Undo. Each settle in its own savepoint, so one refusal leaves that question open. */
     if (handledOn(sql))
@@ -8863,7 +9184,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    *
    * `fts.search` clamps any limit to a hundred, so a hundred hits is character-for-character the answer to a
    * query with exactly a hundred matches. Measured on a record at the owner's size: `revenue` drew 100 where
-   * 140 matched, `the` 100 where 304 did, `bake` 100 where 577 did, and nothing downstream could tell. The
+   * 140 matched, `the` 100 where 304 did, `oxbow` 100 where 577 did, and nothing downstream could tell. The
    * count comes back beside the hits so a clamped read arrives looking like one, the way `list` has always
    * been readable through its cursor and its `matched`.
    *
@@ -8879,11 +9200,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       viewer?: string | undefined;
       grant?: Readonly<Wheres> | undefined;
       hide?: Readonly<Record<string, readonly string[]>> | undefined;
+      /**
+       * Amounts are hidden from the caller (sharing plan §2.7): a figure asked for is matched only where it is still in
+       * the text once every amount written there is taken out (`maskedMatched`), so a row is never found by an amount
+       * she is shown as "£…".
+       */
+      maskMoney?: boolean | undefined;
     } = {},
   ): Searched {
     /* THE CALLER'S GRANT, LIST BY LIST (leak matrix G5): the hits and `matched` both count the rows its rule admits. The
        private rows are `viewer`'s, already in the query, so only a list with a rule of its own is held here. */
-    const { grant, hide, ...asked } = opts;
+    const { grant, hide, maskMoney, ...asked } = opts;
+    const mask = maskMoney === true ? maskMoneyText : undefined;
+    const indexed = (q: string, o: Parameters<typeof ftsSearchMatched>[2]): Searched => (mask === undefined ? ftsSearchMatched(sql, q, o) : maskedMatched(sql, q, o ?? {}, mask));
     const admits = Object.keys(grant ?? {}).flatMap((register) => {
       const c = admitClause(register, grant, undefined);
       return c === null ? [] : [{ register, ...c }];
@@ -8900,13 +9229,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     });
     const found =
       plain.length === 0
-        ? ftsSearchMatched(sql, q, { ...asked, admits })
-        : ftsSearchMatched(sql, q, { ...asked, admits, registers: (asked.registers ?? [...registers.keys()]).filter((r) => !plain.some((p) => p.register === r)) });
+        ? indexed(q, { ...asked, admits })
+        : indexed(q, { ...asked, admits, registers: (asked.registers ?? [...registers.keys()]).filter((r) => !plain.some((p) => p.register === r)) });
     if (plain.length > 0) {
       const most = Math.min(Math.max(1, asked.limit ?? 20), 100);
       const words = searchWords(q);
       for (const p of plain) {
-        const got = containsMatched(sql, words, { ...p, admit: admitClause(p.register, grant, asked.viewer) }, most);
+        const got = containsMatched(sql, words, { ...p, admit: admitClause(p.register, grant, asked.viewer) }, most, mask);
         if (got.n > 0) found.matched[p.register] = got.n;
         found.hits.push(...got.hits.slice(0, Math.max(0, most - found.hits.length)));
       }
@@ -9164,11 +9493,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         actorName?: PageDeps['actorName'];
         /** Who is reading, so rows kept private to somebody else are neither drawn nor counted. */
         viewer?: string | undefined;
+        /** What of the reads across the record she is shown (`PageSees`), or nothing for the owner. */
+        sees?: PageSees | undefined;
       } = {},
     ): Result<PageResult> =>
       readPage(
         {
-          ...pageDeps(opts.viewer),
+          ...pageDeps(opts.viewer, opts.sees),
           /* WHAT THE RECORD READS THAT THE KERNEL CANNOT (`lists`, `pages`), and the names it holds for the people in the log. */
           ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
           ...(opts.actorName ? { actorName: opts.actorName } : {}),
@@ -9284,7 +9615,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND A SOURCE THAT SAYS SOMETHING OF EVERY LIST (`sources/index.ts` `everyList`) NAMES EACH LIST IT WATCHES, so a
        reader held from one of them is held from the block. `*` alone let her through when she had no ceiling. */
     blockRegisters: (block: PageBlock, opts: { hostSources?: PageDeps['hostSources'] } = {}): string[] => [
-      ...registersOfBlock(block, pageDeps().metric, { ...beside(), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) }),
+      ...registersOfBlock(block, declaredKept().metric, { ...beside(declaredKept()), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) }),
       ...(sourceModule(block.source)?.everyList ? watchedLists().map((l) => l.id) : []),
     ],
 
@@ -9677,11 +10008,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         one-block preview tells a `signs` block in the kernel's quiet words to a key the inbox does not reach. */
     block: (
       decl: PageBlock,
-      opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string>; viewer?: string | undefined } = {},
+      opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string>; viewer?: string | undefined; sees?: PageSees | undefined } = {},
     ): BlockResult =>
       readBlock(
         {
-          ...pageDeps(opts.viewer),
+          ...pageDeps(opts.viewer, opts.sees),
           ...(opts.walk === undefined ? {} : { walk: opts.walk }),
           ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }),
           ...(opts.here === undefined ? {} : { here: opts.here }),
@@ -9735,8 +10066,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * and the person reading both has no way to tell which. `sectionsOf` is the one assembly, and
      * this is it without the outbox row on the end.
      */
-    digestToday: (id?: string) => {
-      const deps = digestDeps();
+    digestToday: (id?: string, opts: { sees?: PageSees | undefined } = {}) => {
+      const deps = digestDeps(opts.sees);
       const decls = sql
         .all<{ id: string; body: string }>(
           "SELECT id, body FROM declaration WHERE kind = 'digest' AND superseded_at IS NULL AND retired = 0 ORDER BY id",
@@ -10453,6 +10784,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        caller may not decide one handed to somebody else. */
     handQuestion: (id: string, to: string | null, by: string) => transaction(() => handQuestionIn(governDeps(), id, to, by)),
     deciderOf: (id: string) => deciderOfIn(sql, id),
+    /* WHERE A PRESS CAME FROM (`govern.ts` `answeredIn`): the app a card was pressed in, kept on the decision it made. */
+    answeredIn: (decision: string, app: string, by: string, batch?: string) => transaction(() => answeredInIn(governDeps(), decision, app, by, batch)),
+    answeredInOf: (decision: string) => answeredInOf(sql, decision),
     deciderFault: (id: string, actor: string, isOwner: boolean, nameOf?: (person: string) => string) => deciderFaultIn(sql, id, actor, isOwner, nameOf),
 
     /**
@@ -10918,6 +11252,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           reload({ copied: true });
           rebuildFts();
           transaction(() => rebuildKeys(sql, instant(clock.now())));
+          /* AND WHICH SEALED FILES ARE WHOLE HERE: the file names them, and only this host's parts make one whole. */
+          transaction(() => settleSealed(sql));
           transaction(() => lifecycleEvent('import', 'system', `import ${out.value.rows} rows`));
         }
         return out;
@@ -10995,6 +11331,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       reload({ copied: true });
       rebuildFts();
       transaction(() => rebuildKeys(sql, instant(clock.now())));
+      /* AND WHICH SEALED FILES ARE WHOLE HERE, counted again from the parts this host kept (`sealed.ts`). */
+      transaction(() => settleSealed(sql));
       /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`, PRF-A18), marked after the import so the night it
          brought back does not overwrite the mark. */
       transaction(() => markHand(sql, 'The record was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
@@ -11827,6 +12165,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     projectSuggestions: (): ProjectSuggestion[] => projectSuggestions(sql, registers),
     inScope,
     runFor,
+    /** A session with no folder placed by what it says it is working on, a first project formed from it as a draft. */
+    topicRun,
     endRun,
     /** A run's words and commits read against its project's open tasks, and the project's next step followed (`run-reads.ts`). */
     readRunWork,
@@ -12051,13 +12391,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** One instruction by `IN4` or its row id, or null. */
     instruction: (id: string): Instr | null => instructionOf(sql, id),
     /**
-     * The bridge says run `runId`'s session is open: `pulseRun(runId, at)`, `at` in milliseconds and the record's clock
-     * when left out. Moves `pulse_at` in place, no version and no event; answers whether it moved (`presence.ts`).
+     * The bridge says run `runId`'s session is open: `pulseRun(runId, at, seat)`, `at` in milliseconds and the record's
+     * clock when left out. Moves `pulse_at` in place, no version and no event; answers whether it moved (`presence.ts`).
+     * `seat` is the profile the bridge's headers name (migration 44), written once onto a run that has none.
      */
-    pulseRun: (runId: string, at?: number): boolean => {
+    pulseRun: (runId: string, at?: number, seat?: string | null): boolean => {
       if (schemaRefusal(state)) return false;
       const run = instructedRun(sql, runId);
-      return run !== null && pulseRun(sql, run.id, at ?? clock.now());
+      if (run === null) return false;
+      if (typeof seat === 'string' && seat.trim() !== '' && runRegister().has('seat')) seatRun(sql, run.id, seat.trim());
+      return pulseRun(sql, run.id, at ?? clock.now());
     },
     /** What stops run `runId`, or null: `stopOf(runId) → null | {kind, id, said}`. A helper obeys its parent's. */
     stopOf: (runId: string): Stop | null => runStopOf(sql, runId),
@@ -12067,9 +12410,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     changedSince: (runId: string, stamp: string): Delta => instructionsChangedSince(sql, runId, typeof stamp === 'string' ? stamp : '', clock.now()),
     /** The sessions open now, for `presence` (plan §4.4), newest heard from first. */
     presentRuns: () => presentRuns(sql, clock.now()),
-    /** The settings row an agent works under: `profileFor({kind, token, host}) → Profile`. */
-    profileFor: (who: { kind?: string | null | undefined; token?: string | null | undefined; host?: string | null | undefined }): Profile =>
-      profileMatching(sql, who ?? {}),
+    /** The settings row an agent works under: `profileFor({kind, token, host, seat}) → Profile`. */
+    profileFor: (who: ProfileWho): Profile => profileMatching(sql, who ?? {}),
     /** Every live settings row, Defaults first; retired ones too when asked. */
     agentProfiles: (retired = false): Profile[] => readProfiles(sql, retired),
     /** One settings row by id, or null. */

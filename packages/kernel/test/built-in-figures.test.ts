@@ -294,6 +294,27 @@ test('RUNS-WORKING COUNTS THE AGENTS AT WORK BY THE ONE CLOCK: 14 minutes is wor
   sql.close();
 });
 
+/* THE AGENTS PAGE'S LINE IN THE RECORD'S WORDS: how many machines the agents at work are on, the runs naming none as
+   one between them, and how many open runs wait on him, an idle one among them however lately it called. */
+test('MACHINES-WORKING AND RUNS-WAITING COUNT BY THE SAME CLOCK AS RUNS-WORKING', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const run = (doing: string, state: string, minutesAgo: number, host?: string) =>
+    value(k.create('session', { doing, agent: 'claude', state, ...(host ? { host } : {}) }, { actor: 'p_1', stamp: { last_seen: new Date(NOW - minutesAgo * 60_000).toISOString() } }));
+  const read = (id: string) => value<Reading>(k.metric(BUILT_IN_FIGURES[id]!)).value;
+  assert.deepEqual([read('machines-working'), read('runs-waiting')], [0, 0], 'nobody at work is on no machine');
+  run('On the desk', 'active', 1, 'desk');
+  run('Also on the desk', 'active', 2, 'desk');
+  run('On the build box', 'active', 3, 'build-box');
+  run('Somewhere', 'active', 4);
+  run('Turn over', 'idle', 1, 'desk');
+  run('Quiet a while', 'active', 20, 'desk');
+  assert.equal(read('runs-working'), 4);
+  assert.equal(read('machines-working'), 3, 'two named machines, and the runs naming none as one');
+  assert.equal(read('runs-waiting'), 2, 'the idle run and the quiet one wait on him');
+  sql.close();
+});
+
 /* ── where things apply (AGT-D01) ─────────────────────────────────────────── */
 
 const PROJECTS: Declaration = {

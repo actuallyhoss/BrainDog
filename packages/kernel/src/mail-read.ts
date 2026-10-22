@@ -1,7 +1,7 @@
 /**
  * What a forwarded mail is about, read by rules alone: an invoice or receipt, a renewal notice, a shipping or booking
  * confirmation, and who it names. Pure text in, plain facts out; nothing here reads the record, follows a link or opens
- * an attachment. A figure or a day that is not read cleanly is left out and marked, never guessed (DIRECTION d3).
+ * an attachment. A figure or a day that is not read cleanly is left out and marked, never guessed: a guess would be filed as if it were read.
  */
 
 import { isCurrencyCode } from './coerce.ts';
@@ -107,6 +107,32 @@ export function minorOf(printed: string, exp: number): { minor: number; clean: b
 const NUMBER = '\\d{1,3}(?:[., \\u00a0]\\d{3})+(?:[.,]\\d{1,3})?|\\d+(?:[.,]\\d{1,3})?';
 const MONEY_RE = new RegExp(`(?:\\b([A-Z]{3}) ?(${NUMBER}))|(?:([£€$]) ?(${NUMBER}))|(?:(${NUMBER}) ?([A-Z]{3})\\b)`, 'gu');
 const SYMBOL: Record<string, string> = { '£': 'GBP', '€': 'EUR', $: 'USD' };
+
+/**
+ * Money written in free text, as `MONEY_RE` reads it, held apart from the words around it: nothing word-like or a
+ * separated digit just before, so an id or a cursor that happens to hold `9USD` is never read as money, and nothing
+ * word-like just after. A symbol's amount may end in k, m or bn, as "£1.5k" is written.
+ */
+const MONEY_IN_TEXT = new RegExp(`(?<![\\w.,])(?:([A-Z]{3}) ?(${NUMBER})|([£€$]) ?(${NUMBER})(?:k|m|bn)?|(${NUMBER}) ?([A-Z]{3}))(?!\\w)`, 'gu');
+
+/** What an amount out of sight is written as: its currency kept, its number gone. */
+export const MONEY_MASK = '…';
+
+/**
+ * Text with every amount written in it taken out (sharing plan §2.7, "Hide amounts"): "Paid £923.47 for clay" is "Paid
+ * £… for clay", "GBP 400" is "GBP …" and "400 EUR" is "… EUR". Read by `MONEY_RE`'s own shapes and its own currency
+ * check, so what is masked is what a mail's amount is read as; a number with no currency beside it stays.
+ */
+export function maskMoneyText(text: string): string {
+  if (!/\d/u.test(text)) return text;
+  return text.replace(MONEY_IN_TEXT, (whole, code: string | undefined, _a, symbol: string | undefined, _b, _c, after: string | undefined) => {
+    const currency = code ?? after ?? SYMBOL[symbol ?? ''];
+    if (currency === undefined || !isCurrencyCode(currency)) return whole;
+    if (code !== undefined) return `${code} ${MONEY_MASK}`;
+    if (symbol !== undefined) return `${symbol}${MONEY_MASK}`;
+    return `${MONEY_MASK} ${after}`;
+  });
+}
 
 type Token = { at: number; money: MailMoney; clean: boolean; line: string; before: string };
 

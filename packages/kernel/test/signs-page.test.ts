@@ -73,7 +73,7 @@ test('A SIGN WITH NOTHING TO READ IS NONE, NEVER GREEN: a state out of shape rea
 });
 
 test('WHERE NARROWS BY STATE, and the count is of what matched', () => {
-  const read = readBlock(depsWith([RED, GREEN, NONE, { ...RED, sign: 'pages-clean', name: 'Pages print clean' }]), { ...TABLE, where: 'state is red', limit: 1 });
+  const read = readBlock(depsWith([RED, GREEN, NONE, { ...RED, sign: 'pages-clean', name: 'Pages draw without errors' }]), { ...TABLE, where: 'state is red', limit: 1 });
   assert.deepEqual(read.refusals, []);
   assert.deepEqual(read.rows.map((r) => r.fields.name), ['Arrivals file by themselves']);
   assert.equal(read.matched, 2, 'two red, one drawn under the limit');

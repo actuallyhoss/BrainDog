@@ -116,6 +116,33 @@ test('A JOB KIND INSTALLS AS THE TENTH KIND, AND ITS LINT REFUSES WHAT NO RUN MA
   assert.equal(fillPrompt('Notes for %tag%.', { tag: '%tag% again' }), 'Notes for %tag% again.');
 });
 
+test('A KIND MAY SAY CODEX RUNS IT, and then names no command, which Codex cannot hold a run to', () => {
+  const at = (body: Record<string, unknown>) => jobBody({ id: 'job.release-notes', body: { ...KIND, ...body } })?.at;
+  const codex = { agent: 'codex', tools: ['Read', 'Grep', 'mcp__braindog__propose'] };
+  assert.equal(at(codex), undefined);
+  assert.equal(at({ agent: 'claude' }), undefined);
+  assert.equal(at({ agent: 'cursor' }), 'agent');
+  /* KIND's own tools name git log, which Codex would not keep to. */
+  assert.equal(at({ agent: 'codex' }), 'tools[2]');
+  assert.match(jobBody({ id: 'job.release-notes', body: { ...KIND, agent: 'codex' } })?.fix ?? '', /^job\.release-notes runs on Codex, which cannot hold a run to named commands/u);
+  assert.equal(at({ ...codex, permission: 'acceptEdits', writes: true }), undefined);
+});
+
+test('A CLAIM SAYS WHICH AGENT RUNS THE JOB: Claude Code for a kind that says none, Codex for one that says so', async () => {
+  const { sql, deps, transaction, enrol } = await setup();
+  const { runner } = await enrol('Studio laptop');
+  value(createJob(deps(), { kind: 'job.release-notes', args: { tag: 'v1' } }, () => true));
+  assert.equal(claimed(value(await claimJob(deps(), runner, transaction))).job.agent, 'claude');
+  sql.exec(
+    "INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, created_at) VALUES ('job.codex-notes', 1, 'job', NULL, ?, 'test', 0, ?)",
+    JSON.stringify({ ...KIND, job: 'codex-notes', agent: 'codex', tools: ['Read', 'mcp__braindog__propose'] }),
+    new Date(NOW).toISOString(),
+  );
+  value(createJob(deps(), { kind: 'job.codex-notes', args: { tag: 'v2' } }, () => true));
+  const other = await enrol('Build box');
+  assert.equal(claimed(value(await claimJob(deps(), other.runner, transaction))).job.agent, 'codex');
+});
+
 test('THE WHOLE WALK: started, claimed with a lease and a bearer, reported in order, stopped, ended', async () => {
   const { sql, deps, transaction, enrol } = await setup();
   const { runner } = await enrol('Studio laptop');
@@ -197,4 +224,34 @@ test("ONLY A RUNNER'S BEARER IS A RUNNER: a login grant's and a stranger's are r
   const login = (value(await devicePoll(deps(), { device_code: started.device_code })) as Exchanged).bearer;
   assert.equal(refusalOf(await runnerGrant(deps(), login)).code, 'FORBIDDEN');
   assert.equal(refusalOf(await runnerGrant(deps(), `${RECORD}.not-a-bearer`)).code, 'FORBIDDEN');
+});
+
+test('A JOB PLACED ON A MACHINE OR A PROFILE GOES ONLY TO A RUNNER THERE, and the machine that took each is kept', async () => {
+  const { deps, transaction, enrol } = await setup();
+  const { runner } = await enrol('Studio laptop');
+  const placed = value(createJob(deps(), { kind: 'job.release-notes', args: { tag: 'v2' }, machine: 'kiln-mbp', seat: 'harbour' }, () => true));
+  /* A NAME AND NEVER A FOLDER. */
+  assert.equal(refusalOf(createJob(deps(), { kind: 'job.release-notes', args: { tag: 'v2' }, seat: '/Users/ada/.claude-harbour' }, () => true)).at, 'seat');
+  assert.equal(refusalOf(createJob(deps(), { kind: 'job.release-notes', args: { tag: 'v2' }, machine: 'two words' }, () => true)).at, 'machine');
+
+  /* A RUNNER THAT SAYS NOTHING, or says another machine or no such profile, takes nothing. */
+  assert.equal(value(await claimJob(deps(), runner, transaction)).job, null);
+  assert.equal(value(await claimJob(deps(), runner, transaction, { host: 'kiln-studio', seats: ['harbour'] })).job, null);
+  assert.equal(value(await claimJob(deps(), runner, transaction, { host: 'kiln-mbp', seats: ['default'] })).job, null);
+
+  /* THE RUNNER ON THAT MACHINE THAT CAN RUN THAT PROFILE takes it, and is told the profile by name. */
+  const got = claimed(value(await claimJob(deps(), runner, transaction, { host: 'kiln-mbp', seats: ['default', 'harbour', '../etc'] })));
+  assert.equal(got.job.id, placed.id);
+  assert.equal(got.job.seat, 'harbour');
+  const row = value(await listJobs(deps(), {})).jobs.find((j) => j.id === placed.id);
+  assert.deepEqual([row?.machine, row?.seat, row?.ran_on], ['kiln-mbp', 'harbour', 'kiln-mbp']);
+
+  /* A JOB THAT NAMES NEITHER GOES TO ANY RUNNER, as before, and keeps the machine it ran on when the runner said one. */
+  const plain = value(createJob(deps(), { kind: 'job.release-notes', args: { tag: 'v3' } }, () => true));
+  const other = await enrol('Build box');
+  const took = claimed(value(await claimJob(deps(), other.runner, transaction, { host: 'build-box' })));
+  assert.equal(took.job.id, plain.id);
+  assert.equal(took.job.seat, null);
+  const ran = value(await listJobs(deps(), {})).jobs.find((j) => j.id === plain.id);
+  assert.deepEqual([ran?.machine, ran?.seat, ran?.ran_on], [null, null, 'build-box']);
 });

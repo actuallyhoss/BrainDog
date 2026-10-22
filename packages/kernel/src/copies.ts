@@ -9,7 +9,7 @@
  *
  * A NOTE BEGINNING `failed:` IS A NIGHT THAT DID NOT COPY, as he worded it (P.173), and never a copy: its time is not
  * `last_copy_at`. The same night raises one fault (`fault.ts`, cause `NIGHT_FAULT`), and the same cause the next night
- * counts one more of that fault rather than opening a second. A copy kept clears it. Never a question (DIRECTION 40).
+ * counts one more of that fault rather than opening a second. A copy kept clears it. Never a question.
  *
  * THE NIGHT'S OWN DUMP IS AN EXPORT TOO, written as `system` (`dumpOf` in the Worker), so `last_export_at` is an export
  * somebody asked for: any actor but `system`.
@@ -39,7 +39,7 @@ export const NIGHT_KIND = 'export.night';
 export const keptNote = (id: string, bytes: number): string => `snapshot ${id} ${String(Math.max(0, Math.trunc(bytes)))} bytes`;
 
 /**
- * The note a failed night writes, in his words, and always the same words.
+ * The note a failed night writes, in plain words, and always the same words.
  *
  * THE REASON NEVER GOES IN THE NOTE. A note is history anyone who reads the record sees, and a thrown error can carry
  * a bucket's name, an object's key or a host. The reason goes to the fault alone (`raiseFault`, which caps it). The

@@ -1,11 +1,11 @@
 /**
- * The record's vital signs (PRF-A01, DIRECTION §40): a short closed list of readings about the record itself, each
+ * The record's vital signs (PRF-A01): a short closed list of readings about the record itself, each
  * green, red or none, read on demand and kept a row a day in `sign_reading` (migration 27).
  *
  * WHY THIS EXISTS. His record stood still for nine days after the move, 32 messages waited, 17 of 25 open questions were
  * one question, and every gate stayed green, because every gate drew an invented record. "A daily check watches all of
- * that and says so in the app when one fails" (D40.37). These are that check, and every record has them: nothing here
- * names a list, a bank or a use case (DIRECTION §27).
+ * that and says so in the app when one fails". These are that check, and every record has them: nothing here
+ * names a list, a bank or a use case.
  *
  * FIVE ARE READ HERE, OVER THE KERNEL'S OWN TABLES: arrivals, numbers, questions by cause, the oldest question, runs.
  * FIVE ARE FILED by the layers that know more, through `fileSignReading`: whether the model answers and whether agents
@@ -514,7 +514,8 @@ function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
   if (oldest === undefined) return reading('green', 0, 'No question is waiting.');
   const days = Math.max(0, Math.floor((nowMs - Date.parse(oldest.at)) / DAY));
   const facts = [`Asked on ${dateSaid(oldest.at, tz, nowMs)}: ${askedIn(sql, oldest.id)}`];
-  const said = `The oldest open question is ${count(days, 'day')} old.`;
+  /* NOUGHT DAYS IS TODAY: "is 0 days old" was how Health said a question asked this morning. */
+  const said = days === 0 ? 'The oldest open question was asked today.' : `The oldest open question is ${count(days, 'day')} old.`;
   return reading(days > QUESTION_DAYS_MOST ? 'red' : 'green', days, said, facts);
 }
 
@@ -646,12 +647,12 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('numbers-arrive', 'Numbers arrive on schedule', { FEED_LATE_PERIODS, SERIES_POINTS_LEAST, SERIES_GAP_TIMES, SERIES_STALE_DAYS, SERIES_STALE_ONE_IN }, readNumbers, 2),
   filed('model-answers', 'The model answers', 'host'),
   filed('tools-listed', 'Agents get the tool list', 'host'),
-  filed('briefing-true', 'The briefing is true', 'record'),
-  kernel('questions-by-cause', 'One question per cause', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
+  filed('briefing-true', 'What agents are told is true', 'record'),
+  kernel('questions-by-cause', 'Each problem is asked once', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
-  kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
+  kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
   /* Version 2 (PGS-A01 step 5): a refused block or a path that named nothing, counted by the pages census, is red too. */
-  filed('pages-clean', 'Pages print clean', 'host', 2),
+  filed('pages-clean', 'Pages draw without errors', 'host', 2),
   filed('arrived', 'What shipped has arrived', 'record'),
   ...SIGNS_FLOW,
   ...SIGNS_ACTIONS,

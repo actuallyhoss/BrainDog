@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
     "./flow-grammar": "./src/flow-grammar.ts",
     "./spoken-names": "./src/spoken-names.ts"
   },

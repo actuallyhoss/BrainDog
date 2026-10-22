@@ -1,5 +1,5 @@
 /**
- * What kind of change a write or a proposal is, and the floor no rung lifts (DIRECTION §37).
+ * What kind of change a write or a proposal is, and the floor no rung lifts.
  *
  * The ladder lets an agent make one kind of change without asking once the owner has kept enough of them, so the kind
  * has to be the same name whether it is read off a write, a proposal's body or the log, and the floor has to hold

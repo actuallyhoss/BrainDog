@@ -1,5 +1,5 @@
 /**
- * The walk over what the record already holds (DIRECTION §38), on a scratch record shaped like the owner's and
+ * The walk over what the record already holds, on a scratch record shaped like the owner's and
  * pseudonymised: ledger lines with no party and the payee only in the bank's words, a note's "Payee:" or the
  * description; runs in no project though most name their repository; projects listing bare repository names; and
  * services in no project.

@@ -1,8 +1,8 @@
 /**
  * `job`: the tenth kind of declaration, and the queue a machine the owner enrolled claims its runs from.
  *
- * A job is a run of Claude Code on the owner's own machine, under the owner's own subscription, started from the record
- * and watched in it (`33 §11`, `46 §4.7`).
+ * A job is a run of Claude Code, or of Codex when its kind says `agent: codex`, on the owner's own machine, under the
+ * owner's own subscription, started from the record and watched in it (`33 §11`, `46 §4.7`).
  *
  * A KIND IS APPROVED ONCE, AND A RUN NAMES ONE. What a run may do (its prompt, the tools it may use, the folder it works
  * in, how many turns it takes and how it asks) is a `job.<id>` declaration, installed through the ordinary `change`
@@ -16,6 +16,13 @@
  * queue once and is `interrupted` the second time. The runner fills the prompt's `%arg%` slots once (`fillPrompt`), runs
  * Claude Code with the kind's tools and permission mode, never with its permissions skipped, and posts what happened one
  * event at a time, in order.
+ *
+ * ONE MACHINE, ONE PROFILE, WHEN HE SAYS SO (migration 44). A job may name the machine it runs on, as runs name it
+ * (`host`), and the Claude Code profile it runs under, by name (`studio`), in `job_place` beside it. A runner claims
+ * saying the machine it is on and the profiles it can start Claude Code under, and takes only a job it can run that
+ * way; a job that names neither goes to any runner, as before. The profile reaches the runner as a name, which it turns
+ * into a folder of its own: the record never holds a path. The machine a runner took each job on is kept with it
+ * (`ran_on`), so the app can say a runner on that machine is on.
  *
  * NO EVENT IS WRITTEN BY THE RECORD WHILE A RUNNER HOLDS A JOB. A runner numbers its events and each must be the next
  * (`postJobEvent`), so a line the record wrote in between would refuse the runner's next one. The record writes a note
@@ -31,6 +38,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant, isCurrencyCode, looksLikeCredential } from './coerce.ts';
+import { MACHINE_NAME, SEAT_NAME } from './instruction.ts';
 import { createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
 
 /** How long a claim holds a job with no word from its runner. Every event and every `readCancel` renews it. */
@@ -97,6 +105,8 @@ const SWEEP_MOST = 200;
 const PICK_WALK = 10;
 /** The runner grants walked to find a machine by its id: a record enrols a handful. */
 const RUNNERS_WALK = 200;
+/** The most profiles one claim may say it can run under: a machine keeps a handful. */
+const SEATS_MOST = 32;
 /** How deep a posted body is walked for a credential, and where the walk stops keeping anything. */
 const BODY_DEPTH_MOST = 8;
 const ERROR_CHARS_MOST = 2_000;
@@ -131,6 +141,13 @@ export type JobEventKind = (typeof JOB_EVENT_KINDS)[number];
 export const JOB_PERMISSIONS = ['dontAsk', 'acceptEdits'] as const;
 export type JobPermission = (typeof JOB_PERMISSIONS)[number];
 
+/**
+ * Which agent runs a kind: Claude Code, the first and the default, or Codex (`codex exec`). A kind that says none is
+ * Claude Code's, as every kind installed before this was.
+ */
+export const JOB_AGENTS = ['claude', 'codex'] as const;
+export type JobAgent = (typeof JOB_AGENTS)[number];
+
 /** The file tools a kind may name as they are, beside the record's own tools and named commands. */
 export const JOB_FILE_TOOLS = ['Read', 'Grep', 'Glob'] as const;
 
@@ -155,9 +172,11 @@ export type JobBody = {
   writes?: boolean;
   /** The pack that owns it, when no `pack` row does, read as a script's `pack:` is. */
   pack?: string;
+  /** Which agent runs it: Claude Code when left out. */
+  agent?: JobAgent;
 };
 
-const HEADER = ['job', 'title', 'prompt', 'args', 'repo', 'tools', 'turns', 'permission', 'writes', 'pack'] as const;
+const HEADER = ['job', 'title', 'prompt', 'args', 'repo', 'tools', 'turns', 'permission', 'writes', 'pack', 'agent'] as const;
 const ARG_KEYS = ['id', 'label', 'max'] as const;
 
 /** A kind's own id: the script and ingest grammar, lower case with a hyphen allowed. */
@@ -313,6 +332,21 @@ export function jobBody(decl: { id: string; body: Record<string, unknown> }): Re
     return bad(`${id} changes files without asking, so it says writes: true, which Decide shows before anybody approves it.`, 'writes');
 
   if (body.pack !== undefined && typeof body.pack !== 'string') return bad(`${id}'s pack is the id of the pack that owns it.`, 'pack');
+
+  if (body.agent !== undefined && !(JOB_AGENTS as readonly unknown[]).includes(body.agent))
+    return bad(`${id}'s agent is ${JOB_AGENTS.join(' or ')}, the one that runs it. Leave it out for Claude Code.`, 'agent', JOB_AGENTS);
+  /* CODEX CANNOT HOLD A RUN TO NAMED COMMANDS. It runs commands inside a sandbox, read-only for dontAsk and the folder
+     alone for acceptEdits, with no list of which; a kind that named some would read in Decide as a promise nobody
+     keeps. Its file reads go through that same sandbox, so Read, Grep and Glob, and the record's own tools, are what it
+     names. */
+  if (body.agent === 'codex') {
+    const named = tools.findIndex((t) => typeof t === 'string' && BASH.test(t));
+    if (named >= 0)
+      return bad(
+        `${id} runs on Codex, which cannot hold a run to named commands: it runs any command its sandbox allows, read-only for dontAsk. Name Read, Grep, Glob and the record's own tools, or leave agent out for Claude Code.`,
+        `tools[${named}]`,
+      );
+  }
   return null;
 }
 
@@ -324,8 +358,17 @@ export type JobRunner = { id: string; name: string };
 /** A runner's bearer, checked: who the machine is. */
 export type RunnerGrant = JobRunner;
 
-/** What `createJob` takes. */
-export type CreateJobArgs = { kind?: unknown; args?: unknown; about?: unknown };
+/**
+ * What `createJob` takes. `machine` is the machine it must run on, as runs name it, and `seat` the Claude Code profile
+ * it must run under, by name; each absent for any.
+ */
+export type CreateJobArgs = { kind?: unknown; args?: unknown; about?: unknown; machine?: unknown; seat?: unknown };
+
+/**
+ * Where a runner claiming is: the machine, as runs name it (`os.hostname()`), and the Claude Code profiles it can start
+ * a run under, by name. A runner that says neither takes only a job that names neither.
+ */
+export type RunnerPlace = { host?: unknown; seats?: unknown };
 
 /** One job as the list shows it. `lost` is worked out, never stored: a claim whose lease has run out. */
 export type JobRow = {
@@ -341,6 +384,11 @@ export type JobRow = {
   cancel: boolean;
   /** The name of the machine that claimed it, or `null` while nobody has. */
   runner: string | null;
+  /** The machine it must run on, and the profile it must run under, as he started it; `null` for any (migration 44). */
+  machine: string | null;
+  seat: string | null;
+  /** The machine its runner took it on, as runs name it, or `null` while none has or a runner said none. */
+  ran_on: string | null;
   seq: number;
   created_at: string;
   claimed_at: string | null;
@@ -377,7 +425,11 @@ export type ClaimedJob = {
   permission: JobPermission;
   repo: string | null;
   args: Record<string, string>;
+  /** The profile to start Claude Code under, by name, which the runner turns into a folder of its own; `null` for its own. */
+  seat: string | null;
   seq: number;
+  /** Which agent runs it. A runner older than this field runs every job with Claude Code, so a Codex kind says so. */
+  agent: JobAgent;
 };
 
 export type Claimed = { job: ClaimedJob; lease_until: string; bearer: string; mcp: { url: string } } | { job: null; idle_ms: number };
@@ -544,6 +596,31 @@ export function sweepJobs(deps: TokenDeps): number {
   return moved;
 }
 
+/** A job's place as a caller said it, checked: the machine and the profile, each a name or nothing. */
+function placeFor(args: CreateJobArgs): Result<{ machine: string | null; seat: string | null }> {
+  const out = { machine: null as string | null, seat: null as string | null };
+  for (const [key, grammar, fix] of [
+    ['machine', MACHINE_NAME, 'Name the machine as its runs name it, like Adas-MacBook-Pro.local.'],
+    ['seat', SEAT_NAME, 'Name the profile as its runs name it, like studio or default: a name, never a folder.'],
+  ] as const) {
+    const v = args[key];
+    if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) continue;
+    if (typeof v !== 'string' || !grammar.test(v.trim())) return no('VALUE_MALFORMED', fix, { at: key });
+    out[key] = v.trim();
+  }
+  return ok(out);
+}
+
+/** A claim's place as the runner said it: its machine, or `null`, and the profiles it can run, each a name. */
+function placeOf(place: RunnerPlace | undefined): { host: string | null; seats: string[] } {
+  const hostSaid = place?.host;
+  const host = typeof hostSaid === 'string' && MACHINE_NAME.test(hostSaid.trim()) ? hostSaid.trim() : null;
+  const seatsSaid = place?.seats;
+  const said: unknown[] = Array.isArray(seatsSaid) ? seatsSaid : [];
+  const seats = [...new Set(said.filter((v): v is string => typeof v === 'string' && SEAT_NAME.test(v.trim())).map((v) => v.trim()))].slice(0, SEATS_MOST);
+  return { host, seats };
+}
+
 /** The arguments one start fills in, checked against its kind. */
 function argsFor(kind: string, body: JobBody, given: unknown): Result<Record<string, string>> {
   const declared = Array.isArray(body.args) ? body.args : [];
@@ -582,6 +659,8 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
     return no('DECLARATION_UNKNOWN', `${kind.slice(0, ECHO_CHARS_MOST)} is not a kind of job this record has approved. A kind is approved once, in Decide.`, { at: 'kind' });
   const filled = argsFor(kind, body, args.args);
   if (!filled.ok) return filled as Result<never>;
+  const place = placeFor(args);
+  if (!place.ok) return place as Result<never>;
 
   let about: string | null = null;
   if (args.about !== undefined && args.about !== null) {
@@ -609,6 +688,8 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
     instant(deps.nowMs + JOB_WAITS_MS),
     about,
   );
+  if (place.value.machine !== null || place.value.seat !== null)
+    deps.sql.exec('INSERT INTO job_place (job_id, machine, seat) VALUES (?, ?, ?)', id, place.value.machine, place.value.seat);
   return ok({ id });
 }
 
@@ -650,8 +731,22 @@ async function runnersNamed(deps: TokenDeps): Promise<Map<string, string>> {
   return out;
 }
 
+/** Where a job runs, as `job_place` holds it. */
+type Place = { machine: string | null; seat: string | null; ran_on: string | null };
+const NOWHERE: Place = { machine: null, seat: null, ran_on: null };
+
+/** The places of these jobs, by id: one read for a page. */
+function placesOf(deps: TokenDeps, ids: readonly string[]): Map<string, Place> {
+  if (ids.length === 0) return new Map();
+  return new Map(
+    deps.sql
+      .all<Place & { job_id: string }>('SELECT job_id, machine, seat, ran_on FROM job_place WHERE job_id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))
+      .map((r) => [r.job_id, { machine: r.machine, seat: r.seat, ran_on: r.ran_on }]),
+  );
+}
+
 /** A stored row as the list shows it. */
-function shown(deps: TokenDeps, row: Stored, kinds: Map<string, JobBody | null>, names: Map<string, string>): JobRow {
+function shown(deps: TokenDeps, row: Stored, kinds: Map<string, JobBody | null>, names: Map<string, string>, place: Place = NOWHERE): JobRow {
   if (!kinds.has(row.kind)) kinds.set(row.kind, kindOf(deps, row.kind));
   const kind = kinds.get(row.kind) ?? null;
   const now = instant(deps.nowMs);
@@ -666,6 +761,9 @@ function shown(deps: TokenDeps, row: Stored, kinds: Map<string, JobBody | null>,
     lost: row.status === 'claimed' && (row.lease_until === null || row.lease_until < now),
     cancel: row.cancel === 1,
     runner: row.runner_id === null ? null : (names.get(row.runner_id) ?? 'A runner'),
+    machine: place.machine,
+    seat: place.seat,
+    ran_on: place.ran_on,
     seq: row.seq,
     created_at: row.created_at,
     claimed_at: row.claimed_at,
@@ -705,7 +803,11 @@ export async function listJobs(deps: TokenDeps, args: { status?: unknown; limit?
   const page = rows.slice(0, limit);
   const names = page.some((r) => r.runner_id !== null) ? await runnersNamed(deps) : new Map<string, string>();
   const kinds = new Map<string, JobBody | null>();
-  return ok({ jobs: page.map((r) => shown(deps, r, kinds, names)), cursor: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null });
+  const places = placesOf(deps, page.map((r) => r.id));
+  return ok({
+    jobs: page.map((r) => shown(deps, r, kinds, names, places.get(r.id))),
+    cursor: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null,
+  });
 }
 
 /** What one job has done since a line the caller names, and where it stands now. */
@@ -785,16 +887,27 @@ async function approverOf(deps: TokenDeps, runner: string): Promise<string | nul
 }
 
 /** A job a claim took, before its bearer is minted: enough to answer the runner, or to put it back. */
-type Taken = { id: string; kind: string; body: JobBody; args: Record<string, string>; seq: number; lease_until: string; expires: string };
+type Taken = { id: string; kind: string; body: JobBody; args: Record<string, string>; seat: string | null; seq: number; lease_until: string; expires: string };
 
-/** The oldest queued job whose kind is still installed, claimed for this runner, or `null` when there is none. */
-function take(deps: TokenDeps, runner: JobRunner): Taken | null {
+/**
+ * The oldest queued job whose kind is still installed and that this runner can run where it is, claimed for it, or
+ * `null` when there is none. A job naming a machine goes only to a runner on it, and one naming a profile only to a
+ * runner that can start Claude Code under it; the machine the runner took it on is kept beside it.
+ */
+function take(deps: TokenDeps, runner: JobRunner, where: { host: string | null; seats: string[] }): Taken | null {
   sweepJobs(deps);
   const holding = deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM job WHERE status = 'claimed' AND runner_id = ?", runner.id)?.n ?? 0;
   if (holding >= JOBS_HELD_MOST) return null;
   for (let i = 0; i < PICK_WALK; i++) {
-    const next = deps.sql.one<{ id: string; kind: string; args: string; seq: number; expires: string }>(
-      "SELECT id, kind, args, seq, expires FROM job WHERE status = 'queued' ORDER BY created_at, id LIMIT 1",
+    const next = deps.sql.one<{ id: string; kind: string; args: string; seq: number; expires: string; seat: string | null }>(
+      `SELECT j.id AS id, j.kind AS kind, j.args AS args, j.seq AS seq, j.expires AS expires, p.seat AS seat
+       FROM job j LEFT JOIN job_place p ON p.job_id = j.id
+       WHERE j.status = 'queued'
+         AND (p.machine IS NULL OR p.machine = ?)
+         AND (p.seat IS NULL OR p.seat IN (SELECT value FROM json_each(?)))
+       ORDER BY j.created_at, j.id LIMIT 1`,
+      where.host,
+      JSON.stringify(where.seats),
     );
     if (!next) return null;
     const body = kindOf(deps, next.kind);
@@ -812,8 +925,14 @@ function take(deps: TokenDeps, runner: JobRunner): Taken | null {
       instant(deps.nowMs + JOB_RUNS_MS),
       next.id,
     );
+    if (where.host !== null)
+      deps.sql.exec(
+        'INSERT INTO job_place (job_id, ran_on) VALUES (?, ?) ON CONFLICT (job_id) DO UPDATE SET ran_on = excluded.ran_on',
+        next.id,
+        where.host,
+      );
     const seq = noteOn(deps, next.id, next.seq, { text: `Taken by ${runner.name}.`, runner: runner.name });
-    return { id: next.id, kind: next.kind, body, args: argsOf(next.args), seq, lease_until: lease, expires: next.expires };
+    return { id: next.id, kind: next.kind, body, args: argsOf(next.args), seat: next.seat, seq, lease_until: lease, expires: next.expires };
   }
   return null;
 }
@@ -831,11 +950,16 @@ function take(deps: TokenDeps, runner: JobRunner): Taken | null {
  * is revoked when the job ends, when the sweep takes the job back, and when it runs out.
  *
  * `transaction` IS THE RECORD'S, handed in by `api/jobs.ts`, so the claim is atomic with the sweep that runs before it.
+ *
+ * `place` IS WHERE THE RUNNER SAYS IT IS: its machine and the profiles it can run under (`RunnerPlace`). A name that is
+ * not one is passed over, so an older runner, or one that says nothing, takes only a job that names no machine and no
+ * profile.
  */
-export async function claimJob(deps: TokenDeps, runner: JobRunner, transaction: <T>(fn: () => T) => T): Promise<Result<Claimed>> {
+export async function claimJob(deps: TokenDeps, runner: JobRunner, transaction: <T>(fn: () => T) => T, place?: RunnerPlace): Promise<Result<Claimed>> {
   const person = await approverOf(deps, runner.id);
   if (person === null) return no('FORBIDDEN', 'This machine is no longer enrolled on this record. Enrol it again.', { at: 'principal' });
-  const taken = transaction(() => take(deps, runner));
+  const where = placeOf(place);
+  const taken = transaction(() => take(deps, runner, where));
   if (taken === null) return ok({ job: null, idle_ms: JOB_IDLE_MS });
 
   const minted = await createToken(deps, person, { scope: 'propose', label: bearerLabel(taken.id), days: 1 });
@@ -861,7 +985,9 @@ export async function claimJob(deps: TokenDeps, runner: JobRunner, transaction: 
       permission: taken.body.permission,
       repo: taken.body.repo ?? null,
       args: taken.args,
+      seat: taken.seat,
       seq: taken.seq,
+      agent: taken.body.agent ?? 'claude',
     },
     lease_until: taken.lease_until,
     bearer: minted.value.bearer,

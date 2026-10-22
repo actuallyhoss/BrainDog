@@ -1,5 +1,5 @@
 /**
- * Which agent a run is (DIRECTION §37, "Names: the app and where it runs"): the client's own name, which MCP clients send
+ * Which agent a run is ("Names: the app and where it runs"): the client's own name, which MCP clients send
  * as `clientInfo` on every request since the 2026-07-28 revision, says the kind of agent when the caller named none, and
  * what to call it. A run that said no agent learns its kind from the first call that does.
  *

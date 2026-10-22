@@ -1,5 +1,5 @@
 /**
- * Whether each block of a page is drawn, for every reader (`src/drawn.ts`, DIRECTION §35 and §37, PGS-A05).
+ * Whether each block of a page is drawn, for every reader (`src/drawn.ts`, PGS-A05).
  *
  * THE BLOCKS ARE THE RECORD'S OWN SHAPE (`BlockResult`), so a change to that type that the rule can no longer read is a
  * compile error here rather than a page that quietly draws everything again.
@@ -149,10 +149,10 @@ const cards = (rows: PageRow[], over: Partial<BlockResult> = {}): BlockResult =>
   block({ kind: 'cards', heading: 'Where it stands', source: 'register.things', columns: STANDS, rows, matched: rows.length, ...over });
 
 test('CARDS WHOSE EVERY CARD SAYS NOTHING are unsaid: no value in any column the block draws, on any row', () => {
-  const dash = cards([row({ name: 'Sketchpad', health: null, progress: null, aim: '', agent: null })]);
+  const dash = cards([row({ name: 'Pinwheel', health: null, progress: null, aim: '', agent: null })]);
   assert.equal(unsaid(dash), true);
   /* A FIELD THE ROW NEVER HELD reads as one nobody filled in, and so do two such rows. */
-  assert.equal(unsaid(cards([row({ name: 'Sketchpad' }), row({ name: 'Other', aim: '' })])), true);
+  assert.equal(unsaid(cards([row({ name: 'Pinwheel' }), row({ name: 'Other', aim: '' })])), true);
   const lead = block({ kind: 'table', rows: [row({ title: 'a' })], matched: 1 });
   assert.deepEqual(whys(markDrawn([lead, dash])), ['drawn', 'unsaid']);
   /* ITS HEADING GOES WITH IT, as a section over nothing does. */
@@ -164,7 +164,7 @@ test('A CARD WITH ANYTHING SAID IS DRAWN, and every card beside it: a name, a no
   assert.equal(unsaid(cards([row({ progress: 0 })])), false, 'nought is a value');
   assert.equal(unsaid(cards([row({ health: null }), row({ aim: '2026-12-01' })])), false, 'one card said is the block said');
   /* A CARD WITH A NAME IS NEVER LEFT OUT: a service imported with no cost is still what the project runs on. */
-  const alive = cards([row({ name: 'sketchpad.com', cost: null, cycle: null, note: '', renews: null })], {
+  const alive = cards([row({ name: 'pinwheel.example', cost: null, cycle: null, note: '', renews: null })], {
     heading: 'Keeping it alive',
     columns: [{ field: 'name', as: 'title' }, { field: 'cost', as: 'figure' }, { field: 'cycle', as: 'fact' }, { field: 'note', as: 'fact' }, { field: 'renews', as: 'when' }],
   });
@@ -199,64 +199,64 @@ test('A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with 
   assert.deepEqual(whys(markDrawn([lead, written, bareRing])), ['drawn', 'drawn', 'empty']);
 });
 
-/* THE SKETCHPAD SHAPE (audit 59, claim 4): the project page of an imported project nobody has described. "Where it
+/* THE PINWHEEL SHAPE (audit 59, claim 4): the project page of an imported project nobody has described. "Where it
    stands" is two blocks under one heading, each behind a `when:` (`packages/seed/src/modules/portfolio.ts`): the cards
    while one of the four fields is said, the figures while none is. Under them, the boxed section "More about
-   Sketchpad" names the host's `actions` panel over what the project runs on. */
-const sketchpad = (over: { said?: boolean; panel?: string; box?: boolean; note?: boolean; actions?: unknown[] } = {}): BlockResult[] => {
+   Pinwheel" names the host's `actions` panel over what the project runs on. */
+const pinwheel = (over: { said?: boolean; panel?: string; box?: boolean; note?: boolean; actions?: unknown[] } = {}): BlockResult[] => {
   const said = over.said ?? false;
-  const fields = said ? { name: 'Sketchpad', health: 'at_risk' } : { name: 'Sketchpad', health: null, progress: null, aim: null, agent: null };
-  const more = { ...block({ kind: 'section', heading: 'More about Sketchpad', box: over.box ?? true, panel: over.panel ?? 'actions' }), ...(over.actions ? { actions: over.actions } : {}) };
+  const fields = said ? { name: 'Pinwheel', health: 'at_risk' } : { name: 'Pinwheel', health: null, progress: null, aim: null, agent: null };
+  const more = { ...block({ kind: 'section', heading: 'More about Pinwheel', box: over.box ?? true, panel: over.panel ?? 'actions' }), ...(over.actions ? { actions: over.actions } : {}) };
   return [
     block({ kind: 'table', heading: 'The plan', rows: [row({ title: 'Ship it' })], matched: 1 }),
     cards([row(fields)], { area: 'rail', drawn: said }),
     { ...block({ kind: 'stat', heading: 'Where it stands', area: 'rail', drawn: !said }), readings: [{ label: 'Worked on this week', reading: { value: 2, held: 3 } }] } as unknown as BlockResult,
     more as BlockResult,
     block({ kind: 'feed', heading: 'What changed' }),
-    ...(over.note ? [block({ kind: 'note', heading: 'Notes', empty: 'Nothing is written about Sketchpad yet.' })] : []),
+    ...(over.note ? [block({ kind: 'note', heading: 'Notes', empty: 'Nothing is written about Pinwheel yet.' })] : []),
     cards([], { heading: 'Keys', columns: [{ field: 'name', as: 'title' }] }),
     cards([], { heading: 'Tools and servers', columns: [{ field: 'name', as: 'title' }] }),
   ];
 };
 
-test('WHERE IT STANDS ON SKETCHPAD IS OUT BY ITS WHEN, never by the cards rule, and its figures are drawn in its place', () => {
-  const page = markDrawn(sketchpad());
+test('WHERE IT STANDS ON PINWHEEL IS OUT BY ITS WHEN, never by the cards rule, and its figures are drawn in its place', () => {
+  const page = markDrawn(pinwheel());
   assert.deepEqual(whys(page).slice(0, 3), ['drawn', 'when', 'drawn']);
   /* THE CARDS RULE WOULD HAVE CALLED IT UNSAID, and is never asked: the block's own gate reads the same four fields. */
-  assert.equal(unsaid({ ...sketchpad()[1]!, drawn: true }), true);
+  assert.equal(unsaid({ ...pinwheel()[1]!, drawn: true }), true);
   /* ONCE ONE OF THE FOUR IS SAID the gate opens, the card says it, and the rule answers no. */
-  const told = markDrawn(sketchpad({ said: true }));
+  const told = markDrawn(pinwheel({ said: true }));
   assert.deepEqual(whys(told).slice(0, 3), ['drawn', 'drawn', 'when']);
-  assert.equal(unsaid(sketchpad({ said: true })[1]!), false);
+  assert.equal(unsaid(pinwheel({ said: true })[1]!), false);
 });
 
 /* What the record hands the section once it has counted the project's scheduled actions and found none. */
 const COUNTED_NONE = { actions: [] };
 
 test('A BOXED ACTIONS SECTION IS SHUT WHEN THE RECORD SEES NO SCHEDULED ACTION and every block under it is gone', () => {
-  assert.deepEqual(whys(markDrawn(sketchpad(COUNTED_NONE))).slice(3), ['empty', 'empty', 'empty', 'empty']);
+  assert.deepEqual(whys(markDrawn(pinwheel(COUNTED_NONE))).slice(3), ['empty', 'empty', 'empty', 'empty']);
   /* ONE BLOCK UNDER IT DRAWN KEEPS IT: a sentence is never called empty, so the seed's Notes holds the tile open. */
-  assert.deepEqual(whys(markDrawn(sketchpad({ ...COUNTED_NONE, note: true }))).slice(3), ['drawn', 'empty', 'drawn', 'empty', 'empty']);
+  assert.deepEqual(whys(markDrawn(pinwheel({ ...COUNTED_NONE, note: true }))).slice(3), ['drawn', 'empty', 'drawn', 'empty', 'empty']);
   /* THE OTHER PANELS ALWAYS HOLD SOMETHING, and a heading with no box is not a tile: each stays, as before. */
-  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, panel: 'reporting' })))[3], 'drawn');
-  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, panel: 'run' })))[3], 'drawn');
-  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, box: false })))[3], 'drawn');
+  assert.equal(whys(markDrawn(pinwheel({ ...COUNTED_NONE, panel: 'reporting' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(pinwheel({ ...COUNTED_NONE, panel: 'run' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(pinwheel({ ...COUNTED_NONE, box: false })))[3], 'drawn');
   /* WITH NO BLOCK AFTER IT AT ALL it is the author's own divider, and stays. */
-  assert.equal(whys(markDrawn(sketchpad(COUNTED_NONE).slice(0, 4)))[3], 'drawn');
+  assert.equal(whys(markDrawn(pinwheel(COUNTED_NONE).slice(0, 4)))[3], 'drawn');
   /* AND ARRANGING DRAWS IT AGAIN, with every block under it. */
-  assert.deepEqual(whys(arranged(markDrawn(sketchpad(COUNTED_NONE)))).slice(3), ['drawn', 'drawn', 'drawn', 'drawn']);
+  assert.deepEqual(whys(arranged(markDrawn(pinwheel(COUNTED_NONE)))).slice(3), ['drawn', 'drawn', 'drawn', 'drawn']);
 });
 
 test('A BOXED ACTIONS SECTION IS KEPT BY DEFAULT: a project with one scheduled action and no other block keeps its heading', () => {
   /* NOBODY COUNTED (audit 61, claim 1): no host hands the section its actions, so the record cannot say the panel is
      empty, and the heading the host draws "Nightly import" under stays though every block under it went. */
-  const uncounted = markDrawn(sketchpad());
+  const uncounted = markDrawn(pinwheel());
   assert.deepEqual(whys(uncounted).slice(3), ['drawn', 'empty', 'empty', 'empty']);
   assert.equal(whyOf(uncounted[3]!), undefined);
   /* COUNTED, AND ONE IS THERE: the same, said rather than assumed. */
-  assert.deepEqual(whys(markDrawn(sketchpad({ actions: [{ name: 'Nightly import' }] }))).slice(3), ['drawn', 'empty', 'empty', 'empty']);
+  assert.deepEqual(whys(markDrawn(pinwheel({ actions: [{ name: 'Nightly import' }] }))).slice(3), ['drawn', 'empty', 'empty', 'empty']);
   /* WHAT IS HANDED AND IS NO LIST IS NOT A COUNT OF NONE, so it shuts nothing. */
-  const odd = sketchpad().map((b, n) => (n === 3 ? ({ ...b, actions: null } as unknown as BlockResult) : b));
+  const odd = pinwheel().map((b, n) => (n === 3 ? ({ ...b, actions: null } as unknown as BlockResult) : b));
   assert.equal(whys(markDrawn(odd))[3], 'drawn');
 });
 

@@ -1,7 +1,7 @@
 /**
  * The tidy's finders, over a planted record (AGT-C18 job a).
  *
- * WHAT WAS MEASURED BEFORE THIS. "how good is braindog's mcp at cleaning up stale stuff?" (D40.10) had the answer
+ * WHAT WAS MEASURED BEFORE THIS. "how good is braindog's mcp at cleaning up stale stuff?" had the answer
  * "Poor": one hourly sweep, and no read that says what went stale or what was cleaned. A finder is that read for one
  * kind of thing: how many are stale now, how many the record cleared in the last day, and the one question it may ask.
  */

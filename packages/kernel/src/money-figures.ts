@@ -756,7 +756,16 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      more hours east of UTC (New Zealand in summer), so every leg's `where` would be read from tomorrow. */
   const at = clockOf(ctx);
   const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at };
-  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: () => null, hydrate: (id: string) => rowOf(sql, id), ctx: walkCtx };
+  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: () => null, hydrate: (id: string) => {
+      /* A ROW IS HYDRATED ONCE FOR A READ, since every walk over the same legs asks for the same ones. */
+      const key = `row:${id}`;
+      if (ctx.walks?.has(key)) return ctx.walks.get(key) as Entry | null;
+      const row = rowOf(sql, id);
+      ctx.walks?.set(key, row);
+      return row;
+    },
+    ctx: walkCtx,
+  };
   const today = new Date(at).toISOString().slice(0, 10);
   const home = ctx.fx?.() ?? { home: null, rates: [] };
 
@@ -800,7 +809,15 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     openingUnit = read.value.unit;
   }
 
-  const walk = runway(deps, opening, legs, horizon);
+  /* THE SAME WALK OVER THE SAME LEGS IS WORKED OUT ONCE FOR A READ: a page of figures over the walk ahead (the cash
+     left, the day it runs out, the lowest point) each walked the rows again, one row at a time. */
+  const kept = ctx.walks;
+  const walkKey = kept === undefined ? '' : JSON.stringify([opening, legs, horizon, at]);
+  let walk = kept?.get(walkKey) as ReturnType<typeof runway> | undefined;
+  if (walk === undefined) {
+    walk = runway(deps, opening, legs, horizon);
+    kept?.set(walkKey, structuredClone(walk));
+  } else walk = structuredClone(walk);
   if (!walk.ok) return walk;
 
   /* SEVERAL CURRENCIES WITH NO WAY TO ADD THEM ARE ONE AMOUNT EACH, the walk run once per currency with its own

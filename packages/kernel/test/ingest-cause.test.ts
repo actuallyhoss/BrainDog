@@ -1,5 +1,5 @@
 /**
- * A question an arrival opens has a cause (AGT-C07, "a question has a cause", D40.50).
+ * A question an arrival opens has a cause (AGT-C07, "a question has a cause").
  *
  * BEFORE: the ingest's rowset was inserted with no cause, while its tail and move questions carried one, so the index that
  * keeps one open question a cause (migration 31) could not hold the ingest's own, and a page or an agent reading

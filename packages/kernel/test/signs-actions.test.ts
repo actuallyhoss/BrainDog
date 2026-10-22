@@ -49,7 +49,7 @@ const POLL: Declaration = {
   body: {
     ingest: 'balance',
     channel: 'poll',
-    description: 'Bake revenue',
+    description: 'Oxbow revenue',
     url: 'https://api.example.test/v1/balance',
     every: '1h',
     grant: 'example read',
@@ -99,15 +99,15 @@ test('A PAUSED POLL: a provider that refuses the key pauses it, and the sign and
   assert.equal((await k.runActions(answering(said(401, 'no')))).paused, 1);
   const red = sign(sql, 'actions-paused', clock.now());
   assert.deepEqual([red.state, red.value], ['red', 1]);
-  assert.equal(red.said, '1 action is paused and will not run until somebody resumes it: Bake revenue.');
-  assert.ok(red.facts.includes('Bake revenue has been paused since 5 October: its key was refused (401).'), red.facts.join(' | '));
+  assert.equal(red.said, '1 action is paused and will not run until somebody resumes it: Oxbow revenue.');
+  assert.ok(red.facts.includes('Oxbow revenue has been paused since 5 October: its key was refused (401).'), red.facts.join(' | '));
   plainWords(red);
 
   const [blocking, ...more] = actionsBlocking(sql, clock.now(), 'studio');
   assert.equal(more.length, 0);
   assert.equal(blocking?.why, 'paused');
   assert.equal(blocking?.status, 401);
-  assert.equal(blocking?.said, 'Bake revenue has not answered since 5 October: its key was refused (401). It is paused until somebody resumes it.');
+  assert.equal(blocking?.said, 'Oxbow revenue has not answered since 5 October: its key was refused (401). It is paused until somebody resumes it.');
   plainWords(blocking!);
   /* ANOTHER PROJECT'S WAY HOLDS NOTHING OF IT. */
   assert.deepEqual(actionsBlocking(sql, clock.now(), 'garden'), []);
@@ -122,7 +122,7 @@ test('A LATE ACTION is in its project\'s way past twice its interval, and not a 
   assert.deepEqual(actionsBlocking(sql, clock.now(), 'studio'), []);
   clock.advance(2 * 60_000);
   const late = actionsBlocking(sql, clock.now(), 'studio');
-  assert.deepEqual(late.map((l) => [l.why, l.said]), [['late', 'Bake revenue has not answered since 5 October.']]);
+  assert.deepEqual(late.map((l) => [l.why, l.said]), [['late', 'Oxbow revenue has not answered since 5 October.']]);
   sql.close();
 });
 
@@ -143,10 +143,10 @@ test('A FAILED SCHEDULE: a job that fails eight times reads red with its name, a
   assert.equal(sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'poll' AND key = 'balance'")?.state, 'failed');
   const red = sign(sql, 'schedule-failed', clock.now());
   assert.deepEqual([red.state, red.value], ['red', 1]);
-  assert.equal(red.said, '1 job that runs by itself has stopped after failing: Bake revenue. The operator has been told.');
+  assert.equal(red.said, '1 job that runs by itself has stopped after failing: Oxbow revenue. The operator has been told.');
   plainWords(red);
   assert.equal(sql.all("SELECT 1 FROM suggestion WHERE status = 'open'").length, 0, 'a dead job opened a question');
-  assert.deepEqual(actionsBlocking(sql, clock.now(), 'studio').map((l) => [l.why, l.said]), [['failed', 'Bake revenue has never answered. It stopped after failing again and again.']]);
+  assert.deepEqual(actionsBlocking(sql, clock.now(), 'studio').map((l) => [l.why, l.said]), [['failed', 'Oxbow revenue has never answered. It stopped after failing again and again.']]);
   sql.close();
 });
 
@@ -213,7 +213,7 @@ test('HELD BY THE PLAN: a run the limit held this month reads red with the actio
   );
   const red = sign(sql, 'actions-held', clock.now());
   assert.deepEqual([red.state, red.value], ['red', 1]);
-  assert.equal(red.said, "The plan's limit held 1 run this month, so one action did not run when due: Bake revenue.");
+  assert.equal(red.said, "The plan's limit held 1 run this month, so one action did not run when due: Oxbow revenue.");
   plainWords(red);
   sql.close();
 });

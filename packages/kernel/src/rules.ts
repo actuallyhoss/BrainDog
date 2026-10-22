@@ -309,6 +309,18 @@ export type RulesDeps = {
   entry: (id: string) => Entry | null;
   mint: () => string;
   nowMs: number;
+  /**
+   * WHO A RULE ACTS FOR, BY THE RULE (sharing plan §2.12): `null` where it runs as the record does, its maker an owner
+   * or nobody; `stop` with the sentence a rule is held by once its maker can no longer reach the record; else the
+   * dependencies of its maker's lens (`deps`, writes held to the rows they may change, `bounded` set) and whether a row
+   * is one that lens shows them (`sees`). Absent, every rule runs as the record does.
+   */
+  forRule?: ((rule: string) => { stop: string } | { deps: RulesDeps; sees: (entry: Entry) => boolean } | null) | undefined;
+  /**
+   * Set on the dependencies of a rule its maker's lens bounds: the sentence a step that reaches past the rows they may
+   * read and change is refused in (a link found in another list, a call out of the record).
+   */
+  bounded?: string | undefined;
 };
 
 /**
@@ -349,7 +361,20 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
   let sealed: Set<string> | null = null;
   const sealedHere = (): Set<string> => (sealed ??= sealedOf(deps.sql, fired.register));
 
-  for (const rule of order(deps.rules(fired.register))) {
+  const outer = deps;
+  for (const rule of order(outer.rules(fired.register))) {
+    /* A RULE A COLLEAGUE TURNED ON RUNS THROUGH THEIR LENS, NEVER THE OWNER'S (sharing plan §2.12): its writes are held
+       to the rows they may change, a row they may not see does not start it, and once they can no longer reach the
+       record it is held, with an observation saying so. */
+    const held = outer.forRule?.(rule.rule) ?? null;
+    if (held !== null && 'stop' in held) {
+      out.suppressed.push(rule.rule);
+      observe(outer.sql, outer.nowMs, [{ kind: 'write.refused', subject: `${fired.register}.rule.${rule.rule}.maker:FORBIDDEN` }]);
+      continue;
+    }
+    if (held !== null && !held.sees(fired.entry)) continue;
+    /* THE REST OF THE PASS READS THIS RULE'S OWN DEPENDENCIES under the parameter's name. */
+    const deps = held === null ? outer : held.deps;
     /* THE THREE KEYS THE LINT USED TO REFUSE HERE, READ. `enabled: false` stops the rule, `project:` holds it to one
        project's rows, and `limits.runs_per_day` to that many firings in the last twenty-four hours, as a run's is
        counted. Before this the lint refused all three on the inline path as `NOT_IN_THIS_BUILD`, so a plain write rule
@@ -517,6 +542,11 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         const fault = linkFault(deps.schemaOf, { rule: rule.rule, then: [action] }) ?? alsoFault(deps.schemaOf, { rule: rule.rule, register: rule.register, then: [action] });
         if (fault) {
           undone((fault.at ?? 'then[0]').replace('then[0]', `then[${i}]`), 'DECLARATION_INVALID', fault.fix.replace('then[0]', `then[${i}]`));
+          continue;
+        }
+        /* A LINK FOUND IN ANOTHER LIST READS THAT LIST WHOLE, so a rule bound to a colleague's lens does not take one. */
+        if (deps.bounded !== undefined) {
+          out.refused.push({ code: 'FORBIDDEN', fix: deps.bounded, at: `then[${i}].link` });
           continue;
         }
         const run = fired.run ? { run: fired.run } : {};
@@ -1205,7 +1235,7 @@ function moneyLess(value: unknown, taken: unknown): unknown {
  * words whichever machine filled it.
  *
  * A CURRENCY ENGLISH WRITES BY ITS CODE IS NOT HERE, as it has no sign in `braindog-render`'s `money.ts` either: the
- * franc, the riyal and the Egyptian pound are each written by their letters (his word, 9 October), and the kernel
+ * franc, the riyal and the Egyptian pound are each written by their letters (settled 9 October), and the kernel
  * names no one country's money.
  */
 const SIGN: Readonly<Record<string, string>> = {

@@ -1,5 +1,5 @@
 /**
- * What a queue's question carries for the decision card (DIRECTION §37): the run that asked, by what it was doing and
+ * What a queue's question carries for the decision card: the run that asked, by what it was doing and
  * the app it ran in; who drafted it; the money accepting writes; what changes on the one row it updates; and the kinds of
  * change it is. Each is left off where the record cannot say it.
  */

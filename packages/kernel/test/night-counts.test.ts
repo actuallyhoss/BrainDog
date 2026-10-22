@@ -59,7 +59,7 @@ const point = (sql: NodeSql, series: string, day: string) =>
 
 test('EACH LIST IS COUNTED A NIGHT, live and deleted, and an empty one reads nought rather than no night', async () => {
   const { k, sql } = await record();
-  for (const name of ['Bake', 'Lantern', 'Orbit']) assert.ok(k.create('projects', { name }, P1).ok);
+  for (const name of ['Oxbow', 'Lantern', 'Orbit']) assert.ok(k.create('projects', { name }, P1).ok);
   assert.ok(k.update('projects', 'projects#3', { deleted_at: '2026-10-08' }, P1).ok);
   const counted = countLists(sql, NOW);
   assert.deepEqual(counted.projects, { live: 2, deleted: 1 });
@@ -74,7 +74,7 @@ test('EACH LIST IS COUNTED A NIGHT, live and deleted, and an empty one reads nou
 
 test('A PERSON DELETING IS NOT A SHRINK, A SWEEP IS NOT A SHRINK, and a row gone with no delete is', async () => {
   const { k, sql, clock } = await record();
-  for (const name of ['Bake', 'Lantern', 'Orbit', 'Quay']) assert.ok(k.create('projects', { name }, P1).ok);
+  for (const name of ['Oxbow', 'Lantern', 'Orbit', 'Quay']) assert.ok(k.create('projects', { name }, P1).ok);
   /* ONE NIGHT HAS NOTHING TO FALL FROM. */
   countLists(sql, clock.now());
   assert.equal(read(sql, 'lists-shrunk', clock.now()).value, null);
@@ -111,7 +111,7 @@ const depsOf = (k: Kernel, sql: NodeSql, nowMs: number): DeadPathsDeps => ({
 
 test('A PLANTED DEAD PATH READS 1 THE NEXT NIGHT, and nought the night after it is mended', async () => {
   const { k, sql, clock } = await record();
-  assert.ok(k.create('projects', { name: 'Bake', note: 'Plan for {{name}}: {{projects.count}} projects, `{{as.written}}` in a code span.' }, P1).ok);
+  assert.ok(k.create('projects', { name: 'Oxbow', note: 'Plan for {{name}}: {{projects.count}} projects, `{{as.written}}` in a code span.' }, P1).ok);
   assert.ok(k.create('tasks', { what: '{{not.a.document}}' }, P1).ok);
   assert.equal(read(sql, 'documents-dead-paths', clock.now()).value, null, 'read nought before the walk had been over the notes');
   deadPaths(depsOf(k, sql, clock.now()));
@@ -134,7 +134,7 @@ test('A PLANTED DEAD PATH READS 1 THE NEXT NIGHT, and nought the night after it 
 
 test('THE WALK IS BOUNDED A NIGHT: it says nothing until a pass ends, then keeps what it found across nights', async () => {
   const { k, sql, clock } = await record();
-  for (const [i, name] of ['Bake', 'Lantern', 'Orbit'].entries()) assert.ok(k.create('projects', { name, note: i === 1 ? '{{gone.one}} and {{gone.two}}' : 'clean' }, P1).ok);
+  for (const [i, name] of ['Oxbow', 'Lantern', 'Orbit'].entries()) assert.ok(k.create('projects', { name, note: i === 1 ? '{{gone.one}} and {{gone.two}}' : 'clean' }, P1).ok);
   const first = deadPaths(depsOf(k, sql, clock.now()), null, 2);
   assert.deepEqual([first.read, first.finished, first.next > 0], [2, false, true]);
   assert.equal(read(sql, 'documents-dead-paths', clock.now()).value, null, 'a pass cut short read as the whole record');

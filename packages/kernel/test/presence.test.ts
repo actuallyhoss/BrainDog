@@ -57,6 +57,10 @@ test('ONE WORD A RUN: working only while active and heard from inside fifteen mi
   assert.equal(presenceOf(run('active', null), NOW), 'before');
   /* A reader holding the fields alone, as a page's row does. */
   assert.equal(presenceOf({ fields: { state: 'active', last_seen: iso(NOW - 2 * MIN) } }, NOW), 'working');
+  /* AND A RUN WHOSE BRIDGE STOPPED PULSING IS NOT AT WORK, as the live read calls it gone, so the rail and the Agents
+     page count it the same. One that never pulsed is read by its calls alone. */
+  assert.equal(presenceOf({ state: 'active', fields: { last_seen: iso(NOW - 2 * MIN), pulse_at: iso(NOW - 3 * MIN) } }, NOW), 'quiet');
+  assert.equal(presenceOf({ state: 'active', fields: { last_seen: iso(NOW - 2 * MIN), pulse_at: iso(NOW - MIN) } }, NOW), 'working');
 });
 
 async function record() {

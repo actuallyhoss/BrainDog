@@ -5,8 +5,8 @@
  * seconds (`web/lib/data/optimistic.ts`), which covers a press and nothing else: an agent's run, a rule's cascade or a
  * decision accepted yesterday had no way back but by hand. The log already holds what an undo needs (`index.ts`'s
  * `writing`): one event per changed field with `from` and `to`, a `create` carrying the whole row, a `batch` shared by
- * everything one write caused, and every write signed by whoever made it, `S42` for a run. DIRECTION §37 asks for an
- * agent that acts on its own to be "always undoable", and this is what makes that true.
+ * everything one write caused, and every write signed by whoever made it, `S42` for a run. An agent that acts
+ * on its own must be "always undoable", and this is what makes that true.
  *
  * WHAT EACH LINE OF THE LOG BECOMES, walked per row:
  *   - a `create` becomes a delete, unless somebody outside the undo has changed the row since
@@ -229,7 +229,7 @@ function scoped(sql: Sql, scope: UndoScope): Result<Scoped> {
     const keys = sql
       .all<{ k: string }>('SELECT DISTINCT coalesce(batch, id) AS k FROM event WHERE actor = ?', run)
       .map((r) => r.k);
-    if (keys.length === 0) return no('ROW_UNKNOWN', 'That run changed nothing in this record, so there is nothing to undo.', { at: 'run' });
+    /* A RUN THAT WROTE NOTHING IS A PLAN OF NOTHING, not a refusal: its page asks on every open, and `empty` says it. */
     return ok({ keys, lines: byKeys(keys), decisions: decisionsOf(keys), empty: 'That run changed nothing that can be put back.' });
   }
   return no('VALUE_MALFORMED', 'Say what to undo: a batch, a decision or a run.', { at: 'scope' });

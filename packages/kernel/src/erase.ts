@@ -224,6 +224,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   tomb('job', 'id', ['args', 'result', 'error']);
   /* `job_event` has no single key, so its rowid is the one. */
   tomb('job_event', 'rowid', ['body']);
+  /* A job's machine and profile are names a person may be in (`adas-mbp`, `~/.claude-ada`), as a machine's label is. */
+  tomb('job_place', 'job_id', ['machine', 'seat', 'ran_on']);
   /* THE LAST SIX. An invitation is an address; a saved view keeps a name, a search and a filter somebody typed; a
      rule's run keeps its variables and what it said, and each step what it was answered; an agent token keeps the label
      its maker gave it; an uninstalled pack keeps the settings chosen for it for thirty days. An invitation whose

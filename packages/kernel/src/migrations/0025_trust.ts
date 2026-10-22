@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 25: what the ladder of trust stands on (DIRECTION §37, "staff who earn trust").
+ * The kernel schema, migration 25: what the ladder of trust stands on ("staff who earn trust").
  *
  * `suggestion.kind` IS THE KIND OF CHANGE A QUESTION IS, stamped when it is filed (`change-kind.ts`'s `stampOf`): one key
  * such as `tasks:move:done`, or a JSON list of them, dearest first, when it is several. "The share of suggestions

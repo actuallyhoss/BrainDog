@@ -2,7 +2,7 @@
  * A question already so is closed as moot within the hour (AGT-C08 job 2).
  *
  * WHAT WAS MEASURED BEFORE THIS. A question about rows the owner then changed by hand to the very values it asked for
- * stayed open until somebody pressed something ("how good is braindog's mcp at cleaning up stale stuff?", D40.10).
+ * stayed open until somebody pressed something ("how good is braindog's mcp at cleaning up stale stuff?").
  * `recheck` is what the hourly sweep runs: each open question that would change nothing is closed as `moot`, with a
  * sentence the owner reads, and the agent that asked is not counted against.
  */

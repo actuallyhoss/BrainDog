@@ -133,12 +133,24 @@ export function containsMatched(
   words: readonly string[],
   list: { register: string; fields: readonly string[]; admit: { sql: string; params: readonly (string | number)[] } | null },
   limit: number,
+  mask?: (text: string) => string,
 ): { hits: Hit[]; n: number } {
   if (words.length === 0 || list.fields.length === 0) return { hits: [], n: 0 };
   const like = (f: string) => `lower(CAST(json_extract(fields, '$.${f}') AS TEXT)) LIKE ? ESCAPE '\\'`;
   const each = `(${list.fields.map(like).join(' OR ')})`;
   const where = `register = ? AND deleted_at IS NULL AND ${words.map(() => each).join(' AND ')}${list.admit === null ? '' : ` AND (${list.admit.sql})`}`;
   const args = [list.register, ...words.flatMap((w) => list.fields.map(() => `%${w.replace(/[\\%_]/gu, (c) => `\\${c}`)}%`)), ...(list.admit?.params ?? [])];
+  /* A FIGURE ASKED BY A CALLER FROM WHOM AMOUNTS ARE HIDDEN is held to the fields' text with its amounts taken out
+     (`maskedMatched`), so a row is never found by an amount she is shown as "£…". */
+  if (mask !== undefined && words.some((w) => /\p{N}/u.test(w))) {
+    const rows = sql.all<{ id: string; fields: string }>(`SELECT id, fields FROM entry WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, ...args, MASKED_CANDIDATES_MOST);
+    const kept = rows.filter((r) => {
+      const values = JSON.parse(r.fields) as Record<string, unknown>;
+      const text = list.fields.map((f) => (values[f] === undefined || values[f] === null ? '' : String(values[f]))).join('\n');
+      return figuresStillIn(text, words, mask, true);
+    });
+    return { hits: kept.slice(0, limit).map((r, i) => ({ id: r.id, register: list.register, rank: i + 1 })), n: kept.length };
+  }
   const n = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...args)?.n ?? 0);
   const rows = n === 0 ? [] : sql.all<{ id: string }>(`SELECT id FROM entry WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, ...args, limit);
   return { hits: rows.map((r, i) => ({ id: r.id, register: list.register, rank: i + 1 })), n };
@@ -159,7 +171,7 @@ type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?:
  * A BARE ARRAY CANNOT TELL A HUNDRED FROM A HUNDRED OF A HUNDRED AND FORTY, AND THE SCREEN PRINTED THE WRONG ONE.
  * Driven at a real record's size: `/search?q=revenue` drew **100** under the heading and **"All 100 in Datapoints"**
  * beside the group when 140 rows matched, counted against the record file itself. `the` matched 304 and said 100;
- * `bake` matched 577 and said 100. The clamp below is not the fault. `list` clamps above its own ceiling in silence
+ * `oxbow` matched 577 and said 100. The clamp below is not the fault. `list` clamps above its own ceiling in silence
  * too, and says so at `packages/record/src/index.ts:2038`, but `list` answers a page with a cursor and a `matched`, so
  * a clamped read arrives downstream looking like one. This answered an array, so nothing that received it could know
  * what it was missing, and the surface that exists to find anything in 2,243 rows stated a number that was not true.
@@ -222,16 +234,38 @@ function matching(q: string, registers: readonly string[] | undefined, viewer?: 
   const query = ftsQuery(q);
   if (!query) return null;
   if (registers !== undefined && registers.length === 0) return null;
-  const scope = registers ? ` AND entry_fts.register IN (${registers.map(() => '?').join(', ')})` : '';
+  const scope = registers ? ` AND entry.register IN (${registers.map(() => '?').join(', ')})` : '';
   const kept = viewer === undefined ? '' : ' AND entry.id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)';
   /* A NARROWED LIST'S ROWS ARE THE ONES ITS CLAUSE ADMITS, asked in a statement of their own so the clause's bare names
      are that statement's `entry`, never the search's `entry_fts`, which has an `id` and a `register` too. */
-  const held = admits.map((a) => ` AND (entry_fts.register <> ? OR entry.id IN (SELECT id FROM entry WHERE register = ? AND (${a.sql})))`).join('');
+  /* THE LIST BY ITS ID AS A LITERAL in the statement that finds its admitted rows, so a partial index on a field its rule
+     reads (`entry_i_<list>__<field> ... WHERE register = '<list>'`) answers it, which a bound `?` does not show SQLite.
+     An id is the grammar's (`^[a-z][a-z0-9_]{0,31}$`), checked before it is written in; anything else is bound. The
+     index covers live rows only, so the statement says so: the search already leaves a deleted row out. */
+  const literal = (register: string): boolean => /^[a-z][a-z0-9_]{0,31}$/u.test(register);
+  /* A TEST A ROW OF A NARROWED LIST, ASKING ONLY ITS OWN LIST'S ADMITTED ROWS: a row of one is among the rows that list's
+     rules admit, and a row of a list no rule applies to is not asked at all. Each list's rows are found once by rowid, and
+     the row's own list is looked at first, so a row is checked against one set and not ten. A list with two rules meets
+     both in its set. */
+  const byList = new Map<string, Admit[]>();
+  for (const a of admits) byList.set(a.register, [...(byList.get(a.register) ?? []), a]);
+  const lists = [...byList.keys()];
+  const named = (register: string): { sql: string; args: string[] } => (literal(register) ? { sql: `register = '${register}'`, args: [] } : { sql: 'register = ?', args: [register] });
+  const terms = lists.map((register) => {
+    const on = named(register);
+    const rules = byList.get(register)!;
+    return {
+      sql: `(entry.${on.sql} AND entry.rowid IN (SELECT rowid FROM entry WHERE ${on.sql} AND deleted_at IS NULL AND ${rules.map((a) => `(${a.sql})`).join(' AND ')}))`,
+      args: [...on.args, ...on.args, ...rules.flatMap((a) => a.params)],
+    };
+  });
+  const held = lists.length === 0 ? '' : ` AND (entry.register NOT IN (SELECT value FROM json_each(?)) OR ${terms.map((t) => t.sql).join(' OR ')})`;
+  const heldArgs: (string | number)[] = lists.length === 0 ? [] : [JSON.stringify(lists), ...terms.flatMap((t) => t.args)];
   return {
     from: `FROM entry_fts
        JOIN entry ON entry.rowid = entry_fts.rowid
       WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL${kept}${held}`,
-    args: [query, ...(registers ?? []), ...(viewer === undefined ? [] : [viewer]), ...admits.flatMap((a) => [a.register, a.register, ...a.params])],
+    args: [query, ...(registers ?? []), ...(viewer === undefined ? [] : [viewer]), ...heldArgs],
   };
 }
 
@@ -265,13 +299,71 @@ export function searchMatched(sql: Sql, q: string, opts: Ask = {}): Searched {
   if (!m) return { hits: [], matched: {} };
   const matched: Record<string, number> = {};
   for (const row of sql.all<{ register: string; n: number }>(
-    `SELECT entry_fts.register AS register, count(*) AS n
+    `SELECT entry.register AS register, count(*) AS n
        ${m.from}
-      GROUP BY entry_fts.register`,
+      GROUP BY entry.register`,
     ...m.args,
   ))
     matched[row.register] = row.n;
   return { hits: search(sql, q, opts), matched };
+}
+
+/**
+ * THE MOST ROWS A SEARCH FOR A FIGURE READS BACK to hold against a text with its amounts taken out (`maskedMatched`).
+ * Past it the rows after are not counted, which says less than there is and never more.
+ */
+export const MASKED_CANDIDATES_MOST = 2_000;
+
+/** A word as the index folds it: composed, lower case, its marks taken off, as `unicode61 remove_diacritics 2` reads it. */
+const folded = (s: string): string => s.normalize('NFC').toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '').normalize('NFC');
+
+/**
+ * Whether every word of a search that holds a digit is still a word of `text` (as a prefix, as the index matches, or
+ * anywhere in it with `inside`, as `containsMatched` matches) once
+ * its amounts are taken out by `mask`. Only those words can stop matching: taking an amount out takes digits, never a
+ * word with none.
+ */
+export function figuresStillIn(text: string, words: readonly string[], mask: (text: string) => string, inside = false): boolean {
+  const figures = words.filter((w) => /\p{N}/u.test(w));
+  if (figures.length === 0) return true;
+  const shown = folded(mask(text));
+  /* `inside` IS THE `contains` SEARCH'S OWN TEST, a word anywhere in the text, as its `LIKE` asks. */
+  if (inside) return figures.every((w) => shown.includes(folded(w)));
+  const tokens = shown.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return figures.every((w) => {
+    const f = folded(w);
+    return tokens.some((t) => t.startsWith(f));
+  });
+}
+
+/**
+ * THE SAME SEARCH FOR A CALLER FROM WHOM AMOUNTS ARE HIDDEN, when it asks for a figure (sharing plan §2.7, "Hide
+ * amounts"): a row is a hit, and counted, only when the figure is still in its text once every amount written there is
+ * taken out (`mask`, the kernel's `maskMoneyText`). The index holds "Paid £923.47 for clay", so asked for `923.47` it
+ * found the row for a guest who is shown "Paid £… for clay", and its title said which row held the figure.
+ *
+ * The rows the index matches are read back with their text, best first, at most `MASKED_CANDIDATES_MOST`, and held to
+ * the figure in JavaScript: a pattern in SQL cannot tell an amount from a room number. A search with no digit in it is
+ * the plain one, since taking amounts out takes no other word.
+ */
+export function maskedMatched(sql: Sql, q: string, opts: Ask, mask: (text: string) => string): Searched {
+  const words = searchWords(q);
+  if (!words.some((w) => /\p{N}/u.test(w))) return searchMatched(sql, q, opts);
+  const m = matching(q, opts.registers, opts.viewer, opts.admits);
+  if (!m) return { hits: [], matched: {} };
+  const rows = sql.all<Hit & { text: string }>(
+    `SELECT entry_fts.id AS id, entry_fts.register AS register, entry_fts.text AS text, bm25(entry_fts) AS rank
+       ${m.from}
+      ORDER BY rank
+      LIMIT ?`,
+    ...m.args,
+    MASKED_CANDIDATES_MOST,
+  );
+  const kept = rows.filter((r) => figuresStillIn(r.text, words, mask));
+  const matched: Record<string, number> = {};
+  for (const r of kept) matched[r.register] = (matched[r.register] ?? 0) + 1;
+  const most = Math.min(Math.max(1, opts.limit ?? 20), 100);
+  return { hits: kept.slice(0, most).map(({ id, register, rank }) => ({ id, register, rank })), matched };
 }
 
 /** Every live row's line, rebuilt from nothing. What an import runs once at the end. */

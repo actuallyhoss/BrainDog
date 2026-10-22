@@ -31,7 +31,7 @@ export const SCOPES = ['read', 'propose', 'write'] as const;
 export type Scope = (typeof SCOPES)[number];
 
 /**
- * THE SCOPE IS THE CEILING OVER THE LADDER (DIRECTION §37). The highest rung a token's agent can stand on for any kind:
+ * THE SCOPE IS THE CEILING OVER THE LADDER. The highest rung a token's agent can stand on for any kind:
  * a read token writes nothing, so it has no rung at all; a propose token always asks, however often the owner kept what
  * it asked; and only a write token lets a kind climb to Do and tell or Do quietly. A rung read from the ladder is held
  * under this, never above it, so taking a grant down to Suggest stops every kind it had earned at once.

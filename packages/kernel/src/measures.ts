@@ -197,7 +197,7 @@ const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms:
  * rest newest reading first. What a `stat` over readings draws as tiles, where a single reading is still a figure.
  *
  * THE MEASURES THAT MOVED LEAD, because an import that wrote every measure at one instant made "newest first" mean
- * nothing at all, and the tiles were the first of them alphabetically: "Accounts, Sketchpad", "Active7d", "Ad spend30d"
+ * nothing at all, and the tiles were the first of them alphabetically: "Accounts, Pinwheel", "Active7d", "Ad spend30d"
  * (`loop/research-real-record.md`, Today 3).
  */
 export function measureSeries(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureSeries[] {
@@ -243,7 +243,7 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
   type Group = { name: string; of: string | null; unit: string; last: Map<string, { ms: number; value: number }>; latest: { ms: number; value: number; day: string } | null };
   /* ONE GROUP A MEASURE AND PROJECT. By name alone, two projects' "Orders" were one line through both projects' numbers,
      whichever reported last that day standing for the day, and the importer glued the project onto the name to tell them
-     apart ("Aov, Crumb.gg"). */
+     apart ("Aov, Oxbow.gg"). */
   const groups = new Map<string, Group>();
   for (const r of readings) {
     if (typeof r.at !== 'string') continue;

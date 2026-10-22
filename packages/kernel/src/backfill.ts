@@ -1,5 +1,5 @@
 /**
- * Understanding what the record already holds (DIRECTION §38, "automatically populating people and entities"): the
+ * Understanding what the record already holds ("automatically populating people and entities"): the
  * payee each ledger line was with, the project each run worked in, the project each service is for, and the remote a
  * project's bare repository name stands for.
  *
@@ -33,7 +33,7 @@
  *      guess included ("Is that BrainDog?"), so `sam/lantern` and somebody else's `lantern` are never one question and
  *      one yes (research-audit-23 item 6). Two places of one name in a walk are each said with their owner or their
  *      folder ("acme/Lantern", "lantern in Code"). A run whose place guesses nothing better, in a repository whose owner
- *      on its host holds the repositories of exactly one project, is one question per owner ("Is that Crumb.gg?"). Each
+ *      on its host holds the repositories of exactly one project, is one question per owner ("Is that Oxbow.gg?"). Each
  *      question carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and
  *      never a run already placed, nor one still working, which the ladder places itself.
  *   3. A service with no project is linked when its name, the first word of its name, its domain, or the label of its
@@ -818,7 +818,7 @@ const OWNER_KEY = 'run-project:owner:';
 const ownerQuestion = (owner: string, runs: number, projects: readonly Named[]): string =>
   `${runs === 1 ? `A run worked in a ${owner} repository` : `${runs} runs worked in ${owner} repositories`}. Is that ${orList(projects.map((p) => p.name))}?`;
 
-/** A remote's host and owner, `github.com/bakegame`, and the owner as it was written, `BakeGame`; `null` for a remote with no owner. */
+/** A remote's host and owner, `github.com/oxbowgame`, and the owner as it was written, `OxbowGame`; `null` for a remote with no owner. */
 function ownerOf(remote: string): { key: string; spelled: string } | null {
   const key = remoteKey(remote).split('/');
   if (key.length < 3) return null;
@@ -902,7 +902,7 @@ function placedFor(listed: readonly Candidate[], said: Whereabouts): { sure: Can
 }
 
 /**
- * WHICH PROJECT HOLDS THE REPOSITORIES UNDER EACH OWNER ON A HOST, as `github.com/bakegame`: by a remote a project lists,
+ * WHICH PROJECT HOLDS THE REPOSITORIES UNDER EACH OWNER ON A HOST, as `github.com/oxbowgame`: by a remote a project lists,
  * by a run already placed in one, and by the one remote runs have worked in under a bare name a project lists, which is
  * how the owner's projects mostly name their repositories. An owner whose repositories two projects hold (a person's own
  * account, as `kasdev` is) settles nothing.
@@ -1030,7 +1030,7 @@ function servicesOf(lists: Lists, projects: string | undefined): Services[] {
   return out.sort((a, b) => a.register.localeCompare(b.register));
 }
 
-/** The first label of a registrable domain, the name it spells on the web: `teetime` of `teetime.com`, `bake` of `crumb.gg`. */
+/** The first label of a registrable domain, the name it spells on the web: `teetime` of `teetime.com`, `oxbow` of `oxbow.gg`. */
 const labelOf = (domain: string): string => domain.split('.')[0] ?? '';
 
 function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion) => void): Slice {
@@ -1040,7 +1040,7 @@ function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: s
   if (!projects || all.length === 0) return idle();
   /* A NAME IS COMPARED BY ITS LETTERS AND DIGITS, so the domain `fern.ly` is the project Fernly and `otters.gg` is Otters.gg,
      as the owner's own links say: a domain is how a project spells its name on the web. AND A PROJECT NAMED AS A DOMAIN
-     IS ITS NAME WITHOUT THE ENDING TOO, so `Crumb.gg` answers to `bake`, the first word of "bake VM", and `teetime.com`'s
+     IS ITS NAME WITHOUT THE ENDING TOO, so `Oxbow.gg` answers to `oxbow`, the first word of "oxbow VM", and `teetime.com`'s
      label answers to Tee Time. */
   const fold = (said: string): string => nameKey(said).replace(/[\s'.-]+/gu, '');
   const byName = new Map<string, string[]>();
@@ -1090,7 +1090,7 @@ function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: s
       const linked = deps.write(list.register, row.id, { [list.project]: project }, { ...writes.w(), version: row.version });
       if (linked.ok) wrote++;
       else refused++;
-      /* ONLY A DOMAIN THAT SPELLS THE PROJECT'S NAME is the project's: "bake analytics" at `plausible.io` is Crumb.gg's
+      /* ONLY A DOMAIN THAT SPELLS THE PROJECT'S NAME is the project's: "oxbow analytics" at `plausible.io` is Oxbow.gg's
          service, and `plausible.io` is somebody else's. */
       if (linked.ok) addDomains(deps, projects, project, hosts.filter((d) => (byName.get(fold(labelOf(d))) ?? []).includes(project)), writes.w);
     }

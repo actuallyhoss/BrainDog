@@ -1,5 +1,5 @@
 /**
- * What already waits and is small settles itself on the next sweep (DIRECTION d3; live 20 Oct: "small reversible
+ * What already waits and is small settles itself on the next sweep (measured live on 20 Oct: "small reversible
  * questions settle themselves: none did", with 71 open on the owner's record).
  *
  * THE KINDS SEEN LIVE: an agent's "last seen" change to a tool, asked again and again as the day moved on; an agent's

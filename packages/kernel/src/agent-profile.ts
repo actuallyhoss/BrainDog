@@ -2,9 +2,11 @@
  * The settings each kind of agent works under (agents and MCP plan §5, §8.1; migration 42's `agent_profile`).
  *
  * ONE ROW PER KIND OF AGENT, OPTIONALLY PER CONNECTION. A row matches by agent kind (`claude`, `codex`, `cursor`,
- * `runner`, `script`, …), and optionally by token or machine. The nearest match wins: the token, then the machine with
- * the kind, then the kind, then Defaults (`profileFor`). A row bound to a token is a security boundary; one matched on
- * the kind alone is a claim the client makes of itself, and `by` says which, so the app can label it "applies by name".
+ * `runner`, `script`, …), and optionally by token, machine or Claude Code profile (`seat`, migration 44). The nearest
+ * match wins: the token, then the profile and the machine with the kind, then the profile with the kind, then the
+ * machine with the kind, then the kind, then Defaults (`profileFor`). A row bound to a token is a security boundary;
+ * one matched on the kind, the machine or the profile is a claim the client makes of itself, and `by` says which, so
+ * the app can label it "applies by name".
  *
  * SETTINGS ONLY NARROW (§10.4). What a run may do is min(token scope, `ceiling`, the ladder's rung) under the floors
  * that no setting lifts; `mayOf` is the first two. Lists and projects outside a row's become questions in the record's
@@ -19,6 +21,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { SEAT_NAME } from './instruction.ts';
 import { jcs } from './jcs.ts';
 import { PROFILE_KINDS } from './migrations/0042_agents.ts';
 
@@ -35,8 +38,11 @@ export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
 /** The id of the Defaults row, which applies to any agent no other row matches. */
 export const DEFAULT_PROFILE_ID = 'default';
 
-/** What a row matches on. A row with no key is Defaults. */
-export type ProfileMatch = { kind?: string; token?: string; host?: string };
+/**
+ * What a row matches on. A row with no key is Defaults. `seat` is the Claude Code profile a run is under, by name
+ * (`studio`), as its run's `seat` says it (migration 44).
+ */
+export type ProfileMatch = { kind?: string; token?: string; host?: string; seat?: string };
 
 /** Quiet hours, as the record's notification settings keep them: from and to as `HH:MM`, in a zone. */
 export type ProfileQuiet = { from: string; to: string; zone?: string };
@@ -57,7 +63,8 @@ export type ProfileEnforce = { hooks: boolean; channel: boolean };
  * One settings row, read whole, every optional column filled with what it means when empty.
  *
  * `projects` and `lists_write` are `null` for all; `tools` holds only the tools switched off (`false`), so a tool added
- * later is on. `by` says how `profileFor` matched it (`token`, `host`, `kind` or `default`); a row read by id is `row`.
+ * later is on. `by` says how `profileFor` matched it (`token`, `seat`, `host`, `kind` or `default`); a row read by id is
+ * `row`.
  */
 export type Profile = {
   id: string;
@@ -77,7 +84,7 @@ export type Profile = {
   created_at: string | null;
   updated_at: string | null;
   retired_at: string | null;
-  by: 'token' | 'host' | 'kind' | 'default' | 'row';
+  by: 'token' | 'seat' | 'host' | 'kind' | 'default' | 'row';
 };
 
 /**
@@ -205,27 +212,43 @@ export function profileById(sql: Sql, id: string): Profile | null {
 
 const said = (v: string | null | undefined): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
+/** Who an agent is, as `profileFor` matches it: its kind, its token, its machine and its Claude Code profile. */
+export type ProfileWho = {
+  kind?: string | null | undefined;
+  token?: string | null | undefined;
+  host?: string | null | undefined;
+  seat?: string | null | undefined;
+};
+
 /**
  * The row an agent works under (`profileFor` in §8.3): the nearest live match for what it is, a token row first, then
- * the machine with the kind, then the kind alone, then Defaults (the stored row, else `DEFAULT_PROFILE`). A row that
- * names a key the caller did not say is never a match: a row for `{kind: claude, host: MacBook}` does not apply to
- * Claude on another machine.
+ * the profile and the machine with the kind, then the profile with the kind, then the machine with the kind, then the
+ * kind alone, then Defaults (the stored row, else `DEFAULT_PROFILE`). A row that names a key the caller did not say is
+ * never a match: a row for `{kind: claude, host: MacBook}` does not apply to Claude on another machine, and one for
+ * `{kind: claude, seat: studio}` not to Claude under another profile.
  */
-export function profileFor(sql: Sql, who: { kind?: string | null | undefined; token?: string | null | undefined; host?: string | null | undefined }): Profile {
+export function profileFor(sql: Sql, who: ProfileWho): Profile {
   const kind = said(who.kind);
   const token = said(who.token);
   const host = said(who.host);
+  const seat = said(who.seat);
   const live = readProfiles(sql);
   const fits = (m: ProfileMatch): boolean =>
-    (m.kind === undefined || m.kind === kind) && (m.token === undefined || m.token === token) && (m.host === undefined || m.host === host);
+    (m.kind === undefined || m.kind === kind) &&
+    (m.token === undefined || m.token === token) &&
+    (m.host === undefined || m.host === host) &&
+    (m.seat === undefined || m.seat === seat);
   const pick = (by: Exclude<Profile['by'], 'row'>, test: (m: ProfileMatch) => boolean): Profile | null => {
     const row = live.find((p) => p.id !== DEFAULT_PROFILE_ID && fits(p.match) && test(p.match));
     return row ? { ...row, by } : null;
   };
+  const onKind = (m: ProfileMatch): boolean => m.token === undefined && m.kind !== undefined;
   return (
     (token !== null ? pick('token', (m) => m.token !== undefined) : null) ??
-    (host !== null && kind !== null ? pick('host', (m) => m.token === undefined && m.host !== undefined && m.kind !== undefined) : null) ??
-    (kind !== null ? pick('kind', (m) => m.token === undefined && m.host === undefined && m.kind !== undefined) : null) ?? {
+    (seat !== null && host !== null && kind !== null ? pick('seat', (m) => onKind(m) && m.seat !== undefined && m.host !== undefined) : null) ??
+    (seat !== null && kind !== null ? pick('seat', (m) => onKind(m) && m.seat !== undefined && m.host === undefined) : null) ??
+    (host !== null && kind !== null ? pick('host', (m) => onKind(m) && m.seat === undefined && m.host !== undefined) : null) ??
+    (kind !== null ? pick('kind', (m) => onKind(m) && m.seat === undefined && m.host === undefined) : null) ?? {
       ...(live.find((p) => p.id === DEFAULT_PROFILE_ID) ?? DEFAULT_PROFILE),
       by: 'default',
     }
@@ -256,16 +279,20 @@ function fault(row: ProfileRow, isDefault: boolean): Result<never> | null {
     return bad('name', 'A settings row has a name of up to 80 characters, "MacBook · Claude Code".');
   if (row.match !== undefined) {
     const m = row.match as Record<string, unknown> | null;
-    if (m === null || typeof m !== 'object' || Array.isArray(m) || Object.keys(m).some((k) => !['kind', 'token', 'host'].includes(k)))
-      return bad('match', 'match names a kind, a token or a machine: {kind, token, host}.');
-    for (const k of ['kind', 'token', 'host'] as const)
+    if (m === null || typeof m !== 'object' || Array.isArray(m) || Object.keys(m).some((k) => !['kind', 'token', 'host', 'seat'].includes(k)))
+      return bad('match', 'match names a kind, a token, a machine or a profile: {kind, token, host, seat}.');
+    for (const k of ['kind', 'token', 'host', 'seat'] as const)
       if (m[k] !== undefined && (typeof m[k] !== 'string' || (m[k] as string).trim() === '')) return bad(`match.${k}`, `match.${k} is a name, not empty.`);
+    if (m.seat !== undefined && !SEAT_NAME.test((m.seat as string).trim()))
+      return bad('match.seat', 'match.seat is a profile as its runs name it, like studio or default: a name, never a folder.');
     if (m.kind !== undefined && !(PROFILE_KINDS as readonly string[]).includes(m.kind as string))
       return no('ENUM_VALUE_UNKNOWN', `match.kind is one of ${PROFILE_KINDS.join(', ')}.`, { at: 'match.kind', allowed: PROFILE_KINDS });
     if (isDefault && Object.keys(m).length > 0) return bad('match', 'Defaults applies to every agent no other row matches, so it matches on nothing.');
     if (!isDefault && Object.keys(m).length === 0) return bad('match', 'Say what this row applies to: a kind of agent, a token or a machine.', 'REQUIRED_MISSING');
     if (!isDefault && m.host !== undefined && m.kind === undefined && m.token === undefined)
       return bad('match', 'A machine is matched with a kind of agent on it: {kind, host}.');
+    if (!isDefault && m.seat !== undefined && m.kind === undefined && m.token === undefined)
+      return bad('match', 'A profile is matched with the kind of agent under it: {kind, seat}.');
   }
   if (row.ceiling !== undefined && !(CEILINGS as readonly string[]).includes(row.ceiling))
     return no('ENUM_VALUE_UNKNOWN', `ceiling is one of ${CEILINGS.join(', ')}.`, { at: 'ceiling', allowed: CEILINGS });
@@ -313,7 +340,7 @@ function fault(row: ProfileRow, isDefault: boolean): Result<never> | null {
 /** A match with only the keys it names, each trimmed, so `{kind: 'claude', host: undefined}` is `{kind: 'claude'}`. */
 function cleanMatch(m: ProfileMatch): ProfileMatch {
   const out: ProfileMatch = {};
-  for (const k of ['kind', 'token', 'host'] as const) if (typeof m[k] === 'string') out[k] = m[k].trim();
+  for (const k of ['kind', 'token', 'host', 'seat'] as const) if (typeof m[k] === 'string') out[k] = m[k].trim();
   return out;
 }
 

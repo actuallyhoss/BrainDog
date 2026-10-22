@@ -1,7 +1,7 @@
 /**
  * Automatic people and organisations: someone met in the work, resolved to who the record already knows, or added.
  *
- * RESOLVE, THEN MEET (DIRECTION §38). Everything that comes in is read for who it is about, and the record answers in
+ * RESOLVE, THEN MEET. Everything that comes in is read for who it is about, and the record answers in
  * one identity per person:
  *
  *   1. A KEY MATCH. Every identifier said is a key (`identity-keys.ts`), and `entity_key` holds which row answers to
@@ -72,14 +72,11 @@ import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { pairsFor, type Judged, type JudgedBand, type Pair } from './resolve.ts';
 import { domainOrgName, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, legacyKeysOf, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
-import { LEGACY, PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
+import { PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
+import { PEOPLE } from './constants.ts';
 
-/**
- * The list `meet` wrote by name before any list declared `meets:`, and still does while none does. The record's `meet`
- * guard reads `kernel.meetsList()` and not this name; only its members' names gate, `namesFor`
- * (`packages/record/src/index.ts`), still names `people`, by list and by module.
- */
-export const PEOPLE = LEGACY.meets;
+/* The list `meet` wrote by name before any list declared `meets:`: `constants.ts`'s, where a screen reads it without this file. */
+export { PEOPLE };
 
 /** The provenance lines a person keeps, newest last. */
 export const MET_CAP = 20;
@@ -1601,7 +1598,7 @@ function order(list: DeclaredList<MeetsFields>, a: Row, b: Row): [Row, Row] {
  * joined, the later day in touch, each fold's address kept as a key, a fold's other name joined to `aliases`, and every
  * empty field the identity floor does not hold filled from the first fold that has it.
  *
- * AN EMPTY FIELD THE FLOOR HOLDS IS OFFERED, NEVER WRITTEN (D38.53, D38.54). The organisation a fold held used to become
+ * AN EMPTY FIELD THE FLOOR HOLDS IS OFFERED, NEVER WRITTEN. The organisation a fold held used to become
  * the kept person's on the fold itself, which is a change of who somebody is with no person behind it. Which fields
  * the floor holds is `change-kind.ts`'s own reading of the list (`shapeIn`), so the ladder and the fold agree.
  */
@@ -1842,7 +1839,7 @@ function askAsOne(deps: PeopleDeps, list: DeclaredList<MeetsFields>, me: Row, ne
 }
 
 /**
- * THE SWEEP FOR THE OWNER HELD TWICE, for a caller that has just marked his row and met nobody (DIRECTION §38): the
+ * THE SWEEP FOR THE OWNER HELD TWICE, for a caller that has just marked his row and met nobody: the
  * question every meeting asks (`askSelf`), "Are Kas and Karim Assaf both you?", asked now. The record calls it right
  * after a row is marked by a write of its own; a mark accepted on Decide runs it already (`joinOrganisation`). Asks
  * nothing while no row is marked, never twice, and never about a pair he answered. Answers the question

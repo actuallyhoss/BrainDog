@@ -2,8 +2,8 @@
  * EACH ACCOUNT'S OWN AMOUNT (REC-B23 job 1): Cash now by account reads a dollar account in dollars beside the pound
  * accounts, never converted into pounds. Only what is added up across accounts, Cash now itself, is converted.
  *
- * HIS WORDS: "i want the headlines to be the money i have, not the money im due/owed" and "a finance application on
- * steroids... neatly visualized" (`loop/scope/area-record-b.md`:1755-1760). The Accounts tile grouped by `name`, a text
+ * THE HEADLINES ARE THE MONEY HELD, not the money due or owed, and each amount is drawn as it is kept
+ * (`loop/scope/area-record-b.md`:1755-1760). The Accounts tile grouped by `name`, a text
  * field that names no currency, so every account was turned into the home currency and "Cash (USD)" read in pounds.
  * Two currencies are never added, and parts in two are never ranked on one axis.
  *

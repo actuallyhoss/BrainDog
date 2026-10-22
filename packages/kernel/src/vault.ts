@@ -686,10 +686,10 @@ export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: 
 /**
  * Hold a key whose vault entry names no host to the host an approved action sends it to, from now on.
  *
- * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can (SHL-C05). An entry whose `opens` was "the Bake
+ * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can (SHL-C05). An entry whose `opens` was "the Oxbow
  * test account" opened no host, so the host had nothing to hold the key to; once an approval sends it to
- * `bake.example`, `opens` says `bake.example` and the executor refuses every other host with "This key opens
- * bake.example only." An entry that already names a host is left as it is, whichever host this names, so a pin never
+ * `oxbow.example`, `opens` says `oxbow.example` and the executor refuses every other host with "This key opens
+ * oxbow.example only." An entry that already names a host is left as it is, whichever host this names, so a pin never
  * moves a key: answering `pinned: false` says nothing was written.
  *
  * NOTHING SECRET IS READ OR WRITTEN: the label, the row's `opens` and the host. The words the person typed are replaced

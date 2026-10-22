@@ -1,5 +1,5 @@
 /**
- * A page read under its look (DIRECTION §38, contract 17): every block answers a key, and `readPage` lays the look over
+ * A page read under its look (contract 17): every block answers a key, and `readPage` lays the look over
  * the page after its adds and before its headline is held.
  *
  * THE ROWS ARE A REAL RECORD'S, read through its public `list`, and the look is handed in as the host would hand the

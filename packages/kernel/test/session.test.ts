@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0042_agents.ts';
+import { SESSION_BODY } from '../src/migrations/0044_seat.ts';
 import {
   KERNEL_WRITTEN,
   isStale,
@@ -290,7 +290,7 @@ test('THE KERNEL-WRITTEN FIELDS are refused from a person and from a run alike',
     [...KERNEL_WRITTEN],
     [
       'last_seen', 'project', 'token_id', 'started', 'stretch_at', 'next_at', 'closed_as', 'closed_at', 'taken_by', 'took', 'parent', 'wrote', 'seen_before',
-      'instruction', 'task', 'profile', 'pulse_at', 'stopped', 'worktree',
+      'instruction', 'task', 'profile', 'pulse_at', 'stopped', 'worktree', 'seat',
     ],
   );
   value(k.create('session', { doing: 'Mine' }, { actor: 'p_owner' }));

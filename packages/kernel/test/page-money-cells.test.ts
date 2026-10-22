@@ -1,6 +1,6 @@
 /**
  * A READING THAT IS MONEY ON A PAGE (REC-C03): a `stat` or `lines` block over a list of readings takes a fifth column,
- * the reading as money, integer minor units with its own currency. "Monthly revenue, Crumb.gg" was the decimal 4,815 with
+ * the reading as money, integer minor units with its own currency. "Monthly revenue, Oxbow.gg" was the decimal 4,815 with
  * a unit of text; read through the money field it is USD 48.15, and a reading in another currency is a line of its own,
  * never added to it.
  */

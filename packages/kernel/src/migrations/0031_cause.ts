@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 31: a question has a cause (AGT-C07, D40.50).
+ * The kernel schema, migration 31: a question has a cause (AGT-C07).
  *
  * `suggestion.cause` IS THE KEY FOR WHAT A QUESTION IS ABOUT, and one open question holds a cause at a time: a unique
  * index over the cause of the open ones, so the database refuses a second even when a caller forgot to look. A closed

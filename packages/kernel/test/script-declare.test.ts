@@ -180,7 +180,7 @@ test('hostOpened READS A HOST, A PORT OR A URL AS ITS HOST, and prose, blank or 
   assert.equal(hostOpened('https://api.gold.test/v1'), 'api.gold.test');
   assert.equal(hostOpened('  API.Gold.Test.  '), 'api.gold.test');
   assert.equal(hostOpened('https://api.goldapi.io@collector.test'), 'collector.test');
-  assert.equal(hostOpened('the Bake test account'), null);
+  assert.equal(hostOpened('the Oxbow test account'), null);
   assert.equal(hostOpened(''), null);
   assert.equal(hostOpened(undefined), null);
   assert.equal(

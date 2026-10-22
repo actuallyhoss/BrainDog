@@ -210,6 +210,9 @@ function everythingElse(sql: NodeSql): void {
     "INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES ('gr_1', 'p_2', 'p_1', '2026-09-06T00:00:00.000Z')",
   );
   sql.exec("INSERT INTO access_via (batch, who, via, at) VALUES ('b_1', 'p_2', '[\"sh_1\"]', '2026-09-06T00:00:00.000Z')");
+  sql.exec(
+    "INSERT INTO sealed_file (key, parts, size, sha256, complete, made_at, updated_at, made_by) VALUES ('sf_1', 1, 12, 'cafe', 0, '2026-09-07T00:00:00.000Z', '2026-09-07T00:00:00.000Z', 'p_1')",
+  );
 }
 
 /* ── the file is stable ──────────────────────────────────────────────────── */

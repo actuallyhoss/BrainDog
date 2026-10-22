@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 29: `door_mark`, how each run met the agent door (AGT-B01, DIRECTION §40).
+ * The kernel schema, migration 29: `door_mark`, how each run met the agent door (AGT-B01).
  *
  * ONE ROW A RUN A KIND. `run` is who the door heard: a run's name, `S42`, or `token:` and the token's id when the caller
  * has no run, because a mark never opens one. `kind` is one of `DOOR_KINDS` (`door.ts`). `at` the instant it was last

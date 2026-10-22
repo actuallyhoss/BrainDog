@@ -2,7 +2,7 @@
  * The two finders the first batch left out (AGT-C18 build 1): `questions-moot` and `faults-open`.
  *
  * WHAT WAS MEASURED BEFORE THIS. The tidy counted runs, steps and old questions, so "how good is braindog's mcp at
- * cleaning up stale stuff?" (D40.10) was answered without the two things most often stale on a record: a question that
+ * cleaning up stale stuff?" was answered without the two things most often stale on a record: a question that
  * no longer needs its person, and a fault still open. Both are counted here, and NEITHER ASKS OR CLOSES ANYTHING: the
  * hourly sweep's `recheck` is what closes a moot question, and a fault clears when its work goes through.
  */

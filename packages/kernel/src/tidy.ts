@@ -1,5 +1,5 @@
 /**
- * The tidy (AGT-C18, "how good is braindog's mcp at cleaning up stale stuff?", D40.10): one list of what went stale.
+ * The tidy (AGT-C18, "how good is braindog's mcp at cleaning up stale stuff?"): one list of what went stale.
  *
  * WHAT WAS THERE BEFORE. One hourly sweep (`sweepRecord`) that writes runs off and closes old steps, and no read that
  * says what is stale now or what was cleaned. So nobody could say how the record was keeping itself, and the only

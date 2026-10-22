@@ -38,7 +38,7 @@ const POLL = (over: Record<string, unknown> = {}) => ({
   ingest: 'orders',
   channel: 'poll',
   every: '1h',
-  url: 'https://bake.example/v1/orders',
+  url: 'https://oxbow.example/v1/orders',
   grant: 'lantern key',
   project: 'r_lantern',
   ...over,
@@ -92,7 +92,7 @@ test('THE APPROVAL ENDS WITH WHO ELSE OPENS THE KEY, and never says keys reach e
   const twice = approvalLines([keyed, egressOf(POLL({ ingest: 'stock' }), nameOf, undefined, scopeOf)!]);
   assert.equal(twice.filter((l) => l === KEY_OPENED_UNATTENDED).length, 1);
   const keyless = approvalLines([egressOf(POLL({ grant: undefined, project: undefined }))!]);
-  assert.deepEqual(keyless, ['CALLS OUT bake.example · every 1h · grant "none"']);
+  assert.deepEqual(keyless, ['CALLS OUT oxbow.example · every 1h · grant "none"']);
 });
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
@@ -121,9 +121,9 @@ const bind = (k: Kernel, label: string, opens: string): GrantRow => {
 
 test('THE PROJECT A KEY IS KEPT FOR IS READ FROM THE ROW THAT HOLDS ITS ENTRY', async () => {
   const { k, sql } = await record();
-  const lantern = bind(k, 'lantern key', 'bake.example');
-  const shared = bind(k, 'shared key', 'bake.example');
-  bind(k, 'loose key', 'bake.example');
+  const lantern = bind(k, 'lantern key', 'oxbow.example');
+  const shared = bind(k, 'shared key', 'oxbow.example');
+  bind(k, 'loose key', 'oxbow.example');
   const row = (id: string, fields: Record<string, unknown>) =>
     sql.exec(
       "INSERT INTO entry (id, register, seq, fields, state, version, created_at, updated_at) VALUES (?, 'credentials', NULL, ?, NULL, 1, ?, ?)",
@@ -145,32 +145,32 @@ test('THE PROJECT A KEY IS KEPT FOR IS READ FROM THE ROW THAT HOLDS ITS ENTRY', 
 
 test('A KEY WITH NO HOST IS PINNED BY ITS FIRST APPROVAL, and the line says so', async () => {
   const { k, sql } = await record();
-  const loose = bind(k, 'bake key', 'the Bake test account');
+  const loose = bind(k, 'oxbow key', 'the Oxbow test account');
   const opensOf = (label: string) => keyNamed(sql, label)?.opens ?? null;
 
-  const e = egressOf(POLL({ grant: 'bake key', project: undefined }), nameOf, opensOf)!;
-  assert.equal(e.key_line, 'This key will be sent to bake.example only from now on.');
-  assert.deepEqual(approvalLines([e]).slice(1), ['This key will be sent to bake.example only from now on.', KEY_OPENED_UNATTENDED]);
+  const e = egressOf(POLL({ grant: 'oxbow key', project: undefined }), nameOf, opensOf)!;
+  assert.equal(e.key_line, 'This key will be sent to oxbow.example only from now on.');
+  assert.deepEqual(approvalLines([e]).slice(1), ['This key will be sent to oxbow.example only from now on.', KEY_OPENED_UNATTENDED]);
 
-  const pinned = pinHost(sql, 'bake key', 'bake.example', NOW);
-  assert.deepEqual(pinned.ok ? pinned.value : null, { id: loose.id, host: 'bake.example', pinned: true });
+  const pinned = pinHost(sql, 'oxbow key', 'oxbow.example', NOW);
+  assert.deepEqual(pinned.ok ? pinned.value : null, { id: loose.id, host: 'oxbow.example', pinned: true });
   /* THE NEXT REQUEST CARRIES IT, which is what the host holds the key to. */
-  assert.equal(keyNamed(sql, 'bake key')?.opens, 'bake.example');
-  assert.equal(egressOf(POLL({ grant: 'bake key', project: undefined }), nameOf, opensOf)?.key_line, null);
+  assert.equal(keyNamed(sql, 'oxbow key')?.opens, 'oxbow.example');
+  assert.equal(egressOf(POLL({ grant: 'oxbow key', project: undefined }), nameOf, opensOf)?.key_line, null);
   /* THE EVENT SAYS THE ID AND THE KIND, never the label or what it opens. */
   const ev = sql.one<{ kind: string; note: string }>("SELECT kind, note FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1", `grant:${loose.id}`);
   assert.deepEqual({ ...ev }, { kind: 'grant.bind', note: `${loose.id} api_token` });
 
   /* A PIN NEVER MOVES A KEY: one that names a host already is left as it is. */
-  const moved = pinHost(sql, 'bake key', 'collector.example', NOW);
-  assert.deepEqual(moved.ok ? moved.value : null, { id: loose.id, host: 'bake.example', pinned: false });
-  assert.equal(keyNamed(sql, 'bake key')?.opens, 'bake.example');
+  const moved = pinHost(sql, 'oxbow key', 'collector.example', NOW);
+  assert.deepEqual(moved.ok ? moved.value : null, { id: loose.id, host: 'oxbow.example', pinned: false });
+  assert.equal(keyNamed(sql, 'oxbow key')?.opens, 'oxbow.example');
   /* ONE WORD NAMES NO HOST, so "Stripe" is pinned like prose rather than read as the host `stripe`. */
   bind(k, 'stripe key', 'Stripe');
   const word = egressOf(POLL({ grant: 'stripe key', project: undefined }), nameOf, opensOf)!;
-  assert.equal(word.key_line, 'This key will be sent to bake.example only from now on.');
-  assert.equal(pinHost(sql, 'stripe key', 'bake.example', NOW).ok && keyNamed(sql, 'stripe key')?.opens, 'bake.example');
-  assert.equal(pinHost(sql, 'nobody', 'bake.example', NOW).ok, false);
-  assert.equal(pinHost(sql, 'bake key', '', NOW).ok, false);
+  assert.equal(word.key_line, 'This key will be sent to oxbow.example only from now on.');
+  assert.equal(pinHost(sql, 'stripe key', 'oxbow.example', NOW).ok && keyNamed(sql, 'stripe key')?.opens, 'oxbow.example');
+  assert.equal(pinHost(sql, 'nobody', 'oxbow.example', NOW).ok, false);
+  assert.equal(pinHost(sql, 'oxbow key', '', NOW).ok, false);
   sql.close();
 });

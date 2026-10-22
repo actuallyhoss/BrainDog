@@ -98,12 +98,12 @@ async function record() {
   value(await k.install([PROJECTS, TASKS, NOTES]));
   const made = (register: string, fields: Record<string, unknown>) => value<{ id: string; seq: number }>(k.create(register, fields, OWNER));
   const kiln = made('projects', { name: 'Kiln' });
-  const bake = made('projects', { name: 'Bake' });
+  const oxbow = made('projects', { name: 'Oxbow' });
   made('projects', { name: 'Quiet' });
   made('tasks', { what: 'Fire the glaze', state: 'open', project: kiln.id, hold: 'you' });
   made('tasks', { what: 'Order clay', state: 'doing', project: kiln.id, hold: 'agent' });
   made('tasks', { what: 'Clean the shelves', state: 'done', project: kiln.id, hold: 'you' });
-  made('tasks', { what: 'Proof the dough', state: 'open', project: bake.id, hold: 'you' });
+  made('tasks', { what: 'Proof the dough', state: 'open', project: oxbow.id, hold: 'you' });
   made('tasks', { what: 'Answer the post', state: 'open', hold: 'agent' });
   made('notes', { text: 'Cone 6 is enough', project: kiln.id });
   return { k, sql, clock };
@@ -162,7 +162,7 @@ test('THE ANSWER SAYS WHAT EACH FILTER CAN TAKE, counting open rows only, named 
   assert.deepEqual(project.reads, ['tasks', 'notes', 'projects'], 'the lists counted and the list the names come from');
   assert.deepEqual(project.values, [
     { value: '1', label: 'Kiln', count: 3 },
-    { value: '2', label: 'Bake', count: 1 },
+    { value: '2', label: 'Oxbow', count: 1 },
     { value: '', label: 'No project', count: 1 },
   ]);
 
@@ -183,7 +183,7 @@ test('A CHOSEN VALUE IS ANDED ONTO EVERY BLOCK WHOSE LIST HAS THE FIELD, and the
   assert.deepEqual(titles(kiln.blocks[0], 'what'), ['Fire the glaze', 'Order clay', 'Clean the shelves']);
   assert.equal(kiln.blocks[0]?.matched, 3, 'the count is of what the filter left');
   assert.deepEqual(titles(kiln.blocks[1], 'text'), ['Cone 6 is enough']);
-  assert.deepEqual(titles(kiln.blocks[2], 'name'), ['Kiln', 'Bake', 'Quiet'], 'a list with no such field is left as it is');
+  assert.deepEqual(titles(kiln.blocks[2], 'name'), ['Kiln', 'Oxbow', 'Quiet'], 'a list with no such field is left as it is');
   assert.equal(filterOf(kiln, 'project').chosen, '1');
   /* THE PROJECTS' OWN COUNTS ARE NOT NARROWED BY THE PROJECT CHOSEN; WHOSE WORK IT IS, IS. */
   assert.equal(filterOf(kiln, 'project').values.find((v) => v.value === '2')?.count, 1);

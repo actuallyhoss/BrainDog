@@ -525,6 +525,8 @@ const KEPT: Readonly<Record<string, readonly string[]>> = {
   vault_key: ['purpose', 'wrapped_by'],
   declaration: ['version', 'kind', 'retired'],
   suggestion: ['body_kind', 'status', 'kind'],
+  /* A SEALED FILE'S COUNTS AND WHETHER IT IS WHOLE, which its CHECK holds to one or nothing; its name and hash are his. */
+  sealed_file: ['parts', 'size', 'complete'],
 };
 
 /** The header rows that are facts about the format and the machine, not about him. */

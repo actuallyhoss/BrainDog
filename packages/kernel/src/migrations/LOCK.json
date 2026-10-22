@@ -41,5 +41,7 @@
   "0040_entry_private.ts": {"checksum":"4bd3c2bd0ec090a5e4c00b39b66cdbc6b9038ae3d0d8507493e7846a33221732","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
   "0041_entry_private_travels.ts": {"checksum":"abad798381d8853a454c9a448f5a7cba70a4ae12055c24cd768c553650bc59eb","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
   "0042_agents.ts": {"checksum":"c77b8b32f8e4edaf87bfe119734a1fab98cf43fb2b0431330291f7e693c11739","applied":false,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
-  "0043_share.ts": {"checksum":"5cbc45a76a0cd39f93608139ad71e01d81743950b52d57cc0529578ce0296e5c","applied":false,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}}
+  "0043_share.ts": {"checksum":"5cbc45a76a0cd39f93608139ad71e01d81743950b52d57cc0529578ce0296e5c","applied":false,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
+  "0044_seat.ts": {"checksum":"ca4c846cd796b620b1a62ddc8d32412fd55fe13a4032990af6094e097b307117","applied":false,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}},
+  "0045_sealed.ts": {"checksum":"f1ef4ba3b49675bb1f2282f2e2238e27ce2660cfd26b8be9dd93e108e9120393","applied":false,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}}
 }

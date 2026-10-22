@@ -1,5 +1,5 @@
 /**
- * The questions per message already open are folded into the one (REC-A02 step 6, DIRECTION §42).
+ * The questions per message already open are folded into the one (REC-A02 step 6).
  *
  * HIS RECORD HOLDS THEM ALREADY: about seventeen questions, one per bank text, each asking to add a row whose account was
  * not read, filed before a tail had a question of its own. They carry no `raws` (that came with this change) and were
@@ -59,7 +59,7 @@ test('DIGITS NOBODY HOLDS: the open questions per text fold into the one, and cl
   r.sql.close();
 });
 
-test('DIGITS A PERSON PUT ON AN ACCOUNT: the next text files the backlog, and the old questions close as filed (DIRECTION §42)', async () => {
+test('DIGITS A PERSON PUT ON AN ACCOUNT: the next text files the backlog, and the old questions close as filed', async () => {
   const r = await record(OLD());
   const old = legacy(r, '7731', ['CORNER SHOP', 'NILE BOOKS', 'HALDEN COFFEE']);
   const before = openQuestions(r.sql).length;

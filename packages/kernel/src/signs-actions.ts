@@ -3,7 +3,7 @@
  * (PRF-A01), joined to its closed list with one import and one spread, and the read a project's blockers take from
  * (`actionsBlocking`, for REC-C09).
  *
- * WHY THIS EXISTS. "Now needs to name a failed `pull` too" (P.191), "a dead job" (D40.54), "a run is never skipped
+ * WHY THIS EXISTS. "Now needs to name a failed `pull` too" (P.191), "a dead job", "a run is never skipped
  * silently" (D0b.35). A paused action showed its last status in "Runs on" and nowhere else; a schedule row that failed
  * eight times became one question in Decide per dead job; no sign read the schedule, the meter or the doors. Since
  * AGT-C06 the eighth attempt raises a fault for the operator (`schedule.ts`), and the owner sees one line here.
@@ -64,7 +64,7 @@ const reading = (state: SignState, value: number | null, said: string, facts: st
 /** `n thing` or `n things`. */
 const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** An id said as words, only where nothing declares a name: `bake-revenue` is `bake revenue`. */
+/** An id said as words, only where nothing declares a name: `oxbow-revenue` is `oxbow revenue`. */
 const plain = (id: string): string => id.replace(/[-_.:]+/g, ' ').trim();
 
 /** `A`, `A and B`, `A, B and C`, or the first three and how many more. */
@@ -268,7 +268,7 @@ export type ActionBlocking = {
   since: string | null;
   /** The provider's status on the last run, when it answered one. */
   status: number | null;
-  /** One sentence a person reads: "Bake revenue has not answered since 4 October: its key was refused (401)." */
+  /** One sentence a person reads: "Oxbow revenue has not answered since 4 October: its key was refused (401)." */
   said: string;
 };
 

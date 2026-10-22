@@ -37,6 +37,7 @@ import { evaluate } from '@braindog/where';
 import type { Entry } from '../index.ts';
 import type { BlockResult, PageBlock, PageDeps } from '../pages.ts';
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
 
 /** The source that is every list's deadlines, as a page names it (`sources/deadlines.ts`). */
@@ -200,7 +201,7 @@ export const calendar: KindModule & { across: readonly string[] } = {
 
   /* SHARED: a `series` reads both and a `stat` or `lines` block reads `back`, each as buckets, where a calendar reads
      them as whole months (`block-keys.ts` `KEY_KINDS`). */
-  keys: ['back', 'ahead', 'weeks'],
+  keys: KIND_KEYS.calendar,
 
   validate(block, ctx) {
     for (const key of ['back', 'ahead'] as const) {

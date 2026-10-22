@@ -245,7 +245,26 @@ export type FlowDeps = {
    * absent. A run that has not started waits under it (`advance`).
    */
   held?: { until: number; say: string } | null | undefined;
+  /**
+   * WHO A RUN ACTS FOR, BY ITS RULE (sharing plan §2.12): `null` where it runs as the record does, its maker an owner
+   * or nobody; `stop` with the sentence a run ends on once its maker can no longer reach the record; else the
+   * dependencies of its maker's lens (`deps`, with `bounded` set), and the sentence a run is skipped with when the row
+   * it started for is not one that lens shows (`unseen`). Absent, every run runs as the record does.
+   */
+  boundTo?: ((rule: string) => { stop: string } | { deps: FlowDeps; unseen: string } | null) | undefined;
+  /**
+   * Set on the dependencies of a run its maker's lens bounds: the sentence a step that reaches outside the rows they may
+   * read and change is refused in (`OUTWARD`). Every figure such a run fills is withheld, since it adds up a whole list.
+   */
+  bounded?: string | undefined;
 };
+
+/**
+ * The steps that reach outside the rows a run's maker may read and change: a call out, a script or a job (each reads
+ * through its own approved reach), a question to Slash (which reads the row whole), and a meet (which writes People).
+ * A run bound to a colleague's lens takes none of them (`FlowDeps.bounded`).
+ */
+export const OUTWARD: ReadonlySet<string> = new Set(['call', 'script', 'run_job', 'ask_slash', 'meet']);
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
 export type Installed = { id: string; version: number; body: FlowDecl };
@@ -1332,6 +1351,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
     finish(deps, run, 'cancelled', off);
     return null;
   }
+  /* A RUN A COLLEAGUE TURNED ON READS AND WRITES THROUGH THEIR LENS (sharing plan §2.12), and ends, saying why, once they
+     can no longer reach the record. Asked at every turn, so a share revoked while a run waits stops it at its wake. */
+  const bound = deps.trial ? null : (deps.boundTo?.(run.rule) ?? null);
+  if (bound !== null && 'stop' in bound) {
+    finish(deps, run, 'cancelled', bound.stop);
+    return null;
+  }
+  if (bound !== null) deps = bound.deps;
   /* AT THE RECORD'S MONTHLY ALLOWANCE A RUN THAT HAS NOT STARTED WAITS FOR THE FIRST OF NEXT MONTH, with the
      Directory's sentence on its row. The answer is the run's next due time, so its schedule row wakes it then; a run
      already under way finishes what it started, and a body being tried is never held. */
@@ -1350,10 +1377,16 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const trigger = JSON.parse(run.trigger) as RunTrigger;
   const { vars, kept: stored, unsent: marked, sealed: tainted } = unpack(run.vars);
   let subject = trigger.entry ? deps.entry(trigger.entry) : null;
+  /* A ROW ITS MAKER'S LENS DOES NOT SHOW IS NOT THIS RUN'S TO READ: the run is skipped, saying so, before any step. */
+  if (bound !== null && subject === null && trigger.entry && trigger.deleted !== true) {
+    finish(deps, run, 'cancelled', bound.unseen);
+    return null;
+  }
   /* WHAT A STEP READS AND WHAT IT WRITES ARE TWO ROWS WHEN A DELETE STARTED THE RUN. Its conditions and templates read
      the row as it was deleted, which is what the rule was written about; its writes get `subject`, which is `null`,
-     so a `set` on a deleted row fails with a sentence rather than bringing the row back. */
-  const last = subject === null && trigger.deleted === true && trigger.entry ? deletedRow(deps.sql, trigger.entry) : null;
+     so a `set` on a deleted row fails with a sentence rather than bringing the row back. A run bound to a colleague's
+     lens is not handed the deleted row, which its lens no longer reads. */
+  const last = subject === null && trigger.deleted === true && trigger.entry && bound === null ? deletedRow(deps.sql, trigger.entry) : null;
   const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
   /* WHAT A `create` WITH NO ROW NAMES AS ITS PARENT: the turn on a clock, so a turn delivered twice makes one row, and the
@@ -1473,6 +1506,8 @@ export function advance(deps: FlowDeps, id: string): number | null {
       /* A STEP THIS BUILD OR THIS HOST DOES NOT RUN FAILS THE RUN HERE, by its row in `capabilities.ts`, before anything
          is queued. Slash is not asked on a host that would not answer: a question queued for nobody waits its day and
          fails, having asked nobody, and this is for a rule that became live without meeting `unserved`. */
+      /* A RUN BOUND TO A COLLEAGUE'S LENS TAKES NO STEP THAT REACHES OUTSIDE THE ROWS (`OUTWARD`), in its own sentence. */
+      if (deps.bounded !== undefined && OUTWARD.has(op.verb)) return fail(i, op.verb, deps.bounded);
       const can = capability(op.verb);
       if (can !== undefined && (!can.runs || !serves(can, deps.answersSlash)))
         return fail(i, op.verb, `rule.${run.rule} reached ${op.verb === 'ask_slash' ? 'an' : 'a'} ${op.verb} step, and ${can.says} (NOT_IN_THIS_BUILD). The steps before it were taken.`);
@@ -2577,6 +2612,8 @@ const figures = (deps: FlowDeps, lands: () => ReadonlySet<string>) => {
      three times. The value is still read each time, for the reason above. */
   const hidden = new Map<string, boolean>();
   return (id: string): string => {
+    /* A RUN BOUND TO A COLLEAGUE'S LENS IS SHOWN NO FIGURE: one adds up its lists whole, past what they may read. */
+    if (deps.bounded !== undefined) return WITHHELD;
     if (!hidden.has(id)) hidden.set(id, hiddenFigure(deps.sql, id, lands()));
     return hidden.get(id) ? WITHHELD : figureText(deps.rules(), id);
   };

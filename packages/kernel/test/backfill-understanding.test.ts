@@ -160,17 +160,17 @@ test('WHAT A PAYMENT WAS FOR, AND A PAYMENT NETWORK, COME OFF THE RECORD: neithe
 test('A RUN UNDER AN OWNER WHOSE REPOSITORIES ONE PROJECT HOLDS IS ONE QUESTION FOR THE OWNER, with every place it is about', async () => {
   const { k, sql, deps, clock } = await record();
   const project = (fields: Record<string, unknown>) => value<Entry>(k.create('things', fields, OWNER)).id;
-  const bake = project({ name: 'Crumb.gg', repos: ['crumb-site'] });
+  const oxbow = project({ name: 'Oxbow.gg', repos: ['oxbow-site'] });
   /* A person's own account, whose repositories two projects hold, settles nothing. */
-  project({ name: 'Sketchpad', repos: ['sketchpad'] });
+  project({ name: 'Pinwheel', repos: ['pinwheel'] });
   project({ name: 'Inkwell', repos: ['inkwell'] });
   const braindog = project({ name: 'BrainDog', repos: ['/Users/sam/Code/braindog'] });
   clock.set(NOW - 2 * HOUR);
   const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
-  run({ remote: 'https://github.com/BakeGame/crumb-site', repo: 'crumb-site', cwd: '/Users/sam/Code/bake/site' });
-  run({ remote: 'https://github.com/BakeGame/bot', repo: 'bot', cwd: '/Users/sam/Code/bake/bot' });
-  run({ remote: 'git@github.com:BakeGame/bake-health.git', repo: 'bake-health', cwd: '/Users/sam/Code/bake/health' });
-  run({ remote: 'https://github.com/samdev/sketchpad', repo: 'sketchpad', cwd: '/Users/sam/Code/sketchpad' });
+  run({ remote: 'https://github.com/OxbowGame/oxbow-site', repo: 'oxbow-site', cwd: '/Users/sam/Code/oxbow/site' });
+  run({ remote: 'https://github.com/OxbowGame/bot', repo: 'bot', cwd: '/Users/sam/Code/oxbow/bot' });
+  run({ remote: 'git@github.com:OxbowGame/oxbow-health.git', repo: 'oxbow-health', cwd: '/Users/sam/Code/oxbow/health' });
+  run({ remote: 'https://github.com/samdev/pinwheel', repo: 'pinwheel', cwd: '/Users/sam/Code/pinwheel' });
   run({ remote: 'https://github.com/samdev/inkwell', repo: 'inkwell', cwd: '/Users/sam/Code/inkwell' });
   run({ remote: 'https://github.com/samdev/website', repo: 'website', cwd: '/Users/sam/Code/website' });
   const inBrainDog = run({ remote: 'https://github.com/samdev/BrainDog', repo: 'BrainDog', cwd: '/Users/sam/Code/braindog' });
@@ -179,17 +179,17 @@ test('A RUN UNDER AN OWNER WHOSE REPOSITORIES ONE PROJECT HOLDS IS ONE QUESTION 
 
   assert.equal(k.get(inBrainDog)?.fields.project, k.nameOf(braindog), 'a folder kept among the repositories places the run');
   const asked = runQuestions(done.suggestions);
-  const owner = asked.find((s) => s.place === 'BakeGame');
+  const owner = asked.find((s) => s.place === 'OxbowGame');
   assert.ok(owner, asked.map((s) => s.question).join(' / '));
-  assert.equal(owner.question, '2 runs worked in BakeGame repositories. Is that Crumb.gg?');
-  assert.deepEqual(owner.projects, [{ id: bake, name: 'Crumb.gg' }]);
-  assert.deepEqual(owner.wheres, ['remote:github.com/bakegame/bake-health', 'remote:github.com/bakegame/bot']);
+  assert.equal(owner.question, '2 runs worked in OxbowGame repositories. Is that Oxbow.gg?');
+  assert.deepEqual(owner.projects, [{ id: oxbow, name: 'Oxbow.gg' }]);
+  assert.deepEqual(owner.wheres, ['remote:github.com/oxbowgame/bot', 'remote:github.com/oxbowgame/oxbow-health']);
   assert.ok(!asked.some((s) => s.place === 'website' || s.place === 'samdev'), 'an owner two projects hold asks nothing');
 
   /* A SINGLE GUESS IS ASKED, with the whole place of every run it is about. */
-  const site = asked.find((s) => s.place === 'crumb-site');
-  assert.equal(site?.question, 'A run worked in crumb-site. Is that Crumb.gg?');
-  assert.deepEqual(site?.wheres, ['remote:github.com/bakegame/crumb-site']);
+  const site = asked.find((s) => s.place === 'oxbow-site');
+  assert.equal(site?.question, 'A run worked in oxbow-site. Is that Oxbow.gg?');
+  assert.deepEqual(site?.wheres, ['remote:github.com/oxbowgame/oxbow-site']);
   for (const s of asked) assert.doesNotMatch(s.question, /github\.com|\/Users|things#|remote:|—/u, s.question);
   sql.close();
 });
@@ -204,25 +204,25 @@ test('A FOLDER KEPT AMONG A PROJECT’S REPOSITORIES IS READ AS A FOLDER, wherev
 test('A SERVICE IS MATCHED BY ITS FIRST WORD AND ITS DOMAIN’S LABEL, AND ITS PROJECT GAINS THE DOMAIN, which Undo takes off', async () => {
   const { k, sql, deps } = await record();
   const project = (fields: Record<string, unknown>) => value<Entry>(k.create('things', fields, OWNER)).id;
-  const bake = project({ name: 'Crumb.gg' });
+  const oxbow = project({ name: 'Oxbow.gg' });
   const bluff = project({ name: 'Tee Time', domains: ['tee.time'] });
-  const quartzman = project({ name: 'Quartzman' });
-  project({ name: 'Quartz' });
+  const harbourside = project({ name: 'Harbourside' });
+  project({ name: 'Harbour' });
   const service = (fields: Record<string, unknown>) => value<Entry>(k.create('services', fields, OWNER)).id;
-  const vm = service({ name: 'bake VM' });
-  const db = service({ name: 'quartzman database' });
+  const vm = service({ name: 'oxbow VM' });
+  const db = service({ name: 'harbourside database' });
   const site = service({ name: 'teetime.com', points_at: 'www.teetime.com' });
   const law = service({ name: 'nadrylaw.com' });
-  const stats = service({ name: 'bake analytics', points_at: 'plausible.io' });
+  const stats = service({ name: 'oxbow analytics', points_at: 'plausible.io' });
   const done = understandBackfill(deps);
 
-  assert.equal(k.get(vm)?.fields.thing, bake, 'the first word, against the project’s name without its ending');
-  assert.equal(k.get(db)?.fields.thing, quartzman, 'and never the project whose name it only starts with');
+  assert.equal(k.get(vm)?.fields.thing, oxbow, 'the first word, against the project’s name without its ending');
+  assert.equal(k.get(db)?.fields.thing, harbourside, 'and never the project whose name it only starts with');
   assert.equal(k.get(site)?.fields.thing, bluff, 'the label of its domain, against the project’s name');
   assert.equal(k.get(law)?.fields.thing, undefined);
   assert.deepEqual(k.get(bluff)?.fields.domains, ['tee.time', 'teetime.com']);
-  assert.equal(k.get(stats)?.fields.thing, bake);
-  assert.equal(k.get(bake)?.fields.domains, undefined, 'a domain that is somebody else’s never goes on the project');
+  assert.equal(k.get(stats)?.fields.thing, oxbow);
+  assert.equal(k.get(oxbow)?.fields.domains, undefined, 'a domain that is somebody else’s never goes on the project');
 
   value(undoBackfill(deps, done.services.batch!, 'p_owner'));
   assert.deepEqual(k.get(bluff)?.fields.domains, ['tee.time']);

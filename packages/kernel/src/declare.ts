@@ -24,7 +24,7 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predi
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { jcs } from './jcs.ts';
 import { instant } from './migrate.ts';
-import { INSTRUCTIONS_BODY, SESSION_BODY } from './migrations/0042_agents.ts';
+import { INSTRUCTIONS_BODY, SESSION_BODY } from './migrations/0044_seat.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
@@ -90,7 +90,7 @@ const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
    agent's code, run by a host in a sandbox and never by the record (`script.ts`).
    `job` IS THE TENTH, and migration 18 rebuilds the same CHECK again: what one run of Claude Code on the owner's own
    machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`).
-   `look` IS THE ELEVENTH (DIRECTION §38): what a page leads with, its order, what it hides and its next action, laid
+   `look` IS THE ELEVENTH: what a page leads with, its order, what it hides and its next action, laid
    over the page as it is read (`compose.ts`). The CHECK that holds the database to this list takes it in the migration
    after 23. */
 export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job', 'look'] as const;
@@ -2097,7 +2097,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!Array.isArray(columns) || columns.length === 0 || columns.length > COLUMN_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
       const roles = new Map<string, number>();
-      for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown; edit?: unknown }[]) {
+      for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown; edit?: unknown; kpi?: unknown }[]) {
+        /* `kpi: headline` IS A CARD'S TREND READ FROM THE KEY NUMBER ITS PROJECT LEADS WITH (`pages.ts` `trendsOf`), the
+           figure beside it drawn only on a card whose project keeps none. So it rides a trend column over a figure, and a
+           `kpi:` anywhere else would install and draw nothing. */
+        if (column !== null && typeof column === 'object' && column.kpi !== undefined) {
+          if (column.kpi !== 'headline')
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column kpi: ${JSON.stringify(column.kpi)}, and kpi reads the key number a project's card leads with. Write kpi: headline.`, at, ['headline']);
+          if (block.kind !== 'cards' || column.as !== 'trend' || column.metric === undefined)
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column kpi:, which only a card's trend over a figure reads: { metric, kpi: headline, as: trend } on a cards block.`, at);
+        }
         /* A CARD'S FACT MAY NAME A FIGURE (`card-facts.ts`), asked first so a fact's edit: is refused in a fact's words.
            It counts in the same roles as the field facts, so figures and fields share CARD_FACTS. */
         if (column !== null && typeof column === 'object' && column.as === 'fact' && column.metric !== undefined) {
@@ -5358,7 +5367,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       "register.session is the kernel's own register, and no pack or person may declare it.",
       'register.session',
     );
-  /* AND SO IS `register.instructions` (migration 42), for the same reason: what he tells an agent has one writer. */
+  /* AND SO IS `register.instructions` (migrations 42 and 44), for the same reason: what he tells an agent has one writer. */
   if (decl.id === 'register.instructions' && (decl.pack !== 'kernel' || jcs(decl.body) !== INSTRUCTIONS_BODY))
     return bad(
       'PROVIDES_CONFLICT',

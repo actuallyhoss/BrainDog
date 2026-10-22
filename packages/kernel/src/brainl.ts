@@ -36,7 +36,7 @@
 import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
-import { SEAT_AGENTS } from './migrations/0042_agents.ts';
+import { SEAT_KERNEL_REGISTERS } from './migrations/0044_seat.ts';
 import { SIGNS_KEY } from './signs.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
 import { isShape } from './shape.ts';
@@ -886,9 +886,10 @@ export function importBrainl(
        right. Migration 22's seat is keyed on its checksum, so it changes nothing when the file
        already holds it. */
     /* OR ITS ROWS: a file that brings runs and no declarations still needs each run's `started`, which the seat fills.
-       MIGRATION 42'S SEAT, which is 28's carried forward and seats `register.instructions` too: a file written before 42
-       carries 28's runs list and no instructions list, and the import would otherwise leave the record without either. */
-    if (touched.has('declaration') || touched.has('entry')) execScript(sql, SEAT_AGENTS);
+       MIGRATION 44'S SEAT, which is 42's carried forward, as 42's was 28's: it seats `register.instructions` too, so a file
+       written before 42 carries 28's runs list and no instructions list, and one written before 44 carries 42's, and the
+       import would otherwise leave the record on an older list of either. */
+    if (touched.has('declaration') || touched.has('entry')) execScript(sql, SEAT_KERNEL_REGISTERS);
 
     /* AND A FILE WRITTEN BEFORE MIGRATION 16 CARRIES THE ASSISTANT'S OLD NAME in the rows it brings, for the same
        reason: this record's ledger says the rename ran, so nothing else would rename them. The declaration bodies need

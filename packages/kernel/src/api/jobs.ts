@@ -40,6 +40,7 @@ import {
   type PostJobEventArgs,
   type Posted,
   type RunnerGrant,
+  type RunnerPlace,
 } from '../jobs.ts';
 
 export function extension(parts: KernelParts) {
@@ -74,8 +75,11 @@ export function extension(parts: KernelParts) {
       /** One job's transcript since a line, and where it stands. Reads only. */
       events: (args: { id?: unknown; after?: unknown }): Result<JobEvents> => jobEvents(deps(), args),
 
-      /** A runner takes the oldest queued job, with its lease and its bearer, or is told how long to wait. */
-      claim: (runner: JobRunner): Promise<Result<Claimed>> => claimJob(deps(), runner, transaction),
+      /**
+       * A runner takes the oldest queued job it can run where it is, with its lease and its bearer, or is told how long
+       * to wait. `place` is its machine and the profiles it can run under (migration 44).
+       */
+      claim: (runner: JobRunner, place?: RunnerPlace): Promise<Result<Claimed>> => claimJob(deps(), runner, transaction, place),
 
       /** A runner reports the next line of the job it holds. */
       post: (runner: JobRunner, args: PostJobEventArgs): Result<Posted> => transaction(() => postJobEvent(deps(), runner, args)),

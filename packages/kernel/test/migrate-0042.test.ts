@@ -14,8 +14,8 @@ import { digest, openRecord, validateDeclaration, type Declaration, type Session
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 21, 12);
-const SEATED_28 = '2026-10-08T00:00:00.000Z';
 const SEATED_42 = '2026-10-21T00:00:00.000Z';
+const SEATED_44 = '2026-10-22T00:00:00.000Z';
 
 const NOTES: Declaration = {
   id: 'register.notes',
@@ -38,24 +38,45 @@ const snapshot = (sql: NodeSql) => ({
   token: sql.all('SELECT * FROM token ORDER BY id').map((r) => ({ ...r })),
 });
 
-/** Migration 42's work taken away: the record as migration 41 left it. */
+/**
+ * Migration 44's lists taken away and 42's made live again: the record as migration 43 left it, as far as the two
+ * kernel registers go. A rewind past 42 needs it first, or 42's seat would seat its lists again over 44's.
+ */
+function before44(sql: NodeSql): void {
+  sql.exec("DELETE FROM declaration WHERE id IN ('register.session', 'register.instructions') AND superseded_at IS NULL");
+  sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id IN ('register.session', 'register.instructions') AND superseded_at = ?", SEATED_44);
+}
+
+/** Migration 45's tables taken away: a record from before 45 has none. */
+function before45(sql: NodeSql): void {
+  sql.exec('DROP TABLE sealed_part');
+  sql.exec('DROP TABLE sealed_file');
+  sql.exec("DELETE FROM dog_section WHERE table_name IN ('sealed_file', 'sealed_part')");
+}
+
+/** Migration 42's work taken away, and 45's and 44's before it: the record as migration 41 left it. */
 function before42(sql: NodeSql): void {
+  before45(sql);
+  before44(sql);
   sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL");
   sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session' AND superseded_at = ?", SEATED_42);
   sql.exec("DELETE FROM declaration WHERE id = 'register.instructions'");
   sql.exec('DROP TABLE instruction_seen');
   sql.exec('DROP TABLE agent_profile');
+  sql.exec('DROP TABLE job_place');
   sql.exec('DROP INDEX entry_session_pulse');
-  sql.exec("DELETE FROM dog_section WHERE table_name IN ('instruction_seen', 'agent_profile')");
+  sql.exec("DELETE FROM dog_section WHERE table_name IN ('instruction_seen', 'agent_profile', 'job_place')");
   sql.exec('DELETE FROM migration WHERE version >= 42');
 }
 
 const tableNames = (sql: NodeSql) => sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").map((r) => r.name);
 
 test('THE BODIES ARE CANONICAL, each a register the kernel accepts, and each checksum the one the seat writes', async () => {
-  for (const [body, id] of [[SESSION_BODY, 'runs'], [INSTRUCTIONS_BODY, 'instructions']] as const) {
+  /* UNDER ANOTHER NAME EACH, because only the kernel's newest bytes may be `register.session` or `register.instructions`
+     (migration 44's now), and that arm is about who declares them, not their shape. */
+  for (const [body, id, prefix] of [[SESSION_BODY, 'runs', 'RN'], [INSTRUCTIONS_BODY, 'told', 'TL']] as const) {
     assert.equal(JSON.stringify(JSON.parse(body)).length, body.length);
-    const decl: Declaration = { id: `register.${id}`, kind: 'register', body: { ...JSON.parse(body), id, ...(id === 'runs' ? { seq_prefix: 'RN' } : {}) }, pack: 'kernel' };
+    const decl: Declaration = { id: `register.${id}`, kind: 'register', body: { ...JSON.parse(body), id, seq_prefix: prefix }, pack: 'kernel' };
     assert.equal(validateDeclaration(decl), null);
   }
   const sql = openSqlite();
@@ -84,15 +105,19 @@ test('A RECORD THAT RAN 41 TAKES 42, and every row, line, counter and key is as 
 
   const { result } = await applyMigrations(sql, fixedClock(NOW + 3_600_000));
   assert.ok(result.ok);
-  assert.deepEqual(result.value.applied, [42, 43]);
+  assert.deepEqual(result.value.applied, [42, 43, 44, 45]);
   assert.deepEqual(snapshot(sql), before, 'migration 42 changed a row, a line, a counter or a key');
   const seated = (id: string) =>
     sql.all('SELECT version, superseded_at FROM declaration WHERE id = ? ORDER BY version', id).map((r) => ({ ...r }));
-  assert.deepEqual(seated('register.instructions'), [{ version: 1, superseded_at: null }]);
+  /* 42 seats each list, and 44 its next version over it. */
+  assert.deepEqual(seated('register.instructions'), [
+    { version: 1, superseded_at: SEATED_44 },
+    { version: 2, superseded_at: null },
+  ]);
   assert.deepEqual(seated('register.session').slice(-3), [
-    { version: 3, superseded_at: SEATED_28 },
     { version: 4, superseded_at: SEATED_42 },
-    { version: 5, superseded_at: null },
+    { version: 5, superseded_at: SEATED_44 },
+    { version: 6, superseded_at: null },
   ]);
   for (const t of ['instruction_seen', 'agent_profile']) assert.ok(tableNames(sql).includes(t), `${t} is missing`);
   assert.deepEqual(
@@ -104,11 +129,13 @@ test('A RECORD THAT RAN 41 TAKES 42, and every row, line, counter and key is as 
   );
   assert.ok(sql.one("SELECT 1 AS y FROM sqlite_master WHERE type = 'index' AND name = 'entry_session_pulse'"), 'the pulse index is missing');
 
-  /* AND IT RUNS OVER ITSELF, changing nothing the second time. */
+  /* AND IT RUNS OVER ITSELF, changing nothing the second time: 44's lists taken away first, as a rewind past 42 finds
+     them, and seated again under the same versions. */
   const once = snapshot(sql);
   const versions = sql.all('SELECT id, version FROM declaration ORDER BY id, version').map((r) => ({ ...r }));
+  before44(sql);
   sql.exec('DELETE FROM migration WHERE version >= 42');
-  assert.deepEqual((await applyMigrations(sql, fixedClock(NOW + 7_200_000))).result, { ok: true, value: { kernel: 43, format: 1, applied: [42, 43] } });
+  assert.deepEqual((await applyMigrations(sql, fixedClock(NOW + 7_200_000))).result, { ok: true, value: { kernel: 45, format: 1, applied: [42, 43, 44, 45] } });
   assert.deepEqual(snapshot(sql), once);
   assert.deepEqual(sql.all('SELECT id, version FROM declaration ORDER BY id, version').map((r) => ({ ...r })), versions);
 

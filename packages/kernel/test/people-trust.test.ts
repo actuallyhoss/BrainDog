@@ -433,10 +433,10 @@ test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handl
   /* Now that the record knows the name, a commit with the same name and handle is still asked about: anybody can sign
      a commit as the owner (audit 19 H1). The same from a session's own run folds on its own, into the owner's row, and
      never takes the commit author in with it. */
-  const committed = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in bake' }, AGENT));
+  const committed = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in oxbow' }, AGENT));
   assert.equal(committed.matched_by, 'none');
   assert.ok(committed.question);
-  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@tidepool.example', where: 'session in bake' }, OWNER));
+  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@tidepool.example', where: 'session in oxbow' }, OWNER));
   assert.equal(folded.matched_by, 'strong');
   assert.equal(folded.row?.id, self.id);
   assert.equal(k.get(committed.row!.id)!.fields.merged_into, undefined, 'the commit author was folded in down the chain');

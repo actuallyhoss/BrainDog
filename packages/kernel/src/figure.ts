@@ -77,7 +77,7 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
  * written would be read over a row that is half there. The pass leaves the braces as typed there, so they are refused.
  *
  * AND A FIGURE OVER ANOTHER LIST IN A RUN THAT WRITES INTO A ROW IS REFUSED, since the run would write it as `WITHHELD`
- * (the owner's decision). He asked to be told when the rule goes in, so that he learns it from the lint and not from a
+ * (a settled decision). Whoever writes the rule is told when it goes in, so it is learnt from the lint and not from a
  * placeholder in a row a week later. A REFUSAL AND NOT A WARNING, because install has no channel for one: it answers
  * `Result<Installed[]>`, whose value is each declaration's `{ id, version, changed }`, and a warning carried beside it
  * would have to be threaded through `declare.ts`, `index.ts`, the record's install and the app that shows it. Nothing

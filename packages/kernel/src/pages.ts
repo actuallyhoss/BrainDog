@@ -25,7 +25,7 @@ import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
 import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
 import * as kpiRank from './kpi-rank.ts';
-import type { KpiAnswer } from './sources/kpis.ts';
+import { kpiTrend, type KpiAnswer } from './sources/kpis.ts';
 import { cutActions, type OfferedAction } from './row-actions.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook, type LookBody } from './compose.ts';
 /* A PAGE'S HEAD OVER ITS TITLE (PGS-A16), read and resolved by the file that checks it at install. */
@@ -61,6 +61,7 @@ import { SESSION_PREFIX, agentOf, recordNamed } from './session.ts';
 import { quietSign, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost, type Wait } from './weigh.ts';
+import { REDUCES, ROW_TEXT_MOST, RAIL_PAGES, SUMS, railRoom } from './constants.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
 import { localDays } from './measures.ts';
 
@@ -112,13 +113,15 @@ export type PageBlock = {
   /**
    * `metric:` IN PLACE OF `field:` is a card's `trend`: a figure grouped by a date bucket, `{{field}}` in its id filled
    * from each card's row (`project-done-by-week:{{name}}`), read once a card and answered as `trends`. Such a column
-   * names no field, so its `field` is absent whatever this type says of the rest.
+   * names no field, so its `field` is absent whatever this type says of the rest. `kpi: 'headline'` beside it reads each
+   * card's line from the key number its project leads with (`sources/kpis.ts` `for: cards`), the figure only on a card
+   * whose project keeps none with a value.
    */
   /**
    * `or:` names a second field of the same list, read where `field` holds nothing: a bank line's clean name, or the
    * words the bank wrote where nobody was matched to it. The entry carries both and the host falls back.
    */
-  columns?: { field: string; or?: string; metric?: string; label?: string; as?: string; edit?: boolean; sign?: { field: string; minus: string } }[];
+  columns?: { field: string; or?: string; metric?: string; kpi?: 'headline'; label?: string; as?: string; edit?: boolean; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /**
@@ -219,6 +222,12 @@ export type PageBlock = {
   ahead?: number;
   /** A `calendar`'s: how many whole weeks it shows from the Monday of this one, 1 to 8, in place of back and ahead. */
   weeks?: number;
+  /**
+   * A `drawn` block's (`kinds/drawn.ts`): the component, its HTML, a style tag and a script, which the host draws in a
+   * sandboxed frame; and the height in pixels it stands at before it says its own.
+   */
+  code?: string;
+  height?: number;
   /** A `stat` or `lines` over readings: whether a point is a day or a week. A day when absent. */
   bucket?: string;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */
@@ -477,6 +486,11 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A `kpis` block's key numbers, each with its points, shape, chart, verdict and why it is here (`sources/kpis.ts`). */
   kpis?: KpiAnswer[];
+  /**
+   * A `kpis` block's: the list its key numbers are kept in, found by its shape, so a host links "All numbers" to it
+   * without naming a list of its own. Absent on a record that keeps none, or that this reader may not read.
+   */
+  kpi_list?: string;
   /**
    * A `stat` or `lines` over a register of readings: one series a measure (`measures.ts`). A `stat`'s are every measure,
    * the ones that moved most first; a `lines` block's are only the measures with two points or more in the period to join.
@@ -751,6 +765,19 @@ export type PageFilter = {
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number; run_by?: RunBy | null };
+
+/**
+ * What a page read made for one reader may hand her of the reads across the whole record: each line of the log, each
+ * question and each list asked of her own lens by the host (sharing plan §2.5), so a feed, a queue or what went quiet
+ * drawn for a Viewer or an Admin leaves out what `recentHistory` and `governance` leave out for her: the owner's own
+ * lists, a personal list, a row her rule does not admit. A line is asked with the row it is about, read once, or `null`
+ * for a line about no row or a row gone. Absent, the read hands everything, as it does the owner.
+ */
+export type PageSees = {
+  line: (e: { kind: string; target: string | null; target_kind: string | null; field: string | null; row: Entry | null }) => boolean;
+  question: (kind: 'suggestion' | 'decision', id: string) => boolean;
+  list: (register: string) => boolean;
+};
 
 /**
  * Who changed a row last, for the byline a page draws under it: the kind of actor and who it was, when, and the batch
@@ -1135,40 +1162,10 @@ export const WHOLE_RECORD = '*';
  * default 50 and is correct. Putting it here would refuse a heading that has nothing to add up.
  * That is the other question, and it has its own name below.
  *
- * IT IS CALLED `SUMS` AND IT USED TO BE CALLED `REDUCES`, which was the name of a DIFFERENT SET one
- * import away. `apps/web/src/lib/record/schema.ts` exported a `REDUCES` of these five plus
- * `section`, and this file exported a `REDUCES` of the five, both `ReadonlySet<string>` and both
- * importable into the same module: `page-live.ts` imports one of them today, and adding
- * `import { REDUCES } from '@braindog/kernel'` beside it would have compiled and answered
- * differently about `section`, with nothing in either name to say they disagreed. Two names now,
- * one question each, and `apps/web`'s `block-kinds.test.ts` holds the two packages together.
+ * THE SET ITSELF, AND `REDUCES` BESIDE IT, ARE `constants.ts`'s, so a screen that needs only the set does not
+ * read this file. They are exported from here as they always were.
  */
-/* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SLASH_KINDS` in `slash.ts` is declared as for
-   the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set the
-   kernel refuses by. */
-/* `heat` IS ONE OF THEM BECAUSE IT ADDS THE ROWS ON ONE DAY TOGETHER (`render/src/heat.ts`), and it was left out when
-   the kind landed. Measured over a register of sixty rows on sixty days: fifty rows, `matched: 60`, no refusal, so ten
-   busy days were drawn as gaps. `ring` IS NOT, though it can look like one: over a register it draws one row it counts
-   (`ringOf`), two `matched` figures and never a row read, so a ceiling would refuse a ring over 201 tasks for a limit
-   it never meets. */
-export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat', 'progress', 'split']);
-
-/**
- * `SUMS` and `section`: the kinds whose count on screen is the WHOLE MATCH rather than the page drawn.
- *
- * Nothing in this file reads it, and it is here rather than in the app because it is a fact about
- * the record's own dialect that every consumer with a screen has to get right. `apps/web` reads it
- * for the slice line under a block, on both of its engines: `api.ts` over the sample and
- * `page-live.ts` over a live answer. The two disagreed about `section` while this was one set doing
- * both jobs, and the page said it twice, differently, for the same declaration: measured through
- * `blockOf` on a section with 2 rows and `matched: 301`, `shown 2, total 301`, which is what
- * `/p/[slug]` prints "Showing 2 of 301" on, over a heading that draws no row of its own and whose
- * own count says 301, while the same heading on the sample printed nothing.
- *
- * DERIVED FROM `SUMS` RATHER THAN LISTED AGAIN, so the only way the two can disagree is the one
- * kind that is the actual difference between the questions.
- */
-export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
+export { REDUCES, SUMS };
 /**
  * HOW MANY ROWS RIDE BESIDE A WHOLE READ, and it is no longer a ceiling (PGS-B05). A kind that adds up answers
  * `wholeRead`, its parts and its total over every row, and these rows are handed with it so a drawer written before
@@ -1472,53 +1469,9 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
   return made.flat();
 }
 
-/**
- * HOW MANY PAGES OUT OF ONE TEMPLATE A RAIL DRAWS, and the rule lives here because two rails obey it.
- *
- * A template carrying `nav` is one rail entry per row it admits, which is a rail that grows with
- * the record. Measured end to end through the record's own `boot` at his size, 27 projects, 23
- * services and 22 skills over three nav-carrying templates: 72 rail entries, one per row, against
- * 15 with this cap. A rail that grows without bound is a rail that stops being a rail.
- *
- * THE BUDGET IS KEYED ON THE REGISTER AND THE HEADING TOGETHER. Per register alone, the first
- * template over a list spends the whole budget and a second one drew NOTHING: measured in
- * `apps/web` with a `Clients` template beside the shipped `Projects` one over the same 26 rows,
- * Projects drew 6 and Clients drew 0, so a heading somebody had declared was gone rather than
- * short. A page nobody generated is never counted at all, so rows can never push out a page
- * somebody wrote.
- *
- * IT IS IN THE KERNEL BECAUSE THE SAMPLE AND THE LIVE SHELL BOTH HAVE TO OBEY IT, and they are in
- * different files with no other package between them. The cap shipped as a local constant inside
- * the sample's `boot()` (then in `apps/web/src/lib/record/api.ts`, now in
- * `apps/web/src/lib/record/fixtures/readers.ts`), which is the SAMPLE's rail: the sample is four
- * projects forever, so the rule was true where it changed nothing and absent from the rail a real
- * record draws, where the same 26 links were still being offered every morning.
- *
- * NOTHING IS HIDDEN BY IT. Every page keeps its own address, stays in the list of pages a caller
- * may open, and the list it came out of carries the whole count beside its name in the rail.
- */
-export const RAIL_PAGES = 5;
-
-/**
- * The counter that rule needs, made once per rail: it answers whether one page may be drawn.
- *
- * A page with no `about` is a page somebody wrote, and it is always drawn. A page out of a
- * template is drawn while its register and heading have room, and the ones kept are the first
- * `RAIL_PAGES` offered, which is the order the rail draws them in.
- *
- * THE KEY IS A JSON PAIR RATHER THAN TWO STRINGS JOINED, because a heading is somebody's own
- * words and any separator picked here is one they are allowed to type.
- */
-export function railRoom(): (about: { register: string; section: string } | null | undefined) => boolean {
-  const drawn = new Map<string, number>();
-  return (about) => {
-    if (!about) return true;
-    const key = JSON.stringify([about.register, about.section]);
-    const n = (drawn.get(key) ?? 0) + 1;
-    drawn.set(key, n);
-    return n <= RAIL_PAGES;
-  };
-}
+/* HOW MANY PAGES OUT OF ONE TEMPLATE A RAIL DRAWS, `RAIL_PAGES`, and the counter that keeps to it, `railRoom`: `constants.ts`'s,
+   with why the cap is in the kernel at all, because the shell reads them on its first open and this file is half the kernel. */
+export { RAIL_PAGES, railRoom };
 
 /**
  * One page, with every block run.
@@ -1712,7 +1665,7 @@ function pageHead(deps: PageDeps, decl: PageDecl, every: ReturnType<typeof resol
 }
 
 /**
- * THE PAGE UNDER ITS LOOK (DIRECTION §38), or `null` when the host reads no looks.
+ * THE PAGE UNDER ITS LOOK, or `null` when the host reads no looks.
  *
  * The stored look wins as it is, unless it is the owner's: then the rules fill what he left unset, never over what he
  * pinned (`mergeLook`). With none stored, or one Slash wrote from blocks this reader is held from, the rules' look over
@@ -2394,11 +2347,8 @@ function shorn<T extends { cells?: unknown }>(block: T): T {
 
 /* ── lean rows ───────────────────────────────────────────────────────────── */
 
-/**
- * The characters of one text a page's row carries before it is cut, as many as `list` gives an agent (`packages/mcp`).
- * Counted in code points, so a cut never splits a character in two.
- */
-export const ROW_TEXT_MOST = 280;
+/* The characters of one text a page's row carries before it is cut: `constants.ts`'s, where a screen reads it. */
+export { ROW_TEXT_MOST };
 
 /** A row as a page answers it: the row, saying `clipped` where a text in it was cut (`leanRows`). */
 export type PageRow = Entry & {
@@ -3331,8 +3281,13 @@ function trendColumnFault(deps: PageDeps, block: PageBlock): Refusal | null {
 function trendsOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { trends?: ((number | null)[] | null)[] } {
   const col = trendColumn(block);
   if (!col) return {};
+  const leads = col.kpi === 'headline' ? kpiLeadsOf(deps) : null;
   return {
     trends: rows.map((row) => {
+      /* A PROJECT THAT LEADS WITH A KEY NUMBER DRAWS THAT NUMBER'S OWN LINE, or no line where its points fall short of the
+         periods drawn: never the figure's, beside a number it is not (the KPI plan of 21 October, 2.5, decided 3). */
+      const lead = leads?.get(row.id);
+      if (lead) return kpiTrend(lead, deps.ctx.nowMs, TREND_BUCKETS);
       const filled = String(fill(col.metric!, row));
       if (filled.includes('{{')) return null;
       const { id, param } = trendNamed(filled);
@@ -3347,6 +3302,32 @@ function trendsOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { t
       return counted ? line.map((v) => v ?? 0) : line;
     }),
   };
+}
+
+/** The most project leads one read of the key numbers answers: every card of the longest cards block, and more. */
+const KPI_LEADS_MOST = 200;
+/** The key numbers' source and kind, one name (`sources/index.ts`). */
+const KPIS_KIND = 'kpis';
+
+/**
+ * THE KEY NUMBER EACH PROJECT LEADS WITH, by the project's row id: the `kpis` source read `for: cards`, the one answer the
+ * app's cards, the hero and Today lead with, so a card's line is the number its figure says. Only a number with a value
+ * leads, as a card leads only with one (`cardKpiOf` in the app). A record with no key numbers, or a source that refuses,
+ * gives none, and every card draws its figure as before.
+ *
+ * ONLY FOR A READER OF THE WHOLE RECORD, since the source reads across it (`whole`): a key number worked out from a figure
+ * reads whatever list the figure counts. A member held to some lists is drawn the figure, as the column names, and the
+ * block over the projects is not held from them for the sake of one line.
+ */
+function kpiLeadsOf(deps: PageDeps): ReadonlyMap<string, KpiAnswer> {
+  const source = sourceModule(KPIS_KIND);
+  const reads = deps.ctx.reads;
+  if (!source || (reads !== undefined && !reads(WHOLE_RECORD))) return new Map();
+  const block: PageBlock = { kind: KPIS_KIND, source: KPIS_KIND, for: 'cards', limit: KPI_LEADS_MOST };
+  const read = source.read(deps, block, { ...block, rows: [], matched: 0, refusals: [] }, (...more) => [...more], sourceKit(deps));
+  const out = new Map<string, KpiAnswer>();
+  for (const a of read.kpis ?? []) if (a.latest !== null && (read.refusals ?? []).length === 0) out.set(a.thing, a);
+  return out;
 }
 
 /** A cards block's when column over a figure, or `undefined`. */
@@ -4109,7 +4090,7 @@ const madeFor = (actor: string): boolean =>
  * Who changed each row last, aligned with `rows`: the newest event, its kind of actor, and when, with the batch Undo puts
  * back and, for a run, what the run is.
  *
- * ON EVERY BLOCK OF A LIST, for the byline (DIRECTION §37, trust): a row changed for the reader in the last week carries
+ * ON EVERY BLOCK OF A LIST, for the byline (trust): a row changed for the reader in the last week carries
  * its change and every other row is `null`, and a block with none answers no `changes`. A `changed` column asked for
  * every row's, whoever made it, and gets them.
  */

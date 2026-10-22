@@ -15,6 +15,7 @@
  */
 
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
 
 /** How many links a block draws when it says no `limit:`, as a table does (`pages.ts`). */
@@ -36,7 +37,7 @@ export function linkable(href: string): boolean {
 }
 
 export const link: KindModule = {
-  keys: [],
+  keys: KIND_KEYS.link,
 
   validate(block, ctx) {
     const shape = listedFault(block, 'link', { fewest: 2, most: 3, said: 'two or three columns, the title, the address and a note, such as columns: [name, url, note]' }, ctx.stage);

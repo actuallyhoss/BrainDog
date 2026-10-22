@@ -116,3 +116,30 @@ test('SETTINGS ONLY NARROW: what an agent may do is the narrower of its token an
   assert.equal(mayOf('read', 'write'), 'read');
   assert.equal(mayOf('write', 'write'), 'write');
 });
+
+test('A ROW MAY MATCH A CLAUDE CODE PROFILE: nearer than the machine, held to a name, and only with its kind', async () => {
+  const { k, sql } = await record();
+  const kind = value<Profile>(k.setProfile({ name: 'Claude Code', match: { kind: 'claude' }, ceiling: 'write' }, 'p_1'));
+  const host = value<Profile>(k.setProfile({ name: 'MacBook · Claude Code', match: { kind: 'claude', host: 'MacBook' }, ceiling: 'propose' }, 'p_1'));
+  const seat = value<Profile>(k.setProfile({ name: 'Claude Code as harbour', match: { kind: 'claude', seat: 'harbour' }, ceiling: 'read' }, 'p_1'));
+  const both = value<Profile>(k.setProfile({ name: 'Harbour on the MacBook', match: { kind: 'claude', host: 'MacBook', seat: 'harbour' }, ceiling: 'read' }, 'p_1'));
+  const at = (who: Parameters<typeof k.profileFor>[0]) => {
+    const p = k.profileFor(who);
+    return [p.id, p.by];
+  };
+  assert.deepEqual(at({ kind: 'claude', host: 'MacBook', seat: 'harbour' }), [both.id, 'seat']);
+  assert.deepEqual(at({ kind: 'claude', host: 'Studio', seat: 'harbour' }), [seat.id, 'seat']);
+  assert.deepEqual(at({ kind: 'claude', host: 'MacBook', seat: 'default' }), [host.id, 'host']);
+  assert.deepEqual(at({ kind: 'claude', seat: 'default' }), [kind.id, 'kind']);
+  /* A PROFILE ROW DOES NOT APPLY TO A CALLER THAT SAYS NO PROFILE, nor to another kind under that profile. */
+  assert.deepEqual(at({ kind: 'claude', host: 'Studio' }), [kind.id, 'kind']);
+  assert.deepEqual(at({ kind: 'codex', seat: 'harbour' }), ['default', 'default']);
+
+  /* A NAME AND NEVER A FOLDER, and never without the kind it is for. */
+  assert.equal(codeOf(k.setProfile({ name: 'Bad', match: { kind: 'claude', seat: '/Users/ada/.claude-harbour' } }, 'p_1')), 'VALUE_MALFORMED');
+  assert.equal(codeOf(k.setProfile({ name: 'Bad', match: { kind: 'claude', seat: 'a..b' } }, 'p_1')), 'VALUE_MALFORMED');
+  assert.equal(codeOf(k.setProfile({ name: 'Bad', match: { seat: 'harbour' } }, 'p_1')), 'VALUE_MALFORMED');
+  /* TWO ROWS ON ONE PROFILE ARE ONE TOO MANY, as two on one kind are. */
+  assert.equal(codeOf(k.setProfile({ name: 'Again', match: { kind: 'claude', seat: 'harbour' } }, 'p_1')), 'UNIQUE_VIOLATION');
+  sql.close();
+});

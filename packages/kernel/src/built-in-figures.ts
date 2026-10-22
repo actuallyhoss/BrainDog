@@ -85,8 +85,9 @@ import { no, ok } from '@braindog/ports';
 import { DOOR_KEPT_DAYS, DOOR_WINDOW_DAYS, doorMarks } from './door.ts';
 import { openHandoffs, type OpenHandoff } from './handoff.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
-import { workingRuns } from './presence.ts';
-import { SESSION, isRunName } from './session.ts';
+import { liveStateOf, presentRuns, workingRuns } from './presence.ts';
+import { SESSION, SESSION_PREFIX, isRunName } from './session.ts';
+import type { Json } from './coerce.ts';
 import { intervalMs } from './pull.ts';
 /* `key-scan.ts` IMPORTS ONLY `coerce.ts` AT RUN TIME, and `coerce.ts` only types, so this adds no load ring. */
 import { KEYS_IN_TEXT } from './key-scan.ts';
@@ -152,6 +153,24 @@ const RUNS_WORKING: MetricDecl = {
   compare: 'none',
   format: 'int',
 };
+
+/**
+ * THE TWO OTHER NUMBERS OF THE AGENTS PAGE'S LINE, over the same source, so its "12 at work on 4 machines, 1 waiting on
+ * you" is said by the record and agrees with the rail: `part` names which. NO TARGET, for `runs-working`'s reason.
+ */
+export type RunsDecl = MetricDecl & { part?: 'machines' | 'waiting' };
+
+/**
+ * How many machines the agents at work are on: the machines the working runs name (`host`), each once, and the runs
+ * that name none together as one, since they are on some machine. Nought exactly while nobody is at work.
+ */
+const MACHINES_WORKING: RunsDecl = { ...RUNS_WORKING, metric: 'machines-working', name: 'Machines agents are at work on', part: 'machines' };
+
+/**
+ * How many agents wait on him: open runs whose turn is over or that have not called in fifteen minutes, which the live
+ * read calls waiting (`liveStateOf`), each counted once whatever helpers it has.
+ */
+const RUNS_WAITING: RunsDecl = { ...RUNS_WORKING, metric: 'runs-waiting', name: 'Agents waiting on you', part: 'waiting' };
 
 /* ── the steps left for the next run (AGT-C05) ─────────────────────────── */
 
@@ -516,11 +535,11 @@ const ACTIVITY_STAMP_MS = 10 * 60_000;
 /**
  * THE LINES A FEED NEVER SHOWS, as `activity` in `index.ts` leaves them out, written once more here because that read
  * is the kernel's own and this file is read by `metrics.ts`, which the kernel imports. The owner's lines (keys, access,
- * links, members), a script's quiet night, and the sweep writing a run off. `test/activity-figures.test.ts` holds this
+ * links, members, sealed files), a script's quiet night, and the sweep writing a run off. `test/activity-figures.test.ts` holds this
  * and the kernel's `bookkeeping` to one answer.
  */
 const ACTIVITY_SHOWN = `e.kind NOT LIKE 'grant.%' AND e.kind NOT LIKE 'access.%' AND e.kind NOT LIKE 'share.%'
-  AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+  AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed')
   AND NOT (e.kind = 'pull' AND substr(COALESCE(e.target, ''), 1, 19) = 'declaration:script.'
            AND COALESCE(CASE WHEN json_valid(e.to_v) THEN json_type(e.to_v, '$.quiet') = 'integer' AND json_extract(e.to_v, '$.quiet') = 1 END, 0))
   AND NOT (e.kind = 'state' AND e.actor = 'system' AND substr(COALESCE(e.target, ''), 1, 6) = 'entry:'
@@ -635,7 +654,7 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
       `SELECT e.ts AS ts, e.actor AS actor, e.field AS field, e.from_v AS from_v, e.to_v AS to_v, r.register AS list
          FROM event e JOIN entry r ON r.id = substr(e.target, 7)
         WHERE e.ts >= ? AND e.ts <= ? AND e.kind = 'edit' AND substr(e.target, 1, 6) = 'entry:'
-          AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+          AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed')
           AND e.field IN (SELECT value FROM json_each(?))${kept}`,
       since,
       until,
@@ -936,6 +955,8 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
   'questions-open-in': QUESTIONS_OPEN_IN,
   'runs-working': RUNS_WORKING,
+  'machines-working': MACHINES_WORKING,
+  'runs-waiting': RUNS_WAITING,
   'arrivals-waiting': sign('arrivals-waiting', 'Messages waiting on you', { lte: 0 }, 'int', { door: PARAM }),
   'arrivals-oldest-days': sign('arrivals-oldest-days', 'Days the oldest waiting message has waited', { lte: 1 }, 'days'),
   'arrivals-newest-hours': sign('arrivals-newest-hours', 'Hours since the last message came in', { lte: 72 }, 'int'),
@@ -1014,8 +1035,16 @@ function openOnList(sql: Sql, at: string, list: string | null): number {
  * How many agents are working now, read off `workingRuns`, which every other reader of "working" reads too. Always now,
  * even on a read of a past day: which runs were working at some earlier moment is not kept anywhere to be read back.
  */
-export function readRunsWorking(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>): Result<Reading> {
-  const n = workingRuns(sql, ctx.nowMs).length;
+export function readRunsWorking(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl?: MetricDecl): Result<Reading> {
+  const part = (decl as RunsDecl | undefined)?.part;
+  const said = (v: Json | undefined): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  let n: number;
+  if (part === 'machines') n = new Set(workingRuns(sql, ctx.nowMs).map((r) => said(r.fields.host) ?? '')).size;
+  else if (part === 'waiting') {
+    const present = presentRuns(sql, ctx.nowMs);
+    const open = new Set(present.map((r) => `${SESSION_PREFIX}${String(r.seq)}`));
+    n = present.filter((r) => liveStateOf(r, ctx.nowMs) === 'waiting' && !open.has(said(r.fields.parent) ?? '')).length;
+  } else n = workingRuns(sql, ctx.nowMs).length;
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
 }
 

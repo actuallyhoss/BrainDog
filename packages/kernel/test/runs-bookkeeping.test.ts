@@ -1,5 +1,5 @@
 /**
- * Quiet bookkeeping (DIRECTION §37): the twelve-hour sweep that writes quiet runs off, and an agent's daily stamp of
+ * Quiet bookkeeping: the twelve-hour sweep that writes quiet runs off, and an agent's daily stamp of
  * when it last saw a tool, are the record keeping its books. Their lines stay in the log and in each row's history, and
  * no feed shows them.
  *
@@ -111,7 +111,7 @@ test('THE SWEEP OF A BUSY RECORD STILL LEAVES THE FEED FULL: it reads past six h
 test('AN AGENT’S STAMP OF WHEN IT SAW A TOOL IS NO CHANGE, and a meeting it moves to next week is', async () => {
   const { k, sql, clock } = await record();
   /* The scan records a tool with the moment it saw it, as `braindog tools` does. */
-  const tool = value<Entry>(k.create('tools', { name: 'fly-prism', seen: iso(clock.now()) }, as({ client_id: 'cc-1' })));
+  const tool = value<Entry>(k.create('tools', { name: 'fly-copperleaf', seen: iso(clock.now()) }, as({ client_id: 'cc-1' })));
   clock.advance(25 * HOUR);
   const before = feed(k).matched;
 
@@ -131,7 +131,7 @@ test('AN AGENT’S STAMP OF WHEN IT SAW A TOOL IS NO CHANGE, and a meeting it mo
 test('A MOMENT AN AGENT FILLS FOR THE FIRST TIME IS A CHANGE, as "Sent" filled as it sends is, and only a stamp over a stamp is not', async () => {
   const { k, sql, clock } = await record();
   /* A moment filled as it happens, shaped exactly like a stamp but over nothing. */
-  const tool = value<Entry>(k.create('tools', { name: 'fly-prism' }, as({ client_id: 'cc-1' })));
+  const tool = value<Entry>(k.create('tools', { name: 'fly-copperleaf' }, as({ client_id: 'cc-1' })));
   clock.advance(HOUR);
   const before = feed(k).matched;
   value(k.update('tools', tool.id, { meets: iso(clock.now()) }, as({ client_id: 'cc-1' })));

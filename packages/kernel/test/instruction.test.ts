@@ -344,6 +344,10 @@ test('LIVE PRESENCE: working, thinking, waiting on you, gone, ended', () => {
   /* A BRIDGE FROM BEFORE THE PULSE is read by its calls alone, open while the ladder would still adopt it. */
   assert.equal(liveStateOf(open(20 * 60_000), NOW), 'waiting');
   assert.equal(liveStateOf(open(50 * 60_000), NOW), 'gone');
+  /* AN IDLE RUN WAITS ON HIM however lately it called, and a stale pulse is gone even beside a fresh call, so the live
+     read and the rail's count (`presenceOf`) agree on who is at work. */
+  assert.equal(liveStateOf({ state: 'idle', fields: { last_seen: at(0), pulse_at: at(0) } }, NOW), 'waiting');
+  assert.equal(liveStateOf(open(0, GONE_MS + 1), NOW), 'gone');
 });
 
 test('AND THE RECORD STAMPS THE WORKTREE a run opened in, which no caller writes', async () => {
@@ -352,5 +356,37 @@ test('AND THE RECORD STAMPS THE WORKTREE a run opened in, which no caller writes
   assert.equal(k.get(s1)?.fields.worktree, '/home/ada/code/braindog/.claude/worktrees/agent-a');
   assert.equal(refusal(k.update('session', s1, { worktree: '/elsewhere' }, as('one'))).code, 'IMMUTABLE_FIELD');
   assert.deepEqual(k.presentRuns().map((r) => `S${String(r.seq)}`), [s1]);
+  sql.close();
+});
+
+test('ON A MACHINE, AS A PROFILE: an instruction naming either reaches only the runs that are both, and one to a run keeps neither', async () => {
+  const { k, sql, work } = await record();
+  const harbour = work('harbour', { host: 'kiln-mbp', seat: 'harbour' });
+  const studio = work('studio', { host: 'kiln-studio', seat: 'harbour' });
+  const plain = work('plain', { host: 'kiln-mbp', seat: 'default' });
+  const ids = (run: string) => k.instructionFor({}, run).map((i) => i.id);
+
+  const both = value<Instr>(k.instruct(OWNER, { said: 'Ship the invoice page', to: 'anyone', when: 'now', machine: 'kiln-mbp', seat: 'harbour' }));
+  assert.deepEqual([both.machine, both.seat], ['kiln-mbp', 'harbour']);
+  assert.deepEqual(ids(harbour), [both.id]);
+  assert.deepEqual(ids(studio), []);
+  assert.deepEqual(ids(plain), []);
+
+  const anyMachine = value<Instr>(k.instruct(OWNER, { said: 'Read the notes', to: 'agent', to_agent: 'claude', when: 'now', seat: 'harbour' }));
+  assert.deepEqual(ids(studio), [anyMachine.id]);
+  assert.deepEqual(ids(plain), []);
+
+  /* A RUN THAT SAYS NO PROFILE IS UNDER NONE THE INSTRUCTION NAMES, until it learns one. */
+  const unsaid = work('unsaid', { host: 'kiln-mbp' });
+  assert.deepEqual(ids(unsaid), []);
+
+  /* ONE TO A NAMED RUN IS ALREADY ON ONE MACHINE, so it keeps neither, and reaches that run. */
+  const toRun = value<Instr>(k.instruct(OWNER, { said: 'Stop after this', to_run: plain, machine: 'kiln-studio', seat: 'harbour' }));
+  assert.deepEqual([toRun.machine, toRun.seat], [null, null]);
+  assert.ok(ids(plain).includes(toRun.id));
+
+  /* A FOLDER IS NEVER A PROFILE, and a machine is a name. */
+  assert.equal(refusal(k.instruct(OWNER, { said: 'x', seat: '/Users/ada/.claude-harbour' })).at, 'seat');
+  assert.equal(refusal(k.instruct(OWNER, { said: 'x', machine: 'two words' })).at, 'machine');
   sql.close();
 });

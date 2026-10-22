@@ -25,13 +25,13 @@ import { STALE_MS, heardAt, presenceOf } from './presence.ts';
 
 import type { Json } from './coerce.ts';
 import type { Declaration } from './declare.ts';
-import { SESSION_BODY } from './migrations/0042_agents.ts';
+import { SESSION_BODY } from './migrations/0044_seat.ts';
 
 /** The register's id. */
 export const SESSION = 'session';
 
 /**
- * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 42, so that there is one copy
+ * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 44, so that there is one copy
  * of it.
  *
  * The id is read out of the body rather than written here: this is an envelope around the row the
@@ -40,7 +40,8 @@ export const SESSION = 'session';
  * THE NEWEST, NOT THE FIRST. Migration 2's body lacks the app a run is in and three kinds of agent, so every default
  * read from it (`RUNS`, the kinds `agentOf` takes, a page's fields) described a register no record holds any more, and
  * installing it over a record that had run migration 22 wrote migration 2's body back as a newer version. Migration
- * 22's lacks when a run started, for which the same holds, and 28's the six fields of migration 42.
+ * 22's lacks when a run started, for which the same holds, 28's the six fields of migration 42, and 42's the profile of
+ * migration 44.
  */
 export function sessionDeclaration(): Declaration {
   const body = JSON.parse(SESSION_BODY) as Record<string, Json>;
@@ -69,10 +70,13 @@ const KINDS: readonly string[] =
  * the token that opened it, and when it started; migration 28's nine (`0028_runs.ts`), which say how its work went
  * and how its step closed; and migration 42's six (`0042_agents.ts`): the instruction and the task in hand, the
  * settings row it works under, when the bridge last said it is open, whether he paused or stopped it, and the worktree
- * folder it opened in. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
+ * folder it opened in; and migration 44's `seat` (`0044_seat.ts`), the Claude Code profile it runs under. A caller's
+ * patch naming one is refused `IMMUTABLE_FIELD`.
  *
  * `worktree` IS THE RUN'S OWN HINT, and still the record's to write: it is stamped once as the ladder opens the run
- * (`openingStamp`), as `token_id` is, so a later write cannot move a run out of the folder it opened in.
+ * (`openingStamp`), as `token_id` is, so a later write cannot move a run out of the folder it opened in. `seat` is
+ * the same, and is also learned once by a run that opened without it (`learned`), so an instruction aimed at a
+ * profile reaches it from its next call: a run is under one profile for its whole life, which a write cannot change.
  */
 export const KERNEL_WRITTEN: readonly string[] = [
   'last_seen',
@@ -94,6 +98,7 @@ export const KERNEL_WRITTEN: readonly string[] = [
   'pulse_at',
   'stopped',
   'worktree',
+  'seat',
 ];
 
 /**
@@ -191,12 +196,24 @@ export type SessionHints = {
    * it opens (`openingStamp`), never written by a caller.
    */
   worktree?: string | undefined;
+  /**
+   * The name of the Claude Code profile the agent runs under, `studio` for `~/.claude-studio` and `default` for
+   * `~/.claude` (`x-braindog-profile`). A name and never a path. Stamped on the run as it opens (`openingStamp`), and
+   * learned once by a run that opened without it (`learned`), never written by a caller.
+   */
+  seat?: string | undefined;
   /** `S42`: the run a subagent works for, which places the subagent's run where its parent is when nothing else does. */
   parent?: string | undefined;
   /** Commits HEAD moved since the last handoff here, `12`, for the briefing's card. The run register declares no such field. */
   ahead?: string | undefined;
   /** Who the recent commits were by, `Name <email>, ...`: read to meet people, never stored on the run. */
   authors?: string | undefined;
+  /**
+   * What the person is working on, in a few words, `Kiln works`, as an agent with no folder says it on its `context`
+   * call. With no repository, remote or folder it is the one thing that places the run: in the project of that name, or
+   * in the first project formed from it (`first-project.ts`). The run register declares no such field.
+   */
+  topic?: string | undefined;
 };
 
 /**
@@ -396,11 +413,16 @@ export function opening(hints: SessionHints, register: RunRegister = RUNS): Reco
 
 /**
  * What the record stamps from the run's own hints as the ladder opens a run, beside `opening`'s patch: the hints
- * `KERNEL_WRITTEN` holds, which a caller's patch could not carry. Today the worktree folder alone.
+ * `KERNEL_WRITTEN` holds, which a caller's patch could not carry. The worktree folder and the profile the run is under.
  */
 export function openingStamp(hints: SessionHints, register: RunRegister = RUNS): Record<string, Json> {
-  const tree = typeof hints.worktree === 'string' ? hints.worktree.trim() : '';
-  return tree !== '' && register.has('worktree') ? { worktree: tree } : {};
+  const out: Record<string, Json> = {};
+  for (const key of ['worktree', 'seat'] as const) {
+    const hint = hints[key];
+    const said = typeof hint === 'string' ? hint.trim() : '';
+    if (said !== '' && register.has(key)) out[key] = said;
+  }
+  return out;
 }
 
 /* ── what a run is called ────────────────────────────────────────────────── */
@@ -565,6 +587,11 @@ export function learned(
     const open = key === 'client' ? app === null : same;
     if (open && !keep.includes(key) && register.has(key) && typeof said === 'string' && said !== '' && said !== run.fields[key]) out[key] = said;
   }
+  /* AND THE PROFILE IT RUNS UNDER, ONCE: a run opened by a hook that sent no profile learns it from its next call that
+     does, and a run that has one keeps it, since a session never moves to another profile. */
+  const seat = typeof hints.seat === 'string' ? hints.seat.trim() : '';
+  const hadSeat = typeof run.fields.seat === 'string' && run.fields.seat !== '';
+  if (!hadSeat && seat !== '' && !keep.includes('seat') && register.has('seat')) out.seat = seat;
   const made = keep.includes('doing') ? null : recordNamed(run, project, known);
   if (made) {
     const client = clientOf(app === null ? hints.client : run.fields.client);

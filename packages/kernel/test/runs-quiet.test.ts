@@ -1,5 +1,5 @@
 /**
- * Open is not working (DIRECTION §37, AGT-C02): a run that is open and not working is quiet, and working is active and
+ * Open is not working (AGT-C02): a run that is open and not working is quiet, and working is active and
  * heard from inside fifteen minutes (`WORKING_MS`, the one clock in `presence.ts`). Worked out when read and never a
  * state of its own; and a run's age stands still once it stops.
  *
@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0042_agents.ts';
+import { SESSION_BODY } from '../src/migrations/0044_seat.ts';
 import { isQuiet, isStale, openRecord, QUIET_MS, runAge, STALE_MS, WORKING_MS, type Declaration, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 

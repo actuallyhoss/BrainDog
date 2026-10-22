@@ -248,7 +248,7 @@ test('the record keeping its own books is left out, as a feed leaves it out, and
      what they keep. */
   type Raw = { ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null };
   const json = (v: string | null): never => (v === null ? null : JSON.parse(v)) as never;
-  const owners = (e: Raw): boolean => /^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(e.target_kind ?? '');
+  const owners = (e: Raw): boolean => /^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed'].includes(e.target_kind ?? '');
   const kept = sql
     .all<Raw>('SELECT ts, actor, kind, target, target_kind, field, from_v, to_v FROM event')
     .filter((e) => !owners(e) && !k.bookkeeping({ ...e, from: json(e.from_v), to: json(e.to_v) }));
@@ -335,7 +335,7 @@ test('through the record itself, over writes the record made: the figure counts 
 
   type Raw = { ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null };
   const json = (v: string | null): never => (v === null ? null : JSON.parse(v)) as never;
-  const owners = (e: Raw): boolean => /^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(e.target_kind ?? '');
+  const owners = (e: Raw): boolean => /^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed'].includes(e.target_kind ?? '');
   const kept = sql
     .all<Raw>('SELECT ts, actor, kind, target, target_kind, field, from_v, to_v FROM event')
     .filter((e) => !owners(e) && !k.bookkeeping({ ...e, from: json(e.from_v), to: json(e.to_v) }));

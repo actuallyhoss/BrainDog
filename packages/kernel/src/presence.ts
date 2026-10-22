@@ -87,6 +87,10 @@ const HEARD_SQL = "coalesce(json_extract(fields, '$.last_seen'), min(json_extrac
  * `before`: never heard from here, no `last_seen` (a run carried in from somewhere else). `working`: active and heard
  * from inside `WORKING_MS`. `quiet`: active or idle, otherwise. `left`: it ended and left a step (`handoff`). `ended`:
  * done. `stopped`: the sweep wrote it off (`abandoned`).
+ *
+ * AND A RUN WHOSE BRIDGE STOPPED PULSING IS NOT WORKING (`GONE_MS`), as `liveStateOf` reads it gone: the Agents page drew
+ * no row for it while the rail still counted it, so the two said different numbers. A run that never pulsed is read by
+ * its calls alone, as before.
  */
 export function presenceOf(run: { state?: string | null; fields: Record<string, Json> }, nowMs: number): Presence {
   const seen = run.fields.last_seen;
@@ -95,7 +99,9 @@ export function presenceOf(run: { state?: string | null; fields: Record<string, 
   if (state === 'handoff') return 'left';
   if (state === 'done') return 'ended';
   if (state === 'abandoned') return 'stopped';
-  return state === 'active' && Date.parse(seen) >= nowMs - WORKING_MS ? 'working' : 'quiet';
+  const pulse = run.fields.pulse_at;
+  const gone = typeof pulse === 'string' && pulse !== '' && nowMs - Date.parse(pulse) > GONE_MS;
+  return state === 'active' && !gone && Date.parse(seen) >= nowMs - WORKING_MS ? 'working' : 'quiet';
 }
 
 /** Whether a run is open, active or idle, and not working. A finished run, or one that left a step, is never quiet. */
@@ -236,10 +242,15 @@ export function liveStateOf(run: { state?: string | null; fields: Record<string,
   const parse = (v: Json | undefined): number => (typeof v === 'string' && v !== '' ? Date.parse(v) : NaN);
   const call = parse(run.fields.last_seen);
   const pulse = parse(run.fields.pulse_at);
-  if (Number.isFinite(call) && nowMs - call <= CALL_MS) return 'working';
+  /* GONE BEFORE ANYTHING ELSE, so a run whose bridge stopped pulsing is never working, as `presenceOf` reads it. */
   if (Number.isFinite(pulse)) {
     if (nowMs - pulse > GONE_MS) return 'gone';
   } else if (!Number.isFinite(call) || nowMs - call > STALE_MS) return 'gone';
+  /* AN IDLE RUN WAITS ON HIM, however lately it called: its end hook said its turn is over, so it is open and not at
+     work, which is what `presenceOf` says of it too. Drawn as working, ten idle runs made the Agents page say 22 at
+     work beside the rail's 12. */
+  if (state === 'idle') return 'waiting';
+  if (Number.isFinite(call) && nowMs - call <= CALL_MS) return 'working';
   return Number.isFinite(call) && nowMs - call <= THINKING_MS ? 'thinking' : 'waiting';
 }
 
@@ -272,6 +283,24 @@ export function pulseRun(sql: Sql, id: string, nowMs: number): boolean {
 }
 
 /**
+ * The Claude Code profile a run is under, as a pulse says it, written once onto a run that has none, in place, for a
+ * pulse's reason: no version, no event. Answers whether it wrote (migration 44, `seat` in `session.ts`).
+ *
+ * ONCE, AND NEVER MOVED: a session runs under one profile for its whole life, so a run that has one keeps it, and a
+ * pulse sent under another is not this run's to rename.
+ */
+export function seatRun(sql: Sql, id: string, seat: string): boolean {
+  const moved = sql.one<{ id: string }>(
+    `UPDATE entry SET fields = json_set(fields, '$.seat', ?)
+     WHERE id = ? AND register = '${RUNS}' AND deleted_at IS NULL AND json_extract(fields, '$.seat') IS NULL
+     RETURNING id`,
+    seat,
+    id,
+  );
+  return moved !== undefined;
+}
+
+/**
  * The open runs that are there now, newest heard from first: the rows of `presence` (Today's "Working now", the Agents
  * page, a project's "Working here now"). Read through the pulse index and the `last_seen` index, so the cost is the
  * open runs and not the record's history of them; each row is held to `isPresent`, so a gone run is not a row.
@@ -285,4 +314,21 @@ export function presentRuns(sql: Sql, nowMs: number): RunRow[] {
     pulsed,
     called,
   ).filter((r) => isPresent(r, nowMs));
+}
+
+/**
+ * The machines and profiles runs were heard on inside the last `withinMs`, newest heard first and at most `most`: where
+ * the composer offers to send an instruction. A run that names neither is left out, and every run is a row, so the caller
+ * holds each to what its reader may see.
+ */
+export function placesHeard(sql: Sql, nowMs: number, withinMs: number, most: number): { id: string; host: string | null; seat: string | null }[] {
+  const since = new Date(nowMs - withinMs).toISOString();
+  return sql.all<{ id: string; host: string | null; seat: string | null }>(
+    `SELECT id, json_extract(fields, '$.host') AS host, json_extract(fields, '$.seat') AS seat FROM entry
+      WHERE register = 'session' AND deleted_at IS NULL AND json_extract(fields, '$.last_seen') >= ?
+        AND (json_extract(fields, '$.host') IS NOT NULL OR json_extract(fields, '$.seat') IS NOT NULL)
+      ORDER BY json_extract(fields, '$.last_seen') DESC LIMIT ?`,
+    since,
+    most,
+  );
 }

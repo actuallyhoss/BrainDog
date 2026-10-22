@@ -9,12 +9,12 @@
  * `steps` block installed and read clean while no code for either kind looked at them. So the install now refuses
  * exactly what the read would, from this list, and the read refuses per kind too.
  *
- * IT IMPORTS ONLY THE KIND REGISTRY, so `declare.ts` and `pages.ts` both import it and neither has to import the other,
- * whose own imports reach half the kernel. The registry (`kinds/index.ts`) is read here once, when this file loads, and
- * that is why a kind module never imports this file at run time: it would be asked for its keys before it had any.
+ * IT IMPORTS ONLY THE KINDS' KEYS, so `declare.ts` and `pages.ts` both import it and neither has to import the other,
+ * whose own imports reach half the kernel. The keys are the registry's table (`kinds/keys.ts`), not its modules, so a
+ * screen that reads a block's keys does not load the kinds' code, and the table is read here once, when this file loads.
  */
 
-import { BLOCK_KIND_MODULES } from './kinds/index.ts';
+import { KIND_KEYS } from './kinds/keys.ts';
 import { ACTION_VERBS, BLOCK_VERBS, actionsBody, type ActionKey, type DeclaredAction } from './row-actions.ts';
 
 /**
@@ -31,7 +31,7 @@ const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined 
  * section's alone, and a page that gave its stat tile a glyph was refused at install while the host drew it fine.
  */
 /*
- * `key` IS THE BLOCK'S NAME FOR THE ENGINE (DIRECTION §38), what a page's look (`compose.ts`) leads with, orders, hides
+ * `key` IS THE BLOCK'S NAME FOR THE ENGINE, what a page's look (`compose.ts`) leads with, orders, hides
  * and pins by. A block may declare one; one that does not is named by `defaultBlockKey` below, so every block a read
  * answers carries one and a host keys what it draws by it rather than by its place.
  */
@@ -112,7 +112,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * `KEY_KINDS` with every registered kind's own keys added (`kinds/index.ts`), which is what the install and the read
+ * `KEY_KINDS` with every registered kind's own keys added (`kinds/keys.ts`), which is what the install and the read
  * both refuse from.
  *
  * A KEY THE TABLE ALREADY HAS IS SHARED, not taken: a registered kind that reads `back` joins the kinds that read it.
@@ -121,8 +121,8 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
  */
 const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
   const by = new Map<string, string[]>(Object.entries(KEY_KINDS).map(([key, kinds]) => [key, [...kinds]]));
-  for (const [kind, registered] of Object.entries(BLOCK_KIND_MODULES))
-    for (const key of registered.keys) {
+  for (const [kind, keys] of Object.entries(KIND_KEYS))
+    for (const key of keys as readonly string[]) {
       if ((GENERAL as readonly string[]).includes(key)) continue;
       const kinds = by.get(key) ?? [];
       if (!kinds.includes(kind)) kinds.push(kind);
@@ -157,7 +157,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'presence', 'facts', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis', 'kpi_list',
 ];
 
 /**

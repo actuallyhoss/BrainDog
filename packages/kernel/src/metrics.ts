@@ -867,6 +867,8 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
 
 export type EvalContext = {
   nowMs: number;
+  /** Walks ahead already worked out in this one read (`readWalk`), kept by the host only for a read that writes nothing. */
+  walks?: Map<string, unknown> | undefined;
   /** Who is reading, when rows somebody else kept private must be left out of a raw-SQL figure (`unprivate`); unset reads the whole record. */
   viewer?: string | undefined;
   /**
@@ -1291,7 +1293,7 @@ let readers: Readonly<Record<string, SourceReader>> | null = null;
 export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (readers ??= {
   [GOVERNANCE_OPEN]: readOpenQuestions,
   [RECORD_SIGNS]: readSign,
-  [SESSIONS_WORKING]: (sql, ctx) => readRunsWorking(sql, ctx),
+  [SESSIONS_WORKING]: (sql, ctx, decl) => readRunsWorking(sql, ctx, decl),
   [HANDOFFS_OPEN]: readHandoffsOpen,
   [RECORD_TIDY]: readTidy,
   [RECORD_VITALS]: readVitals,
@@ -2204,7 +2206,7 @@ const NOT_A_NAME: ReadonlySet<unknown> = new Set(['ref', 'money', 'quantity', 'f
  * A ROW THAT SAYS WHICH CURRENCY IT IS KEPT IN is one whose list declares a text or enum field called `currency` and
  * holds a currency code there: money-core's books, a founder's organisations. That is the row's own statement, so a
  * figure about the row is read in it (`groupsOf`, `scopeCurrency`, `readRolled`) rather than converted into the home
- * currency: Quartz says USD, and its part of Cash now by book was drawn in pounds Egyptian.
+ * currency: Harbour says USD, and its part of Cash now by book was drawn in pounds Egyptian.
  *
  * READ FROM THE DECLARATION, because a context carries no list's title field, and one query for every id. A deleted row
  * still names the rows that point at it, as `titleOfRow` in `index.ts` names one; a title field declared `secret`, or
@@ -2283,8 +2285,8 @@ export const withLabels = (groups: readonly Group[], names: GroupNames): Group[]
 /**
  * The currency a figure scoped to one row is read in, when that row says it is kept in one.
  *
- * `book-cash:Quartz` IS A QUESTION ABOUT QUARTZ (`fill` in `fill.ts` sets `within` to the clauses its parameter
- * filled), and Quartz says USD: its page led with its cash in pounds Egyptian, converted. So a scope that pins a ref to
+ * `book-cash:Harbour` IS A QUESTION ABOUT HARBOUR (`fill` in `fill.ts` sets `within` to the clauses its parameter
+ * filled), and Harbour says USD: its page led with its cash in pounds Egyptian, converted. So a scope that pins a ref to
  * one row, in a top-level clause, is asked what that row says, and a single answer is the figure's currency. Two rows
  * that disagree, a list the caller may not read and a row that says nothing all leave the home currency as it was.
  */

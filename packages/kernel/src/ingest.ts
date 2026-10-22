@@ -1011,7 +1011,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        unnamed mail the pattern itself. */
     const doorOf = arrival.ingest ?? matched.door ?? matched.ingest;
 
-    /* BEFORE THIS ARRIVAL IS FILED, WHAT WAITS AT ITS DOOR IS LOOKED AT AGAIN (DIRECTION §42). Digits written on an account
+    /* BEFORE THIS ARRIVAL IS FILED, WHAT WAITS AT ITS DOOR IS LOOKED AT AGAIN. Digits written on an account
        by hand, or an answer given, can make held texts readable, and they were never read again: the owner's card ending
        7731 was set on his account and the texts held before it went on waiting under a question each. A run again sweeps
        nothing, so a sweep never starts a sweep. */
@@ -1151,7 +1151,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
      * door or any other that reads them. It was a question per text, each asking to add a row with its account empty,
      * which the list refuses.
      *
-     * AND DIGITS AN AGENT WROTE ON AN ACCOUNT ARE CONFIRMED ONCE (DIRECTION §42). They read, and the row they name is an
+     * AND DIGITS AN AGENT WROTE ON AN ACCOUNT ARE CONFIRMED ONCE. They read, and the row they name is an
      * agent's word about money, so the first text that reads them waits under the same one question with that account
      * suggested, and never under one per text. Digits a person wrote are their word, and file.
      *
@@ -1292,7 +1292,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
               waits: lid !== 'exact',
             })),
         ...(pending.length ? { tails: pending } : {}),
-        /* A DOUBTFUL ARRIVAL GOES TO TO REVIEW; money not read cleanly still asks in Needs you (DIRECTION §45, d3). */
+        /* A DOUBTFUL ARRIVAL GOES TO TO REVIEW; money not read cleanly still asks in Needs you. */
         ...(!sure?.sure && moneyClean(deps.schemaOf(register), extracted, [...missed, ...invalid, ...soft]) ? { review: true } : {}),
       });
       /* FILED NOW, signed by BrainDog so it shows in Handled with its Undo. A refusal leaves it a question, in the words
@@ -1757,7 +1757,7 @@ export function unknownTail(form: Extractor, text: string, depth = 1): { digits:
 
 /**
  * The digits a lookup that found `row` as a whole value printed, when they are digits and one of the row's own values,
- * or `null`. What an agent wrote on an account is asked about by these (DIRECTION §42).
+ * or `null`. What an agent wrote on an account is asked about by these.
  */
 function wholeDigits(deps: IngestDeps, form: Extractor, text: string, row: string): { digits: string; lookup: LookupForm } | null {
   const lookup = lookupOf(form);
@@ -2774,7 +2774,7 @@ function foldTwins(deps: IngestDeps, questions: Swept[]): void {
 }
 
 /**
- * Before an arrival at `door` is filed, what waits there is looked at again (DIRECTION §42):
+ * Before an arrival at `door` is filed, what waits there is looked at again:
  *
  * 1. an answer the record did not carry out yet is carried out (`answerTail`), so a decision made where the hook was
  *    not wired still files its texts at the next one;
@@ -3737,7 +3737,7 @@ const opening = (text: string): string => text.charAt(0).toUpperCase() + text.sl
 export type SureFacts = { ruleTrusted: boolean; missed: number; soft: number; tails: number; amount: boolean; payee: boolean };
 
 /**
- * HOW SURE A CARD TEXT IS (DIRECTION §45): four things, each worth a quarter. The sender's rule is trusted and read
+ * HOW SURE A CARD TEXT IS: four things, each worth a quarter. The sender's rule is trusted and read
  * everything it was asked to, the account was found by its last digits, the amount was read (not chosen or defaulted),
  * and the shop is named. Only all four file it by itself; any less and a person is asked, and money that did not read
  * cleanly always is.

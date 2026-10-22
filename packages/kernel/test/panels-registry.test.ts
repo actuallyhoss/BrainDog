@@ -44,7 +44,7 @@ test('A NAME THAT IS NO PANEL IS REFUSED, naming every one', () => {
   const odd = panelFault('mood-board', null);
   assert.ok(odd);
   assert.equal(odd.code, 'DECLARATION_INVALID');
-  assert.deepEqual([...(odd.allowed ?? [])], ['actions', 'reporting', 'run', 'seen', 'job', 'look-editor', 'slash-model', 'trust', 'slash-reads', 'my-keys', 'new-action', 'instruct', 'presence']);
+  assert.deepEqual([...(odd.allowed ?? [])], ['actions', 'reporting', 'run', 'seen', 'job', 'look-editor', 'slash-model', 'trust', 'slash-reads', 'my-keys', 'new-action', 'instruct', 'presence', 'run-list', 'left-steps', 'machines']);
   for (const name of PANELS) assert.ok(odd.fix.includes(name), `the sentence names ${name}`);
   /* A KEY OF EVERY OBJECT IS NO PANEL. */
   assert.ok(panelFault('constructor', null));

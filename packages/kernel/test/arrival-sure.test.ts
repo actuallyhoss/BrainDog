@@ -1,5 +1,5 @@
 /**
- * A card text BrainDog is sure of files itself with a mark (DIRECTION §45): the sender's rule trusted, the account found
+ * A card text BrainDog is sure of files itself with a mark: the sender's rule trusted, the account found
  * by its last digits, the amount read and the shop named. One short of that and it asks, as it did.
  */
 

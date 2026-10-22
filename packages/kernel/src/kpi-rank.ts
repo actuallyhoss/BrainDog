@@ -13,7 +13,7 @@
  * THE RULES, each one constant below:
  *   - KIND: the row's own `kind` when it is one of the five; else a currency is money over time (`flow`), `%` is a
  *     `share`, a figure worked out over lists or a count of days is a `count`, and anything else is a `level`.
- *   - CHART: under three points, the number alone (`SERIES_POINTS`, DIRECTION §39). From three: money over time a line,
+ *   - CHART: under three points, the number alone (`SERIES_POINTS`). From three: money over time a line,
  *     a share a split, progress a bar with its target marked (a `level` without a target), a count the number and a
  *     sparkline, a level the number and a sparkline on a tile and a line on its page. A trend only from six.
  *   - STALE: the newest point older than two of its cadence (`FEED_LATE_PERIODS`, held equal by the test), fourteen

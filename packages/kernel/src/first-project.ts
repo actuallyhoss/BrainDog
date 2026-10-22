@@ -1,9 +1,13 @@
 /**
  * The first project, formed from the first agent session (batch 106, "The first five minutes"). A record with no
  * project yet and an agent that arrives from a repository or folder no project holds: the record forms that project
- * as a draft the person keeps with one press (DIRECTION d2), from only what the session itself said.
+ * as a draft the person keeps with one press, from only what the session itself said.
  *
  * Pure: what name, what fields. Whether to form one, and the write, are the kernel's (`index.ts`).
+ *
+ * AN AGENT WITH NO FOLDER NAMES IT BY WHAT THE PERSON IS WORKING ON. Claude.ai and ChatGPT send no repository, remote or
+ * folder, so the `topic` their first `context` call says is the only name there is. It forms the first project the
+ * same way, as a draft, and on a record that already has projects it only ever finds one by that name.
  */
 
 import type { Json } from './coerce.ts';
@@ -31,14 +35,42 @@ export function cleanName(raw: string): string {
   return words === '' ? '' : words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The name a first project takes: the repository's, else the remote's, else the working folder's. `null` when none says anything usable. */
-export function firstProjectName(hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd'>): string | null {
+/**
+ * The name a first project takes: the repository's, else the remote's, else the working folder's, else, for a session
+ * that says nothing of where it is, its `topic`. `null` when none says anything usable.
+ */
+export function firstProjectName(hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd' | 'topic'>): string | null {
   const candidates = [hints.repo ?? '', hints.remote ? remoteKey(hints.remote) : '', hints.cwd ?? ''];
   for (const c of candidates) {
     const piece = lastPiece(c);
     if (piece !== '' && !SCRATCH.test(piece) && !/^[A-Za-z]:?$/u.test(piece)) return cleanName(piece);
   }
-  return null;
+  return noPlace(hints) ? topicName(hints.topic) : null;
+}
+
+/**
+ * Whether a session says nothing of where it is: no repository, remote or folder. Claude.ai, ChatGPT and any remote MCP
+ * client have none, so what they are working on is the one thing that can name their project.
+ */
+export function noPlace(hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd'>): boolean {
+  return (hints.repo ?? '').trim() === '' && (hints.remote ?? '').trim() === '' && (hints.cwd ?? '').trim() === '';
+}
+
+/** The longest topic that is still a name. A sentence is what somebody is doing, not what their project is called. */
+export const TOPIC_MAX = 60;
+
+/** Answers that name nothing, given when an agent is asked what the person is working on and nobody said. */
+const VAGUE = /^(?:nothing|none|n\/?a|general|misc(?:ellaneous)?|stuff|things|chat(?:ting)?|help|test(?:ing)?|unknown|idk|anything|everything|work|project)$/iu;
+
+/**
+ * The name a topic makes: its spaces closed up, quotes and a closing stop taken off, and only its first letter raised,
+ * so "kiln works" is "Kiln works" and "BrainDog" stays as written. `null` when it is empty, longer than `TOPIC_MAX`, or
+ * one of the answers that name nothing.
+ */
+export function topicName(topic: string | undefined): string | null {
+  const said = (topic ?? '').replace(/\s+/gu, ' ').trim().replace(/^["'`]+|["'`.!?]+$/gu, '').trim();
+  if (said === '' || [...said].length > TOPIC_MAX || VAGUE.test(said)) return null;
+  return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
 /**
@@ -46,7 +78,7 @@ export function firstProjectName(hints: Pick<SessionHints, 'repo' | 'remote' | '
  * leaves it out. `about` is the session's `doing`, when the agent said one; lane is "building".
  */
 export function firstProjectFields(
-  hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd' | 'doing'>,
+  hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd' | 'doing' | 'topic'>,
   name: string,
   has: (field: string) => boolean,
 ): Record<string, Json> {

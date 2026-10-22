@@ -347,7 +347,7 @@ export function opensNamed(sql: Sql, name: string): string | null {
  *
  * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the vault's own refusal puts it, so it is read as a
  * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
- * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
+ * `api.gold.test`, and "the Oxbow test account" names nothing. Not a string at all names nothing either, so a lookup that
  * forgot to carry `opens` sends no key rather than every key.
  *
  * IT LIVES HERE, BESIDE `opensNamed`, AND NOT IN `@braindog/host`, because two readers of `opens` disagreed. The host
@@ -370,7 +370,7 @@ export function hostOpened(opens: unknown): string | null {
 /**
  * The host a key is held to (SHL-C05): `hostOpened`, and only a name with a dot or a colon in it.
  *
- * ONE WORD IS A NAME, NOT A HOST. An entry that says "Stripe" or "Bake" parses as the host `stripe`, which no action
+ * ONE WORD IS A NAME, NOT A HOST. An entry that says "Stripe" or "Oxbow" parses as the host `stripe`, which no action
  * can call, so holding the key to it would refuse every send of it; it names no host, and its first approval pins one.
  * The host's executor reads `opens` the same way.
  */

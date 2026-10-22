@@ -53,8 +53,8 @@ test('A DOMAIN IS THE REGISTRABLE ONE, AND NEVER A PUBLIC MAIL HOST', () => {
 });
 
 test('A REMOTE IS host/owner/name, A FOLDER AN ABSOLUTE PATH, A PHONE E.164', () => {
-  assert.equal(keyOf('remote', 'git@github.com:BakeGame/Bot.git'), 'remote:github.com/bakegame/bot');
-  assert.equal(keyOf('remote', 'https://github.com/bakegame/bot'), 'remote:github.com/bakegame/bot');
+  assert.equal(keyOf('remote', 'git@github.com:OxbowGame/Bot.git'), 'remote:github.com/oxbowgame/bot');
+  assert.equal(keyOf('remote', 'https://github.com/oxbowgame/bot'), 'remote:github.com/oxbowgame/bot');
   assert.equal(keyOf('remote', 'bot'), null);
   assert.equal(keyOf('folder', 'C:\\Repos\\roomy\\'), 'folder:c:/Repos/nook');
   assert.equal(keyOf('folder', '/Users/mara/Developer/braindog/'), 'folder:/Users/mara/Developer/braindog');
@@ -79,7 +79,7 @@ test('A From HEADER READS AS A NAME, AN ADDRESS AND A DOMAIN, and a shared inbox
   assert.deepEqual(parseFrom('ada@x.io (Ada L)'), { name: 'Ada L', address: 'ada@x.io', domain: 'x.io' });
   assert.deepEqual(parseFrom('ada@x.io <ada@x.io>'), { name: null, address: 'ada@x.io', domain: 'x.io' });
   assert.equal(parseFrom('Ada'), null);
-  for (const a of ['noreply@lanternfish.example', 'no-reply@accounts.google.com', 'notifications@github.com', 'billing@hetzner.com', 'info@quartz.gg', 'noreply-1234@mail.x.io'])
+  for (const a of ['noreply@lanternfish.example', 'no-reply@accounts.google.com', 'notifications@github.com', 'billing@hetzner.com', 'info@harbour.example', 'noreply-1234@mail.x.io'])
     assert.equal(isOrganisationAddress(a), true, a);
   for (const a of ['ada@lanternfish.example', '583231+octo@users.noreply.github.com', 'information.ada@x.io']) assert.equal(isOrganisationAddress(a), false, a);
 });

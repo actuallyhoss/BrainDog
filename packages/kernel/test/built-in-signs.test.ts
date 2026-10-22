@@ -94,4 +94,4 @@ test("SIGNS RED ON A PAST DAY is that day's kept readings, and a day with none k
   assert.equal(read(sql, 'signs-red', { asOfMs: Date.parse('2026-10-04T12:00:00Z') }).value, null);
 });
 
-/* GREEN DAYS IS THE HOLD NOW (PRF-A18, `hold.ts`): its runs, the Auckland case among them, are in figures-47.test.ts. */
+/* GREEN DAYS IS THE HOLD NOW (PRF-A18, `hold.ts`): its runs, the Auckland case among them, are in figures-health.test.ts. */

@@ -20,6 +20,7 @@
 import type { Json } from '../coerce.ts';
 import type { StoredFile } from '../pages.ts';
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
 import type { Raw } from './words.ts';
 
@@ -58,7 +59,7 @@ function stored(v: Json | undefined): StoredFile | null {
 }
 
 export const gallery: KindModule = {
-  keys: [],
+  keys: KIND_KEYS.gallery,
 
   validate(block, ctx) {
     const limit = block.limit;

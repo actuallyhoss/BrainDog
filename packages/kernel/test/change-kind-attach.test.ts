@@ -1,8 +1,8 @@
 /**
  * An attach is its own kind (ENG-B15): a name in a text put on the row it is, with the sentence it was seen in.
  *
- * Slash may act on its own, per kind (D37.52, D37.53), so the attach it files has to be a kind that can be earned
- * apart from editing the row, off the floors, always undoable (D37.55). A row with an amount is never earned (D37.56):
+ * Slash may act on its own, per kind, so the attach it files has to be a kind that can be earned
+ * apart from editing the row, off the floors, always undoable. A row with an amount is never earned:
  * it is the money floor, and asks at every rung. Nothing else's floor moves.
  */
 

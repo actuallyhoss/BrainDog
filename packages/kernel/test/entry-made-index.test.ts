@@ -41,7 +41,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; sent: Sent[] }> {
   const sent: Sent[] = [];
   const all = sql.all.bind(sql);
   sql.all = ((text: string, ...params: unknown[]) => {
-    if (/FROM entry WHERE register = \?/.test(text) && /\bLIMIT \?/.test(text)) sent.push({ text, params });
+    if (/FROM entry WHERE register = (?:\?|'\w+')/.test(text) && /\bLIMIT \?/.test(text)) sent.push({ text, params });
     return all(text, ...(params as never[]));
   }) as typeof sql.all;
   const clock = fixedClock(NOW);
@@ -106,7 +106,7 @@ test('migration 39 applied again over itself leaves one entry_made and every row
   sql.exec('DELETE FROM migration WHERE version >= 39');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok);
-  assert.deepEqual(result.value.applied, [39, 40, 41, 42, 43]);
+  assert.deepEqual(result.value.applied, [39, 40, 41, 42, 43, 44, 45]);
   const made = sql.all<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'entry_made'");
   assert.equal(made.length, 1);
   assert.match(made[0]!.sql, /ON entry\(register, created_at DESC, id DESC\) WHERE deleted_at IS NULL/);

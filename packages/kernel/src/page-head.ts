@@ -10,7 +10,7 @@
  * PURE, AS `row-actions.ts` IS: a table and three functions, so `declare.ts` and `pages.ts` can both ask it without
  * importing each other. Nothing here reads the record; the read hands `resolveHead` what it needs as functions.
  *
- * FEWER THINGS, NOT MORE (DIRECTION 39). Every part is optional, and a part with nothing to say is left out of the
+ * FEWER THINGS, NOT MORE. Every part is optional, and a part with nothing to say is left out of the
  * answer rather than drawn empty: a count whose figure reads nothing, a state whose figure says no tone the page has
  * words for, a way back to a page that is gone.
  */

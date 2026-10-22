@@ -1,7 +1,7 @@
 /**
  * What kind of change a write or a proposal is, and whether it sits on the floor no rung lifts.
  *
- * WHY THIS EXISTS. An agent earns trust one kind of change at a time (DIRECTION §37, "staff who earn trust"): it starts
+ * WHY THIS EXISTS. An agent earns trust one kind of change at a time ("staff who earn trust"): it starts
  * at Ask, and once the owner has kept ten changes of one kind unchanged it is offered Do and tell for that kind and no
  * other. That needs a name for "a kind of change" that the write path, a proposal and the ladder all agree on, and a
  * fixed set of kinds that never climb however often they are kept. This file is both, written the way `weigh.ts` is:
@@ -55,7 +55,7 @@ export type ChangeKind = { key: string; list: string | null; verb: string; floor
 export const CALL = 'call';
 export const ADDONS = 'addons';
 export const AUTOMATION = 'automation';
-/** The verb of a mention attached to a row it names, `<list>:attach` (ENG-B15, D37.52 and D37.53). */
+/** The verb of a mention attached to a row it names, `<list>:attach` (ENG-B15). */
 export const ATTACH = 'attach';
 
 /** How many days of an existing write token's own writes keep their kinds at Do and tell, once, when the ladder arrives. */
@@ -235,9 +235,9 @@ export const kindOfWrite = (w: WriteSaid): ChangeKind => dearest(kindsOfWrite(w)
 /**
  * The kind of a mention attached to a row it names, `<list>:attach` (ENG-B15): a name read in a text, put on the row
  * the reader took it to be, with the sentence it was seen in. OFF THE FLOORS, so it can be earned apart from editing
- * the row (D37.53), and always undoable (D37.55): it adds a line where the row was seen and changes nothing it says.
+ * the row, and always undoable: it adds a line where the row was seen and changes nothing it says.
  *
- * A ROW WITH AN AMOUNT IS THE `money` FLOOR, and asks at every rung (D37.56): a payment taken for the wrong person is
+ * A ROW WITH AN AMOUNT IS THE `money` FLOOR, and asks at every rung: a payment taken for the wrong person is
  * not a line nobody reads. The floors of every other kind are as they were.
  */
 export const kindOfAttach = (list: string, hasAmount: boolean): ChangeKind => kind(list, ATTACH, hasAmount ? 'money' : null);
@@ -567,7 +567,7 @@ export const ownerIn = (sql: Sql, person: string): boolean =>
  *
  * SLASH WORKS FOR THE RECORD'S OWNERS, whoever they are on any record, and for nobody else. It is no person, so a row
  * a person made is somebody else's to it (`rowFloor`), except a row one of its owners made, which is the work it was
- * given: a row a member made always asks, and the owners' rows climb as any agent's own do (DIRECTION §37).
+ * given: a row a member made always asks, and the owners' rows climb as any agent's own do.
  */
 export function recordReader(sql: Sql, actor: string): KindReader {
   const rowAt = (list: string, at: string): { id: string; fields: string } | undefined => {

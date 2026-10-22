@@ -1,7 +1,7 @@
 /**
  * The tidy as numbers (AGT-C18 job b): how many things are stale now, and how many the record cleared this week.
  *
- * WHAT WAS MEASURED BEFORE THIS. "how good is braindog's mcp at cleaning up stale stuff?" (D40.10) had no number. The
+ * WHAT WAS MEASURED BEFORE THIS. "how good is braindog's mcp at cleaning up stale stuff?" had no number. The
  * finders counted, and nothing read them: no figure, so no tile, no lead note and no vital sign could say it.
  */
 

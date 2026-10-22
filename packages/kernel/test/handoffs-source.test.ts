@@ -45,7 +45,7 @@ async function record() {
     return `S${String(run.seq)}`;
   };
   const first = leave('c1', 'braindog', 'Wire the handoff source into the record');
-  const second = leave('c2', 'bake', 'Check the refund webhook');
+  const second = leave('c2', 'oxbow', 'Check the refund webhook');
   return { sql, k, first, second };
 }
 
@@ -54,7 +54,7 @@ test('EVERY OPEN STEP ON THE RECORD, each place read in its own right, newest fi
   const steps = openSteps(sql, NOW);
   assert.deepEqual(steps.map((s) => [s.spoken, s.repo, s.mark]).sort(), [
     [first, 'braindog', 'next'],
-    [second, 'bake', 'next'],
+    [second, 'oxbow', 'next'],
   ]);
   assert.equal(openSteps(sql, NOW + 8 * DAY).every((s) => s.mark === 'earlier'), true, 'a step past a week is earlier');
   assert.deepEqual(openSteps(sql, NOW, 'things#1'), [], 'a project nobody left a step in has none');

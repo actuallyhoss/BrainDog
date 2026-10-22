@@ -7,7 +7,7 @@
  * open one or asked by a person sends nothing, and inside the record's quiet hours nothing sounds. It never mails, and
  * a record where no owner turned a phone on is told nothing at all: the notice is off until the record already pushes.
  *
- * OVER THE KERNEL'S OWN `propose`, read off the outbox and the `note` events it leaves, as `wire-85.test.ts` reads an
+ * OVER THE KERNEL'S OWN `propose`, read off the outbox and the `note` events it leaves, as `wire-queue-drafts.test.ts` reads an
  * urgent rule's.
  */
 

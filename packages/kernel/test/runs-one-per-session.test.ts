@@ -1,5 +1,5 @@
 /**
- * One run per host session (DIRECTION §37, "Stop the harm"): a write that names no run joins its token's newest open run
+ * One run per host session ("Stop the harm"): a write that names no run joins its token's newest open run
  * instead of opening another, and the host session's own id makes the start hook's run and the tool calls one run.
  *
  * MEASURED BEFORE, on the owner's record: 732 runs, and of the newest 500, 491 abandoned and 439 called "Agent run" and

@@ -18,6 +18,7 @@
  */
 
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid } from './listed.ts';
 
 /**
@@ -79,7 +80,7 @@ const PLAYERS = `${EMBED_PROVIDERS.slice(0, -1)
   .join(', ')} or ${EMBED_PROVIDERS.at(-1)?.name ?? ''}`;
 
 export const embed: KindModule = {
-  keys: [],
+  keys: KIND_KEYS.embed,
 
   validate(block, ctx) {
     if (block.source !== undefined) return invalid('An embed is written out, one row of its address, title and shape, and reads no list. Take source: off.', 'source');

@@ -3,7 +3,7 @@
  * that is not registered reads exactly as it did.
  *
  * THE STUB IS REGISTERED BEFORE THE KERNEL LOADS, which is the only order that means anything: `declare.ts` and
- * `block-keys.ts` build their lists from the registry when they load, so the kernel is imported below, after the
+ * `block-keys.ts` build their lists from the registry and its keys table when they load, so the kernel is imported below, after the
  * line that registers the stub. Each test file runs in a process of its own, so the stub is seen by no other file.
  *
  * EACH TEST DRIVES A REAL RECORD over `node:sqlite`, as `pages.test.ts` does, so the install check, the key closure
@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import type { Declaration } from '../src/index.ts';
 import { BLOCK_KIND_MODULES, type KindModule } from '../src/kinds/index.ts';
+import { KIND_KEYS } from '../src/kinds/keys.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 /** What the stub says it read, so a test can tell its answer from the one `pages.ts` would have given. */
@@ -36,6 +37,8 @@ const STUB: KindModule = {
   },
 };
 BLOCK_KIND_MODULES.stub = STUB;
+/* THE KEYS TABLE IS WHAT `block-keys.ts` READS (`kinds/keys.ts`), so the stub's keys go in it as well. */
+(KIND_KEYS as Record<string, readonly string[]>).stub = STUB.keys;
 
 const { openRecord } = await import('../src/index.ts');
 

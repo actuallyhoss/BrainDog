@@ -1,5 +1,6 @@
 /**
- * BrainDog's own arranging happens at once, with a mark and an Undo, and only that (DIRECTION d3).
+ * BrainDog's own arranging happens at once, with a mark and an Undo, and only that: what is small and reversible
+ * needs no press.
  *
  * WHAT IS HELD: a question filed by an ingest, a rule or Slash whose every write is an edit, a tag or a move on a row
  * the owner made lands as it is filed, signed `rule:handled`, and one Undo on its decision puts it back. Money, adding a

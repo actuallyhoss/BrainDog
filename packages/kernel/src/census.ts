@@ -15,7 +15,7 @@ import type { PageResult } from './pages.ts';
 
 /**
  * Where a page is held: `stored` is a page the record declares, `generated` one a template made for a row, `web` a page
- * written by hand in the app, which the record does not hold (D35.44: every page is declared, the hand-written included).
+ * written by hand in the app, which the record does not hold (every page is declared, the hand-written included).
  */
 export type Held = 'stored' | 'generated' | 'web';
 

@@ -5,7 +5,7 @@
  * WHY THIS EXISTS. A paused script showed on `/scripts` only, and on the owner's record the hub read "76 automations
  * run by themselves, and none failed this month" over a month that held one run. Nothing read either daily. These read the
  * record's own rows (the script and rule declarations, the runs `meter` signs, `automation_run` and its steps) and say
- * what they find with names, never ids, on every record alike (DIRECTION §27).
+ * what they find with names, never ids, on every record alike.
  *
  * NONE IS NOT GREEN, as in `signs.ts`: no script installed, no automation switched on, no run this week, is nothing to
  * judge by and says so.

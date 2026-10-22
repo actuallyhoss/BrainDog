@@ -5,7 +5,7 @@
  * were in touch, the lists they were on, an address that goes in as a key, the other name they went by. That is written
  * with the fold, in its batch, and its Undo takes it back.
  *
- * WHO SOMEBODY IS IS NEVER FILLED BEHIND THE OWNER'S BACK (D38.53, D38.54). A field on the identity floor
+ * WHO SOMEBODY IS IS NEVER FILLED BEHIND THE OWNER'S BACK. A field on the identity floor
  * (`change-kind.ts`, `ListShape.identity`: the organisation a person is with, above all) that the kept row leaves empty
  * and a folded row holds is not written. The folded row's own address and name are not new facts about anybody: they
  * are what it was matched on, and move with it as a key and an alias. It is offered: one line, the field, the value and the row it

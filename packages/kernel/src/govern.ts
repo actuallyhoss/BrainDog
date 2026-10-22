@@ -190,8 +190,10 @@ const SETTLED_BY =
  * the tab that accepted said "Installed Personal" and a reload, or anybody else, read the decision without it. The newest
  * such line wins; a decision with none reads `null`.
  */
+/* ONLY A LINE WITH NO `field`, which is how `keepApplied` writes it: the line saying where a press came from
+   (`answeredIn`) is a note on the decision too, and holds the app's name in `to_v`. */
 const APPLIED =
-  "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
+  "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.field IS NULL AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
 
 /**
  * WHO A QUESTION IS HANDED TO (USE-A13), the newest hand on it (`handQuestion`), or `null` when nobody is named or it was
@@ -260,7 +262,7 @@ export function listGovernance(
     if ((opts.status ?? 'open') === 'open') {
       where.push('(defer_until IS NULL OR defer_until <= ?)');
       params.push(instant(deps.nowMs));
-      /* A DOUBTFUL ARRIVAL WAITS IN TO REVIEW, NOT IN NEEDS YOU (DIRECTION §45): its body says `review`, and the open
+      /* A DOUBTFUL ARRIVAL WAITS IN TO REVIEW, NOT IN NEEDS YOU: its body says `review`, and the open
          questions every count and queue reads stop at it. `review: 'only'` is the To review list's own read. */
       const marked = "(CASE WHEN json_valid(body) THEN COALESCE(json_extract(body, '$.review'), 0) = 1 ELSE 0 END)";
       where.push(opts.review === 'only' ? marked : `NOT ${marked}`);
@@ -597,8 +599,8 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
   /* AND WHO DECIDES IT, written as `handQuestion` writes it, so an agent's question that names Ada arrives already hers. */
   if (p.decider !== undefined) handEvent(deps, at, by, id, p.decider);
-  /* BRAINDOG'S OWN ARRANGING NEEDS NO PRESS (DIRECTION d3): a question that only moves the owner's own rows and can be
-     undone is answered now, marked, with its Undo. Anything else, or a refusal, stays the open question it was. */
+  /* BRAINDOG'S OWN ARRANGING NEEDS NO PRESS, being small and reversible: a question that only moves the owner's own rows
+     and can be undone is answered now, marked, with its Undo. Anything else, or a refusal, stays the open question it was. */
   if (p.body_kind === 'rowset' && deps.settle && handledFault(deps.sql, { body_kind: p.body_kind, body: JSON.stringify(body), opened_by: by }) === null) {
     const done = deps.settle(id);
     if (done.ok) return ok({ id, handled: true });
@@ -1670,8 +1672,8 @@ export function additiveFault(body: Record<string, unknown> | null): string | nu
 }
 
 /**
- * Who answers a question the ladder settles: an agent's proposal of kinds the owner has let it make without asking
- * (DIRECTION §37). No agent answers a question, its own least of all, so the ladder does, and signs as itself.
+ * Who answers a question the ladder settles: an agent's proposal of kinds the owner has let it make without asking.
+ * No agent answers a question, its own least of all, so the ladder does, and signs as itself.
  */
 export const LADDER_RULE = 'rule:ladder';
 
@@ -1740,8 +1742,8 @@ export function ladderFault(sql: Sql, row: { body_kind: string; body: string; op
 }
 
 /**
- * Who answers a question BrainDog settles itself: reversible arranging of the owner's own rows (DIRECTION d3). Its rows
- * are signed by this name, so the byline reads BrainDog and one Undo on the decision puts the whole batch back.
+ * Who answers a question BrainDog settles itself: reversible arranging of the owner's own rows, too small to need a press.
+ * Its rows are signed by this name, so the byline reads BrainDog and one Undo on the decision puts the whole batch back.
  */
 export const HANDLED_RULE = 'rule:handled';
 
@@ -1787,7 +1789,7 @@ function ownAgentFault(sql: Sql, by: string, nowMs: number): string | null {
  * add-ons, outside the record, another person's row). Rows the owner made count as the owner's own, as they do for
  * Slash. The kinds are worked out now, as `ladderFault` works them, never from the stamp.
  *
- * A QUESTION ASKED BECAUSE ITS RUN READ OUTSIDE TEXT (`outside`) IS NEVER SETTLED HERE: DIRECTION §37 drops that run to
+ * A QUESTION ASKED BECAUSE ITS RUN READ OUTSIDE TEXT (`outside`) IS NEVER SETTLED HERE: a run that read outside text drops to
  * Ask so that a person reads what it would change, and settling it an hour later would undo the reason it asked.
  */
 export function handledFault(sql: Sql, row: { body_kind: string; body: string; opened_by: string }, opts: HandledOpts = {}): string | null {
@@ -1802,7 +1804,7 @@ export function handledFault(sql: Sql, row: { body_kind: string; body: string; o
   if (!body) return 'The question cannot be read.';
   if (body.outside === true) return 'Its run read text from outside the record, so it waits for you.';
   const rows = (body.rows ?? []) as Record<string, unknown>[];
-  /* A CONFIDENT ARRIVAL IS THE ONE ADD BRAINDOG FILES ITSELF (DIRECTION §45): an ingest says so in the body
+  /* A CONFIDENT ARRIVAL IS THE ONE ADD BRAINDOG FILES ITSELF: an ingest says so in the body
      (`arrivalSure`), and only new rows of that ingest's own list count; money is read cleanly by then, every other floor stands. */
   const confident = body.confident === true && by.startsWith('ingest:') && rows.every((r) => typeof r?.at !== 'string');
   if (rows.length === 0 || (!confident && rows.some((r) => typeof r?.at !== 'string' || !isMap(r.patch)))) return 'It adds rows, and a new row asks.';
@@ -1865,7 +1867,7 @@ function tokenRowOf(sql: Sql, register: string, at: string): string | null {
 }
 
 /**
- * BrainDog's own arranging, over what already waits (DIRECTION d3, live 20 Oct: "small reversible questions settle
+ * BrainDog's own arranging, over what already waits (measured live on 20 Oct: "small reversible questions settle
  * themselves: none did"). Run by the hourly sweep while `handledOn` holds, in two steps:
  *
  *   1. A QUESTION ASKED AGAIN IS CLOSED. An open rowset whose every field on every row a newer open question also
@@ -3139,7 +3141,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   const { option } = verdict.decide ?? { option: '' };
   let reason = verdict.decide?.reason;
-  /* EVERY QUESTION IS ANSWERED IN ONE PRESS (DIRECTION §37), AND EVERY DECISION STILL CARRIES A SENTENCE, because
+  /* EVERY QUESTION IS ANSWERED IN ONE PRESS, AND EVERY DECISION STILL CARRIES A SENTENCE, because
      `decision.reason` is what renders wherever it is cited. Demanding one before the press taught people to type "ok",
      the failure 20 §3 warns of, and cost a round trip on every answer. A light question a rule or Slash opened (band
      `call`, `weigh.ts`) is decided for its option's own reason; any other says plainly that no reason was given, so
@@ -3683,6 +3685,39 @@ function handEvent(deps: Pick<GovernDeps, 'sql' | 'mint'>, at: string, by: strin
     to ?? '',
     to === null ? 'Taken back, so anybody who may decide can answer it.' : `Handed to ${personNamed(deps.sql, to)} to decide.`,
   );
+}
+
+/**
+ * WHERE A PRESS CAME FROM, kept on the decision it made (a press on the decision card inside Claude or ChatGPT, the MCP
+ * door's `answer`). An event and no column, as `HAND` is: a `note` on the decision whose `field` is `answered_in`, the
+ * app's name in `to_v` and the sentence History says in `note`. A decision answered in the app has none.
+ */
+export const ANSWERED_IN = 'answered_in';
+
+/** Keep where one decision was answered, by the person who answered it, in the batch that decided it. */
+export function answeredIn(deps: Pick<GovernDeps, 'sql' | 'mint' | 'nowMs'>, decision: string, app: string, by: string, batch?: string): void {
+  slashMayWrite(by, 'note');
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note, batch) VALUES (?, ?, ?, 'note', ?, 'decision', ?, ?, ?, ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    by,
+    `decision:${decision}`,
+    ANSWERED_IN,
+    app,
+    `Answered in ${app}, on the card.`,
+    batch ?? null,
+  );
+}
+
+/** The app one decision was answered in, or `null` for a decision answered in BrainDog. */
+export function answeredInOf(sql: Sql, decision: string): string | null {
+  const row = sql.one<{ to_v: string | null }>(
+    "SELECT to_v FROM event WHERE kind = 'note' AND field = ? AND target = ? ORDER BY rowid DESC LIMIT 1",
+    ANSWERED_IN,
+    `decision:${decision}`,
+  );
+  return row?.to_v ? row.to_v : null;
 }
 
 /** Who decides one question: the person the newest hand names, or `null` when nobody is named or it was taken back. */

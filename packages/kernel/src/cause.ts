@@ -1,5 +1,5 @@
 /**
- * A question has a cause (AGT-C07, "a question has a cause", D40.50): the key for what it is about, so it is asked once.
+ * A question has a cause (AGT-C07, "a question has a cause"): the key for what it is about, so it is asked once.
  *
  * TWO IDENTICAL QUESTIONS SEVEN SECONDS APART were filed on the owner's record (SG89 and SG90), and "Needs you" showed
  * one question twice, word for word, because a proposal was inserted as it came with no look at what was open. A cause
@@ -117,7 +117,7 @@ export const MOOT_GONE = 'What this asked about has since been deleted.';
 
 /**
  * Whether what a question asks is already so, and answering it would change nothing (AGT-C08, "how good is braindog's
- * mcp at cleaning up stale stuff?", D40.10).
+ * mcp at cleaning up stale stuff?").
  *
  *   - a rowset whose every row already holds every value it proposes (`noop`), or whose rows are all deleted;
  *   - a change whose declaration, or every one of a bundle's, is live with that very body;

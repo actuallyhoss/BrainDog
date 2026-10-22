@@ -37,6 +37,7 @@ import type { Predicate } from '@braindog/where';
 
 import type { BlockResult } from '../pages.ts';
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
 
 /** The most lanes a block draws. Past it nobody reads a lane, and the block says to narrow itself. */
@@ -142,7 +143,7 @@ const answered = (answer: LanesAnswer): BlockResult => answer as unknown as Bloc
 
 export const lanes: KindModule = {
   /* `tones` IS SHARED with a `bar` and a `split`, which tone a part by the value it groups (`block-keys.ts` `KEY_KINDS`). */
-  keys: ['hours', 'tones'],
+  keys: KIND_KEYS.lanes,
 
   validate(block, ctx) {
     const hours = block.hours;

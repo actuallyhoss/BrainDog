@@ -22,7 +22,7 @@ function forecastBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
   const reach = walkReach(block, deps.walk);
   const opensOn = (w: Runway): Runway =>
     typeof block.horizon === 'number' && w.horizon > block.horizon ? { ...w, horizon: block.horizon, reach: w.horizon } : w;
-  /* AN OPENING IN ONE CURRENCY THAT IS NOT THE HOME ONE IS A BOOK'S OWN: Quartz says USD, so its cash is read in dollars
+  /* AN OPENING IN ONE CURRENCY THAT IS NOT THE HOME ONE IS A BOOK'S OWN: Harbour says USD, so its cash is read in dollars
      (`scopeCurrency` in `metrics.ts`), and its walk is asked for in dollars too, a bill in pounds converted into them.
      Walked in the home currency, a book's dollars were refused as "movements in EGP", or drawn beside an empty walk. */
   const home = deps.ctx.fx?.().home ?? null;

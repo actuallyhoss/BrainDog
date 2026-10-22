@@ -1,5 +1,5 @@
 /**
- * Projects by git remote (DIRECTION §37's one-field fix, made in the matcher): a run is placed by the remote every run
+ * Projects by git remote (the one-field fix, made in the matcher): a run is placed by the remote every run
  * records, `github.com/actuallyhoss/BrainDog`, and failing that by the last name of the folder it works in, so a project
  * row that still lists the folder Windows wrote no longer decides where a Mac's runs belong.
  *
@@ -74,7 +74,7 @@ const placed = (k: Awaited<ReturnType<typeof record>>['k'], where: Parameters<Aw
 test('THE OWNER’S BRAINDOG ROW, LISTING ONLY THE FOLDER WINDOWS WROTE, IS A QUESTION FROM THE MAC and never a guess', async () => {
   const { k, sql } = await record();
   /* A last name alone ties the Mac's checkout to the row (batch 17, M1), so it is asked ("Is this BrainDog?") and the run
-     stays global until the row lists its remote, which is DIRECTION 37's one-field fix. */
+     stays global until the row lists its remote, which is the one-field fix: list the remote. */
   const mac = { remote: 'https://github.com/actuallyhoss/BrainDog.git', repo: 'braindog', cwd: '/Users/mara/Developer/braindog' };
   assert.equal(placed(k, mac), 'between things#1');
   assert.equal(placed(k, { remote: 'git@github.com:actuallyhoss/BrainDog' }), 'between things#1', 'the remote alone does not find it');

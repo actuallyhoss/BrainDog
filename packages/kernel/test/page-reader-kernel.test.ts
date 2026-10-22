@@ -1,5 +1,5 @@
 /**
- * `kernel.page` takes its reader (DIRECTION §38): the look is laid over the blocks as this caller is shown them, so a
+ * `kernel.page` takes its reader: the look is laid over the blocks as this caller is shown them, so a
  * member held from a list is never led by it, and a caller that names no reader reads the page as the record does.
  */
 

@@ -1,5 +1,5 @@
 /**
- * The gate's half of the ladder of trust (DIRECTION §37): every question says what kind of change it is, a decision is
+ * The gate's half of the ladder of trust: every question says what kind of change it is, a decision is
  * written in one batch so it can be undone as one, and the ladder may accept an agent's proposal of kinds it has earned.
  *
  * WHAT WAS MEASURED BEFORE THIS. A suggestion kept no kind, so "the share accepted unchanged, by kind" could not be

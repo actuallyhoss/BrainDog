@@ -60,7 +60,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS, TASKS, BY_WEEK, HOURS_BY_WEEK, DONE]));
   const kiln = value<{ id: string }>(k.create('things', { name: 'Kiln' }, OWNER)).id;
-  value(k.create('things', { name: 'Bake' }, OWNER));
+  value(k.create('things', { name: 'Oxbow' }, OWNER));
   for (const [done_on, hours] of [['2026-09-15', 2], ['2026-09-29', 4], ['2026-09-30', 6], ['2026-10-01', 2]] as const)
     value(k.create('tasks', { what: `Fired on ${done_on}`, thing: kiln, done_on, hours }, OWNER));
   return { k, sql };

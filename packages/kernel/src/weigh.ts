@@ -29,26 +29,10 @@
  * `kinds.ts` owns `TONES`. A kernel that held English would be a kernel with a reader in it.
  */
 
-/**
- * The four, worst first — which is the order they are ranked in, and the order they are compared in.
- *
- * - `undo`  — accepting it is hard to take back, because Put back has nothing to go back to: it
- *             turns a pack off, it moves money, it retypes a field that holds answers, it adds a
- *             field to a list that holds rows, it changes a value the history withholds, or every
- *             option it offers is one its proposer marked hard. The other button tomorrow does not
- *             return the record to where it was.
- * - `shape` — accepting it changes what everyone sees: a pack installed or turned on, a pack's
- *             settings, a page, a declaration that is new or replaces one. Reversible, and not quietly: everyone
- *             who opens the record meets it.
- * - `rows`  — accepting it adds rows, changes or removes rows that exist, or adds a rule that will
- *             add them. Deletable, put back or restored, one at a time.
- * - `call`  — a judgement with nothing attached. Accepting it writes a decision and its reason and
- *             changes no part of the record, which is what makes it the cheapest to get wrong and
- *             the one most worth thinking about last.
- */
-export const COSTS = ['undo', 'shape', 'rows', 'call'] as const;
-
-export type Cost = (typeof COSTS)[number];
+/* THE FOUR, WORST FIRST, and what each band means: `constants.ts`'s, because the queue a screen draws on its first open
+   reads them and not the rest of this file. */
+import { COSTS, type Cost } from './constants.ts';
+export { COSTS, type Cost };
 
 /** Where a band sits in the order, lowest first. Out of the set sorts last rather than throwing. */
 export const costRank = (c: string): number => {

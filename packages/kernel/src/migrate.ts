@@ -63,6 +63,8 @@ import entryPrivate0040 from './migrations/0040_entry_private.ts';
 import entryPrivateTravels0041 from './migrations/0041_entry_private_travels.ts';
 import agents0042 from './migrations/0042_agents.ts';
 import share0043 from './migrations/0043_share.ts';
+import seat0044 from './migrations/0044_seat.ts';
+import sealed0045 from './migrations/0045_sealed.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -111,6 +113,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 41, slug: 'entry_private_travels', sql: entryPrivateTravels0041 },
   { version: 42, slug: 'agents', sql: agents0042 },
   { version: 43, slug: 'share', sql: share0043 },
+  { version: 44, slug: 'seat', sql: seat0044 },
+  { version: 45, slug: 'sealed', sql: sealed0045 },
 ];
 
 /**
@@ -174,6 +178,11 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 43 adds `share`, `share_group` and `share_group_member` in `governance`, `access_via` in `origin`, and
  * `token_lens` and `access_seen` in `local`, plus the `access` counter: an older reader skips a table it has no shape
  * for, so the format is still 1.
+ * Migration 44 adds two rows, the next versions of `register.session` (a run's profile, `seat`) and
+ * `register.instructions` (`machine` and `seat`), which an older file's rows import without and the import seats; and
+ * `job_place`, `local`. So the format is still 1.
+ * Migration 45 adds `sealed_file` in `data`, which an older reader skips as a table it has no shape for, and
+ * `sealed_part` in `local`, so no file carries it. So the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

@@ -1,7 +1,7 @@
 /**
  * Faults: work BrainDog does for itself that keeps failing (AGT-C06).
  *
- * A FAULT IS NEVER A QUESTION. "Nothing an operator must fix is asked of him" (D40.53). A job that dies at the end of
+ * A FAULT IS NEVER A QUESTION. "Nothing an operator must fix is asked of him". A job that dies at the end of
  * the outbox's ladder, or a scheduled thing that never runs, used to file a question opened by `system`: "infer.resolve
  * could not be delivered after 8 attempts: No model answered. Retry it, or change what produces it." with Accept and
  * Decline under it, in Decide, beside the questions that were his to answer. He could do nothing with it but dismiss it,

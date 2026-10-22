@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { forwardedHead, mailboxes, minorOf, readMail } from './mail-read.ts';
+import { forwardedHead, mailboxes, maskMoneyText, minorOf, readMail } from './mail-read.ts';
 
 const invoice = (extra = ''): string =>
   `Invoice INV-2041\nSubtotal: GBP 40.00\nVAT: GBP 8.00\nAmount due: GBP 48.00\nPayment due by 14 November 2026\n${extra}`;
@@ -71,4 +71,11 @@ test('A MAIL THAT TALKS OF MONEY BUT FITS NO RULE IS MARKED FOR THE MODEL', () =
   const r = readMail({ from: 'a@b.example', subject: 'About your payment', body: 'Thanks, we will be in touch about the statement.' });
   assert.equal(r.kind, 'none');
   assert.equal(r.looksFinancial, true);
+});
+
+test('AN AMOUNT WRITTEN IN TEXT IS TAKEN OUT, its currency kept, and a number with no currency or an id stays', () => {
+  assert.equal(maskMoneyText('Paid £923.47 for clay, and £1,250 more.'), 'Paid £… for clay, and £… more.');
+  assert.equal(maskMoneyText('Quote GBP 400, then 1.5k? £1.5k. Fee 90 EUR.'), 'Quote GBP …, then 1.5k? £…. Fee … EUR.');
+  assert.equal(maskMoneyText('Room 42, 3 chairs, ABC 120, 2026-10-22'), 'Room 42, 3 chairs, ABC 120, 2026-10-22');
+  assert.equal(maskMoneyText('01JZ8QK3F7R2M9V4XN6T9USD and e.Ab3GBP'), '01JZ8QK3F7R2M9V4XN6T9USD and e.Ab3GBP');
 });

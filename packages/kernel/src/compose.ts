@@ -1,5 +1,5 @@
 /**
- * THE ENGINE'S LOOK FOR A PAGE (DIRECTION §38): what a page leads with, the order its blocks come in, what it hides and
+ * THE ENGINE'S LOOK FOR A PAGE: what a page leads with, the order its blocks come in, what it hides and
  * the one next action, laid over the page's declaration as it is read and never written into it.
  *
  * A LOOK IS A DECLARATION, `look.<page>` (`declare.ts` checks it), and it is one of three things by `by`:
@@ -503,7 +503,7 @@ function weigh(b: BlockResult, input: ComposeInput): Weighed {
 }
 
 /**
- * WHETHER A BLOCK DREW NOTHING, and so is not drawn (§35: "an empty or unused part is not drawn"). A list that read no
+ * WHETHER A BLOCK DREW NOTHING, and so is not drawn, as no empty or unused part is. A list that read no
  * row, a figure that read no value; a figure in several currencies, one amount a currency, is a value. A note, a heading, the line a row is typed into and a written block are never
  * empty: what they show is what their author wrote.
  */
@@ -553,7 +553,7 @@ export function composeLook(input: ComposeInput): LookBody {
   if (leadAt !== -1) {
     const top = topOf(blocks);
     /* NOR PAST A WALK OF THE MONEY AHEAD. A page that opens on its cash and how long it lasts answers that first
-       (DIRECTION §2: "Money leads with cash and runway"), and a late instalment led his Money above both: what is late
+       ("Money leads with cash and runway"), and a late instalment led his Money above both: what is late
        is said in the page's next line, and its tile moves up only within its own group, under the walk. Today and Decide
        are the reader's desk, where what waits on him comes first (`questionsLead`). */
     if (blocks.slice(top, leadAt).some((b, n) => pinned.has(keys[top + n]!) || (!asksFirst && b.kind === 'forecast' && areaOf(b) === 'main' && b.drawn !== false))) leadAt = -1;

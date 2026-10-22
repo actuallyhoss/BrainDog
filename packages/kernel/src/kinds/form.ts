@@ -35,6 +35,7 @@ import type { Why } from '../drawn.ts';
 import type { BlockResult, PageDeps } from '../pages.ts';
 import { ACTION_VERBS, cutActions } from '../row-actions.ts';
 import type { KindModule } from './index.ts';
+import { KIND_KEYS } from './keys.ts';
 import { invalid } from './listed.ts';
 
 /** The verbs a form writes with: a new row of a list, or a question put to the record's owner. */
@@ -343,7 +344,7 @@ function readForm(deps: PageDeps, block: Readonly<Record<string, unknown>>): For
 export const form: KindModule = {
   /* SHARED: `register` is the list a `capture` adds to and an `inputs` block edits (`block-keys.ts` `KEY_KINDS`), and a
      form names the list it adds to by the same key. */
-  keys: ['verb', 'register', 'fields', 'submit', 'after'],
+  keys: KIND_KEYS.form,
 
   validate(block, ctx) {
     return formFault(block, ctx.stage);

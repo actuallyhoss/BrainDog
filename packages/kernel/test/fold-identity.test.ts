@@ -1,6 +1,6 @@
 /**
- * A fold never changes who somebody is behind the owner's back (ENG-B04 job 5: "A confident match is made", D38.53,
- * "and shown with Undo", D38.54).
+ * A fold never changes who somebody is behind the owner's back (ENG-B04 job 5): a confident match is made, and shown
+ * with Undo.
  *
  * The strong rules fold two of one full name and one handle as one batch. What the folded one held as evidence (the
  * later day in touch, where they were met, their address as a key) is written by that batch. An organisation the kept

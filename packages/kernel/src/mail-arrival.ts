@@ -5,7 +5,7 @@
  * WHAT: an invoice or receipt becomes a bill, a renewal notice moves a service's renewal day, a shipping or booking
  * confirmation becomes a dated task on the project it names. Each is a question BrainDog files itself only when it is
  * sure (the vendor is held, the amount and day read cleanly, the row it belongs to found); otherwise it waits in To
- * review with the filing as the button, and money that did not read cleanly asks in Needs you (DIRECTION d3).
+ * review with the filing as the button, and money that did not read cleanly asks in Needs you: only what is sure is filed alone.
  *
  * LISTS ARE FOUND BY SHAPE AND NEVER BY ID, because a record names its lists as it likes. Nothing here follows a link,
  * opens an attachment or keeps a body: the mail is already stored raw, and only the facts above are written.

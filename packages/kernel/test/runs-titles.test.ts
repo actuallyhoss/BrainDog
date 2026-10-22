@@ -1,5 +1,5 @@
 /**
- * What a run is called (DIRECTION §37): the agent's own `doing`, at most sixty characters; else its first proposal's
+ * What a run is called: the agent's own `doing`, at most sixty characters; else its first proposal's
  * question; else the agent and its project, "Claude in BrainDog". Never a day, and a name the record gave is given again
  * whenever the record learns more, while a name somebody wrote is theirs.
  *

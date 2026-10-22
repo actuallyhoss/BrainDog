@@ -636,7 +636,7 @@ function finishUnawaited(sql: Sql, id: string, tried: 0 | 1): void {
  *
  * "Retry it, or change what produces it" was asked of the owner in Decide, and it was never his to answer: a model with
  * no key, a mail server that refuses, a bucket that is gone are an operator's to fix, and the job comes back the next
- * night whatever he says (D40.53). So the eighth failure raises `outbox#<kind>` (`fault.ts`), one line however many jobs
+ * night whatever he says. So the eighth failure raises `outbox#<kind>` (`fault.ts`), one line however many jobs
  * of the kind die, read in Settings as a plain sentence, and cleared when a job of the kind next completes.
  */
 function deadLetter(

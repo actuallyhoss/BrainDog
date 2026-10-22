@@ -27,7 +27,9 @@ export type Raw = Readonly<Record<string, unknown>>;
  * person's, so it is drawn for anyone who reads), the button that opens the new scheduled action sheet
  * (`new-action`), and the Agents page's control room (agents and MCP plan §7.1): the box he tells an agent in with what
  * each was told (`instruct`, his alone), and the runs open now with Pause and Stop (`presence`, drawn for anyone who
- * reads the runs, the presses only for him).
+ * reads the runs, the presses only for him), every run in one list (`run-list`, drawn for anyone who reads), the steps
+ * runs left for the next one with Take and Drop (`left-steps`, the presses only for him), and the machines and profiles his
+ * agents run on (`machines`, drawn for anyone who reads the runs).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
@@ -51,7 +53,10 @@ export type Panel =
   | 'my-keys'
   | 'new-action'
   | 'instruct'
-  | 'presence';
+  | 'presence'
+  | 'run-list'
+  | 'left-steps'
+  | 'machines';
 
 /** What a host panel is about, who it is drawn for and what it is, in one line. */
 export type PanelEntry = Readonly<{ needs: 'row' | 'none'; level: 'read' | 'write' | 'owner'; says: string }>;
@@ -70,6 +75,9 @@ export const PANEL_TABLE: Readonly<Record<Panel, PanelEntry>> = {
   'new-action': { needs: 'none', level: 'owner', says: 'Make a new action' },
   instruct: { needs: 'none', level: 'owner', says: 'Tell an agent, and what each was told' },
   presence: { needs: 'none', level: 'read', says: 'The agents working now, with pause and stop' },
+  'run-list': { needs: 'none', level: 'read', says: 'Every run, newest first, and the day as lanes' },
+  'left-steps': { needs: 'none', level: 'read', says: 'The steps left for the next run, with take and drop' },
+  machines: { needs: 'none', level: 'read', says: 'The machines and profiles agents run on' },
 };
 
 /* THE KEYS IN THE TABLE'S ORDER, the four of before first, as the refusal lists them and the web's list equals. */

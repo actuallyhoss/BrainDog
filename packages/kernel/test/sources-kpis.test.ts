@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import { ANSWER_KEYS, openRecord, type Declaration, type Kernel, type KpiAnswer } from '../src/index.ts';
 import type { PageBlock } from '../src/pages.ts';
+import { kpiTrend } from '../src/sources/kpis.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 21, 12);
@@ -445,4 +446,98 @@ test('ON A PROJECT’S OWN PAGE the block names no project and reads the row the
     assert.deepEqual(block.kpis?.map((x) => x.name), ['Sign-ups', 'Players', 'Money in']);
   }
   close();
+});
+
+test('A KEY NUMBER AS A CARD’S LINE: its own periods, a flow added up with nought for none, a level its last, another currency left out', () => {
+  const flow = kpiTrend(
+    {
+      kind: 'flow',
+      every: '1m',
+      unit: 'GBP',
+      points: [
+        { at: '2026-07-01T00:00:00Z', amount: 'GBP 6,000.00' },
+        { at: '2026-07-20T00:00:00Z', amount: 'GBP 500.50' },
+        { at: '2026-09-15T00:00:00Z', amount: 'USD 500.00' },
+        { at: '2026-10-01T00:00:00Z', amount: 'GBP 1,000.00' },
+      ],
+    },
+    NOW,
+    4,
+  );
+  assert.deepEqual(flow, [6_500.5, 0, 0, 1_000]);
+  const level = kpiTrend(
+    {
+      kind: 'level',
+      every: '1w',
+      points: [
+        { at: '2026-09-01T09:00:00Z', value: 5 },
+        { at: '2026-10-06T09:00:00Z', value: 40 },
+        { at: '2026-10-08T09:00:00Z', value: 42 },
+        { at: '2026-10-20T09:00:00Z', value: 51 },
+      ],
+    },
+    NOW,
+    3,
+  );
+  /* THREE WEEKS FROM MONDAY 5 OCTOBER: the 8th's 42 is its week's last, nothing came the week of the 12th, and the 20th's 51 is this week's. */
+  assert.deepEqual(level, [42, null, 51]);
+  assert.equal(kpiTrend({ kind: 'level', every: '1d', points: [{ at: '2026-01-01T00:00:00Z', value: 3 }] }, NOW, 8), null);
+});
+
+test('A CARD’S TREND WITH kpi: headline draws the number its project leads with, and the figure only where the project leads with none', async () => {
+  const { k, close } = await seeded();
+  const tallow = must(k.create('things', { name: 'Tallow', lane: 'building', repos: ['tallow'] } as never, OWNER), 'Tallow');
+  must(k.create('ledger', { what: 'October sale', on: '2026-10-05', amount: gbp(400), thing: (tallow as unknown as { value: { id: string } }).value.id } as never, OWNER), 'a sale on Tallow');
+  const cards = (kpi: boolean): Map<string, (number | null)[] | null> => {
+    const trend = { metric: 'project-in-by-month:{{name}}', as: 'trend', ...(kpi ? { kpi: 'headline' } : {}) };
+    const out = k.block({ kind: 'cards', source: 'register.things', columns: [{ field: 'name', as: 'title' }, trend], order: [{ field: 'name', dir: 'asc' }] } as unknown as PageBlock);
+    assert.deepEqual(out.refusals, [], JSON.stringify(out.refusals));
+    return new Map(out.rows.map((r, i) => [String(r.fields.name), out.trends?.[i] ?? null]));
+  };
+  const led = cards(true);
+  const plain = cards(false);
+  /* KILN LEADS WITH ITS REVENUE A MONTH: eight months to October, added up, the dollars left out. Its figure has nothing. */
+  assert.deepEqual(led.get('Kiln'), [0, 0, 0, 0, 6_000, 7_000, 6_200, 1_000]);
+  assert.equal(plain.get('Kiln'), null);
+  /* PORTAGE LEADS WITH PLAYERS, daily: each day's last, today's still to come. Its money in by month is not drawn beside it. */
+  assert.deepEqual(led.get('Portage'), [300, 300, 300, 300, 300, 300, 299, null]);
+  assert.notDeepEqual(led.get('Portage'), plain.get('Portage'));
+  /* TALLOW KEEPS NO KEY NUMBER, so its card draws the figure the column names, as before. */
+  assert.ok(led.get('Tallow'));
+  assert.deepEqual(led.get('Tallow'), plain.get('Tallow'));
+  close();
+});
+
+test('EVERY FORM NAMES THE LIST ITS NUMBERS ARE KEPT IN, so a host links All numbers to it; a record with none names nothing', async () => {
+  const { k, close } = await seeded();
+  for (const block of [
+    { kind: 'kpis', source: 'kpis', for: 'today' },
+    { kind: 'kpis', source: 'kpis', for: 'cards' },
+    { kind: 'kpis', source: 'kpis', for: 'project', about: 'things#1' },
+  ])
+    assert.equal(read(k, block).kpi_list, 'kpis', JSON.stringify(block));
+  close();
+  const sql = openSqlite();
+  const bare = await openRecord(sql, fixedClock(NOW));
+  must(await bare.install([PROJECTS, NUMBERS]), 'install');
+  assert.equal(read(bare, { kind: 'kpis', source: 'kpis', for: 'today' }).kpi_list, undefined);
+  sql.close();
+});
+
+test('kpi: ON A COLUMN IS A CARD TREND’S ALONE, and says headline', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  must(await k.install(SEED), 'install');
+  const install = (columns: Record<string, unknown>[]) => k.install([page([{ kind: 'cards', source: 'register.things', columns: [{ field: 'name', as: 'title' }, ...columns] }])]);
+  must(await install([{ metric: 'project-in-by-month:{{name}}', kpi: 'headline', as: 'trend' }]), 'a trend that reads the lead');
+  for (const column of [
+    { metric: 'project-in-by-month:{{name}}', kpi: 'top', as: 'trend' },
+    { field: 'lane', kpi: 'headline', as: 'fact' },
+    { metric: 'project-open:{{name}}', kpi: 'headline', as: 'when' },
+  ]) {
+    const r = await install([column]);
+    assert.equal(r.ok, false, JSON.stringify(column));
+    assert.equal((r as unknown as { refusal: { code: string } }).refusal.code, 'DECLARATION_INVALID');
+  }
+  sql.close();
 });

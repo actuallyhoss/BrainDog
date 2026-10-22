@@ -2,7 +2,7 @@
  * The seven-day hold (PRF-A18, scope section 2.7): how many days in a row, ending yesterday, every hold sign on this
  * record read green, and the operator's hand marks that end such a run.
  *
- * WHY THIS EXISTS. "and his record's vital signs have stayed green for seven days running" (D41.30). Before this, the
+ * WHY THIS EXISTS. "and his record's vital signs have stayed green for seven days running". Before this, the
  * `green-days` figure counted a day as green when one sign was green and none red, so a day on which four signs had
  * nothing to judge by, or a rule was loosened, still counted. The hold reads each hold sign's own row a day.
  *
@@ -17,7 +17,7 @@
  * the night neither writes nor rewrites it (it prunes it at 400 days with the rest).
  *
  * NOTHING HERE IMPORTS `signs.ts`, which spreads other files into its list at load. The names below are its names, held
- * equal to them by `test/hold-days.test.ts`. Nothing names a list, a bank or a record (DIRECTION §27).
+ * equal to them by `test/hold-days.test.ts`. Nothing names a list, a bank or a record.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -48,11 +48,11 @@ export const HOLD_NAMES: Readonly<Record<HoldSign, string>> = {
   'numbers-arrive': 'Numbers arrive on schedule',
   'model-answers': 'The model answers',
   'tools-listed': 'Agents get the tool list',
-  'briefing-true': 'The briefing is true',
-  'questions-by-cause': 'One question per cause',
+  'briefing-true': 'What agents are told is true',
+  'questions-by-cause': 'Each problem is asked once',
   'oldest-question': 'No question waits too long',
-  'runs-true': 'Runs end as they ended',
-  'pages-clean': 'Pages print clean',
+  'runs-true': 'Agent runs end cleanly',
+  'pages-clean': 'Pages draw without errors',
   arrived: 'What shipped has arrived',
 };
 

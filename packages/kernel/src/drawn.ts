@@ -1,6 +1,6 @@
 /**
  * WHETHER EACH BLOCK OF A PAGE IS DRAWN, FOR EVERY READER: the screen, an agent reading the page, a shared page and an
- * export. DIRECTION §35: an empty or unused part is not drawn; §37: one empty line a page.
+ * export. An empty or unused part is not drawn, and an empty page says so in one line, never one a tile.
  *
  * MOVED FROM THE BROWSER (`apps/web/src/lib/page/home.ts`). The rule was the screen's alone, so an agent reading
  * `/p/quietcart` through the record saw "Where it stands" over a dash and chips that were a name and a dash, blocks the app
@@ -15,7 +15,7 @@
  * PURE: no clock, no record, no I/O.
  */
 
-import { kindModule } from './kinds/index.ts';
+import { isRegisteredKind } from './kinds/keys.ts';
 
 /**
  * Why a block is not drawn: it holds nothing (`empty`), what it reads no row has said (`unsaid`), its `when:` said no
@@ -99,10 +99,10 @@ export const keeps = (b: Drawable): boolean => b.empty === KEEP;
 export const says = (b: Drawable): boolean => b.refusals.length > 0 || b.cannot !== undefined;
 
 /**
- * A BLOCK A REGISTERED KIND DRAWS (`kinds/index.ts`) is never judged here, because only its own module can read what it
+ * A BLOCK A REGISTERED KIND DRAWS (`kinds/keys.ts`) is never judged here, because only its own module can read what it
  * holds. The app marks one by the `answer` it keeps whole.
  */
-const registered = (b: Drawable): boolean => b.answer !== undefined || kindModule(b.kind) !== undefined;
+const registered = (b: Drawable): boolean => b.answer !== undefined || isRegisteredKind(b.kind);
 
 /** Whether the author wrote what the block says when it holds nothing. A blank sentence, and `keep`, say nothing. */
 const saysEmpty = (b: Drawable): boolean => typeof b.empty === 'string' && b.empty.trim() !== '' && b.empty !== KEEP;
@@ -335,7 +335,7 @@ export const gone = (b: Drawable): boolean => goneWhy(b) !== null;
  * and a field to type into aside, whether that is what it holds or the `empty:` line its author wrote. `-1` when no
  * block says anything.
  *
- * ONE EMPTY LINE A PAGE, NEVER ONE A TILE (DIRECTION §37). Every block on Work carries an `empty:`, so a list with
+ * ONE EMPTY LINE A PAGE, NEVER ONE A TILE. Every block on Work carries an `empty:`, so a list with
  * nothing in it drew eight to twelve tiles each saying it held nothing. A page whose lead holds something draws no empty
  * line at all; a page whose lead holds nothing draws that one, and nothing else that is empty.
  */
@@ -347,7 +347,7 @@ export function leadOf(blocks: readonly Drawable[]): number {
  * WHETHER A SECTION'S HOST PANEL KEEPS IT ON THE PAGE WITH NOTHING UNDER IT. IT DOES, UNLESS THE RECORD CAN SEE THE
  * PANEL HOLDS NOTHING. The key a row's numbers are sent with and a run's changes are always something to read. A
  * project's scheduled actions may be none, and the host draws nothing for none, so a boxed section naming `actions`
- * over blocks that all went was a tile holding only its heading ("More about Sketchpad").
+ * over blocks that all went was a tile holding only its heading ("More about Pinwheel").
  *
  * KEPT BY DEFAULT (audit 61, claim 1). The record cannot see the host's panel, and a section handed no `actions` is one
  * nobody counted for: shutting it took the heading off a project with one scheduled action and nothing else under the

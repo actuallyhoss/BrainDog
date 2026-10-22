@@ -1,6 +1,6 @@
 /**
- * THE PAGE EVERY LIST HAS (PGS-A23, DIRECTION 35.44: "every page is declared and dynamic, the hand-written ones
- * included"). `listPage` reads what a list says of itself and answers a page body in the keys the page grammar admits
+ * THE PAGE EVERY LIST HAS (PGS-A23): every page is declared and dynamic, the hand-written ones
+ * included. `listPage` reads what a list says of itself and answers a page body in the keys the page grammar admits
  * today (`block-keys.ts`), so a list nobody wrote a page for is drawn by the page reader as any stored page is, a
  * person can arrange it, and an agent can propose a change to it.
  *

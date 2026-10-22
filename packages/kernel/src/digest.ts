@@ -863,7 +863,7 @@ const waitingLine = (n: number): string => (n === 1 ? '1 thing waits for you' : 
  * told, keeps the hour's limit it always had.
  *
  * AND INSIDE QUIET HOURS NOTHING SOUNDS. This used to let an urgent notice through at three in the morning on the
- * argument that it was urgent then or never. His ruling is the other way: no sound inside them. The note is written,
+ * argument that it was urgent then or never. The rule is the other way now: no sound inside them. The note is written,
  * marked as before, and the next digest leads with it (`heldIn`, `runDigest`), so what was held is the first thing
  * read in the morning and not a thing found by scrolling.
  */

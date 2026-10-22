@@ -15,14 +15,14 @@ const OPTS = { nowMs: NOW, back: 7, tz: 'UTC', fallback: '' };
 
 test('a decimal reading and a money reading of one name and project make one line', () => {
   const readings: RawReading[] = [
-    { at: on(2), name: 'Monthly revenue', of: 'Crumb.gg', project: 't_1', value: 48.15, unit: 'USD' },
-    { at: on(1), name: 'Monthly revenue', of: 'Crumb.gg', project: 't_1', value: null, amount: { amount: 4815, currency: 'USD' } },
+    { at: on(2), name: 'Monthly revenue', of: 'Oxbow.gg', project: 't_1', value: 48.15, unit: 'USD' },
+    { at: on(1), name: 'Monthly revenue', of: 'Oxbow.gg', project: 't_1', value: null, amount: { amount: 4815, currency: 'USD' } },
   ];
   const all = measureSeries(readings, OPTS);
   assert.equal(all.length, 1);
   const line = all[0]!;
   assert.equal(line.name, 'Monthly revenue');
-  assert.equal(line.of, 'Crumb.gg');
+  assert.equal(line.of, 'Oxbow.gg');
   assert.equal(line.unit, 'USD');
   assert.deepEqual(line.now.filter((v) => v !== null), [48.15, 48.15]);
   assert.equal(line.latest?.value, 48.15);

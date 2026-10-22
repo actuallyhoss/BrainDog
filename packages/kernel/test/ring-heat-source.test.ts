@@ -152,7 +152,7 @@ test('forty entries on one old day are one day outside, and the ones with no day
   sql.close();
 });
 
-/* A HEAT'S `of:` (D25.32): each day's wash is the share of that day's whole that the `where` admits. */
+/* A HEAT'S `of:`: each day's wash is the share of that day's whole that the `where` admits. */
 const SHARED = [
   { what: 'A', on: day(0), hours: 2, state: 'done' },
   { what: 'B', on: day(0), hours: 2, state: 'done' },

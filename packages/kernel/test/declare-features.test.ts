@@ -269,7 +269,7 @@ test('A FIELD `by: decide` IS SET AT CREATE AND CHANGED ONLY BY AN ACCEPTED PROP
 /** What a host's door hands the kernel: sealed bytes and what they open, never a value. */
 const SEALED = {
   label: 'Stripe test',
-  opens: 'the Bake test account',
+  opens: 'the Oxbow test account',
   kind: 'api_token' as const,
   ciphertext: new Uint8Array([1, 2, 3, 4]),
   nonce: new Uint8Array([9, 9]),
@@ -278,7 +278,7 @@ const SEALED = {
   kek_id: 'kek_2f',
 };
 
-const INDEX = { label: 'Stripe test', opens: 'the Bake test account' };
+const INDEX = { label: 'Stripe test', opens: 'the Oxbow test account' };
 
 test('A SECRET FIELD IS WRITTEN BY NO CALLER, however it asks', async () => {
   const { k, sql } = await record();

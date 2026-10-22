@@ -58,14 +58,14 @@ const accept = (k: Kernel, id: string) => k.decide(id, { decide: { option: 'acce
 test('A ROW RENAMED SINCE THE QUESTION TAKES THE ACCEPT ONTO ITS FRESH VERSION, and keeps the rename', async () => {
   const { k, at } = await record();
   const asked = value<Filed>(k.propose(seen(at, '2026-10-19'), 'p_owner'));
-  value(k.update('tools', at, { name: 'apify-quartz' }, { actor: 'p_owner', version: 1 }));
+  value(k.update('tools', at, { name: 'apify-harbour' }, { actor: 'p_owner', version: 1 }));
   const out = value<Decided>(accept(k, asked.id));
   assert.equal(out.status, 'resolved');
   assert.equal(out.settled, undefined);
   assert.equal(out.wrote.length, 1);
   const row = k.get(at)!;
   assert.equal(row.fields.seen, '2026-10-19');
-  assert.equal(row.fields.name, 'apify-quartz', 'the rename was written over');
+  assert.equal(row.fields.name, 'apify-harbour', 'the rename was written over');
 });
 
 test('A FIELD WRITTEN SINCE TO ANOTHER VALUE SETTLES THE QUESTION IN A PLAIN LINE, writes nothing, and a second Accept does not loop', async () => {
@@ -86,12 +86,12 @@ test('A FIELD WRITTEN SINCE TO ANOTHER VALUE SETTLES THE QUESTION IN A PLAIN LIN
 test('A FIELD WRITTEN SINCE TO THE VERY VALUE ASKED IS NO CLASH, and the rest of the patch applies', async () => {
   const { k, at } = await record();
   const asked = value<Filed>(
-    k.propose({ ...seen(at, '2026-10-19'), body: { register: 'tools', rows: [{ at, version: 1, patch: { seen: '2026-10-19', note: 'Quartz only' } }] } }, 'p_owner'),
+    k.propose({ ...seen(at, '2026-10-19'), body: { register: 'tools', rows: [{ at, version: 1, patch: { seen: '2026-10-19', note: 'Harbour only' } }] } }, 'p_owner'),
   );
   value(k.update('tools', at, { seen: '2026-10-19' }, { actor: 'p_owner', version: 1 }));
   const out = value<Decided>(accept(k, asked.id));
   assert.equal(out.settled, undefined);
-  assert.equal(k.get(at)!.fields.note, 'Quartz only');
+  assert.equal(k.get(at)!.fields.note, 'Harbour only');
 });
 
 test('A ROW THAT DID NOT MOVE IS WRITTEN AS IT ALWAYS WAS', async () => {

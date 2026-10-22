@@ -116,7 +116,7 @@ const EARNING = 'earning';
 const text = (v: Json | undefined): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined);
 const num = (v: Json | undefined): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const oneOf = <T extends string>(v: Json | undefined, of: readonly T[]): T | undefined => (typeof v === 'string' && (of as readonly string[]).includes(v) ? (v as T) : undefined);
-/** A measure's name as it is matched: case and spacing folded, "Servers ,Crumb.gg" is "servers, crumb.gg". */
+/** A measure's name as it is matched: case and spacing folded, "Servers ,Oxbow.gg" is "servers, oxbow.gg". */
 const folded = (s: string): string => s.toLowerCase().replace(/\s*,\s*/gu, ', ').replace(/\s+/gu, ' ').trim();
 /** A money value as a list holds it, an object or its JSON text, or `null`. */
 function moneyOf(v: unknown): { minor: number; currency: string } | null {
@@ -255,6 +255,42 @@ function nextOf(t: number, p: Period): number {
   if (p !== 'month') return t + (p === 'day' ? DAY : 7 * DAY);
   const d = new Date(t);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+}
+
+/** A point's number as a line draws it: a plain value, or money in whole units when it is in `currency`, else `null`. */
+function pointNumber(p: KpiPoint, currency: string | null): number | null {
+  if (typeof p.value === 'number' && Number.isFinite(p.value)) return p.value;
+  const m = typeof p.amount === 'string' ? /^([A-Z]{3}) ([−-]?)([\d,]+(?:\.\d+)?)$/u.exec(p.amount.trim()) : null;
+  if (!m || (currency !== null && m[1] !== currency)) return null;
+  const n = Number(m[3]!.replace(/,/gu, ''));
+  return Number.isFinite(n) ? (m[2] === '' ? n : -n) : null;
+}
+
+/**
+ * A KEY NUMBER AS A CARD'S LINE (`pages.ts` `trendsOf`, a trend column with `kpi: headline`): its points over the last
+ * `buckets` periods of its own cadence, the one still running among them, oldest first, as a figure's card trend is.
+ * A flow's period is added up and a period with nothing in it is nought, as a count's is; anything else is its last
+ * value in the period, and a gap where none came. Money is in whole units of the number's own currency, and a reading in
+ * another is left out, as the drawer leaves it. `null` when nothing falls in the periods drawn, which draws no line.
+ */
+export function kpiTrend(a: { points: KpiPoint[]; kind: KpiKind; every?: KpiEvery; unit?: string }, now: number, buckets: number): (number | null)[] | null {
+  const p = periodOf(a.every);
+  const starts: number[] = [];
+  for (let s = startOf(now, p); starts.length < buckets; s = startOf(s - 1, p)) starts.unshift(s);
+  const first = starts[0];
+  if (first === undefined) return null;
+  const currency = a.unit !== undefined && /^[A-Z]{3}$/u.test(a.unit.toUpperCase()) ? a.unit.toUpperCase() : null;
+  const flow = a.kind === 'flow';
+  const out: (number | null)[] = starts.map(() => null);
+  const timed = a.points.map((pt) => ({ t: instantOf(pt.at), n: pointNumber(pt, currency) })).sort((x, y) => (x.t ?? 0) - (y.t ?? 0));
+  for (const { t, n } of timed) {
+    if (t === null || n === null || t < first || t >= nextOf(starts.at(-1)!, p)) continue;
+    let i = starts.length - 1;
+    while (i > 0 && starts[i]! > t) i -= 1;
+    out[i] = flow ? (out[i] ?? 0) + n : n;
+  }
+  if (out.every((v) => v === null)) return null;
+  return flow ? out.map((v) => v ?? 0) : out;
 }
 
 /** A change from `was` to `now` as a share, or `null` when there is no fair comparison (nothing before, or nought). */
@@ -551,7 +587,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
 
   if (block.for === 'today') {
     const picks = rank.kpisForToday(candidates, at, most(rank.KPI_TODAY_MOST, TODAY_MOST));
-    return { ...base, kpis: picks.map(ranked), matched: rank.kpiRanked(candidates, at).length };
+    return { ...base, kpis: picks.map(ranked), matched: rank.kpiRanked(candidates, at).length, kpi_list: found.list };
   }
 
   if (block.for === 'cards') {
@@ -560,7 +596,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
       const pick = rank.kpiHeadline(candidates, p.row.id, at);
       if (pick) out.push(ranked(pick));
     }
-    return { ...base, kpis: out.slice(0, most(FALLBACK, MOST)), matched: out.length };
+    return { ...base, kpis: out.slice(0, most(FALLBACK, MOST)), matched: out.length, kpi_list: found.list };
   }
 
   /* ONE PROJECT: his order, then the name, and the one its card leads with marked, which the tile draws large. */
@@ -568,7 +604,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   const order = (k: KpiCandidate): number => (typeof k.order === 'number' && Number.isFinite(k.order) ? k.order : Number.POSITIVE_INFINITY);
   const own = [...candidates].sort((a, b) => order(a) - order(b) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const out = own.map((k) => ({ ...answers.get(k.id)!, headline: k.id === lead }));
-  return { ...base, kpis: out.slice(0, most(FALLBACK, MOST)), matched: out.length };
+  return { ...base, kpis: out.slice(0, most(FALLBACK, MOST)), matched: out.length, kpi_list: found.list };
 }
 
 /* IT DRAWS AS ITS OWN KIND (`computed-set.ts` reads `drawsAs`), so the add-block picker asks for kpis and spells no source. */

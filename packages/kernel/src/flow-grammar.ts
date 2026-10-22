@@ -1,7 +1,7 @@
 /**
  * The grammar of an automation, as one answer: every trigger and every step, each with its arguments, and the ceilings.
  *
- * ONE DEFINITION, TWO EDITORS (D22.51). The web drew its step menu, its `once_per` hint and its depth from its own copy
+ * ONE DEFINITION, TWO EDITORS. The web drew its step menu, its `once_per` hint and its depth from its own copy
  * of `flow-lint.ts`'s tables, and the copy drifted: it never learnt `meet` or `run_job`. This reads the lint's own
  * tables, so a verb added there is a verb here, and the record answers it as the read `flowGrammar` for the canvas and
  * for an agent alike.

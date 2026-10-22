@@ -1,5 +1,5 @@
 /**
- * What he tells an agent from the app, and how it reaches one (agents and MCP plan §2, §8.1, §8.3; migration 42).
+ * What he tells an agent from the app, and how it reaches one (agents and MCP plan §2, §8.1, §8.3; migrations 42, 44).
  *
  * ONE ROW OF `instructions` PER THING HE SAID, `IN4`, written by a person and never by a token: `instruct` refuses a
  * token, so no agent instructs another and text an agent read in a mail never becomes an order to a second one (§10.1).
@@ -14,6 +14,11 @@
  *   - to whoever is next, on a project: the same, any kind.
  *   - to a task: the run whose task in hand it is; while no open run holds it, the next run on the task's project whose
  *     kind matches (`to_agent`, the task's lane, filled in by whoever made the instruction).
+ *
+ * ON A MACHINE AND AS A PROFILE (migration 44): every one but one sent to a run by name may also say the machine a run
+ * must be on (`machine`, as the run's `host` says it) and the Claude Code profile it must run under (`seat`, the run's
+ * own), and reaches only the runs that are. Each narrows, as the project does: an instruction to whoever is next, on
+ * BrainDog, on the Mac, as studio, is the next run there that is both.
  *
  * TAKEN BY ONE RUN, COMPARE AND SET (`takeInstruction`): the read and the move are one transaction, so of two runs
  * taking one instruction the first wins and the second is told "S884 has it". One sent to a run is taken by that run
@@ -114,6 +119,10 @@ export type Instr = {
   project: string | null;
   task: string | null;
   repo: string | null;
+  /** The machine a run must be on to be told it, as the run's `host` says it (migration 44). */
+  machine: string | null;
+  /** The Claude Code profile a run must be under to be told it, as the run's `seat` says it (migration 44). */
+  seat: string | null;
   /** The instruction a redirect replaced, spoken. */
   replaces: string | null;
   expires_at: string | null;
@@ -144,14 +153,17 @@ export type Stop = { kind: 'stop' | 'pause'; id: string; said: string };
 export type Delta = { stamp: string; changed: boolean; pending: Instr[]; stop: Stop | null };
 
 /**
- * What a run says of where it is, for a run whose row does not say it yet: its kind, repository, project and task in
- * hand. The run's own fields win where it has them, so a caller cannot move a run into another place by saying so.
+ * What a run says of where it is, for a run whose row does not say it yet: its kind, repository, project, task in
+ * hand, machine and profile. The run's own fields win where it has them, so a caller cannot move a run into another
+ * place by saying so.
  */
 export type RunHints = {
   agent?: string | undefined;
   repo?: string | undefined;
   project?: string | undefined;
   task?: string | undefined;
+  host?: string | undefined;
+  seat?: string | undefined;
 };
 
 /** What `instruct` is given: what he said, and to whom. `to_run`, `replaces` and `task` take a spoken name or an id. */
@@ -165,6 +177,10 @@ export type InstructInput = {
   project?: string | undefined;
   task?: string | undefined;
   repo?: string | undefined;
+  /** The machine a run must be on, as runs name it (`host`). */
+  machine?: string | undefined;
+  /** The profile a run must be under, as runs name it (`seat`): `studio`, `default`. */
+  seat?: string | undefined;
   replaces?: string | undefined;
   /** How long it waits for a run, in milliseconds; `WAIT_MS` when absent. */
   waits_ms?: number | undefined;
@@ -211,6 +227,8 @@ function instrOf(row: Row): Instr {
     project: text(f.project),
     task: text(f.task),
     repo: text(f.repo),
+    machine: text(f.machine),
+    seat: text(f.seat),
     replaces: text(f.replaces),
     expires_at: text(f.expires_at),
     state: ofList(INSTRUCTION_STATES, row.state ?? f.state, 'sent'),
@@ -291,6 +309,8 @@ function placeOf(run: RunOf, hints: RunHints = {}) {
     repo: pick(f.repo, hints.repo),
     project: pick(f.project, hints.project),
     task: pick(f.task, hints.task),
+    host: pick(f.host, hints.host),
+    seat: pick(f.seat, hints.seat),
     parent: text(f.parent),
     started: Date.parse(text(f.started) ?? run.created_at),
     called: Date.parse(text(f.last_seen) ?? ''),
@@ -305,6 +325,10 @@ function inPlace(i: Instr, at: ReturnType<typeof placeOf>): boolean {
   return true;
 }
 
+/** Whether a run is on the machine and under the profile the instruction names, each where it names one. */
+const onSeat = (i: Instr, at: ReturnType<typeof placeOf>): boolean =>
+  (i.machine === null || at.host === i.machine) && (i.seat === null || at.seat === i.seat);
+
 /**
  * Whether `i` reaches `run` now (§2.2), its taker aside. `holder` is the open run holding the instruction's task, when
  * one does.
@@ -315,6 +339,9 @@ function reaches(i: Instr, run: RunOf, at: ReturnType<typeof placeOf>, nowMs: nu
   if (i.to === 'run') return i.to_run === run.spoken;
   /* A HELPER IS NEVER TOLD A TELL: it works for its parent, which is told. It obeys its parent's stop (`stopOf`). */
   if (at.parent !== null) return false;
+  /* ON THAT MACHINE AND AS THAT PROFILE, WHERE IT SAYS ONE, whatever else it is aimed at: a run elsewhere is not told,
+     even one holding its task, which then waits for that run to end or for one that is there. */
+  if (!onSeat(i, at)) return false;
   /* "NEXT START" IS A RUN THAT STARTED AFTER HE SAID IT, OR ONE ALREADY OPEN ONCE IT CALLS AGAIN: its own call moves
      `last_seen` (the bridge's pulse moves `pulse_at`, which is not one), so a live run is told at its next call and not
      pushed mid-work. "NOW" IS ANY OPEN RUN THERE. */
@@ -441,6 +468,11 @@ export function changedSince(sql: Sql, runRef: string, stamp: string, nowMs: num
 
 const KIND_TO_RUN: readonly InstrKind[] = ['stop', 'pause', 'resume', 'redirect'];
 
+/** A machine as runs name it, the `host` hint's grammar: `Adas-MacBook-Pro.local`. */
+export const MACHINE_NAME = /^[A-Za-z0-9._-]{1,128}$/u;
+/** A profile as runs name it, the `seat` hint's grammar: a short name, never a path and never `..`. */
+export const SEAT_NAME = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+
 /**
  * Make one instruction, `actor` being the person who said it (`instruct`, the kernel's half of the record method). The
  * caller has already refused a token (§10.1); this checks the shape and writes:
@@ -449,6 +481,8 @@ const KIND_TO_RUN: readonly InstrKind[] = ['stop', 'pause', 'resume', 'redirect'
  *   - a redirect names the instruction it replaces, which ends Declined, and goes to the run that had it;
  *   - a stop or pause marks the run `stopped` at once, so the record refuses its next write; a resume clears it and
  *     closes the stop or pause it lifts (Done once taken, Withdrawn before);
+ *   - one to anyone but a named run may say the machine and the profile a run must be on (`machine`, `seat`); one to a
+ *     run keeps neither, since the run is already one machine and one profile;
  *   - it waits `WAIT_MS` (or `waits_ms`) for a run before the sweep expires it.
  */
 export function instruct(d: InstructionDeps, actor: string, input: InstructInput): Result<Instr> {
@@ -468,6 +502,16 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
   const waits = input.waits_ms ?? WAIT_MS;
   if (!Number.isFinite(waits) || waits < 60_000 || waits > 90 * DAY_MS)
     return no('OUT_OF_BOUNDS', 'An instruction waits between a minute and ninety days for a run.', { at: 'waits_ms' });
+  const place: { machine?: string; seat?: string } = {};
+  for (const [key, grammar, fix] of [
+    ['machine', MACHINE_NAME, 'Name the machine as its runs name it, like Adas-MacBook-Pro.local.'],
+    ['seat', SEAT_NAME, 'Name the profile as its runs name it, like studio or default: a name, never a folder.'],
+  ] as const) {
+    const v: unknown = input[key];
+    if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) continue;
+    if (typeof v !== 'string' || !grammar.test(v.trim())) return no('VALUE_MALFORMED', fix, { at: key });
+    place[key] = v.trim();
+  }
 
   return d.sql.transactionSync((): Result<Instr> => {
     let replaced: Instr | null = null;
@@ -515,6 +559,8 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
       if (typeof v === 'string' && v.trim() !== '') patch[key] = v.trim();
     }
     if (run && patch.project === undefined && text(run.fields.project)) patch.project = run.fields.project!;
+    /* ONE TO A NAMED RUN IS ALREADY ON ONE MACHINE, UNDER ONE PROFILE, so it keeps neither. */
+    if (to !== 'run') Object.assign(patch, place);
     if (task !== null) patch.task = task;
     if (replaced) patch.replaces = replaced.id;
 

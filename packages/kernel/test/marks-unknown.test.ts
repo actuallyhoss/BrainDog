@@ -91,14 +91,14 @@ test('MARKS-UNKNOWN COUNTS THE ROWS OF EVERY LIST WITH AN IDENTITY whose mark na
   value(await k.install([list('things', 'Projects', { mark: 'mark' }), list('clients', 'Clients', { mark: 'badge' })]));
   const make = (register: string, fields: Record<string, unknown>) => value<{ id: string }>(k.create(register, fields, { actor: 'p_1' }));
   make('things', { name: 'BrainDog', mark: 'rocket' });
-  make('things', { name: 'Bake', mark: 'cake' });
+  make('things', { name: 'Oxbow', mark: 'cake' });
   make('things', { name: 'Kiln' });
   make('things', { name: 'Tallow', mark: '  ' });
   const clean = read();
   assert.deepEqual([clean.value, clean.held, clean.met], [0, 1, true]);
 
   /* A WORD THE SET DOES NOT DRAW IS COUNTED, on every such list, by the field that list names. */
-  make('things', { name: 'Marsh', mark: 'koala' });
+  make('things', { name: 'Driftwood', mark: 'koala' });
   make('things', { name: 'Portage', mark: 'paw' });
   make('clients', { name: 'Marlow', badge: 'sword', mark: 'rocket' });
   make('clients', { name: 'Fenn', badge: 'gift', mark: 'koala' });

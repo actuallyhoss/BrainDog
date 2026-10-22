@@ -5,7 +5,7 @@
  *
  * WHY THIS EXISTS. The record promises all three (§3's actor grammar, `30 §11`'s format, "minor units, never add
  * currencies"), and nothing read a live record to say they held. These read the record's own tables and say what they
- * find with names, never ids, on every record alike (DIRECTION §27).
+ * find with names, never ids, on every record alike.
  *
  * `system` IS RIGHT FOR THE KERNEL'S OWN WORK (`30 §3`: migrations, purges, the scheduler, the dead-letter question), so
  * `writes-authored` does not count it as such. It counts a write signed by nobody, and a change to a list's items signed

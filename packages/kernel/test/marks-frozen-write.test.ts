@@ -60,7 +60,7 @@ test('A WORD THAT DRAWS NOTHING TAKES ONE MORE WRITE, and is held once it names 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS]));
-  const row = value<{ id: string }>(k.create('things', { name: 'Marsh', mark: 'koala' }, W));
+  const row = value<{ id: string }>(k.create('things', { name: 'Driftwood', mark: 'koala' }, W));
   const bare = value<{ id: string }>(k.create('things', { name: 'Kiln' }, W));
 
   assert.equal(value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { mark: 'rocket' }, W)).fields.mark, 'rocket');
@@ -77,11 +77,11 @@ test('MARKS-UNKNOWN IS READ BY THE RECORD ITSELF, as a stat block reads it', asy
   const decl = builtInFigure('marks-unknown');
   assert.ok(decl, 'no such figure');
   value(k.create('things', { name: 'BrainDog', mark: 'rocket' }, W));
-  const marsh = value<{ id: string }>(k.create('things', { name: 'Marsh', mark: 'koala' }, W));
+  const driftwood = value<{ id: string }>(k.create('things', { name: 'Driftwood', mark: 'koala' }, W));
   value(k.create('things', { name: 'Portage', mark: 'paw' }, W));
   assert.equal(value<Reading>(k.metric(decl)).value, 2);
 
-  value(k.update('things', marsh.id, { mark: 'cake' }, W));
+  value(k.update('things', driftwood.id, { mark: 'cake' }, W));
   assert.equal(value<Reading>(k.metric(decl)).value, 1);
   sql.close();
 });

@@ -1,14 +1,14 @@
 /**
  * The kernel's one register, and the spoken prefix that makes its rows `S1`, `S2`.
  *
- * Migrations 2, 22, 26, 28 and 42 write the `register.session` rows by hand, because a migration's text cannot call the code that
+ * Migrations 2, 22, 26, 28, 42 and 44 write the `register.session` rows by hand, because a migration's text cannot call the code that
  * installs declarations. So each row is held here to what `installDeclarations` writes for the same body: the canonical
  * bytes `jcs` makes, the checksum `digest` takes of them, the next version stamped at the instant the one before is
  * superseded, and the indexes `indexesFor` implies. A hand-written copy that drifts from the code path fails here.
  *
  * THE OLDER ROWS ARE WORKED OUT FROM THOSE FUNCTIONS, NOT BY INSTALLING. `validate` lets `register.session` through
  * only as the kernel's newest bytes, because an older body installed over the newest would be written back as a newer
- * version. Migration 42's row is installed by code too, over a record with 42's work taken away, and compared whole.
+ * version. Migration 44's row is installed by code too, over a record with 44's work taken away, and compared whole.
  * `session.test.ts` installs the kernel's own declaration over a record and checks that nothing changes.
  *
  * AND WHEN A RUN STARTED, which migration 26 adds: stamped as the run's row is made, never moved, and given to a run
@@ -24,7 +24,8 @@ import { SESSION_BODY as MIGRATION_2_BODY } from '../src/migrations/0002_session
 import { SESSION_BODY as MIGRATION_22_BODY } from '../src/migrations/0022_session_client.ts';
 import { SESSION_BODY as MIGRATION_26_BODY } from '../src/migrations/0026_session_started.ts';
 import { SESSION_BODY as MIGRATION_28_BODY } from '../src/migrations/0028_runs.ts';
-import { SEAT_AGENTS as SEAT_SESSION, SESSION_BODY } from '../src/migrations/0042_agents.ts';
+import { SESSION_BODY as MIGRATION_42_BODY } from '../src/migrations/0042_agents.ts';
+import { SEAT_KERNEL_REGISTERS as SEAT_SESSION, SESSION_BODY } from '../src/migrations/0044_seat.ts';
 import {
   digest, indexesFor, jcs, openRecord, sessionDeclaration, validateDeclaration,
   type Declaration, type Entry, type Kernel, type SessionHints, type WriteContext,
@@ -33,12 +34,13 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 11, 12);
 
-/** The instants migrations 2, 22, 26, 28 and 42 seat their versions at; each is also when the one before was superseded. */
+/** The instants migrations 2, 22, 26, 28, 42 and 44 seat their versions at; each is also when the one before was superseded. */
 const DECLARED_2 = '2026-09-11T00:00:00.000Z';
 const SEATED_22 = '2026-10-02T00:00:00.000Z';
 const SEATED_26 = '2026-10-07T00:00:00.000Z';
 const SEATED_28 = '2026-10-08T00:00:00.000Z';
-const SEATED = '2026-10-21T00:00:00.000Z';
+const SEATED_42 = '2026-10-21T00:00:00.000Z';
+const SEATED = '2026-10-22T00:00:00.000Z';
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -91,8 +93,8 @@ const written = async (version: number, body: string, created_at: string, supers
   created_at,
 });
 
-/** Migration 42's row taken away again: the register as migration 41 left it, with migration 28's row the live one. */
-function before42(sql: NodeSql): void {
+/** Migration 44's row taken away again: the register as migration 43 left it, with migration 42's row the live one. */
+function before44(sql: NodeSql): void {
   sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL");
   sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session' AND superseded_at = ?", SEATED);
 }
@@ -100,7 +102,7 @@ function before42(sql: NodeSql): void {
 /* ── the rows the migrations write ───────────────────────────────────────── */
 
 test('every body is canonical, and each is a shape the kernel accepts as a register', () => {
-  for (const body of [MIGRATION_2_BODY, MIGRATION_22_BODY, MIGRATION_26_BODY, MIGRATION_28_BODY, SESSION_BODY]) {
+  for (const body of [MIGRATION_2_BODY, MIGRATION_22_BODY, MIGRATION_26_BODY, MIGRATION_28_BODY, MIGRATION_42_BODY, SESSION_BODY]) {
     assert.equal(jcs(JSON.parse(body)), body, 'the stored bytes are not the canonical form of themselves');
     /* UNDER ANOTHER NAME, because the arm of `validate` that names `register.session` is about who may declare it and
        which bytes are the kernel's own, not about its shape: everything else a register is checked for is checked. */
@@ -109,89 +111,104 @@ test('every body is canonical, and each is a shape the kernel accepts as a regis
   }
 });
 
-test('MIGRATIONS 2, 22, 26, 28 AND 42 WRITE WHAT installDeclarations WRITES: each version in turn, superseded at one instant, and the indexes its body implies', async () => {
+test('MIGRATIONS 2, 22, 26, 28, 42 AND 44 WRITE WHAT installDeclarations WRITES: each version in turn, superseded at one instant, and the indexes its body implies', async () => {
   const { sql } = await record();
   assert.deepEqual(versions(sql), [
     await written(1, MIGRATION_2_BODY, DECLARED_2, SEATED_22),
     await written(2, MIGRATION_22_BODY, SEATED_22, SEATED_26),
     await written(3, MIGRATION_26_BODY, SEATED_26, SEATED_28),
-    await written(4, MIGRATION_28_BODY, SEATED_28, SEATED),
-    await written(5, SESSION_BODY, SEATED, null),
+    await written(4, MIGRATION_28_BODY, SEATED_28, SEATED_42),
+    await written(5, MIGRATION_42_BODY, SEATED_42, SEATED),
+    await written(6, SESSION_BODY, SEATED, null),
   ]);
-  /* THE SAME EIGHT INDEXES FOR ALL FIVE BODIES, because no field migration 22, 26, 28 or 42 added is indexed, so none
-     builds one. Eight is the most a list may index, so `started`, the nine of 28 and the six of 42 could not be a
-     ninth: migration 42's `pulse_at` index is its own, by hand, and not a field's. */
+  /* THE SAME EIGHT INDEXES FOR ALL SIX BODIES, because no field migration 22, 26, 28, 42 or 44 added is indexed, so
+     none builds one. Eight is the most a list may index, so `started`, the nine of 28, the six of 42 and 44's `seat`
+     could not be a ninth: migration 42's `pulse_at` index is its own, by hand, and not a field's. */
   assert.equal(indexes(sql).length, 8);
   assert.deepEqual(indexes(sql), implied(MIGRATION_2_BODY));
   assert.deepEqual(indexes(sql), implied(MIGRATION_22_BODY));
   assert.deepEqual(indexes(sql), implied(MIGRATION_26_BODY));
   assert.deepEqual(indexes(sql), implied(MIGRATION_28_BODY));
+  assert.deepEqual(indexes(sql), implied(MIGRATION_42_BODY));
   assert.deepEqual(indexes(sql), implied(SESSION_BODY));
   sql.close();
 });
 
-test('AND INSTALLED BY CODE, the kernel’s declaration writes what migration 42 wrote, and the older bytes are no longer the kernel’s', async () => {
+test('AND INSTALLED BY CODE, the kernel’s declaration writes what migration 44 wrote, and the older bytes are no longer the kernel’s', async () => {
   const migrated = await record();
   const byHand = versions(migrated.sql);
   const byHandIndexes = indexes(migrated.sql);
 
-  /* The same record with migration 42's row and the indexes taken away, then the kernel's declaration installed by
-     code at 42's instant. */
+  /* The same record with migration 44's row and the indexes taken away, then the kernel's declaration installed by
+     code at 44's instant. */
   const fresh = await record();
-  before42(fresh.sql);
+  before44(fresh.sql);
   for (const { name } of indexes(fresh.sql)) fresh.sql.exec(`DROP INDEX ${name}`);
   value(await installDeclarations(fresh.sql, Date.parse(SEATED), [sessionDeclaration()], (fn) => fresh.sql.transactionSync(fn)));
   assert.deepEqual(versions(fresh.sql), byHand);
   assert.deepEqual(indexes(fresh.sql), byHandIndexes);
 
-  /* THE OLDER BYTES ARE REFUSED NOW, even as the kernel's: over 42's they would be the newest version, and every run
-     opened after would lose what it was told, under 28's how its work went, under 26's when it started too, and under
-     migration 2's its app. */
-  for (const [was, body] of [['2', MIGRATION_2_BODY], ['22', MIGRATION_22_BODY], ['26', MIGRATION_26_BODY], ['28', MIGRATION_28_BODY]] as const) {
+  /* THE OLDER BYTES ARE REFUSED NOW, even as the kernel's: over 44's they would be the newest version, and every run
+     opened after would lose the profile it is under, under 42's what it was told, under 28's how its work went, under
+     26's when it started too, and under migration 2's its app. */
+  for (const [was, body] of [['2', MIGRATION_2_BODY], ['22', MIGRATION_22_BODY], ['26', MIGRATION_26_BODY], ['28', MIGRATION_28_BODY], ['42', MIGRATION_42_BODY]] as const) {
     const older = await installDeclarations(fresh.sql, NOW, [{ ...sessionDeclaration(), body: JSON.parse(body) }], (fn) =>
       fresh.sql.transactionSync(fn),
     );
     assert.equal(refusal(older).code, 'PROVIDES_CONFLICT');
-    assert.deepEqual(versions(fresh.sql), byHand, `migration ${was}’s bytes were written over 42’s`);
+    assert.deepEqual(versions(fresh.sql), byHand, `migration ${was}’s bytes were written over 44’s`);
   }
   migrated.sql.close();
   fresh.sql.close();
 });
 
-test('THE SEAT AN IMPORT RUNS writes migration 42’s row where an older one is live, and nothing where it is already', async () => {
+test('THE SEAT AN IMPORT RUNS writes migration 44’s row where an older one is live, and nothing where it is already', async () => {
   const { sql } = await record();
   const seated = versions(sql);
   execScript(sql, SEAT_SESSION);
   assert.deepEqual(versions(sql), seated, 'seating it a second time wrote a version');
 
-  /* A file written before migration 42 carries migration 28's row as the live one. */
-  before42(sql);
+  /* A file written before migration 44 carries migration 42's row as the live one. */
+  before44(sql);
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), seated, 'the seat did not write what migration 42 writes');
+  assert.deepEqual(versions(sql), seated, 'the seat did not write what migration 44 writes');
+
+  /* One written before migration 42 carries 28's, and this body is the version after it. */
+  sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND version > 4");
+  sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session' AND version = 4");
+  execScript(sql, SEAT_SESSION);
+  assert.deepEqual(versions(sql), [seated[0], seated[1], seated[2], { ...seated[3], superseded_at: SEATED }, { ...seated[5], version: 5 }]);
 
   /* One written before migration 26 carries 22's, and this body is the version after it. */
   sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND version > 2");
   sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session' AND version = 2");
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), [seated[0], { ...seated[1], superseded_at: SEATED }, { ...seated[4], version: 3 }]);
+  assert.deepEqual(versions(sql), [seated[0], { ...seated[1], superseded_at: SEATED }, { ...seated[5], version: 3 }]);
 
   /* One written before migration 22 carries migration 2's. */
   sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND version > 1");
   sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session'");
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), [{ ...seated[0], superseded_at: SEATED }, { ...seated[4], version: 2 }]);
+  assert.deepEqual(versions(sql), [{ ...seated[0], superseded_at: SEATED }, { ...seated[5], version: 2 }]);
 
   /* And a file older than migration 2 carries none at all, so this body is its first version. */
   sql.exec("DELETE FROM declaration WHERE id = 'register.session'");
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), [{ ...seated[4], version: 1 }]);
+  assert.deepEqual(versions(sql), [{ ...seated[5], version: 1 }]);
 
-  /* AND THE INSTRUCTIONS LIST, which a file written before migration 42 does not carry, is seated as its first version. */
-  const told = sql.all("SELECT version, pack_id, superseded_at FROM declaration WHERE id = 'register.instructions'").map((r) => ({ ...r }));
+  /* AND THE INSTRUCTIONS LIST: a file written before migration 44 carries 42's as the live one, over which 44's is the
+     version after, and one written before 42 carries none, so 44's is its first. */
+  const told = () =>
+    sql.all("SELECT version, pack_id, body, superseded_at FROM declaration WHERE id = 'register.instructions' ORDER BY version").map((r) => ({ ...r }));
+  const was = told();
+  assert.deepEqual(was.map((r) => [r.version, r.pack_id, r.superseded_at]), [[1, 'kernel', SEATED], [2, 'kernel', null]]);
+  sql.exec("DELETE FROM declaration WHERE id = 'register.instructions' AND superseded_at IS NULL");
+  sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.instructions'");
+  execScript(sql, SEAT_SESSION);
+  assert.deepEqual(told(), was);
   sql.exec("DELETE FROM declaration WHERE id = 'register.instructions'");
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(sql.all("SELECT version, pack_id, superseded_at FROM declaration WHERE id = 'register.instructions'").map((r) => ({ ...r })), told);
-  assert.deepEqual(told, [{ version: 1, pack_id: 'kernel', superseded_at: null }]);
+  assert.deepEqual(told(), [{ ...was[1], version: 1 }]);
   sql.close();
 });
 
