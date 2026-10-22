@@ -1,7 +1,17 @@
 /**
- * The record checks its own words: `textFaults` (READ+), PGS-B15 job a. It walks every page the caller may open and
- * every document field of every list they may read (`text-check.ts`) and answers `{ count, line, faults }`, the line
- * being the one sentence ("14 values on 6 pages name nothing") and each fault its place and its fix.
+ * The record checks its own words: `textFaults` (READ+), PGS-B15 job a. It walks every page and every document field of
+ * every list (`text-check.ts`) and answers `{ count, line, faults }`, the line being the one sentence ("14 values on 6
+ * pages name nothing") and each fault its place and its fix.
+ *
+ * THE WALK IS THE NIGHT'S, AND A READ WALKS NOTHING. The record's night pass (`lintTick`) runs it once a day as the
+ * system, keeps the answer with the time it was found (`keepTextFaults`), and a reader of the whole record is handed that
+ * answer back at once. It took 10 s to draw the pages on every open after a write, and the record answers one call at a
+ * time. A write does not drop the kept answer: it is the night's, and `computedAt` says when.
+ *
+ * A COUNT BOUNDS EVERY WALK, NEVER THE CLOCK. A Worker's clock stands still while synchronous code runs, so a time limit
+ * never fires there (`page-lint.ts`). A walk reads at most `Budget.pages` pages and `Budget.rows` document rows, and
+ * `truncated` says when it stopped short. A reader the night's answer is not true for (a grant held to some lists or
+ * rows, rows private to somebody else) gets a small walk of its own, `DAY`, and the kept answer is never cut to them.
  *
  * NO SECOND SCANNER. Which paths name nothing is the kernel's answer: a page's blocks carry `unnamed`, and a document
  * off any page is read as a note block over its own row (`kernel.block` with `here`), as `checkPaths` reads one. A
@@ -14,46 +24,50 @@
  * A DOCUMENT IS FOUND ONCE. A row's note drawn on the row's page is the same words twice, so the page's part is left
  * out and the document's fault names the page it is drawn on.
  *
- * IT WRITES NOTHING AND RUNS ONLY WHEN ASKED. It files no question and nothing calls it at night: the question and the
- * three times it runs are job b's (`index.ts`), which reads this same walk.
+ * THE READ WRITES NOTHING. It files no question; the question and the three times it runs are job b's (`index.ts`).
  */
 
 import { viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
-import { ROUND_MS, pagesToLint, roundOver } from '../page-lint.ts';
+import { ROUND_PAGES, pagesToLint } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
-/** What `textFaults` answers: how many faults, the one sentence, and the first `FAULTS_MOST` of them. */
-export type TextFaultsRead = { count: number; pages: number; line: string; faults: TextFault[]; truncated: boolean };
+/** What `textFaults` answers: how many faults, the one sentence, the first `FAULTS_MOST` of them, and when they were found. */
+export type TextFaultsRead = { count: number; pages: number; line: string; faults: TextFault[]; truncated: boolean; computedAt: string | null };
 
 /** The most faults one answer carries. The count and the sentence are over all of them. */
 export const FAULTS_MOST = 100;
 /** The most rows one list is read for its documents, so a list of a hundred thousand notes cannot hold the host. */
 export const TEXT_ROWS_MOST = 2_000;
 
-const DAY_MS = 86_400_000;
+/** What one walk may read, in counts: pages drawn, and document rows read over every list. */
+export type Budget = { pages: number; rows: number };
+/** The night's walk: the page lint's round (`ROUND_PAGES`), and ten thousand document rows. */
+export const NIGHT: Budget = { pages: ROUND_PAGES, rows: 10_000 };
+/** A walk in the day, for a reader the night's answer is not true for: a few pages and rows, never more. */
+export const DAY: Budget = { pages: 12, rows: 300 };
 
-/**
- * How long one ask may walk, a second and not the night lint's five (`ROUND_MS`).
- *
- * A PERSON IS WAITING, AND SO IS EVERY CALL BEHIND THIS ONE. The record answers one call at a time and the walk is
- * synchronous, so the five seconds it was allowed were five seconds the poll, the next page and every tile waited
- * (`loop/research-104.md` 2.1). What the second does not reach is said with `truncated`.
- */
-export const ASK_MS = 1_000;
-
-/**
- * How long an answer is kept for the same caller at the same version: five minutes, because a pinned note's age moves
- * with the clock and a host's sources (a calendar) move without a write.
- */
+/** How long a day walk's answer is kept for the same caller at the same version. */
 export const KEPT_MS = 300_000;
 /** The most callers kept at once; past it the oldest is dropped. */
 const KEPT_MOST = 16;
+
+const DAY_MS = 86_400_000;
+
+/** Where the night's answer is kept: a pref of its own, so the pref reads the briefing makes never parse it. */
+export const HOLDER = 'braindog:text-faults';
+const KEPT = 'kept';
+
+/** The night's answer as kept: when it was found, and what was found. */
+export type TextFaultsKept = { at: number; value: Omit<TextFaultsRead, 'computedAt'> };
+
+/** What a reader of the whole record is told before the night has run once. */
+const NOT_YET: TextFaultsRead = { count: 0, pages: 0, line: '', faults: [], truncated: false, computedAt: null };
 
 /** The words before a colon that are forms and never a figure's name. */
 const NOT_FIGURES: ReadonlySet<string> = new Set([...TYPED, 'bad', 'icon']);
@@ -67,8 +81,19 @@ const words = (id: string): string => {
   return w.charAt(0).toUpperCase() + w.slice(1);
 };
 
-export function methods(deps: RecordDeps) {
-  const { kernel, scoped, readable, sql, clock, no } = deps;
+/** The kept answer as the pref holds it, or `null` when none is there or it is not in shape. */
+const keptIn = (stored: unknown): TextFaultsKept | null => {
+  const k = stored as { at?: unknown; value?: unknown } | null | undefined;
+  const v = k?.value as { count?: unknown; faults?: unknown; line?: unknown } | null | undefined;
+  if (typeof k?.at !== 'number' || !Number.isFinite(k.at) || v === null || typeof v !== 'object') return null;
+  return typeof v.count === 'number' && typeof v.line === 'string' && Array.isArray(v.faults) ? (k as TextFaultsKept) : null;
+};
+
+const toRead = (k: TextFaultsKept): TextFaultsRead => ({ ...k.value, computedAt: new Date(k.at).toISOString() });
+
+/** The walk and its keeper, over the record's own deps. `methods` below is its READ+ door; `lintTick` calls `keep`. */
+function walker(deps: RecordDeps) {
+  const { kernel, readable, sql, clock } = deps;
 
   /** Whether the caller reads the record whole, as the census asks it. */
   const whole = (ctx: CallContext): boolean => {
@@ -79,6 +104,9 @@ export function methods(deps: RecordDeps) {
   };
   const everyList = (ctx: CallContext): boolean =>
     deps.readsEveryList?.(ctx) ?? (whole(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null));
+
+  /** Whether the night's walk, made as the system, is what this caller would see: every list, every row. */
+  const shared = (ctx: CallContext): boolean => whole(ctx) && everyList(ctx) && !kernel.anyHiddenFrom(viewerOfRead(ctx));
 
   /** The lists a block reads, as the kernel names them: over the call's one walk (`pageWalk`), so declarations are read once. */
   type Lists = (block: PageBlock) => string[];
@@ -114,11 +142,14 @@ export function methods(deps: RecordDeps) {
     }
   };
 
+  /** What a walk has left to read, and whether it stopped short of the end. */
+  type Left = { rows: number; cut: boolean };
+
   /**
    * Every document field of every list the caller may read, each with the paths in it that name nothing to them. A row
    * is read through the caller's own grant on the list (`whereFor`), so a member held to some rows reads only those.
    */
-  const documents = (ctx: CallContext, start: number, walk: Walk): (LongText & { key: string })[] => {
+  const documents = (ctx: CallContext, left: Left, walk: Walk): (LongText & { key: string })[] => {
     const out: (LongText & { key: string })[] = [];
     for (const [id, list] of kernel.registers()) {
       if (readable(ctx, id) !== null) continue;
@@ -128,11 +159,18 @@ export function methods(deps: RecordDeps) {
       const ownLists = list.fields.filter((f) => f.type === 'list').map((f) => f.id);
       const rule = kernel.scope(ctx, id);
       let read = 0;
-      for (let cursor: string | null | undefined; cursor !== null && read < TEXT_ROWS_MOST && clock.now() - start <= ASK_MS; ) {
-        const got = kernel.list({ register: id, limit: 500, reads: (other: string) => readable(ctx, other) === null, ...(cursor ? { cursor } : {}) }, rule);
+      for (let cursor: string | null | undefined; cursor !== null; ) {
+        /* A COUNT AND NOT THE CLOCK: more rows are there, and the budget says no. */
+        if (read >= TEXT_ROWS_MOST || left.rows <= 0) {
+          left.cut = true;
+          break;
+        }
+        const limit = Math.min(500, TEXT_ROWS_MOST - read, left.rows);
+        const got = kernel.list({ register: id, limit, reads: (other: string) => readable(ctx, other) === null, ...(cursor ? { cursor } : {}) }, rule);
         if (!got.ok) break;
         for (const row of got.value.rows as Entry[]) {
           read += 1;
+          left.rows -= 1;
           const title = row.fields[list.title];
           const name = typeof title === 'string' && title.trim() !== '' ? title.trim() : 'Untitled';
           for (const f of docs) {
@@ -177,17 +215,22 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
-   * The pages the caller may open, in the page lint's order and within its time, each as its parts: a heading and a
-   * document per block it draws and does not hold from them. A part that is a document already gathered for the row the
-   * page is about is left out, and that document is told the page's title.
+   * The pages the caller may open, in the page lint's order and up to the budget's count, each as its parts: a heading and
+   * a document per block it draws and does not hold from them. A part that is a document already gathered for the row
+   * the page is about is left out, and that document is told the page's title.
    */
-  const pagesFor = (ctx: CallContext, docs: (LongText & { key: string })[], start: number, walk: Walk): TextPage[] => {
+  const pagesFor = (ctx: CallContext, docs: (LongText & { key: string })[], budget: Budget, left: Left, walk: Walk): TextPage[] => {
     const opens = (p: { registers: string[]; about: { register: string } | null }): boolean =>
       (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
     const listed = kernel.pages().filter(opens);
     const out: TextPage[] = [];
+    let drawn = 0;
     for (const p of pagesToLint(listed)) {
-      if (roundOver(out.length, start, clock.now())) break;
+      if (drawn >= budget.pages) {
+        left.cut = true;
+        break;
+      }
+      drawn += 1;
       let answer: PageResult;
       try {
         const got = walk.page(p.slug);
@@ -227,18 +270,60 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
-  /**
-   * The last answer per caller, with what it was true at: the record's version, its declarations, and when.
-   *
-   * THE SAME ASK AT THE SAME VERSION WALKS NOTHING. Home asks this on every open, and the answer moves only when a row,
-   * a page or the clock does. The declarations are read beside the version because an install nobody is named for
-   * writes no event (`DeclaredBy` in the kernel), and a retire is an update, so their count, top and retired are read.
-   */
+  /** One walk for this caller within the budget: every fault in the pages and documents they may read. */
+  const walk = (ctx: CallContext, budget: Budget): Omit<TextFaultsRead, 'computedAt'> => {
+    /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
+       lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
+    const one = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }), viewer: viewerOfRead(ctx) });
+    const left: Left = { rows: budget.rows, cut: false };
+    const docs = documents(ctx, left, one);
+    const pages = pagesFor(ctx, docs, budget, left, one);
+    const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], one);
+    const found = textFaults(pages, docs.map(({ key: _key, ...d }) => d), names);
+    return {
+      count: found.faults.length,
+      pages: found.pages,
+      line: textFaultLine(found),
+      faults: found.faults.slice(0, FAULTS_MOST),
+      truncated: found.faults.length > FAULTS_MOST || left.cut,
+    };
+  };
+
+  /** The night's answer as kept, or `null` before the first night. */
+  const night = (): TextFaultsKept | null => keptIn(kernel.prefsOf(HOLDER)[KEPT]);
+
+  return {
+    shared,
+    walk,
+    night,
+    /** The night's walk, made as the system and kept with its time. Called by `lintTick` and nothing else. */
+    keep(): TextFaultsRead {
+      const at = clock.now();
+      const value = walk({ principal: { kind: 'system', id: 'signs' } }, NIGHT);
+      kernel.setPref(HOLDER, KEPT, { at, value } satisfies TextFaultsKept);
+      return toRead({ at, value });
+    },
+  };
+}
+
+/** The night's walk, kept (see the header). */
+export const keepTextFaults = (deps: RecordDeps): TextFaultsRead => walker(deps).keep();
+
+/** The kept answer put away, so the next night pass finds nothing kept and walks again (an erasure names rows it held). */
+export const dropTextFaults = (deps: Pick<RecordDeps, 'kernel'>): void => deps.kernel.setPref(HOLDER, KEPT, null);
+
+export function methods(deps: RecordDeps) {
+  const { scoped, kernel, clock, no } = deps;
+  const read = walker(deps);
+
+  /* THE LAST DAY WALK PER CALLER, with what it was true at: the record's version and its declarations. The same ask at
+     the same version walks nothing; an install nobody is named for writes no event (`DeclaredBy` in the kernel), so the
+     declarations' count, top and retired are read beside the version. */
   const kept = new Map<string, { stamp: string; at: number; value: TextFaultsRead }>();
   const stampOf = (): string => {
     let decl: unknown = null;
     try {
-      decl = sql.one('SELECT count(*) AS n, max(rowid) AS top, coalesce(sum(retired), 0) AS r, count(superseded_at) AS s FROM declaration');
+      decl = deps.sql.one('SELECT count(*) AS n, max(rowid) AS top, coalesce(sum(retired), 0) AS r, count(superseded_at) AS s FROM declaration');
     } catch {
       decl = clock.now();
     }
@@ -248,40 +333,30 @@ export function methods(deps: RecordDeps) {
   return {
     /**
      * `{}`: every fault in the words of the pages the caller may open and the documents of the lists they may read, as
-     * `{ count, pages, line, faults, truncated }`. The first `FAULTS_MOST` faults are carried, and the count and the line
-     * are over all of them. READ+, held to what the caller may read, and it writes nothing.
+     * `{ count, pages, line, faults, truncated, computedAt }`. The first `FAULTS_MOST` faults are carried, and the count
+     * and the line are over all of them. A reader of the whole record is told what the night found and when
+     * (`computedAt`, `null` before the first night); any other reader is walked a small `DAY` budget. READ+, held to
+     * what the caller may read, and it writes nothing.
      */
     async textFaults(args: unknown, ctx: CallContext): Promise<Result<TextFaultsRead>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const extra = args !== null && typeof args === 'object' ? Object.keys(args)[0] : undefined;
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing.`, { at: extra, allowed: [] });
+      if (read.shared(ctx)) {
+        const night = read.night();
+        return { ok: true, value: night === null ? NOT_YET : toRead(night) };
+      }
       const start = clock.now();
       const who = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null]);
       const stamp = stampOf();
       const was = kept.get(who);
       if (was !== undefined && was.stamp === stamp && start - was.at < KEPT_MS && start >= was.at) return { ok: true, value: was.value };
-      /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
-         lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
-      const walk = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }), viewer: viewerOfRead(ctx) });
-      const docs = documents(ctx, start, walk);
-      const pages = pagesFor(ctx, docs, start, walk);
-      const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], walk);
-      const found = textFaults(pages, docs.map(({ key: _key, ...d }) => d), names);
-      const value: TextFaultsRead = {
-        count: found.faults.length,
-        pages: found.pages,
-        line: textFaultLine(found),
-        faults: found.faults.slice(0, FAULTS_MOST),
-        truncated: found.faults.length > FAULTS_MOST || clock.now() - start > ASK_MS,
-      };
+      const value: TextFaultsRead = { ...read.walk(ctx, DAY), computedAt: new Date(start).toISOString() };
       kept.delete(who);
       kept.set(who, { stamp, at: start, value });
       if (kept.size > KEPT_MOST) kept.delete(kept.keys().next().value!);
-      return {
-        ok: true,
-        value,
-      };
+      return { ok: true, value };
     },
   };
 }

@@ -7,12 +7,13 @@
  *
  * `textFaults` IS READ+ AND WRITES NOTHING: a person, or an agent on a key that reads, is told every path that names
  * nothing, every value that does not parse and every fence drawn as written, on the pages they may open and in the
- * documents of the lists they may read, each with its place and its fix. It takes nothing.
+ * documents of the lists they may read, each with its place and its fix. It takes nothing. A reader of the whole record is
+ * told what the record's night pass kept and when (`computedAt`); the walk is not made when a screen opens.
  */
 
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'textFaults', group: 'READ+', writes: false, what: 'Every fault in the words of your pages and documents: a path that names nothing, a value that does not parse, a block shown as written. Each with its place and its fix. It changes nothing.',
+  { name: 'textFaults', group: 'READ+', writes: false, what: 'Every fault in the words of your pages and documents, as the record found them at its last nightly check, and when that was: a path that names nothing, a value that does not parse, a block shown as written. Each with its place and its fix. It changes nothing.',
     takes: {} },
 ];

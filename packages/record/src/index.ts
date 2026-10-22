@@ -236,6 +236,7 @@ import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
+import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -5164,6 +5165,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The day `lintTick` last ran a round (PRF-A04), kept as the record's own pref beside its updates. */
   const LINT_HOLDER = 'braindog:signs';
   const LINT_LAST = 'pages-clean.last';
+  /** The day the record's words were last walked for `textFaults`, kept apart from the lint's so a deploy day still gets one. */
+  const WORDS_LAST = 'text-faults.last';
   const slashDailyState = () => {
     const prefs = kernel.prefsOf(SLASH);
     return { on: prefs[SLASH_DAILY] !== false, last: typeof prefs[SLASH_LAST] === 'string' ? (prefs[SLASH_LAST] as string) : null };
@@ -9184,6 +9187,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The night's walk of the record's own words, kept for `textFaults` (`methods/text-faults.ts`): on the first alarm of a
+   * UTC day that finds it undone, and a record with none kept gets it on the first alarm after a deploy. The day is kept
+   * before the walk, as the lint's is, so a walk that throws is not tried again until tomorrow; the last answer stands.
+   */
+  const keepWords = (today: string): void => {
+    try {
+      if (kernel.prefsOf(LINT_HOLDER)[WORDS_LAST] === today) return;
+      kernel.setPref(LINT_HOLDER, WORDS_LAST, today);
+      keepTextFaults(methodDeps());
+    } catch {
+      /* The last answer stands. */
+    }
+  };
+
+  /**
    * The record's own person's keys, for `context`: every row of the list `meet` writes that its `self` part marks, read
    * only by a caller who reads that list and that row, each key normalised as the kernel keys it (`rowKeys`). `null` when
    * the list has no `self` part or marks nobody she may read.
@@ -10443,18 +10461,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * AND ON EVERY ALARM, THE BRIEFING'S RED SIGNS ARE READ AND KEPT (`keepSigns`, W1-D), after the round when there is
      * one, so `context` reads a pref and not every sign. A read that throws keeps nothing and costs the lint nothing.
+     *
+     * AND ONCE A DAY, LAST, THE RECORD'S WORDS ARE WALKED AND KEPT (`keepWords`), so `textFaults` reads them back and
+     * walks nothing when a screen opens.
      */
     async lintTick(): Promise<{ ran: false; why: 'today' | 'unopened' } | { ran: true; state: 'green' | 'red' | 'none'; findings: number; pages: number }> {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
+      const today = new Date(clock.now()).toISOString().slice(0, 10);
       const kept = <T>(out: T): T => {
         try {
           keepSigns();
         } catch {
           /* The briefing reads the signs itself until one is kept. */
         }
+        /* THE WORDS' WALK COMES LAST, after the round and every sign, so it costs the night's other work nothing. */
+        keepWords(today);
         return out;
       };
-      const today = new Date(clock.now()).toISOString().slice(0, 10);
       if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return kept({ ran: false, why: 'today' } as const);
       kernel.setPref(LINT_HOLDER, LINT_LAST, today);
       const round = lintRound({
@@ -13423,7 +13446,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['subjects', 'personId', 'basis']);
       if (extra) return { ok: false as const, refusal: extra };
-      return tail(await kernel.erase(args ?? ({} as EraseRequest), actorOf(ctx)));
+      const erased = await kernel.erase(args ?? ({} as EraseRequest), actorOf(ctx));
+      /* THE KEPT FAULTS NAME ROWS, so an erasure puts them away and the next alarm walks again. */
+      if (erased.ok) {
+        dropTextFaults({ kernel });
+        kernel.setPref(LINT_HOLDER, WORDS_LAST, null);
+      }
+      return tail(erased);
     },
 
     /**

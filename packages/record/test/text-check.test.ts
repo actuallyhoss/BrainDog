@@ -12,7 +12,7 @@ import { parse } from 'braindog-render';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { nearest, textFaultLine, textFaults, type TextFault, type TextNames, type TextPart } from '../src/text-check.ts';
-import { methods, type TextFaultsRead } from '../src/methods/text-faults.ts';
+import { keepTextFaults, methods, type TextFaultsRead } from '../src/methods/text-faults.ts';
 import type { RecordDeps } from '../src/methods/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -144,7 +144,8 @@ async function record() {
     no,
     clock: fixedClock(NOW),
   } as unknown as RecordDeps;
-  return { sql, read: methods(deps) };
+  /* `night` IS THE WALK THE RECORD'S NIGHT PASS MAKES (`lintTick`): `textFaults` hands the owner what it kept. */
+  return { sql, read: methods(deps), night: () => keepTextFaults(deps) };
 }
 
 const value = (out: Result<TextFaultsRead>): TextFaultsRead => {
@@ -153,10 +154,12 @@ const value = (out: Result<TextFaultsRead>): TextFaultsRead => {
 };
 
 test('THE READ FINDS THE PLANTED PLACEHOLDER IN A NOTE AND THE BROKEN FENCE ON A PAGE, by names, and writes nothing', async () => {
-  const { sql, read } = await record();
+  const { sql, read, night } = await record();
+  night();
   const changes = (): number => sql.one<{ n: number }>('SELECT total_changes() AS n')!.n;
   const before = changes();
   const got = value(await read.textFaults({}, owner));
+  assert.equal(got.computedAt, new Date(NOW).toISOString());
   const note = got.faults.find((f) => f.kind === 'names-nothing' && f.where.row === 'Kiln');
   assert.ok(note, JSON.stringify(got.faults));
   assert.equal(note.where.list, 'Projects');
@@ -181,9 +184,11 @@ test('THE READ FINDS THE PLANTED PLACEHOLDER IN A NOTE AND THE BROKEN FENCE ON A
 });
 
 test('A READER WHO MAY NOT READ A LIST IS TOLD NOTHING OF IT, and a link reads nothing at all', async () => {
-  const { sql, read } = await record();
+  const { sql, read, night } = await record();
+  night();
   const all = value(await read.textFaults({}, owner));
   assert.ok(all.faults.some((f) => f.where.list === 'Ledger' || f.where.page === 'Books'), JSON.stringify(all.faults));
+  /* THE NIGHT'S ANSWER NAMES THE LEDGER, SO IT IS NEVER HANDED TO HER: she is walked her own small budget. */
   const held = value(await read.textFaults({}, narrow));
   assert.ok(!JSON.stringify(held).match(/Ledger|Books|Spring books|ledger/), JSON.stringify(held));
   assert.ok(held.faults.some((f) => f.where.row === 'Kiln'), JSON.stringify(held.faults));
