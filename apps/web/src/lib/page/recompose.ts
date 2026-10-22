@@ -143,11 +143,19 @@ function ms(style: CSSStyleDeclaration, token: string, fallback: number): number
  * on Today's desk, where the page's blocks are tiles of the board), the nearest ancestor that is positioned, which is
  * the box an absolutely placed copy is placed in. Measured against the page's empty box a copy stood where the window
  * said, and had to be pinned to the window to look right.
+ *
+ * AN ANCESTOR WITH NO BOX OF ITS OWN IS PASSED OVER TOO, positioned or not (fluid F8). On the desk the page's reader is
+ * `display: contents` as well, and it is positioned, so its 0 by 0 box was the frame: no block fit in no room, every
+ * move was planned as a redraw, and the tiles under an answer blinked out and faded back instead of sliding.
  */
 export function frameOf(page: HTMLElement): HTMLElement {
   if (typeof getComputedStyle !== 'function' || getComputedStyle(page).display !== 'contents') return page;
   let up = page.parentElement;
-  while (up && getComputedStyle(up).position === 'static') up = up.parentElement;
+  while (up) {
+    const style = getComputedStyle(up);
+    if (style.position !== 'static' && style.display !== 'contents') break;
+    up = up.parentElement;
+  }
   return up ?? page;
 }
 
