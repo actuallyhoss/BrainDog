@@ -171,7 +171,7 @@ test('AS A PROCESS: the scan prints names and paths on stdout, and nothing of a 
   nowhere([stdout, stderr], values);
 });
 
-/* ── --ask: one question on Decide, on his word ─────────────────────────── */
+/* ── --ask: one question on Decide, only when asked ───────────────────────── */
 
 const COPPERLEAF = '01JTHINGCOPPERLEAFCOPPERLE';
 const OTHER = '01JTHINGLANTERNFISHLANTERN';

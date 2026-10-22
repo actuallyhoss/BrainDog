@@ -14,6 +14,10 @@ $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 # when there is one (http.ts, target).
 $env:BRAINDOG_AGENT = 'claude'
 
+# NODE KEEPS WHAT IT COMPILED (braindog-hook.sh says why): a hook after the first starts in about half the time. A cache
+# he set himself is left as it is.
+if (-not $env:NODE_COMPILE_CACHE) { $env:NODE_COMPILE_CACHE = Join-Path $env:USERPROFILE '.braindog\cache\node' }
+
 $main = Join-Path $PSScriptRoot '..\src\main.ts'
 try {
   $raw = [Console]::In.ReadToEnd()

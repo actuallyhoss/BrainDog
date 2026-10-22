@@ -498,7 +498,7 @@ const bare = (name: string): string => name.toLowerCase().replace(/[-_. ]/g, '')
 
 /**
  * The project that lists a local repository by its bare name (`lanternfish`, `oxbow-drafts`), as an older record keeps it:
- * the name of its remote, of its folder, or of its folder with the one above (`bake/bot` as `crumb-bot`). `null` when
+ * the name of its remote, of its folder, or of its folder with the one above (`oxbow/bot` as `oxbow-bot`). `null` when
  * none does.
  *
  * ONLY A CANDIDATE. A name says nothing about whose clone this is, so the harvest reads it only when the owner has

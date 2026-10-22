@@ -19,7 +19,7 @@ import { PassThrough } from 'node:stream';
 
 import { serveBridge, type ApiOutcome } from '../src/bridge.ts';
 import type { Target } from '../src/http.ts';
-import { keepPlace, placedToday, placesPath, type PlaceIo } from '../src/profile-place.ts';
+import { keepPlace, placedToday, placesPath, QUIET_DAYS, type PlaceIo } from '../src/profile-place.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-profile-place-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -195,12 +195,18 @@ test('A PLACE HE RETIRED IS LEFT ALONE, and a stale one is live again once its m
   assert.equal(stale.rows.profile_places![0]!.state, 'live');
 });
 
-test('A WRITE HIS SETTINGS ASK IS A QUESTION, and the day is spent, so he is asked once a day at most', async () => {
+test('A WRITE HIS SETTINGS ASK IS A QUESTION, and the place then waits 30 days, so he is asked once a month at most', async () => {
   const r = record({ asks: true });
   const home = homeOf();
-  assert.equal(await keepPlace(io(r, home)), 'asked');
-  assert.equal(await keepPlace(io(r, home)), 'already');
+  const day = 86_400_000;
+  const now = Date.parse('2026-10-22T12:00:00Z');
+  assert.equal(await keepPlace(io(r, home, { now })), 'asked');
+  assert.equal(await keepPlace(io(r, home, { now })), 'already');
+  assert.equal(await keepPlace(io(r, home, { now: now + day })), 'already');
+  assert.equal(await keepPlace(io(r, home, { now: now + (QUIET_DAYS - 1) * day })), 'already');
   assert.equal(r.writes().length, 1);
+  assert.equal(await keepPlace(io(r, home, { now: now + (QUIET_DAYS + 1) * day })), 'asked');
+  assert.equal(r.writes().length, 2);
 });
 
 test('NOTHING IS WRITTEN ONCE THE SESSION CLOSES, and the day goes back', async () => {

@@ -295,7 +295,8 @@ export function parseToml(text: string): Toml {
 
 /* ── writing a server table back ──────────────────────────────────────── */
 
-const tomlString = (s: string): string =>
+/** A TOML basic string: quoted, with a backslash, a quote and every control character escaped. */
+export const tomlString = (s: string): string =>
   `"${s.replace(/[\\"\u0000-\u001f\u007f]/g, (c) => (c === '\\' ? '\\\\' : c === '"' ? '\\"' : `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`))}"`;
 const tomlKey = (k: string): string => (/^[A-Za-z0-9_-]+$/.test(k) ? k : tomlString(k));
 

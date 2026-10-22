@@ -5,7 +5,7 @@
  * (`packages/host/src/index.ts`), and `packages/record/src/index.ts`'s `admin()` refuses a `token`
  * principal by name ("Open this from the app; a token cannot change what this record is") before
  * it looks at anything else. Every bearer this CLI holds is a token to the record, so the stub
- * answers exactly that refusal, and `push` then asks on Decide instead (DIRECTION 38): the stub keeps
+ * answers exactly that refusal, and `push` then asks on Decide instead: the stub keeps
  * the questions `propose` files and hands them back from `governance`, as the record does.
  */
 

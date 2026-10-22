@@ -18,7 +18,7 @@
  * was read, and a mismatch is refused, rather than an update that reports one build and installs another.
  *
  * NOT FROM A CHECKOUT. Run from the sources, `main.ts` says `dev+0000000` and the file it would replace is a source
- * file, so it refuses in one sentence. It never runs on its own at a session's start (DIRECTION 42, his default): the
+ * file, so it refuses in one sentence. It never runs on its own at a session's start (the owner's choice): the
  * start hook only says the command is behind, and this verb is typed.
  */
 

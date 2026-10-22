@@ -27,8 +27,8 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 /** Two feeds as a person writes them: one hourly, one of day counts dated from the answer and money in cents. */
 const FILE = `[
   {
-    "id": "bake-gg",
-    "url": "https://crumb.gg/api/stats",
+    "id": "oxbow-gg",
+    "url": "https://oxbow.gg/api/stats",
     "every": "1h",
     "project": "things#1",
     "measures": [
@@ -37,8 +37,8 @@ const FILE = `[
     ]
   },
   {
-    "id": "sketchpad",
-    "url": "https://sketchpad.com/api/daily",
+    "id": "pinwheel",
+    "url": "https://pinwheel.example/api/daily",
     "every": "1d",
     "at": "07:00",
     "tz": "Africa/Cairo",
@@ -114,14 +114,14 @@ test('A FILE OF TWO FEEDS FILES TWO QUESTIONS, each the live feed add-on as its 
   );
   assert.deepEqual(
     asked.map((a) => a.question),
-    ['Poll crumb.gg every 1h for Active users and Monthly revenue?', 'Poll sketchpad.com every 1d for Drawings?'],
+    ['Poll oxbow.gg every 1h for Active users and Monthly revenue?', 'Poll pinwheel.example every 1d for Drawings?'],
   );
   /* MONEY IS AN AMOUNT AND A DATED DAY IS READ FROM THE ANSWER, as the add-on writes them, never re-made here. */
   const first = (asked[0]!.body as unknown as { doc: { declarations: { map: Record<string, unknown>[] }[] } }).doc.declarations[0]!.map;
   assert.deepEqual(first[1]!.amount, { path: 'data.mrr', type: 'money', currency: 'USD', minor: true });
   assert.equal(first[1]!.value, undefined);
-  assert.deepEqual(me.lines, ['Asked on Decide: Numbers from crumb.gg, every 1h.', 'Asked on Decide: Numbers from sketchpad.com, every 1d.']);
-  assert.deepEqual(me.answered, [{ value: { asked: ['Numbers from crumb.gg', 'Numbers from sketchpad.com'], before: [], refused: [] } }]);
+  assert.deepEqual(me.lines, ['Asked on Decide: Numbers from oxbow.gg, every 1h.', 'Asked on Decide: Numbers from pinwheel.example, every 1d.']);
+  assert.deepEqual(me.answered, [{ value: { asked: ['Numbers from oxbow.gg', 'Numbers from pinwheel.example'], before: [], refused: [] } }]);
 });
 
 test('RUN TWICE, A FEED WHOSE QUESTION STILL WAITS IS NOT ASKED AGAIN, and one already installed is said so', async (t) => {
@@ -129,22 +129,22 @@ test('RUN TWICE, A FEED WHOSE QUESTION STILL WAITS IS NOT ASKED AGAIN, and one a
   const h = await host(t, (method) =>
     method === 'governance'
       ? { ok: true, value: [{ id: 's1', status: 'open', body: { install: waiting.pack, doc: waiting } }] }
-      : { ok: false, refusal: { code: 'TRANSITION_ILLEGAL', fix: 'feed-sketchpad is installed at this version.' } },
+      : { ok: false, refusal: { code: 'TRANSITION_ILLEGAL', fix: 'feed-pinwheel is installed at this version.' } },
   );
   const me = io(h.base);
   assert.equal(await feedCommand(['propose', write('again.json', FILE)], me), 0, me.said.join('\n'));
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 1);
-  assert.deepEqual(me.lines, ['Already waiting on Decide: Numbers from crumb.gg.', 'Already there: Numbers from sketchpad.com.']);
+  assert.deepEqual(me.lines, ['Already waiting on Decide: Numbers from oxbow.gg.', 'Already there: Numbers from pinwheel.example.']);
 });
 
 test('A BAD FILE IS REFUSED IN ONE SENTENCE NAMING THE LINE, and nothing is asked', async (t) => {
   const h = await host(t, () => ({ ok: true, value: [] }));
 
   /* The second feed's id is too long for its poll: the add-on's own words, at the line the feed starts on. */
-  const long = FILE.replace('"id": "sketchpad"', '"id": "sketchpad-daily-drawings-count"');
+  const long = FILE.replace('"id": "pinwheel"', '"id": "pinwheel-daily-drawings-count"');
   const me = io(h.base);
   assert.equal(await feedCommand(['propose', write('long.json', long)], me), 1);
-  assert.deepEqual(me.said, ['long.json, line 12: sketchpad-daily-drawings-count is 30 characters, and a feed\'s id is 27 at most, because its poll\'s name is 32 at most.']);
+  assert.deepEqual(me.said, ['long.json, line 12: pinwheel-daily-drawings-count is 29 characters, and a feed\'s id is 27 at most, because its poll\'s name is 32 at most.']);
   assert.deepEqual(h.seen, []);
 
   /* A word a fill does not take, a missing comma, a list that is not one, and one id twice. */
@@ -154,8 +154,8 @@ test('A BAD FILE IS REFUSED IN ONE SENTENCE NAMING THE LINE, and nothing is aske
   assert.equal(comma.ok, false);
   assert.match((comma as { fix: string }).fix, /^feeds\.json, line 1[67]: this is not JSON/);
   assert.deepEqual(readFeeds('{"id":"x"}', 'feeds.json'), { ok: false, fix: 'feeds.json, line 1: the file is a list of feeds, written between [ and ], each one feed.' });
-  const twice = readFeeds(FILE.replace('"id": "sketchpad"', '"id": "bake-gg"'), 'feeds.json');
-  assert.deepEqual(twice, { ok: false, fix: 'feeds.json, line 12: bake-gg is a feed already on line 2, and one id is one add-on.' });
+  const twice = readFeeds(FILE.replace('"id": "pinwheel"', '"id": "oxbow-gg"'), 'feeds.json');
+  assert.deepEqual(twice, { ok: false, fix: 'feeds.json, line 12: oxbow-gg is a feed already on line 2, and one id is one add-on.' });
   /* The add-on's own refusal that says its fix after a full stop is still one sentence here. */
   const zone = readFeeds(FILE.replace('"tz": "Africa/Cairo"', '"tz": "Mars/Olympus"'), 'feeds.json');
   assert.deepEqual(zone, { ok: false, fix: 'feeds.json, line 12: Mars/Olympus is not a time zone; name one such as Africa/Cairo or Europe/London.' });

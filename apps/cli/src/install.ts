@@ -316,7 +316,7 @@ export function hookCommand(which: Which, scripts: string, platform: string = pr
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-/** The suffix of the first copy BrainDog keeps of a file it changes, his word for it (AGT-A07: "`*.pre-braindog` backups"). */
+/** The suffix of the first copy BrainDog keeps of a file it changes, the scope's word for it (AGT-A07: "`*.pre-braindog` backups"). */
 export const FIRST_COPY = '.pre-braindog';
 
 /**

@@ -5,7 +5,8 @@
  * a program nobody at that machine has seen.
  *
  * A PROGRAM ENTRY is anything BrainDog places that runs a program: a hook command, a status line, an `apiKeyHelper`, an
- * MCP server's stdio command or an HTTP server's `headersHelper`, and the `claude` that `env check` runs. Each is
+ * MCP server's stdio command or an HTTP server's `headersHelper`, the `claude` that `env check` runs, and a file of a
+ * thing setup sync carries that runs a program, such as a script for `~/.local/bin` (`sync pull`). Each is
  * printed whole and asked y/N at a terminal before it is first placed, as a runner job kind is pinned before its first
  * run (`runner.ts`, `48 §5.13` step 4). Plain data (a skill's text, a URL server, a rules block) is never pinned.
  *
@@ -28,9 +29,12 @@ import { dayHere } from './keys-list.ts';
 import { isObject, readLock, sha256, writeLock } from './skills.ts';
 import { canonical } from './tools.ts';
 
-/** What a pin is for: BrainDog's hooks, its MCP server, one of the record's tools, or the `claude` `env check` runs. */
-export type PinKind = 'hooks' | 'server' | 'tool' | 'check';
-const KINDS: readonly PinKind[] = ['hooks', 'server', 'tool', 'check'];
+/**
+ * What a pin is for: BrainDog's hooks, its MCP server, one of the record's tools, the `claude` `env check` runs, the status line, or a
+ * program setup sync carried here (`sync-pull.ts`), pinned by where it goes and the SHA-256 of its bytes and mode.
+ */
+export type PinKind = 'hooks' | 'server' | 'tool' | 'check' | 'carry' | 'statusline';
+const KINDS: readonly PinKind[] = ['hooks', 'server', 'tool', 'check', 'carry', 'statusline'];
 
 /** One approved entry: its name, its kind, the profiles it was placed in, and when it was approved. */
 export type Pin = { name: string; kind: PinKind; profiles: string[]; at: string };
@@ -86,7 +90,7 @@ export function forgetPins(file: string, name: string): number {
 }
 
 /** What each kind is, after its name in a line. */
-const KIND_SAID: Record<PinKind, string> = { hooks: "BrainDog's hooks", server: 'the MCP server', tool: 'an MCP tool', check: 'what env check runs' };
+const KIND_SAID: Record<PinKind, string> = { hooks: "BrainDog's hooks", server: 'the MCP server', tool: 'an MCP tool', check: 'what env check runs', carry: 'a program setup sync placed', statusline: 'the status line' };
 
 /** Names joined as a sentence says them: `a`, `a and b`, `a, b and c`. */
 const and = (names: string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`);
@@ -94,9 +98,12 @@ const and = (names: string[]): string => (names.length <= 1 ? (names[0] ?? '') :
 /** The day a pin was approved, on this machine's calendar. */
 const approved = (at: string): string => (Number.isNaN(Date.parse(at)) ? oneLine(at.slice(0, 10)) : dayHere(Date.parse(at)));
 
-/** One pin as `env pins` says it, by name, kind, profiles, the first twelve of its hash and the day it was approved. */
+/**
+ * One pin as `env pins` says it, by name, kind, profiles, the first twelve of its hash and the day it was approved. A
+ * carried program's "profiles" are the things in Carry that brought it.
+ */
 export const pinLine = (sha: string, p: Pin): string =>
-  `  ${oneLine(p.name)}, ${KIND_SAID[p.kind]}: ${p.profiles.length === 0 ? 'placed in no profile yet' : `placed in ${and(p.profiles.map(oneLine))}`}; ${sha.slice(0, 12)}; approved ${approved(p.at)}.`;
+  `  ${oneLine(p.name)}, ${KIND_SAID[p.kind]}: ${p.profiles.length === 0 ? 'placed in no profile yet' : `${p.kind === 'carry' ? 'carried by' : 'placed in'} ${and(p.profiles.map(oneLine))}`}; ${sha.slice(0, 12)}; approved ${approved(p.at)}.`;
 
 /** What `env pins` answers under `--json`: the file, and each pin with its whole hash. */
 export type PinsReport = { file: string; pins: (Pin & { sha256: string })[]; forgot?: { name: string; count: number } };

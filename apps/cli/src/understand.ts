@@ -1,6 +1,6 @@
 /**
- * `braindog understand --dry-run`: what the record's walk over what it already holds would do now (DIRECTION §38,
- * "understanding is the engine's first job"), read from the record's `understandPlan`. How much of each kind it read,
+ * `braindog understand --dry-run`: what the record's walk over what it already holds would do now (because
+ * understanding is the engine's first job), read from the record's `understandPlan`. How much of each kind it read,
  * how many of each it would link, the first of those links, and what it would ask on Decide, all in names.
  *
  * ONLY THE DRY RUN. The walk itself links rows on every list it reads and files questions for the whole record, so it is

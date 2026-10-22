@@ -1,6 +1,6 @@
 /**
- * `braindog signs [--json] [--strict]`: the record's vital signs, read now (PRF-A01, DIRECTION §40 "a daily check watches all of
- * that"). Whether bank messages are being filed, whether project numbers still arrive, whether questions pile up on one
+ * `braindog signs [--json] [--strict]`: the record's vital signs, read now (PRF-A01: a daily check watches all of
+ * that). Whether bank messages are being filed, whether project numbers still arrive, whether questions pile up on one
  * cause, how old the oldest open question is, and whether runs end true, each as the record says it.
  *
  * ONE READ AND NOTHING ELSE. It sends the record's `signs`, a GET, and no session headers, so it names no run, opens
@@ -41,7 +41,7 @@ const NAMES: Record<string, string> = {
   'runs-true': 'Runs ending true',
 };
 
-/** The word beside each state, so the state is never a colour alone (DIRECTION §42). */
+/** The word beside each state, so the state is never a colour alone. */
 const WORDS: Record<SignState, string> = { red: 'Needs a look', green: 'Fine', none: 'Not read yet' };
 
 /** The most facts printed under one sign; the record keeps them short already. */

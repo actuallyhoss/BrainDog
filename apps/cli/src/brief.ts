@@ -2,7 +2,7 @@
  * The card an agent starts from: what the start hook prints, which Claude Code adds to the model's context before its
  * first turn, and what `braindog context` prints on demand.
  *
- * ONE CARD, THE RECORD'S (`packages/record/src/card.ts`, AGT-B07; "the same card from context", D37.81 to D37.89, and
+ * ONE CARD, THE RECORD'S (`packages/record/src/card.ts`, AGT-B07; "the same card from context" and
  * "keep MCP/HTTP/CLI one core", HD.316). The record draws it, with the slots, their order and their caps, and sends it
  * as `card` on `context`; this prints it as it came, each line scrubbed of what a terminal would obey, and held to the
  * characters Claude Code shows of a hook. This command composes no card of its own: a second composer here was a second

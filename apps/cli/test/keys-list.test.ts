@@ -24,7 +24,7 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 /** What must never be printed: a value somebody left in a row, and the id of a grant. */
 const PLANTED = 'sk_live_PLANTED0SECRET0NEVER0PRINTED';
 const GRANT = '01JGRANTGRANTGRANTGRANTGR';
-const BAKE = '01JTHINGBAKEBAKEBAKEBAKEBA';
+const OXBOW = '01JTHINGOXBOWOXBOWOXBOWOXB';
 const LANTERN = '01JTHINGLANTERNLANTERNLANT';
 
 const KEYS_LIST = {
@@ -43,7 +43,7 @@ const KEYS_LIST = {
   ],
 };
 const PROJECTS = [
-  { id: BAKE, seq: 1, fields: { name: 'Crumb.gg' } },
+  { id: OXBOW, seq: 1, fields: { name: 'Oxbow.gg' } },
   { id: LANTERN, seq: 2, fields: { name: 'Lanternfish' } },
 ];
 
@@ -52,7 +52,7 @@ const row = (seq: number, fields: Record<string, unknown>): Row => ({ id: `01JKE
 
 /** Five keys a person would know by sight, then enough plain ones to need three pages. */
 const FIVE: Row[] = [
-  row(1, { label: 'Stripe live', opens: 'Payments for Crumb.gg', project: BAKE, value: GRANT, expires: '2026-11-02', token: PLANTED }),
+  row(1, { label: 'Stripe live', opens: 'Payments for Oxbow.gg', project: OXBOW, value: GRANT, expires: '2026-11-02', token: PLANTED }),
   row(2, { label: 'Cloudflare deploy', opens: 'Deploys of every site', value: { sealed: true, opened: 4, last_opened: null }, note: PLANTED }),
   row(3, { label: 'Apple developer', opens: 'The Lanternfish app in the store', project: LANTERN, where: 'the password manager, under Apple', expires: '2026-10-01' }),
   row(4, { label: 'Old mail relay', opens: 'Mail sent by an old site' }),
@@ -150,7 +150,7 @@ test('ONE LINE A KEY: its name, what it opens, where it applies, sealed or where
     'Apple developer · opens The Lanternfish app in the store · Lanternfish · kept at the password manager, under Apple · expired 1 October 2026',
     'Cloudflare deploy · opens Deploys of every site · Everywhere · sealed · no expiry day',
     'Old mail relay · opens Mail sent by an old site · Everywhere · kept nowhere named · no expiry day',
-    'Stripe live · opens Payments for Crumb.gg · Crumb.gg · sealed · expires 2 November 2026',
+    'Stripe live · opens Payments for Oxbow.gg · Oxbow.gg · sealed · expires 2 November 2026',
   ]);
   assert.deepEqual(one.said, ['4 keys: 2 sealed, 2 kept elsewhere.']);
   for (const line of [...one.lines, ...one.said]) assert.doesNotMatch(line, /—/u, 'no em dash in what a person reads');
@@ -158,7 +158,7 @@ test('ONE LINE A KEY: its name, what it opens, where it applies, sealed or where
 
 test('NEVER A VALUE AND NEVER A GRANT: nothing a row holds beyond the five facts is printed, in lines or in the document', async (t) => {
   const h = await host(t, FIVE);
-  for (const args of [['list'], ['list', '--json'], ['list', '--project', 'crumb.gg'], ['list', '--everywhere']]) {
+  for (const args of [['list'], ['list', '--json'], ['list', '--project', 'oxbow.gg'], ['list', '--everywhere']]) {
     const one = io(h.base);
     assert.equal(await keys(args, one), 0, one.said.join('\n'));
     const all = everything(one);
@@ -196,10 +196,10 @@ test('A VALUE TYPED WHERE A KEY IS KEPT OR IN WHAT IT OPENS IS NOT SAID BACK, in
 
 test('--project KEEPS THE KEYS OF ONE PROJECT, by its name in any case, and --everywhere the keys of no project', async (t) => {
   const h = await host(t, FIVE);
-  const bake = io(h.base);
-  assert.equal(await keys(['list', '--project', 'crumb.GG'], bake), 0, bake.said.join('\n'));
-  assert.deepEqual(bake.lines.map((l) => l.split(' · ')[0]), ['Stripe live']);
-  assert.deepEqual(bake.said, ['1 key in Crumb.gg: 1 sealed.']);
+  const oxbow = io(h.base);
+  assert.equal(await keys(['list', '--project', 'oxbow.GG'], oxbow), 0, oxbow.said.join('\n'));
+  assert.deepEqual(oxbow.lines.map((l) => l.split(' · ')[0]), ['Stripe live']);
+  assert.deepEqual(oxbow.said, ['1 key in Oxbow.gg: 1 sealed.']);
 
   const wide = io(h.base);
   assert.equal(await keys(['list', '--everywhere'], wide), 0, wide.said.join('\n'));
@@ -209,7 +209,7 @@ test('--project KEEPS THE KEYS OF ONE PROJECT, by its name in any case, and --ev
   const none = io(h.base);
   assert.equal(await keys(['list', '--project', 'Glaze'], none), 1);
   assert.deepEqual(none.lines, []);
-  assert.equal(none.said[0], 'No project of yours has that name. Yours are Crumb.gg and Lanternfish.');
+  assert.equal(none.said[0], 'No project of yours has that name. Yours are Lanternfish and Oxbow.gg.');
   assert.ok(!none.said.join(' ').includes('Glaze'));
 
   /* The two flags name two different sets, so both at once is refused before anything is read. */
@@ -516,10 +516,10 @@ test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EI
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
   const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
-  const rows = [row(1, { label: 'Ends today', opens: 'A service', project: BAKE, expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', project: LANTERN, expires: '2026-10-01' })];
+  const rows = [row(1, { label: 'Ends today', opens: 'A service', project: OXBOW, expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', project: LANTERN, expires: '2026-10-01' })];
 
   const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
-  for (const [project, last] of [['crumb.gg', 'expires 13 October 2026'], ['lanternfish', 'expired 1 October 2026']] as const) {
+  for (const [project, last] of [['oxbow.gg', 'expires 13 October 2026'], ['lanternfish', 'expired 1 October 2026']] as const) {
     const one = io(deaf.base);
     assert.equal(await keys(['list', '--project', project], one), 0, one.said.join('\n'));
     assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), [last]);
@@ -530,7 +530,7 @@ test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EI
   /* The same keys on a record that does read the filter: only the key of the 1st is in its answer, so it is believed. */
   const honest = await host(t, rows, null, { today: '2026-10-13' });
   const two = io(honest.base);
-  assert.equal(await keys(['list', '--project', 'crumb.gg'], two), 0, two.said.join('\n'));
+  assert.equal(await keys(['list', '--project', 'oxbow.gg'], two), 0, two.said.join('\n'));
   assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
   assert.equal(two.said.length, 1, 'nothing is said of the clock when the record answered');
 });

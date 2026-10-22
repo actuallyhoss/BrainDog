@@ -9,7 +9,7 @@
  * the rest of the page. A page made for each row of a list has no declaration of its own, so its template's is
  * written, and the command says so.
  *
- * `push` SENDS WHAT `parseDog` READ, WHOLE, AND WHO IS HOLDING THE KEY DECIDES WHAT BECOMES OF IT (DIRECTION 38: an
+ * `push` SENDS WHAT `parseDog` READ, WHOLE, AND WHO IS HOLDING THE KEY DECIDES WHAT BECOMES OF IT (an
  * agent changes a page and the person accepts it in Decide). It is tried first through `setDeclaration`, the door the
  * app's own editor uses, and an owner's session is applied there and then. `setDeclaration` is an ADMIN route, and
  * `packages/record/src/index.ts`'s `admin()` refuses any `token` principal outright (`NEEDS_BROWSER_SESSION`), and every

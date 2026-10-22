@@ -156,8 +156,8 @@ test('--json ANSWERS 48 §4.5 Verified, and a refusal is SIGNATURE_INVALID at do
     container: 'dogl',
     format: 1,
     /* 27 since migration 42 put `agent_profile` in the governance a file carries, and 31 since 43 put `share`,
-       `share_group` and `share_group_member` there and `access_via` in its origin. */
-    tables: 31,
+       `share_group` and `share_group_member` there and `access_via` in its origin, and 32 since 45 put the sealed file index there. */
+    tables: 32,
     rows: (doc.value as { rows: number }).rows,
     manifest: 'ok',
     signature: { valid: true, key_id: await keyIdOf(await signer.publicKey), pinned: true },

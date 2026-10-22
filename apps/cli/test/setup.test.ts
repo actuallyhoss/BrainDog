@@ -366,11 +366,16 @@ test('with Codex and Cursor in the table, a home holding both gets the server in
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
   for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
   assert.ok(readFileSync(join(m.home, '.codex', 'config.toml'), 'utf8').includes('[mcp_servers.braindog]'));
+  /* AND CODEX'S TURN END AND AGENTS.md BLOCK, shown first and written with the --yes given ahead. */
+  assert.ok(m.out.includes("2. Hooks, Codex: these changes to Codex's files come next, with a copy of each file kept first:"), m.out.join('\n'));
+  assert.match(readFileSync(join(m.home, '.codex', 'config.toml'), 'utf8'), /^# braindog: the notify line below is BrainDog's/u);
+  assert.match(readFileSync(join(m.home, '.codex', 'AGENTS.md'), 'utf8'), /^## BrainDog$/mu);
   for (const [file, body] of Object.entries(snapshot(m.home))) assert.deepEqual(tokensIn(body), [], `${file} holds a token shape`);
 
   const settled = snapshot(m.home);
   m.out.length = 0;
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  assert.ok(m.out.includes("2. Hooks, Codex: its config already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block."), m.out.join('\n'));
   for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
   assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');

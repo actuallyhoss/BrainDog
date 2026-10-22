@@ -63,7 +63,7 @@ function host(pulses: (sent: Sent, count: number) => Pulse | { refusal: string }
 }
 
 /** A bridge over two pipes for one session, its environment and home in their own folders. */
-function open(fetch: typeof globalThis.fetch, more: { channel?: boolean; client?: string | null; pulseMs?: number; heldMs?: number } = {}) {
+function open(fetch: typeof globalThis.fetch, more: { channel?: boolean; client?: string | null; pulseMs?: number; heldMs?: number; session?: string } = {}) {
   const env = { XDG_CONFIG_HOME: join(scratch, `config${String(n)}`) };
   const home = join(scratch, `home${String(n++)}`);
   const input = new PassThrough();
@@ -73,7 +73,7 @@ function open(fetch: typeof globalThis.fetch, more: { channel?: boolean; client?
   const client = more.client === undefined ? 'sess-1' : more.client;
   const hints = async () => ({ 'x-braindog-host': 'kiln-mbp', 'x-braindog-agent': 'claude', ...(client === null ? {} : { 'x-braindog-client': client }) });
   const done = serveBridge(
-    { input, output, home, env, fetch, pulseMs: more.pulseMs ?? 40, heldMs: more.heldMs ?? 10, channel: more.channel ?? false, endGraceMs: 0, say: () => undefined },
+    { input, output, home, env, fetch, pulseMs: more.pulseMs ?? 40, heldMs: more.heldMs ?? 10, channel: more.channel ?? false, endGraceMs: 0, say: () => undefined, session: more.session },
     TARGET,
     hints,
   );
@@ -290,4 +290,39 @@ test('THROUGH A REAL SELF-HOST: an instruction reaches the next prompt and is se
   assert.match(written.join('\n'), /stopped this run in BrainDog/u);
   input.end();
   await done;
+});
+
+test('A TOOL CALL GOES AFTER THE PULSE THAT SAYS HOW THE HOOKS SHOWED AN INSTRUCTION, so the record keeps "on its prompt"', async () => {
+  const h = host(() => ({ run: 'S883', stamp: 'v41', changed: false, pending: [told('IN4')], stop: null, lines: [] }));
+  /* A PULSE A MINUTE AWAY, so the only pulse in this test is the one a tool call sends first. */
+  const b = open(h.fetch, { pulseMs: 60_000 });
+  b.hello();
+  await until(() => b.lines.length >= 1);
+  /* THE PROMPT HOOK SHOWED IN4, and the record has not heard: the run's own call must not get there first. */
+  writeState(statePath(b.env, 'sess-1'), { shown: { IN4: 'prompt' }, said_stop: null, redirected: [], blocked: [] });
+  b.input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'instructions', arguments: { take: 'IN4' } } })}\n`);
+  await until(() => b.lines.some((l) => l.id === 2));
+  const order = h.sent.filter((s) => s.path === '/api/pulse' || (s.path === '/mcp' && s.body.method === 'tools/call')).map((s) => (s.path === '/api/pulse' ? 'pulse' : 'call'));
+  assert.deepEqual(order, ['pulse', 'call']);
+  assert.deepEqual(h.pulses()[0]!.body, { shown: ['IN4'], how: 'prompt' });
+  assert.deepEqual(readInbox(inboxPath(b.env, 'sess-1'))?.reported, ['IN4']);
+
+  /* REPORTED ONCE: the next call goes straight to the host. */
+  b.input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'context', arguments: {} } })}\n`);
+  await until(() => b.lines.some((l) => l.id === 3));
+  assert.equal(h.pulses().length, 1);
+  b.input.end();
+  await b.done;
+});
+
+test('A CODEX SESSION, WHICH SAYS NO SESSION ID, IS PULSED AND ITS FILE NAMED BY THE CODEX PROCESS', async () => {
+  const h = host(() => ({ run: 'S900', stamp: 'v1', changed: true, pending: [told('IN9')], stop: null, lines: [told('IN9').line] }));
+  const b = open(h.fetch, { pulseMs: 10, client: null, session: 'codex-4242' });
+  b.hello();
+  await until(() => existsSync(inboxPath(b.env, 'codex-4242')));
+  /* THE RECORD FINDS THE RUN AS IT FINDS EVERY CODEX CALL: no session id is sent, and none is made up. */
+  assert.equal(h.pulses()[0]!.headers.get('x-braindog-client'), null);
+  assert.deepEqual(readInbox(inboxPath(b.env, 'codex-4242'))?.pending.map((t) => t.id), ['IN9']);
+  b.input.end();
+  await b.done;
 });

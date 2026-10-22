@@ -97,6 +97,7 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     heard: no,
     doorHeard: no,
     /* ANSWERED ON THE MACHINE: its tool list asks nobody's settings. */
+    moneyHidden: () => false,
     onMachine: true,
     /* THE DOOR'S OWN HOOKS, not tools: nothing is read signed out, so there is nothing to wall, name or count. */
     firewalled: () => undefined,

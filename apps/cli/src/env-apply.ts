@@ -7,7 +7,9 @@
  * server (`registerServer`), the record's tools that apply everywhere as MCP servers in that profile's own servers file
  * (`writeTools` with `profile`), its skills into that profile's folder (`syncSkills`), and with a Profiles list, that
  * profile's rules in a marked block of its CLAUDE.md. The profiles are the ones `doctor` finds, named as `env diff`
- * names them (`labelsOf`), which is what `--profile` takes.
+ * names them (`labelsOf`), which is what `--profile` takes. AND CODEX, where it is on this machine and no profile was
+ * named: its turn end and BrainDog's AGENTS.md block (`clients/codex-hooks.ts`), and BrainDog's server in its
+ * config.toml (`clients/codex.ts`), each program approved here as Claude Code's are.
  *
  * WHICH PROFILE GETS WHAT. With a list that plays the role `profiles` (the Profiles add-on, `listPlaying`), a tool or a
  * skill whose `profiles` field names profiles goes to those alone, and an empty one to every profile; a profile's row
@@ -44,7 +46,10 @@ import { labelsOf, listPlaying, rowsOf } from './env.ts';
 import { hostsPath, target } from './http.ts';
 import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL } from './install.ts';
 import { keepPin, pinOf, pinsFile, readPins, type PinKind, type Pins } from './pins.ts';
-import { askTerminal, envFor, registerServer, runIn, type ProfileRunner } from './setup.ts';
+import { applyCodexHooks, planCodexHooks } from './clients/codex-hooks.ts';
+import { codex, codexHome } from './clients/codex.ts';
+import { askTerminal, envFor, heldIn, registerServer, runIn, sameServer, type ProfileRunner } from './setup.ts';
+import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { connect, Stopped, syncSkills, type AgentIo, type Connected } from './skills.ts';
 import { canonical, looksLikeKey, writeTools } from './tools.ts';
 
@@ -186,9 +191,9 @@ type Program = { kind: PinKind; name: string; entry: unknown };
 
 /** `braindog env apply`, and the exit code: 1 when anything was left out or failed, or a plan nobody could approve. */
 export async function envApply(args: string[], io: EnvApplyIo): Promise<number> {
-  let values: { profile?: string[] | undefined; 'dry-run'?: boolean | undefined; 'yes-data'?: boolean | undefined; host?: string | undefined };
+  let values: { profile?: string[] | undefined; 'dry-run'?: boolean | undefined; 'yes-data'?: boolean | undefined; statusline?: boolean | undefined; host?: string | undefined };
   try {
-    ({ values } = parseArgs({ args, strict: true, options: { profile: { type: 'string', multiple: true }, 'dry-run': { type: 'boolean' }, 'yes-data': { type: 'boolean' }, host: { type: 'string' } } }));
+    ({ values } = parseArgs({ args, strict: true, options: { profile: { type: 'string', multiple: true }, 'dry-run': { type: 'boolean' }, 'yes-data': { type: 'boolean' }, statusline: { type: 'boolean' }, host: { type: 'string' } } }));
   } catch {
     /* parseArgs quotes what it could not read, and that could be a key pasted in the wrong place. */
     io.say(USAGE);
@@ -208,7 +213,9 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     return 1;
   }
   const profiles = named.length > 0 ? here.filter((p) => named.includes(p.name)) : here;
-  if (profiles.length === 0) {
+  /* CODEX, WHEN IT IS ON THIS MACHINE AND NO PROFILE WAS NAMED: --profile names Claude Code's profiles alone. */
+  const withCodex = named.length === 0 && codex.found(io.home, io.env);
+  if (profiles.length === 0 && !withCodex) {
     io.out('No Claude Code profile was found on this machine, so there is nothing to apply. Run braindog setup <host> first.');
     return 0;
   }
@@ -239,8 +246,8 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
   const pinned = (p: Program): boolean => pins?.[pinOf(p.kind, p.name, p.entry)] !== undefined;
   /** What a plan says of a program entry: approved here before, or asked about first. */
   const planned = (p: Program, what: string): string => {
-    /* BrainDog's hooks are said as several, every other entry as one. */
-    const [run, is, it] = p.kind === 'hooks' ? ['run', 'they are', 'them'] : ['runs', 'it is', 'it'];
+    /* BrainDog's hooks in Claude Code are said as several, every other entry as one, Codex's turn end among them. */
+    const [run, is, it] = p.kind === 'hooks' && p.name === 'hooks' ? ['run', 'they are', 'them'] : ['runs', 'it is', 'it'];
     return pinned(p)
       ? `${what} ${run} a program approved on this machine before, so ${is} not asked about again.`
       : terminal || dryRun
@@ -248,10 +255,10 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
         : `${what} ${run} a program not yet approved on this machine, and no one is at a terminal to approve ${it}.`;
   };
   /** Asked at the terminal, when nothing pins it and this run has not asked: a yes is pinned at once. */
-  const askAbout = async (p: Program, what: string, profile: string): Promise<void> => {
+  const askAbout = async (p: Program, what: string, profile: string, app = 'Claude Code'): Promise<void> => {
     const sha = pinOf(p.kind, p.name, p.entry);
     if (pins?.[sha] !== undefined || answers.has(sha) || !terminal) return;
-    const yes = (await ask(`Allow ${what} to run from Claude Code on this machine? [y/N] `)) === true;
+    const yes = (await ask(`Allow ${what} to run from ${app} on this machine? [y/N] `)) === true;
     answers.set(sha, yes);
     if (yes) pins = keepPin(file, sha, { name: p.name, kind: p.kind, profile, now });
   };
@@ -266,7 +273,11 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     return true;
   };
 
-  io.out(`braindog env apply: ${profiles.length === 1 ? 'one profile' : `${String(profiles.length)} profiles`} on this machine, ${and(profiles.map((p) => oneLine(p.name)))}${dryRun ? ', as a dry run' : planOnly ? ', as a plan' : ''}.`);
+  const which =
+    profiles.length === 0
+      ? 'no Claude Code profile on this machine, and Codex'
+      : `${profiles.length === 1 ? 'one profile' : `${String(profiles.length)} profiles`} on this machine, ${and(profiles.map((p) => oneLine(p.name)))}${withCodex ? ', and Codex' : ''}`;
+  io.out(`braindog env apply: ${which}${dryRun ? ', as a dry run' : planOnly ? ', as a plan' : ''}.`);
   const record = await readRecord(values.host, io, reach);
   if (!record.read) {
     io.out(NOT_READ[record.why]);
@@ -369,6 +380,34 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
             ]);
           }
         }
+      }
+    }
+
+    /* ── 2b. the status line, only where the profile has none of its own ──── */
+    const line = values.statusline === true ? statusLineIn(p.dir) : 'off';
+    if (line === 'off') {
+      /* Not asked for: --statusline places it. */
+    } else if (line === 'has') io.out('2b. Status line: this profile has its own, which is left as it is.');
+    else if (line === 'unreadable') io.out("2b. Status line: Claude Code's settings could not be read, so none was placed.");
+    else {
+      const status: Program = { kind: 'statusline', name: 'statusline', entry: statusLineEntry(io.scripts) };
+      changes = true;
+      io.out(`2b. Status line: ${planOnly ? 'braindog statusline would be set' : 'braindog statusline is set next'} as this profile's status line, with a copy of its settings kept first:`);
+      detail([JSON.stringify(statusLineEntry(io.scripts))]);
+      if (planOnly) detail([planned(status, 'It')]);
+      else {
+        await askAbout(status, "BrainDog's status line", p.name);
+        if (!mayPlace(status, "BrainDog's status line", p.name)) detail(['It was not set, because it is not approved on this machine.']);
+        else
+          try {
+            const done = placeStatusLine(p.dir, io.scripts);
+            wrote = true;
+            detail(['Written: the status line shows the model, the folder and the limits.', ...(done.kept === null ? [] : [`The settings as they were are kept at ${done.kept}.`])]);
+          } catch (e) {
+            io.say(e instanceof Error ? e.message : String(e));
+            detail(["Claude Code's settings could not be written, so they are as they were."]);
+            failed = true;
+          }
       }
     }
 
@@ -520,6 +559,63 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     }
   }
 
+  /* ── Codex: its turn end and AGENTS.md block, and BrainDog's MCP server ── */
+  if (withCodex) {
+    io.out('');
+    io.out(`Codex, ${shown(codexHome(io.home, io.env), io.home)}:`);
+
+    /* 1. THE TURN END RUNS A PROGRAM, so it is approved here as the hooks are; the AGENTS.md block is plain data. */
+    const plan = planCodexHooks({ home: io.home, env: io.env, scripts: io.scripts });
+    const notify: Program = { kind: 'hooks', name: 'codex', entry: plan.notify };
+    const runs = plan.writes.some((w) => w.file.endsWith('config.toml'));
+    if (plan.writes.length === 0) {
+      io.out(plan.left.length === 0 ? "1. Hooks: Codex already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block." : '1. Hooks: nothing is added, and this is why:');
+      detail(plan.left);
+    } else if (planOnly) {
+      changes = true;
+      io.out("1. Hooks: BrainDog's turn end and its block in AGENTS.md would be added to Codex's files, with a copy of each kept first:");
+      detail([...plan.lines, ...plan.left, ...(runs ? [planned(notify, "BrainDog's turn end")] : [])]);
+    } else {
+      changes = true;
+      io.out("1. Hooks: these changes to Codex's files come next, with a copy of each kept first:");
+      detail([...plan.lines, ...plan.left]);
+      if (runs) await askAbout(notify, "BrainDog's turn end", 'codex', 'Codex');
+      const approved = !runs || mayPlace(notify, "BrainDog's turn end", 'Codex');
+      const writes = approved ? plan.writes : plan.writes.filter((w) => !w.file.endsWith('config.toml'));
+      if (!approved) detail(["Codex's config.toml was not written, because BrainDog's turn end is not approved on this machine."]);
+      if (writes.length > 0) {
+        const done = applyCodexHooks({ ...plan, writes }, copied);
+        if (done.written) wrote = true;
+        else failed = true;
+        detail([...(done.written ? [`Written: ${approved ? "BrainDog's turn end and its block in AGENTS.md are" : "BrainDog's block in AGENTS.md is"} in Codex's files.`] : []), ...done.lines]);
+      }
+    }
+
+    /* 2. BRAINDOG'S MCP SERVER, as setup writes it into Codex's config.toml (`clients/codex.ts`). */
+    const want = codex.server;
+    const held = heldIn(codex, 'braindog', io);
+    const server: Program = { kind: 'server', name: 'braindog (Codex)', entry: want };
+    if (sameServer(held, want)) io.out('2. MCP server: braindog is already registered in Codex, running this command.');
+    else {
+      changes = true;
+      const serverPlan = codex.plan({ name: 'braindog', scope: 'user', entry: want, replace: held !== undefined, home: io.home, top: null, cwd: io.cwd });
+      const instead = held !== undefined ? ' in place of the braindog entry there, which runs something else' : '';
+      io.out(`2. MCP server: braindog ${planOnly ? 'would be registered' : 'is registered next'} in Codex${instead}, with a copy of its config.toml kept first:`);
+      detail(serverPlan.lines);
+      if (planOnly) detail([planned(server, 'It')]);
+      else {
+        await askAbout(server, "BrainDog's MCP server", 'codex', 'Codex');
+        if (!mayPlace(server, "BrainDog's MCP server", 'Codex')) detail(['It was not registered, because it is not approved on this machine.']);
+        else {
+          const done = await codex.apply(serverPlan, { run: async () => -1, copied });
+          if (done.written) wrote = true;
+          else failed = true;
+          detail(done.lines);
+        }
+      }
+    }
+  }
+
   /* ── the last lines ────────────────────────────────────────────────── */
   io.out('');
   if (dryRun) {
@@ -540,7 +636,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     );
   io.out(
     wrote
-      ? `Applied to ${and(profiles.map((p) => oneLine(p.name)))}. Sessions started from now on in each have it.`
+      ? `Applied to ${and([...profiles.map((p) => oneLine(p.name)), ...(withCodex ? ['Codex'] : [])])}. Sessions started from now on in each have it.`
       : failed || left.size > 0
         ? 'Nothing else changed.'
         : 'Nothing changed: every profile already holds what the record applies to it.',

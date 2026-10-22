@@ -3,8 +3,8 @@
  *
  *   braindog private-terms [--dry-run] [--host <host>]
  *
- * THE LIST IS THE OWNER'S OWN WORDS, READ FROM HIS OWN RECORD, and it works the same for any person's (LCH-C11, DIRECTION
- * §27): nothing here names a person, a machine or a bank. What it reads, each through what the record declares:
+ * THE LIST IS THE OWNER'S OWN WORDS, READ FROM HIS OWN RECORD, and it works the same for any person's (LCH-C11):
+ * nothing here names a person, a machine or a bank. What it reads, each through what the record declares:
  *   - the owner, as the list declaring `meets:` marks him by its `self` part: every name and alias, every address and
  *     its domain unless that is a public mail service, every handle and every key;
  *   - the people that list holds who have a whole name (two words or more), with their addresses: a single

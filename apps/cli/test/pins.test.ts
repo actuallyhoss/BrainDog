@@ -107,6 +107,22 @@ test('env pins LISTS EACH PIN, OLDEST FIRST, and --forget drops a name so it is 
   assert.deepEqual(readPins(file), {});
 });
 
+test('A PROGRAM SETUP SYNC PLACED IS PINNED AS carry, by where it goes and its bytes and mode, and said as carried by its thing', () => {
+  const home = newHome();
+  const file = pinsFile(home);
+  const where = '~/.local/bin/tidy';
+  const tidy = pinOf('carry', where, { sha256: 'ab'.repeat(32), mode: 0o755 });
+  keepPin(file, tidy, { name: where, kind: 'carry', profile: 'Local programs', now: DAY });
+  assert.deepEqual(readPins(file), { [tidy]: { name: where, kind: 'carry', profiles: ['Local programs'], at: '2026-10-22T12:00:00.000Z' } });
+  assert.deepEqual(envPins([], { home }).lines.slice(1, 2), [`  ${where}, a program setup sync placed: carried by Local programs; ${tidy.slice(0, 12)}; approved 2026-10-22.`]);
+  /* OTHER BYTES OR ANOTHER MODE ARE ANOTHER PIN, and approving one drops the pin of the file it replaces. */
+  assert.notEqual(pinOf('carry', where, { sha256: 'ab'.repeat(32), mode: 0o700 }), tidy, 'a changed mode kept the pin');
+  const tidier = pinOf('carry', where, { sha256: 'cd'.repeat(32), mode: 0o755 });
+  assert.notEqual(tidier, tidy);
+  keepPin(file, tidier, { name: where, kind: 'carry', profile: 'Local programs', now: DAY + 1000 });
+  assert.deepEqual(Object.keys(readPins(file) ?? {}), [tidier]);
+});
+
 test('env pins REFUSES WHAT IT DOES NOT TAKE in one sentence, and a file that does not read before anything changes', async () => {
   const home = newHome();
   assert.throws(() => envPins(['--all'], { home }), /^Error: braindog env pins takes --forget <name> and --json, and nothing else\.$/u);

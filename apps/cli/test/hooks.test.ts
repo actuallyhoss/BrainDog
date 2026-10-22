@@ -661,7 +661,7 @@ test('the MCP server sends the run and client from the session file, and a hook 
 
   const stray = await run(['hook', 'begin'], envFor(folder('config'), {}), '');
   assert.equal(stray.code, 0);
-  assert.match(stray.stderr, /^braindog hook takes start, end, beat, prompt, tool, stop or watch/);
+  assert.match(stray.stderr, /^braindog hook takes start, end, beat, prompt, tool, stop, watch or notify/);
 });
 
 /* ── which run a command is ────────────────────────────────────────────── */

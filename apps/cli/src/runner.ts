@@ -18,35 +18,54 @@
  * (`runner repos add <name> <folder>`) turns the name into a folder. A kind that names none works in an empty folder of
  * its own, removed when the job ends.
  *
+ * A JOB MAY NAME A MACHINE AND A CLAUDE CODE PROFILE, BY NAME (migration 44). Each claim says where this runner is: the
+ * machine as its runs name it (`os.hostname()`) and the profiles it can start Claude Code under, by the names its runs
+ * carry (`profileNameOf`). The record hands it only a job placed nowhere, or placed here. A job under a profile runs
+ * with `CLAUDE_CONFIG_DIR` naming that profile's folder (`envFor`), which only this machine knows: the ones
+ * `~/.braindog/profiles.json` lists, else the ones `doctor` finds. A folder never leaves this machine, and a name two
+ * folders share is refused rather than guessed at, because the wrong one is another login.
+ *
  * CLAUDE CODE RUNS WITH THE KIND'S TOOLS AND PERMISSION MODE AND NOTHING WIDER. `--strict-mcp-config` with a temporary
  * `mcp.json` that reaches the record's MCP door with the job's own bearer, `--allowedTools` with the kind's list,
  * `--permission-mode` with the kind's mode, `--max-turns` with its turns, and never `--dangerously-skip-permissions`. The
  * lint every approved kind passed (`jobBody` in `@braindog/kernel`) is run again here on what the claim carries, so a
  * tool or a mode the record would refuse at install is refused on this machine too.
  *
+ * A KIND THAT SAYS `agent: codex` RUNS ON CODEX (`codex exec --json`), as far as Codex can hold it to the same: its
+ * servers replaced by the record's door alone, the kind's own record tools, a sandbox for its permission mode (read-only
+ * for dontAsk, the folder alone for acceptEdits), nothing asked, and its turns counted here, since Codex has no
+ * `--max-turns`. Codex cannot hold a run to named commands, so the kernel refuses a Codex kind that names any. A machine
+ * runs the kinds of whichever agents it has; a job for one it lacks is refused with the sentence saying so.
+ *
  * NOTHING PRINTS A BEARER. The runner's enrolment leaves this process only as `Authorization` on its three calls
  * (`runnerCall` in `http.ts`), and the job's bearer only inside the `mcp.json` Claude Code reads, written at 0600 in a
- * folder of its own and removed in `finally`. The prompt goes to Claude Code on standard input rather than as an
- * argument, so it is not in any process list, and so a Windows `claude.cmd` needs no multi-line argument escaped.
+ * folder of its own and removed in `finally`, or in the one variable Codex's config names (`JOB_BEARER_VAR`). The
+ * prompt goes on standard input rather than as an argument, so it is not in any process list, and so a Windows
+ * `claude.cmd` needs no multi-line argument escaped.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface as lineReader } from 'node:readline';
 import { createInterface } from 'node:readline/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { JOB_MCP_PREFIX, fillPrompt, jobBody, type ClaimedJob } from '@braindog/kernel';
+import { JOB_MCP_PREFIX, MACHINE_NAME, SEAT_NAME, fillPrompt, jobBody, type ClaimedJob } from '@braindog/kernel';
 import { refused, type Result } from '@braindog/ports';
 
+import { tomlString } from './clients/codex.ts';
+import { profilesIn, realOf } from './doctor.ts';
 import { keepRunner, readHosts, runnerCall, runnerTarget, type RunnerMethod, type RunnerTarget } from './http.ts';
 import type { Answering } from './json.ts';
 import { planCommand } from './keys.ts';
 import { approveRunner } from './login.ts';
+import { listedProfiles } from './placed.ts';
+import { profileNameOf } from './position.ts';
+import { envFor } from './setup.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -69,6 +88,8 @@ export type RunnerIo = {
   fetch?: typeof globalThis.fetch | undefined;
   now?: (() => number) | undefined;
   platform?: string | undefined;
+  /** This machine as its runs name it, `os.hostname()` unless a test says another. */
+  host?: string | undefined;
   /**
    * Asks the person at this terminal one yes-or-no question, or `null` when no terminal is attached. Left out, it is
    * the real terminal when standard input is one, and `null` otherwise.
@@ -88,6 +109,8 @@ export const CLAUDE_LEAST = [2, 1, 248] as const;
 
 /** How long the host is asked to hold a claim open, in seconds, and how much longer this side waits before giving up on it. */
 const CLAIM_WAIT_S = 20;
+/** The most profiles one claim names, the record's own ceiling (`SEATS_MOST` in `@braindog/kernel`). */
+const SEATS_SENT_MOST = 32;
 const CLAIM_SLACK_MS = 10_000;
 /** The longest wait between claims when the host answers at once with nothing (a proxy that cannot hold twenty seconds). */
 const IDLE_MOST_MS = 30_000;
@@ -175,10 +198,26 @@ export async function runner(args: string[], io: RunnerIo): Promise<number> {
   return REFUSED;
 }
 
-/* ── Claude Code on this machine ─────────────────────────────────────────── */
+/* ── Claude Code and Codex on this machine ───────────────────────────────── */
 
-/** What `claude` says of itself: its version, and its help, read for the flags it offers. */
+/** What `claude` or `codex` says of itself: its version, and its help, read for the flags it offers. */
 type Claude = { version: string; help: string };
+
+/** Which agent runs a job, as its kind says it (`JOB_AGENTS` in the kernel). */
+type Agent = 'claude' | 'codex';
+
+/** Each agent as a person calls it. */
+const AGENT_NAME: Readonly<Record<Agent, string>> = { claude: 'Claude Code', codex: 'Codex' };
+
+/** The agents on this machine, each as it said of itself, or the sentence saying why it cannot run a job. */
+type Agents = Record<Agent, Claude | string>;
+
+/**
+ * The oldest Codex this runner starts a job with: the first whose `codex exec --json` writes the event stream read here
+ * (`thread.started`, `item.started`, `item.completed`, `turn.completed`). NOT CONFIRMED against an installed Codex:
+ * none was on the machine this was written on, so the floor is the release notes' word.
+ */
+export const CODEX_LEAST = [0, 46, 0] as const;
 
 /** Whether a file is there, for `planCommand`'s search of PATH. */
 const aFile = (path: string): boolean => {
@@ -195,8 +234,8 @@ const aFile = (path: string): boolean => {
  * THROUGH `planCommand`, as `keys exec` starts a command, because Claude Code installed by npm on Windows is a
  * `claude.cmd`, which Node with no shell cannot start by its bare name.
  */
-function probe(arg: '--version' | '--help', io: RunnerIo): Promise<string | null> {
-  const plan = planCommand('claude', [arg], io.env, { platform: io.platform ?? process.platform, isFile: aFile });
+function probe(arg: '--version' | '--help', io: RunnerIo, program: string = 'claude'): Promise<string | null> {
+  const plan = planCommand(program, [arg], io.env, { platform: io.platform ?? process.platform, isFile: aFile });
   if (typeof plan === 'string') return Promise.resolve(null);
   return new Promise((done) => {
     let out = '';
@@ -245,6 +284,36 @@ async function claudeHere(io: RunnerIo): Promise<Claude | string> {
   return { version: version.join('.'), help: (await probe('--help', io)) ?? '' };
 }
 
+/** Codex as this machine has it, or the sentence that says why no Codex job may run, as `claudeHere` says Claude Code's. */
+async function codexHere(io: RunnerIo): Promise<Claude | string> {
+  const said = await probe('--version', io, 'codex');
+  if (said === null) return 'Codex is not on this machine, or not on its PATH';
+  const parts = /(\d+)\.(\d+)\.(\d+)/.exec(said);
+  if (!parts) return 'Codex did not say which version it is';
+  const version = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+  for (const [i, want] of CODEX_LEAST.entries()) {
+    const have = version[i] ?? 0;
+    if (have > want) break;
+    if (have < want) return `Codex ${version.join('.')} is older than ${CODEX_LEAST.join('.')}, the first this runner starts a job with`;
+  }
+  return { version: version.join('.'), help: '' };
+}
+
+/** Both agents, asked side by side. */
+const agentsHere = async (io: RunnerIo): Promise<Agents> => {
+  const [claude, codex] = await Promise.all([claudeHere(io), codexHere(io)]);
+  return { claude, codex };
+};
+
+/** Whether neither agent can run a job here, which is when nothing is claimed. */
+const noAgent = (a: Agents): boolean => typeof a.claude === 'string' && typeof a.codex === 'string';
+
+/** What runs jobs here, as the start line says it: "Claude Code 2.1.300 and Codex 0.52.0". */
+const agentsSaid = (a: Agents): string =>
+  (['claude', 'codex'] as const)
+    .flatMap((k) => (typeof a[k] === 'string' ? [] : [`${AGENT_NAME[k]} ${(a[k] as Claude).version}`]))
+    .join(' and ');
+
 /**
  * Whether the installed `claude --help` names a flag.
  *
@@ -280,7 +349,7 @@ function stopChild(child: ChildProcess, platform: string): void {
 /* ── ~/.braindog/runner.json ─────────────────────────────────────────────── */
 
 /** A kind as this machine pins it: what the claim says the run will do, every argument's value left out. */
-type Pinned = { kind: string; title: string; prompt: string; tools: string[]; turns: number; permission: string; repo: string | null };
+type Pinned = { kind: string; title: string; prompt: string; tools: string[]; turns: number; permission: string; repo: string | null; agent: Agent };
 
 /**
  * `~/.braindog/runner.json`: this machine's folders by name, the kinds it allowed by the SHA-256 of what they run, and
@@ -297,11 +366,14 @@ const runnerFile = (home: string): string => join(home, '.braindog', 'runner.jso
 /** A pinned kind as the file or a claim holds it, or `null` when it is not one. */
 function pinnedOf(x: unknown): Pinned | null {
   if (!isObject(x)) return null;
-  const { kind, title, prompt, tools, turns, permission, repo } = x;
+  const { kind, title, prompt, tools, turns, permission, repo, agent } = x;
   if (typeof kind !== 'string' || typeof title !== 'string' || typeof prompt !== 'string' || typeof permission !== 'string') return null;
   if (!Array.isArray(tools) || !tools.every((t): t is string => typeof t === 'string') || !isCount(turns)) return null;
   if (repo !== null && typeof repo !== 'string') return null;
-  return { kind, title, prompt, tools: [...tools], turns, permission, repo };
+  /* A HOST OLDER THAN CODEX JOBS SAYS NO AGENT, and every job it hands out is Claude Code's. One it names and this
+     command does not know is no kind this machine can run. */
+  if (agent !== undefined && agent !== 'claude' && agent !== 'codex') return null;
+  return { kind, title, prompt, tools: [...tools], turns, permission, repo, agent: agent ?? 'claude' };
 }
 
 /**
@@ -347,10 +419,15 @@ function saveRunnerFile(file: string, value: RunnerFile): void {
   renameSync(part, file);
 }
 
-/** The SHA-256 of a pinned kind, over its fields in one fixed order, so the same kind always hashes the same. */
+/**
+ * The SHA-256 of a pinned kind, over its fields in one fixed order, so the same kind always hashes the same. The agent
+ * counts only when it is Codex, so a Claude Code kind allowed before there was a choice is still the kind allowed.
+ */
 const shaOf = (p: Pinned): string =>
   createHash('sha256')
-    .update(JSON.stringify({ kind: p.kind, title: p.title, prompt: p.prompt, tools: p.tools, turns: p.turns, permission: p.permission, repo: p.repo }))
+    .update(
+      JSON.stringify({ kind: p.kind, title: p.title, prompt: p.prompt, tools: p.tools, turns: p.turns, permission: p.permission, repo: p.repo, ...(p.agent === 'codex' ? { agent: 'codex' } : {}) }),
+    )
     .digest('hex');
 
 /* ── enrol ───────────────────────────────────────────────────────────────── */
@@ -360,7 +437,8 @@ const ENROL_USAGE = 'braindog runner enrol takes one host, as in braindog runner
 /**
  * `braindog runner enrol <host>`: six digits approved in the app, and the runner's bearer kept in the hosts file.
  *
- * CLAUDE CODE IS ASKED FIRST, so a machine that could never run a job is not enrolled to hold one.
+ * CLAUDE CODE AND CODEX ARE ASKED FIRST, so a machine that could never run a job is not enrolled to hold one. Either
+ * one is enough: a machine with Codex alone runs the kinds that say `agent: codex`.
  */
 async function enrol(args: string[], io: RunnerIo): Promise<number> {
   let positionals: string[];
@@ -375,9 +453,9 @@ async function enrol(args: string[], io: RunnerIo): Promise<number> {
     io.say(ENROL_USAGE);
     return REFUSED;
   }
-  const claude = await claudeHere(io);
-  if (typeof claude === 'string') {
-    io.say(`${claude}, so this machine was not enrolled. Install or update Claude Code, then run this again.`);
+  const agents = await agentsHere(io);
+  if (noAgent(agents)) {
+    io.say(`${String(agents.claude)}, so this machine was not enrolled. Install or update Claude Code, then run this again.`);
     return REFUSED;
   }
   /* READ BEFORE ANYTHING IS ASKED, so a broken hosts file is found before somebody approves a runner whose bearer would
@@ -500,12 +578,19 @@ function describe(job: Pinned, folders: Record<string, string>, say: (line: stri
       : mapped === undefined
         ? `${job.repo}, which names no folder on this machine yet`
         : `${job.repo}, which is ${mapped} on this machine`;
+  const codex = job.agent === 'codex';
   say(`${job.kind}, ${visible(job.title)}, has not run on this machine before.`);
-  say(`  Works in ${where}.`);
-  say(`  May use ${job.tools.join(', ')}.`);
-  say(job.permission === 'acceptEdits' ? '  Changes files in that folder without asking.' : '  Asks for nothing: a tool it was not given is refused.');
+  say(`  Runs on ${AGENT_NAME[job.agent]}, and works in ${where}.`);
+  say(`  May use ${job.tools.join(', ')}${codex ? ", and any command Codex's sandbox allows" : ''}.`);
+  say(
+    job.permission === 'acceptEdits'
+      ? `  Changes files in that folder without asking${codex ? ', and nothing outside it' : ''}.`
+      : codex
+        ? '  Changes nothing: its sandbox is read-only, with no network.'
+        : '  Asks for nothing: a tool it was not given is refused.',
+  );
   say(`  Takes at most ${job.turns} ${job.turns === 1 ? 'turn' : 'turns'}.`);
-  say('  What it asks Claude Code to do:');
+  say(`  What it asks ${AGENT_NAME[job.agent]} to do:`);
   for (const line of job.prompt.split(/\r?\n/)) say(`    ${visible(line)}`);
 }
 
@@ -582,6 +667,8 @@ export type Stream = {
   session: string | null;
   result: Record<string, unknown> | null;
   unread: Set<string>;
+  /** Codex's last message, which its run ends on as Claude Code's `result` line ends on its text. */
+  said?: string;
 };
 
 export const freshStream = (): Stream => ({ calls: new Map(), proposing: new Set(), filed: [], session: null, result: null, unread: new Set() });
@@ -689,6 +776,127 @@ export function distil(line: string, s: Stream): Line[] {
   if (s.unread.size >= UNREAD_MOST || s.unread.has(o.type) || !/^[a-z_]{1,40}$/.test(o.type)) return [];
   s.unread.add(o.type);
   return [{ kind: 'note', body: { text: `Claude Code wrote a line of type ${o.type}, which this runner does not report.` } }];
+}
+
+/* ── a Codex job ─────────────────────────────────────────────────────────── */
+
+/** The variable a Codex job's bearer reaches Codex in: its config names it (`bearer_token_env_var`), never an argument. */
+export const JOB_BEARER_VAR = 'BRAINDOG_JOB_BEARER';
+
+/** Codex's sandbox for a kind's permission: read-only for dontAsk, the folder alone for acceptEdits, never the machine. */
+const SANDBOX: Readonly<Record<ClaimedJob['permission'], string>> = { dontAsk: 'read-only', acceptEdits: 'workspace-write' };
+
+/**
+ * `codex exec`'s arguments for a job, its prompt to follow on standard input (`-`), as Claude Code's does.
+ *
+ * THE KIND'S TOOLS AND NOTHING WIDER, AS FAR AS CODEX CAN SAY IT. `mcp_servers` is set whole with `-c`, which replaces
+ * his own servers for this run as `--strict-mcp-config` does for Claude Code: the record's door alone, reached with the
+ * job's bearer from `JOB_BEARER_VAR`, saying it is Codex, its tools held to the kind's own (`enabled_tools`). The sandbox
+ * is the kind's permission, and nothing is asked, since nobody is there to answer. Its commands are held to no list:
+ * the kernel refuses a Codex kind that names any (`jobBody`), so none was approved as a promise.
+ */
+export function codexFlags(job: Pick<ClaimedJob, 'tools' | 'permission'>, mcp: string): string[] {
+  const tools = job.tools.filter((t) => t.startsWith(JOB_MCP_PREFIX)).map((t) => t.slice(JOB_MCP_PREFIX.length));
+  const door = `{url = ${tomlString(mcp)}, bearer_token_env_var = ${tomlString(JOB_BEARER_VAR)}, http_headers = {"x-braindog-agent" = "codex"}, enabled_tools = [${tools.map(tomlString).join(', ')}]}`;
+  return ['exec', '--json', '--skip-git-repo-check', '--sandbox', SANDBOX[job.permission], '-c', 'approval_policy="never"', '-c', `mcp_servers={braindog = ${door}}`, '-'];
+}
+
+/** A line type, or an item type, said once as one this runner does not report, so a Codex that adds one is noticed. */
+function unreadOnce(type: string, s: Stream): Line[] {
+  if (s.unread.size >= UNREAD_MOST || s.unread.has(type) || !/^[a-z_.:]{1,40}$/.test(type)) return [];
+  s.unread.add(type);
+  return [{ kind: 'note', body: { text: `Codex wrote a line of type ${type}, which this runner does not report.` } }];
+}
+
+/**
+ * One line of `codex exec --json` as the lines a person reads in the job's transcript, as `distil` reads Claude Code's:
+ * `thread.started` is the start and names the session; each item a message, its reasoning, a command, a call to the
+ * record or a change to files; `turn.completed` is the end, on Codex's last message; `turn.failed` an error.
+ *
+ * READ AS CODEX'S OWN DOCUMENTS DESCRIBE IT, NOT AS A RUN WROTE IT: no Codex was on the machine this was written on.
+ * Every field is read as if it may be missing, and a type not read here is said once by its name.
+ */
+export function distilCodex(line: string, s: Stream): Line[] {
+  let o: unknown;
+  try {
+    o = JSON.parse(line);
+  } catch {
+    return [];
+  }
+  if (!isObject(o) || typeof o.type !== 'string') return [];
+  const message = (x: unknown): string => (isObject(x) && typeof x.message === 'string' ? x.message : '');
+
+  if (o.type === 'thread.started') {
+    if (typeof o.thread_id === 'string') s.session = o.thread_id;
+    return [{ kind: 'start', body: { model: null, tools: 0 } }];
+  }
+  if (o.type === 'turn.started') return [];
+  if (o.type === 'turn.completed') {
+    s.result = { type: 'result', subtype: 'success', is_error: false, num_turns: s.calls.size, ...(s.said === undefined ? {} : { result: s.said }) };
+    return [];
+  }
+  if (o.type === 'turn.failed') {
+    s.result = { type: 'result', subtype: 'error', is_error: true, num_turns: s.calls.size, result: message(o.error) || 'Codex ended the turn with an error.' };
+    return [];
+  }
+  if (o.type === 'error') return [{ kind: 'note', body: { text: head(message(o) || 'Codex said there was an error.', SAY_MOST) } }];
+  if ((o.type !== 'item.started' && o.type !== 'item.completed') || !isObject(o.item)) return o.type === 'item.updated' ? [] : unreadOnce(o.type, s);
+
+  const item = o.item;
+  const id = typeof item.id === 'string' ? item.id : `item-${String(s.calls.size + 1)}`;
+  const done = o.type === 'item.completed';
+  const out: Line[] = [];
+  /* A CALL IS SAID ONCE, when it starts or, for an item Codex reports only once it is done, then. */
+  const called = (name: string, input: string): number => {
+    const had = s.calls.get(id);
+    if (had !== undefined) return had;
+    const call = s.calls.size + 1;
+    s.calls.set(id, call);
+    out.push({ kind: 'tool', body: { call, name: head(name, NAME_MOST), input: head(input, TOOL_MOST), len: input.length } });
+    return call;
+  };
+  const result = (call: number, text: string, failed: boolean) => {
+    out.push({ kind: 'out', body: { call, text: head(text, OUT_MOST), len: text.length, ...(failed ? { error: true } : {}) } });
+  };
+
+  if (item.type === 'agent_message') {
+    if (done && typeof item.text === 'string' && item.text !== '') {
+      s.said = item.text;
+      out.push({ kind: 'say', body: { text: head(item.text, SAY_MOST), len: item.text.length } });
+    }
+  } else if (item.type === 'reasoning') {
+    if (done && typeof item.text === 'string' && item.text !== '') out.push({ kind: 'think', body: { text: head(item.text, THINK_MOST), len: item.text.length } });
+  } else if (item.type === 'command_execution') {
+    const call = called('Bash', typeof item.command === 'string' ? item.command : '');
+    if (done) result(call, typeof item.aggregated_output === 'string' ? item.aggregated_output : '', item.status === 'failed' || (typeof item.exit_code === 'number' && item.exit_code !== 0));
+  } else if (item.type === 'mcp_tool_call') {
+    const name = `mcp__${typeof item.server === 'string' ? item.server : 'unknown'}__${typeof item.tool === 'string' ? item.tool : 'unknown'}`;
+    const call = called(name, JSON.stringify(item.arguments ?? {}));
+    if (name === `${JOB_MCP_PREFIX}propose`) s.proposing.add(id);
+    if (done) {
+      const failed = item.status === 'failed' || (item.error !== undefined && item.error !== null);
+      const text = isObject(item.result) ? textOf(item.result.content) : message(item.error);
+      if (!failed && s.proposing.has(id) && s.filed.length < FILED_MOST) {
+        const filed = filedFrom(text);
+        if (filed !== null) s.filed.push(filed);
+      }
+      result(call, text, failed);
+    }
+  } else if (item.type === 'file_change') {
+    if (done) {
+      const changes: unknown[] = Array.isArray(item.changes) ? item.changes : [];
+      const said = changes
+        .map((c) => (isObject(c) ? `${typeof c.kind === 'string' ? c.kind : 'update'} ${typeof c.path === 'string' ? c.path : ''}` : ''))
+        .filter((l) => l.trim() !== '')
+        .join('\n');
+      result(called('Edit', said), item.status === 'failed' ? 'The change was not applied.' : 'Applied.', item.status === 'failed');
+    }
+  } else if (item.type === 'web_search') {
+    called('WebSearch', typeof item.query === 'string' ? item.query : '');
+  } else if (item.type === 'error') {
+    if (done) out.push({ kind: 'note', body: { text: head(message(item) || 'Codex said there was an error.', SAY_MOST) } });
+  } else if (typeof item.type === 'string') return unreadOnce(`item.${item.type}`, s);
+  return out;
 }
 
 /* ── the report: in order, renewed, and stopped when the record says so ──── */
@@ -866,6 +1074,10 @@ function readClaim(value: unknown, to: RunnerTarget): { claim: Claim } | { idle:
   const args = j.args;
   if (pinned === null || !isObject(args) || !Object.values(args).every((v) => typeof v === 'string'))
     return { bad: 'The job arrived in a shape this runner cannot read, so it was not run.', ...at };
+  /* A PROFILE THE JOB NAMES IN A SHAPE THIS RUNNER CANNOT READ IS NOT DROPPED, because dropping it would run the job under
+     this runner's own login rather than the one asked for. A host older than migration 44 names none. */
+  const seat = j.seat === undefined || j.seat === null ? null : typeof j.seat === 'string' && SEAT_NAME.test(j.seat) ? j.seat : undefined;
+  if (seat === undefined) return { bad: 'The job named a Claude Code profile in a shape this runner cannot read, so it was not run.', ...at };
   const bearer = typeof value.bearer === 'string' && BEARER.test(value.bearer) ? value.bearer : '';
   const said = isObject(value.mcp) && typeof value.mcp.url === 'string' ? value.mcp.url : '';
   let mcp = '';
@@ -879,7 +1091,7 @@ function readClaim(value: unknown, to: RunnerTarget): { claim: Claim } | { idle:
   if (bearer === '' || mcp === '') return { bad: 'The job arrived without a key for the record, or with one for another site, so it was not run.', ...at };
   return {
     claim: {
-      job: { ...pinned, id: j.id, seq: j.seq, args: args as Record<string, string>, permission: pinned.permission as ClaimedJob['permission'] },
+      job: { ...pinned, id: j.id, seq: j.seq, args: args as Record<string, string>, permission: pinned.permission as ClaimedJob['permission'], agent: pinned.agent, seat },
       bearer,
       mcp,
     },
@@ -887,11 +1099,63 @@ function readClaim(value: unknown, to: RunnerTarget): { claim: Claim } | { idle:
 }
 
 /**
+ * THE CLAUDE CODE PROFILES THIS MACHINE CAN START A JOB UNDER, by the name its runs carry (`profileNameOf`), each with
+ * the folders that answer to it: the ones `~/.braindog/profiles.json` lists, else every one `doctor` finds
+ * (`profilesIn`), and always the runner's own. One folder reached two ways is one profile; a name two folders share
+ * keeps both, so a job under it can be refused rather than guessed at.
+ */
+export function seatsHere(home: string, env: Env): Map<string, string[]> {
+  const own = (env.CLAUDE_CONFIG_DIR ?? '').trim();
+  const dirs = [...profilesIn(home, listedProfiles(home) ?? [], env), own === '' ? join(home, '.claude') : resolve(own)];
+  const seats = new Map<string, string[]>();
+  const seen = new Set<string>();
+  for (const dir of dirs) {
+    const real = realOf(dir);
+    if (seen.has(real)) continue;
+    seen.add(real);
+    const name = profileNameOf({ CLAUDE_CONFIG_DIR: dir, CCENV_HOME: env.CCENV_HOME }, home);
+    if (name === null || !SEAT_NAME.test(name)) continue;
+    seats.set(name, [...(seats.get(name) ?? []), dir]);
+  }
+  return seats;
+}
+
+/**
+ * WHAT ONE CLAIM SAYS OF WHERE THIS RUNNER IS: the machine, as its runs name it, and the profiles it can start a job
+ * under, by name and never by folder. A host that does not read them yet ignores them, and hands over only jobs placed
+ * nowhere, as before.
+ */
+export function claimArgs(home: string, env: Env, host: string): { wait: number; host?: string; seats: string[] } {
+  const seats = [...seatsHere(home, env).keys()].sort().slice(0, SEATS_SENT_MOST);
+  return { wait: CLAIM_WAIT_S, ...(MACHINE_NAME.test(host) ? { host } : {}), seats };
+}
+
+/**
+ * The environment a job runs in, by the profile it names: this runner's own when it names none, and otherwise the
+ * runner's with `CLAUDE_CONFIG_DIR` naming that profile's folder (`envFor`, which leaves it unset for `~/.claude`). Or
+ * the sentence that refuses it, which names the profile and never a folder, because it is posted to the record.
+ */
+export function seatEnv(seat: string | null, home: string, env: Env): { env: Env; seat: string | null } | { refused: string } {
+  if (seat === null) return { env: { ...env }, seat: profileNameOf(env, home) };
+  const dirs = seatsHere(home, env).get(seat) ?? [];
+  const [dir] = dirs;
+  if (dir === undefined)
+    return { refused: `This machine has no Claude Code profile called ${seat}. Add it to ~/.braindog/profiles.json on the machine, or start the job under another profile.` };
+  if (dirs.length > 1)
+    return { refused: `Two Claude Code profiles on this machine are called ${seat}, so it was not run under either. List the one you mean in ~/.braindog/profiles.json on the machine, then start the job again.` };
+  return { env: envFor(dir, home, env), seat };
+}
+
+/**
  * Why this machine will not run a job, or `null` when it will: the kind's lint, its arguments, its folder, and whether
  * the installed Claude Code knows its permission mode. The pin is asked after these, so nobody is asked about a job
  * that could not have run.
  */
-function refusalOf(job: ClaimedJob, file: RunnerFile, claude: Claude): string | null {
+function refusalOf(job: ClaimedJob, file: RunnerFile, agents: Agents): string | null {
+  /* THE AGENT THE KIND NAMES, on this machine, before anything else is read: a Codex kind on a machine with Claude Code
+     alone is no job it could run. */
+  const runs = agents[job.agent];
+  if (typeof runs === 'string') return `${runs}, so it was not run. Install or update ${AGENT_NAME[job.agent]}, then start the job again.`;
   /* THE KERNEL'S OWN LINT, over what the claim carries. The claim says each argument's value and not its declaration,
      so each is declared as it arrived, at the longest any kind allows; `writes` is not sent, and the lint's rule that a
      kind changing files without asking says so is kept by saying it for exactly those kinds. */
@@ -909,6 +1173,7 @@ function refusalOf(job: ClaimedJob, file: RunnerFile, claude: Claude): string | 
       ...(job.repo === null ? {} : { repo: job.repo }),
       ...(ids.length === 0 ? {} : { args: ids.map((id) => ({ id, label: id, max: ARG_MOST })) }),
       ...(job.permission === 'acceptEdits' ? { writes: true } : {}),
+      ...(job.agent === 'codex' ? { agent: 'codex' } : {}),
     },
   });
   if (fault !== null) return `${fault.fix} So it was not run on this machine.`;
@@ -925,8 +1190,8 @@ function refusalOf(job: ClaimedJob, file: RunnerFile, claude: Claude): string | 
     }
     if (!there) return `${job.repo} is mapped to ${folder} on this machine, and that folder is gone. Map it again, then start the job again.`;
   }
-  if (!knowsMode(claude.help, job.permission))
-    return `Claude Code ${claude.version} on this machine does not know the permission mode ${job.permission}, so it was not run. Update Claude Code, then start the job again.`;
+  if (job.agent === 'claude' && !knowsMode(runs.help, job.permission))
+    return `Claude Code ${runs.version} on this machine does not know the permission mode ${job.permission}, so it was not run. Update Claude Code, then start the job again.`;
   return null;
 }
 
@@ -948,7 +1213,7 @@ type Outcome = 'reported' | 'lost' | 'stopped';
  * One claimed job, from the checks to the end: refused with its sentence, or run in its folder with its tools, its
  * lines reported as they come, and ended with the status its result earns.
  */
-async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: RunnerIo): Promise<{ outcome: Outcome; status: EndBody['status'] | null }> {
+async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: RunnerIo): Promise<{ outcome: Outcome; status: EndBody['status'] | null }> {
   const { job } = claim;
   const now = io.now ?? Date.now;
   const platform = io.platform ?? process.platform;
@@ -976,12 +1241,15 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
     } catch (e) {
       return await refuse(e instanceof Error ? e.message : 'The runner file on this machine could not be read.');
     }
-    const fault = refusalOf(job, held, claude);
+    const fault = refusalOf(job, held, agents);
     if (fault !== null) return await refuse(fault);
+    /* THE PROFILE, BEFORE THE PIN, so nobody is asked about a job that could not have run here. */
+    const under = seatEnv(job.seat, io.home, io.env);
+    if ('refused' in under) return await refuse(under.refused);
 
     /* THE PIN: ASKED ONCE PER KIND ON THIS MACHINE, by the hash of what it would run. The lease is renewed while the
        person reads, and a Cancel in the app ends the question. */
-    const pinned: Pinned = { kind: job.kind, title: job.title, prompt: job.prompt, tools: job.tools, turns: job.turns, permission: job.permission, repo: job.repo };
+    const pinned: Pinned = { kind: job.kind, title: job.title, prompt: job.prompt, tools: job.tools, turns: job.turns, permission: job.permission, repo: job.repo, agent: job.agent };
     const sha = shaOf(pinned);
     if (!Object.hasOwn(held.allowed, sha)) {
       const ask = askerOf(io);
@@ -1013,45 +1281,60 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
 
     /* THE FOLDER: the one this machine mapped the kind's repository to, or an empty one of its own. */
     const folder = job.repo === null ? (temp = mkdtempSync(join(tmpdir(), 'braindog-job-'))) : (held.repos[job.repo] ?? '');
-    /* THE DOOR: a folder of its own holding one file at 0600, which only Claude Code reads and `finally` removes. */
-    door = mkdtempSync(join(tmpdir(), 'braindog-mcp-'));
-    const mcpJson = join(door, 'mcp.json');
-    writeFileSync(mcpJson, JSON.stringify({ mcpServers: { braindog: { type: 'http', url: claim.mcp, headers: { Authorization: `Bearer ${claim.bearer}` } } } }), { mode: 0o600 });
-    chmodSync(mcpJson, 0o600);
-
-    /* `--verbose` BECAUSE `stream-json` UNDER `-p` IS REFUSED WITHOUT IT. `--allowedTools` takes each tool as its own
-       argument, so a named command holding a comma or a space is never split, and the flag after it ends the list. */
-    const flags = [
-      '-p',
-      ...(offers(claude.help, '--restricted') ? ['--restricted'] : []),
-      ...(offers(claude.help, '--disable-slash-commands') ? ['--disable-slash-commands'] : []),
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      '--strict-mcp-config',
-      '--mcp-config',
-      mcpJson,
-      '--allowedTools',
-      ...job.tools,
-      '--permission-mode',
-      job.permission,
-      '--max-turns',
-      String(job.turns),
-    ];
+    const codex = job.agent === 'codex';
+    const name = AGENT_NAME[job.agent];
+    /* THE RUN SAYS ITS MACHINE AND ITS PROFILE, BY NAME, as a session's bridge does, so the record shows where it ran. */
+    const machine = io.host ?? hostname();
+    const where = {
+      ...(MACHINE_NAME.test(machine) ? { 'x-braindog-host': machine } : {}),
+      ...(under.seat !== null && SEAT_NAME.test(under.seat) ? { 'x-braindog-profile': under.seat } : {}),
+    };
     /* THE MACHINE'S LOGIN STAYS OUT OF THE RUN. The job reaches the record with its own bearer and nothing else. */
-    const env: Env = { ...io.env };
+    const env: Env = under.env;
     delete env.BRAINDOG_TOKEN;
-    const plan = planCommand('claude', flags, env, { platform, isFile: aFile });
-    if (typeof plan === 'string') return await refuse('Claude Code could not be started safely on this machine, so it was not run.');
+    let flags: string[];
+    if (codex) {
+      /* CODEX TAKES THE JOB'S BEARER FROM A VARIABLE ITS CONFIG NAMES (`codexFlags`), never an argument or a file. */
+      env[JOB_BEARER_VAR] = claim.bearer;
+      flags = codexFlags(job, claim.mcp);
+    } else {
+      /* THE DOOR: a folder of its own holding one file at 0600, which only Claude Code reads and `finally` removes. */
+      door = mkdtempSync(join(tmpdir(), 'braindog-mcp-'));
+      const mcpJson = join(door, 'mcp.json');
+      writeFileSync(mcpJson, JSON.stringify({ mcpServers: { braindog: { type: 'http', url: claim.mcp, headers: { Authorization: `Bearer ${claim.bearer}`, ...where } } } }), { mode: 0o600 });
+      chmodSync(mcpJson, 0o600);
+      const help = (agents.claude as Claude).help;
+      /* `--verbose` BECAUSE `stream-json` UNDER `-p` IS REFUSED WITHOUT IT. `--allowedTools` takes each tool as its own
+         argument, so a named command holding a comma or a space is never split, and the flag after it ends the list. */
+      flags = [
+        '-p',
+        ...(offers(help, '--restricted') ? ['--restricted'] : []),
+        ...(offers(help, '--disable-slash-commands') ? ['--disable-slash-commands'] : []),
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--strict-mcp-config',
+        '--mcp-config',
+        mcpJson,
+        '--allowedTools',
+        ...job.tools,
+        '--permission-mode',
+        job.permission,
+        '--max-turns',
+        String(job.turns),
+      ];
+    }
+    const plan = planCommand(job.agent, flags, env, { platform, isFile: aFile });
+    if (typeof plan === 'string') return await refuse(`${name} could not be started safely on this machine, so it was not run.`);
 
-    io.say(`Running ${job.kind}, ${visible(job.title)}, in ${job.repo === null ? 'an empty folder' : `${job.repo} (${folder})`}.`);
+    io.say(`Running ${job.kind}, ${visible(job.title)}, in ${job.repo === null ? 'an empty folder' : `${job.repo} (${folder})`}${job.seat === null ? '' : `, as ${job.seat}`}.`);
     const s = freshStream();
     let stderr = '';
     let child: ChildProcess;
     try {
       child = spawn(plan.command, plan.args, { cwd: folder, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true, windowsVerbatimArguments: plan.verbatim });
     } catch {
-      return await refuse('Claude Code did not start on this machine, so it was not run.');
+      return await refuse(`${name} did not start on this machine, so it was not run.`);
     }
     const onHalt = () => stopChild(child, platform);
     if (report.halt.aborted) onHalt();
@@ -1069,7 +1352,13 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
       stderr = (stderr + chunk).slice(-STDERR_KEPT);
     });
     if (child.stdout) lineReader({ input: child.stdout, crlfDelay: Infinity }).on('line', (line) => {
-      for (const one of distil(line, s)) report.post(one.kind, one.body);
+      for (const one of (codex ? distilCodex : distil)(line, s)) report.post(one.kind, one.body);
+      /* CODEX HAS NO --max-turns, so a run that has made more calls than the kind's turns is stopped here, and ends as
+         one that ran out of turns. Claude Code stops itself. */
+      if (codex && s.result === null && s.calls.size > job.turns) {
+        s.result = { type: 'result', subtype: 'error_max_turns', num_turns: job.turns };
+        stopChild(child, platform);
+      }
     });
     const exit = await closed;
     report.halt.removeEventListener('abort', onHalt);
@@ -1102,16 +1391,16 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
     }
     if (r !== null) {
       const subtype = typeof r.subtype === 'string' ? head(r.subtype, 40) : 'error';
-      const text = head(said ?? `Claude Code ended the run with ${subtype}.`, ERROR_MOST);
+      const text = head(said ?? `${name} ended the run with ${subtype}.`, ERROR_MOST);
       report.post('error', { subtype, text });
       return await finish({ status: 'error', error: text, ...kept, ...session, ...turns, ...cost, ...ms });
     }
-    /* NO RESULT LINE. 143 is Claude Code's answer to SIGTERM from outside this runner (`26 §5`); anything else is a
-       failure, said with the end of what it wrote to standard error. */
+    /* NO RESULT LINE. 143 is the answer to SIGTERM from outside this runner (`26 §5`); anything else is a failure, said
+       with the end of what it wrote to standard error. */
     if (!exit.failed && (exit.code === 143 || exit.code === 130 || exit.code === null)) return await finish({ status: 'interrupted', ...kept, ...session, ...ms });
     const error = exit.failed
-      ? 'Claude Code did not start on this machine.'
-      : head(`Claude Code ended with exit code ${String(exit.code)} and no result.${stderr.trim() === '' ? '' : ` It said: ${stderr.trim()}`}`, ERROR_MOST);
+      ? `${name} did not start on this machine.`
+      : head(`${name} ended with exit code ${String(exit.code)} and no result.${stderr.trim() === '' ? '' : ` It said: ${stderr.trim()}`}`, ERROR_MOST);
     report.post('error', { text: error });
     return await finish({ status: 'error', error, ...kept, ...session, ...ms });
   } finally {
@@ -1134,8 +1423,8 @@ const RUN_USAGE = 'braindog runner run takes --once and --host <host>, and nothi
  * `braindog runner run [--once]`: claim, check, run, report, and claim again, one job at a time, until Ctrl+C, or after
  * one job with `--once`.
  *
- * NOTHING IS CLAIMED WITHOUT A CLAUDE CODE TO RUN IT. The version is read at the start and again after every job, so an
- * update that goes wrong mid-afternoon stops the runner rather than the job after it.
+ * NOTHING IS CLAIMED WITHOUT AN AGENT TO RUN IT, Claude Code or Codex. Their versions are read at the start and again
+ * after every job, so an update that goes wrong mid-afternoon stops the runner rather than the job after it.
  */
 async function run(args: string[], io: RunnerIo): Promise<number> {
   let values: { once?: boolean | undefined; host?: string | undefined };
@@ -1154,9 +1443,9 @@ async function run(args: string[], io: RunnerIo): Promise<number> {
     io.say(e instanceof Error ? e.message : `${io.file} could not be read.`);
     return REFUSED;
   }
-  let claude = await claudeHere(io);
-  if (typeof claude === 'string') {
-    io.say(`${claude}, so no job was claimed. Install or update Claude Code, then run this again.`);
+  let agents = await agentsHere(io);
+  if (noAgent(agents)) {
+    io.say(`${String(agents.claude)}, so no job was claimed. Install or update Claude Code, then run this again.`);
     return REFUSED;
   }
 
@@ -1168,12 +1457,12 @@ async function run(args: string[], io: RunnerIo): Promise<number> {
       /* Ctrl+C ends the wait, and the loop sees it. */
     }
   };
-  io.say(`Running jobs for ${to.key} as ${to.label || 'this machine'}, with Claude Code ${claude.version}. Ctrl+C stops it.`);
+  io.say(`Running jobs for ${to.key} as ${to.label || 'this machine'}, with ${agentsSaid(agents)}. Ctrl+C stops it.`);
   let idle = IDLE_LEAST_MS;
   let silent = false;
   while (!stopped()) {
     const asked = now();
-    const r = await runnerCall(to, 'claimJob', { wait: CLAIM_WAIT_S }, { ms: CLAIM_WAIT_S * 1000 + CLAIM_SLACK_MS, signal: io.signal, fetch: io.fetch });
+    const r = await runnerCall(to, 'claimJob', claimArgs(io.home, io.env, io.host ?? hostname()), { ms: CLAIM_WAIT_S * 1000 + CLAIM_SLACK_MS, signal: io.signal, fetch: io.fetch });
     if (stopped()) break;
     if (!r.ok) {
       if (refused(r) && r.refusal.code === 'UNREACHABLE') {
@@ -1219,15 +1508,15 @@ async function run(args: string[], io: RunnerIo): Promise<number> {
       continue;
     }
 
-    const done = await runJob(to, read.claim, claude, io);
+    const done = await runJob(to, read.claim, agents, io);
     io.answer?.({ value: { job: read.claim.job.id, kind: read.claim.job.kind, status: done.status } });
     if (values.once || done.outcome === 'stopped') return done.outcome === 'reported' ? 0 : done.outcome === 'lost' ? UNREACHABLE : REFUSED;
-    const again = await claudeHere(io);
-    if (typeof again === 'string') {
-      io.say(`${again}, so no more jobs are claimed. Install or update Claude Code, then run this again.`);
+    const again = await agentsHere(io);
+    if (noAgent(again)) {
+      io.say(`${String(again.claude)}, so no more jobs are claimed. Install or update Claude Code, then run this again.`);
       return REFUSED;
     }
-    claude = again;
+    agents = again;
   }
   io.say('Stopped. No job is running on this machine.');
   return 0;

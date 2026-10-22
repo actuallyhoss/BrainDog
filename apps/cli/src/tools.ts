@@ -92,6 +92,12 @@ function randomRun(run: string): boolean {
 export const looksLikeKey = (text: string): boolean =>
   KEY_SHAPES.some((shape) => shape.test(text)) || [...text.matchAll(/[A-Za-z0-9+/=_-]{32,}/g)].some(([run]) => randomRun(run));
 
+/**
+ * Whether a text holds a key by an issuer's own shape alone, never by a random-looking run: for a whole file of work,
+ * where a lockfile's hashes and a test's fixtures are random-looking and hold no key (`sync-patches.ts`).
+ */
+export const issuerShaped = (text: string): boolean => KEY_SHAPES.some((shape) => shape.test(text));
+
 /** A name the plan's §5.5 treats as a key's whatever its value looks like. */
 const KEY_NAMED = /(?:KEY|TOKEN|SECRET|PASSWORD|PAT)$/i;
 const AUTH_HEADER = /^(?:proxy-)?authorization$/i;

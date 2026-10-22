@@ -2550,7 +2550,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
   const settling = ask(`say which questions ${file} has settled`, () => adapter.settled?.(watch.value) ?? []);
   if (!settling.ok) return 1;
   /* WHAT NOTHING READ, KNOWN BEFORE THE HOST IS ASKED ANYTHING, so `--strict` refuses with nothing read from the record or
-     sent to it: an import that leaves part of the export behind is one he asked to be told about first. */
+     sent to it: an import that leaves part of the export behind is one a person is told about first. */
   const unread = watch.unread();
   if (values.strict === true && unread.length > 0) {
     for (const line of unreadSaid(unread)) io.say(line);

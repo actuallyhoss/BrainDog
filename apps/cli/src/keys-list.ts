@@ -153,7 +153,7 @@ export function keyLine(k: KeyRead): string {
   return [k.name, k.opens === '' ? 'opens nothing named' : `opens ${k.opens}`, k.applies, kept, day].join(' · ');
 }
 
-/** "Crumb.gg", "Crumb.gg and Lanternfish", "Crumb.gg, Lanternfish and Glaze". */
+/** "Oxbow.gg", "Oxbow.gg and Lanternfish", "Oxbow.gg, Lanternfish and Glaze". */
 const listed = (names: readonly string[]): string => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
 /** The one sentence for the whole: how many, and how many of them are sealed here. `where` is "" for every key. */

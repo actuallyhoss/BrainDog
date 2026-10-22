@@ -35,7 +35,10 @@ import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
-import { runHook, watchHook } from './inbox-file.ts';
+import { codexSession, INBOX_ENTRY, notifyHook, runHook, watchHook } from './inbox-file.ts';
+import { statusline } from './statusline.ts';
+import { readBeat, sendBeat } from './statusline-beat.ts';
+import { STATUSLINE_FILE } from './statusline-place.ts';
 import { agentOf, budgetOf, clientFor, hostsPath, runnerTarget, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
@@ -48,14 +51,19 @@ import { peopleCommand } from './people.ts';
 import { privateTermsCommand } from './private-terms.ts';
 import { understandCommand } from './understand.ts';
 import { signsCommand } from './signs.ts';
-import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
+import { AGENTS, hostSessionOf, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
 import { context } from './context.ts';
 import { doctor } from './doctor.ts';
 import { envCommand } from './env.ts';
 import { envApply } from './env-apply.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
-import { syncCommand } from './sync.ts';
+import { SYNC_VERBS, syncCommand } from './sync.ts';
+import { syncJoin, syncRetire } from './sync-join.ts';
+import { syncPatches } from './sync-patches.ts';
+import { syncDrill, syncPull } from './sync-pull.ts';
+import { logLine, startPush, syncPush } from './sync-push.ts';
+import { sealedSeen, type SyncIo } from './sync-record.ts';
 import { afterHello, startFromServer } from './session-start.ts';
 import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
@@ -88,18 +96,33 @@ const headersHere = async (cwd: string, host: string): Promise<Record<string, st
  * nothing beside it, so `../hooks/` named a folder no machine had: `braindog setup` once wrote both hooks
  * into three profiles pointing at `~/.braindog/hooks/braindog-hook.ps1`, which did not exist, and every session would
  * have started without its context. So the bundle writes its own shims beside itself, each running this file.
+ *
+ * AND THE HOOKS' OWN ENTRY BESIDE THEM (`INBOX_ENTRY`): the inbox reader alone, which the bundle carries as
+ * `__INBOX_HOOK__` (`scripts/bundle.mjs`), so the prompt, tool and stop hooks and Codex's turn end start Node on a few
+ * kilobytes rather than the whole command. Every shim also keeps Node's compile cache, as the checkout's do.
  */
+declare const __INBOX_HOOK__: string;
+declare const __STATUSLINE_ENTRY__: string;
+
 function hookScripts(): string {
   const checkout = fileURLToPath(new URL('../hooks/', import.meta.url));
   if (existsSync(join(checkout, 'braindog-hook.ps1'))) return checkout;
   const dir = join(dirname(fileURLToPath(import.meta.url)), 'hooks');
   mkdirSync(dir, { recursive: true });
+  const inbox = typeof __INBOX_HOOK__ === 'string' && __INBOX_HOOK__ !== '';
+  if (inbox) writeFileSync(join(dir, INBOX_ENTRY), __INBOX_HOOK__);
+  /* THE STATUS LINE'S OWN ENTRY, for the same reason (`statusline-entry.ts`). */
+  if (typeof __STATUSLINE_ENTRY__ === 'string' && __STATUSLINE_ENTRY__ !== '') writeFileSync(join(dir, STATUSLINE_FILE), __STATUSLINE_ENTRY__);
+  /* THE INBOX READER, or the whole command for a bundle built before it carried one. */
+  const reader = inbox ? `"$dir/${INBOX_ENTRY}"` : '"$dir/../braindog.mjs" hook';
+  const readerPs = inbox ? `(Join-Path $PSScriptRoot '${INBOX_ENTRY}')` : '$cli hook';
   const ps1 = [
     "param([string]$Which = 'start')",
     '$OutputEncoding = New-Object System.Text.UTF8Encoding($false)',
     '[Console]::OutputEncoding = $OutputEncoding',
     "$cli = Join-Path $PSScriptRoot '..\\braindog.mjs'",
     "$env:BRAINDOG_AGENT = 'claude'",
+    "if (-not $env:NODE_COMPILE_CACHE) { $env:NODE_COMPILE_CACHE = Join-Path $env:USERPROFILE '.braindog\\cache\\node' }",
     'try {',
     '  $raw = [Console]::In.ReadToEnd()',
     "  if (@('prompt', 'tool', 'stop') -contains $Which) {",
@@ -110,11 +133,11 @@ function hookScripts(): string {
     '    $flags = Join-Path $base "braindog\\sessions\\$id.inbox.flags"',
     '    if (-not (Test-Path -LiteralPath $flags)) { exit 0 }',
     "    if ((([System.IO.File]::ReadAllText($flags)) -split '\\s+') -notcontains $Which) { exit 0 }",
-    '    try { $raw | & node $cli hook $Which } catch { }',
+    `    try { $raw | & node ${readerPs} $Which } catch { }`,
     '    exit 0',
     '  }',
     "  if ($Which -eq 'watch') {",
-    '    $raw | & node $cli hook watch',
+    `    $raw | & node ${readerPs} watch`,
     '    exit $LASTEXITCODE',
     '  }',
     "  if ($Which -eq 'beat') {",
@@ -134,30 +157,46 @@ function hookScripts(): string {
     '}',
     'exit 0',
   ];
+  /* THE SAME STEPS AS THE CHECKOUT'S `hooks/braindog-hook.sh`, whose comments say why each is there. */
   const sh = [
     '#!/bin/sh',
     'which="${1:-start}"',
-    'dir=$(dirname "$0")',
+    'case "$0" in */*) dir=${0%/*} ;; *) dir=. ;; esac',
     'BRAINDOG_AGENT=claude',
     'export BRAINDOG_AGENT',
+    'NODE_COMPILE_CACHE="${NODE_COMPILE_CACHE:-$HOME/.braindog/cache/node}"',
+    'export NODE_COMPILE_CACHE',
+    'session_id() {',
+    '  after=${raw#*\\"session_id\\"}',
+    '  [ "$after" = "$raw" ] && return',
+    '  gap=${after%%\\"*}',
+    `  case "$gap" in *[!\\ :]* | '') return ;; esac`,
+    '  rest=${after#*\\"}',
+    '  id=${rest%%\\"*}',
+    `  case "$id" in '' | *[!A-Za-z0-9._:-]*) id='' ;; *[.:]*) id=$(printf '%s' "$id" | tr '.:' '__') ;; esac`,
+    '}',
     'case "$which" in',
     '  prompt | tool | stop)',
     '    raw=$(cat)',
-    `    id=$(printf '%s' "$raw" | grep -o '"session_id" *: *"[A-Za-z0-9._:-]*"' | head -n 1 | sed 's/.*"\\([^"]*\\)"$/\\1/; s/[^A-Za-z0-9_-]/_/g')`,
+    "    id=''",
+    '    session_id',
     '    [ -n "$id" ] || exit 0',
     '    flags="${XDG_CONFIG_HOME:-$HOME/.config}/braindog/sessions/${id}.inbox.flags"',
-    '    grep -qw "$which" "$flags" 2>/dev/null || exit 0',
-    `    printf '%s' "$raw" | node "$dir/../braindog.mjs" hook "$which" 2>/dev/null`,
+    "    words=''",
+    '    [ -f "$flags" ] && IFS= read -r words < "$flags"',
+    '    case " $words " in *" $which "*) ;; *) exit 0 ;; esac',
+    `    printf '%s' "$raw" | node ${reader} "$which" 2>/dev/null`,
     '    exit 0',
     '    ;;',
     '  watch)',
-    '    node "$dir/../braindog.mjs" hook watch',
+    `    node ${reader} watch`,
     '    exit $?',
     '    ;;',
     'esac',
     'if [ "$which" = beat ]; then',
     '  raw=$(cat)',
-    `  id=$(printf '%s' "$raw" | grep -o '"session_id" *: *"[A-Za-z0-9._:-]*"' | head -n 1 | sed 's/.*"\\([^"]*\\)"$/\\1/; s/[^A-Za-z0-9_-]/_/g')`,
+    "  id=''",
+    '  session_id',
     '  stamp="${HOME}/.braindog/beats/${id:--}"',
     `  [ -n "$(find "$stamp" -mmin -5 2>/dev/null)" ] && exit 0`,
     `  printf '%s' "$raw" | node "$dir/../braindog.mjs" hook beat >/dev/null 2>&1`,
@@ -209,7 +248,7 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 
 const usage = () =>
   [
-    'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>]',
+    'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>] [--statusline]',
     "  Set this machine up from one record, in order: sign in unless it already is, add the hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, sync its skills, and make one token for each agent it wired, each approved in the app. One line per step, and it stops at the first that fails.",
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
@@ -328,22 +367,36 @@ const usage = () =>
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
     "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
-    'braindog hook start|end|beat|prompt|tool|stop|watch',
-    '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh.',
+    'braindog hook start|end|beat|prompt|tool|stop|watch|notify',
+    '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. On a machine that has joined setup sync, end and the day\'s first start begin braindog sync push in the background and never wait for it. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh. notify is what Codex runs when a turn ends: when the run has not taken something you told it, this machine shows one notice saying so.',
+    'braindog statusline',
+    "  What Claude Code runs to draw its status line, with its status on standard input: one short line with the model, the folder's name, how much of the 5 hour and 7 day limits is used and when they reset. At most every five minutes it also sends those figures, by profile name and machine, to the Profiles add-on in the background; nothing waits on it, and nothing else leaves.",
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>] [--rewake]',
     "  Show the hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. --rewake also adds the watcher that wakes an idle session when you tell it something, which is off unless typed. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]',
     "  Read this machine and list, by file and entry, what still names a tool BrainDog replaced, what holds something shaped like a key, and each profile missing BrainDog's server or a hook. It changes nothing and shows no value, and exits 1 when anything is listed.",
     'braindog env diff [--config-dir <folder>] [--host <host>] [--json]',
     "  Compare every Claude Code profile on this machine by name: its MCP servers, plugins, hook events and skills, with a short hash of each server's entry and of its CLAUDE.md, and the record's tools and skills when signed in. It changes nothing and shows no value, and exits 1 when anything differs.",
-    'braindog env apply [--profile <name>] [--dry-run] [--yes-data] [--host <host>]',
+    'braindog env apply [--profile <name>] [--dry-run] [--yes-data] [--statusline] [--host <host>]',
     "  Do what setup does in every Claude Code profile on this machine, or the ones named: BrainDog's hooks and server, the record's tools and skills, and with the Profiles add-on what each profile is given and its rules in a marked block of its CLAUDE.md. Anything that runs a program is shown whole and asked y/N, then pinned; with no terminal, --yes-data writes the plain data alone.",
     'braindog env pins [--forget <name>] [--json]',
     '  List the programs approved on this machine, by name, profile, hash and day; --forget drops one, and it is asked about again the next time it is placed.',
     'braindog env check [--profile <name>] [--json]',
     "  Run claude mcp list in each profile and say each server as connected, needing a sign-in, or failed, by name only. claude is asked about once, as a program, and it changes nothing else.",
     'braindog sync inventory [--under <folder>] [--host <host>] [--json]',
-    "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills the record does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why. It opens no file it lists and changes nothing.",
+    "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills the record does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why, and on a machine that has joined, what the record keeps sealed already by machine. It opens no file it lists, nothing sealed, and changes nothing.",
+    'braindog sync join [--name <machine>] [--new-key] [--host <host>]',
+    "  Join setup sync, with the Setup sync add-on installed: name this machine and keep the sync key in its Keychain, Credential Manager or secret service. The first machine makes the key and asks twice for a new sync passphrase; every other machine asks for it once. The passphrase is typed at the terminal, never shown, kept or sent.",
+    'braindog sync push [--dry-run] [--host <host>]',
+    "  Seal what Carry lists from this machine under the sync key and keep it in the record as one bundle, sending only what changed. An agent app's own login and session transcripts are refused, whatever Carry says. A machine that has joined also pushes by itself in the background when a session ends, and once a day when one starts.",
+    'braindog sync pull [--from <machine>] [--dry-run] [--yes-data] [--host <host>]',
+    "  Place the newest bundle from another machine, or the one --from names, each file at this system's place for it, keeping a file it replaces aside first. Anything that runs a program is shown whole and asked y/N, then pinned; tool sign-ins move only from a retired machine, and someone else's are asked about by their name. With no terminal, --yes-data places the plain data alone.",
+    'braindog sync patches [--from <machine>] [--dry-run] [--host <host>]',
+    "  Put another machine's unpushed work back: each repository cloned from its remote where it is missing, its commits fetched from the bundle, then its staged and unstaged changes and new files. A repository with changes of its own, or on another commit, is left as it is and said.",
+    'braindog sync drill [--from <machine>] [--host <host>]',
+    '  Restore a bundle into a scratch folder, check every file against its hash, write the outcome to Drills, and delete the folder. Nothing is placed.',
+    'braindog sync retire <machine> [--yes] [--host <host>]',
+    "  Retire a machine for good: it sends and places nothing more, its sync key goes the next time it runs braindog, and the tool sign-ins it carried may then move to another. Retiring this machine removes its key now and asks before removing its tool sign-ins.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog runner enrol <host>',
@@ -366,7 +419,7 @@ const usage = () =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, init and serve do not take it.',
+    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, init and serve do not take it.',
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
@@ -437,7 +490,10 @@ async function mcp(args: string[]): Promise<void> {
     /* THE START WORK, ONCE THE FIRST `initialize` IS ANSWERED (`session-start.ts`): for an app with no start hook, once a
        day for this machine, folder and app, in the background and inside the hook's budget, its lines on stderr. */
     const output = afterHello(process.stdout, () => void startFromServer({ io: { env: process.env }, to, where, agent, headers: () => hints(said), ms: hookBudget(process.env), say }));
-    await serveBridge({ input: process.stdin, output, say }, to, hints);
+    /* CODEX SAYS NO SESSION ID, so its session's inbox file goes by the Codex process that started this server, which
+       also starts its turn-end program (`codexSession`, `notifyHook`). */
+    const session = agent === 'codex' && hostSessionOf(process.env) === null ? codexSession(process.ppid) : undefined;
+    await serveBridge({ input: process.stdin, output, say, session }, to, hints);
     process.exitCode = 0;
     setTimeout(() => process.exit(0), 1_000).unref();
     return;
@@ -695,6 +751,26 @@ function selfhost(command: 'init' | 'serve', args: string[]): void {
  * A hook exits 0 whatever happens, because a non-zero exit is how a hook stops a session. What the start
  * hook prints goes into the model's context, so it is written once and synchronously before the exit.
  */
+async function statuslineCommand(args: string[]): Promise<void> {
+  const stdin = ((): string => {
+    try {
+      return process.stdin.isTTY ? '' : readFileSync(0, 'utf8');
+    } catch {
+      return '';
+    }
+  })();
+  /* `--beat` IS THE DETACHED CHILD (`statusline.ts`): it sends the one beat it is handed and prints nothing. */
+  if (args[0] === '--beat') {
+    const beat = readBeat(stdin);
+    if (beat !== null) await sendBeat(beat, process.env);
+    process.exitCode = 0;
+    setTimeout(() => process.exit(0), 1_000).unref();
+    return;
+  }
+  process.stdout.write(`${statusline({ env: process.env, stdin })}\n`);
+  process.exitCode = 0;
+}
+
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
   /*
@@ -722,6 +798,13 @@ async function hook(args: string[]): Promise<void> {
     if (said !== '') writeFileSync(1, `${said}\n`);
     return;
   }
+  /* CODEX'S TURN END, its event as the last argument (`notifyHook`). Codex started this process, so its parent is the
+     Codex process the bridge names the session's files by. Says nothing on any stream. */
+  if (which === 'notify' && more.length <= 1) {
+    process.exitCode = 0;
+    notifyHook(more[0] ?? '', process.env, codexSession(process.ppid));
+    return;
+  }
   /* NINE SECONDS AT MOST, whatever the network does (AGT-B10): the hook ends at HOOK_MS counted from the process's own
      start (`performance.now()`), inside Claude Code's ten-second timeout. The start hook's own deadline starts later,
      so on a hung network this fires first and says the one line itself, unless a line was already written. */
@@ -731,7 +814,7 @@ async function hook(args: string[]): Promise<void> {
     process.exit(0);
   }, Math.max(0, HOOK_MS - performance.now())).unref();
   if ((which !== 'start' && which !== 'end' && which !== 'beat') || more.length > 0) {
-    say('braindog hook takes start, end, beat, prompt, tool, stop or watch, and nothing else. Claude Code runs it, with the event on standard input.');
+    say('braindog hook takes start, end, beat, prompt, tool, stop, watch or notify, and nothing else. Claude Code runs it with the event on standard input, and Codex runs notify with the event as its last argument.');
     return process.exit(0);
   }
   /*
@@ -765,6 +848,9 @@ async function hook(args: string[]): Promise<void> {
     /* The error could quote anything, so the start hook says only that it failed. */
     if (which === 'start') write('BrainDog: the start hook failed, so this session works without shared context.');
   }
+  /* SETUP SYNC'S PUSH, IN THE BACKGROUND, after the hook's own work and never waited for (`startPush`): when a session
+     ends, and on the day's first start, on a machine that has joined. It reads one file and starts one process. */
+  if (which === 'end' || which === 'start') startPush({ home: homedir(), env: process.env, cli: fileURLToPath(import.meta.url), when: which === 'end' ? 'end' : 'day' });
   /* LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive socket to the host holds it
      open. `process.exit` straight after more than one request aborted Node 24 on Windows with a libuv
      assertion, a non-zero exit, which is the one thing a hook must never do. */
@@ -798,7 +884,7 @@ function doctorCommand(args: string[]): void {
 async function readsCommand(which: 'env' | 'sync', args: string[]): Promise<void> {
   let result: Awaited<ReturnType<typeof envCommand>> | Awaited<ReturnType<typeof syncCommand>>;
   try {
-    result = which === 'env' ? await envCommand(args) : await syncCommand(args);
+    result = which === 'env' ? await envCommand(args) : await syncCommand(args, { sealed: sealedSeen });
   } catch (e) {
     return stop(e instanceof Error ? e.message : String(e));
   }
@@ -830,6 +916,36 @@ async function envApplyCommand(args: string[]): Promise<void> {
     /* The record is read with no session headers (`env-apply.ts`), so this is never asked; `AgentIo` has it. */
     headers: async () => ({}),
   });
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
+}
+
+/**
+ * `braindog sync join|push|pull|patches|drill|retire`, over the real terminal (§5.20), and its exit code. Not one of
+ * `readsCommand`'s, for `env apply`'s reasons: each prints for a person as it goes and may ask at the terminal, and
+ * each refuses `--json` through its own strict `parseArgs`. `sync push --auto`, which a hook starts in the background
+ * with nobody to read it, writes every line to `~/.braindog/sync.log` and asks nothing.
+ */
+async function syncActCommand(verb: string, args: string[]): Promise<void> {
+  const stopping = new AbortController();
+  process.on('SIGINT', () => stopping.abort());
+  const home = homedir();
+  const auto = verb === 'push' && args.includes('--auto');
+  const toLog = (line: string) => logLine(home, line);
+  const io: SyncIo = {
+    env: process.env,
+    home,
+    cwd: process.cwd(),
+    out: auto ? toLog : (line: string) => writeFileSync(1, `${line}\n`),
+    say: auto ? toLog : say,
+    signal: stopping.signal,
+    ...(auto ? { terminal: false } : {}),
+  };
+  const verbs: Record<string, (args: string[], io: SyncIo) => Promise<number>> = { join: syncJoin, push: syncPush, pull: syncPull, patches: syncPatches, drill: syncDrill, retire: syncRetire };
+  const run = verbs[verb];
+  if (run === undefined) return stop(`braindog sync takes inventory, ${SYNC_VERBS.join(', ')}.`);
+  const code = await run(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -939,8 +1055,9 @@ const cut = takeJson(rest);
    it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
    `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
 /* AND `env apply`, WHICH PRINTS FOR A PERSON AND ASKS AT THE TERMINAL AS `setup` DOES, so the flag reaches its own strict
-   `parseArgs` and is refused there in its own words. */
-const noEnvelope = ((command === 'usecase' || command === 'pack') && rest[0] === 'preview') || (command === 'env' && rest[0] === 'apply');
+   `parseArgs` and is refused there in its own words. The sync verbs but `inventory` are the same. */
+const syncAct = command === 'sync' && SYNC_VERBS.includes(rest[0] ?? '');
+const noEnvelope = ((command === 'usecase' || command === 'pack') && rest[0] === 'preview') || (command === 'env' && rest[0] === 'apply') || syncAct;
 const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list' || rest[0] === 'scan')));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);
@@ -973,9 +1090,11 @@ try {
   else if (command === 'import' && !(await import('./import.ts')).isAdapterImport(args)) await brainfileCommand('import', args);
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs' || command === 'tidy' || command === 'feed' || command === 'private-terms' || command === 'actions') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
+  else if (command === 'statusline') await statuslineCommand(rest);
   else if (command === 'install') install(args);
   else if (command === 'doctor') doctorCommand(args);
   else if (command === 'env' && rest[0] === 'apply') await envApplyCommand(rest.slice(1));
+  else if (syncAct) await syncActCommand(rest[0] ?? '', rest.slice(1));
   else if (command === 'env' || command === 'sync') await readsCommand(command, args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
      `dev+0000000` and `update` refuses before it touches anything. */

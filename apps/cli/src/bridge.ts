@@ -128,7 +128,15 @@ export type BridgeIo = {
   heldMs?: number | undefined;
   /** Whether the channel is offered: `BRAINDOG_CHANNEL` in the environment unless a test says. Off by default. */
   channel?: boolean | undefined;
+  /**
+   * The name the session's inbox file goes by when the app says no session id of its own: Codex's, by the Codex process
+   * (`codexSession`). Its pulse then names no session, and the record finds the run as it finds every Codex call.
+   */
+  session?: string | undefined;
 };
+
+/** The longest a tool call waits for the pulse that tells the record what the hooks showed first (`seenFirst`). */
+export const SEEN_FIRST_MS = 2_000;
 
 /** Whether the environment turns the channel on: `BRAINDOG_CHANNEL` set to 1, on, yes or true. Anything else is off. */
 export const channelOn = (env: Record<string, string | undefined>): boolean => /^(?:1|on|yes|true)$/iu.test(env.BRAINDOG_CHANNEL ?? '');
@@ -170,7 +178,8 @@ const idOf = (m: Message): Id | null => (typeof m.id === 'string' || typeof m.id
 /**
  * The hints `_meta.session` carries (`packages/host/src/session.ts`), each by the header that says it. `worktree` is
  * the worktree folder apart from its repository (`position.ts`), which the host reads and hands the record, so a lead
- * and its builders in worktrees of one repository see each other.
+ * and its builders in worktrees of one repository see each other; `seat` is the Claude Code profile's name, so an
+ * instruction aimed at one profile reaches the runs under it.
  */
 const HINT_OF: Readonly<Record<string, string>> = {
   'x-braindog-session': 'spoken',
@@ -184,6 +193,7 @@ const HINT_OF: Readonly<Record<string, string>> = {
   'x-braindog-client-name': 'client',
   'x-braindog-client-version': 'client_version',
   'x-braindog-parent': 'parent',
+  'x-braindog-profile': 'seat',
 };
 
 /** The hints the session headers say, as `_meta.session` spells them. `x-braindog-cli` stays a header. */
@@ -512,7 +522,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       return every;
     }
     const session = await hints(client).catch(() => ({}) as Record<string, string>);
-    const id = session['x-braindog-client'];
+    const id = session['x-braindog-client'] ?? io.session;
     if (typeof id !== 'string' || id === '') return every;
     const file = inboxPath(env, id);
     const before = readInbox(file);
@@ -598,19 +608,50 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     return stop !== null ? heldEvery : every;
   };
 
+  /* ONE PULSE AT A TIME, the timer's and a tool call's (`seenFirst`) in one lane, since each reads the file, sends what
+     it has not reported, and writes the file again. */
+  let lane: Promise<number> = Promise.resolve(every);
+  const inLane = (): Promise<number> => {
+    const next = lane.then(() => pulseOnce()).catch(() => every);
+    lane = next;
+    return next;
+  };
+
   /** The next pulse, `wait` from now, unless the input has closed or the pulse was stopped. */
   const schedule = (wait: number) => {
     if (closing || pulseOff) return;
     pulseTimer = setTimeout(() => {
       pulseTimer = null;
-      pulsing = pulseOnce()
-        .catch(() => every)
-        .then((next) => {
-          pulsing = null;
-          schedule(next);
-        });
+      pulsing = inLane().then((next) => {
+        pulsing = null;
+        schedule(next);
+      });
     }, wait);
     pulseTimer.unref?.();
+  };
+
+  /** Whether the hooks or the channel showed the run something the record has not been told yet. */
+  const unreported = (id: string): boolean => {
+    const reported = new Set(readInbox(inboxPath(env, id))?.reported ?? []);
+    return byChannel.size > 0 || Object.keys(readState(statePath(env, id)).shown).some((sid) => !reported.has(sid));
+  };
+
+  /**
+   * THE RECORD HEARS HOW THE RUN SAW AN INSTRUCTION BEFORE IT HEARS THE RUN'S OWN CALL. The prompt hook shows an
+   * instruction and writes that it did; the record heard it only at the next pulse, up to fifteen seconds on, and a
+   * BrainDog call the run made first (taking it, or any call whose answer carried it) was recorded as the first
+   * sighting, so the app said "in a tool answer" or "when it asked" for what reached it on its prompt. The record keeps
+   * the first way, so before a tool call this sends the pulse those sightings wait for, and the call goes after it. Only
+   * when one waits, which is the first call after a hook showed something; and no longer than `SEEN_FIRST_MS`.
+   */
+  const seenFirst = async (): Promise<void> => {
+    if (!greeted || closing || pulseOff || !target.token || refusing !== null) return;
+    const session = await hints(client).catch(() => ({}) as Record<string, string>);
+    const id = session['x-braindog-client'] ?? io.session;
+    if (typeof id !== 'string' || id === '' || !unreported(id)) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    await Promise.race([inLane(), new Promise<void>((done) => (timer = setTimeout(done, SEEN_FIRST_MS)))]);
+    if (timer !== null) clearTimeout(timer);
   };
 
   /**
@@ -645,6 +686,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     if (id !== null) open.set(id, stop);
     let reply: Reply | null;
     try {
+      if (method === 'tools/call') await seenFirst();
       const sent = withOpId(message, takes);
       /* POST THROWS only before it sends (its headers or its body), so a throw is a request that never left. */
       const once = () => post(sent.message, AbortSignal.any([stop.signal, AbortSignal.timeout(ms)])).catch((): Outcome => ({ kind: 'away', maybe: false }));

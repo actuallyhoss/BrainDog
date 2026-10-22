@@ -39,6 +39,12 @@
  * AND ITS BUILD BESIDE IT, as `braindog.mjs.build`: one line, the tuple, and nothing else. `braindog update` reads it
  * first from the address the install script downloads from, so a command that is already the served build says so
  * without fetching the bundle, and one that is behind names the build it is about to become.
+ *
+ * AND THE HOOKS' OWN ENTRY INSIDE IT. The prompt, tool and stop hooks, and Codex's turn end, read one local file and
+ * print; starting Node on the whole bundle for that cost 77 ms where the reader alone costs 20. So
+ * `src/inbox-file.ts`, which imports nothing but Node's own modules, is built first on its own and defined into the
+ * bundle as `__INBOX_HOOK__`, as the skill is, and the command writes it beside its hook scripts as
+ * `braindog-inbox.mjs` (`hookScripts` in `main.ts`). One file is still all a machine downloads.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -114,6 +120,36 @@ try {
   fail(`The Agent Skill is not at ${SKILL}, and the CLI carries it, so there is nothing to bundle.`);
 }
 
+/* THE HOOKS' ENTRY, built on its own (see the top). A module that came to import more than Node's own would make every
+   hook start slow again, so its output is held to that: an import of anything but a `node:` module stops the build. */
+let inboxHook = '';
+try {
+  const built = await build({
+    absWorkingDir: ROOT,
+    entryPoints: ['src/inbox-file.ts'],
+    bundle: true,
+    write: false,
+    platform: 'node',
+    format: 'esm',
+    target: 'node24',
+    logLevel: 'warning',
+  });
+  inboxHook = built.outputFiles[0]?.text ?? '';
+} catch {
+  fail('The hooks\' own entry did not build; the errors above name each file and line.');
+}
+if (inboxHook === '' || /^import\s.*from\s+["'](?!node:)/mu.test(inboxHook)) fail('The hooks\' own entry imports something other than Node\'s own modules, which every hook would then load.');
+
+/* THE STATUS LINE'S ENTRY, built the same way and held to the same rule: Claude Code runs it on every redraw. */
+let statusEntry = '';
+try {
+  const built = await build({ absWorkingDir: ROOT, entryPoints: ['src/statusline-entry.ts'], bundle: true, write: false, platform: 'node', format: 'esm', target: 'node24', logLevel: 'warning' });
+  statusEntry = built.outputFiles[0]?.text ?? '';
+} catch {
+  fail('The status line\'s own entry did not build; the errors above name each file and line.');
+}
+if (statusEntry === '' || /^import\s.*from\s+["'](?!node:)/mu.test(statusEntry)) fail('The status line\'s own entry imports something other than Node\'s own modules, which every redraw would then load.');
+
 /* THE OLD THREE GO FIRST, so a build that fails leaves no file beside a checksum or a build written for another. */
 rmSync(OUT, { force: true });
 rmSync(SUM, { force: true });
@@ -128,7 +164,7 @@ try {
     platform: 'node',
     format: 'esm',
     target: 'node24',
-    define: { __BUILD__: JSON.stringify(tuple), __SKILL__: JSON.stringify(skill) },
+    define: { __BUILD__: JSON.stringify(tuple), __SKILL__: JSON.stringify(skill), __INBOX_HOOK__: JSON.stringify(inboxHook), __STATUSLINE_ENTRY__: JSON.stringify(statusEntry) },
     // A COMMONJS DEPENDENCY STILL CALLS require() INSIDE AN ESM FILE. `yaml` asks for `process` that way, and esbuild's
     // shim throws "Dynamic require is not supported" unless a real `require` is in scope, so the bundle makes one.
     banner: { js: "import { createRequire as __braindogRequire } from 'node:module';\nconst require = __braindogRequire(import.meta.url);" },

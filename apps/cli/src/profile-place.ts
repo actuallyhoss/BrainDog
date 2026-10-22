@@ -10,7 +10,8 @@
  * retired are left alone, and nothing is said.
  *
  * THROUGH THE NORMAL WRITE PATH, AS THE SESSION'S RUN: a `create` or an `update`, so his settings and the ladder decide
- * it as they decide any agent's write. Where they ask, it is a question on Decide, and the day is still spent.
+ * it as they decide any agent's write. Where they ask, it is a question on Decide, and the place then waits `QUIET_DAYS`
+ * before it is kept again, so a ladder that asks files one question a month, not one a day.
  *
  * ONCE A DAY, CLAIMED BEFORE IT IS ASKED (`~/.braindog/places.json`), so ten sessions starting together in one profile
  * write once. A host that did not answer gives the day back, and the next session tries again.
@@ -54,7 +55,10 @@ const PAGES = 10;
 
 type Decl = { id: string; title: string; role?: unknown; done?: unknown; fields: { id: string; type?: unknown; to?: unknown; required?: unknown; retired?: unknown }[] };
 type Row = { id: string; seq: number; version: number; state: string | null; fields: Record<string, unknown> };
-type Kept = { host: string; profile: string; machine: string; day: string };
+type Kept = { host: string; profile: string; machine: string; day: string; until?: string };
+
+/** How long a place that became a question waits before it is kept again. */
+export const QUIET_DAYS = 30;
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const isDecl = (x: unknown): x is Decl => isObject(x) && typeof x.id === 'string' && typeof x.title === 'string' && Array.isArray(x.fields);
@@ -89,17 +93,17 @@ const sameKept = (k: Kept, p: Pick<PlaceIo, 'host' | 'profile' | 'machine'>) => 
 /** Whether this profile's place on this machine was kept today, for this record. */
 export function placedToday(home: string, p: Pick<PlaceIo, 'host' | 'profile' | 'machine'>, now: number = Date.now()): boolean {
   const day = dayOf(now);
-  return readKept(home).some((k) => k.day === day && sameKept(k, p));
+  return readKept(home).some((k) => sameKept(k, p) && (k.day === day || (k.until !== undefined && k.until >= day)));
 }
 
 /* Written whole beside the file and renamed over it, keeping today's alone, as `started.json` is. */
-function writeKept(home: string, p: Pick<PlaceIo, 'host' | 'profile' | 'machine'>, now: number, keep: boolean): void {
+function writeKept(home: string, p: Pick<PlaceIo, 'host' | 'profile' | 'machine'>, now: number, keep: boolean, until?: string): void {
   const day = dayOf(now);
-  const kept = readKept(home).filter((k) => k.day === day && !sameKept(k, p));
+  const kept = readKept(home).filter((k) => (k.day === day || (k.until !== undefined && k.until >= day)) && !sameKept(k, p));
   mkdirSync(join(home, '.braindog'), { recursive: true, mode: 0o700 });
   const file = placesPath(home);
   const tmp = `${file}.${String(process.pid)}.tmp`;
-  const placed = keep ? [...kept, { host: p.host, profile: p.profile, machine: p.machine, day }] : kept;
+  const placed = keep ? [...kept, { host: p.host, profile: p.profile, machine: p.machine, day, ...(until === undefined ? {} : { until }) }] : kept;
   writeFileSync(tmp, `${JSON.stringify({ placed }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);
 }
@@ -113,9 +117,9 @@ function writeKept(home: string, p: Pick<PlaceIo, 'host' | 'profile' | 'machine'
 export async function keepPlace(p: PlaceIo): Promise<PlaceOutcome> {
   const now = p.now ?? Date.now();
   if (placedToday(p.home, p, now)) return 'already';
-  const claim = (keep: boolean) => {
+  const claim = (keep: boolean, until?: string) => {
     try {
-      writeKept(p.home, p, now, keep);
+      writeKept(p.home, p, now, keep, until);
     } catch {
       /* A home folder that cannot be written keeps the place again at the next session, and costs nothing else. */
     }
@@ -123,7 +127,39 @@ export async function keepPlace(p: PlaceIo): Promise<PlaceOutcome> {
   claim(true);
   const out = await placeOnce(p, now).catch((): PlaceOutcome => 'away');
   if (out === 'away') claim(false);
+  if (out === 'asked') claim(true, dayOf(now + QUIET_DAYS * 86_400_000));
   return out;
+}
+
+/** What the status line sends: how much of each limit a profile has used, and when the limit resets. Numbers and a time. */
+export type Meters = { five_hour_pct: number | null; seven_day_pct: number | null; resets_at: string | null };
+
+/**
+ * Write a profile's limit meters on its row of the Profiles list, found as `keepPlace` finds it (the list that plays
+ * `role: profiles`, the row named for this profile). SHOWN, NEVER ACTED ON. A record without the add-on, one whose
+ * version has no meter fields yet, a profile no row is named for and a profile he retired are left alone, and nothing
+ * is said. Through the normal write path, so his settings and the ladder decide it.
+ */
+export async function keepMeters(p: { ask: Ask; profile: string; meters: Meters; now?: number | undefined }): Promise<PlaceOutcome> {
+  try {
+    const schemas = await p.ask('schemas', { every: true });
+    if (schemas.kind !== 'ok') return schemas.kind === 'gone' ? 'away' : 'refused';
+    const lists = isObject(schemas.value) && isObject(schemas.value.lists) ? schemas.value.lists : {};
+    const profiles = Object.values(lists).find((d): d is Decl => isDecl(d) && d.role === 'profiles');
+    if (profiles === undefined) return 'none';
+    /* THE FIELDS ARE THE BEAT'S OWN KEYS, each written only where the list declares it: a list that declares none of the meters is not the one that keeps them. */
+    const values: Record<string, unknown> = { ...p.meters, beat_at: new Date(p.now ?? Date.now()).toISOString() };
+    const metered = Object.keys(values).filter((f) => live(profiles, f) !== undefined);
+    if (!Object.keys(p.meters).some((f) => metered.includes(f))) return 'none';
+    const named = await rowsOf(p.ask, profiles.id);
+    if (!Array.isArray(named)) return named;
+    const profile = named.find((r) => same(r.fields[profiles.title], p.profile) && !doneIn(profiles, r));
+    if (profile === undefined) return 'none';
+    const patch = Object.fromEntries(metered.filter((f) => values[f] !== null && values[f] !== undefined).map((f) => [f, values[f]]));
+    return written(await p.ask('update', { register: profiles.id, seq: profile.seq, patch, version: profile.version }));
+  } catch {
+    return 'away';
+  }
 }
 
 /** Every row of one list, a page at a time, or why not. */

@@ -487,3 +487,29 @@ test('SIGNED OUT, BRAINDOG\'S OWN HOOKS AND SERVER ARE PLACED, and the record\'s
   assert.match(run.all(), /This machine is not signed in to BrainDog, so the record was not read/);
   assert.match(run.all(), /3\. Tools: the record was not read, so none was written\./);
 });
+
+test("CODEX ON THE MACHINE GETS ITS TURN END, BRAINDOG'S AGENTS.md BLOCK AND THE SERVER, each program asked about as Codex's", async () => {
+  /* Codex's folder is the home's, never the machine's own. */
+  delete process.env.CODEX_HOME;
+  const p = planted();
+  mkdirSync(join(p.home, '.codex'));
+  const rec = record({ tools: tools(), skills: skills() });
+  const run = machine(p, rec);
+  await envApply([], run.io);
+  assert.ok(run.asked.includes("Allow BrainDog's turn end to run from Codex on this machine? [y/N] "), run.asked.join('\n'));
+  assert.ok(run.asked.includes("Allow BrainDog's MCP server to run from Codex on this machine? [y/N] "), run.asked.join('\n'));
+  const config = readFileSync(join(p.home, '.codex', 'config.toml'), 'utf8');
+  assert.match(config, /^# braindog: the notify line below is BrainDog's/u);
+  assert.match(config, /^\[mcp_servers\.braindog\]$/mu);
+  assert.match(readFileSync(join(p.home, '.codex', 'AGENTS.md'), 'utf8'), /^## BrainDog$/mu);
+  assert.match(run.all(), /^Codex, ~\/\.codex:$/mu);
+
+  /* A SECOND RUN ASKS NOTHING MORE AND LEAVES CODEX'S FOLDER AS IT WAS. */
+  const before = hashOf(join(p.home, '.codex'));
+  const again = machine(p, rec);
+  await envApply([], again.io);
+  assert.equal(hashOf(join(p.home, '.codex')), before);
+  assert.ok(!again.asked.some((q) => q.includes('from Codex')), again.asked.join('\n'));
+  assert.ok(again.all().includes("1. Hooks: Codex already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block."), again.all());
+  assert.ok(again.all().includes('2. MCP server: braindog is already registered in Codex, running this command.'), again.all());
+});

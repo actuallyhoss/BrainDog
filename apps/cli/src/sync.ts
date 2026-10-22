@@ -17,6 +17,11 @@
  *
  * A PLAN AND A PRINTER, as `doctor` has. `planInventory` walks the folders it is handed and `printInventory` makes the
  * lines, so a test plants a home and no real one is read.
+ *
+ * AND WHAT IS SEALED ALREADY, on a machine that has joined setup sync: each machine that has sent a bundle, its newest
+ * bundle's time, and the sealed files by count and size, read off the record's list of them (`sealedSeen` in
+ * `sync-record.ts`). Nothing sealed is opened, and the sync key is not asked for. The verbs that seal and place are
+ * `sync join`, `push`, `pull`, `patches`, `drill` and `retire` (§5.20).
  */
 
 import { execFile } from 'node:child_process';
@@ -29,6 +34,7 @@ import { oneLine } from './clip.ts';
 import { ccenvHome, isFolder, profilesIn, realOf, shown, SKIPPED } from './doctor.ts';
 import { recordNames, type RecordNames, type Unread } from './env.ts';
 import { isObject, readLock } from './skills.ts';
+import type { SealedSeen } from './sync-record.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -57,8 +63,9 @@ export type Repo = { repo: string; worktreeOf: string | null; unpushed: number |
 /**
  * The plan: what it would carry, what it would refuse, each repository, the folders named with `--under`, and where
  * the skills the record holds were read from, the record or, when it could not be read, this machine's skills lock.
+ * On a machine that has joined setup sync, what the record keeps sealed already.
  */
-export type Inventory = { items: Item[]; refused: Refused[]; repos: Repo[]; under: string[]; skills: { from: 'record' } | { from: 'lock'; why: Unread } };
+export type Inventory = { items: Item[]; refused: Refused[]; repos: Repo[]; under: string[]; skills: { from: 'record' } | { from: 'lock'; why: Unread }; sealed?: SealedSeen };
 
 /** Git, run in a folder with its arguments: what it printed, or `null` when it failed. */
 export type Git = (cwd: string, args: string[]) => Promise<string | null>;
@@ -107,10 +114,13 @@ const list = (folder: string): string[] => {
 const SIGN_IN_FILE = /^(?:\.?credentials\.json|auth\.json|\.netrc|\.npmrc|\.pypirc|id_(?:rsa|dsa|ecdsa|ed25519))$|\.(?:pem|key|p12|pfx|jks|keystore)$/i;
 
 /**
- * The agent apps' own sign-ins, which the inventory names by `stat` alone and refuses: a Claude Code profile's file and
- * Codex's. A refusal list too, and the one place in the command they are named (`tools/gates/no-login.mjs`).
+ * The agent apps' own logins, which nothing BrainDog runs reads, holds or moves: a Claude Code profile's file, Codex's
+ * file, the Keychain item Claude Code keeps a profile's login in, and the claude.ai login inside it. The inventory sizes
+ * the two files by `stat` alone and refuses them, and the setup sync verbs refuse a path, a file or an item that names
+ * any of the four (`carry.ts`, `secret-store.ts`). A refusal list too, and the one place in the command they are named
+ * (`tools/gates/no-login.mjs`).
  */
-const SIGN_INS = { profile: '.credentials.json', codex: 'auth.json' } as const;
+export const SIGN_INS = { profile: '.credentials.json', codex: 'auth.json', keychain: 'Claude Code-credentials', login: 'claudeAiOauth' } as const;
 /** Words in a name that say a key may be inside, whatever the file. */
 const KEY_WORDS = new Set(['key', 'keys', 'apikey', 'secret', 'secrets', 'password', 'passwords', 'passwd', 'credential', 'credentials']);
 /** Words that say the same of a file of data, and not of a program, which handles a sign-in rather than keeping one. */
@@ -194,7 +204,7 @@ function trackedSkills(record: RecordNames, home: string): Set<string> {
 const REPO_DEPTH = 3;
 
 /** Every repository under a folder, by its `.git`, to `REPO_DEPTH` folders down. A repository's own folders are not entered. */
-function reposUnder(folder: string, depth: number = REPO_DEPTH): string[] {
+export function reposUnder(folder: string, depth: number = REPO_DEPTH): string[] {
   try {
     lstatSync(join(folder, '.git'));
     return [folder];
@@ -427,11 +437,32 @@ export function printInventory(inv: Inventory): string[] {
   const files = inv.items.reduce((sum, i) => sum + i.files, 0);
   const n = inv.refused.length;
   lines.push(`It would carry ${count(files, 'file', 'files')}, ${sized(size)}, and refuse ${n === 1 ? 'one thing' : `${n.toLocaleString('en-US')} things`}.`);
+  if (inv.sealed !== undefined) lines.push(...sealedLines(inv.sealed));
   return lines;
 }
 
-/** What the verb reads beyond its arguments, each a test's to hand in: no real home, environment, record or git then. */
-export type InventoryIo = { home?: string; env?: Env; record?: (host: string | undefined) => Promise<RecordNames>; git?: Git };
+/** What the record keeps sealed already, as lines: the files in all, then each machine with its newest bundle. */
+function sealedLines(s: SealedSeen): string[] {
+  const joined = `this machine joined setup sync on ${s.host} as ${oneLine(s.machine)}`;
+  if ('unread' in s) return [`Sealed already: ${joined}, and the record did not list what it keeps. ${oneLine(s.unread)}`];
+  if (s.machines.length === 0) return [`Sealed already: ${joined}, and no machine has sent a bundle yet. braindog sync push sends this one's.`];
+  return [
+    `Sealed already: ${joined}. The record keeps ${count(s.files, 'sealed file', 'sealed files')}, ${sized(s.size)}, none of them opened here:`,
+    ...s.machines.map((m) => `  ${oneLine(m.slug)}: ${count(m.bundles, 'bundle', 'bundles')}, the newest sent ${m.newest.slice(0, 16).replace('T', ' ')} UTC`),
+  ];
+}
+
+/**
+ * What the verb reads beyond its arguments, each a test's to hand in: no real home, environment, record or git then.
+ * `sealed` says what setup sync keeps for the record; with none, the inventory says nothing of it.
+ */
+export type InventoryIo = {
+  home?: string;
+  env?: Env;
+  record?: (host: string | undefined) => Promise<RecordNames>;
+  git?: Git;
+  sealed?: (host: string | undefined, env: Env, home: string) => Promise<SealedSeen | null>;
+};
 
 /**
  * `braindog sync inventory`: its arguments read, the record asked for its skills and the plan made and printed.
@@ -448,13 +479,18 @@ export async function syncInventory(args: string[], io: InventoryIo = {}): Promi
   const home = io.home ?? homedir();
   const env = io.env ?? process.env;
   const record = await (io.record ?? ((host: string | undefined) => recordNames(host, env, { tools: false })))(values.host);
-  const report = await planInventory({ home, profiles: profilesIn(home, [], env), record, env, under: values.under ?? [], git: io.git ?? runGit });
+  const plan = await planInventory({ home, profiles: profilesIn(home, [], env), record, env, under: values.under ?? [], git: io.git ?? runGit });
+  const sealed = io.sealed === undefined ? null : await io.sealed(values.host, env, home);
+  const report: Inventory = sealed === null ? plan : { ...plan, sealed };
   return { lines: printInventory(report), report, json: values.json === true, code: 0 };
 }
 
-/** `braindog sync <verb>`, of which `inventory` is the one. */
+/** The verbs of `braindog sync` that seal and place, each a command of its own (`main.ts`); `inventory` reads. */
+export const SYNC_VERBS: readonly string[] = ['join', 'push', 'pull', 'patches', 'drill', 'retire'];
+
+/** `braindog sync inventory`, the one verb of `sync` that only reads. */
 export async function syncCommand(args: string[], io: InventoryIo = {}): ReturnType<typeof syncInventory> {
   const [verb, ...rest] = args;
-  if (verb !== 'inventory') throw new Error('braindog sync takes inventory, as in braindog sync inventory.');
+  if (verb !== 'inventory') throw new Error('braindog sync takes inventory, join, push, pull, patches, drill or retire, as in braindog sync inventory.');
   return syncInventory(rest, io);
 }

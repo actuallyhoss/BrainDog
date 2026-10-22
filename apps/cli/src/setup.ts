@@ -4,8 +4,9 @@
  *
  * THE STEPS IN ORDER, EACH ONE ALREADY A COMMAND OF ITS OWN: sign in unless a live login for the host is held,
  * `install --apply` into every profile (the session's start and end, the beat, and the prompt, tool and stop hooks
- * that hear what he tells a run and deny its tools when he stops it), the `braindog` MCP server registered in every
- * profile and every other app, `tools write --scope user` with the record's global tools in every app, `skills sync`,
+ * that hear what he tells a run and deny its tools when he stops it) and, where Codex is, its turn end and BrainDog's
+ * block in its AGENTS.md (`clients/codex-hooks.ts`), the `braindog` MCP server registered in every profile and every
+ * other app, `tools write --scope user` with the record's global tools in every app, `skills sync`,
  * and one token for each kind of agent wired, each approved in the app (`agentTokens`). Each step prints one line
  * saying what it did or found, ONE LINE PER APP AND PROFILE where a step touches several, with the lines its command
  * would print indented under it, and the run stops at the first step that fails, with that step's sentence.
@@ -15,7 +16,7 @@
  * those kept from earlier runs in `~/.braindog/profiles.json`, which a run that writes keeps up to date, so a second
  * machine-wide run reaches a profile named once. A kept profile no longer on this machine is left out and said.
  *
- * A COPY OF EVERY FILE IT CHANGES, the first one named `<file>.pre-braindog`, his word for it (`backupOf` in
+ * A COPY OF EVERY FILE IT CHANGES, the first one named `<file>.pre-braindog`, the scope's word for it (`backupOf` in
  * `install.ts`): install's writer keeps one for the settings, and a profile's servers file is copied before
  * `claude mcp add-json` changes it, since that program writes the file and nothing here sees it written.
  *
@@ -44,9 +45,12 @@ import { createInterface } from 'node:readline/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { applyCodexHooks, planCodexHooks } from './clients/codex-hooks.ts';
 import { CLIENTS, type Client } from './clients/index.ts';
 import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
 import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL, serversFileOf } from './install.ts';
+import { keepPin, pinOf, pinsFile, readPins } from './pins.ts';
+import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { approveOperation, login, machineName } from './login.ts';
 import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
 import { writeTools } from './tools.ts';
@@ -93,7 +97,7 @@ export async function askTerminal(question: string, signal?: AbortSignal): Promi
 }
 
 const USAGE =
-  'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, with --dry-run or --yes, --only <app> and --profile <folder>, and nothing else.';
+  'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, with --dry-run or --yes, --only <app>, --profile <folder> and --statusline, and nothing else.';
 
 /**
  * The real `claude`, run in the profile `env` names. NO SHELL, and its output is not relayed, as `runClaude` in
@@ -173,7 +177,7 @@ const profileEnv = (dir: string, io: SetupIo): Env => envFor(dir, io.home, io.en
 export const serverFor = (agent: string): Record<string, unknown> => ({ type: 'stdio', command: BRAINDOG_SERVER.command, args: [BRAINDOG_SERVER.args[0], 'mcp', '--agent', agent] });
 
 /** Whether an entry runs the same server as `want`: the type may be left out of a stdio one, and an empty `env` is no change. */
-function sameServer(held: unknown, want: Record<string, unknown>): boolean {
+export function sameServer(held: unknown, want: Record<string, unknown>): boolean {
   if (!isObject(held)) return false;
   const args = Array.isArray(held.args) ? held.args : [];
   const wanted = Array.isArray(want.args) ? want.args : [];
@@ -270,7 +274,7 @@ export async function registerServer(dir: string, o: { home: string; env: Env; c
 }
 
 /** An app's own person-wide entry of this name, as its reader reads it: the last place that writes at user scope wins. */
-function heldIn(client: Client, name: string, io: SetupIo): unknown {
+export function heldIn(client: Client, name: string, io: { home: string; cwd: string }): unknown {
   let held: unknown;
   for (const set of client.servers(io.home, null, io.cwd)) if (set.writes === 'user' && isObject(set.servers) && Object.hasOwn(set.servers, name)) held = set.servers[name];
   return held;
@@ -329,13 +333,13 @@ function whatIsLeft(rows: ToolRow[], conn: Connected, key: string, io: SetupIo):
 
 /** `braindog setup <url> [--dry-run | --yes] [--only <app>] [--profile <folder>]`, and the exit code: the first failing step's, or 0. */
 export async function setup(args: string[], io: SetupIo): Promise<number> {
-  let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined; only?: string[] | undefined; profile?: string[] | undefined }; positionals: string[] };
+  let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined; statusline?: boolean | undefined; only?: string[] | undefined; profile?: string[] | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({
       args,
       allowPositionals: true,
       strict: true,
-      options: { 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' }, only: { type: 'string', multiple: true }, profile: { type: 'string', multiple: true } },
+      options: { 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' }, statusline: { type: 'boolean' }, only: { type: 'string', multiple: true }, profile: { type: 'string', multiple: true } },
     });
   } catch {
     /* parseArgs quotes what it could not read, and that could be a token pasted in the wrong place. */
@@ -473,6 +477,66 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     io.say(e instanceof Error ? e.message : String(e));
     io.out("2. Hooks: Claude Code's settings could not be changed, so setup stopped there.");
     return 1;
+  }
+  /*
+   * AND CODEX'S, WHEN IT IS HERE (`clients/codex-hooks.ts`): its turn end, `notify`, in a marked block of its
+   * config.toml, and BrainDog's block in its AGENTS.md. Shown first and asked, as Claude Code's are, since the turn end
+   * runs a program in every Codex session; `--yes` answers ahead.
+   */
+  if (here.some((c) => c.id === 'codex')) {
+    const plan = planCodexHooks({ home: io.home, env: io.env, scripts: io.scripts });
+    if (plan.writes.length === 0) {
+      io.out(plan.left.length === 0 ? "2. Hooks, Codex: its config already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block." : '2. Hooks, Codex: nothing was added, and this is why:');
+      detail(plan.left);
+    } else if (dryRun) {
+      io.out("2. Hooks, Codex: BrainDog's turn end and its block in AGENTS.md would be added, with a copy of each file kept first:");
+      detail([...plan.lines, ...plan.left]);
+    } else {
+      io.out("2. Hooks, Codex: these changes to Codex's files come next, with a copy of each file kept first:");
+      detail([...plan.lines, ...plan.left]);
+      const yes = parsed.values.yes === true || (await (io.ask ?? ((q: string) => askTerminal(q, io.signal)))('Write these changes? [y/N] '));
+      if (yes === null) {
+        io.out(`   Nothing was written, because no one is at a terminal to say yes. Run braindog setup ${key} --yes to write them.`);
+        return 1;
+      }
+      if (!yes) {
+        io.out(`   Nothing was written to Codex's files, so setup stopped there. Run braindog setup ${key} again to be asked again.`);
+        return 1;
+      }
+      const done = applyCodexHooks(plan, copied);
+      if (!done.written) {
+        io.out("   Codex's files could not all be written, so setup stopped there:");
+        detail(done.lines);
+        return 1;
+      }
+      changed = true;
+      io.out("   Written: BrainDog's turn end is in Codex's config.toml, and its block in Codex's AGENTS.md.");
+      detail(done.lines);
+    }
+  }
+
+  /* ── 2b. the status line, only in a profile that has none of its own ─── */
+  if (claude && parsed.values.statusline === true) {
+    const bare = profiles.filter((dir) => statusLineIn(dir) === 'none');
+    if (bare.length > 0 && !dryRun) {
+      io.out(`2b. Status line: braindog statusline shows the model, the folder and the limits, and runs on every draw. It would be set in ${bare.map((dir) => nameOf(dir, io.home)).join(', ')}, with a copy of each settings file kept first, and a status line of your own is never touched.`);
+      const pinFile = pinsFile(io.home);
+      const pins = readPins(pinFile);
+      const sha = pinOf('statusline', 'statusline', statusLineEntry(io.scripts));
+      const yes = pins?.[sha] !== undefined || parsed.values.yes === true || (await (io.ask ?? ((q: string) => askTerminal(q, io.signal)))('Set it? [y/N] '));
+      if (yes === true && pins !== null) {
+        for (const dir of bare) {
+          try {
+            placeStatusLine(dir, io.scripts);
+            keepPin(pinFile, sha, { name: 'statusline', kind: 'statusline', profile: nameOf(dir, io.home), now: Date.now() });
+            changed = true;
+            io.out(`   Written: ${nameOf(dir, io.home)} now draws braindog statusline.`);
+          } catch (e) {
+            io.say(e instanceof Error ? e.message : String(e));
+          }
+        }
+      } else io.out('   Left as it is.');
+    } else if (bare.length > 0) io.out(`2b. Status line: braindog statusline would be set in ${bare.map((dir) => nameOf(dir, io.home)).join(', ')}.`);
   }
 
   /* ── 3. the MCP server, in every profile and every other app ─────────── */

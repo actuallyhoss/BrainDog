@@ -39,11 +39,24 @@
  *
  * THE EVENT'S PATH TO THE CONVERSATION IS NEVER READ (`tools/gates/no-transcript.mjs`): `eventOf` below names the
  * fields it keeps, and nothing else of the event is looked at.
+ *
+ * AND CODEX'S TURN END (`notify`). Codex has no hook that can put words in front of the model; what it has is `notify`,
+ * a program it runs after each turn with one JSON argument (`notifyHook` below). The bridge Codex starts keeps this
+ * same inbox file for the session, named by the Codex process both are children of (`codexSession`). When a turn ends
+ * and the run still has not taken something he told it, the person at this machine is told once, in a notice of the
+ * system's own, since the model hears it only at its next BrainDog call. Of the event only its `type` is read: Codex
+ * also sends the turn's own words, which stay unread.
+ *
+ * ITS OWN ENTRY, AND THE BUNDLE'S TOO. A checkout runs this file (`node src/inbox-file.ts prompt`); the published
+ * command, which is one file, carries this module built on its own and writes it beside its hook scripts as
+ * `braindog-inbox.mjs` (`INBOX_ENTRY`, `scripts/bundle.mjs`), so a hook with work starts Node on a few kilobytes and
+ * not on the whole command. Measured on an M-series Mac: 20 ms against 77 for the whole bundle.
  */
 
+import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 type Env = Record<string, string | undefined>;
@@ -61,6 +74,19 @@ export function sessionsDir(env: Env, platform: string = process.platform): stri
 
 /** A host session's id as a file name: every character but a letter, digit, `_` and `-` made `_`, as the scripts make it. */
 export const fileId = (id: string): string => id.replace(/[^A-Za-z0-9_-]/gu, '_');
+
+/**
+ * A Codex session's name for its files: `codex-` and the Codex process's id. Codex says no session id to the server it
+ * starts, and its turn-end program learns the thread only after a turn, but both are children of the one Codex
+ * process, so its id is what they share (`process.ppid` in each).
+ */
+export const codexSession = (pid: number): string => `codex-${String(pid)}`;
+
+/** The hook entry the published command writes beside its hook scripts, this module built on its own. */
+export const INBOX_ENTRY = 'braindog-inbox.mjs';
+
+/** The program that reads the inbox file from a folder of hook scripts: the bundle's own entry there, else a checkout's source. */
+export const inboxEntryIn = (scripts: string): string => (existsSync(join(scripts, INBOX_ENTRY)) ? join(scripts, INBOX_ENTRY) : resolve(scripts, '..', 'src', 'inbox-file.ts'));
 
 export const inboxPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.json`);
 export const flagsPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.flags`);
@@ -109,10 +135,11 @@ export type Inbox = {
 
 /**
  * The hooks' own file, the hooks' alone to write: what each instruction was shown by and how (`shown`), the stop a
- * prompt last said (`said_stop`), the redirects a tool call was denied for (`redirected`) and the instructions a Stop
- * hook held the turn for (`blocked`). Each list only grows, so a reader holding an older copy decides no less.
+ * prompt last said (`said_stop`), the redirects a tool call was denied for (`redirected`), the instructions a Stop
+ * hook held the turn for (`blocked`), and those Codex's turn end told the person about (`noticed`). Each list only
+ * grows, so a reader holding an older copy decides no less.
  */
-export type HookState = { shown: Record<string, SeenHow>; said_stop: string | null; redirected: string[]; blocked: string[] };
+export type HookState = { shown: Record<string, SeenHow>; said_stop: string | null; redirected: string[]; blocked: string[]; noticed?: string[] };
 
 export const NO_STATE: HookState = { shown: {}, said_stop: null, redirected: [], blocked: [] };
 
@@ -172,7 +199,8 @@ export function readState(file: string): HookState {
   if (!isObject(x)) return { ...NO_STATE, shown: {} };
   const shown: Record<string, SeenHow> = {};
   if (isObject(x.shown)) for (const [id, how] of Object.entries(x.shown)) if (id.length <= 64 && SEEN.includes(how as SeenHow)) shown[id] = how as SeenHow;
-  return { shown, said_stop: text(x.said_stop, 64), redirected: ids(x.redirected), blocked: ids(x.blocked) };
+  const noticed = ids(x.noticed);
+  return { shown, said_stop: text(x.said_stop, 64), redirected: ids(x.redirected), blocked: ids(x.blocked), ...(noticed.length > 0 ? { noticed } : {}) };
 }
 
 /* Written whole and renamed, at 0600 in a folder made at 0700, as the session files are. */
@@ -468,23 +496,98 @@ export async function watchHook(stdin: string, env: Env, until: number = Date.no
   }
 }
 
-/* ── run as its own entry, from a checkout's hook script ───────────────── */
+/* ── Codex's turn end ───────────────────────────────────────────────────── */
+
+/** The kinds of what he told a run that ask it to do something, so a turn that ends without taking one is said. */
+const ASKS = new Set(['tell', 'redirect']);
+
+/** The most of his words a notice carries: a system notice shows two lines or so. */
+const NOTICE_MOST = 140;
+
+/** How the notice reaches the person: the system's own, started and left, so the turn's end waits on nothing. */
+export type Show = (title: string, body: string) => void;
+
+/** AppleScript's string, with its two special characters escaped, so his words can never end it early. */
+const appleString = (text: string): string => `"${text.replace(/[\\"]/gu, (c) => `\\${c}`)}"`;
+
+/** A notice of the system's own: Notification Center on a Mac, `notify-send` on Linux, nothing elsewhere. Never throws. */
+export const showNotice: Show = (title, body) => {
+  try {
+    const line = body.replace(/[\p{Cc}]/gu, ' ');
+    const run: [string, string[]] | null =
+      process.platform === 'darwin'
+        ? ['osascript', ['-e', `display notification ${appleString(line)} with title ${appleString(title)}`]]
+        : process.platform === 'linux'
+          ? ['notify-send', [title, line]]
+          : null;
+    if (run === null) return;
+    const child = spawn(run[0], run[1], { stdio: 'ignore', detached: true, shell: false, windowsHide: true });
+    child.on('error', () => undefined);
+    child.unref();
+  } catch {
+    /* A notice not shown is the instruction still waiting in the app, as it would without this. */
+  }
+};
+
+/**
+ * Codex's `notify`: after a turn, what the person is told about the run, or `null` for nothing. `payload` is the one
+ * argument Codex passes, JSON, of which only `type` is read; `session` is `codexSession` of the Codex process.
+ *
+ * ONCE PER INSTRUCTION, and only for one that asks the run to do something and that it has not taken, while the file is
+ * fresh: a turn that ends without taking it leaves it waiting until the next turn, which the person may not start for
+ * hours. A stop or a pause needs no notice, since a run that ended its turn is already doing nothing. Never throws.
+ */
+export function notifyHook(payload: string, env: Env, session: string, now: number = Date.now(), show: Show = showNotice): string | null {
+  try {
+    let x: unknown;
+    try {
+      x = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+    if (!isObject(x) || x.type !== 'agent-turn-complete') return null;
+    const inbox = readInbox(inboxPath(env, session));
+    if (inbox === null || stale(inbox, now)) return null;
+    const state = readState(statePath(env, session));
+    const noticed = state.noticed ?? [];
+    const due = inbox.pending.filter((t) => ASKS.has(t.kind) && !t.taken && !noticed.includes(t.id));
+    if (due.length === 0) return null;
+    const first = due[0]!;
+    const words = first.said.replace(/\s+/gu, ' ').trim();
+    const quoted = words === '' ? '' : `: "${words.length > NOTICE_MOST ? `${words.slice(0, NOTICE_MOST - 3).trimEnd()}...` : words}"`;
+    const more = due.length > 1 ? ` And ${String(due.length - 1)} more.` : '';
+    const body = `Codex ended its turn without taking ${first.id}${quoted}. Send it any message and it reads it first.${more}`;
+    writeState(statePath(env, session), { ...state, noticed: [...noticed, ...due.map((t) => t.id)] });
+    show('BrainDog', body);
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+/* ── run as its own entry, from a hook script ──────────────────────────── */
 
 /*
- * `node src/inbox-file.ts prompt|tool|stop|watch`, the event on standard input. Only when this file is the program
- * itself, never inside the bundle, where every module is one file and `import.meta.url` is the bundle's. The watcher
- * exits 2 with what he said, which is how an async hook wakes Claude Code; everything else exits 0.
+ * `node src/inbox-file.ts prompt|tool|stop|watch`, the event on standard input, or `notify <json>`, the event as
+ * Codex's last argument. Only when this file is the program itself, a checkout's source or the bundle's own entry
+ * (`INBOX_ENTRY`), never inside the bundle, where every module is one file and `import.meta.url` is the bundle's. The
+ * watcher exits 2 with what he said, which is how an async hook wakes Claude Code; everything else exits 0.
  */
 const self = fileURLToPath(import.meta.url);
-if (/inbox-file\.ts$/u.test(self) && process.argv[1] !== undefined && resolve(process.argv[1]) === self) {
+const own = /inbox-file\.ts$/u.test(self) || basename(self) === INBOX_ENTRY;
+if (own && process.argv[1] !== undefined && resolve(process.argv[1]) === self) {
   const which = process.argv[2];
+  process.exitCode = 0;
+  if (which === 'notify') {
+    /* CODEX STARTED THIS PROGRAM ITSELF, so the process it shares with the bridge is this one's parent. */
+    notifyHook(process.argv.at(-1) ?? '', process.env, codexSession(process.ppid));
+  }
   let stdin = '';
   try {
-    if (!process.stdin.isTTY) stdin = readFileSync(0, 'utf8');
+    if (which !== 'notify' && !process.stdin.isTTY) stdin = readFileSync(0, 'utf8');
   } catch {
     /* No event is an event naming no session. */
   }
-  process.exitCode = 0;
   if ((HOOKS as readonly string[]).includes(which ?? '')) {
     const said = runHook(which as Which, stdin, process.env);
     if (said !== '') writeFileSync(1, `${said}\n`);

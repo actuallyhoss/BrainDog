@@ -1,9 +1,9 @@
 /**
  * The command lines a project is worked with, as its own Claude Code settings name them (AGT-D10 job 5, its settings
- * half). His words: "Every MCP server, CLI and integration an agent uses is recorded with:" (D0.41).
+ * half): "Every MCP server, CLI and integration an agent uses is recorded with:".
  *
  * ONLY THE PROJECT'S SETTINGS ARE READ. The scope also counts the shell calls in the session's own log, three or more
- * a program; his rule "transcripts never read" (AGT-B10 job 4) wins over it, so that half is not built, and
+ * a program; the rule "transcripts never read" (AGT-B10 job 4) wins over it, so that half is not built, and
  * `tools/gates/no-transcript.mjs` is red on any line here that opens one. What is read is `permissions.allow` in the
  * project's `.claude/settings.json` and `.claude/settings.local.json`, where an entry such as `Bash(wrangler:*)` says
  * the project lets an agent run that program by name.
