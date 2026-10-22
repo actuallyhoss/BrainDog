@@ -23,40 +23,20 @@
   what is coming up and people, on one board, and everything else behind one More. A page the person kept is drawn as
   they laid it out, with the desk over it, and only the tiles around it fold.
 
-  THREE READS OF THEIR OWN STAND AROUND THE PAGE, behind More: the briefing, what matters today as the record wrote it;
-  what went stale; and who the record matched. Each is asked for beside the page and never by its read, each is fetched
-  with its own part when it is asked for, and each draws nothing for a record that answers none (`homeReads`). After
-  them, what the record found wrong in its own pages and notes (`TextFaults.svelte`), fetched the same way and drawn
-  only when it found something, and what the answers taught (`Learned.svelte`), the same way.
+  ONE READ OF ITS OWN STANDS BESIDE THE PAGE, behind More: the briefing, what matters today as the record wrote it,
+  asked for beside the page and never by its read, fetched with its own part, and drawn for a record that answers any.
+
+  THE RECORD'S HOUSEKEEPING IS NOT HERE (the audit of 22 October, U3): what went stale, who it matched, what it found
+  wrong in its own pages and notes, what the answers taught, what may be one, what has no colour and the imported rules
+  are Settings › Health, read only when that opens. Today asks none of them, the walk of every page and note least of all.
 -->
 <script module lang="ts">
-  /** What Today draws, top to bottom. */
-  export type HomePart = 'briefing' | 'page' | 'stale' | 'matched';
-
   /** Whether Today has been drawn once in this tab: its tiles come in on the first load only. */
   let enteredOnce = false;
   /** When this tab last drew Today from the record, so an open while that is kept draws it and not the local copy. */
   let drewAt = 0;
   /** How long after the first read the tiles still come in, so the desk's late parts land the same way. */
   const ENTER_HELD_MS = 900;
-
-  /**
-   * What Today draws and in what order, from how many briefing cards, how many matches and how many kinds of stale
-   * thing the record answered: the briefing first, the page, what went stale under it, and who was matched last. A
-   * read still out, a refusal and an empty answer are all none, and a record with none of them draws its page as it
-   * did before there was any.
-   *
-   * `stale` IS LAST AND MAY BE LEFT OUT, so a caller written before there was one answers as it did.
-   *
-   * IT IMPORTS NOTHING, so `home-reads.test.ts` runs it as it is written.
-   */
-  export function homeReads(briefing: number, matched: number, stale = 0): HomePart[] {
-    const parts: HomePart[] = ['page'];
-    if (briefing > 0) parts.unshift('briefing');
-    if (stale > 0) parts.push('stale');
-    if (matched > 0) parts.push('matched');
-    return parts;
-  }
 </script>
 
 <script lang="ts">
@@ -67,7 +47,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
-  import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
+  import { homeSlugOf } from '$lib/voice.ts';
+  import { useCaseName } from '@braindog/seed/usecases/names';
   import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import { may } from '$lib/record/may.ts';
@@ -81,7 +62,7 @@
   import { listen } from '$lib/page/listen.svelte.ts';
   import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
   import { markAll } from '$lib/record/news-live.ts';
-  import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
+  import { HOUSE_VOICE, holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
     NEEDS_YOU_LIMIT_PHONE,
@@ -112,12 +93,14 @@
   import { learn } from '$lib/record/remote.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
-  import { createClient, wrote, type Cursor, type EngineHealth, type EventLine } from '@braindog/client';
-  import { engineLine, type EngineLine } from '$lib/ui/engine-line.ts';
+  import { createClient, wrote, type Cursor, type EngineHealth, type EventLine, type SlashStatus } from '@braindog/client';
+  import { quietLine } from '$lib/ui/engine-line.ts';
   import { page } from '$app/state';
   import { afterNavigate } from '$app/navigation';
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
+  import { briefOf, greetingOf, inBriefOrder, lateOf, unasked, type Brief, type BriefPart } from '$lib/home/today-brief.ts';
+  import LateNow from '$lib/home/LateNow.svelte';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { toldNow } from '$lib/home/told-now.svelte.ts';
   import { answeredBy, doneToday, toldNeedOf } from '$lib/record/told-live.ts';
@@ -125,8 +108,6 @@
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { anchorsFor, inPicture, type Placed } from '$lib/home/desk-order.ts';
   import type { BriefingRow } from '$lib/home/briefing.ts';
-  import type { MatchedRow } from '$lib/home/matched.ts';
-  import type { StaleRow } from '$lib/home/stale.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -171,26 +152,36 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  /* THE TITLE IS THE VOICE'S WORD FOR HOME WHEN A USE CASE SAYS ONE, else Today. */
-  const title = $derived.by(() => {
-    const voiced = said('home');
-    return voiced !== VOICE_LINES.home ? voiced : copy.today;
-  });
-
-  /* THE CALM LINE IS THE VOICE'S when a use case words it, and otherwise Home's own. */
-  const nothing = $derived(said('nothing_needs_you') !== VOICE_LINES.nothing_needs_you ? said('nothing_needs_you') : words.nothingNow);
+  /* TODAY IS TODAY ON EVERY RECORD (the audit of 22 October, U1): a use case adds words for new things and never renames
+     one of the five places, so neither the title nor the calm line takes the voice's word ("Team", "Nothing needs your
+     call"). */
+  const title = copy.today;
+  const nothing = words.nothingNow;
 
   /* TODAY'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after the first
      read asks it again in its own words. Built by the same helper the arrange mode rebuilds Today's body with, so the
-     body arranged is the body drawn. */
-  const voice = $derived<HomeVoice>(voiceOf(said));
+     body arranged is the body drawn. NEEDS YOU IS A PLACE AND KEEPS ITS NAME, and so does its calm line: "Needs your
+     call" over the tile named a place the rail calls Needs you. */
+  const voice = $derived<HomeVoice>({ ...voiceOf(said), needsYou: HOUSE_VOICE.needsYou, nothingWaiting: HOUSE_VOICE.nothingWaiting });
 
   /**
-   * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
-   * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
-   * page is asked for when it is there, then the record's `home` when that is, and otherwise Today's body is drawn.
+   * ONLY A PAGE THE PERSON KEPT IS DRAWN IN THE DESK'S PLACE (U1). A use case's own `home-<id>` page never replaces the
+   * desk: on his record the Solo founder's report page stood where Today should be, with its tables, a by-book chart and
+   * "Needs your call", and no desk change since 19 October ever reached it. The desk draws on every record, and the use
+   * case's page stays a page of the record, one link away (`useCasePage`). A page kept by hand, `home`, is still drawn as
+   * it was laid out, and only a page the record holds is asked for.
    */
-  const declares = $derived(homeSlugOf(homePage(), data.pages));
+  const declares = $derived(homeSlugOf(null, data.pages));
+
+  /**
+   * THE USE CASE'S OWN PAGE, held and not drawn here: the one link the desk keeps to it, by the use case's name ("Solo
+   * founder"). `null` where the record holds none, or where a page kept by hand is drawn instead of the desk.
+   */
+  const useCasePage = $derived.by(() => {
+    const slug = homePage();
+    if (slug === null || declares !== null || !data.pages.includes(slug)) return null;
+    return { href: `/p/${slug}`, name: useCaseName(slug.replace(/^home-/u, '')) };
+  });
 
   /* ── a first Today: use case 6, steps 5 and 6 (planner-45, the onboarding target) ──────────────────── */
 
@@ -605,7 +596,6 @@
         settled = true;
         bodyAsked = true;
         fromMemory = false;
-        pageHeard();
         drewFirst();
         if (hold !== null && !hold.done) {
           hold.done = true;
@@ -731,10 +721,15 @@
   const desked = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
     /* ON A PHONE NEEDS YOU SHOWS FOUR, the first with its buttons and the rest rows a tap opens (the style below), and
-       its count still says how many wait: the rest are "N more". */
+       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk, at
+       the top with a button each, so the page's own late block is marked not drawn at its place and More does not say
+       it again. */
+    const lateAt = new Set(board ? (late?.at ?? []) : []);
     const blocks =
-      board && phone.current
-        ? shaped.blocks.map((b) => (b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b))
+      board && (phone.current || lateAt.size > 0)
+        ? shaped.blocks.map((b, n) =>
+            lateAt.has(n) ? { ...b, drawn: false } : phone.current && b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b,
+          )
         : shaped.blocks;
     /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
        reader indexes the blocks it is handed, so the order is made here, before it. */
@@ -765,40 +760,24 @@
   const phone = new MediaQuery('(width < 600px)', false);
 
   /**
-   * THE THREE READS AROUND THE PAGE, each with the part that draws it: the briefing (`briefing.ts`), what went stale
-   * (`stale.ts`) and who the record matched (`matched.ts`). `null` until one has answered, and an answer of none
-   * draws nothing.
+   * THE BRIEFING BESIDE THE PAGE (`briefing.ts`), with the part that draws it: what matters today as the record wrote it,
+   * and whether its written brief is paused, which the head says in its one quiet line (U7). `null` until it has
+   * answered, and an answer of none draws nothing.
    *
-   * BESIDE THE PAGE READ AND NEVER IN IT. The page is asked for in its own effect and waits on none of them, so Today
-   * paints as fast as it did; what lands later is put in its place by `homeReads`, keyed, and moves nothing drawn.
+   * BESIDE THE PAGE READ AND NEVER IN IT, asked the moment the page's own read has gone out, so the record answers the
+   * page first. It is the one read left beside the page: what went stale, who was matched and the rest of the record's
+   * housekeeping are Settings › Health (U3), and nothing of theirs is asked here.
    *
-   * FETCHED WHEN ASKED FOR, the reader and its part alike, as `Today.svelte` fetches the briefing's: this screen is the
-   * front door, and nothing here is added to what it loads first. No read of them can fail the screen, since each
-   * answers none for a host without the call, a reader it refuses and a line that dropped.
-   *
-   * ASKED AGAIN WHEN THE RECORD MOVES, and what is drawn stays until the new answer lands.
+   * FETCHED WHEN ASKED FOR, the reader and its part alike: this screen is the front door, and nothing here is added to
+   * what it loads first. No read of it can fail the screen, since it answers none for a host without the call, a reader
+   * it refuses and a line that dropped. ASKED AGAIN WHEN THE RECORD MOVES, and what is drawn stays until the new answer
+   * lands.
    */
   type BriefingPart = typeof import('./Briefing.svelte').default;
-  type MatchedPart = typeof import('./Matched.svelte').default;
-  type StalePart = typeof import('./Stale.svelte').default;
-  type FaultsPart = typeof import('./TextFaults.svelte').default;
-  type FaultsFound = import('./text-faults.ts').TextFaults;
   type HandledFound = import('./handled.ts').Handled;
-  type LearnedPart = typeof import('./Learned.svelte').default;
-  type LearnedFound = import('./learned.ts').Learned;
-  type NamedPart = typeof import('./NamedTwice.svelte').default;
-  type NamedFound = import('./named-twice.ts').NamedTile;
-  type HuesPart = typeof import('./Hues.svelte').default;
-  type HuesFound = import('./hues.ts').HuesFound;
-  type ImportedPart = typeof import('./ImportedRules.svelte').default;
-  type ImportedFound = import('./imported-rules.ts').ImportedFound;
   type DeskPart = typeof import('./Desk.svelte').default;
   type DeskCards = import('./desk-read.ts').Cards;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; paused: string | null; Part: BriefingPart } | null>(null);
-  let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
-  let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
-  /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
-  let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
   /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
   let handled = $state.raw<HandledFound | null>(null);
   /* THE FIRST BODY WAITS FOR THE FIRST HANDLED READ, a short while at most (`HANDLED_WAIT_MS`), so the foot's line is in
@@ -809,72 +788,41 @@
   let deskHeard: () => void = () => {};
   const deskLanded = new Promise<void>((done) => (deskHeard = done));
   const HANDLED_WAIT_MS = 800;
-  /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
-  let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
-  /* WHAT MAY BE ONE, kept only when there is something: nought draws nothing. */
-  let named = $state.raw<{ found: NamedFound; Part: NamedPart } | null>(null);
-  /* WHAT HAS NO COLOUR OF ITS OWN, kept only when there is something: nought draws nothing. */
-  let hues = $state.raw<{ found: HuesFound; Part: HuesPart } | null>(null);
-  /* IMPORTED AUTOMATIONS AS FILING RULES, an offer he presses. Kept once shown, so its Undo outlives the reread its press causes. */
-  let imported = $state.raw<{ found: ImportedFound; Part: ImportedPart } | null>(null);
-  /* WHETHER EVERY TILE BEHIND MORE HAS ANSWERED, so More says one count and not the count of whichever landed first: it
-     read 4 at 1,512 and 5 at 390 for one record, a picture each side of the last tile landing (VERIFY P3). */
-  let tilesHeard = $state(false);
+  /* WHETHER THE BRIEFING HAS ANSWERED, so More says one count and not a count that grows by one as it lands (VERIFY P3). */
+  let briefHeard = $state(false);
   /**
    * THE VERSION A TILE IS ASKED ONCE AT (`tileOnce`): the record's, as the poll heard it, and this tab's writes. Read in
    * each effect, so a move of the record still asks every tile again.
    */
   const asOf = (): string => `${moving.version} ${wrote()}`;
-  /**
-   * TODAY'S PAGE IS ASKED BEFORE THE TILES BEHIND MORE. The record answers one call at a time, so the briefing, the
-   * matches and what went stale, asked as the screen mounted, were answered ahead of the page they sit under. They are
-   * asked the moment the page's own read has gone out, and are still part of the screen's first read.
-   *
-   * AND THEY ARE SENT ONCE THE PAGE HAS LANDED (`pageLanded`), since they are folded behind More and nothing over the
-   * fold waits on them: sent beside it, they and the reads they lead to took five of the six places a browser keeps for
-   * one host, and the page's own walks of the lists its rows name waited behind them (`loop/perf/r3-diag.mjs`). The
-   * screen's bracket still opens with the page's, so it is not measured settled with a tile on its way.
-   */
+  /* WHETHER THE PAGE'S OWN READ HAS GONE OUT, so the briefing is asked after it and the record answers the page first. */
   let bodyAsked = $state(false);
-  let pageHeard: () => void = () => {};
-  const pageLanded = new Promise<void>((done) => (pageHeard = done));
-  /** The longest the tiles wait for the page, should its read never come back. */
-  const TILES_WAIT_MS = 2_000;
   $effect(() => {
     if (data.refused || !bodyAsked) return;
     const ver = asOf();
     const base = apiBase();
     let here = true;
-    /* WHAT TODAY LAST DREW OF THEM, drawn at once (`today-kept.ts`); with all three there, the reads land over them. */
+    /* WHAT TODAY LAST DREW OF IT, drawn at once (`today-kept.ts`); the read lands over it. */
     type Briefed = NonNullable<typeof brief>;
-    type Matches = NonNullable<typeof matched>;
-    type Stales = NonNullable<typeof stale>;
-    const wasBrief = untrack(() => brief) ?? keptPart<Briefed>('brief', base);
-    const wasMatched = untrack(() => matched) ?? keptPart<Matches>('matched', base);
-    const wasStale = untrack(() => stale) ?? keptPart<Stales>('stale', base);
-    brief = wasBrief;
-    matched = wasMatched;
-    stale = wasStale;
-    /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with a tile still on its way, and closed as
-       fine whatever came back: none of the reads refuses the screen. */
-    const at = (wasBrief && wasMatched && wasStale) || copyDrawn ? null : untrack(opened);
-    /* THE QUIET MARK IS NOT TOLD while a tile is still to be asked, copy drawn or not (`quiet`). */
+    const was = untrack(() => brief) ?? keptPart<Briefed>('brief', base);
+    brief = was;
+    if (was) briefHeard = true;
+    /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with it still on its way, and closed as fine
+       whatever came back: the briefing never refuses the screen. */
+    const at = was || copyDrawn ? null : untrack(opened);
+    /* THE QUIET MARK IS NOT TOLD while it is still to be asked, copy drawn or not (`quiet`). */
     const quietAgain = holdQuiet();
-    const after = Promise.race([pageLanded, new Promise<void>((done) => setTimeout(done, TILES_WAIT_MS))]);
-    const briefing = after.then(() => Promise.all([import('./briefing.ts'), import('./Briefing.svelte')])).then(async ([m, part]) => {
+    const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
       const out = await tileOnce('briefing', base, ver, () => m.readBriefingSaid(base));
       if (here) keepPart('brief', base, (brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default }));
     });
-    const matches = after.then(() => Promise.all([import('./matched.ts'), import('./Matched.svelte')])).then(async ([m, part]) => {
-      const out = await tileOnce('matched', base, ver, () => m.readMatched(base));
-      if (here) keepPart('matched', base, (matched = { rows: out.value, Part: part.default }));
-    });
-    const stales = after.then(() => Promise.all([import('./stale.ts'), import('./Stale.svelte')])).then(async ([m, part]) => {
-      const out = await tileOnce('stale', base, ver, () => m.readStale(base));
-      if (here) keepPart('stale', base, (stale = { rows: out.value, Part: part.default }));
-    });
-    void Promise.allSettled([briefing, matches, stales]).then(() => at !== null && closed(true, at));
-    void Promise.allSettled([briefing, matches, stales]).then(quietAgain);
+    void briefing
+      .catch(() => undefined)
+      .then(() => {
+        if (here) briefHeard = true;
+        if (at !== null) closed(true, at);
+        quietAgain();
+      });
     return () => {
       here = false;
       quietAgain();
@@ -882,10 +830,12 @@
   });
 
   /**
-   * WHETHER SLASH'S MODEL HAS STOPPED, said once under the head (`engine-line.ts`): not answering, his key closed, or the
-   * month spent. Asked only where a model is behind Slash; healthy, a refusal or an old host draw nothing.
+   * WHETHER THE MODEL THAT WRITES IS QUIET, said once under the brief (`engine-line.ts` `quietLine`, U7): not answering,
+   * his key closed, the record's own written brief paused because the model did not answer, or the month spent. The
+   * engine is asked only where a model is behind Slash; the briefing's word on its brief is read beside the page anyway.
+   * While it answers, nothing is said.
    */
-  let engineDown = $state.raw<EngineLine | null>(null);
+  let engine = $state.raw<{ health: EngineHealth | null; month: SlashStatus | null } | null>(null);
   $effect(() => {
     if (data.refused || page.data.slash !== true) return;
     void moving.version;
@@ -894,12 +844,13 @@
     void Promise.all([client.engineHealth().catch(() => null), client.slashStatus().catch(() => null)]).then(([out, month]) => {
       const v = out?.ok ? (out.value as EngineHealth | null) : null;
       const health = v !== null && typeof v === 'object' && 'health' in v ? v : null;
-      if (here) engineDown = engineLine(health, month?.ok ? month.value : null);
+      if (here) engine = { health, month: month?.ok ? month.value : null };
     });
     return () => {
       here = false;
     };
   });
+  const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, brief?.paused ?? null));
 
   /**
    * THE DESK ABOVE THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
@@ -976,69 +927,6 @@
   /* WHETHER THE PAGE DRAWS ITS NEEDS YOU QUESTIONS, so the foot is the tile's lower part, or the whole tile at nought. */
   const needsDrawn = $derived((desked?.blocks ?? []).some((b) => b.key === 'needs-you' && b.drawn));
 
-  /**
-   * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing
-   * drawn over them, but each is a call the record answers in turn: asked beside the page read they went ahead of it, and
-   * what the record found wrong in its words (`textFaults`) walks every page and note, 11 to 16 seconds on a lived-in
-   * record, so the page under the briefing stayed bars for as long as the walk ran. So they are asked once the page has
-   * answered (`settled`), and the walk is asked once for the tab and not each time the record moves (`textFaultsOnce`).
-   */
-  $effect(() => {
-    if (data.refused || !settled) return;
-    const ver = asOf();
-    const base = apiBase();
-    let here = true;
-    /* A TAB BEING LEFT ASKS NOTHING MORE: WebKit refuses every call begun once a navigation starts and prints each as an
-       error, and a failed tile walks on to the next. `beforeunload` is the last event before that, so it stops the walk. */
-    const leaving = new AbortController();
-    const leave = () => leaving.abort();
-    addEventListener('beforeunload', leave);
-    const io: Fetch = (url, init) => fetch(url, { ...init, signal: leaving.signal });
-    /* ONE TILE AT A TIME, EACH WHEN THE TAB IS IDLE (`loop/research-104.md` 2.1). The record answers one call at a time,
-       so six asked at once were six places in its queue ahead of the next screen, and of the poll. */
-    const tiles: (() => Promise<unknown>)[] = [];
-    /* THE BOARD'S LAST TILE: what the record found wrong in its own pages and notes. */
-    tiles.push(() => Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
-      const found = await m.textFaultsOnce(base, io);
-      if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
-    }, () => undefined));
-    /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
-    tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
-      const found = await tileOnce('learned', base, ver, () => m.loadLearned(base, io));
-      if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined));
-    /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
-    tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
-      const found = await tileOnce('named', base, ver, () => m.loadNamedTwice(base, io));
-      if (here) named = found && (found.lines.length > 0 || found.people > 0) ? { found, Part: part.default } : null;
-    }, () => undefined));
-    /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
-    tiles.push(() => Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
-      const found = await tileOnce('hues', base, ver, () => m.loadHues(base, io));
-      if (here) hues = found && found.lists.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined));
-    /* AND THE IMPORTED AUTOMATIONS TO KEEP AS FILING RULES. Never set back to null on a reload: after the press the
-       automations are off and the reload finds none, and the tile must keep its Undo. */
-    tiles.push(() => Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
-      const found = await tileOnce('imported', base, ver, () => m.loadImported(base, io));
-      if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
-    }, () => undefined));
-    void (async () => {
-      for (const tile of tiles) {
-        await idle();
-        if (!here || leaving.signal.aborted) break;
-        /* A TILE THAT FAILS IS NOT DRAWN, and the next is still asked. */
-        await tile().catch(() => undefined);
-      }
-      if (here) tilesHeard = true;
-      removeEventListener('beforeunload', leave);
-    })();
-    return () => {
-      here = false;
-      removeEventListener('beforeunload', leave);
-    };
-  });
-
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
@@ -1046,22 +934,12 @@
      rest, and the head's sentence says what it led with. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
 
-  /* THE BRIEFING IS NOT DRAWN WHILE ITS MODEL IS PAUSED (today F19): it would only say Late's lines again. */
-  const briefShown = $derived((brief?.cards.length ?? 0) > 0 && !brief?.paused);
+  /* THE BRIEFING IS DRAWN WHATEVER ITS MODEL DOES (U2): every card the rules wrote is the record speaking, and a paused
+     model decides only that no prose of its own is shown, which the record already leaves out. */
+  const briefShown = $derived((brief?.cards.length ?? 0) > 0);
 
-  /* WHAT MORE HOLDS: the page's blocks the desk folds, and each tile Home draws around the page that has something. */
-  const extras = $derived(
-    [
-      briefShown,
-      (stale?.rows.length ?? 0) > 0,
-      (matched?.rows.length ?? 0) > 0,
-      faults,
-      learned,
-      named,
-      hues,
-      imported,
-    ].filter(Boolean).length,
-  );
+  /* WHAT MORE HOLDS: the page's blocks the desk folds, and the briefing where it has a card. */
+  const extras = $derived(briefShown ? 1 : 0);
   const folds = $derived((desked?.folded ?? 0) + extras);
   /* WHERE THE DESK'S OWN PARTS AND MORE'S LINE STAND AMONG THE PAGE'S TILES, so the document is in the picture's order. */
   const anchors = $derived(anchorsFor(board ? (desked?.blocks ?? []) : [], board && reader));
@@ -1091,19 +969,33 @@
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
 
   /**
-   * THE DESK OPENS ON ITS LEAD TILE (the Bento boards, 22 October): the day in meta and the sentence at 40 (32 on a
-   * phone) on the first tile of the board, which Needs you continues under it, in place of a 28px "Today" over a 17px
-   * line on the board. The head keeps only the phone's bar. Not on a first Today, which opens on its card, nor a kept
-   * page, which is drawn as its owner laid it out.
+   * TODAY SPEAKS FIRST (the audit of 22 October, U2): on the board, over the tiles, a greeting by the time of day and his
+   * name, then two or three sentences that name what is late and what needs him (`today-brief.ts`), and one quiet line
+   * while the model that writes is not answering (`quiet`, U7). The head keeps only the phone's bar, and the date and the
+   * sun glyph go: the tab already says where he is. Not on a first Today, which opens on its card, nor a kept page, which
+   * is drawn as its owner laid it out.
    */
-  const leadTile = $derived(board && !tell && !data.refused && !empty);
+  const headed = $derived(board && !tell && !data.refused && !empty);
 
-  /**
-   * ON A PHONE THE LEAD TILE SAYS ITS FIRST SENTENCE ONLY ("8 need you."): what is late and who is working are the tiles
-   * under it, and the whole line at 32 took the first screen. A full stop with a figure after it is not a sentence's end.
-   */
-  const firstOf = (text: string): string => /^.*?[.!?](?=\s|$)/u.exec(text)?.[0] ?? text;
-  const leadText = $derived(lead ? (leadTile && phone.current ? firstOf(lead.text) : lead.text) : '');
+  /** The greeting, by the reader's own name as `boot` says it. */
+  const greeting = $derived(greetingOf(data.now, data.me?.name ?? (data.me?.person ? data.names?.[data.me.person] : null)));
+
+  /* TODAY'S LATE LIST, read off the page as Home shaped it: what the brief names, and the Late tile at the top of the
+     desk shows with a button each, in the brief's order and less what a question in Needs you already asks about
+     (`unasked`). */
+  const late = $derived(board && shaped ? lateOf(shaped.blocks) : null);
+  const queued = $derived(shaped?.blocks.find((b) => b.key === 'needs-you')?.queue ?? []);
+  const lateShown = $derived(late ? inBriefOrder(unasked(late.lines, queued)) : []);
+
+  /* WHO IS WORKING, BY NAME and each once, for the brief's last sentence. */
+  const agentsNow = $derived([...new Set(workingTile.filter((r) => r.live === 'working').map((r) => r.agent))]);
+  /* THE ONE COUNT OF WHAT NEEDS HIM, the badge's: `boot`'s questions and what agents asked back, else the queue's own. */
+  const needing = $derived(waits ? waits.questions + (waits.told ?? 0) : (shaped?.blocks.find((b) => b.key === 'needs-you')?.total ?? 0));
+
+  /* THE BRIEF THE RULES WRITE, from the late list and what waits; the model's line stands in its place when it wrote one. */
+  const ruled = $derived<Brief | null>(
+    shaped ? briefOf({ lines: late?.lines ?? [], more: late?.more ?? 0, needYou: needing, inbox: waits?.inbox ?? 0, agents: agentsNow, calm: nothing }) : null,
+  );
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
   const lands = $derived(landing(data));
@@ -1152,12 +1044,12 @@
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<!-- THE PAGE'S NAME WITH ITS ICON, as every place's header draws it, the day over it and the one line
-     under it. -->
+<!-- THE PAGE'S NAME WITH ITS ICON, as every place's header draws it, the day over it and the one line under it. On the
+     desk the head is the greeting and the brief over the board (`headed`), and this keeps only the phone's bar. -->
 <PageHead
   {title}
   icon="today"
-  tiled={leadTile}
+  tiled={headed}
   kicker={today}
   sentence={tell ? TELL_LINE : slashed ? slashSaid : lead ? leadSaid : undefined}
   heldLines={board ? 3 : 1}
@@ -1166,9 +1058,10 @@
   below={capture && !wide.current && !board ? headCapture : undefined}
 />
 
-<!-- SLASH'S MODEL HAS STOPPED: one line under the head, the same one Slash shows, and nothing while it answers. -->
-{#if engineDown}
-  <p class="home-engine" role="status"><span data-needs>{engineDown.lead}</span>{engineDown.rest}</p>
+<!-- THE MODEL THAT WRITES IS QUIET: one quiet line under a kept page's head, and nothing while it answers. On the desk the
+     same line stands under the brief. -->
+{#if quiet && !headed}
+  <p class="home-engine" role="status">{quiet}</p>
 {/if}
 
 <!-- THE LINE A TASK IS TYPED INTO, at the right of the name (one line of its own under the sentence on a phone). -->
@@ -1196,13 +1089,21 @@
 -->
 {#snippet leadSaid()}
   {#if lead}
-    {#each partsOf(leadText, lead.needs || undefined) as part, n (n)}{#if part.needs && NEEDS_DOOR.test(part.text)}<a class="home-needs tap" href={inApp('/decide')} data-needs>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
+    {#each partsOf(lead.text, lead.needs || undefined) as part, n (n)}{#if part.needs && NEEDS_DOOR.test(part.text)}<a class="home-needs tap" href={inApp('/decide')} data-needs>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
   {/if}
+{/snippet}
+
+<!--
+  THE RULES' BRIEF (U2): its figures at 600 in the ink, the one phrase that needs him in the red, and each thing it names
+  a quiet link to its own row; "3 questions" is the door to Needs you.
+-->
+{#snippet ruledSaid(parts: readonly BriefPart[])}
+  {#each parts as part, n (n)}{#if part.href}<a class="brief-link" href={inApp(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span class="brief-needs" data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
 {/snippet}
 
 <!-- WHAT MATTERS TODAY, with who wrote it, drawn once: by the page's reader, or here where none draws the blocks. -->
 {#snippet briefed()}
-  {#if brief}<brief.Part cards={brief.cards} foot={engineDown !== null && brief.foot === brief.paused ? null : brief.foot} />{/if}
+  {#if brief}<brief.Part cards={brief.cards} foot={quiet !== null && brief.foot === brief.paused ? null : brief.foot} />{/if}
 {/snippet}
 
 <!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
@@ -1221,19 +1122,25 @@
 
 <!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
 {#snippet moreLine()}
-  {#if folds > 0 && desked}
-    <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-      <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
-      {#if !moreOpen}<span class="more-count num" style:visibility={tilesHeard ? null : 'hidden'}>{folds}</span>{/if}
-      <Icon name="chevronDown" size="s" />
-    </button>
+  {#if (folds > 0 && desked) || useCasePage}
+    <div class="desk-foot">
+      {#if folds > 0 && desked}
+        <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+          <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
+          {#if !moreOpen}<span class="more-count num" style:visibility={briefHeard ? null : 'hidden'}>{folds}</span>{/if}
+          <Icon name="chevronDown" size="s" />
+        </button>
+      {/if}
+      <!-- THE USE CASE'S OWN PAGE, ONE LINK AWAY (U1): what only it draws is there, and the desk stays the desk. -->
+      {#if useCasePage}<a class="desk-own tap" href={inApp(useCasePage.href)}>{words.useCasePage(useCasePage.name)}<Icon name="arrow" size="s" /></a>{/if}
+    </div>
   {/if}
 {/snippet}
 
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
 {#snippet needsFoot()}
   {#if shaped}
-    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} shared={sharedNow} calm={words.nothingNeedsYou} />
+    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={late ? null : shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} shared={sharedNow} calm={words.nothingNeedsYou} />
   {/if}
 {/snippet}
 
@@ -1312,19 +1219,38 @@
     {#if !board}{@render deskPart('all')}{/if}
 
     <!--
+      TODAY SPEAKS FIRST (U2): the greeting, the screen's `h1`, and under it the brief, the model's line when it wrote one
+      today and the rules' sentences otherwise, then one quiet line while the model that writes is not answering (U7).
+      While the brief is on its way the room its words take is held.
+    -->
+    {#if headed}
+      <header class="today-head">
+        <h1 class="today-hi" tabindex="-1">{greeting}</h1>
+        <p class="today-brief">
+          {#if slashed}{@render slashSaid()}{:else if ruled}{@render ruledSaid(ruled.parts)}{:else}<span class="today-held" aria-hidden="true">{waitsLine?.text ?? nothing}</span>{/if}
+        </p>
+        {#if quiet && !slashed}<p class="today-quiet" role="status">{quiet}</p>{/if}
+      </header>
+    {/if}
+
+    <!--
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
       each where the 19 October desk puts it, and More under them. A kept page is its own board, with More under it.
     -->
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
-      <!-- THE LEAD TILE: the day, and the sentence that is the screen's one headline, its `h1`. Needs you goes on under it
-           as one tile. While the sentence is on its way the room its words take is held. -->
-      {#if leadTile}
-        <section class="today-lead" aria-labelledby="today-said">
-          <p class="today-when">{today}</p>
-          <h1 id="today-said" class="today-said" tabindex="-1"
-            >{#if slashed}{@render slashSaid()}{:else if lead}{@render leadSaid()}{:else}<span class="today-held" aria-hidden="true">{waitsLine?.text ?? nothing}</span>{/if}</h1
-          >
-        </section>
+      <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button (U2, U-A13): beside who is working at a desk, and the
+           first thing under the brief on a phone. -->
+      {#if board && lateShown.length > 0}
+        <div class="today-late">
+          <LateNow
+            lines={lateShown}
+            heading={late?.heading || voice.overdue}
+            more={late?.more ?? 0}
+            most={phone.current ? 3 : 4}
+            writes={(list) => may(data, 'write', list)}
+            onfinished={() => void reread()}
+          />
+        </div>
       {/if}
       <!-- THE FIRST ROW'S RIGHT COLUMN UNDER WHO IS WORKING AND CASH, held so nothing laid out later lands in it. -->
       {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
@@ -1335,32 +1261,8 @@
       {#if board}{@render placedParts(anchors.tail)}{:else}{@render moreLine()}{/if}
       {#if moreOpen && extras > 0}
         <div class="more-body">
-          <!--
-            TOP TO BOTTOM AS `homeReads` SAYS: the briefing, what went stale, who was matched, each keyed by its part so a
-            read that lands late is put in its place and moves nothing drawn. The page is on the board, over More.
-          -->
-          {#each homeReads(briefShown ? (brief?.cards.length ?? 0) : 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
-            {#if part === 'briefing'}
-              <!-- WHAT MATTERS TODAY, with who wrote it. -->
-              {@render briefed()}
-            {:else if part === 'stale'}
-              <!-- WHAT WENT STALE AND WHERE EACH IS CLEARED. -->
-              {#if stale}<stale.Part rows={stale.rows} />{/if}
-            {:else if part === 'matched'}
-              <!-- WHO THE RECORD MATCHED ON ITS OWN. -->
-              {#if matched}<matched.Part rows={matched.rows} />{/if}
-            {/if}
-          {/each}
-          <!-- WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES. -->
-          {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
-          <!-- WHAT THE ANSWERS TAUGHT: what the record will not ask again. -->
-          {#if learned}<learned.Part found={learned.found} />{/if}
-          <!-- WHAT MAY BE ONE: a pair he can put to Decide. -->
-          {#if named}<named.Part found={named.found} />{/if}
-          <!-- WHAT HAS NO COLOUR OF ITS OWN: one press gives each its own. -->
-          {#if hues}<hues.Part found={hues.found} />{/if}
-          <!-- IMPORTED AUTOMATIONS AS FILING RULES: one press, one Undo. -->
-          {#if imported}<imported.Part found={imported.found} />{/if}
+          <!-- WHAT MATTERS TODAY, with who wrote it. The page is on the board, over More. -->
+          {@render briefed()}
         </div>
       {/if}
     </div>
@@ -1435,58 +1337,84 @@
     }
   }
 
-  /* THE ENGINE'S LINE, set as the Slash page sets it: body type, what is wrong in the danger ink. */
+  /* THE QUIET LINE UNDER A KEPT PAGE'S HEAD, while the model that writes is not answering: meta, in the quiet ink. */
   .home-engine {
-    margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-  }
-
-  .home-engine [data-needs] {
-    color: var(--red);
-  }
-
-  /* ── the lead tile ────────────────────────────────────────────────────── */
-
-  /* THE DAY IN META OVER THE SENTENCE, 24 in, on the tile; the sentence at 40/44 and 600, 32/36 on a phone, its figures
-     at its own weight and "8 need you" in the red. Its lower corners are square: Needs you is the rest of the tile. */
-  .today-lead {
-    display: grid;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    padding: var(--tile-pad-lead) var(--tile-pad-lead) var(--sp-2);
-    background: var(--tile);
-    border-start-start-radius: var(--r-tile);
-    border-start-end-radius: var(--r-tile);
-  }
-
-  .today-when {
     margin: 0;
+    padding: 0 var(--gutter);
+    max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
 
-  .today-said {
-    max-inline-size: 22em;
+  /* ── the head: the greeting and the brief (U2) ─────────────────────────── */
+
+  /* ON THE BOARD, NOT ON A TILE (the approved look of 19 October): the greeting at 34/40 in the display face (28/34 on a
+     phone, `--fs-hero`), the brief at 17/26 in the second ink with its figures at 600 in the ink and the one phrase that
+     needs him in the red, and the quiet line under it at 13 in the quiet ink. */
+  .today-head {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .today-hi {
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--fs-hero);
     font-weight: var(--fw-semi);
     line-height: 40px;
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+    letter-spacing: -0.01em;
   }
 
-  .today-said:focus:not(:focus-visible) {
+  .today-hi:focus:not(:focus-visible) {
     /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
     outline: none;
   }
 
-  .today-said :global(.home-fig) {
-    font-weight: inherit;
+  .today-brief {
+    max-inline-size: 60em;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-head);
+    line-height: 26px;
+    text-wrap: pretty;
+  }
+
+  .today-brief :global(.home-fig) {
+    color: var(--ink);
+  }
+
+  .brief-needs,
+  .brief-link[data-needs] {
+    color: var(--red);
+    font-weight: var(--fw-semi);
+  }
+
+  /* WHAT IT NAMES IS A QUIET LINK TO ITS ROW: the words in the ink, underlined in the rule colour, the ink under the
+     pointer. */
+  .brief-link {
+    border-radius: var(--r-xs);
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 4px;
+  }
+
+  .brief-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .brief-link[data-needs] {
+    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
+  }
+
+  .today-quiet {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .today-held {
@@ -1494,29 +1422,28 @@
   }
 
   @media (width < 640px) {
-    .today-said {
-      font-size: var(--fs-hero-phone);
+    .today-hi {
       line-height: 34px;
     }
   }
 
-  /* IN NEEDS YOU'S PLACE IN THE ORDER, so nothing the board draws at no height (the page's ⋯ on a phone) stands between
-     them and opens a gap. */
-  .body[data-board] > .today-lead {
+  /* WHAT IS LATE STANDS IN NEEDS YOU'S PLACE IN THE ORDER, before it, so on a phone it is the first tile under the brief,
+     and nothing the board draws at no height (the page's ⋯ on a phone) stands between them and opens a gap. Its tile
+     fills its cell, so beside a taller Working now it does not end short. */
+  .body[data-board] > .today-late {
+    display: flex;
+    flex-direction: column;
     order: 1;
   }
 
-  /* THE PAGE'S ⋯ ROW, which a phone draws in the flow and which holds only closed sheets there, goes to the board's foot
-     rather than over the lead tile, where its row and its gap pushed the tile down. */
-  .body[data-board]:has(> .today-lead) :global(.home-page > .home-tools) {
-    order: 19;
+  .today-late > :global(.tile) {
+    flex: 1;
   }
 
-  /* NEEDS YOU GOES ON UNDER IT AS ONE TILE: no gap between them, and its upper corners square. */
-  .body[data-board]:has(> .today-lead) :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot][data-alone])) {
-    margin-block-start: calc(var(--tile-gap) * -1);
-    border-start-start-radius: 0;
-    border-start-end-radius: 0;
+  /* THE PAGE'S ⋯ ROW, which a phone draws in the flow and which holds only closed sheets there, goes to the board's foot
+     rather than over the late tile, where its row and its gap pushed the tile down. */
+  .body[data-board]:has(> .today-late) :global(.home-page > .home-tools) {
+    order: 19;
   }
 
   /* ON A PHONE, NEEDS YOU'S FIRST QUESTION IS ANSWERED WHERE IT STANDS AND THE REST ARE ROWS (the Bento phone board): each
@@ -1524,19 +1451,6 @@
   @media (width < 600px) {
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa :is(.dc-actions, .dr-actions)) {
       display: none;
-    }
-
-    /* UNDER "8 NEED YOU." THE TILE'S OWN NAME WOULD SAY IT AGAIN, so on a phone it is out of sight, but kept for a screen
-       reader: the questions under it are third-level headings and the list needs its second. */
-    .body[data-board]:has(> .today-lead) :global(.block-slot[data-key='needs-you'] > .block-bar) {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      min-block-size: 0;
-      margin: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .queue-card) {
@@ -1753,7 +1667,7 @@
     order: 10;
   }
 
-  .body[data-board] .more {
+  .body[data-board] .desk-foot {
     order: 20;
   }
 
@@ -1801,36 +1715,41 @@
       grid-row: 1 / span 4;
     }
 
-    /* WITH THE LEAD TILE THE LEFT STACK IS FOUR TRACKS: the lead beside who is working, then Needs you over two and its
-       foot beside cash. The lead fills its track, so Needs you goes on under it with no seam where who is working is the
-       taller. AND THE TWO STACKS END ON ONE LINE (the boards' balance): the foot and cash each stretch to the last
-       track, so whichever column is the shorter takes the air at its foot rather than leaving a hole beside the other. */
-    .body[data-board]:has(> .today-lead) > .today-lead {
+    /* WITH WHAT IS LATE THE LEFT STACK IS FOUR TRACKS: the late tile beside who is working, then Needs you over two and
+       its foot beside cash. The late tile and who is working fill their track together, so neither ends short of the
+       other. AND THE TWO STACKS END ON ONE LINE (the boards' balance): the foot and cash each stretch to the last track,
+       so whichever column is the shorter takes the air at its foot rather than leaving a hole beside the other. */
+    .body[data-board]:has(> .today-late) > .today-late {
       grid-row: 1;
       grid-column: 1 / span var(--n);
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-lead) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+    .body[data-board]:has(> .today-late) > :global([data-working]),
+    .body[data-board]:has(> .today-late) :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
+      align-self: stretch;
+    }
+
+    .body[data-board]:has(> .today-late) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
       grid-row: 2 / span 2;
     }
 
-    .body[data-board]:has(> .today-lead):not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
-    .body[data-board]:has(> .today-lead) :global(.home-page > .page > [data-needs-foot][data-alone]) {
+    .body[data-board]:has(> .today-late):not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
+    .body[data-board]:has(> .today-late) :global(.home-page > .page > [data-needs-foot][data-alone]) {
       grid-row: 2 / span 3;
     }
 
-    .body[data-board]:has(> .today-lead) :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
+    .body[data-board]:has(> .today-late) :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
       grid-row: 4;
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-lead) :global(.home-page > .page > .block-slot[data-key='cash']) {
+    .body[data-board]:has(> .today-late) :global(.home-page > .page > .block-slot[data-key='cash']) {
       grid-row: 2 / span 3;
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-lead):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+    .body[data-board]:has(> .today-late):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
       grid-row: 1 / span 4;
     }
 
@@ -2120,6 +2039,33 @@
     white-space: nowrap;
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
+  }
+
+  /* THE BOARD'S FOOT: More at the start, and the use case's own page at the end where the record holds one. */
+  .desk-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  /* ONE QUIET LINK, as a tile's own: 13/500 in the second ink, its arrow after it. */
+  .desk-own {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin-inline-start: auto;
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  .desk-own:hover {
+    color: var(--ink);
   }
 
   /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */
