@@ -733,7 +733,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
       },
       decided: {
         option: 'accept',
-        reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.',
+        reason: 'Both are live and both renew; an invoice line nobody wrote down is the thing this record exists to stop.',
       },
     },
     {
