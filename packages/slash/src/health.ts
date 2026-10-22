@@ -13,6 +13,10 @@
  * `core.reserve`), budget refusals and the rows of a call that needed no model (settled under `-`) say nothing either way
  * and are passed over.
  *
+ * ONLY THE MODEL THAT WRITES (`LEDGER_WRITING`). The search embedding is a row of kind `embed`, and the state, the last
+ * answer, the run of failures, who answered last and the last words are read from every row but those. The embedding
+ * answered every few minutes through the days the model that writes did not, and health said "answering" for all of them.
+ *
  * NO MODEL ID, JOB NAME OR CODE IN WHAT A PERSON READS. `said` names the model as "Slash's model" and the key as "your own
  * key", because a person cannot act on `@cf/...` or `UNREACHABLE`; the operator reads those in the Worker's log
  * (ENG-A01), which is where the provider's own words are kept.
@@ -103,6 +107,14 @@ export const LEDGER_ANSWERED =
  */
 export const LEDGER_BUDGET = "model = '-' AND code IN ('SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT')";
 
+/**
+ * A call that writes: every row but an embedding. HEALTH SPEAKS FOR THE MODEL THAT WRITES (the brief, the headlines, the
+ * digest, Slash's own asks) AND NEVER FOR THE SEARCH EMBEDDING. On 22 October the embedding answered every few minutes
+ * while no writing call had for days, so "answering" and "answered 11 minutes ago" were true of the wrong model. Kept
+ * apart from the three clauses above, which the vital sign and the engine's readings restate and still count embeddings.
+ */
+export const LEDGER_WRITING = "kind <> 'embed'";
+
 /** The most of a provider's own words a person is shown. */
 export const WORDS_MOST = 200;
 
@@ -112,8 +124,9 @@ export const WORDS_MOST = 200;
  * THE WORKER'S `scrubRaw` (`apps/worker/src/inference.ts`), RESTATED, because this package may not import an app and a
  * `raw` reaches the ledger by more than one road: the Worker scrubs the platform's sentence before it is written, but the
  * host's router writes a throw's message as it came (`packages/host/src/infer.ts`, `said`), and a provider quotes back
- * what it was sent. So it is scrubbed again on the way out, whoever wrote it. The patterns are the Worker's, line for
- * line; a change to one is a change to both.
+ * what it was sent. So it is scrubbed again on the way out, whoever wrote it. The first patterns are the Worker's, line
+ * for line, and a change to one is a change to both. The last three are this one's: a person reads these words and the
+ * operator's log does not need to be cut as far, so ids and account numbers go here and stay there.
  */
 export const scrubWords = (said: string): string =>
   said
@@ -123,6 +136,10 @@ export const scrubWords = (said: string): string =>
     .replace(/(["']?)\b([\w-]*(?:key|token|secret|password|authorization)[\w-]*)\1(\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'[^']*'|[^\s,;}&]+)/giu, '$1$2$1$3[cut]')
     .replace(/(["']?)\b(content|prompt|text|input)\1(\s*:\s*)(?:"(?:[^"\\]|\\.)*"?|\[(?:[^\]"]|"(?:[^"\\]|\\.)*"?)*\]?)/giu, '$1$2$1$3"[cut]"')
     .replace(/[A-Za-z0-9_\-+/=]{32,}/gu, '[cut]')
+    /* AND WHAT A PERSON CANNOT ACT ON, which the operator's log keeps: a record's id, a request's id, an account number. */
+    .replace(/(?<![A-Za-z0-9])[0-9A-HJKMNP-TV-Z]{26}(?![A-Za-z0-9])/gu, '[cut]')
+    .replace(/(?<![A-Za-z0-9])[0-9a-f]{16,}(?![A-Za-z0-9])/gu, '[cut]')
+    .replace(/(?<![A-Za-z0-9.])\d{8,}(?![A-Za-z0-9])/gu, '[cut]')
     .replace(/\s+/gu, ' ')
     .trim()
     .slice(0, WORDS_MOST);
@@ -144,7 +161,7 @@ const NOT_HELD = "(code IS NULL OR code NOT IN ('SLASH_PENDING', 'SPARK_PENDING'
 const DOUBLED = `
   WITH seq AS (
     SELECT rowid AS r, route, candidate, ${flag(LEDGER_ANSWERED)} AS answered, ${flag(LEDGER_FAILED)} AS failed
-    FROM slash_call WHERE ts >= ? AND ${NOT_HELD}
+    FROM slash_call WHERE ts >= ? AND ${NOT_HELD} AND ${LEDGER_WRITING}
   ),
   lagged AS (
     SELECT answered, route, candidate,
@@ -184,11 +201,11 @@ const beside = (sql: Sql, from: string, nowMs: number): Beside => {
   const made = sql.one<{ sql: string | null }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'")?.sql ?? '';
   const v3 = /\braw\b/.test(made) && /\bcandidate\b/.test(made) && /\bspends\b/.test(made);
 
-  const last = sql.one<{ model: string; ts: string }>(`SELECT model, ts FROM slash_call WHERE ts >= ? AND ${LEDGER_ANSWERED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
+  const last = sql.one<{ model: string; ts: string }>(`SELECT model, ts FROM slash_call WHERE ts >= ? AND ${LEDGER_WRITING} AND ${LEDGER_ANSWERED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
   if (last !== undefined) out.answeredBy = { model: last.model, at: last.ts };
   if (!v3) return out;
 
-  const failed = sql.one<{ raw: string | null }>(`SELECT raw FROM slash_call WHERE ts >= ? AND ${LEDGER_FAILED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
+  const failed = sql.one<{ raw: string | null }>(`SELECT raw FROM slash_call WHERE ts >= ? AND ${LEDGER_WRITING} AND ${LEDGER_FAILED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
   const words = failed?.raw ? scrubWords(failed.raw) : '';
   if (words !== '') out.lastWords = words;
 
@@ -224,12 +241,12 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
      looking at Settings, and `openStore` is the engine's to run on its first ask. */
   const ledger = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'")?.n ?? 0;
   const lastOk =
-    ledger === 0 ? null : (sql.one<{ ts: string | null }>(`SELECT MAX(ts) AS ts FROM slash_call WHERE ts >= ? AND ${LEDGER_ANSWERED}`, from)?.ts ?? null);
+    ledger === 0 ? null : (sql.one<{ ts: string | null }>(`SELECT MAX(ts) AS ts FROM slash_call WHERE ts >= ? AND ${LEDGER_WRITING} AND ${LEDGER_ANSWERED}`, from)?.ts ?? null);
   const fails =
     ledger === 0
       ? { n: 0, first: null, newest: null }
       : (sql.one<{ n: number; first: string | null; newest: string | null }>(
-          `SELECT COUNT(*) AS n, MIN(ts) AS first, MAX(ts) AS newest FROM slash_call WHERE ts >= ? AND ts > ? AND ${LEDGER_FAILED}`,
+          `SELECT COUNT(*) AS n, MIN(ts) AS first, MAX(ts) AS newest FROM slash_call WHERE ts >= ? AND ts > ? AND ${LEDGER_WRITING} AND ${LEDGER_FAILED}`,
           from,
           lastOk ?? '',
         ) ?? { n: 0, first: null, newest: null });
@@ -239,7 +256,7 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
     const keyRefused =
       fails.newest !== null &&
       sql.one<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM slash_call WHERE ts = ? AND tier <> 'a' AND code = 'PULL_REQUEST_REFUSED' AND ${LEDGER_FAILED}`,
+        `SELECT COUNT(*) AS n FROM slash_call WHERE ts = ? AND tier <> 'a' AND code = 'PULL_REQUEST_REFUSED' AND ${LEDGER_WRITING} AND ${LEDGER_FAILED}`,
         fails.newest,
       )?.n !== 0;
     if (facts.key_open === false || keyRefused) return { state: 'key_closed', last_ok: lastOk, since: fails.first, ...more };

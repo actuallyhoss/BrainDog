@@ -224,7 +224,7 @@ test('A SPENT MONTH IS ITS OWN CLAUSE (audit 40-42, 5): never an answer, never a
 
 /* ── What the ledger says beside the state (ENG-A05, ENG-A06: "health shown") ─────────────────────────────────────── */
 
-type Planted = { ms: number; status: string; code?: string | null; model?: string; tier?: string; spends?: string; route?: string | null; candidate?: string | null; raw?: string | null };
+type Planted = { ms: number; status: string; kind?: string; code?: string | null; model?: string; tier?: string; spends?: string; route?: string | null; candidate?: string | null; raw?: string | null };
 
 /** A ledger at version 3, its rows planted with the columns a router writes, in the order they were settled. */
 const routed = () => {
@@ -234,9 +234,10 @@ const routed = () => {
   const row = (r: Planted): void =>
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, spends, route, candidate, raw)
-       VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?)`,
       `p${String(++n).padStart(4, '0')}`,
       at(r.ms),
+      r.kind ?? 'read',
       r.tier ?? 'a',
       r.model ?? 'glm-5.3-flash',
       r.status,
@@ -282,6 +283,51 @@ test("A FAILURE'S OWN WORDS are carried, cut at 200, and anything shaped like a 
   /* An old row with no words on it says none: never the older row's words in its place. */
   row({ ms: NOW - HOUR / 2, status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'flash' });
   assert.equal(engineHealth(sql, clock, MODEL).lastWords, undefined);
+});
+
+test('THE EMBEDDING IS NEVER AN ANSWER, NOR A FAILURE: health speaks for the model that writes (22 October)', () => {
+  const { sql, row } = routed();
+  const clock = fixedClock(NOW);
+  const GATEWAY = "Today's look failed: 2001: Please configure AI Gateway in the Cloudflare dashboard";
+  /* The model that writes answered two days ago and has failed three times since; the embedding answered every hour. */
+  row({ ms: NOW - DAYS(2), status: 'ok', model: 'glm-5.3-flash' });
+  for (let i = 0; i < 3; i++) row({ ms: NOW - (20 - i) * HOUR, status: 'error', code: 'UNREACHABLE', spends: 'none', raw: GATEWAY });
+  for (let i = 0; i < 12; i++) row({ ms: NOW - (12 - i) * HOUR, kind: 'embed', status: 'ok', model: '@cf/baai/bge-m3', spends: 'background' });
+  const h = engineHealth(sql, clock, MODEL);
+  assert.deepEqual(base(h), { state: 'not_answering', last_ok: at(NOW - DAYS(2)), since: at(NOW - 20 * HOUR) });
+  assert.deepEqual(h.answeredBy, { model: 'glm-5.3-flash', at: at(NOW - DAYS(2)) }, 'who answered last is not the embedding');
+  assert.equal(h.lastWords, GATEWAY);
+  assert.match(engineSaid(h, NOW).text, /^Slash's model has not answered since /);
+  assert.doesNotMatch(engineSaid(h, NOW).text, /bge|embed|2001/);
+
+  /* An embedding that does not answer is no failure of the model that writes, however many there are. */
+  const b = routed();
+  b.row({ ms: NOW - 3 * HOUR, status: 'ok', model: 'glm-5.3-flash' });
+  for (let i = 0; i < 6; i++) b.row({ ms: NOW - (2 * HOUR - i * 60_000), kind: 'embed', status: 'error', code: 'UNREACHABLE', spends: 'none', raw: 'No embedding today.' });
+  const w = engineHealth(b.sql, clock, MODEL);
+  assert.deepEqual(base(w), { state: 'answering', last_ok: at(NOW - 3 * HOUR), since: null });
+  assert.equal(w.lastWords, undefined);
+
+  /* A ledger of embeddings alone has asked the model that writes nothing. */
+  const c = routed();
+  c.row({ ms: NOW - HOUR, kind: 'embed', status: 'ok', model: '@cf/baai/bge-m3', spends: 'background' });
+  assert.deepEqual(base(engineHealth(c.sql, clock, MODEL)), { state: 'never_asked', last_ok: null, since: null });
+});
+
+test('THE LAST WORDS CARRY NO ID, NO ACCOUNT NUMBER AND NO PROMPT, and keep the code a person can search for', () => {
+  const { sql, row } = routed();
+  row({ ms: NOW - 3 * HOUR, status: 'ok' });
+  row({
+    ms: NOW - HOUR,
+    status: 'error',
+    code: 'UNREACHABLE',
+    spends: 'none',
+    raw: 'AiError 2001: Please configure AI Gateway, account 123456789012, record rec_01J8Z3N4W5X6Y7Z8A9B0C1D2E3, request 4f9c2a7e81b3d605, prompt: "what did Mara owe"',
+  });
+  const words = engineHealth(sql, fixedClock(NOW), MODEL).lastWords ?? '';
+  assert.match(words, /2001: Please configure AI Gateway/);
+  assert.ok(!/123456789012|01J8Z3N4W5X6Y7Z8A9B0C1D2E3|4f9c2a7e81b3d605|Mara/.test(words), words);
+  assert.equal(words.split('[cut]').length - 1, 4, words);
 });
 
 test('TWO ATTEMPTS FOR ONE ASK, AND ONE FOR ANOTHER, is a second model for one ask of two', () => {
