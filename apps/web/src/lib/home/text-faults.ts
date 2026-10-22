@@ -1,7 +1,8 @@
 /**
- * What the record found wrong in its own pages and notes, on Home: the record's `textFaults` as lines a person can read
- * (`TextFaults.svelte`). PGS-B15 job d, drawn as a tile and never as a question: nothing here asks, and nothing asks by
- * itself at night.
+ * What the record found wrong in its own pages and notes, in Settings › Health (Today asks none of it since the audit of
+ * 22 October, U3): the record's `textFaults` as lines a person can read (`TextFaults.svelte`). PGS-B15 job d, drawn as
+ * a tile and never as a question: nothing here asks. The record walks its words in its night pass and keeps what it
+ * found; before the first night it says so (`computedAt` `null`), and that is said as not checked yet (`notChecked`).
  *
  * THROUGH THE RECORD'S OWN `textFaults` AND NOTHING ELSE. The record walks the text of every page and note the reader
  * may read and says each fault in a sentence with its fix (`packages/record/src/text-check.ts`); this file only turns
@@ -37,8 +38,13 @@ export type FaultAt = { slug?: string; list?: string; seq?: number };
 /** One fault, as the record says it. `kind` is the record's word for it and is never drawn. */
 export type TextFault = { kind: string; where: FaultWhere; said: string; fix: string; at?: FaultAt };
 
-/** The record's answer: how many faults in all, its one sentence, the first of them, and whether it held some back. */
-export type TextFaults = { count: number; line: string; faults: TextFault[]; truncated: boolean };
+/**
+ * The record's answer: how many faults in all, its one sentence, the first of them, whether it held some back, and when
+ * the record's night pass made the walk (`computedAt`). `null` there is NOT CHECKED YET, before the first night, and
+ * never clean: its count of nought says nothing of the words. Absent, the host walked as it was asked (a build before
+ * the night pass kept the walk).
+ */
+export type TextFaults = { count: number; line: string; faults: TextFault[]; truncated: boolean; computedAt?: string | null };
 
 /** One fault as it is drawn: the place's own name, what is wrong, the fix, and where it opens (`null`: words alone). */
 export type FaultRow = { title: string; said: string; fix: string; href: string | null };
@@ -142,11 +148,21 @@ function titleOf(where: FaultWhere): string {
 export function textFaultsOf(answer: unknown): TextFaults | null {
   const a = answer as { ok?: unknown; value?: unknown } | null | undefined;
   if (a?.ok !== true || typeof a.value !== 'object' || a.value === null) return null;
-  const v = a.value as { count?: unknown; line?: unknown; faults?: unknown; truncated?: unknown };
+  const v = a.value as { count?: unknown; line?: unknown; faults?: unknown; truncated?: unknown; computedAt?: unknown };
   if (typeof v.count !== 'number' || !Number.isInteger(v.count) || v.count < 0) return null;
   const faults = Array.isArray(v.faults) ? v.faults.map(faultOf).filter((f): f is TextFault => f !== null) : [];
-  return { count: v.count, line: plain(v.line), faults, truncated: v.truncated === true };
+  const found: TextFaults = { count: v.count, line: plain(v.line), faults, truncated: v.truncated === true };
+  /* WHEN THE NIGHT PASS WALKED, as the record says it; `null` is not checked yet, and kept as `null`. */
+  if (v.computedAt === null) found.computedAt = null;
+  else if (typeof v.computedAt === 'string' && v.computedAt !== '') found.computedAt = v.computedAt;
+  return found;
 }
+
+/**
+ * WHETHER THE RECORD HAS NOT CHECKED ITS WORDS YET: its night pass has not walked them (`computedAt` is `null`). Such an
+ * answer is said as "not checked yet" and never as nothing to fix.
+ */
+export const notChecked = (found: TextFaults | null): boolean => found !== null && found.computedAt === null;
 
 /** Ask the record's `textFaults`. `null` on a refusal, a method the host does not know, or a call that threw. */
 export async function readTextFaults(call: Call): Promise<TextFaults | null> {

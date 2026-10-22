@@ -11,7 +11,8 @@
   reader are fetched as they are asked for, so Settings carries none of them until somebody opens Health.
 
   A PART THAT FINDS NOTHING DRAWS NOTHING, and a read that fails is not drawn. With all of them heard and none holding
-  anything, one calm line says so.
+  anything, one calm line says so. THE WORDS ARE WALKED AT NIGHT: before the record's first night pass its answer says
+  not checked yet (`notChecked`), and that is said in its place, never as nothing to fix.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -27,6 +28,9 @@
     reading: 'Reading the record for anything to tidy.',
     clear: 'Nothing to tidy',
     clearBody: 'Every page and note reads as it should, and nothing has gone stale.',
+    pages: 'Pages and notes',
+    notYet: 'Not checked yet, it runs at night.',
+    clearBodyUnchecked: 'Nothing has gone stale, and nothing else waits to be tidied.',
   } as const;
 
   type StalePart = typeof import('$lib/home/Stale.svelte').default;
@@ -46,6 +50,8 @@
   let imported = $state.raw<{ found: import('$lib/home/imported-rules.ts').ImportedFound; Part: ImportedPart } | null>(null);
   /** Whether every part has answered, so the calm line is said only once nothing is left to land. */
   let heard = $state(false);
+  /** Whether the record has not walked its words yet: said as not checked, and the calm line does not vouch for them. */
+  let unchecked = $state(false);
 
   const any = $derived(Boolean(stale || matched || faults || learned || named || hues || imported));
 
@@ -67,7 +73,9 @@
       () =>
         Promise.all([import('$lib/home/text-faults.ts'), import('$lib/home/TextFaults.svelte')]).then(async ([m, part]) => {
           const found = await m.textFaultsOnce(base, io);
-          if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
+          if (!here) return;
+          unchecked = m.notChecked(found);
+          faults = found && found.count > 0 ? { found, Part: part.default } : null;
         }),
       /* WHAT WENT STALE, AND WHERE EACH IS CLEARED. */
       () =>
@@ -125,6 +133,12 @@
 </script>
 
 <div class="health" data-health>
+  {#if unchecked}
+    <section class="health-part" aria-labelledby="health-pages">
+      <h2 class="health-h" id="health-pages">{words.pages}</h2>
+      <p class="health-said">{words.notYet}</p>
+    </section>
+  {/if}
   {#if faults}<faults.Part found={faults.found} lists={shell.lists} />{/if}
   {#if stale}<stale.Part rows={stale.rows} />{/if}
   {#if matched}<matched.Part rows={matched.rows} />{/if}
@@ -135,7 +149,7 @@
   {#if !heard}
     <p class="health-reading" role="status">{words.reading}</p>
   {:else if !any}
-    <Empty kind="cleared" title={words.clear} body={words.clearBody} />
+    <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
   {/if}
 </div>
 
@@ -145,6 +159,31 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  /* A PART OF ITS OWN, flat as the tiles beside it: the name of what was not checked, and the plain line under it. */
+  .health-part {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    padding: var(--tile-pad, 20px);
+    background: var(--tile);
+    border-radius: var(--r-tile, 16px);
+  }
+
+  .health-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-body);
+  }
+
+  .health-said {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
 
   .health-reading {
