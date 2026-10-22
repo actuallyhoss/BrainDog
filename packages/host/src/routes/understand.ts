@@ -1,6 +1,6 @@
 /**
  * The route row for reading what the record already holds for who and what each thing is about, now rather than
- * tonight: the record's `understand`, one slice of the nightly walk (DIRECTION §38: "understanding is the engine's
+ * tonight: the record's `understand`, one slice of the nightly walk ("understanding is the engine's
  * first job").
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:

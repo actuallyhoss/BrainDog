@@ -1,5 +1,5 @@
 /**
- * The written brief (DIRECTION 45, decision 4): two or three plain sentences on where things stand, which a small model
+ * The written brief (decision 4): two or three plain sentences on where things stand, which a small model
  * rewrites only when the rows the brief reads change, and which Today then shows at once.
  *
  * Pure: nothing here reads a table or holds a kernel. A caller hands the facts it gathered (`briefFactsFor`), the
@@ -17,6 +17,7 @@
  * most `WRITTEN_ASKS_DAY` times a day, and a failed ask is not repeated at that basis for `WRITTEN_RETRY_MS`.
  */
 
+import { WHOLE_LENS } from './brief-write.ts';
 import { BRIEF_RULES_MOST, briefBasis, briefCandidates, briefInput, rulesBrief, type BriefCard, type BriefFact, type BriefInput } from './briefing.ts';
 import { SYSTEM_WORDS, holesOf, numbersIn } from './headlines.ts';
 
@@ -49,8 +50,11 @@ const INFLIGHT_MS = 2 * 60_000;
 /** One run of a kept sentence: plain words, or a figure of a row (`figure`), or a thing's name for a row (`row` alone). */
 export type WrittenPart = { text: string; row?: string; figure?: string };
 
-/** The brief as it is kept: the basis it was written from, when, and its sentences as parts. */
-export type KeptWritten = { basis: string; at: string; sentences: { parts: WrittenPart[] }[] };
+/**
+ * The brief as it is kept: the basis it was written from, when, its sentences as parts, and the lens its facts were
+ * gathered through (`briefLensOf`), absent on one kept before lenses, which was gathered as the whole record is read.
+ */
+export type KeptWritten = { basis: string; at: string; sentences: { parts: WrittenPart[] }[]; lens?: string };
 
 /** What the read hands Today: each run's words as they are now and the row it opens, `null` for plain words. */
 export type WrittenRead = {
@@ -203,7 +207,7 @@ export function writtenKeptOf(value: unknown): KeptWritten | null {
     }
     sentences.push({ parts: out });
   }
-  return sentences.length === 0 ? null : { basis: v.basis, at: v.at, sentences };
+  return sentences.length === 0 ? null : { basis: v.basis, at: v.at, sentences, ...(typeof v.lens === 'string' ? { lens: v.lens } : {}) };
 }
 
 /**
@@ -211,9 +215,11 @@ export function writtenKeptOf(value: unknown): KeptWritten | null {
  * figure is the fact's figure now, a name is its title now, and a row this caller was not handed, or a figure or name
  * that moved, voids the whole brief, so nothing stale and nothing about what they cannot read is ever said.
  */
-export function writtenShown(kept: unknown, facts: readonly BriefFact[]): WrittenRead | null {
+export function writtenShown(kept: unknown, facts: readonly BriefFact[], lens: string = WHOLE_LENS): WrittenRead | null {
   const k = writtenKeptOf(kept);
-  if (k === null) return null;
+  /* ONLY TO A READER WHO SEES THROUGH THE LENS IT WAS WRITTEN THROUGH (sharing plan T16): facts that happen to match are
+     not enough, since the model's plain words were written about what that lens shows. */
+  if (k === null || (k.lens ?? WHOLE_LENS) !== lens) return null;
   const byRow = new Map<string, BriefFact>();
   for (const f of usable(facts)) if (!byRow.has(f.row)) byRow.set(f.row, f);
   const sentences: WrittenRead['sentences'] = [];
@@ -282,6 +288,8 @@ export async function writtenTick(args: {
   read: (key: string) => unknown;
   write: (key: string, value: unknown) => void;
   ask: WrittenAsk;
+  /** The lens `facts` are gathered through (`briefLensOf`); the whole record's when left out. */
+  lens?: string;
 }): Promise<{ asked: boolean; dropped: string | null }> {
   const { now, read, write } = args;
   const idle = { asked: false, dropped: null };
@@ -304,7 +312,8 @@ export async function writtenTick(args: {
   const basis = briefBasis(handed);
   const kept = writtenKeptOf(read(WRITTEN_KEPT));
   /* THE KEPT BRIEF WAS WRITTEN FROM THESE SAME FACTS. */
-  if (kept !== null && kept.basis === basis) {
+  const lens = args.lens ?? WHOLE_LENS;
+  if (kept !== null && kept.basis === basis && (kept.lens ?? WHOLE_LENS) === lens) {
     save({ version: args.version, looked: day, dirty: null, failed: null });
     return idle;
   }
@@ -334,7 +343,7 @@ export async function writtenTick(args: {
   /* RE-READ, for a state another tick may have moved while the model was awaited. */
   const now2 = writtenStateOf(read(WRITTEN_STATE), day);
   if (sentences.length > 0) {
-    write(WRITTEN_KEPT, { basis, at: new Date(now).toISOString(), sentences } satisfies KeptWritten);
+    write(WRITTEN_KEPT, { basis, at: new Date(now).toISOString(), sentences, lens } satisfies KeptWritten);
     write(WRITTEN_STATE, { ...now2, dirty: null, inflight: null, failed: null });
     return { asked: true, dropped: null };
   }

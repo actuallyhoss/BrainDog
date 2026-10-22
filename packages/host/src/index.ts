@@ -1,7 +1,7 @@
 /**
  * The bit both hosts share: the route table, the status mapping, and the loop that answers.
  *
- * TWO HOSTS EXIST — the Worker and the self-host — and they are the same product. `ADR-064` puts
+ * TWO HOSTS EXIST (the Worker and the self-host) and they are the same product. `ADR-064` puts
  * their common half in one platform-neutral package for a reason that is not tidiness: a route that
  * exists in one and not the other is a product that behaves differently depending on where a
  * customer runs it, and nobody finds out until somebody exports a record from one and imports it
@@ -167,7 +167,7 @@ if (BY_NAME.size !== ROUTES.length) {
 /**
  * The list above is a promise, and this is the thing that keeps it.
  *
- * `UNROUTED` WAS READ BY NOTHING — declared, documented, and enforced by no line in the repository.
+ * `UNROUTED` WAS READ BY NOTHING: declared, documented, and enforced by no line in the repository.
  * Adding `openGrant` to `ROUTES` and to the handler map would have passed both of the assertions
  * `handlersFor` makes, and started returning sealed bytes over HTTP to anything holding a token.
  * The comment above it argues exactly why that must not happen; this is the argument in code.
@@ -181,8 +181,8 @@ for (const name of UNROUTED)
  *
  * `422` FOR ANY REFUSAL AND `409` FOR A CONFLICT, and the distinction is structural rather than a
  * lookup by code (30 §6). This was a table of forty codes, and a table has two failure modes a
- * shape does not: a code nobody remembered to add came back as a 500 — an ordinary "you typed the
- * wrong enum value" arriving as "the server is broken" — and a code somebody guessed at got a 409,
+ * shape does not: a code nobody remembered to add came back as a 500 (an ordinary "you typed the
+ * wrong enum value" arriving as "the server is broken") and a code somebody guessed at got a 409,
  * which tells a client to re-read a row that never moved and retry a write that will be refused
  * again forever.
  *
@@ -198,7 +198,7 @@ const NOT_422: Readonly<Record<string, number>> = {
   RATE_LIMITED: 429,
   FORBIDDEN: 403,
   /* A BROWSER SESSION IS NOT A SCOPE PROBLEM. 403 with the envelope, because the sentence is the
-     part that tells somebody what to do about it — 30 §6's own row. */
+     part that tells somebody what to do about it: 30 §6's own row. */
   NEEDS_BROWSER_SESSION: 403,
   /* THE REFINEMENTS OF `FORBIDDEN`, AND THERE WERE THREE. 30 §6 has one code for "a credential
      outside its scope, level or ceiling", and this file answered with which of the three it was,
@@ -207,8 +207,8 @@ const NOT_422: Readonly<Record<string, number>> = {
      are a strict refinement, so they take `FORBIDDEN`'s status.
 
      THE INSTRUCTION IS RIGHT AND THE REMEDY WAS WRONG, and `PERSON_REQUIRED` has gone because of it.
-     `30 §6`'s `FORBIDDEN` row already carries three separate facts — a `slash` principal writing a
-     row, a runner posting out of `seq` order, the scope case — each told apart by its SENTENCE. A
+     `30 §6`'s `FORBIDDEN` row already carries three separate facts (a `slash` principal writing a
+     row, a runner posting out of `seq` order, the scope case), each told apart by its SENTENCE. A
      code is what a caller branches on; "ask a person to sign in" is what it acts on, and minting a
      code per remedy grows the vocabulary at the speed of the copywriting (`10 §7`).
      `LEVEL_REQUIRED` is in the registry and stays. `SCOPE_INSUFFICIENT` was the last invention of
@@ -223,9 +223,9 @@ const NOT_422: Readonly<Record<string, number>> = {
   SCHEMA_NEWER: 503,
   /* A RECORD NOBODY MAY ACT ON IS NOT A REFUSAL OF THE CALLER'S INPUT. Every owner suspended is the
      record's problem, at 503, and it answered 422 for as long as its code was outside the registry
-     and therefore outside this table — `49 §5.1` step 5.3, and the self-host's `NOBODY`. */
+     and therefore outside this table: `49 §5.1` step 5.3, and the self-host's `NOBODY`. */
   RECORD_UNAVAILABLE: 503,
-  /* The router's own four, which no method returns — `30 §6`'s host and client family, except
+  /* The router's own four, which no method returns: `30 §6`'s host and client family, except
      `INTERNAL`, which is a crash rather than a refusal and is discussed at the catch below. */
   ROUTE_UNKNOWN: 404,
   BODY_MALFORMED: 400,
@@ -270,7 +270,7 @@ const FIREWALLED = new WeakMap<Record<string, Handler>, (method: string, strippe
  * The handlers, built once from the record's surface.
  *
  * THE WIRING IS SHARED, not just the table. A test could assert that two hosts wire the same routes;
- * this makes it impossible for them not to — the Worker and the self-host both call this, so a route
+ * this makes it impossible for them not to: the Worker and the self-host both call this, so a route
  * cannot exist in one and not the other, and "the product behaves differently depending on where you
  * run it" stops being a thing anybody has to remember.
  *
@@ -540,7 +540,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
         ? (method as Handler).call(api, a, ctx)
         : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This BrainDog cannot answer ${route.name} yet, so nothing was read or written.` } };
     };
-  /* The table and the wiring, checked against each other where they are both in scope — so adding a
+  /* The table and the wiring, checked against each other where they are both in scope, so adding a
      route to one without the other throws at start rather than 404ing in production. */
   for (const route of ROUTES)
     if (!handlers[route.name]) throw new TypeError(`${route.name} is in the route table and has no handler`);
@@ -562,7 +562,7 @@ export const PREVIEW_READ_ONLY: Refusal = { code: 'FORBIDDEN', fix: "You're seei
 /**
  * Answer one request against a set of handlers.
  *
- * ONE SHAPE FOR EVERY ANSWER — `{ ok, value }` or `{ ok, refusal }` — because a client that has to
+ * ONE SHAPE FOR EVERY ANSWER (`{ ok, value }` or `{ ok, refusal }`) because a client that has to
  * branch on shape per route is a client that gets one of them wrong. The status carries the same
  * information for anything that reads status codes; the body carries the sentence.
  */
@@ -612,7 +612,7 @@ export async function serveApi(
        whatever the end is: on the Cloud the only ceiling was the platform's, and the whole body sat in the record's
        Durable Object before a byte of it was looked at. The method is known by
        now, so the ceiling is chosen per method here, in one place, for both hosts. */
-    const cap = name === 'import' ? IMPORT_BODY_MOST_BYTES : API_BODY_MOST_BYTES;
+    const cap = name === 'import' ? IMPORT_BODY_MOST_BYTES : name === 'sealedPut' ? SEALED_BODY_MOST_BYTES : API_BODY_MOST_BYTES;
     const text = await textOf(request, cap);
     if (text === null)
       return json(413, {
@@ -685,19 +685,19 @@ export async function serveApi(
   }
 
   /* NOTHING THROWS ACROSS THIS BOUNDARY, and this is where that promise is kept. A handler that
-     throws — an argument nobody coerced, a driver error, a bug — used to escape here, and the caller
+     throws (an argument nobody coerced, a driver error, a bug) used to escape here, and the caller
      never wrote a response at all: the socket stayed open, the request hung, and on the self-host
      the SERVER then never closed. A crash is a 500 with a sentence, not a connection nobody ends. */
   /**
    * `INTERNAL` IS LEFT STANDING, DELIBERATELY, AND IT IS NOT A REFUSAL.
    *
-   * `30 §6`'s whole shape is *a refusal names the field and what was expected* — a crash names
+   * `30 §6`'s whole shape is *a refusal names the field and what was expected*: a crash names
    * neither, and there is nothing a caller can fix. So the registry should not carry it, and it is
    * the one code in this file that stays outside on purpose rather than by neglect: a 500 body has
    * to say something, the envelope has one shape, and the shape has a `code`.
    *
    * THE REASON IT IS NOT RENAMED HERE IS THAT THERE ARE THREE OF IT. This catch, the self-host's
-   * outer `catch` and the Worker's own — one fact, one word, three files, and the first paragraph of
+   * outer `catch` and the Worker's own: one fact, one word, three files, and the first paragraph of
    * this module is about exactly the failure of the two hosts drifting apart. Moving two of the
    * three would buy a lower number in one gate and a product that answers differently depending on
    * where a customer runs it, which is the trade this file exists to refuse.
@@ -772,6 +772,17 @@ export const API_BODY_MOST_BYTES = 1_048_576;
  * comes through this door. The number rises when the kernel's two-pass streaming import (`41 §10`) is built.
  */
 export const IMPORT_BODY_MOST_BYTES = 16 * 1_048_576;
+
+/**
+ * The most a `sealedPut` body may weigh: six mebibytes, the one other method past `API_BODY_MOST_BYTES`.
+ *
+ * A PART OF A SEALED FILE IS FOUR MEBIBYTES BEFORE BASE64 (`SEALED_PART_MOST` in `@braindog/record`), which is 5,592,408
+ * characters after it, and the body around it is a key of at most 200 characters, a hash and three numbers. Six mebibytes
+ * is that with room, and no more: the body is held as bytes, as text and as the parsed part at once, so about four times
+ * this at the peak, well inside the Durable Object's 128 MB. The Worker's net under every POST holds the same number
+ * (`BODY_MOST.sealed` in `abuse.ts`).
+ */
+export const SEALED_BODY_MOST_BYTES = 6 * 1_048_576;
 
 /**
  * A POST's body as text, or `null` when it weighs more than `cap`.

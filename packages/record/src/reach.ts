@@ -1,7 +1,7 @@
 /**
  * SLASH'S REACH: TOOLS AND SKILLS, AND TONE (ENG-B20 job 1, `loop/scope/area-engine-b.md`).
  *
- * His words: "spark basically organizes and designs the tone of your braindog to fit your exact product." and "the
+ * The aim: "spark basically organizes and designs the tone of your braindog to fit your exact product." and "the
  * pages you see, the extensions, the pages, the tools, everything." The one recommender (`design-agent.ts`) weighs the
  * navigation, pages, blocks and icons. This file is two more sources for the same queue.
  *

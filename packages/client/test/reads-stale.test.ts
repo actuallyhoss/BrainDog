@@ -2,7 +2,7 @@
  * What batch 85 added, through the client: the read `stale`, the number `context` carries of it, and the tidy's two
  * figures, `gone-stale` and `tidied-week`, read as any figure is.
  *
- * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-84.test.ts` is not: `serveApi` over a real record, so what
+ * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-briefing.test.ts` is not: `serveApi` over a real record, so what
  * the client sends is what the host decodes, the caller is held by the record's own guards, and the numbers are what
  * the kernel's finders and the hourly sweep's own pass (`purge`) hold.
  */

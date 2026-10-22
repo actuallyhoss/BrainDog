@@ -1,11 +1,12 @@
 /**
- * What a share shows of the money, said before it is made (the owner's call of 21 October): `sharePreview` names the
+ * What a share shows of the money, said before it is made (as decided on 21 October): `sharePreview` names the
  * money lists a share reaches, whether every amount is hidden, and for a project its own figures, the first amount its
  * row says and each money figure its page's tiles name for it, as the record reads them.
  *
  * WHAT IS HELD: a project shared whole shows Kiln's "Earned in a year" and its "Still to come in", in the page's order,
  * each said as the record writes money; Hide amounts says hidden and no figure; a share that reaches no amount says no
- * money; a figure over a list the share does not reach is not said; and a figure that reads nothing is left out.
+ * money; a figure over a list the share does not reach is not said; and a money figure that reads nothing is said as
+ * nothing (`said: null`), so a project with no bills still says what is still to come in.
  */
 
 import { test } from 'node:test';
@@ -107,4 +108,15 @@ test('HIDE AMOUNTS SAYS HIDDEN AND NO FIGURE, and a share that reaches no amount
   assert.deepEqual(millSaid.money, { lists: ['Projects', 'Bills'], hidden: false, figures: [{ label: 'Still to come in', said: 'GBP 9,999.00' }] });
   /* AND A LIST SHARED WHOLE SAYS ITS MONEY WITH NO FIGURE: figures are a project's. */
   assert.deepEqual((await preview(api, { what: { lists: ['bills'] } })).money, { lists: ['Bills'], hidden: false, figures: [] });
+});
+
+test('A MONEY FIGURE THAT READS NOTHING IS SAID AS NOTHING: a project with no bills says nothing is still to come in', async () => {
+  const { api } = await record();
+  const loom = value<{ id: string }>(await api.create({ register: 'things', fields: { name: 'Loom', revenue: { amount: 250_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'tasks', fields: { what: 'Warp it', thing: loom.id } }, owner));
+  const got = await preview(api, { what: { project: loom.id } });
+  assert.deepEqual(got.money?.figures, [
+    { label: 'Earned in a year', said: 'GBP 2,500.00' },
+    { label: 'Still to come in', said: null },
+  ]);
 });

@@ -288,7 +288,7 @@ export type McpSurface<C> = {
   offered?(ctx: C): Answer;
   /**
    * What the record's walk over what it already holds would link next and ask on Decide, in names, with nothing changed
-   * (the record's `understandPlan`, READ+, DIRECTION §38). It backs the `braindog:understand` resource. Optional for the command line's
+   * (the record's `understandPlan`, READ+). It backs the `braindog:understand` resource. Optional for the command line's
    * reason above: both HTTP hosts hand `serveMcp` the whole record, and a surface without it answers `NOT_IN_THIS_BUILD`.
    */
   understandPlan?(args: Record<string, never>, ctx: C): Answer;
@@ -333,6 +333,8 @@ export type McpSurface<C> = {
   firewalled?(method: string, stripped: readonly string[]): void;
   /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, for the firewall, or `null`. */
   listOf?(spoken: string): string | null;
+  /** Whether amounts are hidden from this caller, so the firewall takes the ones written in an answer's text out too. */
+  moneyHidden?(ctx: C): boolean;
   /** One tool call answered, counted for the audit as `mcp:<tool>` for a caller who is not an owner (sharing plan §2.10). */
   toolSeen?(args: { tool: string }, ctx: C): void;
   /**
@@ -396,7 +398,7 @@ export type Tool = {
   /**
    * What a host shows a person for it, in their words: "Suggest a change for the owner", never "propose".
    *
-   * IT NAMES NO ROW AND NO LIST, which are the system's words for the person's own things (`DIRECTION.md` §35). A
+   * IT NAMES NO ROW AND NO LIST, which are the system's words for the person's own things. A
    * host draws it in a permission dialog and beside a step in a transcript, so it is copy a person reads.
    */
   title: string;
@@ -474,11 +476,14 @@ export const TOOLS: readonly Tool[] = [
        (plan §3.2): what he told you first, then where you are, your rules, who else is here and your lane. The four
        arguments are what saves a second call: a task whole with its version, a project by name, how much, and since a
        stamp, which answers only what moved. */
-    description: 'Start here: what you were told, where you are, who else is here, your lane.',
+    description: 'Start here: what you were told, where you are, who is here, your lane.',
     /* `depth` AND `since` ARE TAKEN AND NOT LISTED (`quiet`): a task asks the task's depth and `format: "full"` the full
        one, and `since` is a bridge's or a hook's, which hold the stamp `_meta.braindog` carries; an agent is handed what
        moved on its next answer without asking. */
-    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' } }),
+    /* AND `topic`, WHAT THE PERSON IS WORKING ON, which an agent with no folder says on its first call (Claude.ai,
+       ChatGPT, any remote client): with no repository, remote or folder it is the one thing that places its run, in the
+       project of that name or the first one formed from it. An agent that sends none is asked for it in the answer. */
+    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' }, topic: str('No folder: what they work on') }),
     quiet: ['depth', 'since'],
     writes: false,
   },
@@ -729,7 +734,7 @@ export const TOOLS: readonly Tool[] = [
     writes: true,
   },
   /* `understand` WAS THE SEVENTEENTH TOOL, and is the resource `braindog:understand` now (AGT-B05): "Tools: keep the
-     16" (DIRECTION §37). It takes nothing and writes nothing, which is a resource's shape, and its tokens paid for
+     16". It takes nothing and writes nothing, which is a resource's shape, and its tokens paid for
      `op_id` on `create` and `update`. */
   {
     name: 'meet',
@@ -2332,7 +2337,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * `get` BY A NAME (plan §4.3, §6.1): "Crumb.gg" or "Send Jennifer the Crumb Pass refund email" was refused, because `get`
+   * `get` BY A NAME (plan §4.3, §6.1): "Oxbow.gg" or "Send Wren the Oxbow Pass refund email" was refused, because `get`
    * took a handle alone, and an agent searched and read again. Now the one thing whose title is that name, case and
    * spacing aside, answers as its handle does; a search with one hit answers too. Several are refused `NAME_AMBIGUOUS`
    * with each by its handle and list, and the call for the first as `try`. `null` when nothing is called that, so the
@@ -2439,13 +2444,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /**
      * AND WHAT IT ASKED FOR (plan §3.1): `task` whole with its version, `project` by name, `depth`, and `since` a stamp,
      * which answers only what moved for its run, "Nothing new." when nothing did. A full answer asks the full depth.
+     * `topic` is what an agent with no folder says the person is working on, which the record places its run by.
      */
     context: async (args, ctx, turn) => {
       if (!surface.context) return { result: unbuilt('context', 'Call record_index for the registers, then list what is open.') };
       const full = (ctx as { session?: { format?: unknown } }).session?.format === 'full';
       const sent = Object.fromEntries(
-        (['task', 'project', 'depth', 'since'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
-      ) as { task?: string; project?: string; depth?: string; since?: string };
+        (['task', 'project', 'depth', 'since', 'topic'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
+      ) as { task?: string; project?: string; depth?: string; since?: string; topic?: string };
       if (full && sent.depth === undefined && sent.since === undefined) sent.depth = 'full';
       const raw = await surface.context(sent as never, ctx);
       if (!raw.ok || !isObject(raw.value)) return { result: raw };
@@ -3368,7 +3374,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
        from the masked answer itself, as JSON, and never in those words. */
     let walled = false;
     {
-      const held = firewall(ctx, result, typeof surface.listOf === 'function' ? (spoken) => surface.listOf!(spoken) : undefined);
+      const held = firewall(ctx, result, typeof surface.listOf === 'function' ? (spoken) => surface.listOf!(spoken) : undefined, () => surface.moneyHidden?.(ctx) === true);
       if (held.stripped.length > 0) {
         result = held.answer;
         walled = true;
@@ -3417,7 +3423,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * WHAT THE RECORD WOULD LINK AND ASK, BEFORE ANYBODY IS MET (DIRECTION §38): the record's `understandPlan`, the next
+   * WHAT THE RECORD WOULD LINK AND ASK, BEFORE ANYBODY IS MET: the record's `understandPlan`, the next
    * slice of its nightly walk looked at and nothing kept, said in names. Who may read it is the record's to say, so a
    * refusal passes through in its words.
    *
@@ -3451,7 +3457,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * THE STEPS LEFT AND NOT TAKEN, as `braindog:handoffs`: one table over the page source `handoffs.open`, drawn by the
    * record's `previewPage` and filed nowhere, so it is the same read as the briefing's Next line and the Agents page,
    * held to the caller as a page she may open is. No record needs a page installed for it, and nothing is special to
-   * one record: every record answers it from its own runs (DIRECTION §27). A record without the preview lists no address.
+   * one record: every record answers it from its own runs. A record without the preview lists no address.
    */
   const handoffsRead = async (ctx: C): Promise<Result<unknown>> => {
     if (!surface.previewPage) return unbuilt('braindog:handoffs', 'Read braindog:context, whose Next line names the step to take.');

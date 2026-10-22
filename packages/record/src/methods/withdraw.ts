@@ -1,5 +1,5 @@
 /**
- * An agent takes back a question it asked: `withdraw` (DATA), AGT-C07's record half ("a question has a cause", D40.50).
+ * An agent takes back a question it asked: `withdraw` (DATA), AGT-C07's record half ("a question has a cause").
  *
  * BEFORE THIS ONLY THE LADDER COULD. An agent that asked something it then learnt the answer to, or asked by mistake,
  * left the question in Decide until the owner pressed something, and the next thing it proposed was held behind it.

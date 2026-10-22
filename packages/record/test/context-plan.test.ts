@@ -25,7 +25,7 @@ const who = (over: Partial<CardParts> = {}): CardParts => ({
   placed: true,
   also: null,
   next: 'Next     Build wave 2 of the agents plan. (Claude Code, 2h ago, check before acting)',
-  signs: 'Signs    1 read red here: Runs end as they ended',
+  signs: 'Signs    1 read red here: Agent runs end cleanly',
   waiting: 'Waiting  1 on Mara, first: Add 12 tools for use everywhere?',
   learned: 'Learned  Money is minor units plus currency.',
   update: null,

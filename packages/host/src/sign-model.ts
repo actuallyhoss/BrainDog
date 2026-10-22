@@ -6,7 +6,7 @@
  * (`slash-ask.ts` `read` and `background`, and the engine's own rows), which lives in the host's storage. And the model
  * jobs that died on the retry ladder are the kernel's faults (`fault.ts`), which this reads through the kernel's
  * `faults()` where the record has it. On his record no model composed a page on the Cloud for days and nothing said so
- * (D40.24: "whether a model answered").
+ * ("whether a model answered").
  *
  * THE RULE, 2.2's: over 7 days, red when the newest ask failed, when fewer than 9 in 10 of 5 or more were answered, when
  * a model job is dead, or when the last day held asks and none was answered. `none` when there was no ask in the week
@@ -24,6 +24,10 @@
  * sign counted every `error` as a failure, so at his 600-ask cap the night's budget refusals read red here while
  * Settings read "answered an hour ago" over the same ledger. An answer the engine's own checks refused, or one that broke
  * its schema, was still the model speaking.
+ *
+ * AN ASK, NOT AN ATTEMPT, AND NEVER A TEST (`asksOf`). A model a route passed over for the next is one ask, and the
+ * model tests (`probe`) are none. And a red reading says which kind of ask went unanswered and since when
+ * (`kindsMissed`): "Digest summaries have not been answered since 14 October." A count alone named nothing to look at.
  *
  * NO PROVIDER'S WORDS, ONLY THE FAULT'S OWN SENTENCE. A dead job's kept error and the host's last failure can carry a
  * provider's words about a key, which is why `faults` (`packages/record/src/methods/faults.ts`) holds the error back
@@ -54,6 +58,8 @@ export const MODEL_ANSWERED_TENTHS = 9;
 export const MODEL_DAY_MS = DAY;
 /** How many of the other dead jobs' sentences the facts carry. */
 const OTHER_MOST = 2;
+/** The longest reading a sign files. */
+const READ_MOST = 280;
 
 /* ── the ledger's three clauses, Slash's own ───────────────────────────────────────────────────────────────────────────── */
 
@@ -103,19 +109,110 @@ function dateSaid(ms: number, tz: string): string {
 
 /**
  * One ask of the week as the sign reads it: `ok` is 1 where Slash's health reads an answer, and `spent` is 1 where it
- * reads a budget refusal, which is never an answer and never a failure.
+ * reads a budget refusal, which is never an answer and never a failure. `purpose` is what the ask was for, `null` on a
+ * ledger built before the column (store version 3), where nothing can say it.
  */
-type Ask = { ts: string; ok: number; spent: number };
+type Ask = { ts: string; ok: number; spent: number; purpose: string | null };
 
-/** The asks of the window and its budget refusals, Slash's health's way, newest first. `[]` where Slash never ran. */
+/** The model tests: the engine's probe (`engine-probe.ts`) and the silent model's half-hourly test (`model-jobs.ts`). */
+const PROBE = 'probe';
+
+/**
+ * The asks of the window and its budget refusals, Slash's health's way, newest first. `[]` where Slash never ran.
+ *
+ * ONE ROW AN ASK, AND A TEST IS NO ASK. The ledger writes one row an ATTEMPT: a route's walk writes the candidate it
+ * passed over and then the one that ended the walk (`core.run`, `digestProse`, the host's `infer`), so an ask the second
+ * model answered read here as one failure and one answer, and one that no candidate answered as two failures. A row is
+ * passed over the way Slash's health reads a second model (`DOUBLED` in `packages/slash/src/health.ts`): a failure on a
+ * candidate whose next settled row is the same purpose, on the same route, on another candidate. And the model tests
+ * spend nothing and ask nothing of the record, so `probe` is not counted either: the half-hourly test of a silent model
+ * read as one more ask the model did not answer every half hour of an outage. The engine's health still reads both.
+ *
+ * READ WHERE THE COLUMNS ARE, off the table's own `CREATE` text as `engine-ledger.ts` reads it: a ledger built before
+ * store version 3 has no `purpose`, `route` or `candidate`, and every row of it is an ask, as it always was.
+ */
 function asksOf(sql: Sql, sinceMs: number): Ask[] {
-  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'") === undefined) return [];
+  const built = sql.one<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'");
+  if (built === undefined) return [];
+  const has = (column: string): boolean => new RegExp(`\\b${column}\\b`, 'u').test(built.sql);
+  const purpose = has('purpose') ? 'purpose' : 'NULL';
+  const walked = has('route') && has('candidate');
+  const route = walked ? 'route' : 'NULL';
+  const candidate = walked ? 'candidate' : 'NULL';
   return sql.all<Ask>(
-    `SELECT ts, CASE WHEN ${LEDGER_ANSWERED} THEN 1 ELSE 0 END AS ok, CASE WHEN ${LEDGER_BUDGET} THEN 1 ELSE 0 END AS spent
-     FROM slash_call WHERE ts >= ? AND ((${LEDGER_ANSWERED}) OR (${LEDGER_FAILED}) OR (${LEDGER_BUDGET}))
-     ORDER BY ts DESC, rowid DESC`,
+    `SELECT ts, ok, spent, purpose FROM (
+       SELECT rowid AS r, ts, ${purpose} AS purpose, ${route} AS route, ${candidate} AS candidate,
+              CASE WHEN ${LEDGER_ANSWERED} THEN 1 ELSE 0 END AS ok, CASE WHEN ${LEDGER_BUDGET} THEN 1 ELSE 0 END AS spent,
+              CASE WHEN ${LEDGER_FAILED} THEN 1 ELSE 0 END AS failed,
+              LEAD(${purpose}) OVER w AS n_purpose, LEAD(${route}) OVER w AS n_route, LEAD(${candidate}) OVER w AS n_candidate
+       FROM slash_call WHERE ts >= ? AND ((${LEDGER_ANSWERED}) OR (${LEDGER_FAILED}) OR (${LEDGER_BUDGET}))
+       WINDOW w AS (ORDER BY rowid)
+     )
+     WHERE (purpose IS NULL OR purpose <> '${PROBE}')
+       AND NOT (failed = 1 AND candidate IS NOT NULL AND n_candidate IS NOT NULL AND n_candidate IS NOT candidate
+                AND n_route IS route AND n_purpose IS purpose)
+     ORDER BY ts DESC, r DESC`,
     new Date(sinceMs).toISOString(),
   );
+}
+
+/**
+ * What each kind of ask is, in a person's words, as Usage names it (`apps/web/src/lib/ui/slash-asks.ts`), restated
+ * because this package may not import an app. A purpose with no entry is a newer host's, and is said as other asks.
+ */
+const KINDS: Readonly<Record<string, string>> = {
+  ask: 'Your questions',
+  automation: 'Automation steps',
+  plan: 'First plans',
+  headline: 'Page headlines',
+  understand: 'Readings of what arrived',
+  look: 'Daily looks and drafts',
+  compose: 'Drafts',
+  skill: 'Skill revisions',
+  pattern: 'Pattern drafts',
+  prose: 'Digest summaries',
+  embed: 'Search updates',
+};
+
+/** How many kinds of ask a red reading names, the most missed first. */
+const KINDS_MOST = 2;
+
+/**
+ * Which kinds of ask the model did not answer and since when, one sentence each, the most missed first. `[]` on a
+ * ledger that cannot say what an ask was for.
+ *
+ * STILL FAILING IS SAID WITH THE DAY IT BEGAN, which is the first miss after that kind's last answer this week, or the
+ * week's first miss where none was answered: "Digest summaries have not been answered since 14 October." A kind that
+ * answers again is said with how often it missed and its last miss, so a week that mended itself does not read as a
+ * fault still open. Before this the sentence was a count alone, and "87 of 190" said neither what to look at nor whether
+ * it was over.
+ */
+function kindsMissed(asks: readonly Ask[], tz: string): string[] {
+  const by = new Map<string, Ask[]>();
+  for (const a of asks) {
+    if (a.purpose === null) return [];
+    const kind = Object.hasOwn(KINDS, a.purpose) ? a.purpose : 'other';
+    by.set(kind, [...(by.get(kind) ?? []), a]);
+  }
+  const missed = [...by.entries()]
+    .map(([kind, rows]) => ({ kind, rows, no: rows.filter((a) => !answered(a)).length }))
+    .filter((k) => k.no > 0)
+    .sort((a, b) => b.no - a.no || (a.kind < b.kind ? -1 : 1))
+    .slice(0, KINDS_MOST);
+  return missed.map(({ kind, rows, no }) => {
+    /* NEWEST FIRST, as the week's rows are. */
+    const name = KINDS[kind] ?? 'Other asks';
+    const lastOk = rows.findIndex(answered);
+    if (lastOk === 0) {
+      const lastMiss = rows.find((a) => !answered(a))!;
+      return `${name} missed ${no === 1 ? 'once' : `${no} times`}, the last on ${dateSaid(Date.parse(lastMiss.ts), tz)}, and answer again.`;
+    }
+    const run = lastOk === -1 ? rows : rows.slice(0, lastOk);
+    const began = dateSaid(Date.parse(run[run.length - 1]!.ts), tz);
+    /* NO ANSWER IN THE WEEK, so the run may have begun before it: the week's first miss is said as that, not as its start. */
+    if (lastOk === -1) return `${name} have not been answered this week, ${no === 1 ? 'one ask' : `${no} asks`} from ${began}.`;
+    return `${name} have not been answered since ${began}.`;
+  });
 }
 
 /** The first instant of the month after `ms`, in UTC: the day a month's spent asks come back (`slash/src/call.ts` `resets`). */
@@ -211,9 +308,13 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
       : no === 0
         ? `The model answered ${yes} of ${count(asks.length, 'ask')} this week, but ${dead.length === 1 ? 'a model job' : `${dead.length} model jobs`} stopped after every retry.`
         : `The model did not answer ${no} of ${count(asks.length, 'ask')} this week.`;
+  /* WHICH KIND OF ASK, AND SINCE WHEN (`kindsMissed`), each sentence only where the reading has room for it beside the
+     dead job's sentence below, which is never the one cut. */
+  const room = READ_MOST - (deadSaid[0] === undefined ? 0 : deadSaid[0].length + 1);
+  const told = spent || no === 0 ? head : kindsMissed(asks, tz).reduce((said, kind) => (`${said} ${kind}`.length <= room ? `${said} ${kind}` : said), head);
   /* THE NEWEST DEAD MODEL JOB'S OWN SENTENCE, which says what was not done and when it is tried again. Never its error. */
-  const said = deadSaid[0] === undefined ? head : `${head} ${deadSaid[0]}`;
-  return { state: 'red', value: yes, said: said.slice(0, 280), facts: facts.slice(0, 6) };
+  const said = deadSaid[0] === undefined ? told : `${told} ${deadSaid[0]}`;
+  return { state: 'red', value: yes, said: said.slice(0, READ_MOST), facts: facts.slice(0, 6) };
 }
 
 /**

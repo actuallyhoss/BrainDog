@@ -17,9 +17,9 @@
  * key", because a person cannot act on `@cf/...` or `UNREACHABLE`; the operator reads those in the Worker's log
  * (ENG-A01), which is where the provider's own words are kept.
  *
- * BESIDE THE SENTENCE, WHAT SETTINGS SAYS UNDER IT (ENG-A05, ENG-A06, "health shown", DIRECTION 40): which model answered
+ * BESIDE THE SENTENCE, WHAT SETTINGS SAYS UNDER IT (ENG-A05, ENG-A06, "health shown"): which model answered
  * last and when, the provider's own words for the newest failure (scrubbed again, never a key), how many asks needed a
- * second model, and this month's asks by whose allowance they spent. "Rules are the fallback, not the engine." (D35.43):
+ * second model, and this month's asks by whose allowance they spent. "Rules are the fallback, not the engine.":
  * a fallback that doubles the bill unseen is the risk the scope names, so the share is read here and not guessed.
  */
 

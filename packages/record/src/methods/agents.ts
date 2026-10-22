@@ -10,13 +10,13 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { SEEN_HOW, agentOf, liveStateOf, sessionDeclaration, type ArrivalSettled, type Entry, type LiveState, type Patch, type SeenHow, type Stop, type WriteContext } from '@braindog/kernel';
+import { INSTRUCTIONS, SEEN_HOW, agentOf, liveStateOf, sessionDeclaration, type ArrivalSettled, type Entry, type LiveState, type Patch, type SeenHow, type Stop, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
 import { readSight } from '../sight.ts';
-import { OWN_RUN, stopLine, toldOf, type Told } from './instructions.ts';
+import { OWN_RUN, stopLine, toldOf, toldTo, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
 export type UsedByRun = { run: string; agent: string | null; machine: string | null; at: string; count: number };
@@ -123,6 +123,8 @@ export type PresenceRow = {
   name: string | null;
   agent: string | null;
   machine: string | null;
+  /** The Claude Code profile it runs under, by name (`studio`), or `null` when its agent said none (migration 44). */
+  seat: string | null;
   project: string | null;
   repo: string | null;
   worktree: string | null;
@@ -336,13 +338,18 @@ export function methods(deps: RecordDeps) {
       const found = kernel.findRun(ctx.session ?? {}, p.id);
       if (found === null) return ok({ run: null, stamp: null, changed: false, pending: [], stop: null, lines: [] });
       const run = kernel.nameOf(found.id);
-      kernel.pulseRun(run);
+      /* AND THE PROFILE ITS HEADERS NAME, written once onto a run that opened without one (migration 44). */
+      kernel.pulseRun(run, undefined, ctx.session?.seat ?? null);
       const shown = (a.shown as string[] | undefined) ?? [];
       const how = (a.how as SeenHow | undefined) ?? 'prompt';
-      for (const id of shown) kernel.seenInstruction(id, run, how);
+      /* WHAT IT IS HANDED AND NO MORE (`toldTo`): a member's agent is never handed his words to his own agents, nor marks
+         one seen by naming it. */
+      const handed = toldTo(readable, ctx, kernel.instructionFor({}, run));
+      const mine = new Set(handed.map((i) => i.id));
+      for (const id of shown) if (mine.has(id) || readable(ctx, INSTRUCTIONS) === null) kernel.seenInstruction(id, run, how);
       const was = typeof a.stamp === 'string' ? a.stamp : '';
       const delta = kernel.changedSince(run, was);
-      const pending = kernel.instructionFor({}, run).map((i) => toldOf(sql, i));
+      const pending = handed.map((i) => toldOf(sql, i));
       const fresh = new Set(delta.pending.map((i) => i.id));
       const held = stopLine(sql, kernel, delta.stop);
       const lines = delta.changed
@@ -406,13 +413,14 @@ export function methods(deps: RecordDeps) {
           const f = r.fields as Record<string, unknown>;
           const agent = of(f, 'agent');
           const heard = [of(f, 'last_seen'), of(f, 'pulse_at')].filter((v): v is string => v !== null).sort().at(-1) ?? null;
-          const profile = kernel.profileFor({ kind: agent, token: of(f, 'token_id'), host: of(f, 'host') });
+          const profile = kernel.profileFor({ kind: agent, token: of(f, 'token_id'), host: of(f, 'host'), seat: of(f, 'seat') });
           const stopped = f.stopped === 'stop' || f.stopped === 'pause' ? f.stopped : null;
           return {
             run: spoken(r),
             name: of(f, RUN_TITLE),
             agent,
             machine: of(f, 'host'),
+            seat: of(f, 'seat'),
             project: of(f, 'project'),
             repo: of(f, 'repo'),
             worktree: of(f, 'worktree'),
@@ -449,7 +457,8 @@ export function methods(deps: RecordDeps) {
       const said = typeof args?.spoken === 'string' ? args.spoken.trim() : '';
       if (!said) return no('REQUIRED_MISSING', 'Name the key or the tool by its spoken id, such as credentials#3 or tools#2.', { at: 'spoken' });
       const row = kernel.get(said);
-      if (!row || readable(ctx, row.register) !== null)
+      /* AND A ROW HER GRANT DOES NOT ADMIT, or one kept private from her, is not there either (`sight`). */
+      if (!row || readable(ctx, row.register) !== null || !deps.sight.admits(ctx, row))
         return no('REF_UNKNOWN', 'There is no key or tool you can read by that name.', { at: 'spoken' });
       const KEYS = listFor('keys-index', kernel.registers());
       if (row.register !== KEYS && row.register !== TOOLS)

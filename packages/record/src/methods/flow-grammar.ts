@@ -2,7 +2,7 @@
  * The read `flowGrammar`: the kernel's grammar of an automation, every trigger and step with its arguments, and the
  * ceilings (`packages/kernel/src/flow-grammar.ts`).
  *
- * ONE DEFINITION, TWO EDITORS (D22.51). The canvas copied the lint's tables by hand and the copy drifted, so it reads
+ * ONE DEFINITION, TWO EDITORS. The canvas copied the lint's tables by hand and the copy drifted, so it reads
  * them here instead, as an agent may. The answer is the kernel's as it stands: nothing in it is about this record, and
  * whether a body's named lists, doors and calls are there is `checkAutomation`'s to say.
  *

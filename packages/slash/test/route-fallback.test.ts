@@ -1,5 +1,5 @@
 /**
- * The walk (ENG-A06 job 3): "Rules are the fallback, not the engine." (D35.43)
+ * The walk (ENG-A06 job 3): "Rules are the fallback, not the engine."
  *
  * WHEN THE FIRST MODEL DOES NOT ANSWER, THE NEXT ONE THE HOST HANDED IS ASKED, before a caller's rules speak. Each attempt
  * is one ledger row priced by its own model, the answer carries the model that gave it, and the ask is counted once.

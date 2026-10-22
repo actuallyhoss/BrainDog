@@ -170,8 +170,10 @@ export function exceptionsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
     const stale = declared.get(id);
     lists.push({ id, name: decl.name, ...(stale ? { stale } : {}) });
   }
-  /* THE WAYS IN AND THE FEEDS ARE THE WHOLE RECORD'S: what arrives through one lands on lists this caller may not read. */
-  const everything = deps.readsEveryList?.(ctx) === true;
+  /* THE WAYS IN AND THE FEEDS ARE THE WHOLE RECORD'S: what arrives through one lands on lists this caller may not read.
+     `readsAcross` AND NOT `readsEveryList`, as the `exceptions` block asks it: an Admin is told a way in went quiet while
+     the record keeps a personal list, whose own quiet is left out above with every list she cannot read. */
+  const everything = (deps.readsAcross ?? deps.readsEveryList)?.(ctx) === true;
   const found: ExceptionFound[] = [];
   for (const e of reader.openExceptions(sql, nowMs, lists)) {
     if ((e.kind === 'door' || e.kind === 'schedule') && !everything) continue;

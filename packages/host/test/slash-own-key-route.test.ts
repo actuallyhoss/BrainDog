@@ -1,6 +1,6 @@
 /**
  * His own key is a route of one candidate (HD.324, "own key lifts monthly cap"): a record set to his key whose key will
- * not open is answered with `OWN_KEY_FAILED`, his words, and nothing is sent, and the included model is never asked in
+ * not open is answered with `OWN_KEY_FAILED`'s sentence, and nothing is sent, and the included model is never asked in
  * its place, at the adapter, at the router and in the walk.
  *
  * Every model here is a fake that counts its calls. No key is real.

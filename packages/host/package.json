@@ -8,6 +8,7 @@
     "./actions": "./src/actions.ts",
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
+    "./drawn-frame": "./src/drawn-frame.ts",
     "./first-read": "./src/first-read.ts",
     "./infer": "./src/infer.ts",
     "./abuse": "./src/abuse.ts",

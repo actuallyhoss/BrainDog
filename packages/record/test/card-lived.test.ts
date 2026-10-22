@@ -10,7 +10,7 @@
  *
  * TRUE MEANS THE RECORD SAYS IT TOO. The step a Next line quotes is the newest one left where the session stands, by
  * the run the line names; the red signs it counts are the ones the record reads red. Nothing here is anybody's: the
- * names and the step are made up (DIRECTION 27).
+ * names and the step are made up.
  */
 
 import { test } from 'node:test';

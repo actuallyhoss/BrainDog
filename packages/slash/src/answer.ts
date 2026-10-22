@@ -38,7 +38,7 @@ const STOPPED = 'PULL_REQUEST_REFUSED';
 /**
  * What a rule's question is on the ledger: an automation's ask, and one of his own.
  *
- * AN AUTOMATION'S ASK SPENDS HIS ALLOWANCE, the default taken for him (DIRECTION 42): the rule is his, it asks because
+ * AN AUTOMATION'S ASK SPENDS HIS ALLOWANCE, the default taken for him: the rule is his, it asks because
  * he wrote it to, and a rule that asked on the background's count could spend the month's headlines in an afternoon.
  * Said once here and handed to the hold and to every settle; a rung no model answered is written `none` by the ledger
  * (`call.ts`, `unspent`), so the ladder's retries cost his month nothing.

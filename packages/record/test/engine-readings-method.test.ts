@@ -90,3 +90,15 @@ test("ON A REAL RECORD the host's ledger is handed through", async (t) => {
   if (out.ok && out.value === null) return t.todo('record index.ts does not hand engineLedger to methods(...) yet');
   assert.deepEqual(out, { ok: true, value: engineReadings({ now: T0, ...LEDGER, owed: [], braked: UNBRAKED }) });
 });
+
+test('A READER HELD TO PART OF THE RECORD IS REFUSED: every count is over the whole of it', async () => {
+  let asked = 0;
+  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(T0), engineLedger: async () => (asked++, LEDGER) } as never);
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }).ok);
+  const narrowed: CallContext = { principal: { kind: 'person', id: 'p_sam', level: null }, registers: ['session'], levels: { session: 'read' } } as CallContext;
+  const out = (await api.engineReadings(undefined, narrowed)) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false, 'a narrowed reader was told the whole record\'s counts');
+  assert.equal(out.refusal?.code, 'FORBIDDEN');
+  assert.doesNotMatch(out.refusal?.fix ?? '', /readsAcross|[A-Z]{4,}/u);
+  assert.equal(asked, 0, 'the ledger was opened for a reader who is refused');
+});

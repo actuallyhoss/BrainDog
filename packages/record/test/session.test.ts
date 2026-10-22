@@ -507,7 +507,7 @@ test('WHAT CHANGED LEAVES OUT THE RECORDâ€™S BOOKKEEPING: the sweep and a toolâ€
   const said = agent({ ...HERE, client_id: 'c-1' });
   const task = value<Entry>(await api.create({ register: 'tasks', fields: { what: 'Ship the brief' } }, said));
   /* The scan records a tool with the moment it saw it, and stamps it again a day later. */
-  const tool = value<Entry>(await api.create({ register: 'tools', fields: { name: 'fly-prism', seen: iso(clock.now()) } }, said));
+  const tool = value<Entry>(await api.create({ register: 'tools', fields: { name: 'fly-copperleaf', seen: iso(clock.now()) } }, said));
   clock.advance(25 * HOUR);
   value(await api.update({ register: 'tools', seq: tool.seq!, patch: { seen: iso(clock.now()) } }, said));
   /* Twelve hours of silence later the hourly row writes the run off. */

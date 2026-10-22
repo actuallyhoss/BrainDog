@@ -4,7 +4,7 @@
  * WHY THIS FILE EXISTS. The inbox's refusal to a token was `allows`'s "This needs owner, and no token reaches it. A
  * person has to do it, signed in." It stopped being true the day the `inbox` reach was made: a token its owner gave
  * the reach does read the inbox, and an agent's owner told "no token reaches it" went looking for a person to sign in
- * when one flag on the token was all it lacked (his words: "Once minting lands, that sentence should name the inbox
+ * when one flag on the token was all it lacked ("Once minting lands, that sentence should name the inbox
  * reach instead."). Batch 88 changed the sentence; this holds every refusal of both doors to it, so a new branch that
  * falls back on `allows`'s wording turns this red.
  *

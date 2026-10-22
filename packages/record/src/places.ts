@@ -2,7 +2,7 @@
  * The rail's places as data (SHL-A18 job 1): the ordered places a person's rail draws, each with the page it opens, its
  * glyph, its name and who put it there, so the web shell draws them and holds no order of its own.
  *
- * HIS WORDS: "The fixed part is small: the frame." (D38.17), and "how dynamic is everything?" (D40.6). The web ranked
+ * THE AIM: "The fixed part is small: the frame.", and "how dynamic is everything?". The web ranked
  * the rail by a list of section names it wrote itself (`apps/web/src/lib/nav/rail.ts` `PLACES`), so a stranger's add-on
  * whose section is not one of those seven words sat after every one of them, whatever it asked. Here nothing is
  * spelled: the order is read off what the declarations say.

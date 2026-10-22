@@ -93,7 +93,7 @@ const EMBED_ANSWER_BYTES = 12_000_000;
 export const SLASH_TOKENS_CEILING = 1_000_000;
 
 /**
- * THE ONE EXAMPLE PAGE THE MODEL IS SHOWN, so "a good page" (DIRECTION §35) is a body it can copy and not only a sentence.
+ * THE ONE EXAMPLE PAGE THE MODEL IS SHOWN, so "a good page" is a body it can copy and not only a sentence.
  * A lead note with two figures, a stat with its trend beside the firings still to run, every heading with its glyph, the
  * rows tiling to 12 and the list saying what it says when it is empty. Every key is one `block-keys.ts` reads, so a model
  * that copies it draws clean.
@@ -205,7 +205,7 @@ export const SLASH_SKILL_INSTRUCTIONS = [
  * `packages/record/src/headlines.ts`). A line with a digit, a number in words, or a hole for a figure the page was not
  * handed is not kept, so these rules are the ones that check holds it to, said first.
  *
- * AND THE SAME ASK ARRANGES THE PAGE (DIRECTION §38, `packages/record/src/compose-look.ts`). A page handed `blocks` and
+ * AND THE SAME ASK ARRANGES THE PAGE (`packages/record/src/compose-look.ts`). A page handed `blocks` and
  * `rows` may be answered as `{ headline, lead, order, hide, next, group }`: a lead and an order of the keys handed, each once,
  * the lead line first; a hide of keys handed, never the lead line nor what leads; a next naming a row handed, in one
  * plain phrase of at most `NEXT_MOST` characters, 80, with no number it was not handed.
@@ -1111,7 +1111,7 @@ const ownAddressOf = (own: SlashOwnKey, hostUrl: string | undefined): string | n
 };
 
 /**
- * The sentence for his own key when the vault would not open it, thrown before anything is sent, in his words.
+ * The sentence for his own key when the vault would not open it, thrown before anything is sent, in plain words.
  *
  * HIS OWN KEY IS A ROUTE OF ONE CANDIDATE. `routeFor` answers `[m.key]` alone for the `key` form (`infer.ts`), each host's
  * `chosen()` throws where his key is gone rather than hand back the included model, and `infer` throws a closed key on as

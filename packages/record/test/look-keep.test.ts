@@ -1,5 +1,5 @@
 /**
- * The app's two answers to Slash arranging a page while the person looks at it (DIRECTION §37's 6-second Undo):
+ * The app's two answers to Slash arranging a page while the person looks at it (its 6-second Undo):
  * `undoLook` puts back what Slash replaced, and `keepLook`, once the Undo has passed, says who kept it, which the page
  * read answers as `look.kept` so the history line survives a reload. Both are the owner's, from the app.
  */

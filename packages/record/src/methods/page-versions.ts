@@ -68,6 +68,9 @@ export type PageVersions = { page: string; title: string; versions: PageVersion[
 /** How many versions one read answers, newest first, as `VERSIONS_SHOWN` bounds an automation's. */
 export const PAGE_VERSIONS_SHOWN = 50;
 
+/** The runs list, whose row says which agent a run was. */
+const SESSION = 'session';
+
 /** A run's spoken id, `S42`, which signs a write an agent made inside a run. */
 const RUN = /^S[1-9][0-9]*$/u;
 
@@ -125,20 +128,39 @@ export function methods(deps: RecordDeps) {
     return key === undefined ? null : { code: 'FIELD_UNKNOWN', fix: `${key} is not something this call takes. It takes ${takes.join(', ')}.`, at: key, allowed: [...takes] };
   };
 
-  /** Whether the caller may open a page `kernel.pages()` lists: the rule of `seesPage` in `index.ts`. */
-  const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
-    (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
+  /** Whether the caller may open a page `kernel.pages()` lists: the rule of `seesPage` in `index.ts`, the row it is about admitted too. */
+  const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string; seq?: number | null } | null }): boolean =>
+    (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || aboutSeen(ctx, p.about));
 
-  /** Who an actor is, as a person reads it: a person by name, a run by its agent, and never an id. */
-  const whoOf = (actor: string): string => {
+  /** Whether the row a page is made for is one she is shown: its list read, and the row admitted (`aboutSeen` in `index.ts`). */
+  const aboutSeen = (ctx: CallContext, about: { register: string; seq?: number | null }): boolean => {
+    if (readable(ctx, about.register) !== null) return false;
+    if (typeof about.seq !== 'number' || kernel.scope(ctx, about.register) === undefined) return true;
+    const row = kernel.get({ register: about.register, seq: about.seq });
+    return row !== null && deps.sight.admits(ctx, row);
+  };
+
+  /**
+   * Who an actor is, as a person reads it: a person by name, a run by its agent, and never an id.
+   *
+   * AN AGENT'S KIND IS READ OFF ITS RUN, AND THE RUNS ARE THE OWNER'S OWN LIST. A reader who may not read the runs, or
+   * not that run, is told "An agent": "Claude Code" under a version said which app the owner works with to somebody the
+   * runs were never shared with (sharing plan §2.7, the lens leftovers). An `agent:` actor says its kind in its own
+   * name, and is held the same way.
+   */
+  const whoOf = (actor: string, ctx: CallContext): string => {
     if (actor === 'slash') return 'Slash';
     if (actor === 'system' || actor === 'rule:ladder' || actor === 'rule:additive' || actor === 'rule:update') return 'BrainDog';
     if (actor.startsWith('rule:') || actor.startsWith('script:')) return 'A rule';
     if (actor.startsWith('ingest:')) return 'An import';
     const spaced = (kind: string): string => kind.replace(/[-_]+/gu, ' ').replace(/^./u, (c) => c.toUpperCase());
-    if (actor.startsWith('agent:')) return actor === 'agent:other' ? 'An agent' : spaced(actor.slice('agent:'.length));
+    const runsRead = kernel.registers().has(SESSION) && readable(ctx, SESSION) === null;
+    if (actor.startsWith('agent:')) return actor === 'agent:other' || !runsRead ? 'An agent' : spaced(actor.slice('agent:'.length));
     if (RUN.test(actor)) {
-      const agent = sql.one<{ a: unknown }>("SELECT json_extract(fields, '$.agent') AS a FROM entry WHERE register = 'session' AND seq = ?", Number(actor.slice(1)))?.a;
+      if (!runsRead) return 'An agent';
+      const run = kernel.get({ register: SESSION, seq: Number(actor.slice(1)) });
+      if (run === null || !deps.sight.admits(ctx, run)) return 'An agent';
+      const agent = run.fields.agent;
       return typeof agent === 'string' && agent !== '' && agent !== 'other' ? spaced(agent) : 'An agent';
     }
     return sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim() || 'Someone';
@@ -261,7 +283,7 @@ export function methods(deps: RecordDeps) {
           version: r.version,
           at: r.created_at,
           live: r.superseded_at === null && r.retired === 0,
-          by: by ? whoOf(by.actor) : r.pack_id === null ? null : 'An add-on',
+          by: by ? whoOf(by.actor, ctx) : r.pack_id === null ? null : 'An add-on',
           body: shown.body,
           ...(shown.cut === 0 ? {} : { cut: shown.cut }),
         };

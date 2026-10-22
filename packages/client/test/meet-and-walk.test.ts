@@ -35,12 +35,12 @@ test('PAGE ASKS A LONGER WALK AS TEXT, in days or to the last bill, and asks non
   const net = recording({ blocks: [] });
   const c = createClient({ base: 'https://braindog.example', fetch: net.fetch });
   await c.page('money');
-  await c.page('money', { project: 'bake' }, { walk: 1825 });
+  await c.page('money', { project: 'oxbow' }, { walk: 1825 });
   await c.page('money', undefined, { walk: 'last' });
   const asked = net.seen.map((s) => [s.url.searchParams.get('slug'), s.url.searchParams.get('walk'), s.url.searchParams.get('filter')]);
   assert.deepEqual(asked, [
     ['money', null, null],
-    ['money', '1825', '{"project":"bake"}'],
+    ['money', '1825', '{"project":"oxbow"}'],
     ['money', 'last', null],
   ]);
 });

@@ -96,6 +96,27 @@ test('A 2 MIB CREATE IS 413 BEFORE THE HANDLER RUNS, AND A 5 MIB IMPORT STILL RE
   assert.equal((reached[0]?.args.lines as string[]).length, file.lines.length, 'every line arrived');
 });
 
+test('A FOUR-MEBIBYTE PART OF A SEALED FILE REACHES sealedPut, AND A BODY PAST SIX IS 413 BEFORE IT RUNS', async () => {
+  const reached: number[] = [];
+  const handlers: Record<string, host.Handler> = {
+    sealedPut: async (args) => (reached.push(String(args.bytes).length), ok({ key: 'sync/key', part: 0, parts: 2, complete: false })),
+    create: async () => ok({ id: 'r_1' }),
+  };
+  const part = JSON.stringify({ key: 'sync/key', part: 0, parts: 2, size: 5 * MiB, sha256: 'a'.repeat(64), bytes: Buffer.alloc(4 * MiB, 7).toString('base64') });
+  assert.ok(part.length > host.API_BODY_MOST_BYTES && part.length < host.SEALED_BODY_MOST_BYTES);
+  const fits = await host.serveApi(post('sealedPut', part), handlers, {});
+  assert.equal(fits.status, 200, await fits.clone().text());
+  assert.equal(reached[0], 5_592_408, 'the part did not arrive whole');
+
+  const heavy = await host.serveApi(post('sealedPut', JSON.stringify({ key: 'sync/key', bytes: 'A'.repeat(7 * MiB) })), handlers, {});
+  assert.equal(heavy.status, 413);
+  assert.match(((await heavy.json()) as Answer).refusal?.fix ?? '', /sealedPut/);
+  assert.equal(reached.length, 1, 'the handler ran on a body past the part ceiling');
+
+  /* AND THE CEILING IS THE PUT'S ALONE: the same body to any other method is past its megabyte. */
+  assert.equal((await host.serveApi(post('create', part), handlers, {})).status, 413);
+});
+
 test('a body with no Content-Length is counted as it arrives, and the reading stops at the first piece over', async () => {
   const { reached, handlers } = counting();
   const sent = streamed(createOf(4 * MiB));

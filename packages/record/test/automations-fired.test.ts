@@ -1,7 +1,7 @@
 /**
  * What a rule has done, as `automations` answers it: `fired`, `last_at`, `why_idle` and `family` (SHL-D07 job 2).
  *
- * HIS WORDS: "how many rows a rule has filed, and never for one that has not". The count is the kernel's `rule_stat`,
+ * THE RULE: "how many rows a rule has filed, and never for one that has not". The count is the kernel's `rule_stat`,
  * the whole of it and not a page of history. A rule that has done nothing says why in one sentence, counted from the
  * list itself and never from the log, so a pruned history cannot make it say more were added than the list holds.
  * Rules that do the same thing to the same list share one `family` key, read from the body's shape.

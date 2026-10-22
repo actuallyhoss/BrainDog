@@ -1,6 +1,6 @@
 /**
  * Which skills are behind their findings: `skillsBehind` (READ+), AGT-C16 jobs a and b as a read ("and the skills
- * updates with findings and stuff", D0.10; "A change to a skill's text is proposed with its diff", D0.176).
+ * updates with findings and stuff"; "A change to a skill's text is proposed with its diff").
  *
  * BEFORE THIS ONLY THE NIGHTLY DRAFT ASKED IT (`skillBearings` in `../slash.ts`), and the draft needs a model that
  * offers a skill ask, so on a record with no such model nothing said which skills have lessons they do not take in.

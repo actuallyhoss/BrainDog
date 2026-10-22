@@ -45,6 +45,7 @@ export type AbuseName = keyof typeof ABUSE;
 export const BODY_MOST = {
   api: { bytes: 1_048_576, why: 'A record call, as the API door already caps it (`API_BODY_MOST_BYTES`).' },
   import: { bytes: 16 * 1_048_576, why: 'A whole-record import is the one call that is allowed to be large.' },
+  sealed: { bytes: 6 * 1_048_576, why: 'One part of a sealed file, four mebibytes before base64, as the API door caps it (`SEALED_BODY_MOST_BYTES`).' },
   auth: { bytes: 65_536, why: 'A passkey ceremony is a few kilobytes; nothing at sign-in is larger.' },
   oauth: { bytes: 16_384, why: 'A registration, a consent and a token form are a few hundred bytes.' },
   account: { bytes: 1_048_576, why: 'Billing and the operator doors; a payment event is the largest at one megabyte.' },

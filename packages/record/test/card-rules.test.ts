@@ -2,7 +2,7 @@
  * The card's Learned and More slots after AGT-B09. Learned leads with the record's own rules, each cut at sixty
  * characters, with "and N more rules" when `context` found more, then the lessons that matter most. More says how many
  * there are by count, the Home page and the call, and names no key and no skill. Every context here is drawn by hand;
- * the names are made up (DIRECTION 27).
+ * the names are made up.
  */
 
 import { test } from 'node:test';

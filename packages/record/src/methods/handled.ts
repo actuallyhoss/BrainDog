@@ -1,10 +1,10 @@
 /**
  * What BrainDog arranged for itself today: `handled` (READ+), one line each for the changes it made without asking
- * (DIRECTION d3: a reversible arrangement of the owner's own rows happens with a mark, the reason and an Undo), newest
+ * (a reversible arrangement of the owner's own rows happens with a mark, the reason and an Undo), newest
  * first, with the decision's handle so one press can put the whole batch back.
  *
  * READ FROM THE DECISIONS THE RECORD ALREADY KEEPS, signed by `rule:handled` (`handledFault` in the kernel), with no
- * table of its own. One that was put back since is left out, and so is one in a list the caller may not read.
+ * table of its own. One that was put back since is left out, and so is one in a list the caller may not read whole.
  *
  * IT WRITES NOTHING. Undoing a line is the record's own `undo` on its decision.
  */
@@ -31,7 +31,7 @@ export type Handled = { rows: HandledRow[]; more: number };
 const lineOf = (question: string): string => question.replaceAll(/\s*—\s*/gu, ', ').replace(/\?+\s*$/u, '').trim();
 
 export function methods(deps: RecordDeps) {
-  const { sql, scoped, readable, clock } = deps;
+  const { sql, kernel, sight, scoped, readable, clock } = deps;
 
   return {
     /** `{}`: what BrainDog arranged itself today, newest first, `HANDLED_MOST` at most, and `more` past them. READ+, and it changes nothing. */
@@ -59,7 +59,9 @@ export function methods(deps: RecordDeps) {
         } catch {
           list = undefined;
         }
-        if (typeof list !== 'string' || readable(ctx, list) !== null) continue;
+        /* AND READ WHOLE (`sight`): a question and a reason are worded from the rows the change named, so a caller held to
+           some of the list's rows, or from whom a field of it is hidden, is not told what was done to the others. */
+        if (typeof list !== 'string' || readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0) continue;
         const line = lineOf(f.question);
         if (line === '') continue;
         rows.push({ decision: f.id, line, why: lineOf(f.reason), at: f.ts });

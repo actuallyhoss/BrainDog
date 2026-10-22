@@ -2,7 +2,7 @@
  * What batch 87 added, through the client: the read `learnings` (AGT-C14), what the record's agents learned and still
  * stands, in the order a session should read it.
  *
- * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-85.test.ts` is not: `serveApi` over a real record, so what
+ * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-stale.test.ts` is not: `serveApi` over a real record, so what
  * the client sends is what the host decodes, the caller is held by the record's own guards, and the rows are the ones
  * the record's own `create` wrote into the list the agents add-on declares.
  */

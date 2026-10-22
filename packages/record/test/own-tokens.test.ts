@@ -1,6 +1,6 @@
 /**
  * A colleague's own agent key: `createOwnToken`, `ownTokens` and `revokeOwnToken` (USE-A11; `docs/20-COLLABORATION.md`
- * §2, tier 0). His words: "A colleague may mint own agent token", "capped at their level", "revocable by" the owner.
+ * §2, tier 0). The rule: "A colleague may mint own agent token", "capped at their level", "revocable by" the owner.
  *
  * THE TOKEN'S CONTEXT IS BUILT AS A HOST BUILDS IT, from `verifyToken` and then `access` at every call (the self-host's
  * `bearerFor`, the Worker's `sessionContext`), so "capped at her level" is measured where it holds: her level is read

@@ -1435,6 +1435,40 @@ let KEEPING = false;
 /** The one key the tab's kept schemas are under while reads are kept. */
 const TAB = {};
 /**
+ * A TAB BEING LEFT BEGINS NO MORE CALLS. WebKit refuses every call begun once a navigation starts and prints each as an
+ * uncaught error, whoever catches it, so a call asked after `beforeunload` is answered unreachable without going out. A
+ * call already out is called off, which is a handled AbortError where a cancelled load is an uncaught one. A leave
+ * that was cancelled is over after a moment, and a page restored from the back-forward cache is not leaving.
+ */
+let LEAVING = false;
+/** Every call out now that the tab's leaving may stop (`LEAVING`); a call taken off it as it answers. */
+const OUTGOING = new Set<AbortController>();
+/** Who is told when the count of calls out changes: the app's quiet mark (`onCallsOut`). */
+const COUNTERS = new Set<(out: number) => void>();
+const tell = (): void => {
+  for (const fn of COUNTERS) fn(OUTGOING.size);
+};
+/** How many calls are out now, told to `fn` at once and at every change; the returned function stops it. */
+export function onCallsOut(fn: (out: number) => void): () => void {
+  COUNTERS.add(fn);
+  fn(OUTGOING.size);
+  return () => void COUNTERS.delete(fn);
+}
+const WINDOW = globalThis as { document?: unknown; addEventListener?: (type: string, fn: () => void) => void };
+if (typeof WINDOW.addEventListener === 'function' && WINDOW.document !== undefined) {
+  /* `beforeunload` is not sent to a page nobody has touched, and `pagehide` is, so both stop it. */
+  const leave = () => {
+    LEAVING = true;
+    for (const out of OUTGOING) out.abort();
+    OUTGOING.clear();
+    tell();
+    setTimeout(() => (LEAVING = false), 3000);
+  };
+  WINDOW.addEventListener('beforeunload', leave);
+  WINDOW.addEventListener('pagehide', leave);
+  WINDOW.addEventListener('pageshow', () => (LEAVING = false));
+}
+/**
  * The record's version as this tab last heard it, by host and token, whichever client asked: the poll asks through one
  * client and the screens read through many, some with a fetch of their own, so the version a kept read is checked
  * against is the tab's and not one client's.
@@ -1776,9 +1810,20 @@ export function createClient(options: ClientOptions) {
   }
 
   async function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
+    if (LEAVING && !outlives) return { ok: false, refusal: unreachable('This page is being left.') };
     let res: Response;
+    const leaving = outlives ? null : new AbortController();
+    if (leaving) {
+      OUTGOING.add(leaving);
+      tell();
+    }
+    /* TAKEN OFF AS IT ANSWERS, whichever way it ends, so the count of calls out returns to nothing. */
+    const done = (): void => {
+      if (leaving && OUTGOING.delete(leaving)) tell();
+    };
     try {
       res = await doFetch(url.toString(), {
+        ...(leaving ? { signal: leaving.signal } : {}),
         method: writes ? 'POST' : 'GET',
         headers: {
           ...(writes ? { 'content-type': 'application/json' } : {}),
@@ -1788,6 +1833,7 @@ export function createClient(options: ClientOptions) {
         ...(outlives ? { keepalive: true } : {}),
       });
     } catch (e) {
+      done();
       return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
     }
 
@@ -1796,6 +1842,8 @@ export function createClient(options: ClientOptions) {
       body = await res.json();
     } catch {
       return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+    } finally {
+      done();
     }
 
     const out = answered<T>(res.status, body);
@@ -2100,7 +2148,8 @@ export function createClient(options: ClientOptions) {
     /**
      * Tell an agent something from the app (agents and MCP plan §2.1): `to` a run (`to_run`, S883), a kind of agent
      * (`to_agent`), whoever is next, or a task; `when` now or at the next start; or stop, pause, resume or redirect a run
-     * (`kind`). A person only: every key is refused `NEEDS_BROWSER_SESSION`. DATA.
+     * (`kind`). `machine` and `seat` narrow any but a named run to the runs on that machine and under that Claude Code
+     * profile, each by name. A person only: every key is refused `NEEDS_BROWSER_SESSION`. DATA.
      */
     instruct: (args: {
       said: string;
@@ -2112,6 +2161,8 @@ export function createClient(options: ClientOptions) {
       project?: string;
       task?: string;
       repo?: string;
+      machine?: string;
+      seat?: string;
       replaces?: string;
       waits_ms?: number;
     }) => call<Answer<'instruct'>>('instruct', args as Record<string, unknown>),
@@ -2137,8 +2188,8 @@ export function createClient(options: ClientOptions) {
     agentProfiles: (args: { retired?: boolean } = {}) => call<Answer<'agentProfiles'>>('agentProfiles', args as Record<string, unknown>),
     /** Make (no `id`), change or retire (`retired: true`) one agent settings row. ADMIN: the owner, signed in. */
     setAgentProfile: (args: Record<string, unknown>) => call<Answer<'setAgentProfile'>>('setAgentProfile', args),
-    /** Queue a job of a declared kind for a runner to take. */
-    createJob: (args: { kind: string; args?: Record<string, unknown>; about?: string }) =>
+    /** Queue a job of a declared kind for a runner to take: any runner, or one on `machine` that can run `seat`. */
+    createJob: (args: { kind: string; args?: Record<string, unknown>; about?: string; machine?: string; seat?: string }) =>
       call<Answer<'createJob'>>('createJob', args as Record<string, unknown>),
     /** Stop one job: at once while it waits, or by a flag its runner reads while a machine runs it. */
     cancelJob: (args: { id: string }) => call<Answer<'cancelJob'>>('cancelJob', args as Record<string, unknown>),
@@ -2340,7 +2391,7 @@ export function createClient(options: ClientOptions) {
     undoOwn: (args: { batch: string; dry?: boolean }) => call<Answer<'undoOwn'>>('undoOwn', args as Record<string, unknown>),
     /** Put back every change one agent run made. */
     undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<Answer<'undoRun'>>('undoRun', args as Record<string, unknown>),
-    /* UNDERSTANDING, ON ASK (DIRECTION §38): ADMIN, so a browser session, and no token reaches it. The nightly walk over
+    /* UNDERSTANDING, ON ASK: ADMIN, so a browser session, and no token reaches it. The nightly walk over
        what the record holds, run now: what is certain is linked, the rest is asked on Decide. A record built before it
        answers 501 `NOT_IN_THIS_BUILD`. */
     /**

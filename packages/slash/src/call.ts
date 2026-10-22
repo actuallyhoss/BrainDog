@@ -23,7 +23,7 @@ import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts
 import { scrubWords } from './health.ts';
 import { LAST_ROWS_SQL, NOT_SERVED, PASSED_WORDS, RAW_MAX, pausedFor, type LastRow } from './paused.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
-import type { Inference, Purpose, ReadTrace, Settings, SlashRoute, Spends, Tier } from './types.ts';
+import type { Inference, Purpose, ReadTrace, Settings, SlashCandidate, SlashPurpose, SlashRoute, Spends, Tier } from './types.ts';
 
 /** Every tier the `slash_settings` CHECK admits, and the ones a host answers unless it says fewer (`SlashOptions.tiers`). */
 export const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
@@ -156,6 +156,12 @@ export type Core = {
    */
   account(row: AccountRow): void;
   run(args: RunArgs): Promise<Ran>;
+  /**
+   * The candidates the host's route offers for `purpose`, for a job that calls its model outside `run` (`digestProse`,
+   * `jobs.ts`), held to `run`'s own rule: none where the host handed no route, and none on his own key, which is never
+   * walked past. Empty is the job's own model, as it always was.
+   */
+  routeOf(purpose: SlashPurpose): readonly SlashCandidate[];
 };
 
 /** `34 §4`: 26 characters, Crockford base 32, time first so two asks a second apart sort. */
@@ -501,7 +507,7 @@ const budgetIn = (e: unknown): boolean => typeof e === 'object' && e !== null &&
  * which is what `pausedFor` reads back (`paused.ts`); a throw that carries no `why` is read from its sentence, as the
  * host router reads a refusal's.
  */
-const thrownRaw = (thrown: unknown): string | undefined => {
+export const thrownRaw = (thrown: unknown): string | undefined => {
   if (typeof thrown !== 'object' || thrown === null) return undefined;
   const { why, raw, message } = thrown as { why?: unknown; raw?: unknown; message?: unknown };
   const said = typeof raw === 'string' ? scrubWords(raw) : '';
@@ -852,5 +858,6 @@ export const core = (
     },
     account,
     run,
+    routeOf: (purpose) => (route === undefined || settings().tier === 'b' ? [] : route(purpose)),
   };
 };

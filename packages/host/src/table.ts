@@ -24,7 +24,7 @@ export type ArgType = 'text' | 'integer' | 'json';
 
 /**
  * The six groups `30 §5` splits the surface into, and it splits it by WHO MAY REACH IT rather than
- * by convenience — which is what makes ADR-018's "the web app is a client of the agent API"
+ * by convenience, which is what makes ADR-018's "the web app is a client of the agent API"
  * enforceable rather than aspirational.
  *
  * `INTERNAL` IS HERE SO IT CAN BE REFUSED. It is the host's own surface and not routable from
@@ -41,10 +41,10 @@ export type Route = {
   /**
    * Which of `30 §5`'s six.
    *
-   * EVERY ROUTE DECLARES ONE, and `30 §5` asks for exactly this: "the router asserts it — every
+   * EVERY ROUTE DECLARES ONE, and `30 §5` asks for exactly this: "the router asserts it: every
    * route declares its group, and a CI test walks the router and fails on a route with no group".
    * The rule it keeps is the one that stops the surface drifting: *if a screen needs something
-   * outside DATA and READ+, it is either a browser-session group — VAULT, JOBS, ADMIN — or it is a
+   * outside DATA and READ+, it is either a browser-session group (VAULT, JOBS, ADMIN) or it is a
    * design error.* There is no third case, and a group in the table is how a reviewer sees which
    * case a new method is claiming to be.
    */
@@ -150,7 +150,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'checkPaths', group: 'READ+', writes: false, what: 'Each placeholder a document holds, and whether your record has anything by that name. It changes nothing.',
     takes: { document: 'text', register: 'text' } },
   /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
-     GET it is `?filter={"project":"bake"}`. What it may name is the record's question (`kernel.page`), not this table's.
+     GET it is `?filter={"project":"oxbow"}`. What it may name is the record's question (`kernel.page`), not this table's.
      `walk` IS HOW FAR A FORECAST LOOKS when the reader asks past the two years walked unasked: `?walk=1825` or
      `?walk=last`. It is text because one answer is a word; the record turns a digit string into days. */
   { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup. A filter narrows it to what you chose.',
@@ -233,13 +233,13 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'setPackConfig', group: 'ADMIN', writes: true, what: "Change a pack's settings. They are read the next time the pack is planned and installed." },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
-  /* SLASH'S LOOK OVER A PAGE, ANSWERED BY THE PERSON WHO SAW IT LAND (DIRECTION §37's Undo). ADMIN for
+  /* SLASH'S LOOK OVER A PAGE, ANSWERED BY THE PERSON WHO SAW IT LAND, who may undo it or keep it. ADMIN for
      `setDeclaration`'s reason: a look is a declaration, and what it puts back or keeps is the page everybody opens. */
   { name: 'undoLook', group: 'ADMIN', writes: true, what: 'Put a page back the way it was before Slash arranged it. Only while that arrangement is still the one Slash wrote.' },
   { name: 'keepLook', group: 'ADMIN', writes: true, what: 'Keep how Slash arranged a page once its Undo has passed, so the page says who kept it. The arrangement itself is not changed.' },
-  /* UNDO ON THE SERVER (DIRECTION §37's trust ladder): one batch of changes or one decision, and every change one run
-     made. ADMIN for `restore`'s reason, a person in a browser: what is put back is the record everybody reads, and no
-     token reaches either, so an agent cannot quietly take back what a person saw. `dry` answers the plan in names and
+  /* UNDO ON THE SERVER, so what was handed to an agent can be taken back: one batch of changes or one decision, and
+     every change one run made. ADMIN for `restore`'s reason, a person in a browser: what is put back is the record
+     everybody reads, and no token reaches either, so an agent cannot quietly take back what a person saw. `dry` answers the plan in names and
      the hash that applying it needs, so what is put back is the plan the person read and nothing that moved since. */
   { name: 'undo', group: 'ADMIN', writes: true, what: 'Put back one set of changes, or what one decision did. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
   { name: 'undoRun', group: 'ADMIN', writes: true, what: 'Put back every change one agent run made. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
@@ -266,8 +266,8 @@ const CORE_ROUTES: readonly Route[] = [
   /* THE DOORS THIS RECORD DECLARES, so the screen that mints their tokens learns them from the record and names none of
      its own. An owner's, for the mint's reason; the digest is never in it. */
   { name: 'doors', group: 'ADMIN', writes: false, what: 'Every webhook door this record declares: what it is, how it is verified, whether a token is held for it and the list it writes. Never the token.' },
-  /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
-     vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
+  /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event (12 §6's rule that a
+     vault whose reads are not audited cannot say whether anything got out) and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
   { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
   /* `replace` IS A RESTORE AND NOT A MERGE: the file must be this record's own copy, and it replaces every row that travels.

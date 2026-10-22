@@ -17,13 +17,13 @@ import { keysFor, PAGE_KEYS } from '../../kernel/src/block-keys.ts';
 const lines = SLASH_INSTRUCTIONS.split('\n');
 const scriptLine = lines.find((l) => l.startsWith('A script is code'));
 
-test('NO WORD OF A REAL PROJECT: neither the instructions nor the example page say bake, in any case', () => {
+test('NO WORD OF ONE RECORD\'S PROJECT: neither the instructions nor the example page say bake, in any case', () => {
   for (const [name, text] of [
     ['SLASH_INSTRUCTIONS', SLASH_INSTRUCTIONS],
     ['SLASH_COMPOSE_INSTRUCTIONS', SLASH_COMPOSE_INSTRUCTIONS],
     ['GOOD_PAGE', JSON.stringify(GOOD_PAGE)],
   ] as const)
-    assert.ok(!/bake/iu.test(text), `${name} names a real project`);
+    assert.ok(!/bake/iu.test(text), `${name} names one record's project`);
 });
 
 test('A SCRIPT SLASH WRITES SENDS NO KEY: its header shows keys: [], and nothing teaches a key by its label', () => {

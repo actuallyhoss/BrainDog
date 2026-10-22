@@ -1,6 +1,6 @@
 /**
  * What was learned, in the order a session needs it: `learnings` (READ+), AGT-C14 job c, Build 3 ("What an agent learns
- * that a future session would otherwise get wrong becomes a learning", D0.55).
+ * that a future session would otherwise get wrong becomes a learning").
  *
  * WHAT WAS THERE BEFORE. `context` hands a run twenty of the project's and twenty from everywhere, in the order the
  * rows last changed (`index.ts`, the fading read). So a note whose topic was corrected this morning stood above the
@@ -356,7 +356,7 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * `{}`: one question on Decide for each lesson learned twice, "Kiln and Crumb.gg learned the same thing. Keep it
+     * `{}`: one question on Decide for each lesson learned twice, "Kiln and Oxbow.gg learned the same thing. Keep it
      * once, for everywhere?", the four parts of the test under it, signed by the person who pressed. DATA, a person's
      * only: no agent widens a learning, and no night asks this by itself. At most `TWICE_OPEN_MOST` wait at once; a
      * pair asked already, or one he said no to, is never asked again. Accepting one is a rowset Decide writes in one

@@ -11,7 +11,8 @@
  *   0 Stop or pause      the whole answer's first line when set; never cut
  *   1 Told you           open instructions, in his voice, with how to take or answer; never cut
  *   2 Card               who and where, Next, the two-sessions warning, Waiting, Learned: five lines, 120 words
- *   3 What you may do    one sentence from the effective settings
+ *   3 What you reach     for an agent acting for a colleague, one line of what it can reach; never cut
+ *     What you may do    one sentence from the effective settings
  *   4 Rules and brief    his brief for this agent, then rules here, then everywhere: 120 tokens
  *   5 Working here now   other live runs in this repo (worktrees are the same repo); one in your tree or on your
  *                        branch is warned of on the card, the one text the start hook prints
@@ -26,7 +27,7 @@
  * (`first`), never again. The "More: call context" line is gone (this is context), and so are the owner's vital signs
  * (the app shows them, where he can act).
  *
- * A SCRIPT KEY (`who: null`) is told only what it was told and what it may do.
+ * A SCRIPT KEY (`who: null`) is told only what it was told, what it reaches and what it may do.
  */
 
 import type { InstrKind, InstrState, InstrTo, InstrWhen, Stop } from '@braindog/kernel';
@@ -154,7 +155,7 @@ export type SinceFact = {
 };
 
 /** The calls a cut section names, by section, and how many rows there are in all where more were left unread. */
-export type SectionId = 'stop' | 'told' | 'may' | 'rules' | 'here' | 'lane' | 'kpis' | 'decided' | 'learned' | 'task' | 'needs' | 'teach' | 'extra' | 'since';
+export type SectionId = 'stop' | 'told' | 'reach' | 'may' | 'rules' | 'here' | 'lane' | 'kpis' | 'decided' | 'learned' | 'task' | 'needs' | 'teach' | 'extra' | 'since';
 
 /**
  * Everything `context` may say, gathered by the record (§8.3). `who` is the card's lines (`cardParts`), or `null` for a
@@ -165,6 +166,11 @@ export type ContextFacts = {
   told: readonly ToldFact[];
   who: CardParts | null;
   may: MayFact | string | null;
+  /**
+   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam: Kiln, view; amounts
+   * hidden." Said beside May and never cut, so it knows why a list is not there. `null` or absent for an owner's agent.
+   */
+  reach?: string | null | undefined;
   rules: readonly RuleFact[];
   brief: string | null;
   others: readonly OtherRun[];
@@ -373,6 +379,7 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
 
   /* A SCRIPT KEY is told what it was told and what it may do, and nothing else. */
   if (f.who === null) {
+    if (f.reach) sections.push({ id: 'reach', lines: [labeled('Reach', oneLine(f.reach))] });
     if (f.may !== null) sections.push({ id: 'may', lines: [labeled('May', mayLine(f.may))] });
     const plan = { card: '', sections };
     return { ...plan, tokens: said(plan), retire: [], ...(f.stamp ? { stamp: f.stamp } : {}) };
@@ -430,7 +437,8 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
   const calls = f.calls ?? {};
   const totals = f.totals ?? {};
 
-  /* 3 WHAT YOU MAY DO, one line. */
+  /* 3 WHAT YOU REACH, for an agent acting for a colleague, never cut; then WHAT YOU MAY DO, one line. */
+  if (f.reach) sections.push({ id: 'reach', lines: [labeled('Reach', oneLine(f.reach))] });
   if (f.may !== null) fill('may', 'May', [mayLine(f.may)], 1, 'whoami');
 
   /* THE TASK IN HAND, whole, at depth `task`: fields, note, last three history lines and its version. */
@@ -511,6 +519,7 @@ function sectionText(s: PlanSection, label: string): string[] {
 const LABELS: Record<SectionId, string> = {
   stop: 'Stop',
   told: 'Told',
+  reach: 'Reach',
   may: 'May',
   rules: 'Rules',
   here: 'Here now',
@@ -538,7 +547,7 @@ export const planCardWords = (p: Plan): number => wordCount(p.card);
 /* ── the facts from today's context ────────────────────────────────────── */
 
 /** What `factsFromContext` is told beside the context: the card's `at`, the instant, and what `Context` does not hold. */
-export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since' | 'kpis'>>;
+export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'reach' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since' | 'kpis'>>;
 
 const str = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
 
@@ -593,6 +602,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
     told: at.told ?? [],
     who: cardParts(c, at, at.now),
     may: at.may ?? null,
+    ...(at.reach ? { reach: at.reach } : {}),
     rules,
     brief: at.brief ?? null,
     others,

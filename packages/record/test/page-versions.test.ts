@@ -322,3 +322,13 @@ test('A BLOCK OVER A SOURCE THIS BUILD NO LONGER KNOWS IS CUT for a reader who d
   assert.equal((whole.body.blocks as unknown[]).length, 2);
   made.sql.close();
 });
+
+test('AN AGENT\'S KIND UNDER A VERSION IS SAID ONLY TO WHOEVER READS THE RUNS: "An agent" to anybody else', async () => {
+  const { api, sql, read } = await record();
+  assert.ok((await api.setDeclaration({ body: body('a') }, ada)).ok);
+  /* THE LINE SIGNED AS AN AGENT, its kind in its name, as an agent's apply signs one. */
+  sql.exec("UPDATE event SET actor = 'agent:claude-code' WHERE kind = 'declare' AND target = 'declaration:page.plans'");
+  assert.deepEqual((await listed(read, { page: 'plans' }, ada)).versions.map((v) => v.by), ['Claude code']);
+  for (const ctx of [reader, noteReader]) assert.deepEqual((await listed(read, { page: 'plans' }, ctx)).versions.map((v) => v.by), ['An agent']);
+  sql.close();
+});

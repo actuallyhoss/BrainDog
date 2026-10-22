@@ -79,8 +79,8 @@ test('a page value is the paginator’s, and there is no page without one', () =
 });
 
 test('a probe value lands, and one the probe never read is refused rather than emptied', () => {
-  assert.equal(resolve({ path: '/s/{probe.site}' }, null, { site: 'bake' }).url.pathname, '/s/bake');
-  const no = refusal(() => resolve({ path: '/s/{probe.missing}' }, null, { site: 'bake' }));
+  assert.equal(resolve({ path: '/s/{probe.site}' }, null, { site: 'oxbow' }).url.pathname, '/s/oxbow');
+  const no = refusal(() => resolve({ path: '/s/{probe.missing}' }, null, { site: 'oxbow' }));
   assert.equal(no.code, 'PULL_REQUEST_REFUSED');
   assert.equal(no.at, 'fetch.path');
 });

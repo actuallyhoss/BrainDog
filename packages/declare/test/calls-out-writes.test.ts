@@ -52,7 +52,7 @@ test('A PROJECT THE RECORD CANNOT NAME is never said by its row id, and an unnam
   const w = writesOf({ ...POLL, project: '01JZ8QK3F7R2M9V4XN6TCB5HAE', writes: { register: 'shop_numbers' } }, () => null);
   assert.equal(w!.project, 'another project');
   assert.equal(w!.list, 'shop numbers');
-  assert.equal(writesOf({ ...POLL, project: 'bake' }, () => null)!.project, 'bake', 'a project written as words is said as written');
+  assert.equal(writesOf({ ...POLL, project: 'oxbow' }, () => null)!.project, 'oxbow', 'a project written as words is said as written');
 });
 
 test('A PULL WRITING A LIST EVERYWHERE names the fields it reads by their labels, and an unlabelled one in words', () => {

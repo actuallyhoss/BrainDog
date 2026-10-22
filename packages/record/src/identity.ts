@@ -119,7 +119,7 @@ const CHALLENGES: Rule = { most: 30, window: MINUTE };
  * stands in front of `start`:
  * three an hour each, and the fourth locks the key for an hour.
  *
- * TIGHTER THAN `SIGN_IN` UNTIL THE CHECK IS KEYED (DIRECTION §42). Sign-up is open to strangers before Turnstile has
+ * TIGHTER THAN `SIGN_IN` UNTIL THE CHECK IS KEYED. Sign-up is open to strangers before Turnstile has
  * its keys, and with nothing in front of `start` these strikes are the whole brake: `SIGN_IN`'s ten in fifteen minutes
  * is forty letters an hour from one address to whoever a script types. The host says on every `start` whether its
  * check ran (`checked`), and a `start` that says nothing is read as unchecked, so a host that forgot gets the tight one.

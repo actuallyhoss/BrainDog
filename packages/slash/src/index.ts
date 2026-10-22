@@ -146,7 +146,13 @@ const SOURCES: readonly Source[] = ['included', 'key'];
  *
  * Arguments and not fields of `SlashDeps` because `SlashDeps` is the ports, and neither of these is a port.
  */
-export type SlashOptions = { priced?: readonly Tier[] | undefined; tiers?: readonly Tier[] | undefined; route?: SlashRoute | undefined };
+export type SlashOptions = {
+  priced?: readonly Tier[] | undefined;
+  tiers?: readonly Tier[] | undefined;
+  route?: SlashRoute | undefined;
+  /** How a retry waits before it asks a model again (`digestProse`, `jobs.ts`). Absent is the clock's own; a test waits for nothing. */
+  wait?: ((ms: number) => Promise<void>) | undefined;
+};
 
 /** Each tier as a sentence names it, for the refusal that lists the ones a host runs. */
 const TIER_NAMED: Record<Tier, string> = { a: 'the included model', b: 'your own key', byo: 'your own endpoint' };
@@ -217,7 +223,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   const tiers = options.tiers ?? TIERS;
   const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced, tiers, options.route);
   const asking = palette(core, deps.record, deps.inference);
-  const pattern = patterns(core, deps.record, deps.inference);
+  const pattern = patterns(core, deps.record, deps.inference, options.wait);
   const automation = answering(core, deps.inference);
   const firstRun = setups(core, deps.inference);
 

@@ -3,8 +3,8 @@
  *
  * A REMINDER IS A NOTICE WITH THE TONE `today` (`TODAY_TONE` in the kernel), and a notice is a `note` line signed
  * `rule:<id>` in the log, so this reads the log for the rules that carry that tone and nothing else: no table of its
- * own, and a rule turned off or retired stops showing at once. Held to the lists the caller reads, since a line is
- * worded from a row.
+ * own, and a rule turned off or retired stops showing at once. Held to the lists the caller reads and the rows she is
+ * shown, since a line is worded from a row.
  */
 
 import type { Result } from '@braindog/ports';
@@ -33,7 +33,21 @@ export function remindsToday(node: unknown): boolean {
 }
 
 export function methods(deps: RecordDeps) {
-  const { sql, scoped, readable, clock } = deps;
+  const { sql, kernel, sight, scoped, readable, clock } = deps;
+  /**
+   * Whether one line goes to this caller: one about a row to whoever is shown the row (`sight`), and one about no row to
+   * whoever reads the rule's list whole, or every list for a rule about none. Held to the list alone, a member held to
+   * Kiln's tasks read a reminder worded from a Loom task, and one about no list went to a guest of one project.
+   */
+  const shown = (ctx: CallContext, list: string | null, target: string | null): boolean => {
+    const id = target?.startsWith('entry:') ? target.slice('entry:'.length) : null;
+    if (id !== null) {
+      const row = kernel.get(id, { includeDeleted: true });
+      return row !== null && readable(ctx, row.register) === null && sight.admits(ctx, row);
+    }
+    if (list === null) return deps.readsEveryList?.(ctx) === true;
+    return kernel.scope(ctx, list) === undefined && sight.hidden(ctx, list).size === 0;
+  };
   return {
     /** The reminders on Today, newest first. READ, held to the lists the caller may read. */
     async todayReminders(_args: unknown, ctx: CallContext): Promise<Result<{ lines: Reminder[] }>> {
@@ -48,8 +62,8 @@ export function methods(deps: RecordDeps) {
         if (list !== null && readable(ctx, list) !== null) continue;
         const bare = d.id.slice('rule.'.length);
         const actor = `rule:${typeof body.rule === 'string' && body.rule !== '' ? body.rule : bare}`;
-        for (const e of sql.all<{ ts: string; note: string | null }>("SELECT ts, note FROM event WHERE actor = ? AND kind = 'note' AND ts >= ? ORDER BY ts DESC LIMIT ?", actor, since, MOST))
-          if (e.note !== null && e.note !== '') lines.push({ text: e.note, at: e.ts, rule: bare });
+        for (const e of sql.all<{ ts: string; note: string | null; target: string | null }>("SELECT ts, note, target FROM event WHERE actor = ? AND kind = 'note' AND ts >= ? ORDER BY ts DESC LIMIT ?", actor, since, MOST))
+          if (e.note !== null && e.note !== '' && shown(ctx, list, e.target)) lines.push({ text: e.note, at: e.ts, rule: bare });
       }
       lines.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
       return ok({ lines: lines.slice(0, MOST) });

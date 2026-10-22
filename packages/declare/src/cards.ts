@@ -2,7 +2,7 @@
  * A `cards` or a `table` block's grouping: `group: <field>` puts its rows under the thing each one points at (a client's
  * projects under the client, a person's tasks under the person) or under the value of a choice or of the list's state,
  * and `fold: <n>` (cards only) shows that many cards of a group
- * before the rest fold behind "n more", and is only said with a group. DIRECTION §37's "lists without boxes grouped
+ * before the rest fold behind "n more", and is only said with a group. It is the calm "lists without boxes grouped
  * under quiet headings", said in the block grammar so the engine can compose it and a pack can declare it. The rules
  * are the kernel's `cardGroupFault`, asked here first so a pack is refused when it is written, not when it is installed.
  *

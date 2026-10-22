@@ -548,7 +548,7 @@ export type Directory = ReturnType<typeof createDirectory>;
  * at sign-up without paying starts on (`FREE_PLAN` in `apps/worker/src/billing.ts`); `hosted` is Cloud and `plus` is
  * Cloud Plus, the two the checkout sells (`HOSTED_PLANS` there); `selfhost` is counted and never limited.
  *
- * FREE IS NOT THE COLUMN'S DEFAULT, on purpose (DIRECTION §35). Every record already in a Directory is `hosted`
+ * FREE IS NOT THE COLUMN'S DEFAULT, on purpose. Every record already in a Directory is `hosted`
  * and keeps it, and `provision` with no plan still says `hosted`, the plan the operator's own records and the paid
  * path's have always been made under; a record is put on `free` by the door that makes it free.
  */
@@ -729,13 +729,13 @@ const SPENT: Record<keyof Allowance, (limit: number) => string> = {
 const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]).includes(value ?? '') ? (value as Plan) : 'hosted');
 
 /**
- * Free's "one person" (DIRECTION §35), as the owner reads it when an invitation is refused, and as the person holding the
+ * Free's "one person", as the owner reads it when an invitation is refused, and as the person holding the
  * link reads it. Each says why and offers the way on, which is the owner moving the record to Cloud.
  *
  * THE COUNT AND THE NAMES ARE THE TABLE'S (`PLAN_TABLE.free.people`), so the sentence moves with the figure.
  */
 const PLUS = PLAN_TABLE.plus.name;
-/* TEAMS ARE A PLUS FEATURE (DIRECTION §42): the plain line an owner reads when an invitation is refused, and the one the
+/* TEAMS ARE A PLUS FEATURE: the plain line an owner reads when an invitation is refused, and the one the
    person holding the link reads. Each says why and offers the way on. The gate is off while the host sells no plan. */
 export const FREE_ONE_PERSON = `Teams are part of ${PLUS}, so nobody else can join this record yet. Move it to ${PLUS} in Settings to invite colleagues.`;
 /* TEAMS HELD (the Worker var `TEAMS_HELD`): sharing is not open yet, on any plan, so the sentence names no plan. */
@@ -1381,7 +1381,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
   const at = (): string => new Date(clock.now()).toISOString();
 
   /**
-   * Whether this person may join this record, as its plan has it: `null` is yes. Teams are a Plus feature (DIRECTION §42), so a
+   * Whether this person may join this record, as its plan has it: `null` is yes. Teams are a Plus feature, so a
    * record on Free or Cloud takes nobody who is not on it already, and Plus and a self-host take anybody.
    *
    * ASKED BY `join` AND BY THE HOST BEFORE AN INVITATION IS SPENT, so a link to a free record is refused before the record

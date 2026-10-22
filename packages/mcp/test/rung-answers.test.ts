@@ -1,5 +1,5 @@
 /**
- * What an agent is told its rung did with a write (DIRECTION §37's ladder).
+ * What an agent is told its rung did with a write (the ladder of trust).
  *
  * OVER THE STUB SURFACE, because the ladder is the record's: what is tested is that the tool layer says what the record
  * answered, in names, and decides nothing itself. `rung` beside a write means it went through on the agent's rung;

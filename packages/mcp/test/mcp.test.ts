@@ -83,8 +83,8 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
      `triage` is the sixteenth, the one tool the ceiling was raised for. `undo` is the seventeenth: it takes back one of the
-     caller's own writes by the batch its receipt gave, which is what lets an agent put right what it just wrote. `understand` was a seventeenth (DIRECTION
-     §38) and is the resource `braindog:understand` now (AGT-B05, "keep the 16" of §37): it takes nothing and writes
+     caller's own writes by the batch its receipt gave, which is what lets an agent put right what it just wrote. `understand` was a seventeenth
+     and is the resource `braindog:understand` now (AGT-B05, "keep the 16"): it takes nothing and writes
      nothing, and its words paid for `op_id` on `create` and `update`.
 
      `instructions` CAME AND `schema` AND `history` WENT INTO `record_index` AND `get` (agents and MCP plan §6.1, 12a): what

@@ -59,11 +59,11 @@ test('THE QUESTION names both projects and writes the four parts under it, with 
     [lesson('a1', 'Run the import twice to prove it holds', 'imports', '2026-10-01'), { ...lesson('a2', 'Always run imports twice and prove they hold.', 'imports', '2026-10-02'), because: 'An import ran once and doubled a month of lines.' }],
     projectOf,
   );
-  const asked = promotionQuestion(pair!, (p) => (p === 'pA' ? 'Kiln' : 'Crumb.gg'));
-  assert.equal(asked.question, 'Kiln and Crumb.gg learned the same thing. Keep it once, for everywhere?');
+  const asked = promotionQuestion(pair!, (p) => (p === 'pA' ? 'Kiln' : 'Oxbow.gg'));
+  assert.equal(asked.question, 'Kiln and Oxbow.gg learned the same thing. Keep it once, for everywhere?');
   assert.equal(asked.parts.length, 4);
   assert.match(asked.parts[0], /^It changes what a session does: Run the import twice to prove it holds\.$/u);
-  assert.match(asked.parts[1], /Kiln and Bake\.gg each learned it/u);
+  assert.match(asked.parts[1], /Kiln and Oxbow\.gg each learned it/u);
   assert.match(asked.parts[2], /doubled a month of lines\.$/u);
   assert.match(asked.parts[3], /no other home/u);
   for (const said of [asked.question, ...asked.parts]) assert.ok(!/[—]|pA|pB|a1|a2/u.test(said), said);

@@ -24,11 +24,14 @@ import {
   INSTRUCTION_STATES,
   INSTRUCTION_TO,
   INSTRUCTION_WHEN,
+  MACHINE_NAME,
   PROFILE_KINDS,
   REPLY_STATES,
   SEEN_HOW,
+  SEAT_NAME,
   agentOf as kindOf,
   instructionsTakenBy,
+  placesHeard,
   type Instr,
   type InstructInput,
   type Kernel,
@@ -72,6 +75,17 @@ export function lineOf(i: Instr, by: string): string {
 }
 
 /** An instruction as `Told`, its maker named once. */
+/**
+ * The open instructions a run is handed, as its caller may read them: every one to whoever reads the owner's list of
+ * them (his own agents, and one a grant names the list to, as `list` asks it), and to anybody else's agent only the
+ * ones sent to its own run by name. Whoever is next, any Claude and a task's note are his words to his own agents: a
+ * member's agent was handed them whole on `context`, `attach`, `pulse` and `instructionsMine`, while `list` refused it
+ * the list they are rows of (`kernelStop`).
+ */
+export function toldTo(readable: RecordDeps['readable'], ctx: CallContext, open: readonly Instr[]): Instr[] {
+  return readable(ctx, INSTRUCTIONS) === null ? [...open] : open.filter((i) => i.to === 'run');
+}
+
 export function toldOf(sql: Sql, i: Instr): Told {
   const by = personNamed(sql, i.by);
   return { ...i, by_name: by, line: lineOf(i, by) };
@@ -187,7 +201,7 @@ export function inHandAt(held: readonly Instr[], ts: string, nowIso: string): In
 /* ── the doors ──────────────────────────────────────────────────────────── */
 
 /** What `instruct` takes, beside what the kernel reads (`InstructInput`). */
-const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'project', 'task', 'repo', 'replaces', 'waits_ms'] as const;
+const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'project', 'task', 'repo', 'machine', 'seat', 'replaces', 'waits_ms'] as const;
 
 /** What `instructionList` takes. */
 const LIST_TAKES = ['state', 'project', 'task', 'run', 'limit', 'cursor'] as const;
@@ -211,6 +225,22 @@ const BROWSER_ONLY = 'Only a person tells an agent, signed in to BrainDog. An ag
 /** One thread of `instructionList`: the instruction, who was shown it and how, and what the run did while it held it. */
 export type Thread = Told & { seen: { run: string; how: SeenHow; at: string }[]; receipts: Receipts | null };
 
+/**
+ * The machines and Claude Code profiles an instruction may be aimed at, by name, as runs say them: those on the runs
+ * he is shown from the last `PLACES_DAYS` days, and those on his Profiles and Places when that add-on is on. Names
+ * only, never a folder, and only to whoever reads the runs already.
+ */
+export type Places = { machines: string[]; seats: string[] };
+
+/** How far back the runs are read for the machines and profiles the composer offers. */
+export const PLACES_DAYS = 30;
+
+/** The most machines or profiles offered, newest heard first. */
+const PLACES_MOST = 20;
+
+/** The most recent runs read for them. */
+const PLACES_RUNS = 500;
+
 /** What `instructionsMine` answers: the run, its stamp, what is pending for it, what stops it, and the lines to say. */
 export type Mine = {
   run: string;
@@ -226,7 +256,7 @@ export type Mine = {
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, no, tail, clock } = deps;
+  const { kernel, sql, guard, readable, no, tail, clock } = deps;
   const nowIso = (): string => new Date(clock.now()).toISOString();
   const sight = readSight(kernel);
 
@@ -235,7 +265,7 @@ export function methods(deps: RecordDeps) {
     try {
       const f = (kernel.get(runId, { includeDeleted: true })?.fields ?? {}) as Record<string, unknown>;
       const str = (k: string): string | null => (typeof f[k] === 'string' && f[k] !== '' ? (f[k] as string) : null);
-      const profile = kernel.profileFor({ kind: str('agent'), token: str('token_id'), host: str('host') });
+      const profile = kernel.profileFor({ kind: str('agent'), token: str('token_id'), host: str('host'), seat: str('seat') });
       tellFinished({ sql, outbox: (kind, payload) => void kernel.outbox(kind, payload), nowMs: clock.now(), tz: kernel.identity()?.tz ?? 'UTC' }, i, profile);
     } catch {
       /* A PUSH IS NEVER WORTH AN ANSWER: the reply is written either way. */
@@ -306,17 +336,63 @@ export function methods(deps: RecordDeps) {
     return found.ok ? ok(found.value.spoken) : (found as Result<never>);
   };
 
-  /** What is open for one run now, a stop or a pause first, each as `Told`. */
-  const pendingFor = (run: string): Told[] => kernel.instructionFor({}, run).map((i) => toldOf(sql, i));
+  /** What is open for one run now, a stop or a pause first, each as `Told`, as its caller may be handed them (`toldTo`). */
+  const pendingFor = (run: string, ctx: CallContext): Told[] => toldTo(readable, ctx, kernel.instructionFor({}, run)).map((i) => toldOf(sql, i));
 
   /** Marks each of `ids` seen by `run`, `how`; an id that is not the run's is passed over, since a list may be old. */
   const markSeen = (ids: readonly string[], run: string, how: SeenHow): void => {
     for (const id of ids) kernel.seenInstruction(id, run, how);
   };
 
+  /**
+   * The machines and profiles the composer offers (`Places`): off the runs the caller is shown from the last
+   * `PLACES_DAYS` days, newest heard first, and off the Profiles add-on's two lists where the caller reads them, which
+   * are personal, so only their owner ever does.
+   */
+  const placesFor = (ctx: CallContext): Places => {
+    const runs = placesHeard(sql, clock.now(), PLACES_DAYS * 86_400_000, PLACES_RUNS);
+    const shown = guard(ctx, 'read', 'session') === null ? sight.admitted(ctx, 'session', runs.map((r) => r.id)) : new Set<string>();
+    const machines: string[] = [];
+    const seats: string[] = [];
+    /* ONLY A NAME `instruct` TAKES IS OFFERED: a profile he called "Second account" on his Profiles list is no name a run
+       says, and offered, it would only be refused. */
+    const add = (list: string[], v: unknown, grammar: RegExp): void => {
+      const name = typeof v === 'string' ? v.trim() : '';
+      if (grammar.test(name) && !list.includes(name) && list.length < PLACES_MOST) list.push(name);
+    };
+    for (const r of runs) {
+      if (!shown.has(r.id)) continue;
+      add(machines, r.host, MACHINE_NAME);
+      add(seats, r.seat, SEAT_NAME);
+    }
+    /* THE OWNER'S PROFILES AND PLACES, the add-on's lists found by what they are and not by an id: the list playing
+       `profiles`, and the one with a link to it and a `host`. Each is personal, so its owner alone is let through. */
+    const lists = [...kernel.registers().values()];
+    const profiles = lists.find((d) => (d as { role?: unknown }).role === 'profiles') ?? null;
+    if (profiles !== null && guard(ctx, 'read', profiles.id) === null) {
+      for (const r of sql.all<{ name: unknown }>(
+        `SELECT json_extract(fields, ?) AS name FROM entry WHERE register = ? AND deleted_at IS NULL AND coalesce(state, '') <> 'retired' ORDER BY updated_at DESC LIMIT ?`,
+        `$."${profiles.title}"`,
+        profiles.id,
+        PLACES_MOST,
+      ))
+        add(seats, r.name, SEAT_NAME);
+      const places =
+        lists.find((d) => d.id !== profiles.id && d.fields.some((f) => f.to === profiles.id && !f.retired) && d.fields.some((f) => f.id === 'host' && !f.retired)) ?? null;
+      if (places !== null && guard(ctx, 'read', places.id) === null)
+        for (const r of sql.all<{ host: unknown }>(
+          `SELECT json_extract(fields, '$.host') AS host FROM entry WHERE register = ? AND deleted_at IS NULL AND coalesce(state, '') <> 'retired' ORDER BY updated_at DESC LIMIT ?`,
+          places.id,
+          PLACES_MOST,
+        ))
+          add(machines, r.host, MACHINE_NAME);
+    }
+    return { machines, seats };
+  };
+
   /** What a run is answered with: its stamp, what is pending, what stops it, and the lines in his voice. */
-  const mineOf = (run: string, extra: Partial<Mine> = {}): Mine => {
-    const pending = pendingFor(run);
+  const mineOf = (run: string, ctx: CallContext, extra: Partial<Mine> = {}): Mine => {
+    const pending = pendingFor(run, ctx);
     const stop = kernel.stopOf(run);
     const held = stopLine(sql, kernel, stop);
     const lines = [...(held === null ? [] : [held]), ...pending.filter((i) => i.kind !== 'stop' && i.kind !== 'pause').map((i) => i.line)];
@@ -332,6 +408,9 @@ export function methods(deps: RecordDeps) {
      * handle; both are read back to the spoken name a run's own `project` and `task` carry, so the kernel's predicates
      * compare like with like. A task's lane (`hand.agent`) and project fill `to_agent` and `project` when he names
      * neither, so "Hand to Claude, with a note" reaches Claude on that project.
+     *
+     * ON A MACHINE, AS A PROFILE: `machine` and `seat` are names as runs say them (`Places`), and narrow any but a named
+     * run to the runs there (migration 44); the kernel holds each to its grammar.
      */
     async instruct(args: InstructInput | undefined, ctx: CallContext): Promise<Result<Told>> {
       const stop = guard(ctx, 'owner');
@@ -340,7 +419,7 @@ export function methods(deps: RecordDeps) {
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = strayOf('instruct', a, INSTRUCT_TAKES);
       if (stray) return stray;
-      for (const key of ['said', 'to_run', 'to_agent', 'project', 'task', 'repo', 'replaces'] as const)
+      for (const key of ['said', 'to_run', 'to_agent', 'project', 'task', 'repo', 'machine', 'seat', 'replaces'] as const)
         if (a[key] !== undefined && a[key] !== null && typeof a[key] !== 'string') return no('VALUE_MALFORMED', `${key} is text.`, { at: key });
       for (const [key, list] of [['kind', INSTRUCTION_KINDS], ['when', INSTRUCTION_WHEN], ['to', INSTRUCTION_TO]] as const)
         if (a[key] !== undefined && !(list as readonly unknown[]).includes(a[key]))
@@ -366,7 +445,7 @@ export function methods(deps: RecordDeps) {
       }
 
       const input: InstructInput = { said: '' };
-      for (const key of ['said', 'to_run', 'repo', 'replaces'] as const) if (typeof a[key] === 'string') input[key] = a[key] as string;
+      for (const key of ['said', 'to_run', 'repo', 'machine', 'seat', 'replaces'] as const) if (typeof a[key] === 'string') input[key] = a[key] as string;
       if (agent !== null) input.to_agent = agent;
       if (a.kind !== undefined) input.kind = a.kind as InstructInput['kind'];
       if (a.when !== undefined) input.when = a.when as InstructInput['when'];
@@ -415,8 +494,14 @@ export function methods(deps: RecordDeps) {
      * His read of what he told agents, newest first: each thread with who was shown it and how ("Seen by S883 at start"),
      * and the receipts of the run that took it. In one state (`open` for Sent, Seen and Working together), on one
      * project or task, or to or by one run. READ+, the owner's.
+     *
+     * AND THE MACHINES AND PROFILES THE COMPOSER OFFERS (`places`), off the runs he is shown and his Profiles and Places,
+     * with the page, so the box he tells an agent in needs no read of its own.
      */
-    async instructionList(args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } | undefined, ctx: CallContext): Promise<Result<{ rows: Thread[]; cursor: string | null }>> {
+    async instructionList(
+      args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } | undefined,
+      ctx: CallContext,
+    ): Promise<Result<{ rows: Thread[]; cursor: string | null; places: Places }>> {
       const stop = guard(ctx, 'owner');
       if (stop) return { ok: false, refusal: stop };
       const a = (args ?? {}) as Record<string, unknown>;
@@ -471,7 +556,7 @@ export function methods(deps: RecordDeps) {
         const i = kernel.instruction(`IN${String(seq)}`);
         return i === null ? [] : [{ ...toldOf(sql, i), seen: kernel.instructionSeen(i.id), receipts: receiptsOf(sql, kernel, i, now, ctx, sight) }];
       });
-      return ok({ rows, cursor: seqs.length > limit ? `IN${String(seqs[limit - 1]!.seq)}` : null });
+      return ok({ rows, cursor: seqs.length > limit ? `IN${String(seqs[limit - 1]!.seq)}` : null, places: placesFor(ctx) });
     },
 
     /**
@@ -511,9 +596,14 @@ export function methods(deps: RecordDeps) {
       const run = runOfCaller(ctx, 'opened: instructions');
       if (!run.ok) return tail(run as Result<never>);
       if (typeof a.take === 'string') {
-        const taken = kernel.takeInstruction(a.take.trim(), run.value);
+        /* ONLY ONE IT IS HANDED (`toldTo`): an agent that may not read his instructions guessed `IN4` and took it whole. The
+           sentence is the kernel's for an instruction that is not this run's to take. */
+        const asked = a.take.trim();
+        if (readable(ctx, INSTRUCTIONS) !== null && !pendingFor(run.value, ctx).some((i) => i.id === asked))
+          return tail(no('ROW_UNKNOWN', `There is no open instruction called ${asked} for this run.`, { at: 'take' }));
+        const taken = kernel.takeInstruction(asked, run.value);
         if (!taken.ok) return tail(taken as Result<never>);
-        return tail(ok(mineOf(run.value, { instruction: toldOf(sql, taken.value) })));
+        return tail(ok(mineOf(run.value, ctx, { instruction: toldOf(sql, taken.value) })));
       }
       if (typeof a.reply === 'string') {
         const answered = kernel.replyInstruction(a.reply.trim(), run.value, {
@@ -522,11 +612,13 @@ export function methods(deps: RecordDeps) {
         });
         if (!answered.ok) return tail(answered as Result<never>);
         tellDone(answered.value, run.value);
-        return tail(ok(mineOf(run.value, { instruction: toldOf(sql, answered.value), receipts: receiptsOf(sql, kernel, answered.value, nowIso(), ctx, sight) })));
+        return tail(ok(mineOf(run.value, ctx, { instruction: toldOf(sql, answered.value), receipts: receiptsOf(sql, kernel, answered.value, nowIso(), ctx, sight) })));
       }
-      const ids = Array.isArray(a.seen) ? (a.seen as string[]) : pendingFor(run.value).map((i) => i.id);
+      /* AND ONLY WHAT IT IS HANDED IS MARKED SEEN BY IT, so a member's agent naming his broadcast never marks it seen. */
+      const handed = new Set(pendingFor(run.value, ctx).map((i) => i.id));
+      const ids = Array.isArray(a.seen) ? (a.seen as string[]).filter((id) => readable(ctx, INSTRUCTIONS) === null || handed.has(id)) : [...handed];
       markSeen(ids, run.value, how);
-      return tail(ok(mineOf(run.value)));
+      return tail(ok(mineOf(run.value, ctx)));
     },
   };
 }

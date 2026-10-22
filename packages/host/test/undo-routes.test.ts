@@ -1,5 +1,5 @@
 /**
- * `undo` and `undoRun`, the server's Undo (DIRECTION §37): routed as ADMIN writes and handed to the record method of the
+ * `undo` and `undoRun`, the server's Undo: routed as ADMIN writes and handed to the record method of the
  * same name with the arguments as sent. The record has both now (`record/src/methods/undo.ts`), so the host calls them
  * as it calls every other method of its own table.
  */

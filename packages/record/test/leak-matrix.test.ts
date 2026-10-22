@@ -86,7 +86,7 @@ test("THE OWNER'S OWN CANARIES ARE LIVE: what he told his agent, what its run wa
   const f = await reads();
   const h = handlers(f);
   const told = f.extras.filter((e) => /instruction|run/u.test(e.canary.label));
-  assert.equal(told.length, 4, told.map((e) => e.canary.label).join(', '));
+  assert.equal(told.length, 5, told.map((e) => e.canary.label).join(', '));
   const said = JSON.stringify([
     await ask(h, 'list', { register: 'instructions' }, f.owner),
     await ask(h, 'list', { register: 'session' }, f.owner),
@@ -140,9 +140,162 @@ test("A PERSONAL LIST IS LIVE: the owner's set-ups are on his own reads and his 
   /* AND THE FEED OF WHAT HAPPENED NAMES THEM TO THE OWNER, so a feed drawn for anybody else would be caught carrying them. */
   const feed = { body: { page: 'probe-feed', title: 'Probe', blocks: [{ kind: 'feed', key: 'feed', heading: 'What happened', source: 'activity', empty: 'Nothing yet.' }] } };
   assert.ok(JSON.stringify(await ask(h, 'previewPage', feed, f.owner)).includes(f.rows.get('s-kiln')!.canary.word), "the owner's feed does not name his set-up");
+  /* AND AN ADMIN IS DRAWN IT TOO, LESS THE SET-UPS: a personal list's lines are left out of the feed, not the feed out of
+     his Activity (`seesFor`). It held the whole feed back from him while the record kept any personal list. */
   const admin = f.callers.find((c) => c.shape.id === 'admin' && c.variant === 'person')!;
-  const drawn = (await ask(h, 'previewPage', feed, admin.ctx)) as { ok: boolean; value?: { blocks: { refusals?: unknown[] }[] } };
-  assert.ok(!drawn.ok || (drawn.value!.blocks[0]!.refusals?.length ?? 0) > 0, 'an Admin is drawn the feed while the record keeps a personal list');
+  const drawn = (await ask(h, 'previewPage', feed, admin.ctx)) as { ok: boolean; value?: { blocks: { refusals?: unknown[]; feed?: unknown[] }[] } };
+  assert.ok(drawn.ok && (drawn.value!.blocks[0]!.refusals?.length ?? 0) === 0, 'an Admin is refused the feed while the record keeps a personal list');
+  assert.ok((drawn.value!.blocks[0]!.feed?.length ?? 0) > 0, 'an Admin is drawn an empty feed');
+  assert.deepEqual(leaks(drawn, f.out(admin)), []);
+});
+
+/* ── the reads across the whole record, through the lens (TEAMS_HELD gaps) ─ */
+
+/** A page of what reads across the record: the feed and the questions waiting, as Activity and Decide draw them. */
+const ACROSS_PROBE = {
+  body: {
+    page: 'probe-across',
+    title: 'Probe',
+    blocks: [
+      { kind: 'feed', key: 'feed', heading: 'What happened', source: 'activity', empty: 'Nothing yet.' },
+      { kind: 'queue', key: 'open', heading: 'Needs you', source: 'governance.open', empty: 'Nothing waits.' },
+    ],
+  },
+};
+
+test("LENS-1 A VIEWER AND AN ADMIN ARE DRAWN THE FEED, THE QUESTIONS AND THE DIGEST, with no line of the owner's own lists or of a personal list", async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const wrong: string[] = [];
+  for (const c of f.callers.filter((x) => x.shape.id === 'whole' || x.shape.id === 'admin')) {
+    const drawn = (await ask(h, 'previewPage', ACROSS_PROBE, c.ctx)) as { ok: boolean; value?: { blocks: { key?: string; refusals?: unknown[]; feed?: unknown[] }[] } };
+    if (!drawn.ok) {
+      wrong.push(`${c.label} was refused the probe`);
+      continue;
+    }
+    for (const b of drawn.value!.blocks) if ((b.refusals?.length ?? 0) > 0) wrong.push(`${c.label} was refused ${b.key}`);
+    if ((drawn.value!.blocks.find((b) => b.key === 'feed')?.feed?.length ?? 0) === 0) wrong.push(`${c.label} was drawn an empty feed`);
+    /* WHAT A RUN WAS DOING AND WHAT HE TOLD IT ARE ROWS OF HIS OWN LISTS, and a set-up is a personal list's: none of them. */
+    const digest = await ask(h, 'digestToday', {}, c.ctx);
+    for (const l of leaks([drawn, digest], f.out(c))) wrong.push(`${c.label}: ${l}`);
+  }
+  assert.deepEqual(wrong, []);
+  /* AND THE OWNER IS DRAWN HIS OWN: the feed is held to the lens, not emptied. */
+  const own = JSON.stringify(await ask(h, 'previewPage', ACROSS_PROBE, f.owner));
+  assert.ok(own.includes(f.rows.get('s-kiln')!.canary.word), "the owner's feed does not name his set-up");
+});
+
+test("LENS-2 THE DIGEST'S SECTIONS ARE HELD AS THEIR BLOCKS ARE: a guest held to part of the record is told neither what agents did nor what is working", async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const across = ['activity', 'governance.open', 'sessions.working', 'handoffs.open'];
+  const sourcesOf = async (ctx: CallContext): Promise<string[]> => {
+    const got = (await ask(h, 'digestToday', {}, ctx)) as { ok: boolean; value?: { sections: { source: string }[] }[] };
+    return (got.value ?? []).flatMap((d) => d.sections.map((s) => s.source));
+  };
+  /* THE OWNER IS TOLD ALL FOUR. */
+  assert.deepEqual((await sourcesOf(f.owner)).filter((s) => across.includes(s)).sort(), [...across].sort());
+  const wrong: string[] = [];
+  for (const c of f.callers.filter((x) => x.shape.narrowed && x.variant !== 'see-as')) {
+    const told = (await sourcesOf(c.ctx)).filter((s) => across.includes(s));
+    if (told.length > 0) wrong.push(`${c.label} is told ${told.join(', ')}`);
+  }
+  /* AND NOBODY WHO MAY NOT OPEN THE RUNS IS TOLD THEM, a Viewer and an Admin among them. */
+  for (const c of f.callers.filter((x) => x.shape.id === 'whole' || x.shape.id === 'admin')) {
+    const told = (await sourcesOf(c.ctx)).filter((s) => s === 'sessions.working' || s === 'handoffs.open');
+    if (told.length > 0) wrong.push(`${c.label} is told ${told.join(', ')}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('LENS-3 NOBODY WHO MAY NOT OPEN THE RUNS IS COUNTED ONE: a guest on Kiln is told no agent is working on it', async () => {
+  const f = await build({ shapes: SHAPES.filter((s) => ['owner', 'whole', 'comment', 'kiln-no-amounts'].includes(s.id)) });
+  const h = handlers(f);
+  /* THE OWNER'S RUN WORKS ON KILN, a row each guest is shown. */
+  const run = f.extras.find((e) => e.canary.label === "a run's doing")!.canary.id!;
+  f.sql.exec("UPDATE entry SET fields = json_set(fields, '$.project', ?) WHERE id = ?", f.spoken(f.rows.get('kiln')!), run);
+  type Booted = { ok: boolean; value?: { waits: { working: number }; working: unknown[] } };
+  const own = (await ask(h, 'boot', {}, f.owner)) as Booted;
+  assert.equal(own.value?.waits.working, 1, 'the owner is not counted his own run');
+  const wrong: string[] = [];
+  for (const c of f.callers.filter((x) => x.shape.id !== 'owner')) {
+    const got = (await ask(h, 'boot', {}, c.ctx)) as Booted;
+    if (!got.ok) continue;
+    if (got.value!.waits.working !== 0 || got.value!.working.length !== 0) wrong.push(`${c.label} is counted ${got.value!.waits.working} working`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('LENS-4 AN AMOUNT WRITTEN IN TEXT IS TAKEN OUT FOR A SHARE THAT HIDES AMOUNTS: a note, a comment and a line of the log', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const quoted = f.rows.get('t-kiln-review')!;
+  const paidOn = f.rows.get('t-kiln-todo')!;
+  /* THE QUOTE IS THE LAST AMOUNT HELD ON THE ROW, after its own rate (`fixture.ts`). */
+  const quote = quoted.held.at(-1)!.amount!;
+  /* THE OWNER IS SHOWN BOTH, as written. */
+  const ownRead = JSON.stringify([await ask(h, 'get', { register: quoted.list, seq: quoted.seq }, f.owner), await ask(h, 'comments', { on: f.spoken(paidOn) }, f.owner)]);
+  assert.ok(ownRead.includes(`${String(quote).slice(0, -2)}.${String(quote).slice(-2)}`), 'the owner is not shown the quote in the notes');
+  const wrong: string[] = [];
+  for (const c of f.callers.filter((x) => x.shape.id === 'kiln-no-amounts' || x.shape.id === 'hide-amounts')) {
+    const answers = [
+      await ask(h, 'get', { register: quoted.list, seq: quoted.seq }, c.ctx),
+      await ask(h, 'list', { register: 'tasks' }, c.ctx),
+      await ask(h, 'comments', { on: f.spoken(paidOn) }, c.ctx),
+      await ask(h, 'recentHistory', { limit: 200 }, c.ctx),
+      await ask(h, 'whatsNew', {}, c.ctx),
+      await ask(h, 'search', { q: 'Quoted' }, c.ctx),
+    ];
+    for (const l of leaks(answers, f.out(c))) wrong.push(`${c.label}: ${l}`);
+    /* AND SHE IS TOLD THERE WAS ONE, its currency kept. */
+    if (!JSON.stringify(answers[0]).includes('Quoted £…')) wrong.push(`${c.label} is not shown that an amount was quoted`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('LENS-6 A SEARCH FOR THE EXACT FIGURE FINDS NOTHING FOR A SHARE THAT HIDES AMOUNTS: no hit, no count, no comment', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const quoted = f.rows.get('t-kiln-review')!;
+  const quote = quoted.held.at(-1)!.amount!;
+  const figure = `${String(quote).slice(0, -2)}.${String(quote).slice(-2)}`;
+  type Found = { ok: boolean; value?: { hits: { register: string; seq: number }[]; matched: Record<string, number>; comments: { body: string }[] } };
+  /* THE OWNER FINDS THE ROW BY ITS FIGURE, so the search is one that would find it. */
+  const own = (await ask(h, 'search', { q: figure }, f.owner)) as Found;
+  assert.ok(own.value?.hits.some((x) => x.register === quoted.list && x.seq === quoted.seq), 'the owner does not find the quoted task by its figure');
+  const wrong: string[] = [];
+  for (const c of f.callers.filter((x) => x.shape.id === 'kiln-no-amounts' || x.shape.id === 'hide-amounts')) {
+    const got = (await ask(h, 'search', { q: figure }, c.ctx)) as Found;
+    if (!got.ok) continue;
+    if (got.value!.hits.some((x) => x.register === quoted.list && x.seq === quoted.seq)) wrong.push(`${c.label} finds the quoted task by its hidden figure`);
+    if ((got.value!.matched[quoted.list] ?? 0) > 0) wrong.push(`${c.label} is counted a ${quoted.list} row for the hidden figure`);
+    if (got.value!.comments.length > 0) wrong.push(`${c.label} finds a comment by the hidden figure`);
+    /* AND THE WORDS AROUND IT STILL FIND IT: only the figure is out of her sight. */
+    const words = (await ask(h, 'search', { q: 'Quoted' }, c.ctx)) as Found;
+    if (words.ok && c.shape.sees(quoted, f.built) && !words.value!.hits.some((x) => x.seq === quoted.seq)) wrong.push(`${c.label} no longer finds the task by its words`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('LENS-5 A NOTE HOLDING AN AMOUNT HIDDEN FROM ITS EDITOR IS HERS TO READ AND NOT TO SAVE OVER', async () => {
+  const f = await build({ shapes: SHAPES.filter((s) => s.id === 'owner') });
+  const h = handlers(f);
+  f.sql.exec("INSERT INTO person (id, email, name, suspended_at) VALUES ('p_ked', 'ked@example.test', 'Ked', NULL)");
+  const until = new Date(Date.UTC(2026, 10, 20)).toISOString();
+  const shared = (await f.api.share({ share: { effect: 'allow', who: { kind: 'person', id: 'p_ked' }, what: { project: f.built.ids.kiln }, can: 'edit', hide: { types: ['money'] }, when: { until } } } as never, f.owner)) as { ok: boolean };
+  assert.ok(shared.ok, 'the owner could not share Kiln to edit with amounts hidden');
+  f.api.kernel.accessChanged();
+  const ked = personCtx(f.api, 'p_ked');
+  const quoted = f.rows.get('t-kiln-review')!;
+  const shown = (await ask(h, 'get', { register: quoted.list, seq: quoted.seq }, ked)) as { ok: boolean; value?: { fields: { notes?: string } } };
+  const notes = shown.value?.fields.notes ?? '';
+  assert.ok(notes.includes('£…'), 'the editor is shown the amount in the notes');
+  /* SAVED BACK AS SHE WAS SHOWN IT, IT WOULD WRITE "£…" OVER THE AMOUNT: refused, naming the field. */
+  const saved = (await ask(h, 'update', { register: quoted.list, seq: quoted.seq, patch: { notes } }, ked)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.equal(saved.ok, false, 'the editor saved the masked notes over the amount');
+  assert.equal(saved.refusal?.at, 'notes');
+  /* AND EVERY OTHER FIELD OF THE ROW IS STILL HERS TO CHANGE. */
+  assert.ok(((await ask(h, 'update', { register: quoted.list, seq: quoted.seq, patch: { stage: 'done' } }, ked)) as { ok: boolean }).ok, 'the editor could not move the task on');
 });
 
 /* ── P1: no answer carries a canary ─────────────────────────────────────── */

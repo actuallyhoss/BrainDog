@@ -1,5 +1,5 @@
 /**
- * Free is one person (DIRECTION §35): a free record takes nobody who is not on it already, and every other plan takes
+ * Free is one person: a free record takes nobody who is not on it already, and every other plan takes
  * anybody. Before this, `join` wrote `dir_member` for whoever an invitation named, on any plan.
  */
 

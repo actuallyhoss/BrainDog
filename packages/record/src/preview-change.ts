@@ -36,6 +36,7 @@ import {
   type Json,
   type Kernel,
   type PageBlock,
+  type PageSees,
   type Patch,
   viewerOfRead,
 } from '@braindog/kernel';
@@ -87,8 +88,10 @@ export type Holding = {
   heldBy: (ctx: CallContext, b: PageBlock) => { log: Refusal | null; beyond: Refusal | null };
   unplaced: (ctx: CallContext, block: unknown, forList: unknown) => { block: unknown; back: Map<string, string> };
   whereHeld: (ctx: CallContext, block: unknown) => { refusal: Refusal; shell: boolean } | null;
-  seesPage: (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }) => boolean;
+  seesPage: (ctx: CallContext, p: { registers: string[]; about: { register: string; seq?: number | null } | null }) => boolean;
   readsEveryList: (ctx: CallContext) => boolean;
+  /** What of the reads across the record she is shown, handed to every page read made for her (`seesFor` in `index.ts`). */
+  seesFor: (ctx: CallContext) => PageSees | undefined;
 };
 
 export type PreviewDeps = {
@@ -483,7 +486,8 @@ export function previewer(deps: PreviewDeps) {
         } else entry = mine[0];
         row = entry?.about ? kernel.get({ register: entry.about.register, seq: entry.about.seq ?? 0 }) : null;
       }
-      const page = entry === undefined ? null : kernel.page(entry.slug);
+      /* READ FOR HER, as `page` reads one: no row kept private from her (`viewer`), and a feed or a queue through her lens. */
+      const page = entry === undefined ? null : kernel.page(entry.slug, undefined, { viewer: viewerOfRead(ctx), sees: held.seesFor(ctx) });
       const shown = page !== null && page.ok ? page.value : null;
       /* A PAGE PER ROW WITH NO ROW TO BE ABOUT IS DRAWN AS WRITTEN, placeholders and all, under one sentence that says so,
          which is how `previewPage` draws every template. */
@@ -576,7 +580,7 @@ export function previewer(deps: PreviewDeps) {
             ? listedNow.find((q) => q.about === null && q.slug === page.slug)
             : listedNow.find((q) => q.about !== null && `${q.about.register}#${q.about.seq}` === page.about);
         if (now === undefined || !held.seesPage(ctx, now)) return { ...page, was: null };
-        const read = kernel.page(now.slug);
+        const read = kernel.page(now.slug, undefined, { viewer: viewerOfRead(ctx), sees: held.seesFor(ctx) });
         return { ...page, was: read.ok ? read.value.blocks.map((b) => held.heldBlock(ctx, b) as BlockResult) : null };
       }),
     };

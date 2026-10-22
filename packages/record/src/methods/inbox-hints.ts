@@ -1,6 +1,6 @@
 /**
  * What each arrival waiting in the Inbox is and who it is from: `inboxHints` (READ+), the rules half of ENG-B06 job 4
- * ("Everything that comes in ... is read for who and what it is about", D38.41).
+ * ("Everything that comes in ... is read for who and what it is about").
  *
  * BEFORE THIS AN INBOX LINE SAID ONLY ITS OWN TITLE. The scope keeps the model's hint on the arrival, which needs a
  * column the owner's migration has not added. A hint worked out by rules when the Inbox is read needs none, so this

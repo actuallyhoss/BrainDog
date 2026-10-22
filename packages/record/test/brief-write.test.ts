@@ -81,6 +81,7 @@ test('three good cards are kept as the model wrote them, with the day, the slot 
     at: '2026-10-14T05:00:00.000Z',
     cards: GOOD.cards,
     said: null,
+    lens: 'whole',
   });
   assert.deepEqual(b.asks, [briefInput(FACTS, '2026-10-14')]);
   /* WHAT IS KEPT IS READ BACK AS THE BRIEFING: holes filled from the record, each card opening its own thing. */
@@ -191,7 +192,7 @@ test('a model that throws keeps no cards and says the rules wrote this', async (
   const b = bench(() => Promise.reject(new Error('socket hang up')));
   const done = await b.tick(MORNING);
   assert.equal(done.asked, true);
-  assert.deepEqual(b.store.get(BRIEF_KEPT), { day: '2026-10-14', slot: 1, basis: briefBasis(FACTS), at: '2026-10-14T05:00:00.000Z', cards: [], said: BRIEF_NO_ANSWER });
+  assert.deepEqual(b.store.get(BRIEF_KEPT), { day: '2026-10-14', slot: 1, basis: briefBasis(FACTS), at: '2026-10-14T05:00:00.000Z', cards: [], said: BRIEF_NO_ANSWER, lens: 'whole' });
   assert.equal(BRIEF_NO_ANSWER, 'The model did not answer, so the rules wrote this.');
   assert.ok(!JSON.stringify(done).includes('socket'), 'what the model threw is never said');
 });
@@ -220,7 +221,7 @@ test('an answer at fault keeps its cards that pass, and none when none passes', 
   const some = bench(() => ({ raw: mixed }));
   const done = await some.tick(MORNING);
   assert.match(done.dropped ?? '', /typed a number/u);
-  assert.deepEqual(some.store.get(BRIEF_KEPT), { day: '2026-10-14', slot: 1, basis: briefBasis(FACTS), at: '2026-10-14T05:00:00.000Z', cards: [GOOD.cards[1]], said: null });
+  assert.deepEqual(some.store.get(BRIEF_KEPT), { day: '2026-10-14', slot: 1, basis: briefBasis(FACTS), at: '2026-10-14T05:00:00.000Z', cards: [GOOD.cards[1]], said: null, lens: 'whole' });
 
   for (const raw of [{ cards: [{ h: 'f1', line: 'Fix the rows for 2 days.' }] }, 'no', null, { cards: [] }]) {
     const none = bench(() => ({ raw }));

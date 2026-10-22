@@ -136,7 +136,7 @@ export type InferTier = 'a' | 'b' | 'byo';
  * One model a host can ask, on one wire.
  *
  * `id` IS THE HOST'S HANDLE FOR IT, written on the row beside the model's name and never shown to a person. `large` marks
- * the larger model, which is on a route only where he said yes to its cost (HD.463).
+ * the larger model, which is on a route only where the record's owner allowed its cost (HD.463).
  */
 export type Candidate = {
   id: string;
@@ -171,7 +171,7 @@ export type RouteFacts = {
     endpoint?: Candidate | undefined;
     fallback?: Candidate | undefined;
   };
-  /** He said yes to the larger model's cost. */
+  /** The record's owner allowed the larger model's cost. */
   large: boolean;
   /** A runner is enrolled and the kind is allowed. */
   machine: boolean;
@@ -183,7 +183,7 @@ export type Route = { name: string; class: ModelClass; form: RouteForm; candidat
 /**
  * The candidates for a purpose, in the order they are tried.
  *
- * THE LARGER MODEL IS ON THE COMPOSING ROUTE ALONE, AND ONLY ON HIS YES. A candidate marked `large` is dropped from
+ * THE LARGER MODEL IS ON THE COMPOSING ROUTE ALONE, AND ONLY WHEN ITS COST IS ALLOWED. A candidate marked `large` is dropped from
  * every other place it is handed in at, so a host that names it as its flash model has not switched it on by doing so.
  */
 export const routeFor = (purpose: InferPurpose, facts: RouteFacts): Route => {
@@ -197,7 +197,9 @@ export const routeFor = (purpose: InferPurpose, facts: RouteFacts): Route => {
     if (facts.form === 'selfhost') return [m.endpoint, m.fallback];
     if (cls === 'answer') return [m.flash, m.second, m.provider];
     if (composing) return [facts.machine ? m.machine : undefined, m.large, m.flash, m.second];
-    return [purpose === 'prose' ? m.small : undefined, m.flash, m.second];
+    /* PROSE ON THE FLASH MODEL: digest prose is asked for a JSON object, and the small model is not one Workers AI
+       holds to a JSON schema, so a plain-text answer was set aside with nothing to fall to. */
+    return [m.flash, m.second];
   })();
   const seen = new Set<string>();
   const candidates = order.filter((c): c is Candidate => {

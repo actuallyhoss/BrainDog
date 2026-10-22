@@ -11,9 +11,9 @@ import assert from 'node:assert/strict';
 
 import { sendAction, type ActionAnswer, type ActionRequest, type OpenKey, type Send } from '../src/actions.ts';
 
-const BAKE = 'https://bake.example';
+const OXBOW = 'https://oxbow.example';
 const OTHER = 'https://collector.example';
-const FAKE = `bd_fake_bake_value_${crypto.randomUUID()}`;
+const FAKE = `bd_fake_oxbow_value_${crypto.randomUUID()}`;
 
 const request = (origin: string, opens: string | undefined): ActionRequest => ({
   job: 'o_1',
@@ -23,7 +23,7 @@ const request = (origin: string, opens: string | undefined): ActionRequest => ({
   url: `${origin}/v1/orders`,
   origin,
   headers: { accept: 'application/json' },
-  grant: { id: 'g_1', label: 'Bake' },
+  grant: { id: 'g_1', label: 'Oxbow' },
   ...(opens === undefined ? {} : { opens }),
   timeoutMs: 10_000,
   maxBytes: 2_000_000,
@@ -40,27 +40,27 @@ function counted() {
     fetched.push(url.host);
     return new Response('[]');
   };
-  return { opened, fetched, run: sendAction({ origins: () => [BAKE, OTHER], openKey, send }) };
+  return { opened, fetched, run: sendAction({ origins: () => [OXBOW, OTHER], openKey, send }) };
 }
 
 const codeOf = (a: ActionAnswer): string | number => ('refused' in a ? a.refused.code : a.status);
 const fixOf = (a: ActionAnswer): string => ('refused' in a ? a.refused.fix : '');
 
 test('A KEY IS SENT TO THE HOST ITS ENTRY OPENS, however the entry spells it', async () => {
-  for (const opens of ['bake.example', 'https://bake.example/v1', 'BAKE.example:443', 'bake.example.']) {
+  for (const opens of ['oxbow.example', 'https://oxbow.example/v1', 'OXBOW.example:443', 'oxbow.example.']) {
     const net = counted();
-    const answer = await net.run(request(BAKE, opens));
-    assert.equal(codeOf(answer), 200, `"${opens}" did not send to bake.example: ${fixOf(answer)}`);
-    assert.deepEqual(net.fetched, ['bake.example']);
-    assert.deepEqual(net.opened, ['Bake']);
+    const answer = await net.run(request(OXBOW, opens));
+    assert.equal(codeOf(answer), 200, `"${opens}" did not send to oxbow.example: ${fixOf(answer)}`);
+    assert.deepEqual(net.fetched, ['oxbow.example']);
+    assert.deepEqual(net.opened, ['Oxbow']);
   }
 });
 
 test('ANOTHER HOST IS REFUSED with the host the key opens, before the key is opened and with nothing fetched', async () => {
   const net = counted();
-  const answer = await net.run(request(OTHER, 'bake.example'));
+  const answer = await net.run(request(OTHER, 'oxbow.example'));
   assert.equal(codeOf(answer), 'WRONG_KEY');
-  assert.equal(fixOf(answer), 'This key opens bake.example only.');
+  assert.equal(fixOf(answer), 'This key opens oxbow.example only.');
   assert.deepEqual(net.opened, [], 'the key was opened for a host it does not open');
   assert.deepEqual(net.fetched, [], 'something was fetched');
   assert.equal((answer as { requests: number }).requests, 0);
@@ -68,7 +68,7 @@ test('ANOTHER HOST IS REFUSED with the host the key opens, before the key is ope
 
   /* AND THE ENTRY'S USER-INFO DOES NOT MOVE IT: the host is the one after the `@`, as the kernel reads it. */
   const tricked = counted();
-  const trick = await tricked.run(request(BAKE, 'https://bake.example@collector.example'));
+  const trick = await tricked.run(request(OXBOW, 'https://oxbow.example@collector.example'));
   assert.equal(fixOf(trick), 'This key opens collector.example only.');
   assert.deepEqual(tricked.fetched, []);
 });
@@ -76,21 +76,21 @@ test('ANOTHER HOST IS REFUSED with the host the key opens, before the key is ope
 test('A KEY WITH NO HOST IS SENT, and once its approval pins the host it is held there', async () => {
   /* THE ENTRY NAMES NO HOST, so the host has nothing to hold it to and it goes, as every approved action did before. */
   const first = counted();
-  assert.equal(codeOf(await first.run(request(BAKE, 'the Bake test account'))), 200);
-  assert.deepEqual(first.fetched, ['bake.example']);
-  /* ONE WORD IS A NAME, NOT A HOST: "Bake" parses as `bake`, which no action calls, so it holds the key to nothing. */
+  assert.equal(codeOf(await first.run(request(OXBOW, 'the Oxbow test account'))), 200);
+  assert.deepEqual(first.fetched, ['oxbow.example']);
+  /* ONE WORD IS A NAME, NOT A HOST: "Oxbow" parses as `oxbow`, which no action calls, so it holds the key to nothing. */
   const named = counted();
-  assert.equal(codeOf(await named.run(request(BAKE, 'Bake'))), 200, 'a key whose entry says one word was refused everywhere');
+  assert.equal(codeOf(await named.run(request(OXBOW, 'Oxbow'))), 200, 'a key whose entry says one word was refused everywhere');
   const unsaid = counted();
-  assert.equal(codeOf(await unsaid.run(request(BAKE, undefined))), 200, 'a request built before `opens` was carried stopped sending');
+  assert.equal(codeOf(await unsaid.run(request(OXBOW, undefined))), 200, 'a request built before `opens` was carried stopped sending');
 
   /* PINNED: `pinHost` writes the host on the entry (kernel `vault.ts`), and `keyNamed` carries it on the next request. */
-  const pinned = 'bake.example';
+  const pinned = 'oxbow.example';
   const again = counted();
-  assert.equal(codeOf(await again.run(request(BAKE, pinned))), 200);
+  assert.equal(codeOf(await again.run(request(OXBOW, pinned))), 200);
   const away = counted();
   const refused = await away.run(request(OTHER, pinned));
-  assert.equal(fixOf(refused), 'This key opens bake.example only.');
+  assert.equal(fixOf(refused), 'This key opens oxbow.example only.');
   assert.deepEqual(away.opened, []);
   assert.deepEqual(away.fetched, []);
 });

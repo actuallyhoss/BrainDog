@@ -1,5 +1,5 @@
 /**
- * `meet` at the agent's rung (research-audit-20 H4, DIRECTION §38): what a meeting does on its own stays automatic, a
+ * `meet` at the agent's rung (research-audit-20 H4): what a meeting does on its own stays automatic, a
  * person added and the line of where they were met; what an agent asserts on somebody already known (an address a fold
  * by the strong rules would carry onto them) is held to the ladder, and where it would ask it is a mention and one question instead of a write. An
  * agent on a Suggest grant only ever leaves mentions.

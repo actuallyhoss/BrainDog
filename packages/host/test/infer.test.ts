@@ -91,14 +91,15 @@ test('THE INCLUDED ROUTES ARE IN THE ORDER THE SCOPE GIVES', () => {
   assert.deepEqual(ids('ask', CLOUD), ['flash', 'second', 'provider']);
   assert.deepEqual(ids('look', CLOUD), ['flash', 'second']);
   assert.deepEqual(ids('understand', CLOUD), ['flash', 'second']);
-  assert.deepEqual(ids('prose', CLOUD), ['small', 'flash', 'second']);
+  /* PROSE IS ASKED OF THE FLASH MODEL TOO: the small one does not hold a JSON answer. */
+  assert.deepEqual(ids('prose', CLOUD), ['flash', 'second']);
   assert.deepEqual(ids('embed', CLOUD), ['embed']);
   const bare: RouteFacts = { form: 'included', models: { flash: FLASH }, large: false, machine: false };
   assert.deepEqual(ids('ask', bare), ['flash']);
   assert.deepEqual(ids('embed', bare), []);
 });
 
-test('A LARGE CANDIDATE IS SKIPPED UNLESS HE SAID YES, and his machine unless it is allowed', () => {
+test('A LARGE CANDIDATE IS SKIPPED UNLESS ITS COST IS ALLOWED, and his machine unless it is allowed', () => {
   assert.deepEqual(ids('compose', CLOUD), ['flash', 'second']);
   assert.deepEqual(ids('compose', { ...CLOUD, large: true }), ['large', 'flash', 'second']);
   assert.deepEqual(ids('compose', { ...CLOUD, large: true, machine: true }), ['machine', 'large', 'flash', 'second']);

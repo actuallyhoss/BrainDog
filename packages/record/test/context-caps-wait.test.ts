@@ -1,7 +1,7 @@
 /**
  * The card's Waiting slot in the order waiting costs (AGT-C08 step 4): this project's questions first as before, each
  * half by Decide's own rank (`waitRank`), read from the `waits` the record said or from `waitOf` on the question, ties
- * in the order handed in, and a question with no weighing after every weighed one. Every row is made up (DIRECTION 27).
+ * in the order handed in, and a question with no weighing after every weighed one. Every row is made up.
  */
 
 import { test } from 'node:test';

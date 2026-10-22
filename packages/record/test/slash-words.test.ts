@@ -1,5 +1,5 @@
 /**
- * What Slash noticed and what it asks, in the person's words (DIRECTION §35): every rule in `noticeUsage` fires over one
+ * What Slash noticed and what it asks, in the person's words: every rule in `noticeUsage` fires over one
  * reading, and not one sentence it says or question it files calls their things rows or lists.
  */
 

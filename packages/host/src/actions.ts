@@ -245,7 +245,7 @@ export function holding(execute: Execute, record: string, mayRun: Ledger['mayRun
  * The same question, asked of a connector.
  *
  * WITHOUT THIS THE ALLOWANCE HAD A HOLE THE SIZE OF THE EXPENSIVE KIND. `holding` wraps the
- * executor, and the connector runner is not the executor — the pass hands a `Paged` straight to it.
+ * executor, and the connector runner is not the executor: the pass hands a `Paged` straight to it.
  * So a record at its monthly limit was held for `call`, `poll` and a one-request `pull`, and its
  * paging connectors ran on, which are the runs that make the most requests of anybody.
  *
@@ -266,7 +266,7 @@ export function holdingPaged(page: PagedRun, record: string, mayRun: Ledger['may
  *
  * ONE COUNT AND NOT TWO. The ledger is told of a run only after the pass, so each wrapper has to
  * carry what it has already admitted. Two counts would each start at zero, and a record with one
- * run left would be allowed one request AND one connector — which is the allowance overrun this
+ * run left would be allowed one request AND one connector, which is the allowance overrun this
  * count exists to prevent, arriving by a different door.
  */
 export type Admissions = { ask: (record: string, action: string, mayRun: Ledger['mayRun']) => Promise<Hold> };
@@ -872,7 +872,7 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
       return refuse('PULL_ORIGIN_REFUSED', `${url.host} is not an origin an installed declaration names, so nothing was sent.`);
     if (refusedHost(url) !== null) return refuse('PULL_ORIGIN_REFUSED', `${url.host} is a private or local address, so nothing was sent.`);
     /* A KEY GOES ONLY TO ITS OWN HOST (SHL-C05), checked BEFORE the key is opened or anything resolved. A declaration
-       that names a person's Bake key and another host passes the origin check, since the origin is its own; what it may
+       that names a person's Oxbow key and another host passes the origin check, since the origin is its own; what it may
        not do is carry that key there. `opens` is the vault entry's words, read as a host the one way the kernel reads
        them (`hostOpened`); an entry that names no host is held to nothing here, and its first approval pins one
        (`pinHost`). Only the label and `opens` are read, never the value. */
@@ -1113,7 +1113,7 @@ export function readPublic<P extends object | undefined = undefined>(options: { 
  * ceiling set at the real one is a ceiling the run reaches by surprise.
  *
  * IT LIVES HERE, in the one file both hosts import, because the self-host needs the same arithmetic
- * to behave the same way and not the same limit — a Node process has no such ceiling, so it passes
+ * to behave the same way and not the same limit: a Node process has no such ceiling, so it passes
  * no budget and the kernel skips the check entirely.
  */
 export const SUBREQUESTS = 800;

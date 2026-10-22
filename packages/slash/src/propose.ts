@@ -1036,7 +1036,7 @@ export type SetupAnswer = {
   /**
    * The one question the model would ask back, where the answer would change what is built (USE-B06), or null.
    *
-   * ONE, NEVER TWO (his word of 9 October, `apps/web/src/lib/start/question.ts`, over the scope's two). Absent where the
+   * ONE, NEVER TWO (settled on 9 October, `apps/web/src/lib/start/question.ts`, over the scope's two). Absent where the
    * model said nothing about it, which reads as null.
    */
   ask?: SetupQuestion | null;

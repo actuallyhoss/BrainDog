@@ -1,7 +1,8 @@
 /**
  * The address a device start tells a person to open.
  *
- * THE APP LIVES UNDER `/app` NOW, so `${origin}/settings/agents` is a page on the marketing site: once `brain.dog`
+ * THE PAGE IS `/connect/approve`, the six digits and nothing else. THE APP LIVES UNDER `/app` NOW, so
+ * `${origin}/connect/approve` would be a page on the marketing site: once `brain.dog`
  * serves both, the old address answers the site's 404 and the six digits have nowhere to be typed. On the Worker the
  * record goes in the path when the device named one, because under `/app/<slug>` the app reads that record and no other.
  *
@@ -43,18 +44,18 @@ test('the device route this file tests is the one serveAuth answers', () => {
   assert.ok(AUTH_ROUTES.some((r) => r.path === '/auth/device' && r.method === 'POST'));
 });
 
-test('A DEVICE THAT NAMED ITS RECORD IS SENT TO THAT RECORD\'S AGENTS PAGE, UNDER /app', async () => {
+test('A DEVICE THAT NAMED ITS RECORD IS SENT TO THAT RECORD\'S APPROVE PAGE, UNDER /app', async () => {
   const d = door();
   const out = await start(d.door, { slug: 'acme', reach: 'login', label: 'laptop' });
   assert.equal(out.status, 200);
-  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/acme/settings/agents');
+  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/acme/connect/approve');
   assert.equal(d.asked[0]?.slug, 'acme');
 });
 
-test('A DEVICE THAT NAMED NO RECORD IS SENT TO /app/settings/agents, which is the record the session is on', async () => {
+test('A DEVICE THAT NAMED NO RECORD IS SENT TO /app/connect/approve, which is the record the session is on', async () => {
   const out = await start(door().door, { reach: 'login', label: 'laptop' });
   assert.equal(out.status, 200);
-  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/settings/agents');
+  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/connect/approve');
 });
 
 test('A SLUG NO RECORD COULD HAVE NEVER REACHES THE ADDRESS, so it cannot make it another page', async () => {
@@ -64,11 +65,11 @@ test('A SLUG NO RECORD COULD HAVE NEVER REACHES THE ADDRESS, so it cannot make i
     const out = await start(door().door, { slug, reach: 'login', label: 'laptop' });
     assert.equal(out.status, 200, slug);
     const uri = new URL(out.body.value?.verification_uri ?? '');
-    assert.equal(`${uri.origin}${uri.pathname}${uri.search}${uri.hash}`, 'https://brain.dog/app/settings/agents', slug);
+    assert.equal(`${uri.origin}${uri.pathname}${uri.search}${uri.hash}`, 'https://brain.dog/app/connect/approve', slug);
   }
   for (const slug of ['ab', 'acme-studio', 'a1', 'x'.repeat(32)]) {
     const out = await start(door().door, { slug, reach: 'login', label: 'laptop' });
-    assert.equal(out.body.value?.verification_uri, `https://brain.dog/app/${slug}/settings/agents`, slug);
+    assert.equal(out.body.value?.verification_uri, `https://brain.dog/app/${slug}/connect/approve`, slug);
   }
 });
 
@@ -76,7 +77,7 @@ test('THE SELF-HOST IS NEVER SENT UNDER A SLUG, because it serves no /app/<slug>
   const d = door('brain.dog', 'selfhost');
   const out = await start(d.door, { slug: 'acme', reach: 'login', label: 'laptop' });
   assert.equal(out.status, 200);
-  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/settings/agents');
+  assert.equal(out.body.value?.verification_uri, 'https://brain.dog/app/connect/approve');
 });
 
 test('REACHED BY ANOTHER NAME, NOTHING IS STARTED, as before the move', async () => {

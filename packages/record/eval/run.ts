@@ -21,7 +21,7 @@
  *
  * WHAT IT MEASURES AND WHY IT IS NOT A TEST. The suite in `test/` drives `describe` and the headlines over canned answers,
  * which says what the record does with an answer and nothing about whether a model gives a good one. This asks the model
- * itself and scores what came back, by the bar DIRECTION §35 sets, "good on the first try":
+ * itself and scores what came back, by the bar a drawn page is held to, "good on the first try":
  *
  *   - FIRST TRY: the share of descriptions where a draft drew clean from the first ask, with no repair;
  *   - CALM: `calmFaults` a page, over the pages the first ask drew, before any repair mended them;
@@ -134,7 +134,7 @@ const counted: SlashModel = {
 
 /* ── what a person reads ───────────────────────────────────────────── */
 
-/** The system's words (DIRECTION §35), which never name a person's own things. */
+/** The system's words, which never name a person's own things. */
 const SYSTEM_WORDS = /\b(?:rows?|lists?|list items?|entit(?:y|ies)|fields?|registers?|blocks?|declarations?|metrics?|records?)\b/giu;
 /** The keys whose text a person reads on a drawn page or a question. */
 const READ_KEYS = new Set(['title', 'name', 'heading', 'body', 'empty', 'label', 'one', 'holds', 'question', 'text', 'say', 'summary']);

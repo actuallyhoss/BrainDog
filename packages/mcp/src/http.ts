@@ -286,7 +286,7 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
   const answer = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said), options.build);
   /* THE FIREWALL (sharing plan §2.5 item 6), as `/api`'s: a field hidden from this caller still on a row of the reply is
      taken off and raised as fault `lens.firewall` naming the method, a tool by its name and a resource by its address. */
-  const held = walled(who, answer, surface.listOf);
+  const held = walled(who, answer, surface.listOf, () => surface.moneyHidden?.(who) === true);
   if (held.stripped.length > 0) surface.firewalled?.(`mcp ${mcpMethodOf(message)}`, held.stripped);
   const reply = held.answer;
   if (options.called && reply !== null && !('error' in reply) && isObject(message) && message.method === 'tools/call') {
@@ -301,8 +301,8 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
  * answer written as JSON, read and written again only when the firewall took something off it. Text written in words is
  * past any key to take off; the structured half beside it is what finds the path that did not mask.
  */
-function walled<T>(ctx: unknown, reply: T, listOf?: (spoken: string) => string | null): { answer: T; stripped: string[] } {
-  const held = firewall(ctx, reply, listOf);
+function walled<T>(ctx: unknown, reply: T, listOf?: (spoken: string) => string | null, money?: () => boolean): { answer: T; stripped: string[] } {
+  const held = firewall(ctx, reply, listOf, money);
   const result = isObject(held.answer) && isObject(held.answer.result) ? held.answer.result : null;
   if (result === null || !Array.isArray(result.content)) return held;
   const stripped = new Set(held.stripped);
@@ -314,7 +314,7 @@ function walled<T>(ctx: unknown, reply: T, listOf?: (spoken: string) => string |
     } catch {
       return part;
     }
-    const text = firewall(ctx, read, listOf);
+    const text = firewall(ctx, read, listOf, money);
     if (text.stripped.length === 0) return part;
     for (const s of text.stripped) stripped.add(s);
     return { ...part, text: JSON.stringify(text.answer, null, 2) };

@@ -5,7 +5,7 @@
  * version 3, so `Asked` had no such field and every case here read `undefined`. A page that lists the asks could not
  * tell his own from the record's, nor the reading of what arrived from the page headlines.
  *
- * HIS WORDS: "thinking budget 600 a month". The 600 is the record's own work, and it is several kinds of work.
+ * THE RULE: "thinking budget 600 a month". The 600 is the record's own work, and it is several kinds of work.
  */
 
 import assert from 'node:assert/strict';

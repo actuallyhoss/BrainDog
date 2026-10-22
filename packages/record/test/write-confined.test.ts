@@ -113,11 +113,12 @@ test('the post-image is checked in the kernel: a move out of the rule unwinds wi
   f.sql.exec("UPDATE person SET name = 'Mara' WHERE id = ?", 'p_ada');
   const kiln = f.rows.get('t-kiln-review')!;
   const rule = { field: 'stage', is: 'review' };
+  const was = f.api.kernel.get(`tasks#${kiln.seq}`)!.version;
   const out = f.api.kernel.update('tasks', `tasks#${kiln.seq}`, { stage: 'done' } as never, { actor: 'p_x', within: rule as never });
   assert.deepEqual(out, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That would move it out of what you can edit. Ask Mara.', at: 'patch' } });
   const row = f.api.kernel.get(`tasks#${kiln.seq}`)!;
   assert.equal(row.fields.stage, 'review');
-  assert.equal(row.version, 1);
+  assert.equal(row.version, was, 'the refused write left the row at its version');
   /* A ROW OUTSIDE IT BEFORE THE WRITE IS ONE THAT IS NOT THERE. */
   const loom = f.rows.get('t-loom-todo')!;
   assert.deepEqual(f.api.kernel.update('tasks', `tasks#${loom.seq}`, { notes: 'x' } as never, { actor: 'p_x', within: rule as never }), {

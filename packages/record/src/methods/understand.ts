@@ -1,5 +1,5 @@
 /**
- * The walk over what the record already holds, asked for by hand (DIRECTION §38, "understanding is the engine's first
+ * The walk over what the record already holds, asked for by hand ("understanding is the engine's first
  * job"): `understand`, ADMIN, and `understandPlan`, READ+.
  *
  * WHAT IS LINKED AND HOW IS THE KERNEL'S (`kernel/src/backfill.ts`): each old payment to who it was with, each old run to

@@ -1,5 +1,5 @@
 /**
- * Sign-up's strikes while no bot check stands in front of it (DIRECTION §42): open to strangers, and narrow until the
+ * Sign-up's strikes while no bot check stands in front of it: open to strangers, and narrow until the
  * check is keyed.
  *
  * `SIGNUP_UNCHECKED` APPLIES TO BOTH KEYS a start strikes, `signup:<ip>` and `signup-email:<address>`, whenever the host

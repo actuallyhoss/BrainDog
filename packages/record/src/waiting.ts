@@ -48,8 +48,8 @@ export type WaitingNow = {
 /** One open question as the reader is handed it: when it was opened, and what kind of change it proposes. */
 export type WaitingQuestion = { opened_at: string; body_kind: string; body: unknown };
 
-/** One run as the reader is handed it: its state and its fields, with when its row last changed. */
-export type WaitingRun = { state?: string | null; fields: Record<string, Json>; updated_at: string };
+/** One run as the reader is handed it: its state and its fields, with when its row last changed, and its number. */
+export type WaitingRun = { state?: string | null; fields: Record<string, Json>; updated_at: string; seq?: number | null };
 
 /**
  * What `waiting` reads: the questions this reader may see, the inbox count they are told, and the open runs they may
@@ -100,6 +100,20 @@ export function presenceOf(run: WaitingRun, nowMs: number): Presence {
 /** Whether a run is working now: the one clock (`presenceOf`). */
 export const isWorking = (run: WaitingRun, nowMs: number): boolean => presenceOf(run, nowMs) === 'working';
 
+/**
+ * The runs at work now, a helper left out while the run that started it is at work too: ONE AGENT WITH FOUR HELPERS IS
+ * ONE AGENT AT WORK, as the kernel's `workingRuns` counts it, so the rail, Today and the Agents page's line say one
+ * number. A helper whose parent ended or went quiet stands on its own. A run handed without its number is never a parent.
+ */
+export function atWork<R extends WaitingRun>(runs: readonly R[], nowMs: number): R[] {
+  const working = runs.filter((run) => isWorking(run, nowMs));
+  const spoken = new Set(working.flatMap((run) => (typeof run.seq === 'number' ? [`S${String(run.seq)}`] : [])));
+  return working.filter((run) => {
+    const parent = run.fields.parent;
+    return !(typeof parent === 'string' && spoken.has(parent) && parent !== `S${String(run.seq)}`);
+  });
+}
+
 /** What waits on the reader `r` describes. */
 export function waiting(r: WaitingReader): WaitingNow {
   let late = 0;
@@ -113,7 +127,7 @@ export function waiting(r: WaitingReader): WaitingNow {
     late,
     hard,
     inbox: r.inbox,
-    working: r.runs.filter((run) => isWorking(run, r.nowMs)).length,
+    working: atWork(r.runs, r.nowMs).length,
   };
 }
 

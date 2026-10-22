@@ -63,6 +63,7 @@ import { ROUTES as DECIDER } from './decider.ts';
 import { ROUTES as actionRun } from './action-run.ts';
 import { ROUTES as SHARING } from './sharing.ts';
 import { ROUTES as SCHEMAS } from './schemas.ts';
+import { ROUTES as SEALED } from './sealed.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -117,5 +118,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...actionRun,
   ...SHARING,
   ...SCHEMAS,
+  ...SEALED,
   /* END ROUTES */
 ];

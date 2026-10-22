@@ -1,5 +1,5 @@
 /**
- * An agent's `propose` answer and its briefing say names, never an id or an address (audit 19, M11; DIRECTION §38: "the
+ * An agent's `propose` answer and its briefing say names, never an id or an address (audit 19, M11: "the
  * MCP answers in those names, so an agent never meets a raw id or a duplicate person").
  *
  * THE SENTENCES COME FROM ELSEWHERE: a question is the agent's own words or the record's, a step is what the last run

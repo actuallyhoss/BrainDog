@@ -7,7 +7,7 @@
  * reads use from the record, so each description is drafted over a record nobody else's case has touched, and two runs
  * hand the model the same reading.
  *
- * ORDINARY DECLARATIONS AND NOTHING SPECIAL (DIRECTION §27): lists, figures and pages as any pack or person would declare
+ * ORDINARY DECLARATIONS AND NOTHING SPECIAL: lists, figures and pages as any pack or person would declare
  * them, so what the model is measured on is what it meets on any record.
  *
  * THE CLOCK STANDS STILL ON FRIDAY 2 OCTOBER 2026, so "late" and "this month" name the same rows on every run. Money is in

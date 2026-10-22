@@ -354,8 +354,15 @@ const NOT_SENT_TEXT = 'not sent';
 /** The months a meter has already said it is spent in, so the line is said once a month and not on every alarm. */
 const told = new WeakMap<ModelJobMeter, string>();
 
-/** What the silent model's test asks about: a digest of one line that is nobody's, so the test leases no job. */
-const TEST_DIGEST = { digest: 'model-test', name: 'A test', text: 'One task closed.' };
+/**
+ * What the silent model's test asks about: a digest of one line that is nobody's, so the test leases no job.
+ *
+ * `probe: true` MAKES ITS LEDGER ROW A TEST AND NOT A DIGEST (`digestProse`, `packages/slash/src/jobs.ts`): purpose
+ * `probe`, spending nothing, asked once. Written as `prose`, each half hour of an outage read as one more digest the
+ * model did not answer, and the vital sign `model-answers` counted every one as an ask. The engine's health still reads
+ * the row, which is how a test the model answers ends the wait.
+ */
+export const TEST_DIGEST = { digest: 'model-test', name: 'A test', text: 'One task closed.', probe: true };
 
 /** The key the next test's time is kept under, in the host's store. */
 const TEST_MARK = 'model.test.next';
@@ -816,7 +823,7 @@ const foldQuery = (q: string): string => q.trim().replace(/\s+/gu, ' ').toLowerC
  * call of one text, and one vector of the width it states is `ok` and is kept. The call goes through the host's
  * engine, which writes its ledger row, so `backgroundMeter` and the vital signs count it as an embedding.
  *
- * THE LOG NEVER HOLDS HIS WORDS: a refusal's fix or a thrown message, and a message that echoes the query is replaced.
+ * THE LOG NEVER HOLDS THE PERSON'S WORDS: a refusal's fix or a thrown message, and a message that echoes the query is replaced.
  */
 export function queryVector(deps: { embed: ModelJobEmbed['embed'] | undefined; meter: ModelJobMeter; now: () => number; reads?: Reads; log?: (line: string) => void }): ((q: string) => Promise<QueryMeaning>) | undefined {
   const { embed, meter } = deps;

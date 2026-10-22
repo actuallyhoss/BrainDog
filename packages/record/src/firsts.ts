@@ -7,7 +7,7 @@
  * so a hundredth hello leaves the first one's time standing. Not an event, for the reason a pref is not one: when it
  * first happened is not the record's history, and nobody's name or key is kept with it, only the instant.
  *
- * ON EVERY RECORD ALIKE (DIRECTION §27): whichever record it is, the door and the briefing keep the same two.
+ * ON EVERY RECORD ALIKE: whichever record it is, the door and the briefing keep the same two.
  */
 
 import type { Kernel } from '@braindog/kernel';

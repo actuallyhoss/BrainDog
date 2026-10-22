@@ -41,6 +41,10 @@ export type JobCard = {
   permissionSays: string;
   /** True when a run changes files, which the card says in red. */
   writes: boolean;
+  /** Which agent runs it: Claude Code unless the kind says Codex. */
+  agent: 'claude' | 'codex';
+  /** Which agent runs it and what that means for its commands, as a sentence. */
+  agentSays: string;
 };
 
 const TOOL_SAYS: Readonly<Record<string, string>> = {
@@ -52,6 +56,12 @@ const TOOL_SAYS: Readonly<Record<string, string>> = {
 const PERMISSION_SAYS: Readonly<Record<string, string>> = {
   dontAsk: 'Uses only the tools listed, and asks nothing.',
   acceptEdits: 'Changes files without asking.',
+};
+
+/* CODEX RUNS COMMANDS INSIDE A SANDBOX AND HOLDS THEM TO NO LIST, so its card says the sandbox instead of the list. */
+const CODEX_PERMISSION_SAYS: Readonly<Record<string, string>> = {
+  dontAsk: 'Runs any read-only command, with no network, and asks nothing.',
+  acceptEdits: 'Changes files in its folder without asking, and nothing outside it.',
 };
 
 /**
@@ -81,6 +91,8 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 export function jobCard(body: unknown): JobCard | null {
   if (!isObject(body)) return null;
   const permission = text(body.permission);
+  const codex = body.agent === 'codex';
+  const says = codex ? CODEX_PERMISSION_SAYS : PERMISSION_SAYS;
   return {
     title: text(body.title),
     prompt: text(body.prompt),
@@ -89,21 +101,24 @@ export function jobCard(body: unknown): JobCard | null {
     tools: (Array.isArray(body.tools) ? body.tools : []).filter((t): t is string => typeof t === 'string').map((tool) => ({ tool, says: toolSays(tool) })),
     turns: typeof body.turns === 'number' ? body.turns : 0,
     permission,
-    permissionSays: Object.hasOwn(PERMISSION_SAYS, permission) ? (PERMISSION_SAYS[permission] ?? permission) : permission,
+    permissionSays: Object.hasOwn(says, permission) ? (says[permission] ?? permission) : permission,
     writes: body.writes === true,
+    agent: codex ? 'codex' : 'claude',
+    agentSays: codex ? 'Runs on Codex, on the machine that takes it.' : 'Runs on Claude Code, on the machine that takes it.',
   };
 }
 
 /** The parts of a claimed job a pin is taken over: everything that decides what the run may do. */
-export type Pinned = { prompt: string; tools: readonly string[]; turns: number; permission: string; repo: string | null };
+export type Pinned = { prompt: string; tools: readonly string[]; turns: number; permission: string; repo: string | null; agent?: 'claude' | 'codex' };
 
 /**
  * The pin a machine keeps for a kind it allowed: the SHA-256, as lower-case hex, of the canonical JSON of the prompt as
  * approved (its `%arg%` slots unfilled), the tools, the turns, the permission and the repository.
  *
  * THE ARGUMENTS ARE NOT IN IT, since they change with every run and are only ever filled into the approved slots. The
- * title is not either: renaming a kind changes nothing it can do.
+ * title is not either: renaming a kind changes nothing it can do. The agent is, when it is Codex, so a pin taken
+ * before kinds could name one is still the same pin for a Claude Code kind.
  */
 export function jobPin(job: Pinned): Promise<string> {
-  return digest(jcs({ prompt: job.prompt, tools: [...job.tools], turns: job.turns, permission: job.permission, repo: job.repo }));
+  return digest(jcs({ prompt: job.prompt, tools: [...job.tools], turns: job.turns, permission: job.permission, repo: job.repo, ...(job.agent === 'codex' ? { agent: 'codex' } : {}) }));
 }

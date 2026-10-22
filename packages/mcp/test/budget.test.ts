@@ -51,6 +51,11 @@
  * callable until `FOLDED_UNTIL`; arguments a bridge sends and no agent chooses (`context`'s `since` and `depth`,
  * `activity`'s `everything`, `instructions`' `seen` and `how`) are taken and not listed (`quiet`); and eleven
  * descriptions and two lines of the instructions said what they said in fewer words. It measured 2,739 after.
+ *
+ * `context`'s `topic` WAS PAID FOR BY ITS OWN SCHEMA LINE AND ONE WORD, AND THE CEILING STAYED AT 2,760 (22 October). An
+ * agent with no folder, Claude.ai or ChatGPT, says what the person is working on, which is the one thing that places
+ * its run. Its line says no more than when to send it ("No folder: what they work on"), the `start` prompt, which costs
+ * the list nothing, says the rest, and `context`'s description lost "else". It measured 2,760.
  */
 
 import { test } from 'node:test';

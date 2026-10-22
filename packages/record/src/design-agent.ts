@@ -11,7 +11,7 @@
  * and filing a question are the caller's. Nothing here opens a table, asks a model or knows what day it is: the caller
  * says `nowMs`.
  *
- * THE ORDER IS THE DIRECTION'S: the navigation shape first, "before any page"; then pages, for a thing with no page as
+ * THE ORDER IS SET: the navigation shape first, "before any page"; then pages, for a thing with no page as
  * drawn and for a list that grows; then the blocks and columns a list has earned; then icons, only when the host has
  * handed the glyph names. A tier is never outranked by one below it, so the order offers come in is their rank.
  *
@@ -157,7 +157,7 @@ export const WAITING_MOST = 3;
 export const LAPSE_DAYS = 14;
 /** A measured basis has moved once it is this many times what it was: a list ten times the size is a different list. */
 export const BASIS_GROWTH = 10;
-/** Somebody or something earns a page once met this often, or named by this many entries (DIRECTION 38). */
+/** Somebody or something earns a page once met this often, or named by this many entries. */
 export const NAMED_PAGE = { met: 5, linked: 3 } as const;
 /** A list grows when it gains this many entries in thirty days, on this many separate days. */
 export const GROWS = { rows: 5, days: 3 } as const;

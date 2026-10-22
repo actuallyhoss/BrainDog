@@ -85,6 +85,9 @@ test('A RUN IS THE APP AND THE MACHINE A PERSON WOULD NAME, never the host name'
   assert.equal(runnerOf({ agent: 'claude' }), 'Claude');
   assert.equal(runnerOf({ agent: 'claude', client: 'codex-cli', host: 'DESKTOP-1' }), 'Codex on Windows PC');
   assert.equal(runnerOf({}), 'An agent');
+  /* AND THE PROFILE IT RUNS UNDER, BY NAME, where it is not the default one (migration 44). */
+  assert.equal(runnerOf({ agent: 'claude', cwd: '/Users/studio/Code/kiln', host: 'Studio-MacBook-Air.local', seat: 'harbour' }), 'Claude Code as harbour on MacBook');
+  assert.equal(runnerOf({ agent: 'claude', cwd: '/Users/studio/Code/kiln', host: 'Studio-MacBook-Air.local', seat: 'default' }), 'Claude Code on MacBook');
 });
 
 test('THE CLOSEST NAME IS ONE IN ANOTHER CASE OR NUMBER, THE START OF ONE, OR A TYPO AWAY, and nothing else', () => {

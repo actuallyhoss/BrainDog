@@ -32,6 +32,7 @@ import {
   type GroupKept,
   type HeldShare,
   type Json,
+  type LensSources,
   type LensCatalog,
   type LensCatalogList,
   type Share,
@@ -53,6 +54,12 @@ import type { RecordDeps } from './index.ts';
 export const SHARES_ENDED_DAYS = 30;
 /** The most live shares one person holds, their groups' among them (T14). */
 export const SHARES_PER_PERSON_MOST = 50;
+/**
+ * The most bytes one person's lens may take on the hop to the record (§2.13, T13), the Worker's `CTX_HEADER_MOST`. A
+ * share that would take somebody past it is refused at save in the plan's own sentence.
+ */
+export const SHARE_CTX_MOST = 32 * 1024;
+export const SHARE_CTX_TOO_LARGE = "This is more than one person's sharing can hold. Join some of these.";
 /** The longest name a group takes, in characters. */
 export const GROUP_NAME_MOST = 80;
 
@@ -89,16 +96,17 @@ export type Shared = { id: string; version: number; sentence: string };
 /**
  * What `sharePreview` answers: the sentence, how many rows of each list the share reaches now, and the money it shows.
  *
- * `money` IS SAID PLAINLY, BECAUSE A GUEST READS IT (the owner's call of 21 October): `null` when the share reaches no
+ * `money` IS SAID PLAINLY, BECAUSE A GUEST READS IT (as decided on 21 October): `null` when the share reaches no
  * list with an amount in it; else the money lists it reaches by name, whether every amount is hidden from them, and,
  * for a project shared whole or in part, the project's own figures that they will read: what its row leads with, and
  * what its page's figures say about it over lists the share reaches ("GBP 18,400.00", `moneyText`), at most
- * `MONEY_SAID_MOST`. No figure is said when the amounts are hidden.
+ * `MONEY_SAID_MOST`. No figure is said when the amounts are hidden. A figure that reads nothing says `null`, so the
+ * sentence says "nothing still to come in" and never leaves the figure out as if the page had none.
  */
 export type SharePreview = {
   sentence: string;
   lists: { list: string; name: string; rows: number }[];
-  money: { lists: string[]; hidden: boolean; figures: { label: string; said: string }[] } | null;
+  money: { lists: string[]; hidden: boolean; figures: { label: string; said: string | null }[] } | null;
 };
 
 /** The most figures a preview says a project's money in. */
@@ -127,6 +135,15 @@ export type MyShare = {
   live: boolean;
   by: string | null;
   welcome: string;
+  /**
+   * ON A SHARE THEY MAY SHARE ON (`onward`), what the onward sheet offers: the share's target and what it is about by
+   * name, the lists it can be passed on one at a time (each whole, or inside its project), and the people on the record
+   * it may go to, by name, owners and the caller left out. Absent on any other share.
+   */
+  what?: ShareTarget;
+  subject?: string;
+  lists?: { id: string; name: string }[];
+  to?: { id: string; name: string }[];
 };
 
 /** A group as the Sharing page lists it: its name, its people by name beside their ids, and how many shares it holds. */
@@ -272,6 +289,35 @@ export function methods(deps: RecordDeps) {
     return kernel.sharesKept().filter((s) => s.who.kind === who.kind && s.who.id === who.id && s.id !== but);
   };
 
+  /**
+   * How many bytes a person's lens takes on the hop to the record with these shares, as the Worker sends it (§2.13): the
+   * role and the list rows they hold now, merged with these shares at this instant. Past `SHARE_CTX_MOST` the Worker
+   * would not send it at all, so the share that would take them there is refused at save, never at their next call.
+   */
+  const heldBytes = (person: string, shares: HeldShare[], catalog: LensCatalog): number => {
+    const rows = sql.all<{ register: string; level: NonNullable<LensSources['role']>; row_where: string | null }>('SELECT register, level, row_where FROM member WHERE person_id = ?', person);
+    const parse = (t: string | null): Json | null => {
+      if (t === null) return null;
+      try {
+        return JSON.parse(t) as Json;
+      } catch {
+        return null;
+      }
+    };
+    const lens = lensOf(
+      {
+        person,
+        role: rows.find((r) => r.register === '*')?.level ?? null,
+        lists: rows.filter((r) => r.register !== '*').map((r) => ({ register: r.register, level: r.level, where: parse(r.row_where) })),
+        shares,
+        me: shareMeOf(sql, person, kernel.meetsList()?.register ?? null),
+      },
+      catalog,
+      clock.now(),
+    );
+    return lens === null ? 0 : new TextEncoder().encode(JSON.stringify(lens.ctx)).length;
+  };
+
   /** Whether a person is on the record at all: a member row, or a live share of their own. */
   const onRecord = (person: string): boolean =>
     sql.one('SELECT 1 AS y FROM member WHERE person_id = ? LIMIT 1', person) !== undefined || (sharesFor(sql, person) ?? []).length > 0;
@@ -291,6 +337,8 @@ export function methods(deps: RecordDeps) {
     if (bad) return bad;
     if (others.length >= SHARES_PER_PERSON_MOST)
       return { code: 'OUT_OF_BOUNDS', fix: `They already hold ${SHARES_PER_PERSON_MOST} shares. Stop one, or combine some of them.`, at: 'who' };
+    if (who.kind === 'person' && heldBytes(who.id, [...others, { ...s, id: 'sh_trial' }], catalog) > SHARE_CTX_MOST)
+      return { code: 'OUT_OF_BOUNDS', fix: SHARE_CTX_TOO_LARGE, at: 'share' };
     const outsider = who.kind === 'email' || (who.kind === 'person' && !onRecord(who.id));
     /* THE PLUS GATE (§2.15) IS THE HOST'S, which knows the plan and asks for it, so it may answer later. */
     return outsider ? ((await deps.plus?.(ctx, who)) ?? null) : null;
@@ -381,7 +429,7 @@ export function methods(deps: RecordDeps) {
     if (reached.length === 0) return null;
     const hide = hideMap(s.hide, catalog);
     const hidden = reached.every((x) => moneyFields(byId.get(x.list)!).every((f) => hide[x.list]?.includes(f)));
-    const figures: { label: string; said: string }[] = [];
+    const figures: { label: string; said: string | null }[] = [];
     if (!hidden && 'project' in s.what) {
       const project = s.what.project;
       const row = kernel.get(project);
@@ -406,11 +454,20 @@ export function methods(deps: RecordDeps) {
             if (m === null || m[2] !== title) continue;
             const decl = kernel.metricDecl(m[1]!);
             if (!decl || kernel.figureLists(decl).some((list) => !reaches.has(list))) continue;
+            /* A MONEY FIGURE THAT READS NOTHING IS SAID AS NOTHING. With no bills on Kiln, "Still to come in" read nought and
+               was left out, so the sentence named what Kiln earned and said nothing of what is owed, as if the page did not
+               ask. A figure that is no money (a count of open tasks) is still left out. */
+            if (typeof decl.format !== 'string' || !decl.format.startsWith('money')) continue;
+            const label = cell.label ?? decl.name;
             const got = deps.figure?.(`${m[1]}:${name}`, ctx) ?? null;
-            if (got === null || got.amount <= 0) continue;
+            if (got === null || got.amount === 0) {
+              if (!figures.some((x) => x.said === null && x.label === label)) figures.push({ label, said: null });
+              continue;
+            }
+            if (got.amount < 0) continue;
             const said = moneyText(got.amount, got.currency);
             if (figures.some((x) => x.said === said)) continue;
-            figures.push({ label: cell.label ?? decl.name, said });
+            figures.push({ label, said });
           }
         }
       }
@@ -754,20 +811,47 @@ export function methods(deps: RecordDeps) {
         const made = kernel.shareKept(id)?.made_by;
         return made === undefined ? null : (personName(sql, made) ?? null);
       };
+      /* WHO A SHARE MAY GO ON TO, read once: everybody on the record by a member row or a live share of their own, by
+         name, never an owner and never the caller. Somebody with no name and no address is not offered. */
+      let people: { id: string; name: string }[] | null = null;
+      const peopleHere = (): { id: string; name: string }[] =>
+        (people ??= (() => {
+          const own = new Set(owners());
+          const ids = sql
+            .all<{ id: string }>(
+              `SELECT person_id AS id FROM member
+               UNION SELECT who AS id FROM share WHERE who_kind = 'person' AND effect = 'allow' AND revoked_at IS NULL`,
+            )
+            .map((r) => r.id)
+            .filter((id) => id !== ctx.principal.id && !own.has(id) && onRecord(id));
+          return [...new Set(ids)].flatMap((id) => {
+            const name = personName(sql, id);
+            return name === undefined ? [] : [{ id, name }];
+          });
+        })());
       return ok(
         held
           .filter((s) => s.effect === 'allow')
           .map((s) => {
             const by = byOf(s.id);
+            const onward = s.can === 'manage' && s.caps?.onward !== false && s.who.kind === 'person';
+            /* THE LISTS IT CAN BE PASSED ON ONE AT A TIME, as `inside` takes them: a project's lists it reaches, or the
+               lists any other share reaches whole. */
+            const lists = onward
+              ? catalog.lists
+                  .filter((l) => ('project' in s.what ? shareTargetReaches(s.what, l) : shareTargetWhole(s.what, l)))
+                  .map((l) => ({ id: l.id, name: l.name }))
+              : [];
             return {
               id: s.id,
               sentence: shareSentenceOf(s, n, { now }),
               can: s.can,
               until: s.when?.until ?? null,
-              onward: s.can === 'manage' && s.caps?.onward !== false && s.who.kind === 'person',
+              onward,
               live: (s.when?.from === undefined || Date.parse(s.when.from) <= now) && (s.when?.until === undefined || Date.parse(s.when.until) > now),
               by,
               welcome: sharedWithYou([s, ...denies], by ?? undefined, n, { now }),
+              ...(onward ? { what: s.what, subject: shareSubjectOf(s.what, n), lists, to: peopleHere() } : {}),
             };
           }),
       );

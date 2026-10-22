@@ -41,7 +41,7 @@ const utf8 = new TextEncoder();
 
 /** The pack's declaration, as `mercuryPack` writes it: one page, one bearer key, rows under `accounts`. */
 const MERCURY: IngestDecl = {
-  id: 'mercury_quartz',
+  id: 'mercury_harbour',
   fetch: {
     base: BASE,
     path: '/api/v1/accounts',

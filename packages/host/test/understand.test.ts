@@ -312,18 +312,18 @@ const ORGS = {
   } as never,
 };
 
-const BAKE_NOTE = 'Ahmed runs our deliveries every weekend. I read an interview with Adam Mosseri about creators. Jo Okonkwo drew the new menu. Lina once mentioned a cafe.';
+const OXBOW_NOTE = 'Ahmed runs our deliveries every weekend. I read an interview with Adam Mosseri about creators. Jo Okonkwo drew the new menu. Lina once mentioned a cafe.';
 
 async function record() {
   let now = T0 - 3_600_000;
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: { now: () => now } });
   /* AN OWNER WHO SIGNS IN AS ada@kiln.example: their notes are "your note", and their address is never offered. */
-  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'bake', name: 'Bake', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@kiln.example', name: 'Ada' } }).ok);
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'oxbow', name: 'Oxbow', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@kiln.example', name: 'Ada' } }).ok);
   const installed = await api.kernel.install([PROJECTS, PEOPLE]);
   assert.ok(installed.ok, JSON.stringify(installed));
-  const bake = await api.create({ register: 'projects', fields: { name: 'Bake', note: BAKE_NOTE } }, OWNER);
-  assert.ok(bake.ok && !('asked' in bake.value), JSON.stringify(bake));
+  const oxbow = await api.create({ register: 'projects', fields: { name: 'Oxbow', note: OXBOW_NOTE } }, OWNER);
+  assert.ok(oxbow.ok && !('asked' in oxbow.value), JSON.stringify(oxbow));
   const jo = await api.create({ register: 'people', fields: { name: 'Jo Okonkwo', email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly.' } }, OWNER);
   assert.ok(jo.ok && !('asked' in jo.value), JSON.stringify(jo));
   const filed: { question: string; body: Record<string, unknown> }[] = [];
@@ -342,24 +342,24 @@ async function record() {
       return out;
     },
   };
-  return { api, kernel, filed, bake: bake.value, jo: jo.value, at: (ms: number) => (now = ms) };
+  return { api, kernel, filed, oxbow: oxbow.value, jo: jo.value, at: (ms: number) => (now = ms) };
 }
 
-/** What the model says about the Bake note: one relation, one public figure, one already in People, one only mentioned, one invented. */
+/** What the model says about the Oxbow note: one relation, one public figure, one already in People, one only mentioned, one invented. */
 function reader(log: MentionsInput[]) {
   return async (input: MentionsInput) => {
     log.push(input);
-    const bake = input.notes.find((n) => n.about === 'Bake');
-    if (!bake) return { ok: true as const, value: { mentions: [] } };
+    const oxbow = input.notes.find((n) => n.about === 'Oxbow');
+    if (!oxbow) return { ok: true as const, value: { mentions: [] } };
     return {
       ok: true as const,
       value: {
         mentions: [
-          { note: bake.id, name: 'Ahmed', type: 'person', sentence: 'Ahmed runs our deliveries every weekend.', relation: true },
-          { note: bake.id, name: 'Adam Mosseri', type: 'public_figure', sentence: 'I read an interview with Adam Mosseri about creators.', relation: true },
-          { note: bake.id, name: 'Jo Okonkwo', type: 'person', sentence: 'Jo Okonkwo drew the new menu.', relation: true },
-          { note: bake.id, name: 'Lina', type: 'person', sentence: 'Lina once mentioned a cafe.', relation: false },
-          { note: bake.id, name: 'Marcus Wright', type: 'person', sentence: 'Marcus Wright bakes the bread.', relation: true },
+          { note: oxbow.id, name: 'Ahmed', type: 'person', sentence: 'Ahmed runs our deliveries every weekend.', relation: true },
+          { note: oxbow.id, name: 'Adam Mosseri', type: 'public_figure', sentence: 'I read an interview with Adam Mosseri about creators.', relation: true },
+          { note: oxbow.id, name: 'Jo Okonkwo', type: 'person', sentence: 'Jo Okonkwo drew the new menu.', relation: true },
+          { note: oxbow.id, name: 'Lina', type: 'person', sentence: 'Lina once mentioned a cafe.', relation: false },
+          { note: oxbow.id, name: 'Marcus Wright', type: 'person', sentence: 'Marcus Wright OXBOWS_THE_BREAD.', relation: true },
           { note: 'n99', name: 'Sara', type: 'person', sentence: 'Sara is our accountant.', relation: true },
         ],
       },
@@ -376,15 +376,15 @@ test('THE NOTES PASS ASKS, NEVER WRITES: one question for the one relation, with
 
   assert.deepEqual(out, { ran: true, read: 2, asked: 1 });
   assert.equal(asked.length, 1);
-  assert.deepEqual(asked[0]!.notes.map((n) => [n.about, n.kind]).sort(), [['Bake', 'project'], ['Jo Okonkwo', 'person']]);
+  assert.deepEqual(asked[0]!.notes.map((n) => [n.about, n.kind]).sort(), [['Jo Okonkwo', 'person'], ['Oxbow', 'project']]);
   assert.ok(!JSON.stringify(asked[0]).includes('@'), 'an address went to the model');
 
   assert.equal(r.filed.length, 1);
-  assert.equal(r.filed[0]!.question, 'Add Ahmed to People? Your note on Bake names them.');
+  assert.equal(r.filed[0]!.question, 'Add Ahmed to People? Your note on Oxbow names them.');
   assert.ok(!r.filed[0]!.question.includes('—'));
   assert.deepEqual(r.filed[0]!.body, {
     register: 'people',
-    rows: [{ name: 'Ahmed', met: ['2026-10-06 · note on Bake: "Ahmed runs our deliveries every weekend."'], projects: [r.bake.id] }],
+    rows: [{ name: 'Ahmed', met: ['2026-10-06 · note on Oxbow: "Ahmed runs our deliveries every weekend."'], projects: [r.oxbow.id] }],
     lapses: '2026-10-20',
   });
   /* NOTHING WAS WRITTEN: People still holds Jo alone until the owner says yes on Decide. */
@@ -409,14 +409,14 @@ test('NIGHTLY, AND ONLY WHAT CHANGED: the same night does nothing, an unchanged 
   assert.deepEqual(await serveNotes(r.kernel, deps), { ran: true, read: 0, asked: 0 });
   assert.equal(asked.length, 1, 'notes that did not change were read again');
 
-  /* THE BAKE NOTE CHANGES: it is read again, and Ahmed, already asked about, is not asked about again. */
+  /* THE OXBOW NOTE CHANGES: it is read again, and Ahmed, already asked about, is not asked about again. */
   r.at(T0 + NOTES_EVERY_MS + 120_000);
-  const moved = await r.api.update({ register: 'projects', seq: r.bake.seq!, patch: { note: `${BAKE_NOTE} We open on Sundays now.` }, version: r.bake.version }, OWNER);
+  const moved = await r.api.update({ register: 'projects', seq: r.oxbow.seq!, patch: { note: `${OXBOW_NOTE} We open on Sundays now.` }, version: r.oxbow.version }, OWNER);
   assert.ok(moved.ok, JSON.stringify(moved));
   now = T0 + 2 * NOTES_EVERY_MS + 180_000;
   const out = await serveNotes(r.kernel, deps);
   assert.equal(asked.length, 2);
-  assert.deepEqual(asked[1]!.notes.map((n) => n.about), ['Bake']);
+  assert.deepEqual(asked[1]!.notes.map((n) => n.about), ['Oxbow']);
   assert.equal(out.asked, 0);
   assert.equal(r.filed.length, 1);
 });
@@ -454,13 +454,13 @@ test('A REFUSAL THAT NEVER REACHED A MODEL LEAVES THE NOTES UNREAD, and they are
 });
 
 test('A MENTION IS KEPT ONLY IN THE WORDS OF THE NOTE IT WAS READ FROM', () => {
-  const handed = new Map([['n1', { about: 'Bake', text: 'Ahmed runs our deliveries. Bake opens at eight.' }]]);
+  const handed = new Map([['n1', { about: 'Oxbow', text: 'Ahmed runs our deliveries. Oxbow opens at eight.' }]]);
   const kept = mentionsKept(
     {
       mentions: [
         { note: 'n1', name: 'Ahmed', type: 'person', sentence: 'Ahmed runs our deliveries.', relation: true },
         { note: 'n1', name: 'Ahmed', type: 'person', sentence: 'Ahmed runs our deliveries.', relation: true },
-        { note: 'n1', name: 'Bake', type: 'project', sentence: 'Bake opens at eight.', relation: true },
+        { note: 'n1', name: 'Oxbow', type: 'project', sentence: 'Oxbow opens at eight.', relation: true },
         { note: 'n1', name: 'Ahmed', type: 'robot', sentence: 'Ahmed runs our deliveries.', relation: true },
         { note: 'n1', name: 'Ahmed', type: 'person', sentence: 'Ahmed owns the company.', relation: true },
         { note: 'n2', name: 'Ahmed', type: 'person', sentence: 'Ahmed runs our deliveries.', relation: true },
@@ -502,7 +502,7 @@ test('THE MODEL-JOBS PASS READS THE NOTES ONCE ITS NIGHT HAS COME, on a host tha
   assert.equal(open.value.length, 1, 'the question about Ahmed is on Decide, and the link for Jo is not');
   const linked = r.api.kernel.list({ register: 'people', where: 'name is "Jo Okonkwo"' });
   assert.ok(linked.ok);
-  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.bake.id], 'the link for Jo was not made');
+  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.oxbow.id], 'the link for Jo was not made');
   /* AND NOT AGAIN ON THE NEXT ALARM. */
   await serveModelJobs(r.api, deps);
   assert.equal(asked.length, 1);
@@ -535,7 +535,7 @@ test('AN ADDRESS OR A LOGIN IS READ ONLY AS THE NOTE SPELLS IT, after the servic
 test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT: one question each, saying what kind and never the thing', async () => {
   const r = await record();
   const store = openSqlite();
-  const quill = await r.api.create({ register: 'people', fields: { name: 'Quill', handles: ['discord:quillart'], note: 'Art for Bake. Her email is quill.pixels@gmail.com, GitHub @quillpx' } }, OWNER);
+  const quill = await r.api.create({ register: 'people', fields: { name: 'Quill', handles: ['discord:quillart'], note: 'Art for Oxbow. Her email is quill.pixels@gmail.com, GitHub @quillpx' } }, OWNER);
   assert.ok(quill.ok && !('asked' in quill.value), JSON.stringify(quill));
   /* A KEY ANOTHER PERSON HOLDS IS NOT OFFERED, and neither is anything in a note an agent wrote. */
   assert.ok((await r.api.create({ register: 'people', fields: { name: 'Sam Reyes', note: 'Copies jo@okonkwo.example on every invoice.' } }, OWNER)).ok);
@@ -545,7 +545,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.deepEqual(out, { ran: true, asked: 2 });
   assert.deepEqual(
     r.filed.map((f) => f.question),
-    ['Add an address at gmail.com and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Bake? Your note on Bake says so.'],
+    ['Add an address at gmail.com and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Oxbow? Your note on Oxbow says so.'],
   );
   for (const f of r.filed) assert.ok(!f.question.includes('@') && !f.question.includes('—'), f.question);
   /* THE KERNEL'S OWN SHAPE FOR AN OFFER: the row as a person says it, and the keys, so a later meeting brings it up to date. */
@@ -555,15 +555,15 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
     offer: { keys: ['email:quillpixels@gmail.com', 'github:quillpx'] },
     lapses: '2026-10-20',
   });
-  assert.deepEqual(r.filed[1]!.body, { register: 'people', rows: [{ at: `people#${r.jo.seq}`, version: r.jo.version, patch: { projects: [r.bake.id] } }], lapses: '2026-10-20' });
+  assert.deepEqual(r.filed[1]!.body, { register: 'people', rows: [{ at: `people#${r.jo.seq}`, version: r.jo.version, patch: { projects: [r.oxbow.id] } }], lapses: '2026-10-20' });
 
-  /* NOTHING WAS WRITTEN until the owner says yes, and nothing is offered again. Quill's link to Bake, which the offer's
+  /* NOTHING WAS WRITTEN until the owner says yes, and nothing is offered again. Quill's link to Oxbow, which the offer's
      update would not carry, is its own question the night after. */
   const held = r.api.kernel.get(quill.value.id);
   assert.equal(held?.fields.email ?? null, null);
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 60_000, log: () => {} }), { ran: false, asked: 0, why: 'not yet' });
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} }), { ran: true, asked: 1 });
-  assert.equal(r.filed[2]!.question, 'Link Quill to Bake? Your note on Quill says so.');
+  assert.equal(r.filed[2]!.question, 'Link Quill to Oxbow? Your note on Quill says so.');
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} }), { ran: true, asked: 0 });
 
   /* MET AGAIN BEFORE THE OWNER ANSWERS, the offer is brought up to Quill as they are now, and still accepted. */
@@ -647,7 +647,7 @@ test(`AT MOST ${OFFERS_PER_PASS} OFFERS A NIGHT, and the rest are offered the ni
   for (const open of waiting.value)
     assert.ok((await r.api.decide({ id: open.id as string, decide: { option: 'reject', reason: 'Not now.' } } as never, OWNER)).ok);
   const third = serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} });
-  /* FIVE ADDRESSES AND JO'S LINK TO BAKE: six questions over the nights, each asked once. */
+  /* FIVE ADDRESSES AND JO'S LINK TO OXBOW: six questions over the nights, each asked once. */
   assert.equal(first.asked + second.asked + third.asked, 6);
   assert.equal(new Set(r.filed.map((f) => f.question)).size, 6);
 });
@@ -656,11 +656,11 @@ test("A RUN'S HANDOFF IS READ FOR NAMES: one is a question linked to the run's p
   const r = await record();
   const store = openSqlite();
   assert.ok(r.api.kernel.create('session', { doing: 'Menu proofs', next: 'Send the proofs to Mateo once he signs off.', agent: 'claude', state: 'active' }, { actor: 'p_owner', stamp: { project: 'projects#1' } }).ok);
-  assert.ok(r.api.kernel.create('session', { doing: 'Claude Code in Bake', agent: 'claude', state: 'active' }, { actor: 'p_owner', stamp: { project: 'projects#1' } }).ok);
+  assert.ok(r.api.kernel.create('session', { doing: 'Claude Code in Oxbow', agent: 'claude', state: 'active' }, { actor: 'p_owner', stamp: { project: 'projects#1' } }).ok);
   const asked: MentionsInput[] = [];
-  const bake = reader(asked);
+  const oxbow = reader(asked);
   const mentions = async (input: MentionsInput) => {
-    const said = await bake(input);
+    const said = await oxbow(input);
     const run = input.notes.find((n) => n.kind === 'run');
     const more = run ? [{ note: run.id, name: 'Mateo', type: 'person', sentence: 'Send the proofs to Mateo once he signs off.', relation: true }] : [];
     return { ok: true as const, value: { mentions: [...(said.value.mentions as unknown[]), ...more] } };
@@ -669,12 +669,12 @@ test("A RUN'S HANDOFF IS READ FOR NAMES: one is a question linked to the run's p
 
   assert.deepEqual(out, { ran: true, read: 3, asked: 1 });
   const runs = asked[0]!.notes.filter((n) => n.kind === 'run');
-  assert.deepEqual(runs.map((n) => [n.about, n.text]), [['Bake', 'Menu proofs Send the proofs to Mateo once he signs off.']]);
-  assert.equal(r.filed[0]!.question, 'Add 2 names to People? Ahmed and Mateo, named in your note on Bake and a run on Bake.');
+  assert.deepEqual(runs.map((n) => [n.about, n.text]), [['Oxbow', 'Menu proofs Send the proofs to Mateo once he signs off.']]);
+  assert.equal(r.filed[0]!.question, 'Add 2 names to People? Ahmed and Mateo, named in your note on Oxbow and a run on Oxbow.');
   assert.deepEqual((r.filed[0]!.body.rows as unknown[])[1], {
     name: 'Mateo',
-    met: ['2026-10-06 · a run on Bake: "Send the proofs to Mateo once he signs off."'],
-    projects: [r.bake.id],
+    met: ['2026-10-06 · a run on Oxbow: "Send the proofs to Mateo once he signs off."'],
+    projects: [r.oxbow.id],
   });
   const people = r.api.kernel.list({ register: 'people' });
   assert.ok(people.ok);
@@ -691,5 +691,5 @@ test('THE OFFERS NEED NO MODEL: a host with none still offers what the notes spe
   assert.equal(open.value.length, 0, 'the link for Jo waits on Decide');
   const linked = r.api.kernel.list({ register: 'people', where: 'name is "Jo Okonkwo"' });
   assert.ok(linked.ok);
-  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.bake.id], 'the link for Jo was not made');
+  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.oxbow.id], 'the link for Jo was not made');
 });

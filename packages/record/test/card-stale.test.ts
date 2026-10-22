@@ -7,7 +7,7 @@
  * call that clears it, and says nothing when the count is zero or the context carries none.
  *
  * LEARNED IS THE LESSON THAT MATTERS, NOT THE LAST ONE WRITTEN: a method before a fact, this project's before the ones
- * that apply everywhere, then the newest. Every context here is drawn by hand; the names are made up (DIRECTION 27).
+ * that apply everywhere, then the newest. Every context here is drawn by hand; the names are made up.
  */
 
 import { test } from 'node:test';

@@ -1,5 +1,5 @@
 /**
- * What an agent reads before it meets anyone and after it proposes (DIRECTION §38): the `braindog:understand` resource says the
+ * What an agent reads before it meets anyone and after it proposes: the `braindog:understand` resource says the
  * record's `understandPlan` in names, `meet`'s description says where honestly, and a proposal's answer says the money
  * it moves one currency at a time and what it changes, in the decision card's words.
  *

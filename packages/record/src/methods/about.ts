@@ -107,8 +107,12 @@ export function methods(deps: RecordDeps) {
         READ,
       );
       for (const hit of hits) {
-        /* THE WHOLE NAME, WORD FOR WORD: the index matches a word's start, and `Northbanks` is not Northbank. */
-        if (!wordsOf(JSON.parse(hit.fields) as Record<string, unknown>).includes(` ${key} `)) continue;
+        /* THE WHOLE NAME, WORD FOR WORD: the index matches a word's start, and `Northbanks` is not Northbank. AND ONLY IN
+           THE FIELDS SHE IS SHOWN (`sight.hidden`): matched on a field hidden from her, a name she typed told her which
+           row's hidden notes held it. */
+        const hidden = sight.hidden(ctx, hit.register);
+        const fields = Object.entries(JSON.parse(hit.fields) as Record<string, unknown>).filter(([k]) => !hidden.has(k));
+        if (!wordsOf(Object.fromEntries(fields)).includes(` ${key} `)) continue;
         if (!sight.admits(ctx, hit)) continue;
         const list = kernel.register(hit.register)?.name ?? null;
         const title = kernel.titleOfRow(hit.id);

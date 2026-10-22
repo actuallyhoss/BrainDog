@@ -1,5 +1,5 @@
 /**
- * The walk over what the record already holds, asked for by hand (DIRECTION §38): `understand({ dry: true })` says what the
+ * The walk over what the record already holds, asked for by hand: `understand({ dry: true })` says what the
  * next slice would do, in names, and keeps nothing; `understand({})` does it, files what it would not do on its own, and
  * hands back what `understand({ undo })` takes back. An owner in a browser, and never a token.
  */

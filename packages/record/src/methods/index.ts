@@ -83,6 +83,8 @@ import { methods as instructions } from './instructions.ts';
 import { methods as agentProfile } from './agent-profile.ts';
 import { methods as sharing } from './sharing.ts';
 import { methods as schemasMethods } from './schemas.ts';
+import { methods as chatAnswer } from './chat-answer.ts';
+import { methods as sealedMethods } from './sealed.ts';
 /* END METHODS */
 
 /**
@@ -160,6 +162,11 @@ export type RecordDeps = {
    */
   readsEveryList?: (ctx: CallContext) => boolean;
   /**
+   * Whether the caller reads every list a grant can reach, all of each (`readsAcross` in `index.ts`): `readsEveryList`
+   * less the personal lists, which a read that can leave a list's lines out asks instead. Absent, `readsEveryList`.
+   */
+  readsAcross?: (ctx: CallContext) => boolean;
+  /**
    * Which host keeps this record, as `Build.host` in `index.ts` says it, which `faults` asks before it shows the raw error
    * of a fault: only a self-host's owner reads it, because there the owner is the operator. Absent is the Cloud's answer.
    */
@@ -186,6 +193,13 @@ export type RecordDeps = {
   withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
   /** The host's answer to whether it can make a read-only link (`shareable`). Absent is no. */
   shares?: (() => import('./shares.ts').SharesAnswer) | undefined;
+  /**
+   * The record's own `decide`, every check it makes, for the one caller that answers a question as a person's press
+   * outside the app (`chat-answer.ts`), with the context it built from a spent card grant. Absent, that press is refused.
+   */
+  decideAs?: ((args: { id: string; decide: { option: string; reason: string } }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
+  /** Where this host keeps sealed bytes (`sealed.ts`). Absent, the four sealed methods keep and hand back none. */
+  sealed?: import('./sealed.ts').SealedStore | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -251,6 +265,8 @@ export function methods(deps: RecordDeps) {
     ...agentProfile(deps),
     ...sharing(deps),
     ...schemasMethods(deps),
+    ...chatAnswer(deps),
+    ...sealedMethods(deps),
     /* END METHODS */
   };
 }

@@ -31,7 +31,31 @@ export const BRIEF_NO_ANSWER = 'The model did not answer, so the rules wrote thi
  * the model wrote that passed (each its handle and its line, holes unfilled), and `said`, `null` when cards stand and
  * else the sentence a reader is told beside the rules' cards.
  */
-export type KeptBrief = { day: string; slot: number; basis: string; at: string; cards: { h: string; line: string }[]; said: string | null };
+export type KeptBrief = { day: string; slot: number; basis: string; at: string; cards: { h: string; line: string }[]; said: string | null; lens?: string };
+
+/**
+ * THE LENS A KEPT BRIEF WAS WRITTEN THROUGH, and the only one it is shown through (sharing plan T16). The ticks gather
+ * facts as somebody who reads the whole record, which is `WHOLE_LENS`; any other reader has a lens of their own
+ * (`briefLensOf`), so a brief is never handed to somebody whose facts only happen to match. A kept brief from before
+ * lenses carries none and was gathered whole.
+ */
+export const WHOLE_LENS = 'whole';
+
+/**
+ * A reader's lens as a kept brief is keyed by: `WHOLE_LENS` for whoever reads across the whole record with nothing
+ * hidden, else everything their context narrows by (who, their rung, their lists, their rows and hidden fields), as
+ * one text. `across` is the record's `readsAcross`; absent, the caller is taken to read it whole, as a method file built
+ * without it is a test of the arithmetic.
+ */
+export function briefLensOf(
+  ctx: { principal: { kind: string; id: string; person?: string; level?: unknown }; registers?: unknown; levels?: unknown; wheres?: unknown; hides?: Readonly<Record<string, readonly string[]>> | undefined; nots?: unknown },
+  across?: (ctx: never) => boolean,
+): string {
+  const hidden = Object.values(ctx.hides ?? {}).some((f) => f.length > 0);
+  if (!hidden && (across === undefined || across(ctx as never))) return WHOLE_LENS;
+  const p = ctx.principal;
+  return JSON.stringify([p.person ?? p.id, p.level ?? null, ctx.registers ?? null, ctx.levels ?? {}, ctx.wheres ?? {}, ctx.hides ?? {}, ctx.nots ?? {}]);
+}
 
 /** The day's asks: how many, and the slot and basis of the last one. */
 export type BriefAsked = { day: string; asks: number; slot: number | null; basis: string | null };
@@ -81,16 +105,16 @@ function keptOf(value: unknown): KeptBrief | null {
     if (typeof h !== 'string' || typeof line !== 'string') return null;
     cards.push({ h, line });
   }
-  return { day: v.day, slot: v.slot, basis: v.basis, at: v.at, cards, said: v.said };
+  return { day: v.day, slot: v.slot, basis: v.basis, at: v.at, cards, said: v.said, ...(typeof v.lens === 'string' ? { lens: v.lens } : {}) };
 }
 
 /**
  * The kept briefing, only while it is about the facts as they are: `briefBasis(briefCandidates(facts))` is the basis
  * it was written from. Else `null`, and the rules say the cards until the model is asked again.
  */
-export function keptBrief(kept: unknown, facts: readonly BriefFact[]): KeptBrief | null {
+export function keptBrief(kept: unknown, facts: readonly BriefFact[], lens: string = WHOLE_LENS): KeptBrief | null {
   const k = keptOf(kept);
-  return k !== null && k.basis === briefBasis(briefCandidates(facts)) ? k : null;
+  return k !== null && k.basis === briefBasis(briefCandidates(facts)) && (k.lens ?? WHOLE_LENS) === lens ? k : null;
 }
 
 /**
@@ -107,6 +131,8 @@ export async function briefTick(args: {
   read: (key: string) => unknown;
   write: (key: string, value: unknown) => void;
   ask: BriefAsk;
+  /** The lens `facts` were gathered through (`briefLensOf`); the whole record's when left out. */
+  lens?: string;
 }): Promise<{ asked: boolean; kept: KeptBrief | null; dropped: string | null }> {
   const { now, read, write } = args;
   const idle = { asked: false, kept: null, dropped: null };
@@ -144,7 +170,7 @@ export async function briefTick(args: {
     cards = [];
     dropped = BRIEF_NO_ANSWER;
   }
-  const kept: KeptBrief = { day, slot, basis, at: new Date(now).toISOString(), cards, said };
+  const kept: KeptBrief = { day, slot, basis, at: new Date(now).toISOString(), cards, said, lens: args.lens ?? WHOLE_LENS };
   /* A LATER ASK MAY HAVE GONE OUT WHILE THIS ONE WAITED (the facts moved): its answer is the newer, so this one is not kept over it. */
   const since = askedOn(read(BRIEF_ASKED), day);
   if (since.slot !== slot || since.basis !== basis) return { asked: true, kept: null, dropped };

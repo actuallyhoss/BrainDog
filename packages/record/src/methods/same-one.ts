@@ -1,6 +1,6 @@
 /**
  * A person says two or more people may be one: `sameOne` (DATA), AGT-D05's record half ("likely duplicates are offered as
- * a merge", D0.30).
+ * a merge").
  *
  * BEFORE THIS A PERSON IN THE APP COULD NOT START ONE. A write that folds one person into another is refused with
  * "Merging happens on Decide" (`mergeShaped` in `index.ts`), and the only things that put the question on Decide were a

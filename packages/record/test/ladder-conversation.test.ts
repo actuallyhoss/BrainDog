@@ -1,5 +1,5 @@
 /**
- * Outside text drops the run that read it to Ask (DIRECTION §37), and only that run, and the question says so.
+ * Outside text drops the run that read it to Ask, and only that run, and the question says so.
  *
  * LIVE 20 OCT: every write of the owner's own agents reached Needs you as a bare question. A read before a session's
  * first write marked the key, not the session, so the first write of every other session on that key asked too; and the

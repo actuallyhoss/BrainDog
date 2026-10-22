@@ -44,13 +44,13 @@ import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, raiseFault, remembe
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
-import { OWN_RUN, personNamed, stopLine, toldOf, type Told } from './methods/instructions.ts';
+import { OWN_RUN, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
 import type { MetricDecl } from '@braindog/kernel';
-import type { PageFilter } from '@braindog/kernel';
+import type { PageFilter, PageSees } from '@braindog/kernel';
 import {
   ANSWER_KEYS,
   CAUSE,
@@ -149,12 +149,14 @@ import {
   type Wheres,
   REVIVED as KERNEL_REVIVED,
   whollyWithheld,
+  TOPIC_MAX,
+  topicName,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
-import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
+import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
@@ -220,7 +222,9 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { narrowBeyond } from './methods/own-tokens.ts';
-import { sharedSaid } from './methods/sharing.ts';
+import { namesOf as shareNamesOf, sharedSaid } from './methods/sharing.ts';
+import { actsFor } from './acts-for.ts';
+import { maskMoneyText, sharesFor as heldSharesOf } from '@braindog/kernel';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
@@ -228,6 +232,7 @@ import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } fr
 import { briefTick } from './brief-write.ts';
 import { writtenTick } from './written-brief.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
+import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
@@ -262,6 +267,7 @@ export type { PenItem } from './emergent.ts';
 /* THE ENGINE'S READINGS, THE ARITHMETIC ALONE (engine-readings-59): what was asked, answered, kept and refused, the
    mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
+export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type SealedStore } from './methods/sealed.ts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
@@ -274,7 +280,7 @@ export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_R
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
-export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
+export { LATE_DAYS, atWork, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
 export { firewall, FIREWALL_FAULT } from './sight.ts';
 /* THE RULE `pages()` DROPS A PAGE BY (PGS-A01), so a reader of the record names the kernel's rule and not a copy of it. */
@@ -594,6 +600,16 @@ export type CallContext = {
    * for an import cannot export, list, write or open the vault on the approver's behalf.
    */
   operation?: string | undefined;
+
+  /**
+   * The chat app a press came from, when a host built this context from a press on the decision card inside Claude or
+   * ChatGPT (`methods/chat-answer.ts`): `principal` is then the person whose card it was, at the level they hold now.
+   *
+   * SET ONLY BY `chatAnswer`, AFTER IT HAS SPENT THE CARD'S ONE-TIME GRANT, and for one `decide` and nothing else. It
+   * answers a question as the person's own press, and `admin` and `vault` refuse it, so a press in a chat can never
+   * install, change what runs unattended, or open a key, which stay a browser session's (ADR-060).
+   */
+  pressedIn?: string | undefined;
 
   /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
@@ -1042,6 +1058,7 @@ export const PREF_KEYS = [
   'look.shot',
   'packs.known_keys',
   'shelf.kept',
+  'agents.answer_in_chat',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1065,6 +1082,10 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  *
  * `packs.known_keys` IS THE PUBLISHER KEYS THIS PERSON HAS SEEN SIGN EACH ADD-ON (batch 97), add-on by add-on, at most
  * eight ids each: Browse reads it to say when an add-on's key changed, on every device rather than in one browser.
+ *
+ * `agents.answer_in_chat` IS "ANSWER FROM INSIDE CHAT APPS" in Settings > Agents: `true` lets a press on the decision card
+ * inside Claude or ChatGPT answer the question (`methods/chat-answer.ts`). Absent or `false` is off, and the card's
+ * buttons open BrainDog. Only an owner in a browser sets it, so no agent turns it on for itself.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -1085,6 +1106,8 @@ export type Prefs = {
   'look.theme'?: string;
   'look.shot'?: boolean;
   'packs.known_keys'?: Record<string, string[]>;
+  /** Whether a press on the decision card inside a chat app answers the question. Absent is off. */
+  'agents.answer_in_chat'?: boolean;
   /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
   'shelf.kept'?: { id: string; name: string; block: Record<string, unknown> }[];
 };
@@ -1528,7 +1551,7 @@ export type PersonBrief = Brief & { name: string; role: string | null; org: stri
 export type OrgBrief = { spoken: string; name: string; kind: string | null; linked: boolean };
 
 /**
- * What `understand` answers (DIRECTION §38): the next slice of the walk over what the record already holds, looked at
+ * What `understand` answers: the next slice of the walk over what the record already holds, looked at
  * (`dry`) or done. `kinds` is each kind of thing it reads, how many it read, linked (or would) and the record refused, and
  * for payments how many organisations it made; `writes` the first changes in names and `more` how many past them;
  * `questions` the first things it would not do on its own, as a person is asked them, and `asks` how many of each kind.
@@ -1569,7 +1592,7 @@ export type MeetSaid = {
 };
 
 /**
- * A write an agent's rung did not let through, answered in place of the row (DIRECTION §37, "Ask"): it was filed as a
+ * A write an agent's rung did not let through, answered in place of the row ("Ask"): it was filed as a
  * question for the person, `id` is the question's handle, `question` what she is asked, and `why` the one line that says
  * why this change asks. Nothing was written to the list.
  */
@@ -1730,6 +1753,11 @@ export type Context = {
   /** One sentence: what to call next. */
   next: string;
   /**
+   * ONE LINE FOR THE AGENT TO PUT TO THE PERSON, when it has no folder and stands in no project: ask what they are working
+   * on and send it back as `topic`, or, when the topic it sent names no project, ask which one this is. Absent otherwise.
+   */
+  ask?: string;
+  /**
    * THE CARD AN AGENT STARTS FROM (`card.ts`, AGT-B07), composed here so the start hook, `context` and `braindog context`
    * print one text: about 120 words, never past 150. `card_next` is its Next line alone, for a session that just
    * compacted, or `null` with no step.
@@ -1756,6 +1784,11 @@ export type Context = {
   stamp?: string | null;
   /** What his settings let this agent do, as one sentence (§3.2, section 3); `null` for a caller who is no agent. */
   may?: string | null;
+  /**
+   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`, sharing plan §2.9): "You act for Sam:
+   * Kiln, view; amounts hidden." `null` for a person, and for an owner's agent, which reaches everything.
+   */
+  reach?: string | null;
   /** His brief for this kind of agent (§3.2, section 4), from Settings › Agents. */
   brief?: string | null;
   /** The context size his settings give this agent, in tokens (400, 700 or 1,200), for the plan that ranks the rest. */
@@ -1788,7 +1821,7 @@ export const CONTEXT_DEPTHS = ['card', 'brief', 'task', 'full'] as const;
 export type ContextDepth = (typeof CONTEXT_DEPTHS)[number];
 
 /** What `context` takes. Every key is optional; `since` answers a delta (`ContextSince`) in place of the briefing. */
-export type ContextArgs = { task?: string; project?: string; depth?: ContextDepth; since?: string; format?: 'full' | 'brief' };
+export type ContextArgs = { task?: string; project?: string; depth?: ContextDepth; since?: string; format?: 'full' | 'brief'; topic?: string };
 
 /**
  * A task as `context { task }` hands it: by its spoken name and version, its fields, its project, and its last three
@@ -1976,6 +2009,12 @@ export type RecordDeps = {
    * keeps a last copy says where (`kept`) and how many files it removed (`removed`), and `deleteRecord` passes both on.
    */
   destroy?: (() => Promise<{ kept: string; removed: number } | void>) | undefined;
+  /**
+   * Where this host keeps sealed files' bytes (`methods/sealed.ts`): beside the record and never in it, where no page and
+   * no file door reads. Absent, `sealedPut` and `sealedGet` refuse `NOT_IN_THIS_BUILD`, and the index still lists and
+   * deletes what a copy brought.
+   */
+  sealed?: SealedStore | undefined;
   /**
    * Why this host cannot take an invitation, or `null` when it can.
    *
@@ -2259,7 +2298,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -2524,8 +2563,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The settings row a token's call works under (`profileFor`, plan §5.1): the nearest row for its key, its machine with
-   * its kind, or its kind, else Defaults. Read once a call. `null` for anybody who is no token, AND FOR A ROW THE RECORD
+   * The settings row a token's call works under (`profileFor`, plan §5.1): the nearest row for its key, its profile or
+   * its machine with its kind, or its kind, else Defaults. Read once a call. `null` for anybody who is no token, AND FOR A ROW THE RECORD
    * DOES NOT HOLD: until the hourly data step has written Defaults and a row for each kind its runs used (migration 42),
    * nothing narrows, so an agent keeps what its token gives it and a record never wakes up to every write asked.
    *
@@ -2535,7 +2574,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const profileOf = (ctx: CallContext): Profile | null => {
     if (ctx.principal.kind !== 'token') return null;
     const hints = ctx.session ?? {};
-    const held = kernel.profileFor({ kind: kindOf(hints).agent ?? 'other', token: ctx.principal.id, host: hints.host });
+    const held = kernel.profileFor({ kind: kindOf(hints).agent ?? 'other', token: ctx.principal.id, host: hints.host, seat: hints.seat });
     return held.created_at === null ? null : held;
   };
 
@@ -2740,7 +2779,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * looking for a bigger token, and there is not one — so the refusal names the thing that IS
    * missing: a person, in a browser, signed in.
    */
+  /** What `admin` and `vault` say to a press on a card inside a chat app: that one is the app's to do. */
+  const pressedNot: Refusal = {
+    code: 'NEEDS_BROWSER_SESSION',
+    fix: 'A press on the card in a chat answers a question and nothing more. Open this one in BrainDog.',
+    at: 'principal',
+  };
+
   const vault = (ctx: CallContext): Refusal | null => {
+    if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
@@ -2771,6 +2818,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      context carrying an operation is admitted here only by the door it names, and then held to what its approver holds
      now: an owner who was moved down since approving has approved nothing. Any other door refuses it, in `allows`. */
   const admin = (ctx: CallContext, reads?: string, method?: string): Refusal | null => {
+    /* A PRESS IN A CHAT ANSWERS A QUESTION AND REACHES NOTHING AN OWNER DOES IN A BROWSER (`pressedIn`). */
+    if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.operation !== undefined) {
       if (method === undefined || ctx.operation !== method || ctx.principal.kind !== 'person') return allows(ctx, 'owner', listName);
       const { operation: _spent, ...approver } = ctx;
@@ -3295,7 +3344,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
       }
-      /* SLASH CLIMBS THE SAME LADDER AS ANY AGENT (DIRECTION §37), never for money, which is on the floor: rows of a kind
+      /* SLASH CLIMBS THE SAME LADDER AS ANY AGENT, never for money, which is on the floor: rows of a kind
          the owner has let it make without asking land now, signed by the ladder, and keep their Undo. */
       const landed = d.body_kind === 'rowset' ? kernel.decide(put.value.id, { rule: 'ladder' }, SLASH) : null;
       if (landed?.ok) ladderAnswered(put.value.id, 'accept', true);
@@ -3436,7 +3485,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE NIGHTLY WALK OVER WHAT THE RECORD ALREADY HOLDS (DIRECTION §38, "understanding is the engine's first job"): the
+   * THE NIGHTLY WALK OVER WHAT THE RECORD ALREADY HOLDS ("understanding is the engine's first job"): the
    * kernel's `backfill` links each old payment to who it was with, each old run to its project and each service to the
    * project it is for, a bounded slice at a time, and hands back what it would not do on its own. Each of those is filed
    * as one question on Decide, once, and never again after a no (`understand_key`, `stableKey`).
@@ -3567,7 +3616,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE WALK ASKED FOR BY HAND (`understand`, DIRECTION §38): the next slice of what the nightly walk reads, from where it
+   * THE WALK ASKED FOR BY HAND (`understand`): the next slice of what the nightly walk reads, from where it
    * stopped, either looked at (`dry`) or done.
    *
    * DRY IS THE SLICE RUN AND TAKEN BACK, by the kernel's own dry walk (`kernel.backfill({ dry: true })`), which runs it in
@@ -3805,7 +3854,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * BRAINDOG'S OWN UPDATES REACH THE RECORD ON THEIR OWN (DIRECTION §37): every first-party module this build ships at a
+   * BRAINDOG'S OWN UPDATES REACH THE RECORD ON THEIR OWN: every first-party module this build ships at a
    * newer version than the record holds is planned against the record as it is, put in when the plan loses nothing the
    * person changed, and asked about once on Decide when it would (`updateFirstParty` in `@braindog/seed/packs/quiet`,
    * which decides; this lends it the record).
@@ -5131,8 +5180,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * entry's title to a member invited to Obligations alone. `about` is the row a template expanded over (`kernel.pages`),
    * and the list that row lives in is asked on its own, whatever the blocks read.
    */
-  const seesPage = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
-    (p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id))) && (p.about === null || !readable(ctx, p.about.register));
+  const seesPage = (ctx: CallContext, p: { registers: string[]; about: { register: string; seq?: number | null } | null }): boolean =>
+    (p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id))) && (p.about === null || aboutSeen(ctx, p.about));
+
+  /**
+   * Whether a list holds rows back from this caller (`kernel.scope`), asked once for each list in a tick. A sweep of pages
+   * asks it of the same list for every page made for one of its rows, and each ask is a read of the private rows.
+   * Nothing writes inside a synchronous sweep, so the answer holds until the microtask that drops it.
+   */
+  const heldInTick = new WeakMap<object, Map<string, boolean>>();
+  const aboutHeld = (ctx: CallContext, register: string): boolean => {
+    let seen = heldInTick.get(ctx);
+    if (seen === undefined) {
+      seen = new Map();
+      heldInTick.set(ctx, seen);
+      queueMicrotask(() => heldInTick.delete(ctx));
+    }
+    let held = seen.get(register);
+    if (held === undefined) {
+      held = kernel.scope(ctx, register) !== undefined;
+      seen.set(register, held);
+    }
+    return held;
+  };
+
+  /**
+   * Whether the row a page is made for is one this caller is shown: its list read, AND THE ROW ITSELF ADMITTED (`sight`).
+   * Asked of the list alone, a member held to Kiln's tasks, or anybody a row was kept private from, was listed the
+   * title, the slug and the hue of a page made for a row she is never shown. A caller the list holds nothing back from
+   * is not asked again.
+   */
+  const aboutSeen = (ctx: CallContext, about: { register: string; seq?: number | null }): boolean => {
+    if (readable(ctx, about.register)) return false;
+    if (typeof about.seq !== 'number' || !aboutHeld(ctx, about.register)) return true;
+    const row = kernel.get({ register: about.register, seq: about.seq });
+    return row !== null && sight.admits(ctx, row);
+  };
 
   /**
    * Who a page is drawn for (`kernel.page`'s `reader`), ONE READER FOR `page` AND `pages`: each block held as `heldBlock`
@@ -5166,16 +5249,72 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
   };
 
-  const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string>; viewer?: string } => {
+  const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string>; viewer?: string; sees?: PageSees } => {
     const p = ctx.principal;
-    /* THE VIEWER GOES WITH THE CUT, so every page read made for a caller leaves out the rows others kept private. */
+    /* THE VIEWER GOES WITH THE CUT, so every page read made for a caller leaves out the rows others kept private. AND HER
+       LENS OVER WHAT READS ACROSS THE RECORD (`seesFor`), so a feed, a queue or what went quiet is hers. */
     const viewer = viewerOf(ctx);
-    const who = viewer === undefined ? {} : { viewer };
+    const sees = seesFor(ctx);
+    const who = { ...(viewer === undefined ? {} : { viewer }), ...(sees === undefined ? {} : { sees }) };
     if (p.kind === 'person') return { level: p.level ?? 'read', readerIs: p.level === 'owner' ? 'owner' : 'member', runs: RUNS, ...who };
     if (p.kind === 'token') return { level: p.level ?? 'read', readerIs: 'agent', runs: RUNS, ...who };
     if (p.kind === 'share') return { level: 'read', readerIs: 'link', runs: RUNS };
     return { level: 'read', runs: RUNS };
   };
+
+  /**
+   * What of the reads across the record this caller is shown (`PageSees`), or `undefined` for whoever is shown all of it:
+   * the record itself, and an owner who holds the rowids (`holdsRowids`), whom no line, question or list is kept from.
+   *
+   * THE SAME QUESTIONS THE RECORD'S OWN READS ASK, asked by the kernel's page read of each line, question and list: a
+   * line as `lineOf` keeps it (`feedSees`), a question as `governance` keeps it (`holds`), a list as `list` does. A feed
+   * drawn for a Viewer or an Admin named a run's work and the owner's words to his agents off the kernel's lists, which
+   * `recentHistory` held back from both, and held the whole feed back from an Admin while any personal list was kept.
+   */
+  const seesFor = (ctx: CallContext): PageSees | undefined => {
+    if (ctx.principal.kind === 'system' || holdsRowids(ctx)) return undefined;
+    return {
+      line: (e) => feedSees(ctx, e),
+      question: (kind, id) => {
+        const row = kernel.governanceRow(kind, id);
+        return row === null ? readsEveryList(ctx) : !heldBack(ctx, row);
+      },
+      list: (register) => readable(ctx, register) === null,
+    };
+  };
+
+  /**
+   * Whether one line of the log goes to this caller on a page, by `lineOf`'s own questions: a row's line to whoever may
+   * read its list and is shown the row, less a line about a field hidden from her (`sight.maskLine`); a question's to
+   * whoever `governance` shows it to; a comment's resolution to whoever sees what it is on; a list's declaration to
+   * whoever reads the list. A line about a row gone from the table names no list, so it goes to nobody but the owner.
+   * Everything else is about the record as a whole, which the block that reads the log already asked of her.
+   */
+  const feedSees = (ctx: CallContext, e: Parameters<PageSees['line']>[0]): boolean => {
+    const target = e.target ?? '';
+    const colon = target.indexOf(':');
+    const kind = e.target_kind ?? (colon > 0 ? target.slice(0, colon) : null);
+    const id = colon > 0 ? target.slice(colon + 1) : target;
+    if (kind === 'entry') {
+      const row = e.row;
+      if (!row || readable(ctx, row.register) || !sight.admits(ctx, row)) return false;
+      return sight.maskLine(ctx, row.register, { kind: e.kind, field: e.field }) !== null;
+    }
+    if (kind === 'suggestion' || kind === 'decision') {
+      const row = kernel.governanceRow(kind, id);
+      return row === null ? readsEveryList(ctx) : !heldBack(ctx, row);
+    }
+    if (kind === 'event' && e.kind === 'note' && e.field === 'resolve') {
+      const held = kernel.commentOf(id);
+      return held !== null && sightOf(ctx, held.target) !== null;
+    }
+    if (kind === 'inbox_raw') return inboxSees(ctx);
+    if (id.startsWith('register.')) return readable(ctx, id.slice('register.'.length)) === null;
+    return true;
+  };
+
+  /** Whether the inbox's lines go to this caller: an owner, and a token an owner gave the `inbox` reach, read whole (`inbox`). */
+  const inboxSees = (ctx: CallContext): boolean => allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx));
 
   /**
    * Whether every block of a page, drawn for this caller, is held from her (kernel `whollyWithheld`, the rule the agent
@@ -5306,7 +5445,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const part = narrowedSource(ctx, b);
       return part === null ? b : ownRows(ctx, b, part);
     }
-    return shellOf(b, beyond, log !== null);
+    /* A BLOCK HELD FOR ANOTHER KIND OF READER (`when: { reader: owner }`) THAT ANSWERED NO WAS NEVER READ (`drawn: false, why: 'when'`),
+       so there is nothing to refuse her: it stays undrawn, blanked as any held block is, and is not drawn as a sentence about
+       what she cannot open. */
+    const shell = shellOf(b, beyond, log !== null);
+    const forReader = b.drawn === false && b.why === 'when' && JSON.stringify((b as { when?: unknown }).when ?? null).includes('"reader"');
+    return forReader ? { ...shell, refusals: [], drawn: false, why: 'when' as const } : shell;
   };
 
   /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
@@ -5533,9 +5677,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
        whoever reads every list, and so are the questions put off and the ones answered, which name the same rowsets. */
     /* AND WHAT WENT QUIET NAMES EVERY LIST, so it too is for whoever reads every one of them. */
-    /* AND A PERSONAL LIST'S ROWS ARE IN EACH OF THEM, so they are the owner's while the record keeps one (`personalStop`). */
-    const whole =
-      (typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsEveryList(ctx) : wholeRecord(ctx)) && readsPersonal(ctx);
+    /* AND A PERSONAL LIST'S ROWS AND THE OWNER'S OWN LISTS ARE LEFT OUT OF EACH, NOT THE BLOCK. This held the whole block
+       from an Admin while the record kept any personal list, so one list of set-ups took Activity and Decide from every
+       Admin. The page read now hands the kernel her lens (`seesFor`), and the feed, the queue and what went quiet draw
+       her what `recentHistory` and `governance` answer her: `readsAcross`, which is `readsEveryList` less the personal
+       lists she is not shown. */
+    const whole = typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsAcross(ctx) : wholeRecord(ctx);
     /* NOR DOES A GRANT NARROWED TO SOME OF A LIST'S ROWS (`wheres`) READ ALL OF IT: the kernel's feed names every row
        written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
     const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
@@ -6412,7 +6559,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * An agent's read that handed back text from outside the record marks its run (DIRECTION §37: untrusted text drops the
+   * An agent's read that handed back text from outside the record marks its run (untrusted text drops the
    * run to Ask for the rest of it): rows a feed or a project's key brought in, and rows another person made, whose words
    * are theirs and not the owner's. The first source is the one said. A person's read marks nothing.
    */
@@ -6629,19 +6776,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const activeRuns = (ctx: CallContext | null): Entry[] => heardSince(ctx, ['active'], clock.now(), 200);
 
   /**
-   * THE RUNS A READER WHO MAY NOT READ RUNS IS COUNTED, AND NEVER SHOWN: the ones on a project row they are shown, so a
-   * Viewer or a guest on Kiln reads "2 agents are working" and never what either is doing. Only `waiting` reads these,
-   * and it answers a number (`WaitingNow.working`).
-   */
-  const countedRuns = (ctx: CallContext): Entry[] =>
-    activeRuns(null).filter((run) => {
-      const ref = run.fields.project;
-      if (typeof ref !== 'string' || ref === '') return false;
-      const row = kernel.get(ref);
-      return row !== null && readable(ctx, row.register) === null && sight.admits(ctx, row);
-    });
-
-  /**
    * WHAT WAITS ON A READER, COUNTED ONCE (`waiting()`): `boot`, Home's line and the queue's counts all read this.
    *
    * HELD TO THE READER AS EACH COUNT ALREADY WAS: the questions `holds` leaves them, the inbox only to an owner and a
@@ -6656,7 +6790,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       nowMs: clock.now(),
       questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
       inbox: told ? kernel.inboxWaiting() : null,
-      runs: ctx !== null && readable(ctx, SESSION) ? countedRuns(ctx) : activeRuns(ctx),
+      /* AND NO RUN TO A READER WHO MAY NOT READ RUNS. A Viewer or a guest on Kiln was counted the runs on rows she is shown,
+         so the rail and Home said "2 working" over an Agents place she cannot open: a count of the owner's own list. */
+      runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(ctx),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
       withheld: costNow().withheld,
       held: costNow().held,
@@ -6678,8 +6814,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const title = kernel.titleOfRow(row.id);
       return title === null ? null : (scrubbed(title) ?? null);
     };
-    return activeRuns(ctx)
-      .filter((row) => isWorking(row, now))
+    return atWork(activeRuns(ctx), now)
       .slice(0, WORKING_MOST)
       .map((row) => ({
         spoken: `${PREFIX}${String(row.seq)}`,
@@ -7103,8 +7238,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * One event as this caller may see it, or `null` when they may not.
    *
    * THE SAME QUESTIONS THE OTHER READS ASK, one event at a time. A row's event goes to whoever may `list` its register,
-   * a question's to whoever `governance` shows it to, and a line about keys, access or links to an owner only, because
-   * the vault and the members list are theirs. Everything else is about the record as a whole, so somebody invited to
+   * a question's to whoever `governance` shows it to, and a line about keys, access, links or sealed files to an owner
+   * only, because the vault, the members list and the sealed files are theirs. Everything else is about the record as a whole, so somebody invited to
    * named registers does not see it.
    */
   const lineOf = (ctx: CallContext, e: LogLine, seen: LineSight = sight.lines(ctx, [e])): Walked | null => {
@@ -7152,8 +7287,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const held = kernel.commentOf(id);
       return held !== null && sightOf(ctx, held.target) !== null ? bare : null;
     }
-    if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
+    if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed'].includes(kind ?? ''))
       return allows(ctx, 'owner') === null ? bare : null;
+    /* AN ARRIVAL'S LINE IS THE INBOX'S, so it goes to whoever the inbox does (`inboxReached`), never to a reader of the record. */
+    if (kind === 'inbox_raw') return inboxSees(ctx) ? bare : null;
     if (id.startsWith('register.')) return readable(ctx, id.slice('register.'.length)) ? null : bare;
     return wholeRecord(ctx) ? logOf(ctx, bare) : null;
   };
@@ -7278,14 +7415,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * named payments, payees and runs from the rest of the record to it. Reading every list is reading all of each.
    */
   const readsEveryList = (ctx: CallContext): boolean =>
+    readsAcross(ctx) &&
+    /* AND EVERY PERSONAL LIST, which nobody but the owner himself reads, an Admin included (`personalStop`). */
+    readsPersonal(ctx);
+
+  /**
+   * Whether this caller reads every list a grant can reach, and all of each: `readsEveryList` less the personal lists.
+   *
+   * WHAT CAN LEAVE A LIST OUT ASKS THIS. A feed, the questions and what went quiet are drawn through the reader's lens
+   * (`seesFor`), so a personal list's lines are left out of them for an Admin, where `readsEveryList` held the whole of
+   * each from him while the record kept one. A number counted across every list, a question's number and the rowids
+   * still ask `readsEveryList`, since a count cannot leave one list out.
+   */
+  const readsAcross = (ctx: CallContext): boolean =>
     wholeRecord(ctx) &&
     Object.keys(ctx.wheres ?? {}).length === 0 &&
     /* AND NO FIELD HIDDEN ANYWHERE (sharing plan §2.7): reading every list is reading all of each row of each, so a share
        that hides one field switches on every conservative path already built for a narrowed caller. */
     Object.values(ctx.hides ?? {}).every((fields) => fields.length === 0) &&
-    Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null) &&
-    /* AND EVERY PERSONAL LIST, which nobody but the owner himself reads, an Admin included (`personalStop`). */
-    readsPersonal(ctx);
+    Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
 
   /**
    * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
@@ -8261,20 +8409,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * knowing where the last one stopped. `here` is the briefing's place; the caller's own run is never any of them. With
    * only older steps open, it says nothing: "Nothing was handed over" would not be true, and they are counted elsewhere.
    */
-  const stepOf = (here: unknown, open: OpenHandoff[], others: LiveRun[], own: Entry | null, ahead: number | null): [LeftStep | null, LastHere | null] => {
+  const stepOf = (ctx: CallContext, here: unknown, open: OpenHandoff[], others: LiveRun[], own: Entry | null, ahead: number | null): [LeftStep | null, LastHere | null] => {
     const first = open.find((h) => h.mark === 'next');
     if (first) {
       const by: TreeRun = { spoken: first.spoken, fields: first.agent === null ? {} : { agent: first.agent } };
       return [{ by, step: first.next, at: first.left_at, tried: first.tried, commits: ahead, mine: false }, null];
     }
     if (open.length > 0) return [null, null];
+    /* HELD TO HER SCOPE ON THE RUNS (`kernel.scope`), as `list` reads them: a grant naming the runs narrowed to some of
+       them, and a run kept private from her, are left out of the last run she is told of. */
     const newest = (also: Predicate[], order: string) => {
-      const got = kernel.list({
-        register: SESSION,
-        where: { all: [here, ...also] } as Predicate,
-        order: [{ field: order, dir: 'desc' }, { field: 'updated_at', dir: 'desc' }],
-        limit: 2,
-      });
+      const got = kernel.list(
+        {
+          register: SESSION,
+          where: { all: [here, ...also] } as Predicate,
+          order: [{ field: order, dir: 'desc' }, { field: 'updated_at', dir: 'desc' }],
+          limit: 2,
+        },
+        kernel.scope(ctx, SESSION),
+      );
       return got.ok ? got.value.rows.find((row) => row.id !== own?.id) : undefined;
     };
     const took = newest([{ field: 'closed_as', is: 'taken' } as Predicate], 'closed_at');
@@ -8357,7 +8510,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const drawn = cardOf(told, cardAt, now);
     /* BEHIND IS THE UPDATE LINE ITSELF, never the sentence anywhere: a step or a sign a run wrote may quote it. */
     const behindIn = (said: string): boolean => said.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
-    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card) } };
+    /* WHAT AN AGENT ACTING FOR A COLLEAGUE REACHES, from the lens the door merged (`acts-for.ts`). */
+    const reach = key === null ? null : actsFor(ctx, kernel.catalog(), shareNamesOf(sql, kernel.catalog()), heldSharesOf(sql, ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id) ?? []);
+    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card) }, reach };
     /* THE OWNER'S OWN `braindog context` KEEPS THE CARD `card.ts` DRAWS, with its More line and its signs. */
     if (key === null) return out;
     /* AN AGENT'S KEY IS ANSWERED THE PLAN (`context-plan.ts`, plan §3), drawn from the facts this context already holds:
@@ -8372,6 +8527,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         stop: told.stop ? { kind: told.stop.kind, id: told.stop.id, said: told.stop.said } : null,
         told: (told.told ?? []).map((i) => toldFact(ctx, i)),
         may: told.may ?? null,
+        reach,
         brief: told.brief ?? null,
         ...(told.stamp ? { stamp: told.stamp } : {}),
         ...(where.task ? { task: taskFact(ctx, where.task) } : {}),
@@ -8525,16 +8681,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * WHAT WAITS FOR WHOEVER IS NEXT WHERE A SESSION STANDS, before it has a run (plan §2.3 A): an instruction no run took,
-   * to anyone or to this kind of agent, on this project or, with none, in this repository. The kernel's predicates read a
-   * run's own row, and a session that has written nothing has none, so this is their first two rows read over its hints:
-   * a session that has not started yet starts after he said it.
+   * to anyone or to this kind of agent, on this project or, with none, in this repository, and on this machine and under
+   * this profile where it names them (migration 44). The kernel's predicates read a run's own row, and a session that
+   * has written nothing has none, so this is their first rows read over its hints: a session that has not started yet
+   * starts after he said it.
    */
-  const waitingHere = (kind: string | null, project: string | null, repo: string | null): Instr[] => {
+  const waitingHere = (kind: string | null, project: string | null, repo: string | null, where: { host?: string | undefined; seat?: string | undefined } = {}): Instr[] => {
     const now = clock.now();
     return openInstructions(sql).filter((i) => {
       if (i.taken_by !== null || (i.to !== 'anyone' && i.to !== 'agent')) return false;
       if (i.expires_at !== null && Date.parse(i.expires_at) < now) return false;
       if (i.to_agent !== null && i.to_agent !== kind) return false;
+      if (i.machine !== null && i.machine !== (where.host ?? null)) return false;
+      if (i.seat !== null && i.seat !== (where.seat ?? null)) return false;
       if (i.project !== null) return i.project === project;
       if (i.repo !== null) return i.repo === repo;
       return true;
@@ -8551,7 +8710,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (run === null) return { since: { stamp: null, changed: false, pending: [], stop: null, lines: ['Nothing new.'] } };
     const spoken = `${PREFIX}${String(run.seq)}`;
     const delta = kernel.changedSince(spoken, stamp);
-    const pending = delta.pending.map((i) => toldOf(sql, i));
+    const pending = toldTo(readable, ctx, delta.pending).map((i) => toldOf(sql, i));
     const held = delta.changed ? stopLine(sql, kernel, delta.stop) : null;
     const lines = [...(held === null ? [] : [held]), ...pending.filter((i) => i.kind !== 'stop' && i.kind !== 'pause').map((i) => i.line)];
     return { since: { stamp: delta.stamp, changed: delta.changed, pending, stop: delta.stop, lines: lines.length === 0 ? ['Nothing new.'] : lines } };
@@ -8618,11 +8777,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
     /* A PROJECT ASKED FOR BY NAME (`context { project }`) IS WHERE IT STANDS, in place of where its folder places it. */
     const named = where.project !== undefined && holder && !readable(ctx, holder.id) ? projectAsked(ctx, holder, where.project) : null;
+    /* A CALLER WITH NO FOLDER STANDS WHERE ITS RUN WAS PLACED, by the topic it said (`topicRun`) or by its parent run,
+       since nothing about where it is can place it: Claude.ai's second call was briefed as in no project. */
+    const unplaced = !place.remote && !place.repo && !place.cwd;
+    const ranIn = !named && unplaced && holder && !readable(ctx, holder.id) ? text(run?.fields.project) : null;
+    const runAt = ranIn !== null && holder ? projectAsked(ctx, holder, ranIn) : null;
     const resolvedAt: { project: { id: string; spoken: string; how: 'remote' | 'folder' | 'repo' | 'asked' } | null; ambiguous: string[] } = named
       ? { project: named, ambiguous: [] }
-      : holder && !readable(ctx, holder.id)
-        ? kernel.resolveProject(place)
-        : { project: null, ambiguous: [] };
+      : runAt
+        ? { project: runAt, ambiguous: [] }
+        : holder && !readable(ctx, holder.id)
+          ? kernel.resolveProject(place)
+          : { project: null, ambiguous: [] };
     /* A PROJECT HER GRANT LEAVES OUT, OR ONE KEPT PRIVATE FROM HER, IS NO PROJECT HERE (leak matrix G2): she is briefed
        as a run in no project, and a project named as a choice is one she is shown. */
     const found = resolvedAt.project ? kernel.get(resolvedAt.project.id) : null;
@@ -8689,7 +8855,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const others = runs ? live({ ...ctx, session: tree }).filter((r) => r.id !== run?.id) : [];
     const nowMs = clock.now();
     const also_here = runs ? alsoHere(others, { spoken: tree.spoken, fields: tree as Record<string, JsonValue> }, nowMs) : null;
-    const next_lines = runs && here ? nextLines(...stepOf(here, open, others, run, aheadOf(hints)), nowMs) : [];
+    const next_lines = runs && here ? nextLines(...stepOf(ctx, here, open, others, run, aheadOf(hints)), nowMs) : [];
     const liveBrief = (r: LiveRun): LiveBrief => ({
       spoken: r.spoken,
       state: r.state,
@@ -8866,6 +9032,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             ? 'When a learning shown here held, set its confirmed_on to today with update, and call handoff before you stop.'
             : 'Work from what is open here, say what you are doing once you know it, and call handoff with the one next step before you stop.';
 
+    /* AN AGENT WITH NO FOLDER IN NO PROJECT IS TOLD TO ASK what the person is working on, in one line, and to say it back
+       as `topic`, which places its run (`topicRun`). One that said a topic no project is called is told so instead. */
+    const ask = token && unplaced && project === null && holder && !readable(ctx, holder.id) ? topicLine(hints.topic) : null;
+
     /* THIS PROJECT'S QUESTIONS FIRST (AGT-B09), and how many of them there are. */
     const asked = projectWaiting(placedWaiting(ctx), project?.spoken ?? null, ASKED);
     const people = peopleHere(met, format === 'full' ? MET : 5, everyone);
@@ -8894,6 +9064,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       signs: redSigns(ctx),
       stale: staleOf(ctx),
       next,
+      ...(ask === null ? {} : { ask }),
     };
     /* WHAT STOPS IT AND WHAT HE TOLD IT (plan §3.2, sections 0 and 1, never cut), its stamp, and what his settings let
        it do and his brief for it (sections 3 and 4): the facts the context plan ranks the rest under. */
@@ -8901,7 +9072,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const spoken = run ? `${PREFIX}${String(run.seq)}` : null;
       const stop = spoken === null ? null : kernel.stopOf(spoken);
       const kind = text(run?.fields.agent) ?? kindOf(hints).agent ?? null;
-      const open = spoken === null ? waitingHere(kind, project?.spoken ?? null, repo ?? null) : kernel.instructionFor({}, spoken);
+      /* AND ONLY WHAT IT IS HANDED (`toldTo`): his words to whoever is next go to his own agents, never a member's. */
+      const open = toldTo(readable, ctx, spoken === null ? waitingHere(kind, project?.spoken ?? null, repo ?? null, { host: hints.host, seat: hints.seat }) : kernel.instructionFor({}, spoken));
       const effective = effectiveOf(ctx);
       told.stop = stop === null ? null : { ...stop, line: stopLine(sql, kernel, stop)! };
       told.told = open.map((i) => toldOf(sql, i));
@@ -8919,6 +9091,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       branch: hints.branch ?? text(run?.fields.branch) ?? null,
       ahead: aheadOf(hints),
     }, where);
+  };
+
+  /**
+   * The line an agent with no folder in no project is told (`Context.ask`): to ask what the person is working on, or,
+   * when the topic it said names a project the record does not have, which one this is.
+   */
+  const topicLine = (topic: string | undefined): string => {
+    const name = topicName(topic);
+    return name === null
+      ? 'You have no folder, so no project yet. Ask what they are working on, then call context with topic set to its name.'
+      : `No project is called ${name}. Ask which one this is, then call context with its name as topic.`;
   };
 
   /** Whether the caller reads the whole record, which a number counted across every list is held to. */
@@ -8948,7 +9131,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -9149,7 +9332,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     unwound(() => kernel.transaction(() => heldMet(ctx, kernel.meet(sent, by) as Result<unknown>)));
 
   /**
-   * AN AGENT'S `meet`, AT ITS RUNG (research-audit-20 H4, DIRECTION §38). What `meet` does on its own stays automatic,
+   * AN AGENT'S `meet`, AT ITS RUNG (research-audit-20 H4). What `meet` does on its own stays automatic,
    * since understanding is meant to fill People without asking and every write it makes keeps its Undo: a person or an
    * organisation it adds, the dated line of where they were met, the last day in touch, the run's project, and a merge
    * the kernel's strong rules make. What the agent asserts on top about somebody the record ALREADY holds (a key carried
@@ -9981,27 +10164,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (refused) return refused;
         return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, rung.gate.why, rung.gate.outside === true));
       }
-      return tail(
-        keptOnLadder(
-          rung,
-          ownRowsAsked(
+      /* THE ROW IT ANSWERS IS HER VIEW OF IT: a field hidden from her is not in it, though she moved the row on. */
+      const written = keptOnLadder(
+        rung,
+        ownRowsAsked(
+          args.register,
+          args.patch,
+          offRegister(
             args.register,
-            args.patch,
-            offRegister(
-              args.register,
-              kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-                ...writerOf(ctx),
-                reads: refsSeen(ctx),
-                within,
-                ...(args.version === undefined ? {} : { version: args.version }),
-                ...(args.note === undefined ? {} : { note: args.note }),
-                ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-                ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-              }),
-            ),
+            kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+              ...writerOf(ctx),
+              reads: refsSeen(ctx),
+              within,
+              ...(args.version === undefined ? {} : { version: args.version }),
+              ...(args.note === undefined ? {} : { note: args.note }),
+              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+            }),
           ),
         ),
       );
+      return tail(written.ok && 'fields' in written.value ? ok(sight.maskRow(ctx, written.value as Entry) as Entry | Asked) : written);
     },
 
     /* ── pages and figures ─────────────────────────────────────── */
@@ -10023,7 +10206,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { accentOf, hueOf } = pageHues();
       /* HELD FROM NO BLOCK is `heldBy`'s own question asked whole: every list read, no grant narrowed to some rows
          (`wheres` holds a feed and a figure), and a level that reads. A token held to some rows of one list was listed
-         a page of one feed it opened onto nothing (`test/record-wire-44.test.ts`). */
+         a page of one feed it opened onto nothing (`test/record-wire-signs.test.ts`). */
       const everyList = readsEveryList(ctx) && allows(ctx, 'read') === null;
       return ok(
         kernel
@@ -10332,7 +10515,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return no('VALUE_MALFORMED', `${key} is a list of text.`, { at: key });
       if (said.skills !== undefined && (!Array.isArray(said.skills) || !(said.skills as unknown[]).every((x) => Number.isInteger(x))))
         return no('VALUE_MALFORMED', 'skills is a list of row numbers from Skills.', { at: 'skills' });
-      if (Array.isArray(said.skills) && said.skills.length > 0 && !wholeRecord(ctx))
+      /* EXAMPLE ROWS AND SKILLS GO OUT WHOLE, so they ask for every list read whole (`readsAcross`): a share of the whole
+         record with a field hidden, or held to some rows, read as whole and was handed the rows to file away. */
+      if (Array.isArray(said.skills) && said.skills.length > 0 && !readsAcross(ctx))
         return no('FORBIDDEN', 'Skills are shared by somebody who can read the whole BrainDog.', { at: 'skills' });
       for (const key of ['usecase', 'title', 'summary', 'version', 'audience', 'author'])
         if (said[key] !== undefined && (typeof said[key] !== 'string' || !(said[key] as string).trim()))
@@ -10340,7 +10525,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const examples = said.examples;
       if (examples !== undefined && (typeof examples !== 'object' || examples === null || Array.isArray(examples)))
         return no('VALUE_MALFORMED', 'examples names row numbers by list, such as {"courses":[1,2]}.', { at: 'examples' });
-      if (examples !== undefined && Object.keys(examples).length > 0 && !wholeRecord(ctx))
+      if (examples !== undefined && Object.keys(examples).length > 0 && !readsAcross(ctx))
         return no('FORBIDDEN', 'Example rows are shared by somebody who can read the whole BrainDog.', { at: 'examples' });
       return sharing.exportFile(said as ExportArgs, (register) => {
         const denied = readable(ctx, register);
@@ -10722,7 +10907,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
                 : cost
                   ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
-                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx) }));
+                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) }));
         /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
         const back = renamed[i]!.back;
         if (back.size === 0) return drawn;
@@ -11064,8 +11249,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          is a read of a register like any other, and it answers the same question `list` does. That
          question was the CEILING alone, so a section over a register somebody may only append to
          still went out to them. */
+      /* AND ITS FEED AND ITS QUEUE ARE READ THROUGH HER LENS (`seesFor`), as a page's are: the digest was read for nobody
+         in particular, so a section of what agents did named a run's work and the owner's words to his agents to every
+         reader of the record, and the questions about lists she cannot open. */
       return ok(
-        kernel.digestToday(args?.digest).map((d) => {
+        kernel.digestToday(args?.digest, { sees: seesFor(ctx) }).map((d) => {
           /* A SECTION OVER A FIGURE READS THE FIGURE'S LIST. The kernel reads `metric.<id>` through the metric's own
              declaration (`digest.ts`), and this kept any source that did not start with `register.`, so a member read
              `Monday: Diary 2` and a reading of 2 off a figure over the diary, while `metric('diary-count')` answered
@@ -11077,7 +11265,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             const decl = s.source.startsWith('metric.') ? kernel.metricDecl(s.source.slice('metric.'.length)) : null;
             const lists = decl ? kernel.figureLists(decl) : s.source.startsWith('register.') ? [s.source.slice('register.'.length)] : [];
             if (lists.length > 0) return lists.every((list) => !readable(ctx, list));
-            return !s.source.startsWith('metric.') || wholeRecord(ctx);
+            if (s.source.startsWith('metric.')) return wholeRecord(ctx);
+            /* A SECTION OVER WHAT READS ACROSS THE RECORD IS HELD AS ITS BLOCK IS: the runs and the steps they left to whoever
+               reads the runs, and what agents did and the questions to whoever a page draws them for (`heldBy`). Kept for
+               everybody, a member invited to one list read what each run was doing. */
+            if (s.source === 'sessions.working' || s.source === 'handoffs.open') return readable(ctx, SESSION) === null;
+            if (s.source === 'activity' || s.source.startsWith('governance.')) return heldBy(ctx, { kind: 'queue', source: s.source } as never).log === null;
+            return true;
           });
           return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };
         }),
@@ -11197,6 +11391,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
+      } else if (key === 'agents.answer_in_chat') {
+        /* THE OWNER'S, IN A BROWSER: it lets a press in a chat app answer questions, so it is held to `admin`'s door. */
+        const owner = admin(ctx, 'let a chat app answer questions');
+        if (owner) return { ok: false as const, refusal: owner };
+        if (value !== null && typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
+        kept = value as boolean | null;
       } else if (value !== null && (key === 'look.contrast' || key === 'look.shot')) {
         if (typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value;
@@ -11344,7 +11544,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { run, spoken, opened } = found.value;
       /* WHAT HE TOLD THIS RUN IS SEEN AT ITS START (plan §2.3 A), each marked `start` before the briefing that lists it:
          one sent to the run by name is taken as it is first seen, so the card says it is in hand. */
-      for (const i of kernel.instructionFor({}, spoken)) kernel.seenInstruction(i.id, spoken, 'start');
+      for (const i of toldTo(readable, ctx, kernel.instructionFor({}, spoken))) kernel.seenInstruction(i.id, spoken, 'start');
       /* THE BRIEFING FOR THE RUN JUST NAMED, so the start hook prints it from this one answer. */
       const briefed = (): Context => briefing({ ...ctx, session: { ...hints, spoken } });
       if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run), context: briefed() }));
@@ -11586,7 +11786,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Where the caller stands, in one call: its run and project, the last handoff here, who else is
      * live, what waits on a person, and the rows that apply here with the global ones they inherit. A
-     * READ, scoped as `boot` is, and it opens no run: an agent asking where it is has not started yet.
+     * READ, scoped as `boot` is, and it opens no run: an agent asking where it is has not started yet. BUT FOR `topic`:
+     * an agent with no folder that says what the person is working on has started, and its run is placed by it.
      */
     /*
      * IT TAKES WHERE AND HOW MUCH (agents and MCP plan §3.1): `project` stands it in a project by name, `task` hands one
@@ -11598,8 +11799,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const wrong = stray(said, ['task', 'project', 'depth', 'since', 'format']);
+      const wrong = stray(said, ['task', 'project', 'depth', 'since', 'format', 'topic']);
       if (wrong) return { ok: false, refusal: wrong };
+      if (said.topic !== undefined && said.topic !== null && (typeof said.topic !== 'string' || said.topic.trim() === '' || [...said.topic.trim()].length > TOPIC_MAX))
+        return no('VALUE_MALFORMED', `topic is what the person is working on, in a few words, at most ${String(TOPIC_MAX)} characters: "Kiln works".`, { at: 'topic' });
       for (const key of ['task', 'project', 'since'] as const)
         if (said[key] !== undefined && said[key] !== null && (typeof said[key] !== 'string' || (said[key] as string).trim() === '' || (said[key] as string).length > LINE))
           return no('VALUE_MALFORMED', key === 'since' ? 'since is the stamp an earlier answer carried.' : `${key} is a name or a handle as get and list say it.`, { at: key });
@@ -11609,7 +11812,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('ENUM_VALUE_UNKNOWN', 'format is full or brief.', { at: 'format', allowed: ['full', 'brief'] });
       if (typeof said.since === 'string') return ok(sight.mask(ctx, contextSince(ctx, said.since.trim()))) as Out;
       const depth: ContextDepth = (said.depth as ContextDepth | undefined) ?? (said.format === 'full' ? 'full' : typeof said.task === 'string' ? 'task' : 'brief');
-      const asked = depth === 'full' ? { ...ctx, session: { ...(ctx.session ?? {}), format: 'full' } as SessionHints } : ctx;
+      /* WHAT AN AGENT WITH NO FOLDER SAYS IT IS WORKING ON PLACES ITS RUN (`kernel.topicRun`): in the project of that name,
+         or in the first project formed from it as a draft, the run opened there when it has none. It is said once, on this
+         call, so it is settled now and never left for a write that will not carry it. A key that may not keep its own run
+         is briefed as it would be without, and a topic that comes to nothing is said to it in one line (`topicLine`). */
+      const topic = typeof said.topic === 'string' ? said.topic.trim() : undefined;
+      const hinted: CallContext = topic === undefined ? ctx : { ...ctx, session: { ...(ctx.session ?? {}), topic } };
+      let placed: CallContext = hinted;
+      if (topic !== undefined && ctx.principal.kind === 'token' && guard(ctx, 'propose', OWN_RUN) === null) {
+        const settled = kernel.topicRun(writerOf(hinted));
+        if (settled.ok && settled.value.run !== null) placed = { ...hinted, session: { ...(hinted.session ?? {}), spoken: settled.value.run } };
+      }
+      const asked = depth === 'full' ? { ...placed, session: { ...(placed.session ?? {}), format: 'full' } as SessionHints } : placed;
       if (typeof said.project === 'string') {
         const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
         if (!holder || readable(ctx, holder.id) !== null || projectAsked(ctx, holder, said.project) === null)
@@ -11706,7 +11920,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (said.role !== undefined && said.role !== null && parts.role === undefined && !kernel.register(people.register)?.fields.some((f) => f.id === 'role' && !f.retired))
           return no('FIELD_UNKNOWN', `${people.register} keeps no role. Meet them without one.`, { at: 'role' });
       }
-      /* A RUN THE LADDER DROPPED TO ASK FOR READING UNTRUSTED TEXT MEETS PEOPLE UNDER THE SAME RULE (DIRECTION §37): what it
+      /* A RUN THE LADDER DROPPED TO ASK FOR READING UNTRUSTED TEXT MEETS PEOPLE UNDER THE SAME RULE: what it
          says of them is that text, so nobody is merged on it and an address it read is never taken as theirs. */
       const caller = callerOf(ctx);
       const doubted = said.untrusted === true || (caller !== null && trust.untrusted(caller) !== null);
@@ -12583,7 +12797,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * Put back how a page was arranged: one step back, whoever wrote the look and at any time. Slash's own 6-second Undo
-     * (DIRECTION §37) comes first, as it was; any other look, the person's pin or arrangement included, goes back to its
+     * comes first, as it was; any other look, the person's pin or arrangement included, goes back to its
      * version before, or the page to the rules when it had none (`undoLook` in `compose-look.ts`).
      */
     async undoLook(args: { page: string } | undefined, ctx: CallContext) {
@@ -14047,7 +14261,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the row index never held one; the kernel reads the log's newest lines for the words, and `sightOf` holds each to
          what the caller sees, so a comment on a thing she may not see is neither answered nor counted. Asked before the
          empty case below, so the two answers have one shape. */
-      const comments = kernel.commentsMatching(String(args.q ?? ''), (target) => sightOf(ctx, target));
+      /* A COMMENT FOUND BY A FIGURE SHE IS SHOWN AS "£…" IS NOT FOUND (sharing plan §2.7): to a caller amounts are hidden
+         from, a comment is a hit only while what she typed is still in its words with their amounts taken out. */
+      const said = String(args.q ?? '').trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
+      const masked = sight.amountsHidden(ctx);
+      const comments = kernel
+        .commentsMatching(String(args.q ?? ''), (target) => sightOf(ctx, target))
+        .filter((c) => !masked || maskMoneyText(c.body).replace(/[A-Z]/g, (x) => x.toLowerCase()).includes(said));
       if (registers.length === 0) return ok({ hits: [], matched: {}, comments });
       /**
        * HOW MANY MATCHED COMES BACK WITH THEM, and the answer is an object for that reason alone.
@@ -14055,7 +14275,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        * `fts` clamps any limit to a hundred, so a hundred hits is character-for-character the answer to a
        * query with exactly a hundred matches, and every caller downstream printed the length it was handed.
        * Measured on a record at the owner's size: `revenue` drew 100 where 140 matched, `the` 100 where 304
-       * did, `bake` 100 where 577 did. `list` has never had this problem because its page carries a cursor
+       * did, `oxbow` 100 where 577 did. `list` has never had this problem because its page carries a cursor
        * and a `matched`, which is the shape copied here.
        *
        * THE COUNT IS SCOPED THE WAY THE HITS ARE. `matched` is built inside the same query, under the same
@@ -14075,7 +14295,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          reach below, which only drops hits and so keeps the order it is given. */
       /* NOT BY MEANING OVER A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER (sharing plan §2.7): a row's vector holds what
          that field says, so those hits keep the words' order and no row of the list is fused in. */
-      const unmeant = sight.unmeant(ctx);
+      /* AND NOT BY MEANING AT ALL FOR A FIGURE ASKED BY SOMEBODY AMOUNTS ARE HIDDEN FROM: a row's vector holds the amounts
+         written in it, so the nearest rows to "923.47" are the ones that say it. */
+      const unmeant = masked && /\p{N}/u.test(said) ? new Set(registers) : sight.unmeant(ctx);
       const meant = unmeant.size === 0 ? found.hits : found.hits.filter((h) => !unmeant.has(h.register));
       const byWords = await byMeaning(sql, deps.meaning, String(args.q ?? ''), meant, registers.length === every.length && unmeant.size === 0 ? {} : { registers: registers.filter((r) => !unmeant.has(r)) });
       const searched = unmeant.size === 0 ? byWords : { ...byWords, hits: [...byWords.hits, ...found.hits.filter((h) => unmeant.has(h.register))] };
@@ -14127,6 +14349,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
     },
 
+    /** Whether amounts are hidden from this caller: what the MCP door's firewall asks before it takes the ones in text out. */
+    moneyHidden(ctx: CallContext): boolean {
+      return sight.amountsHidden(ctx);
+    },
+
     /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, or `null`: what the MCP door's firewall reads a row by. */
     listOf(spoken: string): string | null {
       return kernel.get(spoken, { includeDeleted: true })?.register ?? null;
@@ -14168,7 +14395,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        as `page` and `previewPage` hold a block, never by a second copy of who may see what (`methods/preview-change.ts`). */
     ...previewChangeMethods(
       { kernel, sql, guard, scoped, readable, sightOf, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock },
-      { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList },
+      { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList, seesFor },
     ),
   };
 
@@ -14179,6 +14406,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const out = await method.call(this, args, ctx);
       seenCall(name, args, ctx, out);
       return out;
+    };
+  }
+
+  /* AND EVERY ANSWER LESS THE AMOUNTS WRITTEN IN ITS TEXT, to a caller amounts are hidden from (`sight.maskMoney`, sharing
+     plan §2.7). Hiding a money field kept the field off each answer, and a note, a comment, a title or a line of the log
+     that wrote the same amount out still said it. Asked of every method once, here, so no method can forget it; a caller
+     nothing is hidden from is answered as before, at the cost of one look at her lens. */
+  const isCtx = (v: unknown): v is CallContext => v !== null && typeof v === 'object' && 'principal' in v;
+  for (const [name, method] of Object.entries(api)) {
+    if (typeof method !== 'function') continue;
+    (api as Record<string, unknown>)[name] = function (this: unknown, ...argv: unknown[]) {
+      const out = (method as (...a: unknown[]) => unknown).apply(this, argv);
+      const ctx = argv.find(isCtx);
+      if (ctx === undefined || !sight.amountsHidden(ctx)) return out;
+      return out instanceof Promise ? out.then((v: unknown) => sight.maskMoney(ctx, v)) : sight.maskMoney(ctx, out);
     };
   }
   return api;

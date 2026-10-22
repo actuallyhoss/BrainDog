@@ -1,7 +1,7 @@
 /**
  * The filing of an attach (`src/about.ts` `attachFiled`, ENG-B15): what the text names lands as it does today, and
- * what rests on the model's word alone is asked first, as its own kind, so Slash can earn it (D37.52, D37.53). A row
- * with an amount always asks (D37.56). NO MODEL IS CALLED: every answer is planted by a fake adapter, and every name
+ * what rests on the model's word alone is asked first, as its own kind, so Slash can earn it. A row
+ * with an amount always asks. NO MODEL IS CALLED: every answer is planted by a fake adapter, and every name
  * is invented (`fixtures/names.ts`).
  */
 

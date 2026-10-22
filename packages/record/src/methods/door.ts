@@ -1,5 +1,5 @@
 /**
- * The agent door's own signs, the record's half: `heard`, DATA, and `doorSigns`, READ+ (AGT-B01, DIRECTION §40 "the
+ * The agent door's own signs, the record's half: `heard`, DATA, and `doorSigns`, READ+ (AGT-B01, so "the
  * agent door lists its tools and its briefing is true").
  *
  * WHAT A MARK IS AND WHAT THE MARKS ADD UP TO IS THE KERNEL'S (`kernel/src/door.ts`): one row a run a kind, a count that

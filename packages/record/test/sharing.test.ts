@@ -275,3 +275,47 @@ test('sharedOut tells Today what is shared out, by name, and needs him only for 
   assert.deepEqual(later, { live: 2, names: ['new@example.test', 'Lee'], more: 0, fresh: [], needs: false });
   assert.doesNotMatch(JSON.stringify(later), /p_lee|sh_/u);
 });
+
+test('myShares tells a manager what the onward sheet offers: the target, its name, its lists and who it can go to', async () => {
+  const { api, kiln } = await record();
+  const parent = value<{ id: string }>(await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { project: kiln }, can: 'manage', when: { until } } }, owner));
+  value(await api.share({ share: { who: { kind: 'person', id: 'p_sam' }, what: { lists: ['money'] }, can: 'view', when: { until } } }, owner));
+  type Mine = { id: string; onward: boolean; what?: unknown; subject?: string; lists?: { id: string; name: string }[]; to?: { id: string; name: string }[] };
+  const mine = value<Mine[]>(await api.myShares(undefined, own(api, 'p_lee')));
+  const m = mine.find((s) => s.id === parent.id)!;
+  assert.deepEqual(m.what, { project: kiln });
+  assert.equal(m.subject, 'Kiln');
+  assert.deepEqual(m.lists?.map((l) => l.name).sort(), ['Tasks', 'Things']);
+  /* NEVER AN OWNER, NEVER LEE, and only people already on the record, by name. */
+  assert.deepEqual(m.to?.map((p) => p.name).sort(), ['Ada', 'Priya', 'Sam']);
+  for (const id of m.to?.map((p) => p.id) ?? []) assert.ok(!['p_1', 'p_own2', 'p_lee'].includes(id), id);
+  /* AND THE SHEET'S ONE-LIST PICK IS ONE `shareOnward` KEEPS. */
+  value(await api.shareOnward({ from: parent.id, who: 'p_sam', can: 'view', what: { project: kiln, lists: ['tasks'] } }, own(api, 'p_lee')));
+  /* A SHARE THEY CANNOT PASS ON SAYS NONE OF IT. */
+  const sams = value<Mine[]>(await api.myShares(undefined, own(api, 'p_sam')));
+  for (const s of sams.filter((x) => !x.onward)) assert.equal(s.to, undefined);
+});
+
+test('a share that would take somebody past what one person\'s sharing can hold is refused at save', async () => {
+  const { api, sql } = await record();
+  /* SIX MORE LISTS, so the conditions grow past 32 KB before any one list reaches its 60 parameters. */
+  const lists = ['l0', 'l1', 'l2', 'l3', 'l4', 'l5'];
+  assert.ok((await api.kernel.install(lists.map((id) => reg(id, `List ${id}`, 'note', [{ id: 'note', type: 'text', required: true }])))).ok);
+  /* EACH SHARE ONE CONDITION OF 16 LONG LEAVES, about 3.6 KB, three to a list. */
+  const where = (n: number) => ({ any: Array.from({ length: 16 }, (_, j) => ({ field: 'note', is: `${'w'.repeat(190)} ${n}.${j}` })) });
+  let refusal: { code: string; fix: string; at?: string } | null = null;
+  let kept = 0;
+  for (const list of lists)
+    for (let i = 0; i < 3 && refusal === null; i++) {
+      const out = (await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { list, where: where(i) }, can: 'view', when: { until } } }, owner)) as R;
+      if (out.ok) kept++;
+      else refusal = out.refusal ?? null;
+    }
+  assert.ok(refusal, 'every share was kept');
+  assert.equal(refusal!.code, 'OUT_OF_BOUNDS', refusal!.fix);
+  assert.equal(refusal!.fix, "This is more than one person's sharing can hold. Join some of these.");
+  assert.ok(kept > 0);
+  /* WHAT WAS KEPT STILL TRAVELS UNDER THE CAP. */
+  assert.ok(new TextEncoder().encode(JSON.stringify(api.kernel.access('p_lee'))).length <= 32 * 1024);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM share WHERE who = 'p_lee'")!.n, kept);
+});

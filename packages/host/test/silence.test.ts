@@ -34,7 +34,7 @@ const asked = (handlers: Record<string, Handler>): Promise<Response> =>
   serveApi(new Request('https://x/api/boot'), handlers, {});
 
 test('A VALUE THAT CANNOT BE SERIALISED IS A 500 WITH A SENTENCE, not a request nobody ever answered', async () => {
-  /* `Param` — what `@braindog/ports` says a driver may hand back — includes `bigint`, and
+  /* `Param` (what `@braindog/ports` says a driver may hand back) includes `bigint`, and
      `JSON.stringify` throws on one. Measured against the code before this: the call came out of
      `serveApi` as `TypeError: Do not know how to serialize a BigInt`, thrown from `json` at
      `src/index.ts:707`, with no `Response` ever built. */

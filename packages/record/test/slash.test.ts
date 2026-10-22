@@ -149,7 +149,7 @@ test('SLASH READS HOW A RECORD IS USED and says what it noticed in plain sentenc
   assert.equal(said['untouched:notes'], 'Nothing in Notes has been opened or changed in ninety days.');
   assert.equal(said['unopened:work'], undefined, 'a page opened this quarter was called unopened');
   for (const n of seen.noticed) assert.ok(!n.text.includes('—'), `an em dash in: ${n.text}`);
-  /* THE PERSON'S WORDS, NEVER THE SYSTEM'S (DIRECTION §35): nothing Slash says or asks calls their things rows or lists. */
+  /* THE PERSON'S WORDS, NEVER THE SYSTEM'S: nothing Slash says or asks calls their things rows or lists. */
   for (const text of [...seen.noticed.map((n) => n.text), ...seen.drafts.map((d) => d.question)]) assert.doesNotMatch(text, /\brows?\b|\blists?\b/iu, text);
 
   assert.deepEqual(

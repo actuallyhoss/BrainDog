@@ -20,7 +20,7 @@
  * a key or a tool is `usedBy` in `methods/agents.ts`; the run that made a row is the log), windowed by `since`.
  *
  * NAMES, NEVER IDS. Every sentence says a project by its name and a row by its name; a repository or a folder is said
- * as "a repository of Crumb.gg", never by its address or its path. Ids are only the handles in what is answered.
+ * as "a repository of Oxbow.gg", never by its address or its path. Ids are only the handles in what is answered.
  */
 
 /** The window the `used` vote reads, in days, as its sentence says it. The caller turns it into `since`. */
@@ -119,8 +119,8 @@ function folderOf(listed: string): string | null {
 /**
  * How one text (already `plain`) names one project, said as the end of a sentence, or `null` when it does not.
  *
- * A NAME FOUND IS TAKEN OUT OF THE TEXT (`rest`), and the longest names are looked for first, so "Crumb.gg" is not
- * also read as a project called "Bake".
+ * A NAME FOUND IS TAKEN OUT OF THE TEXT (`rest`), and the longest names are looked for first, so "Oxbow.gg" is not
+ * also read as a project called "Oxbow".
  */
 function namedIn(hay: string, p: ScopeProject): { how: string; rest: string } | null {
   const name = plain(p.name);
@@ -154,7 +154,7 @@ function byRow<T extends { row: string }>(items: readonly T[] | undefined): Map<
 /**
  * Every project one row's evidence names, and the votes it makes.
  *
- * `rivals` IS EVERY PROJECT ANY EVIDENCE NAMES, a vote or not: four runs in Crumb.gg and one in Marsh make no `used`
+ * `rivals` IS EVERY PROJECT ANY EVIDENCE NAMES, a vote or not: four runs in Oxbow.gg and one in Driftwood make no `used`
  * vote, and they still say the key is shared. A project that is finished is no home and no rival, so evidence for it
  * is set aside; a project not handed in cannot be named, so it is a rival and never a proposal.
  */

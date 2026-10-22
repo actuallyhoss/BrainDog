@@ -1,6 +1,6 @@
 /**
  * The keys sign-up's brakes count by: a network address as the place it stands for, and a mail address as the mailbox
- * it reaches. Audit 34 finding 3, DIRECTION §42.
+ * it reaches. Audit 34 finding 3.
  *
  * WHY THESE ARE NOT THE RAW STRINGS. Sign-up is open to strangers before the bot check is keyed, so the strikes
  * `signup:<ip>`, `signup-email:<address>` and `email:<address>` are the whole brake. Keyed on the raw text, one IPv6

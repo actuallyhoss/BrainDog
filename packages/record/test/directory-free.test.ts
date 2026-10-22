@@ -1,5 +1,5 @@
 /**
- * Free, the plan a record made without paying is on (DIRECTION §35): the Directory names it, meters it and holds it to
+ * Free, the plan a record made without paying is on: the Directory names it, meters it and holds it to
  * its own allowance, and every record already there keeps the plan it had.
  */
 

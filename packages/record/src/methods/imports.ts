@@ -1,5 +1,5 @@
 /**
- * Every import made into the record, and the owner's word on each (ENG-A13, D37.116 "Untrusted text (mail, bank texts,
+ * Every import made into the record, and the owner's word on each (ENG-A13: "Untrusted text (mail, bank texts,
  * imports, other people's rows, add-on descriptions) drops the run to Ask").
  *
  * WHAT AN IMPORT IS AND WHAT IT BROUGHT IN IS THE LADDER'S (`ladder.ts`, `importsFound`): a run `braindog import` wrote

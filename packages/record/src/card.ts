@@ -2,7 +2,7 @@
  * THE CARD AN AGENT STARTS FROM, composed in the record (AGT-B07), so the start hook, `context` and `braindog context`
  * print one text made by one set of rules, whatever build of the command sits on the machine.
  *
- * THE BRIEF COMES FIRST AND IS FIVE SHORT TRUE LINES, NAMES FIRST (LAUNCH 108, DIRECTION 45), each under about 100
+ * THE BRIEF COMES FIRST AND IS FIVE SHORT TRUE LINES, NAMES FIRST (LAUNCH 108), each under about 100
  * characters and none of them an id:
  *
  *   Claude Code on MacBook, working on BrainDog
@@ -191,7 +191,7 @@ const rowsOf = (c: Context, role: AgentRole): Brief[] => {
  * `all`, a path becomes its file's name and a handle becomes the row's own words, or the list it is one of.
  *
  * THE QUESTIONS ARE WRITTEN BY OTHER RUNS AND BY THE RECORD'S OWN SCANS, and one on the owner's record read "Change
- * tools#8 to how fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?". A handoff's step keeps its
+ * tools#8 to how fly-copperleaf is set up in ~/.claude.json on Maras-MacBook-Pro.local?". A handoff's step keeps its
  * paths and handles, which the next run needs; only the machine's network name goes from it.
  */
 export function plainly(said: string, c: Context, all: boolean, at?: CardAt): string {

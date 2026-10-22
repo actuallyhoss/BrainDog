@@ -11,7 +11,7 @@
  * A FINDING NAMES THE PAGE AND THE PART, never a slug, a block key or a figure's id: Health prints these, and a finding
  * that printed `project-kiln` would be the next thing this lint finds.
  *
- * NOTHING IS SPECIAL-CASED (DIRECTION §27). Every page the record lists is linted the same way, the pages a pack wrote
+ * NOTHING IS SPECIAL-CASED. Every page the record lists is linted the same way, the pages a pack wrote
  * and the pages a template made per row, and a part's own declarations (`theirs`, `ids`) are what render reads.
  */
 

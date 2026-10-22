@@ -49,3 +49,17 @@ test('THE AUTHORS OF RECENT COMMITS ARE KEPT AS SENT, and text that cannot ride 
   assert.equal(authors('x'.repeat(1024)), 'x'.repeat(1024));
   assert.equal(authors('x'.repeat(1025)), undefined);
 });
+
+/* THE PROFILE A RUN IS UNDER (migration 44): `x-braindog-profile` reaches the record as the run's `seat`, a short name
+   and never a path, and anything else is dropped with the call's other hints kept. */
+test('THE PROFILE IS KEPT AS A SHORT NAME, and a path, a long name or `..` is dropped', () => {
+  const seat = (v: string) => sessionOf(new Headers({ 'x-braindog-profile': v, 'x-braindog-session': 'S4' }));
+  assert.equal(HINTS.seat.header, 'x-braindog-profile');
+  for (const name of ['default', 'harbour', 'work.2', 'a_b-c', 'x'.repeat(64)]) {
+    assert.deepEqual(seat(name), { spoken: 'S4', seat: name }, name);
+    assert.deepEqual(hintsOf({ seat: name }), { seat: name }, name);
+  }
+  for (const bad of ['x'.repeat(65), '/Users/ada/.claude-harbour', '~/.claude', '.claude', 'a..b', '-flag', 'two words'])
+    assert.deepEqual(seat(bad), { spoken: 'S4' }, bad);
+  assert.deepEqual(hintsOf({ seat: 7 }), {});
+});

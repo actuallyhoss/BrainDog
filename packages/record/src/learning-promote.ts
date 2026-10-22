@@ -1,6 +1,6 @@
 /**
  * One lesson learned twice: the finder and its question, AGT-D15 jobs 2 and 3 ("Promoted when it holds beyond the
- * project (the four-part test, `32 §5`), as a proposal", D0.132; "making a project's learning hold everywhere is a
+ * project (the four-part test, `32 §5`), as a proposal"; "making a project's learning hold everywhere is a
  * proposal", P.315).
  *
  * WHAT WAS THERE BEFORE. A project's learning was handed only inside its project, so a session in another one never

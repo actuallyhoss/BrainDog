@@ -5,7 +5,7 @@
  * THE LINE SAID WHERE AND HOW OFTEN AND NOT WHAT LANDS. `CALLS OUT <host> · every 1h · grant "<label>"` is the whole of
  * what a person approved, and it "does not show the measures or the paths" ([SET] 1.8): a poll filing five numbers on
  * one project read exactly as one filing one number everywhere. So the plan carries the list, the project and the
- * measures, and one sentence under the line, "Writes Numbers on Bake: revenue, customers, 3 more."
+ * measures, and one sentence under the line, "Writes Numbers on Oxbow: revenue, customers, 3 more."
  *
  * NAMES, NEVER IDS. The list, the project and each field go through the `nameOf` the caller hands in, which answers a
  * list's id with its name, a project's row id with its title, and `<list>.<field>` with the field's label. A list or a
@@ -83,7 +83,7 @@ export function writesOf(body: unknown, nameOf: (ref: string) => string | null):
 }
 
 /**
- * The sentence under the call line: "Writes Numbers on Bake: revenue, customers, 3 more."
+ * The sentence under the call line: "Writes Numbers on Oxbow: revenue, customers, 3 more."
  *
  * AT MOST THREE ITEMS: up to three measures are named, and past three the first two are named and the rest counted, so
  * the sentence is never longer than a line on a phone and never says "1 more" in place of a name it had room for.

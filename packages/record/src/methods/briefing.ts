@@ -38,7 +38,7 @@ import type { Result } from '@braindog/ports';
 import { SLASH, agentOf, localDays, openHandoffs, readableZone, sessionDeclaration, spoken } from '@braindog/kernel';
 import type { Entry, HandoffPlace, Json } from '@braindog/kernel';
 
-import { BRIEF_KEPT, keptBrief } from '../brief-write.ts';
+import { BRIEF_KEPT, briefLensOf, keptBrief } from '../brief-write.ts';
 import { markFirst } from '../firsts.ts';
 import { BRIEF_RANK, briefFrom, type Brief, type BriefCard, type BriefFact } from '../briefing.ts';
 import { firstSessionCards } from '../first-session.ts';
@@ -307,14 +307,17 @@ export function methods(deps: RecordDeps) {
       const facts = briefFactsFor(deps, ctx, nowMs);
       /* NO MODEL IS ASKED HERE. What one answered at the last write is read out of the model's own prefs, and it stands
          only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
-      const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts);
+      /* AND ONLY THROUGH THE LENS IT WAS WRITTEN THROUGH (`briefLensOf`, T16): a reader whose facts happen to equal the
+         whole record's is still answered the rules, since what a model wrote was written for whoever reads it all. */
+      const lens = briefLensOf(ctx, (deps.readsAcross ?? deps.readsEveryList) as ((ctx: never) => boolean) | undefined);
+      const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts, lens);
       const brief = briefFrom(kept === null ? null : { cards: kept.cards }, facts, new Date(nowMs).toISOString(), kept?.said ?? null);
       /* A NEW RECORD'S FIRST LINES COME FROM THE AGENT'S FIRST SESSION, while no briefing was written and its draft project stands. */
       if (kept === null) brief.cards = [...firstCards(deps, ctx), ...brief.cards];
       if (brief.cards.length > 0 && ctx.principal.kind !== 'system') markFirst(kernel, 'first.brief', nowMs);
       /* THE WRITTEN BRIEF, KEPT AS PARTS AND FILLED FROM THESE FACTS: it asks no model and waits on nothing. */
       const prefs = kernel.prefsOf(SLASH);
-      const written = facts.length === 0 ? null : writtenShown(prefs[WRITTEN_KEPT], facts);
+      const written = facts.length === 0 ? null : writtenShown(prefs[WRITTEN_KEPT], facts, lens);
       const paused = facts.length === 0 || (written !== null && !writtenFailed(prefs[WRITTEN_STATE])) ? null : await pausedLine(deps, writtenFailed(prefs[WRITTEN_STATE]));
       return { ok: true, value: { ...brief, said: brief.said ?? null, written: paused === null ? written : null, paused } };
     },

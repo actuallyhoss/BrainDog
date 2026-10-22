@@ -1,5 +1,5 @@
 /**
- * The sign "Pages print clean" with the pages census beside it (PGS-A01 step 5): how many pages have a refused block,
+ * The sign "Pages draw without errors" with the pages census beside it (PGS-A01 step 5): how many pages have a refused block,
  * how many print a path that named nothing, how many the record does not hold, and how many suggested pages wait.
  * Red on the first two, with the pages named; green over an empty census; and exactly the lint's reading without one.
  * Then the record's own census, read as the system, filed through the kernel and read back with its counts.

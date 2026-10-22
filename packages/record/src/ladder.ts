@@ -1,5 +1,5 @@
 /**
- * The ladder of trust, the record's half (DIRECTION §37, "staff who earn trust"): what an agent's write does at the rung
+ * The ladder of trust, the record's half ("staff who earn trust"): what an agent's write does at the rung
  * it stands on, when it is offered the next rung, and what takes it back down.
  *
  * WHAT THE KERNEL ALREADY SAYS IS READ, NEVER COPIED. A kind of change and its floor are `change-kind.ts`'s, the rung an
@@ -173,7 +173,7 @@ export function ladder(deps: LadderDeps) {
   /* ── untrusted text ─────────────────────────────────────────────────── */
 
   /**
-   * Whether a run read text from outside the record (DIRECTION §37: "untrusted text drops the run to Ask for the rest of
+   * Whether a run read text from outside the record ("untrusted text drops the run to Ask for the rest of
    * it"), and where from, or `null`.
    *
    * A MARK MADE BEFORE THE RUN OPENED IS THE CONVERSATION'S, and the run it opens next adopts it: a read opens no run, so
@@ -287,7 +287,7 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
-   * The owner's word on one import, by his own press (ENG-A13, D37.116): `yes` it is his own, `no` it is outside text.
+   * The owner's word on one import, by his own press (ENG-A13): `yes` it is his own, `no` it is outside text.
    * Kept with when and by whom; it moves no rung and files nothing. `run` is one `importsFound` names (the method checks).
    */
   const adopt = (run: string, yes: boolean, by: string): void => kernel.setPref(IMPORTS, run, { yes, at: iso(), by });
@@ -698,7 +698,7 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
-   * The owner's own "Ask again" (ENG-A12, "undo" D37.167): an agent back to asking on one kind, said in the words
+   * The owner's own "Ask again" (ENG-A12, its "undo"): an agent back to asking on one kind, said in the words
    * `standing` says it in, or on every kind it was lifted on when `kind` is `null`. It is `drop` with `owner` for why,
    * so `standing` says "You put it back to asking." and an offer waiting on that kind is withdrawn.
    *

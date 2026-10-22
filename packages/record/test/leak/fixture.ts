@@ -21,6 +21,11 @@
  * A PERSONAL LIST (`personal: true`), Setups, with a project and an amount on each row, is the owner's alone: his own
  * session and his own keys read it, and no other caller does, a grant and a share naming it, the owner's child key and
  * a key narrowed to it included (`PERSONAL`, read by `visible`).
+ *
+ * AN AMOUNT WRITTEN OUT IN TEXT is a canary too: a Kiln task's notes quote one and a comment on another says what was
+ * paid, each held as that row's `rate`, so a share that hides amounts must never be answered either, in a note, a
+ * comment or a line of the log. AND A DIGEST of what agents did, what waits, what is working and the steps they left,
+ * read through `digestToday`, and AN INSTRUCTION TO WHOEVER IS NEXT, the owner's words to his own agents only.
  */
 
 import assert from 'node:assert/strict';
@@ -107,6 +112,27 @@ export const METRICS = [
   metric({ metric: 'money-on', name: 'Spent on it', source: 'register.money', where: 'thing is {{it}}', value: { sum: 'amount' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
   metric({ metric: 'setups-cost', name: 'Set-up costs', source: 'register.setups', value: { sum: 'cost' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
 ];
+
+/**
+ * A digest over what reads across the record: what agents did, the questions waiting, the runs working and the steps
+ * they left. Read on screen through `digestToday`, each section held as its block is and drawn through the reader's lens.
+ */
+export const DIGEST = {
+  id: 'digest.evening',
+  kind: 'digest' as const,
+  body: {
+    digest: 'evening',
+    name: 'Evening',
+    schedule: { at: '17:00' },
+    channels: ['in-app'],
+    sections: [
+      { heading: 'Done by agents', source: 'activity' },
+      { heading: 'Needs you', source: 'governance.open' },
+      { heading: 'Working', source: 'sessions.working' },
+      { heading: 'Stuck', source: 'handoffs.open' },
+    ],
+  } as never,
+};
 
 /** The field a row's amount is in, by its list. */
 const amountField = (list: string): string => (list === 'money' ? 'amount' : list === 'things' ? 'earned' : list === 'setups' ? 'cost' : 'rate');
@@ -332,8 +358,8 @@ export const SHAPES: readonly Shape[] = [
     sees: (r) => r.list === 'tasks' || r.list === 'money' || r.list === 'things',
     hides: { things: ['earned'], tasks: ['rate'], money: ['amount'] },
   },
-  /* A PROJECT SHARED WITH ITS AMOUNTS HIDDEN, as the Share sheet shares one with anybody outside his team (the owner's call
-     of 21 October): Kiln's tasks, notes and money with no amount anywhere, its own "Earned in a year" among them, and no
+  /* A PROJECT SHARED WITH ITS AMOUNTS HIDDEN, as the Share sheet shares one with anybody outside his team (as decided
+     on 21 October): Kiln's tasks, notes and money with no amount anywhere, its own "Earned in a year" among them, and no
      figure or tile over money. */
   {
     id: 'kiln-no-amounts',
@@ -475,8 +501,9 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
 
   const built: Built = { ids: { kiln: rows.get('kiln')!.id, loom: rows.get('loom')!.id, one: one.id }, seqs: { one: one.seq } };
 
-  /* THE PAGES, THEIR FIGURES, AND THE GRANTS. */
+  /* THE PAGES, THEIR FIGURES, THE DIGEST, AND THE GRANTS. */
   for (const page of PAGES) okValue(await api.setDeclaration({ body: page } as never, owner), `page ${page.page}`);
+  okValue(await api.kernel.install([DIGEST]), 'digest');
   for (const shape of shapes) {
     if (!shape.invite || shape.person === SAM) continue;
     const wheres = shape.invite.wheres?.(built);
@@ -538,6 +565,19 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   }
   okValue(await api.decide({ id: asked[0]!, decide: { option: 'reject', reason: 'Not yet.' } } as never, owner), 'decide');
 
+  /* AN AMOUNT WRITTEN OUT IN TEXT: a quote in a Kiln task's notes, and what was paid in a comment on another, each held
+     as the row's rate, so a share that hides amounts is caught being answered either (`sight.maskMoney`). */
+  const written = (n: number): string => `£${(n / 100).toFixed(2)}`;
+  const quoted = rows.get('t-kiln-review')!;
+  const quote = prime();
+  const notes = okValue<Entry>(await api.get({ register: quoted.list, seq: quoted.seq } as never, owner), 'get the quoted task').fields.notes;
+  okValue(await api.update({ register: quoted.list, seq: quoted.seq, patch: { notes: `${String(notes)} Quoted ${written(quote)} for the firing.` } as never }, owner), 'quote');
+  quoted.held.push({ field: 'rate', amount: quote });
+  const paidOn = rows.get('t-kiln-todo')!;
+  const paid = prime();
+  okValue(await api.comment({ on: spoken(paidOn), body: `Paid ${written(paid)} for the glaze.` } as never, owner), 'comment paid');
+  paidOn.held.push({ field: 'rate', amount: paid });
+
   /* AN INBOX ARRIVAL, read by the owner alone. */
   const inboxWord = mint.word('zq');
   api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@bank.example' }, body: `Your statement ${inboxWord} is ready`, sha256: 'leak-arrival' } as never);
@@ -560,7 +600,11 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   const answered = mint.word('zk');
   okValue(await api.instructionsMine({ reply: instruction.id, said: `Checked it ${answered}`, state: 'done' } as never, agent), 'reply');
   const instructionRow = api.kernel.get(instruction.id)!;
+  /* AND HIS WORDS TO WHOEVER IS NEXT, which a member's agent is never handed (`toldTo`). */
+  const broad = mint.word('zk');
+  okValue(await api.instruct({ said: `Tidy the glaze shelf ${broad}`, to: 'anyone' } as never, owner), 'instruct anyone');
   extras.push(
+    { canary: { label: 'an instruction to anyone', word: broad }, sees: ownerOnly },
     { canary: { label: "an instruction's words", word: told, id: instructionRow.id }, sees: ownerOnly },
     { canary: { label: "a run's doing", word: doing, id: run.session.id }, sees: ownerOnly },
     { canary: { label: "a run's head, on its receipt", word: head }, sees: ownerOnly },

@@ -210,7 +210,7 @@ export type Tier = 'a' | 'b' | 'byo';
 export const ASK_CAP_DEFAULT = 80;
 
 /**
- * The monthly ask limit of a record on Free, the plan a record made without paying is on (DIRECTION §35): Slash credits,
+ * The monthly ask limit of a record on Free, the plan a record made without paying is on: Slash credits,
  * as the pricing page counts them. Cloud's is `ASK_CAP_DEFAULT`.
  *
  * NAMED HERE BESIDE IT, for the same reason: the site's Free card says it, and `apps/site/src/lib/plans.test.ts` holds
@@ -223,7 +223,7 @@ export const ASK_CAP_FREE = 20;
  * The asks a month Slash's background work may spend on the included model: the daily look, the page headlines, digest
  * prose, a pattern drafted for the inbox and the reading of who is who, apart from the asks a person makes.
  *
- * 600, HIS RECORD'S MONTHLY THINKING BUDGET (DIRECTION 42). It was 60 while the ledger could not tell a background ask
+ * 600, HIS RECORD'S MONTHLY THINKING BUDGET. It was 60 while the ledger could not tell a background ask
  * from one of his, and a background ask on the included model spent one of his 80. The ledger says it now (`Spends`,
  * `call.ts`'s `backgroundUsed`), so this is a count of its own and his 80 stay his. An automation's question is not in
  * it: that spends his own allowance.
@@ -262,9 +262,9 @@ export type SlashCandidate = { id?: string | undefined; model: string; inference
 /**
  * The host's router, handed to the core (ENG-A06): the candidates for one purpose, in the order they are tried.
  *
- * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When the first candidate is not served, `core.run` asks the next
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE". When the first candidate is not served, `core.run` asks the next
  * before its caller's rules speak. THE HOST DECIDES WHAT IS ON IT: his own key is a route of one, and the larger model is
- * on none unless he said yes to its cost (HD.463). No route, or an empty one, is the template's own model as before.
+ * on none unless its cost was agreed (HD.463). No route, or an empty one, is the template's own model as before.
  */
 export type SlashRoute = (purpose: SlashPurpose) => readonly SlashCandidate[];
 

@@ -1,5 +1,5 @@
 /**
- * `understand`, the nightly read of what the record holds run on ask (DIRECTION §38): routed as an ADMIN write, handed to
+ * `understand`, the nightly read of what the record holds run on ask: routed as an ADMIN write, handed to
  * the record method of the same name with the arguments as sent, and answered `NOT_IN_THIS_BUILD` by a record built
  * before it had one, never a 500.
  *

@@ -7,7 +7,7 @@
  * one machine, so two runs share one only when they name the same `host` and the same repository, and a session and
  * its helpers are one piece of work, not two that overwrite each other (`sameTree`).
  *
- * THE WARNING IS SAID ONCE, then who (`alsoHere`): his words word for word, then the three most recently heard from by
+ * THE WARNING IS SAID ONCE, then who (`alsoHere`): the warning word for word, then the three most recently heard from by
  * name and what each says it is doing, then how many more. Only runs working by the kernel's one clock (`presenceOf`)
  * count, so a session gone quiet never warns anybody.
  *
@@ -18,7 +18,7 @@
 
 import { agentOf, presenceOf, type Json } from '@braindog/kernel';
 
-/** His words, said once on a card when another working run is in the same tree (P.136). */
+/** The warning, said once on a card when another working run is in the same tree (P.136). */
 export const TREE_WARNING = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
 
 /** How many working runs "Also here" names before it counts the rest. */

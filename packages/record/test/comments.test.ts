@@ -6,7 +6,7 @@
  * where it is asked: every case goes through `createRecordApi` as a person or a token, so `sightOf`, `guard` and the
  * signature are the record's own.
  *
- * HIS WORDS. "anyone who can read may comment" (HD.382); "Comments: 280 chars" (HD.381); "no mentions or notifications
+ * THE RULES. "anyone who can read may comment" (HD.382); "Comments: 280 chars" (HD.381); "no mentions or notifications
  * yet" (HD.383).
  */
 

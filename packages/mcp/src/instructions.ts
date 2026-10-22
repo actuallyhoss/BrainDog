@@ -13,7 +13,7 @@
  * the tools they are about (`index.ts`), where a model reads them when it picks the tool.
  *
  * AND ONE LINE SAYS WHOM TO MEET, because the record understands the people and organisations in the work only as well
- * as agents tell it about them (DIRECTION §38): everyone worked with or told about, with an address or handle, since a
+ * as agents tell it about them: everyone worked with or told about, with an address or handle, since a
  * name alone is only noted. The opening's list of what a record holds paid for it.
  *
  * SENT ONCE A CONNECTION: in `initialize`, or in `server/discover` for a client of the stateless revision, and no longer
@@ -57,7 +57,7 @@ const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => str
   start: () =>
     [
       'Start this session with BrainDog:',
-      '1. Call context. Its first lines are what the person told you, if anything.',
+      '1. Call context. Its first lines are what the person told you, if anything. With no folder, pass topic: what the person is working on, in a few words.',
       '2. If something was told to you, call instructions with {take:"<its id>"} before you start on it.',
       '3. Say your plan in one line with handoff {doing:"<verb first>"}, then work.',
     ].join('\n'),

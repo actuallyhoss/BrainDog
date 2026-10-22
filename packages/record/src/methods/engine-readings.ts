@@ -9,7 +9,7 @@
  *
  * READ LEVEL, SO A READ TOKEN, THE COMMAND LINE AND THE DAILY VITAL-SIGN READ CAN ALL CALL IT. It holds no row of the
  * record and no person's words: purposes, counts, instants and a failure's code, each already held to a plain word by
- * the arithmetic.
+ * the arithmetic. But every count is over the whole record, so a caller who does not read all of it is refused.
  *
  * NOTHING IS OWED YET. What waits for a model to read it is the `about_owed` table's to say (ENG-B03), and that table
  * does not exist, so `owed` is handed in empty and every `owed` reads 0 until it does.
@@ -179,6 +179,14 @@ export function methods(deps: RecordDeps) {
     async engineReadings(_args: unknown, ctx: CallContext): Promise<Result<EngineReadingsAnswer | null>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
+      /* THE COUNTS ARE THE WHOLE RECORD'S, so they are answered only to whoever reads all of it (sharing plan §2.7, the
+         lens leftovers): the open questions by their cause, the folds, what Slash filed and what came of it, counted over
+         every list. A guest of one project or a reader held to some rows was told how many questions waited across lists
+         she was never shown. Refused as `signs` holds its counts, by who reads across, never with a row of zeros. The
+         record always hands the question in; a method file built without it is a test of the arithmetic. */
+      const across = deps.readsAcross ?? deps.readsEveryList;
+      if (across !== undefined && !across(ctx))
+        return { ok: false, refusal: { code: 'FORBIDDEN', fix: "The engine's readings count across the whole record, so they are for whoever reads all of it.", at: 'principal' } };
       const read = deps.engineLedger;
       if (read === undefined) return { ok: true, value: null };
       const now = clock.now();

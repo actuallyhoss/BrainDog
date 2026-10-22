@@ -37,7 +37,7 @@ const POLL: Declaration = {
   body: {
     ingest: 'balance',
     channel: 'poll',
-    description: 'Bake revenue',
+    description: 'Oxbow revenue',
     url: 'https://api.example.test/v1/balance',
     every: '1h',
     grant: 'example read',
@@ -66,7 +66,7 @@ async function record() {
 }
 
 const EXPECTED = [
-  { name: 'No scheduled action is paused', said: '1 action is paused and will not run until somebody resumes it: Bake revenue.' },
+  { name: 'No scheduled action is paused', said: '1 action is paused and will not run until somebody resumes it: Oxbow revenue.' },
   { name: 'Nothing that runs by itself has died', said: '1 job that runs by itself has stopped after failing: A reminder. The operator has been told.' },
   { name: 'Every arrival is verified', said: '1 message in 7 days came in that nothing verified, so no pattern was offered it.' },
 ];

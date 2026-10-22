@@ -1,5 +1,5 @@
 /**
- * Where every agent stands on the ladder of trust, the record's half: `trust`, READ+ (ENG-A12, DIRECTION §37 "a ladder
+ * Where every agent stands on the ladder of trust, the record's half: `trust`, READ+ (ENG-A12, "a ladder
  * per agent and kind").
  *
  * WHAT A RUNG IS AND WHAT MOVES IT IS THE LADDER'S (`ladder.ts`), which ran on every agent's write with nothing to read
@@ -16,7 +16,7 @@
  * no part of the record. Everyone else is refused in one sentence, as `signs` refuses a caller held to part of it.
  *
  * AND ONE WRITE, THE OWNER'S PRESS: `trustTakeBack` puts an agent back to asking on a kind it was lifted on, or on all
- * of them ("undo", D37.167). ADMIN, as `slashReads` is: a person in a browser, never a token, since an agent that could
+ * of them ("undo"). ADMIN, as `slashReads` is: a person in a browser, never a token, since an agent that could
  * set its own rung, or another's, would be trusted by nobody. It names the agent and the kind as `trust` said them.
  */
 

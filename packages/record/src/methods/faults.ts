@@ -1,6 +1,6 @@
 /**
  * What is not working in BrainDog itself, the record's half: `faults` (READ+) and `retryFault` (ADMIN), AGT-C06 job e
- * ("Nothing an operator must fix is asked of him", D40.53).
+ * ("Nothing an operator must fix is asked of him").
  *
  * A FAULT IS NOT A QUESTION. A job that died eight times used to be filed as a question opened by "system", with its job
  * name, its attempt count and the model's error in the words, and it sat in Decide with Accept and Decline under it.

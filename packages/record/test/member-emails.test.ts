@@ -1,7 +1,7 @@
 /**
  * No read a reader makes holds a colleague's address (USE-A12, RQ-USE-090 and RQ-USE-091).
  *
- * "MEMBER LEVELS SAY WHO MAY SEE IT" (D0.154). A person invited to read a record sees its work, and the address each
+ * "MEMBER LEVELS SAY WHO MAY SEE IT". A person invited to read a record sees its work, and the address each
  * colleague signed in with is not its work: it is how that colleague is reached, and a reader holding nine of them is
  * a reader who can mail nine people the owner never meant to hand over. The people list is the one place an address
  * belongs, and only an address somebody typed there on purpose.

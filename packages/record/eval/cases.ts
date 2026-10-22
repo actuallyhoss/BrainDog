@@ -7,7 +7,7 @@
  * `stub` IS FOR A RUN WITH NO MODEL ALONE: what the stub model builds for the case (`stub.ts`), so the dry run walks the
  * same path a real model's answer does. A real run never reads it.
  *
- * THE LAST FOUR ARE AT THE LEVEL OF DIRECTION 28's BAR, a page as fitted as one a person would have built for
+ * THE LAST FOUR ARE AT THE HIGHEST BAR, a page as fitted as one a person would have built for
  * themselves: each is three sentences that need a list with its own fields, two figures, a page with a lead line, a chart
  * and a form, and one rule. `stub.built` is what a good answer to one declares, whole, with the sample entries its chart
  * is drawn over, three at least because a chart with fewer says nothing. `tools/model-checks/describe-live.mjs --stub`

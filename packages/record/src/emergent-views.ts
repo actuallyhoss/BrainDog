@@ -1,5 +1,5 @@
 /**
- * A saved view a person keeps opening is offered a place in the rail (USE-B13 job 2; `29 §3` T2; D6.2: "all these
+ * A saved view a person keeps opening is offered a place in the rail (USE-B13 job 2; `29 §3` T2: "all these
  * pages would start dynamically showing as the user starts to use brain.dog").
  *
  * A SAVED VIEW IS A PAGE UNDER VIEWS (`apps/web/src/lib/record/rows-write.ts` `viewPage`): one table over one list,

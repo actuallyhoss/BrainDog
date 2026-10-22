@@ -19,7 +19,8 @@ import { refused, type Result } from '@braindog/ports';
 import { INSTRUCTIONS } from './instructions.ts';
 
 export { INSTRUCTIONS };
-import { CARD_OF_TOOL, cardHtml, cardMeta, cardOf, cardResource, cardResources } from './cards.ts';
+import { ANSWER_TOOL, CARD_OF_TOOL, cardHtml, cardMeta, cardOf, cardResource, cardResources, type Look } from './cards.ts';
+import { ANSWER_LISTED, answerCall, answers, answersFor, groundOf, withGrant } from './answer.ts';
 import { FOLDED, FOLDED_UNTIL, HOUR, MINUTE, TEMPLATES, TOOLS, pendingOf, takesOf, toolNamed, tools, ttlOf, type McpSurface, type Pending, type Said, type Tool } from './index.ts';
 import { PROMPTS, promptOf } from './instructions.ts';
 import { refusalBrief } from './brief.ts';
@@ -250,6 +251,16 @@ function hear<C>(surface: McpSurface<C>, ctx: C, mark: Mark): void {
   } catch {
     /* A mark that throws is a mark not kept, and nothing more. */
   }
+}
+
+/** The longest a decision card waits for the rows its pictures are drawn against: past it, it is drawn without them. */
+const GROUND_MS = 400;
+
+/** The one question a `governance` answer by id holds: the answer itself, or a page of exactly one. */
+function questionIn(structured: Record<string, unknown>): Record<string, unknown> | null {
+  if (typeof structured.question === 'string') return structured;
+  const rows = Array.isArray(structured.rows) ? structured.rows : [];
+  return rows.length === 1 && isObject(rows[0]) ? rows[0] : null;
 }
 
 /** The slug of the record this server serves (`boot`'s `record.slug`), or null when it names none or cannot be read. */
@@ -787,8 +798,12 @@ async function dispatch<C>(
       const wrong = paged(params);
       if (wrong) return wrong;
       const listed = surface.onMachine === true ? TOOLS : listedFor(await effectiveOf(surface, ctx, watchOf(surface, caller), true));
-      hear(surface, ctx, { kind: 'listed', n: listed.length });
-      return said({ tools: listed.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+      /* AND `answer`, FOR THE DECISION CARD ONLY (`answer.ts`), to a key Claude or ChatGPT holds: hidden from the model in
+         both apps, and of no use to it, since it holds no grant. */
+      const shown: unknown[] = listed.map(listedTool);
+      if (surface.onMachine !== true && (await answersFor(surface, ctx))) shown.push(ANSWER_LISTED);
+      hear(surface, ctx, { kind: 'listed', n: shown.length });
+      return said({ tools: shown, ttlMs: HOUR, cacheScope: 'private' });
     }
 
     case 'tools/call': {
@@ -804,6 +819,9 @@ async function dispatch<C>(
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
         return said(render(ownWords('propose', args, { result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }, { ...params, ...args })));
       const name = params.name;
+      /* A PRESS ON A DECISION CARD (`answer.ts`), answered with the grant the card was drawn with, or refused for want of
+         one, which is the model asking. Before the switches and what waits: it is the person's press, not the agent's call. */
+      if (name === ANSWER_TOOL && answers(surface)) return said(await answerCall(surface, args, ctx));
       const watch = watchOf(surface, caller);
       /* A TOOL HE SWITCHED OFF FOR THIS AGENT IS REFUSED BEFORE IT RUNS, whatever list the client cached (`TOOL_OFF`). */
       const off = offFor(name, await effectiveOf(surface, ctx, watch, false));
@@ -825,11 +843,25 @@ async function dispatch<C>(
       }
       /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
       let drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
-      /* THE RECORD'S SLUG IS ASKED ONLY FOR AN ANSWER A CARD DRAWS, so the link lands on this record and not the app's front door. */
-      if (drawn !== null && origin !== undefined) drawn = cardOf(params.name, args, out.structured, origin, await slugOf(surface, ctx)) ?? drawn;
+      let granted: Record<string, unknown> = {};
+      if (drawn !== null) {
+        /* THE RECORD'S SLUG IS ASKED ONLY FOR AN ANSWER A CARD DRAWS, so the link lands on this record and not the app's front door. */
+        const slug = origin === undefined ? undefined : await slugOf(surface, ctx);
+        /* A DECISION'S PICTURES ARE DRAWN AGAINST ITS GROUND, read as the caller, and never waited on past `GROUND_MS`. */
+        const asked = drawn.kind === 'decision' ? questionIn(out.structured) : null;
+        const look: Look = asked === null ? {} : { now: Date.now(), ground: (await within(groundOf(surface, ctx, asked), GROUND_MS)) ?? {} };
+        drawn = cardOf(params.name, args, out.structured, origin, slug, look) ?? drawn;
+        /* AND ITS GRANT, when the record gives one: the card's buttons then answer, and the grant rides in `_meta` only. */
+        if (drawn.kind === 'decision' && asked !== null) {
+          const id = typeof asked.id === 'string' && asked.id !== '' ? asked.id : String(args.id);
+          const g = await withGrant(surface, ctx, id, drawn);
+          drawn = g.card;
+          granted = g.meta;
+        }
+      }
       const shown = render(out);
       /* A RULE IS ANSWERED BY `governance`, WHICH LISTS THE DECISION CARD, so the answer names its own template beside it. */
-      const meta: Record<string, unknown> = drawn?.kind === 'rule' ? cardMeta('rule') : {};
+      const meta: Record<string, unknown> = { ...(drawn?.kind === 'rule' ? cardMeta('rule') : {}), ...granted };
       const body = drawn === null ? shown : { ...shown, structuredContent: { ...out.structured, card: drawn } };
 
       /* WHAT WAITS, ON EVERY ANSWER (plan §2.3 B, §8.3): `_meta.braindog = { stamp, pending, stop }`, and one line or

@@ -5,7 +5,7 @@
  * PRF-A20: add-ons, the command and the model). The route that reads every sign is `methods/signs.ts`.
  *
  * WHY. The card a session on his record started with handed a next step from a run ten hours and 53 commits old, and
- * for a week no client was given the tools; nothing in the record could say either (D40.25, "whether the tools list").
+ * for a week no client was given the tools; nothing in the record could say either ("whether the tools list").
  *
  * EACH IS COUNTED APART FROM THE CODE IT WATCHES. The briefing is the record's own `context` value, taken as a set of
  * claims (this handoff, these questions, these runs live) and checked against reads of the tables written here, never

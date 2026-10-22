@@ -25,7 +25,7 @@
  * not empty at midnight or on the 1st. `answered`, `kept` and `refused` are the last day's, the window of `asked.day`:
  * the vital sign is red when a purpose has `asked.day` above 0 and `answered` 0.
  *
- * AND WHAT CAME OF SLASH'S SUGGESTIONS (ENG-B01 with ENG-A16, "answers that teach", D37.183): for each kind of question
+ * AND WHAT CAME OF SLASH'S SUGGESTIONS (ENG-B01 with ENG-A16, "answers that teach"): for each kind of question
  * Slash filed in the month, how many it offered and how each ended. Accepted is taken as it was filed; changed is taken
  * with only some of it (some rows of it, or some parts of an arrangement), since the person changed what was asked;
  * declined is a no; undone is one whose answer an undo put back; lapsed is one still open past the last day it waits,

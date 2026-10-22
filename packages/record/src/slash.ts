@@ -58,7 +58,7 @@ const LABEL_MOST = 40;
 const HOLDS_MOST = 280;
 /**
  * A person, an organisation or a project earns a page of its own once it is met this often or this many things here name
- * it (DIRECTION §38): so many dated `met` lines, or so many rows in other lists pointing at it. THE COUNTS ARE THE
+ * it: so many dated `met` lines, or so many rows in other lists pointing at it. THE COUNTS ARE THE
  * RECOMMENDER'S OWN (`design-agent.ts` `NAMED_PAGE`), kept under the name the reading has always said them by, and a list
  * is said to grow by its `GROWS`: one place weighs an arrangement, so no count is written twice.
  */
@@ -1068,7 +1068,7 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       const one = turned === null ? null : inSentence(turned);
       const oneNow = oneHeld ? (oneHeld.value ?? oneHeld.default) : null;
       /* ONE QUESTION FOR ONE RENAME: the singular rides on the name's own card, since every list declares it, and two
-         cards on Decide for one word was the busy screen §35 asks against. AND THE QUESTION SAYS SO. It set the singular
+         cards on Decide for one word was the busy screen a calm page is meant to avoid. AND THE QUESTION SAYS SO. It set the singular
          without a word about it, so accepting "Call Tickets Issues everywhere?" also changed every "New ticket" button.
          The singular is named beside the name, in quotes as the name is, or left out of both the question and the change
          where it cannot be made with confidence (`singularOf`). */
@@ -2392,7 +2392,7 @@ function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
   for (const t of seen.value.tried ?? [])
     for (const s of t.steps) if (s.state === 'failed') faults.push({ at: `${t.rule}.${s.path}`, fix: s.say });
   /* AND WHAT DRAWS BUT IS NOT A GOOD PAGE, so the same repair that mends a refusal mends a page that opens on nothing,
-     leaves a hole in a row, or calls the person's things rows (DIRECTION §35). */
+     leaves a hole in a row, or calls the person's things rows. */
   faults.push(...calmFaults(seen.value.pages));
   return faults;
 }
@@ -2405,7 +2405,7 @@ const COLUMNS = 12;
 /** At most this many blocks are drawn before a page's first section; more go in a section, folded. */
 export const PAGE_TILES_FIRST = 6;
 
-/** The system's words, which a heading never says about the person's own things (DIRECTION §35). */
+/** The system's words, which a heading never says about the person's own things. */
 const HEADING_WORDS = /\b(?:rows?|lists?|list items?|registers?|blocks?|entit(?:y|ies))\b/iu;
 
 /** A block as a preview drew it, read here only for the keys the bar looks at. */
@@ -2450,8 +2450,8 @@ const drawsRows = (b: DrawnBlock): boolean => {
 const named = (b: DrawnBlock, i: number): string => (typeof b.heading === 'string' && b.heading.trim() ? `"${b.heading.trim()}"` : `block ${i + 1}`);
 
 /**
- * What keeps a drawn page from being a good one, each with the path the model mends it by. DIRECTION §35's bar, the same
- * one `SLASH_INSTRUCTIONS` describes to the model:
+ * What keeps a drawn page from being a good one, each with the path the model mends it by. It is the same bar
+ * that `SLASH_INSTRUCTIONS` describes to the model:
  *
  * - THE FIRST BLOCK IS A LEAD NOTE WITH A FIGURE IN IT, the one line that answers the page's question;
  * - ITS ROWS TILE TO TWELVE, every row before the last full, measured as the app lays them out (`layout.test.ts`);

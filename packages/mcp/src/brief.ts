@@ -71,8 +71,11 @@ const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'obj
 
 /** The kernel's own register of runs. Its rows carry a machine's name, a folder and two ids no person reads. */
 const RUNS = 'session';
-/** The run fields a line never says: ids, a folder, a host name, a remote and a commit. The host is said as a device. */
-const RUN_INSIDES = new Set(['client_id', 'token_id', 'cwd', 'host', 'remote', 'head', 'project']);
+/**
+ * The run fields a line never says: ids, a folder, a host name, a remote and a commit. The host is said as a device,
+ * and the profile in the run's name (`runnerOf`), so neither is a line of its own.
+ */
+const RUN_INSIDES = new Set(['client_id', 'token_id', 'cwd', 'host', 'remote', 'head', 'project', 'seat']);
 
 /** A field's id as words, where the register gives it no label: `done_on` is `Done on`. */
 const labelOf = (f: Field | undefined, id: string): string => {
@@ -869,7 +872,7 @@ export function wroteBrief(verb: 'Added' | 'Changed', row: Shaped, register: str
 }
 
 /**
- * What became of an agent's write under its rung (DIRECTION §37's ladder), as the record answers it beside the write:
+ * What became of an agent's write under its rung (the ladder of trust), as the record answers it beside the write:
  * `rung` when the write went through because the agent may make that kind of change (`null` when the record said it
  * landed by the ladder without naming the rung), `filed` when it was put on Decide as a question instead, with the
  * record's one line on why. Neither for a person's own write, which has no rung.

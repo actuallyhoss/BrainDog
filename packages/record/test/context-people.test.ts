@@ -1,5 +1,5 @@
 /**
- * Who is here, by name (`loop/contract-17.md`, DIRECTION §38): `context` answers the people linked to the project with
+ * Who is here, by name (`loop/contract-17.md`): `context` answers the people linked to the project with
  * their role, the organisation they are with and the last day anybody was in touch, the ones in touch latest first, and
  * the project's organisations, so the briefing card can say "Teodor Vance (Lanternfish, client)" rather than a count.
  *

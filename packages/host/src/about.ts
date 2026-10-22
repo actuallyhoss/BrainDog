@@ -395,8 +395,8 @@ const THINGS_SAID: readonly string[] = ['note', 'mail', 'text', 'run'];
  * Which attaches land as they do today and which are asked first (ENG-B15). WHAT THE TEXT WRITES LANDS: the row's own
  * name or an alias is in it (`named`), or the kernel found the row by a key the text holds (`how: 'key'`, the rules'
  * one attach), a second signal beside the model's word. WHAT RESTS ON THE MODEL ALONE ASKS,
- * as "Is the Sara in this note Sara Idris?", and is its own kind (`attach`), so it starts at Ask and can be earned
- * (D37.52, D37.53). An attach to a row with an amount is the money floor and always asks (D37.56).
+ * as "Is the Sara in this note Sara Idris?", and is its own kind (`attach`), so it starts at Ask and can be earned.
+ * An attach to a row with an amount is the money floor and always asks.
  *
  * `job` names each row by its handle, and `placeOf` (the caller's) says the list it is in. Pure, as the rest of this
  * file: nothing is filed here, and an untrusted text has no attach to file (`aboutKept`).

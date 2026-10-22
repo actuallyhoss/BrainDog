@@ -91,6 +91,15 @@ test('WAITING IS PURE: a question opened past two weeks is late, and an instant 
   assert.deepEqual(w, { questions: 3, late: 1, hard: 1, inbox: null, working: 0 });
 });
 
+/* ONE AGENT WITH A HELPER IS ONE AT WORK, as the kernel's `runs-working` counts it, so the rail and the Agents page's
+   line agree; an idle run is not at work however lately it called. */
+test('WORKING COUNTS A HELPER UNDER ITS WORKING PARENT ONCE, and an idle run not at all', () => {
+  const seen = new Date(NOW - 60_000).toISOString();
+  const run = (seq: number, state: string, parent?: string) => ({ seq, state, updated_at: seen, fields: { last_seen: seen, ...(parent ? { parent } : {}) } });
+  const w = waiting({ nowMs: NOW, questions: [], inbox: null, runs: [run(1, 'active'), run(2, 'active', 'S1'), run(3, 'active', 'S9'), run(4, 'idle')] });
+  assert.equal(w.working, 2);
+});
+
 test('HOME’S LINE READS THE SAME COUNTS: the reading handed to the model names 25 questions and 32 arrivals', async () => {
   const { api, sql } = await record();
   /* THE RULES' LINE FOR HOME IS WRITTEN FROM `waiting()`: never "Nothing needs you" while 25 wait. */

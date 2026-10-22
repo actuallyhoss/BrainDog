@@ -261,16 +261,17 @@ test('ruling 305: each of the twelve module questions is confirmed or replaced, 
   const lines = tableUnder('### 9.2 · The twelve module questions (ruling 305)');
   assert.deepEqual(lines.map((l) => l[0]), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
   for (const [n, , call, ruling] of lines) {
-    assert.match(call ?? '', /^(confirmed|replaced by (ruling \d+|sections? [\d ,and]+))$/u, `question ${n} is "${call}"`);
+    assert.match(call ?? '', /^(confirmed|replaced later|replaced by ruling \d+)$/u, `question ${n} is "${call}"`);
     assert.ok((ruling ?? '').length > 10, `question ${n} has no ruling`);
   }
   const call = (n: string) => lines.find((l) => l[0] === n)?.[2];
-  /* THE THREE LATER WORDS, as the requirement records them: the demo went in 26, a model in the first run is 35 and 38. */
-  assert.equal(call('11'), 'replaced by section 26');
-  assert.equal(call('8'), 'replaced by sections 35 and 38');
+  /* THE THREE LATER WORDS: the demo went, and a model joined the first run, each by a later decision; one by a ruling. */
+  assert.equal(call('11'), 'replaced later');
+  assert.equal(call('8'), 'replaced later');
   assert.equal(call('6'), 'replaced by ruling 304');
   /* AND TWO CONFIRMED CALLS THE CODE CAN SHOW: the icons are Lucide's, credited, and nothing draws a frame from another site. */
   assert.match(read('packages/render/src/glyphs/set.ts'), /Lucide, ISC License/u);
-  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && read(f).includes('<iframe'));
+  /* THE ONE FRAME IS A DRAWN COMPONENT'S: it runs code the record keeps, in a sandbox, in the host's own frame document, and loads nothing from another site. */
+  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && f !== 'apps/web/src/lib/page/DrawnFrame.svelte' && read(f).includes('<iframe'));
   assert.deepEqual(framed, [], 'an outside embed is drawn in a frame');
 });

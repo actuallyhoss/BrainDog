@@ -1,7 +1,7 @@
 /**
  * The half both hosts share.
  *
- * The failure this package exists to prevent is not a bug in a route — it is a route that exists in
+ * The failure this package exists to prevent is not a bug in a route: it is a route that exists in
  * the Worker and not in the self-host, so the product behaves differently depending on where a
  * customer runs it, and nobody finds out until a record moves between them.
  */
@@ -41,7 +41,7 @@ async function host() {
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok((await api.kernel.install([OBLIGATIONS])).ok);
 
-  /* Through `handlersFor`, which is what both hosts call — a test that built its own map would be
+  /* Through `handlersFor`, which is what both hosts call: a test that built its own map would be
      testing a third wiring nobody ships. */
   const handlers = handlersFor(api);
 
@@ -226,7 +226,7 @@ test('a refusal carries its sentence and a status that says what to do about it'
   assert.equal(forbidden.status, 403);
 
   // 422: a register nobody declared is a value the caller can fix, not a missing route. 30 §6 is
-  // explicit that ANY refusal is a 422 — the exceptions are enumerated and this is not one of them.
+  // explicit that ANY refusal is a 422: the exceptions are enumerated and this is not one of them.
   const nowhere = await call('schema?register=atlantis');
   assert.equal(nowhere.status, 422);
   assert.equal(nowhere.body.refusal?.code, 'REGISTER_UNKNOWN');
@@ -269,8 +269,8 @@ test('every answer has one shape, and no answer is cacheable', async () => {
 
 test('THE STATUS COMES FROM THE SHAPE, so a code nobody enumerated is still a 422', () => {
   // The table this replaced had forty rows and two ways to be wrong: a code nobody remembered to add
-  // came back as a 500 — an ordinary "you typed the wrong enum value" arriving as "the server is
-  // broken" — and a code somebody guessed at got a 409, telling a client to re-read a row that never
+  // came back as a 500 (an ordinary "you typed the wrong enum value" arriving as "the server is
+  // broken") and a code somebody guessed at got a 409, telling a client to re-read a row that never
   // moved and retry a write that will be refused forever.
   assert.equal(httpStatus(no('SOMETHING_NOBODY_MAPPED', 'x')), 422);
   assert.equal(httpStatus(no('ENUM_VALUE_UNKNOWN', 'x')), 422);
@@ -280,7 +280,7 @@ test('THE STATUS COMES FROM THE SHAPE, so a code nobody enumerated is still a 42
 test('and a conflict is a 409 while a refusal never is', () => {
   // The one distinction a client acts on: 409 means re-read and re-apply, 422 means fix the value.
   assert.equal(httpStatus(clash(7, { id: 'x' }, 'p_ada')), 409);
-  // `PLAN_STALE` and `IMPORT_NOT_EMPTY` read like conflicts and are refusals — 30 §6 says so by name,
+  // `PLAN_STALE` and `IMPORT_NOT_EMPTY` read like conflicts and are refusals: 30 §6 says so by name,
   // because repeating either will fail again until the caller does something different.
   assert.equal(httpStatus(no('PLAN_STALE', 'x')), 422);
   assert.equal(httpStatus(no('IMPORT_NOT_EMPTY', 'x')), 422);
@@ -296,7 +296,7 @@ test('the four exceptions each say something different to the caller', () => {
 
 test('A CONFLICT LEAVES THE HOST AS A CONFLICT, body and all', async () => {
   // The body is the whole point: `current` is the row as it now stands and `actor` is who moved it,
-  // and without both the client cannot re-apply — which is what a 409 is instructing it to do.
+  // and without both the client cannot re-apply, which is what a 409 is instructing it to do.
   const res = await serveApi(
     new Request('https://x/api/boot'),
     { boot: async () => clash(41, { id: 'obligations#1', fields: { due: '2026-07-27' } }, 'p_ada') },

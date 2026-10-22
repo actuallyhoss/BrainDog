@@ -1,7 +1,7 @@
 /**
  * What batch 86 added, through the client: Undo on a match the record made, and the briefing a model wrote.
  *
- * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-85.test.ts` is not: `serveApi` over a real record, so what
+ * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-stale.test.ts` is not: `serveApi` over a real record, so what
  * the client sends is what the host decodes and the caller is held by the record's own guards. The model is the host's
  * own adapter (`endpointModel`) over a request that never leaves the test, so no key and no network, and its asks are
  * counted by the host's own meter (`slashRecordMeter`) in Slash's real ledger.

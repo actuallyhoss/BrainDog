@@ -2,8 +2,8 @@
  * The headline line on each page, and the one on Home, written by the model and checked before it is kept.
  *
  * A PAGE'S LEAD NOTE IS SAID BY RULES (`leadOf` in the app): its holes filled and a clause whose figure is nought taken
- * away. That reads "Cash is GBP 33,850.00 across 2 accounts", which is true and says nothing about what matters. DIRECTION
- * §35 has a model read the figures and say it, so once a day `slashHeadlines` (`index.ts`) asks the model for one line a
+ * away. That reads "Cash is GBP 33,850.00 across 2 accounts", which is true and says nothing about what matters. A model
+ * reads the figures and says it instead, so once a day `slashHeadlines` (`index.ts`) asks the model for one line a
  * page, every page at once, on the background allowance and never one of the person's own asks.
  *
  * THE MODEL IS HANDED THE PERSON'S OWN THINGS, NOT ONLY FIGURES: the titles of what is late or due on the page's lists
@@ -25,7 +25,7 @@
  * (`owedPages`), so a burst of writes is one ask and not one a write. On the background allowance, and never more than
  * `HEADLINE_ASKS_DAY` headline asks in one day (`HEADLINES_ASKED`).
  *
- * AND THE SAME ASK ARRANGES THE PAGE (DIRECTION §38, `compose-look.ts`). Each page is handed its blocks by `key` and a
+ * AND THE SAME ASK ARRANGES THE PAGE (`compose-look.ts`). Each page is handed its blocks by `key` and a
  * few of the rows it draws by their handle and title, and the model may answer `{ headline, order, next }` in place of
  * the bare line: what leads after the lead note, and the one thing to do next. No extra ask, so the look costs Free
  * nothing beyond the headline it already had.
@@ -69,7 +69,7 @@ export const HEADLINE_LOOK_MS = 15 * 60_000;
 /** Slash's pref counting the day's headline asks, and the basis each page was last asked at that day. Not `headline.`, so no page's slug can be it. */
 export const HEADLINES_ASKED = 'headlines.asked';
 
-/** The words a person never reads about their own things (DIRECTION §35): the system's, not theirs. */
+/** The words a person never reads about their own things: the system's, not theirs. */
 export const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
 
 /**

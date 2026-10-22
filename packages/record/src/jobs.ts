@@ -42,7 +42,8 @@ export function methods(deps: RecordDeps) {
   return {
     /**
      * Start one job of a kind the owner approved. It waits for a machine, and is cancelled with a note if none takes it
-     * in a day. `about` names the row it is about, by its spoken id.
+     * in a day. `about` names the row it is about, by its spoken id; `machine` the machine it must run on and `seat` the
+     * Claude Code profile it must run under, each by name (migration 44).
      */
     async createJob(args: CreateJobArgs, ctx: CallContext): Promise<Result<{ id: string }>> {
       const stop = admin(ctx, 'start a job');
@@ -72,15 +73,20 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * A runner takes the oldest queued job, with a lease it renews as it reports and a bearer for the record's MCP door,
-     * or is told how long to wait before asking again. `wait` is the host's to hold, and this answers at once.
+     * A runner takes the oldest queued job it can run where it is, with a lease it renews as it reports and a bearer for
+     * the record's MCP door, or is told how long to wait before asking again. `wait` is the host's to hold, and this
+     * answers at once. `host` is the machine the runner is on, as runs name it, and `seats` the Claude Code profiles it
+     * can start a run under, by name: a job placed on a machine or a profile goes only to a runner that says it.
      */
     /* THE ANSWER IS TYPED FROM `kernel.jobs.claim` AND NOT BY NAME, because `@braindog/kernel` already exports a
        `Claimed` (the scheduler's, `schedule.ts`), so the job's own `Claimed` cannot be exported under that name too. */
-    async claimJob(_args: { wait?: unknown } | undefined, ctx: CallContext): Promise<Awaited<ReturnType<RecordDeps['kernel']['jobs']['claim']>>> {
+    async claimJob(
+      args: { wait?: unknown; host?: unknown; seats?: unknown } | undefined,
+      ctx: CallContext,
+    ): Promise<Awaited<ReturnType<RecordDeps['kernel']['jobs']['claim']>>> {
       const machine = runner(ctx);
       if (refused(machine)) return { ok: false, refusal: machine };
-      return tail(await kernel.jobs.claim(machine));
+      return tail(await kernel.jobs.claim(machine, { host: args?.host, seats: args?.seats }));
     },
 
     /** A runner reports the next line of the job it holds, and learns whether it was stopped. */

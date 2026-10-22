@@ -171,7 +171,7 @@ test('ON A RECORD OF THOUSANDS OF RUNS, context, record_index and governance ans
   for (const n of [RUNS - 4, RUNS - 3, RUNS - 2, RUNS - 1]) assert.ok(live.some((run) => run.doing === `Run ${String(n)} working on part ${String(n % 17)}`), `run ${String(n)} is not live`);
   assert.ok(live.some((run) => run.doing === 'Asking about the tasks'), 'the run that asked is not live');
   assert.ok(live.every((run) => run.age_s < 45 * 60), 'a stale run is live');
-  assert.ok(told.signs.some((s) => s.name === 'Runs end as they ended'), JSON.stringify(told.signs));
+  assert.ok(told.signs.some((s) => s.name === 'Agent runs end cleanly'), JSON.stringify(told.signs));
 
   /* AND A WRITE IS SEEN AT ONCE: the briefing held for the version before it is not the one answered after it. */
   const here = (ctx: Context) => ctx.registers.find((x) => x.id === 'tasks')?.here ?? -1;

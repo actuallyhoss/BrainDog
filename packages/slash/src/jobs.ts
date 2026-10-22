@@ -38,11 +38,12 @@
 
 import { no, ok, refused, type Result } from '@braindog/ports';
 
-import type { CallStatus, Charge, Core } from './call.ts';
+import { thrownRaw, type CallStatus, type Charge, type Core } from './call.ts';
+import { LAST_ROWS_SQL, NOT_SERVED, PASSED_WORDS, pausedFor, type LastRow } from './paused.ts';
 import { anchorFault, checkSchema, isRecord, tokens } from './project.ts';
 import { fenced, fill, type PromptTemplate } from './prompts.ts';
 import { indexLines, nameIn, SLASH_CTX } from './propose.ts';
-import type { CallContext, Embedding, Inference, InferenceReply, Proposal, RawPayload, ReadTrace, RecordApi } from './types.ts';
+import type { CallContext, Embedding, Inference, InferenceReply, Proposal, RawPayload, ReadTrace, RecordApi, SlashCandidate } from './types.ts';
 
 /** `12 §5`: the register that holds credentials is not one a derived pattern may write to. */
 const FORBIDDEN_REGISTERS = new Set(['grant']);
@@ -128,6 +129,7 @@ export const patterns = (
   core: Core,
   record: RecordApi,
   fallback: Inference,
+  wait?: Wait,
 ): {
   proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
   draftPattern(samples: readonly RawPayload[], waiting?: number): Promise<Result<PatternDraft>>;
@@ -322,7 +324,7 @@ export const patterns = (
       return ok(drafted.value.draft);
     },
 
-    digestProse: (digest) => prose(core, fallback, digest),
+    digestProse: (digest) => prose(core, fallback, digest, wait),
     embedTexts: (texts) => embedOf(core, fallback, texts),
   };
 };
@@ -439,7 +441,7 @@ const PROSE_SCHEMA = {
  */
 export const PROSE: PromptTemplate = {
   purpose: 'prose',
-  model: 'llama-3.2-1b',
+  model: 'glm-5.3-flash',
   maxTokens: 120,
   capIn: 4000,
   system: PROSE_SYSTEM,
@@ -468,6 +470,31 @@ const kept = (text: string): string =>
 /** The usage a host's marked throw reports, read structurally, or nothing. */
 const usageIn = (v: unknown): { in: number; out: number } | undefined =>
   isRecord(v) && typeof v['in'] === 'number' && typeof v['out'] === 'number' ? { in: v['in'], out: v['out'] } : undefined;
+
+/** How long each retry of a digest's prose waits first: a model not reached is asked twice more, a little later. */
+export const PROSE_BACKOFF_MS: readonly number[] = [1_000, 4_000];
+
+/** A wait of `ms`, handed in so a test waits for nothing. */
+export type Wait = (ms: number) => Promise<void>;
+
+const sleep: Wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/** The model test's charge: nobody's allowance, and never one of the record's asks (`packages/host/src/sign-model.ts`). */
+const PROBED = { purpose: 'probe', spends: 'none' } as const;
+
+/** A throw the host marked as a ceiling saying no before anything was sent: true of every later attempt and candidate. */
+const budgetThrown = (e: unknown): boolean => isRecord(e) && e['code'] === 'SLASH_BUDGET_SPENT';
+
+/**
+ * A throw a wait may mend: a model not reached (a gateway's 5xx, a timeout, a dropped connection). Not a call never sent,
+ * not one the model answered and may have billed, not a ceiling's no, and not a model its provider does not serve.
+ */
+const transient = (e: unknown): boolean => {
+  const mark: Record<string, unknown> = isRecord(e) ? e : {};
+  if (mark['sent'] === false || mark['answered'] === true || budgetThrown(e)) return false;
+  const why = typeof mark['why'] === 'string' ? mark['why'] : e instanceof Error ? e.message : '';
+  return !why.includes(NOT_SERVED);
+};
 
 /**
  * The user message for one digest, cut to the template's cap.
@@ -504,80 +531,132 @@ const proseAsked = (name: string, id: string, text: string): string => {
  * says nothing, or that types a figure answers `{ text: '' }`, which the kernel's ack reads as "ship the figures", and
  * the ledger row says which it was. Asking again would bill a second call for the same two sentences.
  *
- * A MODEL NOT REACHED IS `UNREACHABLE`, which the host's pass acks as failed: the retry ladder asks again, and at its
- * ceiling the kernel sends the digest as figures (`ack` in `packages/kernel/src/outbox.ts`), so an outage delays a digest
- * and never loses one. A call the host says it never sent (`sent: false`) will not be sent on a retry either, so that
- * digest goes as figures at once, and no row is written for a call that was not made.
+ * A MODEL NOT REACHED IS ASKED AGAIN, TWICE, A LITTLE LATER (`PROSE_BACKOFF_MS`), and that is not the rule above: no
+ * model answered, so nothing was billed, and a gateway's 502 or a timeout is usually gone seconds later. Before this one
+ * blip sent the job down the outbox's ladder, each rung a row of its own, so a flaky gateway read as many digests the
+ * model never answered. The retries are one ask and leave ONE row, the last attempt's, as `runModel`'s three paths to
+ * one model are one call (`apps/worker/src/inference.ts`). A model its provider does not serve, a ceiling's no and a
+ * call never sent are not retried: waiting mends none of them.
+ *
+ * AND THE ROUTE IS WALKED, where the host handed one (`core.routeOf('prose')`): the flash model first and the second model
+ * after it on the Cloud (`routeFor` in `packages/host/src/infer.ts`). It was not, so a small model that would not answer
+ * left every digest without its sentences while the flash model answered the rest of the record. A candidate that did
+ * not answer after its retries is a row of its own under its model, spending nothing, as `core.run` writes the attempts
+ * it passes over, and one its own last rows pause (`paused.ts`) is skipped with the same `-` row `core.run` writes. The
+ * last candidate is never skipped. No route, or his own key, is `PROSE`'s own model alone, as before.
+ *
+ * A MODEL NOT REACHED AT ALL IS `UNREACHABLE`, which the host's pass acks as failed: the retry ladder asks again, and at
+ * its ceiling the kernel sends the digest as figures (`ack` in `packages/kernel/src/outbox.ts`), so an outage delays a
+ * digest and never loses one. A call the host says it never sent (`sent: false`) will not be sent on a retry either, so
+ * that digest goes as figures at once, and no row is written for a call that was not made.
  *
  * THE ROW IS `prose`, BY KIND AND BY PURPOSE, WHICH NO COUNT OF THE OWNER'S ASKS READS (`asksUsed` counts the rows
  * that say `spends = 'person'`, and this one says `background`). It carries no
  * question and no read: what the digest said stays in the digest.
+ *
+ * EXCEPT THE HOST'S MODEL TEST (`probe: true` on the payload, `allowed` in `packages/host/src/model-jobs.ts`): the one
+ * call that asks whether a silent model is back. Its row is `probe` and spends nothing, and it is asked once with no
+ * retry, since it is asked again in half an hour. Written as `prose`, every half hour of an outage read as one more
+ * digest the model did not answer, and the vital sign counted each as an ask.
  */
-async function prose(core: Core, fallback: Inference, digest: unknown): Promise<Result<{ text: string }>> {
+async function prose(core: Core, fallback: Inference, digest: unknown, wait: Wait = sleep): Promise<Result<{ text: string }>> {
   const d: Record<string, unknown> = isRecord(digest) ? digest : {};
   const text = typeof d['text'] === 'string' ? d['text'] : '';
   /* NOTHING TO DESCRIBE, NOTHING ASKED. */
   if (text.trim() === '') return ok({ text: '' });
   const name = typeof d['name'] === 'string' ? d['name'].slice(0, NAME_MOST) : '';
   const id = typeof d['digest'] === 'string' ? d['digest'] : 'digest';
+  const probe = d['probe'] === true;
+  const charge = probe ? PROBED : PROSED;
+  const retries = probe ? 0 : PROSE_BACKOFF_MS.length;
 
   const s = core.settings();
-  const callId = core.mint();
-  const t0 = core.clock.now();
   const content = proseAsked(name, id, text);
   const estimate = tokens(PROSE.system) + tokens(content);
-  const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
-    core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...PROSED });
+  const route = core.routeOf('prose');
+  const walk: readonly SlashCandidate[] = route.length === 0 ? [{ model: PROSE.model }] : route;
 
-  let reply: InferenceReply;
-  try {
-    reply = await fallback.complete({
-      model: PROSE.model,
-      messages: [
-        { role: 'system', content: PROSE.system },
-        { role: 'user', content },
-      ],
-      maxTokens: PROSE.maxTokens,
-      jsonSchema: PROSE.schema,
-    });
-  } catch (e) {
-    /* THE HOST'S MARKS, READ AS `answer.ts` READS THEM: `sent: false` is a call never made, `answered: true` a model that
-       answered with something unreadable and may have billed it, `reached: true` a model called that then threw. A throw
-       with none of them reached nothing, and is settled under `-`, which the Worker's operator ceiling does not count. */
-    const mark: Record<string, unknown> = isRecord(e) ? e : {};
-    const model = nameIn(e) ?? PROSE.model;
-    if (mark['sent'] === false) return ok({ text: '' });
-    if (mark['answered'] === true) {
-      account('error', model, usageIn(mark['usage']) ?? { in: estimate, out: 0 }, 'PROPOSAL_SCHEMA');
+  for (const [i, candidate] of walk.entries()) {
+    const final = i === walk.length - 1;
+    const callId = core.mint();
+    const t0 = core.clock.now();
+    const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string, raw?: string): void =>
+      core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...charge, candidate: candidate.id, raw });
+
+    /* SKIPPED AT ONCE WHERE ITS OWN LAST ROWS PAUSE IT, as `core.run` skips one: under `-`, spending nothing. */
+    if (!final && candidate.id !== undefined) {
+      const paused = pausedFor(core.sql.all<LastRow>(LAST_ROWS_SQL, candidate.id, candidate.model), core.clock.now());
+      if (paused !== null) {
+        account('nothing', '-', { in: 0, out: 0 }, 'UNREACHABLE', PASSED_WORDS[paused]);
+        continue;
+      }
+    }
+
+    const asked = candidate.inference ?? fallback;
+    let reply: InferenceReply | undefined;
+    let thrown: unknown;
+    for (let turn = 0; reply === undefined; turn++) {
+      try {
+        reply = await asked.complete({
+          model: candidate.model,
+          messages: [
+            { role: 'system', content: PROSE.system },
+            { role: 'user', content },
+          ],
+          maxTokens: PROSE.maxTokens,
+          jsonSchema: PROSE.schema,
+        });
+      } catch (e) {
+        thrown = e;
+        if (turn >= retries || !transient(e)) break;
+        await wait(PROSE_BACKOFF_MS[turn] ?? 0);
+      }
+    }
+
+    if (reply === undefined) {
+      /* THE HOST'S MARKS, READ AS `answer.ts` READS THEM: `sent: false` is a call never made, `answered: true` a model that
+         answered with something unreadable and may have billed it, `reached: true` a model called that then threw. A throw
+         with none of them reached nothing, and is settled under `-`, which the Worker's operator ceiling does not count;
+         one a walk passes over keeps its model's name, as `core.run` keeps it, so its pause can be read back. */
+      const mark: Record<string, unknown> = isRecord(thrown) ? thrown : {};
+      const model = nameIn(thrown) ?? candidate.model;
+      if (mark['sent'] === false) return ok({ text: '' });
+      if (mark['answered'] === true) {
+        account('error', model, usageIn(mark['usage']) ?? { in: estimate, out: 0 }, 'PROPOSAL_SCHEMA');
+        return ok({ text: '' });
+      }
+      const onward = !final && !budgetThrown(thrown);
+      account('error', mark['reached'] === true || onward ? model : '-', { in: estimate, out: 0 }, 'UNREACHABLE', thrownRaw(thrown));
+      if (onward) continue;
+      const why = thrown instanceof Error ? thrown.message.replace(/[.\s]+$/u, '') : '';
+      return no('UNREACHABLE', `The model did not answer${why === '' ? '' : `: ${why}`}. The digest is held, and its two sentences are asked for again.`);
+    }
+
+    const model = nameIn(reply) ?? candidate.model;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(reply.text);
+    } catch {
+      parsed = null;
+    }
+    if (!isRecord(parsed) || checkSchema(PROSE.schema, parsed) !== null) {
+      account('error', model, reply.usage, 'PROPOSAL_SCHEMA');
       return ok({ text: '' });
     }
-    account('error', mark['reached'] === true ? model : '-', { in: estimate, out: 0 }, 'UNREACHABLE');
-    const why = e instanceof Error ? e.message.replace(/[.\s]+$/u, '') : '';
-    return no('UNREACHABLE', `The model did not answer${why === '' ? '' : `: ${why}`}. The digest is held, and its two sentences are asked for again.`);
+    const said = kept(String(parsed['text']));
+    if (said === '') {
+      account('nothing', model, reply.usage);
+      return ok({ text: '' });
+    }
+    if (FIGURED.test(said)) {
+      account('refused', model, reply.usage, 'PROPOSAL_UNCITED');
+      return ok({ text: '' });
+    }
+    account('ok', model, reply.usage);
+    return ok({ text: said });
   }
-
-  const model = nameIn(reply) ?? PROSE.model;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(reply.text);
-  } catch {
-    parsed = null;
-  }
-  if (!isRecord(parsed) || checkSchema(PROSE.schema, parsed) !== null) {
-    account('error', model, reply.usage, 'PROPOSAL_SCHEMA');
-    return ok({ text: '' });
-  }
-  const said = kept(String(parsed['text']));
-  if (said === '') {
-    account('nothing', model, reply.usage);
-    return ok({ text: '' });
-  }
-  if (FIGURED.test(said)) {
-    account('refused', model, reply.usage, 'PROPOSAL_UNCITED');
-    return ok({ text: '' });
-  }
-  account('ok', model, reply.usage);
-  return ok({ text: said });
+  /* NOT REACHED: the last candidate always returns above. */
+  return no('UNREACHABLE', 'The model did not answer. The digest is held, and its two sentences are asked for again.');
 }
 
 /**

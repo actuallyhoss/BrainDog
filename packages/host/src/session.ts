@@ -38,6 +38,12 @@ export type SessionHints = {
   ahead?: string | undefined;
   /** Who the recent commits here were by, `Name <email>, ...`, then the last few commits as ` || abc1234 Subject`. */
   authors?: string | undefined;
+  /**
+   * The name of the Claude Code profile the agent runs under, `studio` for `~/.claude-studio`, `default` for `~/.claude`
+   * (`profileNameOf` in the command line). A name and never a path. The record stamps it on the run as the run opens,
+   * or learns it once from a later call or pulse, and no caller writes it after (migration 44).
+   */
+  seat?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -74,6 +80,9 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   ahead: { header: 'x-braindog-ahead', grammar: /^(?:0|[1-9][0-9]{0,3})$/ },
   /* The authors of the last commits, as written there; the record meets each as a person seen in the commits. */
   authors: { header: 'x-braindog-authors', grammar: printable(1024) },
+  /* A PROFILE'S NAME AND NEVER A PATH: a short name, up to 64 characters, with no `..`, the command line's own
+     `PROFILE_NAME`. Anything else is dropped, so a run is never named by a folder on his machine. */
+  seat: { header: 'x-braindog-profile', grammar: /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];

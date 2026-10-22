@@ -1,7 +1,7 @@
 /**
  * The model's half of a page's look: what leads after the lead note, the headline, and the one thing to do next.
  *
- * THE SHELL IS FIXED AND WHAT FILLS IT IS COMPOSED (DIRECTION §38). The kernel lays a `look.<page>` declaration over a
+ * THE SHELL IS FIXED AND WHAT FILLS IT IS COMPOSED. The kernel lays a `look.<page>` declaration over a
  * page at read time (`loop/contract-17.md`, "Look overlay"), and its rules answer one when none is stored. This file is
  * what the model adds to that, and it rides inside the night's headline ask (`headlines.ts`), so it costs Free no ask
  * beyond the line it already had: each page is handed its blocks by `key` and a few of the rows it draws by handle and
@@ -720,7 +720,7 @@ const parsed = (text: string): unknown => {
 };
 
 /**
- * PUT BACK, ONE STEP, WHOEVER WROTE THE LOOK (DIRECTION §38: a composition is a proposal the person can pin, change or
+ * PUT BACK, ONE STEP, WHOEVER WROTE THE LOOK (a composition is a proposal the person can pin, change or
  * undo). The live look's version before it is installed again, held to the live version, or the page is given back to
  * the kernel's rules when it had none. `actor` is who pressed it, for the history.
  *

@@ -1,6 +1,6 @@
 /**
  * What the owner's agent asked and he never got to settles itself on the next sweep, and lands in Handled today with
- * the decision one Undo puts back (DIRECTION d3; live 20 Oct: none of 71 open questions ever settled).
+ * the decision one Undo puts back (live 20 Oct: none of 71 open questions ever settled).
  */
 
 import { test } from 'node:test';

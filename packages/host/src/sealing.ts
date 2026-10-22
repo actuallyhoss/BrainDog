@@ -48,7 +48,7 @@ export type Bytes = Uint8Array<ArrayBuffer>;
  * A CALLER'S BYTES, NARROWED BY PROOF RATHER THAN BY ASSERTION.
  *
  * The parameters stay plain `Uint8Array`, because narrowing them instead would push the same annotation into
- * both apps' `keys.ts`, both `Plaintext` brands and `@braindog/record`'s `Sealed` and `SealTarget` — a type
+ * both apps' `keys.ts`, both `Plaintext` brands and `@braindog/record`'s `Sealed` and `SealTarget`: a type
  * change across four packages to describe bytes that are already an `ArrayBuffer`'s everywhere they are made.
  * So the check happens here, once, and it is a real check: `buffer instanceof ArrayBuffer` is the thing the
  * DOM's `BufferSource` is asking about, and the cast sits inside the branch that has just proved it.
@@ -72,10 +72,10 @@ const UNIT = '\u001f';
    in the place it actually bites. The copy is a short label's bytes and never key material. */
 const utf8 = (text: string): Bytes => Uint8Array.from(new TextEncoder().encode(text));
 
-/** `record_id ‖ 0x1F ‖ purpose` — the DEK wrap's AAD. */
+/** `record_id ‖ 0x1F ‖ purpose`: the DEK wrap's AAD. */
 export const recordAad = (record: string, purpose: string): string => `${record}${UNIT}${purpose}`;
 
-/** `record_id ‖ 0x1F ‖ grant_id ‖ 0x1F ‖ version` — a sealed value's AAD. */
+/** `record_id ‖ 0x1F ‖ grant_id ‖ 0x1F ‖ version`: a sealed value's AAD. */
 export const grantAad = (record: string, grant: string, version: string): string =>
   `${record}${UNIT}${grant}${UNIT}${version}`;
 

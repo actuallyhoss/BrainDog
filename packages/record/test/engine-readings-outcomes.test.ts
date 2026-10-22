@@ -2,7 +2,7 @@
  * What came of Slash's suggestions, read by the record (ENG-B01 job 3 with ENG-A16's reading).
  *
  * WHY THIS FILE EXISTS. The readings said what the model was asked and nothing of how its suggestions ended, so "the
- * share accepted unchanged" (D37.183) had no figure anywhere. Held here on a fresh record through `engineReadings`:
+ * share accepted unchanged" had no figure anywhere. Held here on a fresh record through `engineReadings`:
  * Slash files three, the owner takes one as it was, takes only some of another, turns the third down, then undoes the
  * first, and each count and the share say so; one past its last day is lapsed without anything being written; an event
  * signed by Slash outside what it may sign is counted in `outside`, and nothing it may sign is; a fold the record made by

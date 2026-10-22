@@ -73,3 +73,17 @@ test('THE RECORD IS SAID BY ITS NAME, then its slug, never an id, and BrainDog w
   assert.equal(connectedLine(undefined), 'Connected to BrainDog. Call context.');
   assert.equal(briefed({ context: {}, look, home: null }).card, 'Connected to BrainDog. Call context.');
 });
+
+test('AN AGENT ACTING FOR A COLLEAGUE IS TOLD WHAT IT CAN REACH, once, after the card or in the plan as its record drew it', () => {
+  const reach = 'You act for Sam: Kiln, view; amounts hidden';
+  const card = 'BrainDog · run S6 · project Kiln\nMore     call context';
+  const out = briefed({ context: { ...FULL, card, reach }, look, home: null });
+  assert.equal(out.value.reach, reach);
+  assert.equal(out.text.split('\n')[card.split('\n').length], reach, out.text);
+  /* A PLAN SAYS IT ITSELF, as its Reach line, so the door does not say it twice. */
+  const planned = briefed({ context: { ...FULL, card, reach, plan: `${card}\nReach    ${reach}`, plan_card: card }, look, home: null });
+  assert.equal(planned.text.split('\n').filter((l) => l.includes(reach)).length, 1, planned.text);
+  assert.equal(planned.value.reach, reach);
+  /* AND NOBODY ELSE IS TOLD ANY. */
+  assert.equal(briefed({ context: { ...FULL, card }, look, home: null }).value.reach, undefined);
+});

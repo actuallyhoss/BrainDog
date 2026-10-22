@@ -1,5 +1,5 @@
 /**
- * The ladder of trust at the record's door (DIRECTION §37, "staff who earn trust"): an agent's write at Ask, on the
+ * The ladder of trust at the record's door ("staff who earn trust"): an agent's write at Ask, on the
  * floor, or from a run that read text from outside the record is filed as a question instead; a write its rung lets
  * through is written; ten kept in fourteen days offer the next rung; an undo, three declines, a burst or a new app takes
  * it back to Ask.

@@ -1,7 +1,7 @@
 /**
  * A row on one line, as `list` says it: a project's one line cut at 90 characters, and a list of text said as how many.
  *
- * THE OWNER'S WORDS: "one line per project with the one-liner cut to 90 characters and the blocker COUNT". A line cut
+ * THE RULE: "one line per project with the one-liner cut to 90 characters and the blocker COUNT". A line cut
  * a text at 48, which is half a one-liner, and said a list of text as its first three items, so a project with three
  * things in the way spent a line's worth of words on them where an agent wanted to know there are three.
  *
@@ -29,12 +29,12 @@ const decl = {
 
 const look: Look = { now: Date.UTC(2026, 9, 13), decl: () => decl, title: (spoken) => ({ 'people#1': 'Sam', 'people#2': 'Ada' })[spoken], actor: (by) => by, decider: 'Ada' };
 
-const row = (fields: Record<string, unknown>) => ({ spoken: 'things#1', fields: { name: 'Crumb.gg', stage: 'building', ...fields } });
+const row = (fields: Record<string, unknown>) => ({ spoken: 'things#1', fields: { name: 'Oxbow.gg', stage: 'building', ...fields } });
 
 test('A TEXT IN THE CARD FIELDS IS CUT AT 90, AT A WORD, and one that fits is said whole', () => {
   const fits = 'A recipe site that bakes a shopping list from whatever a person pastes into it';
   assert.ok(fits.length > 48 && fits.length <= 90);
-  assert.equal(rowLine(row({ one_line: fits }), 'things', look), `Crumb.gg (things#1) · building · ${fits}`);
+  assert.equal(rowLine(row({ one_line: fits }), 'things', look), `Oxbow.gg (things#1) · building · ${fits}`);
 
   const long = 'A recipe site that bakes a shopping list from whatever a person pastes into it, and then keeps the pantry in step with what was cooked';
   const line = rowLine(row({ one_line: long }), 'things', look);
@@ -50,20 +50,20 @@ test('A TEXT IN THE CARD FIELDS IS CUT AT 90, AT A WORD, and one that fits is sa
 test('A LIST OF TEXT IS SAID AS ITS LABEL AND ITS COUNT, never as its items', () => {
   const blockers = ['The domain is still with the old registrar', 'Stripe wants a second document', 'No answer from the baker'];
   const line = rowLine(row({ one_line: 'Recipes into shopping lists', in_the_way: blockers }), 'things', look);
-  assert.equal(line, 'Crumb.gg (things#1) · building · Recipes into shopping lists · In the way 3');
+  assert.equal(line, 'Oxbow.gg (things#1) · building · Recipes into shopping lists · In the way 3');
   for (const b of blockers) assert.ok(!line.includes(b.slice(0, 12)), `the line said an item: ${b}`);
 });
 
 test('A COUNT IS GROUPED, counts only what is written, and an empty list says nothing', () => {
-  assert.equal(rowLine(row({ in_the_way: ['One thing'] }), 'things', look), 'Crumb.gg (things#1) · building · In the way 1');
-  assert.equal(rowLine(row({ in_the_way: [] }), 'things', look), 'Crumb.gg (things#1) · building');
-  assert.equal(rowLine(row({ in_the_way: ['', '  ', 'One thing', null] }), 'things', look), 'Crumb.gg (things#1) · building · In the way 1');
+  assert.equal(rowLine(row({ in_the_way: ['One thing'] }), 'things', look), 'Oxbow.gg (things#1) · building · In the way 1');
+  assert.equal(rowLine(row({ in_the_way: [] }), 'things', look), 'Oxbow.gg (things#1) · building');
+  assert.equal(rowLine(row({ in_the_way: ['', '  ', 'One thing', null] }), 'things', look), 'Oxbow.gg (things#1) · building · In the way 1');
   const many = Array.from({ length: 1200 }, (_, i) => `Thing ${String(i)}`);
-  assert.equal(rowLine(row({ in_the_way: many }), 'things', look), 'Crumb.gg (things#1) · building · In the way 1,200');
+  assert.equal(rowLine(row({ in_the_way: many }), 'things', look), 'Oxbow.gg (things#1) · building · In the way 1,200');
 });
 
 test('A LIST OF ROWS STILL NAMES THEM: the count is for a list of text only', () => {
   const linked = { ...decl, mobile: ['name', 'stage', 'helpers'] } as Decl;
   const at: Look = { ...look, decl: () => linked };
-  assert.equal(rowLine(row({ helpers: ['people#1', 'people#2'] }), 'things', at), 'Crumb.gg (things#1) · building · Sam (people#1), Ada (people#2)');
+  assert.equal(rowLine(row({ helpers: ['people#1', 'people#2'] }), 'things', at), 'Oxbow.gg (things#1) · building · Sam (people#1), Ada (people#2)');
 });

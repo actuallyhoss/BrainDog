@@ -1,5 +1,5 @@
 /**
- * BrainDog's own updates reach a record on their own (DIRECTION §37): from the host's tick, a first-party module this
+ * BrainDog's own updates reach a record on their own: from the host's tick, a first-party module this
  * build ships newer than the record holds goes in when its plan loses nothing, once a deploy and once a day, whether
  * Slash is on or not, and what happened is kept in names.
  */

@@ -205,14 +205,19 @@ const CLIENT_WORDS: readonly (readonly [RegExp, string])[] = [
   [/^(?:visual studio code|vs[\s._-]*code)/u, 'VS Code'],
 ];
 
-/** A run as a person names it: `Claude Code on MacBook`, or the app alone where the machine says no kind. */
+/**
+ * A run as a person names it: `Claude Code on MacBook`, or the app alone where the machine says no kind; and the Claude
+ * Code profile it runs under where it is not the default one, `Claude Code as studio on MacBook` (migration 44).
+ */
 export function runnerOf(fields: Record<string, unknown>): string {
   const local = ['cwd', 'repo', 'host'].some((k) => typeof fields[k] === 'string' && fields[k] !== '');
   const client = typeof fields.client === 'string' ? fields.client.trim().toLowerCase() : '';
   /* THE CLIENT'S OWN NAME WINS where the run kept it, because `agent` is a kind of four and `claude` is two apps. */
   const app = CLIENT_WORDS.find(([name]) => client !== '' && name.test(client))?.[1] ?? agentOf(fields.agent, local);
+  const seat = typeof fields.seat === 'string' ? fields.seat.trim() : '';
+  const as = seat === '' || seat === 'default' ? app : `${app} as ${seat}`;
   const device = deviceOf(fields.host);
-  return device ? `${app} on ${device}` : app;
+  return device ? `${as} on ${device}` : as;
 }
 
 /** An id a person never says, as words: `bank-card-used-sms` is `Bank card used sms`, `renewal_due` `Renewal due`. */

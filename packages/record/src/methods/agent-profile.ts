@@ -4,7 +4,8 @@
  *
  * `agentProfiles` IS HIS READ: every row, Defaults first, each with what it lets an agent do said as one sentence, how
  * it matches ("applies by name" when only a kind says so, a security boundary when a token does), when an agent it
- * covers was last heard from, and the machines it was heard on. The owner's, since a row names his tokens.
+ * covers was last heard from, and the machines and Claude Code profiles it was heard on. The owner's, since a row names
+ * his tokens.
  *
  * `setAgentProfile` IS ADMIN: only he changes what an agent may do, signed in to the app, and every token is refused
  * `NEEDS_BROWSER_SESSION` before the row is read (§10.4). Each change is a line in the log, which the kernel writes.
@@ -25,8 +26,11 @@ export type Effective = {
   applies: 'token' | 'name' | 'default';
 };
 
-/** One row of `agentProfiles`: the settings, what they let an agent do, and who it last covered. */
-export type ProfileView = Profile & { effective: Effective; heard_at: string | null; machines: string[] };
+/**
+ * One row of `agentProfiles`: the settings, what they let an agent do, and who it last covered: when, on which machines
+ * and under which Claude Code profiles (`seats`, by name).
+ */
+export type ProfileView = Profile & { effective: Effective; heard_at: string | null; machines: string[]; seats: string[] };
 
 /** The floors no setting lifts, said the same way on every row and in `whoami` (§5.1). */
 export const FLOORS = 'money, keys and deletes are asked';
@@ -44,9 +48,9 @@ export function saysOf(p: Pick<Profile, 'ceiling' | 'lists_write' | 'projects'>,
 export const appliesOf = (p: Pick<Profile, 'id' | 'match'>): Effective['applies'] =>
   p.id === 'default' ? 'default' : p.match.token !== undefined ? 'token' : 'name';
 
-/** When an agent this row covers was last heard from, and on which machines, read off the runs. */
-function heardOf(sql: Sql, p: Profile): { heard_at: string | null; machines: string[] } {
-  if (p.id === 'default' || (p.match.kind === undefined && p.match.token === undefined)) return { heard_at: null, machines: [] };
+/** When an agent this row covers was last heard from, and on which machines and under which profiles, read off the runs. */
+function heardOf(sql: Sql, p: Profile): { heard_at: string | null; machines: string[]; seats: string[] } {
+  if (p.id === 'default' || (p.match.kind === undefined && p.match.token === undefined)) return { heard_at: null, machines: [], seats: [] };
   const where: string[] = ["register = 'session'", 'deleted_at IS NULL'];
   const params: string[] = [];
   if (p.match.kind !== undefined) {
@@ -61,15 +65,21 @@ function heardOf(sql: Sql, p: Profile): { heard_at: string | null; machines: str
     where.push("json_extract(fields, '$.host') = ?");
     params.push(p.match.host);
   }
+  if (p.match.seat !== undefined) {
+    where.push("json_extract(fields, '$.seat') = ?");
+    params.push(p.match.seat);
+  }
   const heard = sql.one<{ at: string | null }>(`SELECT max(json_extract(fields, '$.last_seen')) AS at FROM entry WHERE ${where.join(' AND ')}`, ...params);
-  const machines = sql
-    .all<{ host: string }>(
-      `SELECT json_extract(fields, '$.host') AS host, max(json_extract(fields, '$.last_seen')) AS at FROM entry
-        WHERE ${where.join(' AND ')} AND json_extract(fields, '$.host') IS NOT NULL GROUP BY host ORDER BY at DESC LIMIT 5`,
-      ...params,
-    )
-    .map((r) => r.host);
-  return { heard_at: heard?.at ?? null, machines };
+  /* THE FIVE NEWEST HEARD, by the one field asked: the machines, then the profiles. */
+  const newest = (field: 'host' | 'seat'): string[] =>
+    sql
+      .all<{ v: string }>(
+        `SELECT json_extract(fields, '$.${field}') AS v, max(json_extract(fields, '$.last_seen')) AS at FROM entry
+          WHERE ${where.join(' AND ')} AND json_extract(fields, '$.${field}') IS NOT NULL GROUP BY v ORDER BY at DESC LIMIT 5`,
+        ...params,
+      )
+      .map((r) => r.v);
+  return { heard_at: heard?.at ?? null, machines: newest('host'), seats: newest('seat') };
 }
 
 /** A row as the app reads it. */

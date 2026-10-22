@@ -1,6 +1,6 @@
 /**
  * The pen as a view of the one queue (ENG-B14 job 4): "max 3 waiting" (HD.224), "every proposal states a deadline"
- * (HD.579), "a recommendation lands in the holding pen §4 already defines" (D5c.14).
+ * (HD.579), "a recommendation lands in the holding pen §4 already defines".
  *
  * WHAT WAS SEEN BEFORE: the pen ranked its own offers to 24 and showed three and any list opened lately beside them, so
  * the rail said "4 suggested" where the Slash page listed seven. Now `boot`'s pen is what `queueOf(recommend(...))`

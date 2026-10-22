@@ -28,7 +28,7 @@ test('a projects row becomes a project card from the fields the list declares', 
 });
 
 test('the brief is the clean first lines of the note when there is no about, and the link falls back to /app', () => {
-  const card = projectCard({ spoken: 'projects#5', fields: { name: 'Quartz', note: '# Quartz\nStatus: building · Lane: ship\nA tool for sites. It builds them nightly.\nMore later.' } }, 'https://brain.dog');
+  const card = projectCard({ spoken: 'projects#5', fields: { name: 'Harbour', note: '# Harbour\nStatus: building · Lane: ship\nA tool for sites. It builds them nightly.\nMore later.' } }, 'https://brain.dog');
   assert.equal(card?.brief, 'A tool for sites. It builds them nightly.');
   assert.equal(card?.href, 'https://brain.dog/app');
   assert.equal(card?.hue, null);

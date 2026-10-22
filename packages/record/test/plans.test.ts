@@ -14,7 +14,7 @@ const HOUR = 3_600_000;
 const GB = 1_000_000_000;
 const EXTRA = { runs: { cents: 100, per: 5_000 }, requests: { cents: 100, per: 50_000 }, bytes: { cents: 50, per: GB }, ms: { cents: 100, per: 10 * HOUR } };
 
-/** Every figure, as DIRECTION §42 takes them: Cloud Plus five times Cloud, agents 3, 15 and 75, no yearly price. */
+/** Every figure, as the price list sets them: Cloud Plus five times Cloud, agents 3, 15 and 75, no yearly price. */
 const EXPECTED: Record<string, PlanFigures> = {
   free: {
     name: 'Free',

@@ -657,7 +657,7 @@ function namesSaid(names: readonly string[]): string {
 /** Where the names in one question were read: notes by what they are kept on, runs by the project each ran in. */
 type Source = { run: boolean; about: string };
 
-/** "your note on Bake", "your notes on Bake and Jo and a run on Fanline", and whether that is more than one. */
+/** "your note on Oxbow", "your notes on Oxbow and Jo and a run on Fanline", and whether that is more than one. */
 function sourcesSaid(sources: readonly Source[]): { said: string; many: boolean } {
   const notes = [...new Set(sources.filter((s) => !s.run).map((s) => s.about))];
   const runs = sources.filter((s) => s.run);
@@ -1026,7 +1026,7 @@ type Person = { row: Entry; name: string; keys: Set<string>; projects: string[] 
  */
 type Offer = { register: string; rows: Record<string, unknown>[]; question: string; notes: Set<string>; offered: string[]; keys?: string[] };
 
-/** Whether `name` stands in `text` as whole words, spelled as it is: `Bake` in "Works on Bake." and not in "bake bread". */
+/** Whether `name` stands in `text` as whole words, spelled as it is: `Oxbow` in "Works on Oxbow." and not in "oxbow lake". */
 const standsIn = (text: string, name: string): boolean =>
   new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?![\\p{L}\\p{N}])`, 'u').test(text);
 

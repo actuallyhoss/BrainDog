@@ -1,7 +1,7 @@
 /**
  * Slash drafting a page for a person, an organisation or a project that keeps coming up (`slash.ts` `entitiesOf`,
  * `entityDrafts`): five or more dated `met` lines, or three or more rows in other lists pointing at it, and no page of its
- * own yet (DIRECTION §38).
+ * own yet.
  *
  * WHAT THESE HOLD. The reading counts met lines and the rows that name each row, from the lists the caller reads, and
  * leaves out examples and rows folded into another. A draft is a page that opens on a lead line from the row itself,

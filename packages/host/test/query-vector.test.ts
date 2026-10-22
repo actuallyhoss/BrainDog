@@ -2,7 +2,7 @@
  * A search's words as a vector (ENG-B18): `queryVector`, the record's one guarded path, over a hand-built meter and a
  * fake embed. Each step that says no sends nothing: a folded query that is empty or too long, his switch off or not
  * readable, a month with no room past its kept half. A query asked again within the day is answered from memory with no
- * call, and the log never holds his words. And the pass, whose embed room is now `embedRoom`, leases as it did.
+ * call, and the log never holds the person's words. And the pass, whose embed room is now `embedRoom`, leases as it did.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

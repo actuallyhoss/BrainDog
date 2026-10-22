@@ -7,10 +7,10 @@
  * Directory's `ALLOWANCE` and `PLANS` are this table read again (`directory.ts`), the checkout takes its names and
  * prices from here (`apps/worker/src/billing.ts`), and `test/plans.test.ts` holds every figure.
  *
- * THE DEFAULTS TAKEN FOR THE OWNER (DIRECTION §42, his to change here with a word): Cloud Plus is five times Cloud, the
+ * THE DEFAULTS TAKEN (each one a change of a word here): Cloud Plus is five times Cloud, the
  * code's figure and its card's own claim, not the roadmap's 60,000; agents are 3 on Free, 15 on Cloud and 75 on Cloud
- * Plus; no yearly price; the packs and extra usage he chose on 26 September stand. Free's figures are the default of
- * 2 October (DIRECTION §35), Cloud's his own of 26 September.
+ * Plus; no yearly price; the packs and extra usage chosen on 26 September stand. Free's figures are the default of
+ * 2 October, Cloud's the one set on 26 September.
  *
  * MONEY IS WHOLE CENTS OF ONE CURRENCY, `CURRENCY`. `price` is those cents as a person reads them, made here and never
  * typed beside them. Nothing here charges: billing stays off or in test mode until he sits for a live charge.
@@ -123,7 +123,7 @@ export const teamsOn = (plan: string | null): boolean => plan === null || !(plan
 /** A pack of Slash credits: `credits` for `cents` of `CURRENCY`, on top of a plan's month. */
 export type Pack = { id: string; credits: number; cents: number };
 
-/** The packs he chose on 26 September: 100 credits for $5, 500 for $20. Sold by no checkout yet (LCH-A10). */
+/** The packs chosen on 26 September: 100 credits for $5, 500 for $20. Sold by no checkout yet (LCH-A10). */
 export const PACKS: readonly Pack[] = [
   { id: 'credits-100', credits: 100, cents: 500 },
   { id: 'credits-500', credits: 500, cents: 2_000 },

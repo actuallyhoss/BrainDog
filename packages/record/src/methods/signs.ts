@@ -1,5 +1,5 @@
 /**
- * The record's vital signs, the record's half: `signs`, READ+ (PRF-A01, DIRECTION §40 "a daily check watches all of
+ * The record's vital signs, the record's half: `signs`, READ+ (PRF-A01: "a daily check watches all of
  * that").
  *
  * WHAT A SIGN IS AND HOW IT IS READ IS THE KERNEL'S (`kernel/src/signs.ts`): a closed list of readers over the kernel's

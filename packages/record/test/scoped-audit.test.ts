@@ -210,7 +210,7 @@ test('2. A BLOCK WHOSE SOURCE IS NOT A LIST IS JUDGED BY WHAT IT READS: the cash
   const desk = value<PageOut>(await api.page({ slug: 'desk' }, wren));
   /* FOUND BY ITS KIND AND, AMONG BLOCKS OF ONE KIND, BY WHAT IT READS, because a refused block no longer says what it
      reads (`source: register.diary` named the list `boot` leaves out of her rail), and the page answers its blocks in
-     its look's order, not the order they are declared (DIRECTION §38, `applyLook`). Of the tables, only the diary's is
+     its look's order, not the order they are declared (`applyLook`). Of the tables, only the diary's is
      refused over a list, so it is the one that says no source. */
   const declared = (DECLS as { id: string; body: { blocks?: { kind: string; source?: string }[] } }[]).find((d) => d.id === 'page.desk')!.body.blocks!;
   assert.equal(desk.blocks.length, declared.length);

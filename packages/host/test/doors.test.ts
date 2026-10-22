@@ -1,6 +1,6 @@
 /**
- * Every door a self-host has answers, or says in a sentence what this host lacks (LCH-C13 job 4, D33.45: "The software
- * stays self-hostable").
+ * Every door a self-host has answers, or says in a sentence what this host lacks (LCH-C13 job 4): the software
+ * stays self-hostable.
  *
  * EVERY ROUTE OF `ROUTES` IS ASKED ON THE SELF-HOST, started in this process as `apps/selfhost/test/front-doors.test.ts`
  * starts it, twice (with no server key as the owner on the machine, and with one and the owner's key), with the least a

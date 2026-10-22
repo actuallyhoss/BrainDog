@@ -5,7 +5,7 @@
  * a pattern is written as kind `pattern`, so on the included model a background ask spent one of his 80: `asks.used`
  * read 1 after one `draftPattern` and nobody had asked anything. The header of `jobs.ts` said it did not.
  *
- * HIS WORDS: "cap stays 80", and "a non-2xx status from the model is retried and not counted". So a failed attempt
+ * THE RULES: "cap stays 80", and "a non-2xx status from the model is retried and not counted". So a failed attempt
  * moves neither count (cases 3 and 4) and keeps the neurons a platform may have billed, where a reply nobody could
  * read and a timeout count once (case 5). An automation's question is one of his asks (case 6).
  */
@@ -50,7 +50,8 @@ const build = () => {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const inference = canned();
-  const slash = createSlash({ sql, clock, inference, record: fakeRecord() });
+  /* A DIGEST'S PROSE ASKS A MODEL NOT REACHED TWICE MORE (`PROSE_BACKOFF_MS`), and here it waits for nothing. */
+  const slash = createSlash({ sql, clock, inference, record: fakeRecord() }, { wait: async () => {} });
   const ledger = core(sql, clock, inference);
   return {
     sql,

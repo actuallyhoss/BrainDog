@@ -1,5 +1,5 @@
 /**
- * The nightly walk over what the record already holds (DIRECTION §38, "understanding is the engine's first job"), from
+ * The nightly walk over what the record already holds ("understanding is the engine's first job"), from
  * Slash's daily run: the kernel's `backfill` links what it is sure of, and what it would not do on its own is filed on
  * Decide as one question each, once, and carried out when it is answered.
  */

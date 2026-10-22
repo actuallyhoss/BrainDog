@@ -1,7 +1,7 @@
 /**
  * `context`, as an agent reads it first: the record's card, and beside it the briefing cut to what a session acts on.
  *
- * ONE CARD, THE RECORD'S (`packages/record/src/card.ts`, AGT-B07; "the same card from context", D37.81 to D37.89, and
+ * ONE CARD, THE RECORD'S (`packages/record/src/card.ts`, AGT-B07; "the same card from context", and
  * "keep MCP/HTTP/CLI one core", HD.316). `context` sends `card`, and this door prints it as it came, then the open work,
  * the Home page and the habits, none of which is a card. The door composes no card of its own: a second composer here
  * was a second set of rules, and the card a session read was whatever this package was built with. A host too old to
@@ -264,6 +264,11 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   /* ── what follows the card ─────────────────────────────────────────────── */
 
   const lines: string[] = [];
+  /* WHAT AN AGENT ACTING FOR A COLLEAGUE REACHES, one line the record said ("You act for Sam: Kiln, view; amounts
+     hidden"), first after the card, so a list it expected and does not see is not taken for an empty one. A plan says
+     it itself, as its Reach line. */
+  const reach = text(c.reach);
+  if (reach !== null && text(c.plan) === null) lines.push(reach);
   const ambiguous = Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : [];
   /* ONE QUESTION, which the agent can put to the person as it stands: which of these this folder is. It was a statement
      of what the record could not tell, with the consequence after it, and nothing for anybody to answer. */
@@ -273,6 +278,10 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const choices = rest > 0 ? `${named.join(', ')} or one of ${grouped(rest)} more` : named.length === 1 ? named[0]! : `${named.slice(0, -1).join(', ')} or ${named.at(-1)!}`;
     lines.push(`Which project is this folder, ${choices}? Until one is set you work in no project.`);
   }
+  /* AND AN AGENT WITH NO FOLDER IN NO PROJECT IS ASKED ONE THING (`Context.ask`): what the person is working on, which it
+     sends back as `topic` and the record places its run by. Claude.ai and ChatGPT have no folder to place them. */
+  const ask = text(c.ask);
+  if (ask !== null) lines.push(ask);
   /* THE RED SIGNS ARE THE CARD'S (its `Signs` slot), so they are kept here for the agent that acts on one, never said again. */
   const signs = (Array.isArray(c.signs) ? c.signs : []).filter(isObject).filter((s) => typeof s.name === 'string' && typeof s.said === 'string');
   for (const g of groups) {
@@ -300,6 +309,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     ...(session ? { session: { spoken: session.spoken, ...(text(session.state) ? { state: session.state } : {}), ...(runner ? { as: runner } : {}) } } : {}),
     ...(project ? { project: { spoken: project.spoken, name: project.name, ...(text(project.how) ? { how: project.how } : {}) } } : {}),
     ...(ambiguous.length > 0 ? { ambiguous } : {}),
+    ...(ask !== null ? { ask } : {}),
     ...(signs.length > 0 ? { signs: signs.map((s) => ({ name: s.name, said: s.said })) } : {}),
     ...(handoff
       ? {
@@ -321,6 +331,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     ...(people.length > 0 ? { people: people.slice(0, PEOPLE_MOST).map((p) => lean(p, false, KEPT_TEXT)) } : {}),
     ...(typeof c.faded === 'number' && c.faded > 0 ? { faded: c.faded } : {}),
     ...(text(c.next) ? { next: c.next } : {}),
+    ...(reach !== null ? { reach } : {}),
     teach: taught,
   };
   /**
@@ -345,5 +356,5 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   const first = session === null ? taught : [];
   /* THE CARD IN THE ANSWER IS THE PLAN'S, the one its text prints, with no More line: this is context. */
   const planCard = text(c.plan_card) ?? said;
-  return { value: { ...planned, card: planCard, teach: first }, text: [plan, ...lines.filter((l) => l.startsWith('Which project')), ...first].join('\n'), card: planCard };
+  return { value: { ...planned, card: planCard, teach: first }, text: [plan, ...lines.filter((l) => l.startsWith('Which project') || l === ask), ...first].join('\n'), card: planCard };
 }

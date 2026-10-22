@@ -1,6 +1,6 @@
 /**
  * Where things stand, and the one call that clears each: `stale` (READ+), AGT-C18 job c ("how good is braindog's mcp at
- * cleaning up stale stuff?", D40.10).
+ * cleaning up stale stuff?").
  *
  * WHAT WAS THERE BEFORE. The kernel counted what went stale (`kernel/src/tidy.ts`, a finder a kind) and nothing told
  * whoever was standing in the record. An agent starting work was handed the newest step and never told that three older

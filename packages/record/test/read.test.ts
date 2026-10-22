@@ -573,7 +573,9 @@ test('BOOT IS ONE READ, so a write from another connection lands wholly before i
   let armed = true;
   sql.one = ((text: string, ...params: never[]) => {
     const out = one(text, ...params);
-    if (armed && text.includes('count(*) AS n FROM entry WHERE register = ?') && params[0] === 'obligations') {
+    /* A LIST IS NAMED BY ITS ID AS A LITERAL in the kernel's reads (`onList`), or by a placeholder when the id is not plain. */
+    const counts = text.includes("count(*) AS n FROM entry WHERE register = 'obligations'") || (text.includes('count(*) AS n FROM entry WHERE register = ?') && params[0] === 'obligations');
+    if (armed && counts) {
       armed = false;
       assert.ok(second.kernel.create('obligations', { what: 'During' }, { actor: 'p_1' }).ok);
     }

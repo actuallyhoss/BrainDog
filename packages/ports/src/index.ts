@@ -172,8 +172,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-four, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 23 write path · 11 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-five, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 24 write path · 11 auth and vault · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -232,7 +232,7 @@ const GRAMMAR = [
   'REF_UNKNOWN',
 ] as const;
 
-/** Write path — 23. */
+/** Write path — 24. */
 const WRITE = [
   'REGISTER_UNKNOWN', 'ROW_UNKNOWN', 'FIELD_UNKNOWN', 'ROW_LOCKED', 'HUMAN_ONLY', 'TEXT_JSON_QUOTED',
   'TEXT_ESCAPED_NEWLINE', 'INT_OUT_OF_RANGE', 'VALUE_MALFORMED', 'REQUIRED_MISSING', 'ENUM_VALUE_UNKNOWN',
@@ -252,6 +252,10 @@ const WRITE = [
      the ladder files it as a question for nothing; and a name `get` was handed that more than one thing is called, with
      each by its handle. Not `VALUE_MALFORMED`: the shape is right, and the repair is a different call. */
   'PATCH_EMPTY', 'NAME_AMBIGUOUS',
+  /* A SEALED FILE OR A PART OF ONE THIS RECORD DOES NOT HOLD, 2026-10-22 (Setup sync): `sealedGet` by a name nothing was
+     put under, or a part not put yet. Not `ROW_UNKNOWN`, whose sentence is about rows a caller may not see: a sealed
+     file is the owner's alone, and the command that asks for one branches on its absence to put it. */
+  'NOT_FOUND',
 ] as const;
 
 /** Auth and vault — 11. */
@@ -320,7 +324,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and thirty-four, in `30 §6`'s order. */
+/** The hundred and thirty-five, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
@@ -333,7 +337,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and thirty-four. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and thirty-five. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

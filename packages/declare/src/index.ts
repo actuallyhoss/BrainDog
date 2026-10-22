@@ -577,7 +577,7 @@ export type Diff = {
      * writes reads as it did before the key.
      */
     writes?: Writes;
-    /** The sentence under the line, "Writes Numbers on Bake: revenue, customers, 3 more." Beside `writes`. */
+    /** The sentence under the line, "Writes Numbers on Oxbow: revenue, customers, 3 more." Beside `writes`. */
     writes_line?: string;
     /** Its interval is the provider's own floor (`floor:`), the least it may run at: "every 6h, the provider's minimum". */
     at_floor?: true;

@@ -24,10 +24,16 @@
  * line about one (a line about a hidden field is dropped, and a create line's `to` loses the hidden keys), and a row's
  * mirrored state when its state field is hidden. `firewall` is the doors' safety net, the same strip on any row left in
  * an answer, which a door raises as a fault, so a path that forgot to mask is found and never leaks.
+ *
+ * AND THE AMOUNTS WRITTEN IN TEXT (`maskMoney`). Hiding a money field kept its value off every answer, and "Paid £923.47
+ * for clay" in the same row's notes, a comment or a line of the log still said it. Once any money field is hidden from a
+ * caller (`amountsHidden`, a share's "Hide amounts" among them), every amount written in the text she is answered is
+ * taken out, its currency kept (`maskMoneyText`), and a text field holding one is hers to read and not to change, so
+ * what she saves never writes "£…" over the amount.
  */
 
 import type { Entry, Json, Kernel, Wheres } from '@braindog/kernel';
-import { PRIVATE_NOTE, viewerOfRead, whereFor } from '@braindog/kernel';
+import { PRIVATE_NOTE, maskMoneyText, viewerOfRead, whereFor } from '@braindog/kernel';
 import type { Refusal, Sql } from '@braindog/ports';
 
 import type { CallContext } from './index.ts';
@@ -54,6 +60,40 @@ export const hidesAny = (ctx: Pick<Sighted, 'hides'>): boolean => Object.values(
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/**
+ * Whether amounts are hidden from this caller: some money field of some list is, by a share's "Hide amounts" or by one
+ * naming the field. Read off the lens and the declarations, never off a flag a host could leave out.
+ */
+export const amountsHiddenIn = (kernel: Pick<Kernel, 'register'>, ctx: Pick<Sighted, 'hides'>): boolean =>
+  Object.entries(ctx.hides ?? {}).some(([register, fields]) => fields.length > 0 && (kernel.register(register)?.fields ?? []).some((f) => f.type === 'money' && fields.includes(f.id)));
+
+/** A plain object or array, the only things an answer is walked into: a byte array or a date is handed on as it is. */
+const plain = (v: object): boolean => Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null;
+
+/**
+ * An answer with every amount written in its text taken out (`maskMoneyText`): each string in it, at any depth, the
+ * same answer when none held one. Keys are names and are left as they are.
+ */
+export function moneyMasked<T>(answer: T): T {
+  const walk = (v: unknown, depth: number): unknown => {
+    if (typeof v === 'string') return maskMoneyText(v);
+    if (v === null || typeof v !== 'object' || depth > 64 || !plain(v)) return v;
+    if (Array.isArray(v)) {
+      const out = v.map((x) => walk(x, depth + 1));
+      return out.some((x, i) => x !== v[i]) ? out : v;
+    }
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) {
+      const y = walk(x, depth + 1);
+      if (y !== x) changed = true;
+      next[k] = y;
+    }
+    return changed ? next : v;
+  };
+  return walk(answer, 0) as T;
+}
+
 /** A row as any answer carries one: a list's id beside the row's `fields`. */
 const isRow = (v: Record<string, unknown>): v is { register: string; fields: Record<string, unknown> } => typeof v.register === 'string' && isObj(v.fields);
 
@@ -73,9 +113,11 @@ export const FIREWALL_FAULT = 'lens.firewall';
  * THE DOORS' SAFETY NET (sharing plan §2.5 item 6): every row left in an answer with a field hidden from its caller, the
  * field taken off, and which `list.field` were found. A pure walk, the same at `/api` and `/mcp`; the door that finds
  * one raises fault `lens.firewall` naming the method. Never the main control: every method masks its own answer, and a
- * strip here is a path that did not. `listOf` names the list of a row the MCP door shapes by its spoken id alone.
+ * strip here is a path that did not. `listOf` names the list of a row the MCP door shapes by its spoken id alone, and
+ * `money` asks, only of a caller something is hidden from, whether amounts are, so those written in the answer's text
+ * come out too.
  */
-export function firewall<T>(ctx: unknown, answer: T, listOf?: (spoken: string) => string | null): { answer: T; stripped: string[] } {
+export function firewall<T>(ctx: unknown, answer: T, listOf?: (spoken: string) => string | null, money?: () => boolean): { answer: T; stripped: string[] } {
   const hides = isObj(ctx) && isObj(ctx.hides) ? (ctx.hides as Record<string, readonly string[]>) : undefined;
   if (hides === undefined || !hidesAny({ hides })) return { answer, stripped: [] };
   const stripped = new Set<string>();
@@ -106,7 +148,11 @@ export function firewall<T>(ctx: unknown, answer: T, listOf?: (spoken: string) =
     }
     return changed ? next : v;
   };
-  const out = walk(answer, 0) as T;
+  const walked = walk(answer, 0) as T;
+  /* AND THE AMOUNTS WRITTEN IN TEXT, when the door knows amounts are hidden from her (`money`, the record's
+     `moneyHidden`): a path that forgot to mask them is found here as one that forgot a field is. */
+  const out = money?.() === true ? moneyMasked(walked) : walked;
+  if (out !== walked) stripped.add('amounts written in text');
   return { answer: out, stripped: [...stripped].sort() };
 }
 
@@ -209,7 +255,7 @@ export function readSight(kernel: Kernel) {
 
   /** A search, its hits and `matched` both the rows the caller is shown, by the fields she is shown. */
   const searchMatched = (ctx: Sighted, q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}) =>
-    kernel.searchMatched(q, { ...opts, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides });
+    kernel.searchMatched(q, { ...opts, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides, ...(amountsHidden(ctx) ? { maskMoney: true } : {}) });
 
   /**
    * The lists a search does not ask by meaning for this caller: one with a searchable field hidden from her, which
@@ -287,8 +333,15 @@ export function readSight(kernel: Kernel) {
       }
       return changed ? next : v;
     };
-    return walk(answer, 0) as T;
+    /* AND THE AMOUNTS WRITTEN IN ITS TEXT, when amounts are hidden from her (`maskMoney`). */
+    return maskMoney(ctx, walk(answer, 0) as T);
   };
+
+  /** Whether amounts are hidden from this caller (`amountsHiddenIn`). */
+  const amountsHidden = (ctx: Sighted): boolean => amountsHiddenIn(kernel, ctx);
+
+  /** An answer as this caller is shown it, less every amount written in its text when amounts are hidden from her. */
+  const maskMoney = <T>(ctx: Sighted, answer: T): T => (amountsHidden(ctx) ? moneyMasked(answer) : answer);
 
   /**
    * Whether one write can change which OLDER lines of the log this caller is shown, which is when a remembered version
@@ -298,6 +351,9 @@ export function readSight(kernel: Kernel) {
    */
   const moves = (ctx: Sighted, e: Line & { kind: string; field: string | null }, seen: LineSight): boolean => {
     if (e.kind === 'note' && e.field === PRIVATE_NOTE) return true;
+    /* A ROW'S FIRST LINE HAS NO OLDER LINE ABOUT THAT ROW TO MOVE: a row made outside her rule is a line she is not shown,
+       and nothing before it changes, so a poll across a run of creates keeps what it remembered. */
+    if (e.kind === 'create') return false;
     const rules = Object.values(ctx.wheres ?? {});
     if (rules.length === 0) return false;
     const fields = rules.map(ruleFields);
@@ -309,7 +365,7 @@ export function readSight(kernel: Kernel) {
     return rule !== undefined && (e.field === null || ruleFields(rule)!.has(e.field));
   };
 
-  return { whole, admitted, admits, rows, lines, moves, clause, inScope, backlinks, searchMatched, unmeant, hidden: hiddenOf, maskRow, maskLine, mask };
+  return { whole, admitted, admits, rows, lines, moves, clause, inScope, backlinks, searchMatched, unmeant, hidden: hiddenOf, maskRow, maskLine, mask, amountsHidden, maskMoney };
 }
 
 /* ── the write half ──────────────────────────────────────────────────────── */
@@ -409,6 +465,19 @@ export function writeSight(deps: SightDeps) {
       const stop = mayDelete(ctx, register);
       if (stop) return stop;
     }
+    /* A TEXT FIELD HOLDING AN AMOUNT HIDDEN FROM HER IS HERS TO READ AND NOT TO CHANGE: she reads "Paid £… for clay", and
+       saving it back, even as she was shown it, would write that over the amount. */
+    if (row !== null && amountsHiddenIn(kernel, ctx))
+      for (const key of Object.keys(sent)) {
+        const held = row.fields[key];
+        if (typeof held !== 'string' || maskMoneyText(held) === held || sent[key] === held) continue;
+        const label = kernel.register(register)?.fields.find((f) => f.id === key)?.label ?? key;
+        return {
+          code: 'FORBIDDEN',
+          fix: `${label} on this ${one(listName(register))} holds an amount hidden from you, so only ${kernel.ownerName() ?? 'the owner'} or an Admin can change it.`,
+          at: key,
+        };
+      }
     /* A CONDITIONAL WRITER LEAVES THE GATE FIELDS AS THEY ARE. Whole-list writers, and creates, are not asked here: the
        kernel holds a create to the predicate after it is made. */
     const conditional = (ctx.wheres !== undefined && Object.hasOwn(ctx.wheres, register)) || (ctx.writes !== undefined && Object.hasOwn(ctx.writes, register));
