@@ -977,8 +977,12 @@
    */
   const headed = $derived(board && !tell && !data.refused && !empty);
 
-  /** The greeting, by the reader's own name as `boot` says it. */
-  const greeting = $derived(greetingOf(data.now, data.me?.name ?? (data.me?.person ? data.names?.[data.me.person] : null)));
+  /** The greeting, by the reader's name as the bar's face takes it: the record's name for them, else `boot`'s `me.name`. */
+  const greeting = $derived.by(() => {
+    const id = data.me?.person;
+    const named = id && data.names && Object.hasOwn(data.names, id) ? (data.names[id] ?? '').trim() : '';
+    return greetingOf(data.now, named || (data.me?.name ?? '').trim());
+  });
 
   /* TODAY'S LATE LIST, read off the page as Home shaped it: what the brief names, and the Late tile at the top of the
      desk shows with a button each, in the brief's order and less what a question in Needs you already asks about
