@@ -98,6 +98,41 @@ test('A JOB THAT FAILS FOR A CAUSE THAT IS NOT THE MODEL STILL CLIMBS ITS OWN LA
   assert.deepEqual(r.rows(), [{ state: 'failed', attempts: 1 }, { state: 'failed', attempts: 1 }]);
 });
 
+test('THE EMBEDDINGS GO ON WHILE THE MODEL THAT WRITES IS SILENT: only the digest waits, and nothing is tested for them', async () => {
+  let now = T0;
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: { now: () => now } });
+  const prose = enqueue(sql, () => 'JP', now, 'infer.prose', { digest: 'weekly-1', headline: 'Your week', text: 'Three tasks closed.', channels: ['mcp'] });
+  enqueue(sql, () => 'JE', now, 'infer.embed', { at: new Date(now).toISOString(), ids: ['R0', 'R1'], texts: ['a cup of tea', 'the kiln'] });
+  const asked: string[] = [];
+  const store = openSqlite();
+  const deps = (): ModelJobsDeps => ({
+    inference: {
+      draft: async () => assert.fail('no draft is queued'),
+      prose: async () => (asked.push('prose'), no('UNREACHABLE', 'The model did not answer.')),
+      embed: async (texts) => (asked.push(`embed ${texts.length}`), no('UNREACHABLE', 'The embedding model did not answer.')),
+    },
+    meter: ROOM,
+    now: () => now,
+    store,
+    log: () => {},
+    health: async () => ({ health: { state: 'not_answering', last_ok: null, since: '2026-10-09T08:40:00.000Z' } }),
+  });
+  await serveModelJobs(api, deps());
+  assert.deepEqual(asked, ['embed 2']);
+  assert.deepEqual({ ...sql.one<Row>('SELECT state, attempts FROM outbox WHERE id = ?', prose) }, { state: 'pending', attempts: 0 });
+  /* AND THE HALF HOUR'S TEST IS ASKED FOR THE DIGEST THAT WAITS, one call, as before. */
+  now = T0 + MODEL_TEST_EVERY_MS;
+  await serveModelJobs(api, deps());
+  assert.equal(asked.filter((a) => a === 'prose').length, 1);
+  assert.deepEqual({ ...sql.one<Row>('SELECT state, attempts FROM outbox WHERE id = ?', prose) }, { state: 'pending', attempts: 0 });
+  /* WITH NO DIGEST WAITING, THE MODEL THAT WRITES IS NOT TESTED FOR AN EMBEDDING'S SAKE. */
+  sql.exec('DELETE FROM outbox WHERE id = ?', prose);
+  now = T0 + 2 * MODEL_TEST_EVERY_MS;
+  await serveModelJobs(api, deps());
+  assert.equal(asked.filter((a) => a === 'prose').length, 1);
+});
+
 test('THE WAIT OUTLIVES THE ISOLATE: a fresh health read over the same store still waits, and does not test early', async () => {
   const r = await record();
   await r.pass(T0);

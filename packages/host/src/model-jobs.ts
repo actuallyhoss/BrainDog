@@ -181,7 +181,8 @@ export type ModelJobsDeps = {
   store?: UnderstandStore | undefined;
   /**
    * The engine's health (`engine-health.ts`, `engineHealthRead`), asked before anything is leased. `not_answering` holds
-   * the jobs `pending` with their attempts as they were, and the model is tried every `MODEL_TEST_EVERY_MS` by a call that is no job.
+   * the writing jobs `pending` with their attempts as they were (the embeddings go on: health is the model that writes),
+   * and the model is tried every `MODEL_TEST_EVERY_MS` by a call that is no job.
    * ABSENT, or a read that throws, and the pass leases as it always did.
    */
   health?: (() => Promise<Pick<EngineHealthRead, 'health'>>) | undefined;
@@ -439,14 +440,14 @@ async function allowed(
   }
   if (next === null) {
     setTestNext(deps, read, now + MODEL_TEST_EVERY_MS);
-    log(`Slash's model is not answering, so the record's model jobs wait with their attempts kept, and the model is tried again every ${MODEL_TEST_EVERY_MS / 60_000} minutes.`);
+    log(`Slash's model is not answering, so the record's writing jobs wait with their attempts kept, and the model is tried again every ${MODEL_TEST_EVERY_MS / 60_000} minutes.`);
     return 'none';
   }
   if (now < next) return 'none';
   setTestNext(deps, read, now + MODEL_TEST_EVERY_MS);
   /* NOTHING WAITING, NOTHING TO TEST FOR: the test is a model call, and one made every half hour over an empty queue is
      spent on nobody. A job leased as the test (before) was only ever tried when one waited, and so is this call. */
-  const kinds: OutboxKind[] = ['infer.draft', 'infer.prose', ...(inference.resolve ? [RESOLVE] : []), ...(inference.embed ? (['infer.embed'] as const) : [])];
+  const kinds: OutboxKind[] = ['infer.draft', 'infer.prose', ...(inference.resolve ? [RESOLVE] : [])];
   if (kernel.outboxWaiting?.(kinds) === false) return 'none';
   let answered = false;
   try {
@@ -455,7 +456,7 @@ async function allowed(
     /* a test that throws is a model still silent */
   }
   if (!answered) {
-    log("Slash's model is still not answering, so the record's model jobs keep waiting with their attempts kept.");
+    log("Slash's model is still not answering, so the record's writing jobs keep waiting with their attempts kept.");
     return 'none';
   }
   setTestNext(deps, read, null);
@@ -641,9 +642,10 @@ async function settle(
  * AND THE NOTES PASS LAST, once its night has come (`serveNotes`), where the host hands a store, a kernel that reads and
  * a model that reads notes. Its ask is understanding's too, so it is held to the same share and the work's month.
  *
- * A MODEL THAT IS NOT ANSWERING LEASES NOTHING, where the host hands its health (`allowed`): every job waits `pending`,
- * one call that is no job tests the model every `MODEL_TEST_EVERY_MS`, and the pass runs as before once it is answered. A
- * job that fails for any other cause, while the model answers, still climbs its own ladder.
+ * A MODEL THAT IS NOT ANSWERING LEASES NO WRITING JOB, where the host hands its health (`allowed`): every draft, digest and
+ * pair waits `pending`, one call that is no job tests the model every `MODEL_TEST_EVERY_MS`, and the pass runs as before
+ * once it is answered. The embeddings are another model's and still go. A job that fails for any other cause, while the
+ * model answers, still climbs its own ladder.
  *
  * AND NOTHING AT ALL WHILE HE HAS BACKGROUND READING OFF (`mayThink`): the offers, which ask no model, still run.
  *
@@ -693,9 +695,10 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     return false;
   }
 
-  /* A SILENT MODEL LEASES NOTHING (ENG-A04): an outage once spent each job's eight attempts in four hours and filed it
-     as a question. Leasing nothing leaves them `pending` with their attempts as they were, and the notes wait too. */
-  if ((await allowed(deps, api.kernel, inference, now, log)) === 'none') return false;
+  /* A SILENT MODEL LEASES NO WRITING JOB (ENG-A04): an outage once spent each job's eight attempts in four hours and filed
+     it as a question. Leasing none leaves them `pending` with their attempts as they were, and the notes wait too. The
+     embeddings go on: health speaks for the model that writes, and another model embeds. */
+  const silent = (await allowed(deps, api.kernel, inference, now, log)) === 'none';
 
   const n = Math.min(MODEL_JOBS_PER_PASS, left);
   /* THE DRAFTS, THE PROSE AND THE EMBEDDINGS NEVER SPEND UNDERSTANDING'S FLOOR (`budget-plan.ts`): they are leased no
@@ -711,8 +714,10 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     const own = meter.of?.(purpose, leased);
     return own === undefined ? restLeft : Math.min(restLeft, own.cap - own.spent(month));
   };
-  let asked: OutboxRow[];
-  if (meter.of === undefined) {
+  let asked: OutboxRow[] = [];
+  if (silent) {
+    /* NOTHING THAT NEEDS THE MODEL THAT WRITES. */
+  } else if (meter.of === undefined) {
     /* A METER BUILT BY HAND HAS ONE MONTH FOR BOTH, and the queue decides which comes first, as it always did. */
     const drafting = Math.min(n, restLeft);
     asked = drafting > 0 ? api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], drafting) : [];
@@ -733,7 +738,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   }
   /* A PAIR IS ONE ASK AT MOST AND OFTEN NONE (the cache), and it is leased no further than understanding's month has left. */
   const understandLeft = meter.understand ? meter.understand.cap - meter.understand.spent(month) : 0;
-  const judging = Math.min(n - asked.length, understandLeft);
+  const judging = silent ? 0 : Math.min(n - asked.length, understandLeft);
   const judged = inference.resolve && judging > 0 ? api.kernel.leaseOutbox([RESOLVE], judging) : [];
   leased.understand = judged.length;
   /* AN EMBEDDING HAS NO FLOOR, so its own month is what is left over once every floor nobody has used is set aside. */
@@ -765,7 +770,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     log(`Slash held ${held.length === 1 ? 'one pattern' : `${held.length} patterns`} it noticed and asked you nothing: ${held[0]} The arrivals stay in the inbox.`);
 
   /* THE NOTES, AFTER THE JOBS AND ON WHAT THE MONTH STILL HAS: the understanding share, held under the work's. */
-  if (inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
+  if (!silent && inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
     const work = meter;
     const understand = meter.understand;
     const held: ModelJobMeter = { cap: understand.cap, spent: (since) => Math.max(understand.spent(since), understand.cap - (work.cap - work.spent(since))) };
