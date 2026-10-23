@@ -525,3 +525,18 @@ test("A WALK THAT OPENS FROM ONE BOOK'S CASH IS A TEMPLATE, though it has no whe
   assert.equal(isTemplate(METRICS['book-lasts-until']!), true, 'a walk asked about no book was read as a figure');
   assert.equal(isTemplate(METRICS['runs-out-on']!), false, "the record's own walk has no hole");
 });
+
+test('A LEAD OF TWO SENTENCES LOSES A SENTENCE WHOLE, and a typed hole stands or goes with its path', async () => {
+  const { leadOf } = await import('./metrics.ts');
+  const body = 'Cash is {{cash-now}} across {{cash-accounts}} account(s). {{parts-late.first}} is late: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.';
+  const late: Record<string, string> = { 'cash-now': '£33,850', 'cash-accounts': '2', 'parts-late.first': 'Copperleaf part 2', 'parts-late.first_amount': '£480', 'parts-late.first_due': '2026-10-13' };
+  assert.equal(
+    leadOf(body, (p) => late[p] ?? null),
+    'Cash is {{cash-now}} across {{cash-accounts}} accounts. {{parts-late.first}} is late: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.',
+  );
+  const none: Record<string, string> = { 'cash-now': '£33,850', 'cash-accounts': '1' };
+  assert.equal(leadOf(body, (p) => none[p] ?? null), 'Cash is {{cash-now}} across {{cash-accounts}} account.');
+  /* A SENTENCE WITH NO FIGURE LEANS ON THE ONE BEFORE IT. */
+  assert.equal(leadOf('It is from {{as-of}}. Update it.', () => null), '');
+  assert.equal(leadOf('It is from {{as-of}}. Update it.', () => '3 Sep'), 'It is from {{as-of}}. Update it.');
+});

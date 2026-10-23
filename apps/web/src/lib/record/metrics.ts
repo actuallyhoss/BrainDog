@@ -895,6 +895,36 @@ const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*(?::[^{}\s]+)?)\s*\}\}
  * rules drop its clause: an unread change takes the clause with it, and `0%` is nought.
  */
 export function leadOf(template: string, read: (path: string) => string | null | undefined | typeof UNNAMED): string {
+  const sentences = template.split(SENTENCE_END);
+  if (sentences.length === 1) return leadSentence(template, read);
+  /* SENTENCE BY SENTENCE, so a sentence whose figures did not read goes whole and takes nothing of the one before it
+     ("Cash is £33,850. Kiln's part 2 is late." on a record with nothing late is the first sentence alone). A sentence
+     with no figure in it leans on the one before, and goes when that one went. */
+  const out: string[] = [];
+  let before = true;
+  for (const sentence of sentences) {
+    if (!HOLE_IN.test(sentence)) {
+      if (before) out.push(sentence);
+      continue;
+    }
+    const said = leadSentence(sentence, read).trim();
+    before = said !== '';
+    if (said !== '') out.push(/[.!?]$/u.test(said) ? said : `${said}.`);
+  }
+  return out.join(' ');
+}
+
+/** Where one sentence of a lead ends and the next begins: a stop, then space, then more words. */
+const SENTENCE_END = /(?<=[.!?])\s+(?=\S)/u;
+/** Whether text holds a `{{path}}`. */
+const HOLE_IN = /\{\{\s*[a-z][a-z0-9_-]*/u;
+/** A typed hole's form, `{{ago:tasks-late.first_by}}`, read by the path after it. */
+const TYPED_FORM = /^(?:date|day|until|ago|money|quantity|pct|ref):(?=[A-Za-z])/u;
+
+/** One sentence of a lead by `leadOf`'s rules: its clauses chosen, its plurals and verbs settled, its holes kept. */
+function leadSentence(template: string, readAs: (path: string) => string | null | undefined | typeof UNNAMED): string {
+  /* A TYPED HOLE IS READ BY ITS PATH: `{{ago:x.first_due}}` stands or goes with `x.first_due`, as the renderer reads it. */
+  const read = (path: string) => readAs(path.replace(TYPED_FORM, ''));
   /* A PATH THAT NAMES NOTHING (`UNNAMED`) KEEPS ITS CLAUSE: the renderer prints the author's words for it, so it is no
      figure that failed to read and no nought. Everywhere else here it reads as no words. */
   const said = (path: string): string | null => {
