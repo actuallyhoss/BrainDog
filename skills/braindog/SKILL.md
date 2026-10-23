@@ -45,6 +45,16 @@ The person can tell an agent something from the BrainDog app. It comes back as a
 
 The prompts `/braindog:start`, `/braindog:wrap` and `/braindog:ask` say these steps in order.
 
+## Pages you made
+
+An audit, a plan, a design or a before and after goes on the thing it is about, so the person sees it inside BrainDog.
+
+- From a shell: `braindog attach page.html --on "<task, project, or SG5>"`. The pictures the page names beside it go
+  up with it. The answer ends with the line that takes it back.
+- Over MCP: `log {spoken:"<the thing>", note:"<its title>", page:"<the HTML>"}`, with pictures inline as `data:`.
+- The page loads nothing from elsewhere: no links out, no fonts or scripts from the web. Sent again under the same
+  title, it is the next version.
+
 ## Key numbers
 
 `context` lists the key numbers you keep on the project under "Numbers", with when each was last reported. "Stale"

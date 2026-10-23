@@ -2697,6 +2697,11 @@ export function createClient(options: ClientOptions) {
       } catch {
         return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
       }
+      /* THE FILE DOOR ANSWERS A KEPT FILE BARE, `{ sha256, mime, bytes }`, and only a refusal in the envelope
+         (`apps/worker/src/files.ts`), so a success read through `answered` alone came back as an unreachable host. */
+      const kept = body as { sha256?: unknown; mime?: unknown; bytes?: unknown } | null;
+      if (res.ok && kept !== null && typeof kept.sha256 === 'string' && typeof kept.mime === 'string' && typeof kept.bytes === 'number')
+        return { ok: true, value: { sha256: kept.sha256, mime: kept.mime, bytes: kept.bytes } };
       return answered<{ sha256: string; mime: string; bytes: number }>(res.status, body);
     },
   };

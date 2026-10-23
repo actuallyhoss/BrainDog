@@ -197,6 +197,8 @@ export type McpSurface<C> = {
   meet?(args: Args, ctx: C): Answer;
   /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
   undoOwn?(args: { batch: string; dry?: boolean }, ctx: C): Answer;
+  /** Hang a page on a thing, or give one it carries a new version (`methods/visuals.ts`). Optional like `undoOwn`. */
+  attachVisual?(args: { on: string; page: string; title?: string }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
   /**
    * The record's whole log, newest first, a page at a time, held to what the caller may see. READ+.
@@ -692,7 +694,10 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     title: 'Add a note',
-    description: 'One note on an entry, changing nothing else.',
+    /* AND A PAGE DRAWN ON IT (DIRECTION §45): a visual changes no value, as a note changes none, so it rides on `log`
+       rather than an eighteenth tool the list has no tokens for. `note` is then its title, and a page sent again under
+       the same title is its next version. */
+    description: 'Note an entry; page: HTML drawn on it.',
     /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
@@ -701,6 +706,8 @@ export const TOOLS: readonly Tool[] = [
       { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' } },
       ['note'],
     ),
+    /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. */
+    quiet: ['page'],
     writes: true,
   },
   {
@@ -2398,6 +2405,23 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     };
   };
 
+  /**
+   * `log` WITH A PAGE: a visual hung on the thing `spoken` names, a task by its handle or name, or a question as SG5.
+   * The record resolves the thing and holds the page to the frame's rules; its answer's batch is the receipt's undo.
+   */
+  const pageOn = async (args: Args, ctx: C, turn: Turn): Promise<Done> => {
+    if (!surface.attachVisual) return { result: unbuilt('a page on log', 'Hand the page in with braindog attach.') };
+    if (typeof args.spoken !== 'string' || args.spoken.trim() === '')
+      return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Say in spoken what the page is on: a task, a project, or a question as SG5.', at: 'spoken' } } };
+    if (typeof args.page !== 'string') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'page is the HTML itself, with its style and script.', at: 'page' } } };
+    const title = typeof args.note === 'string' && args.note.trim() !== '' ? { title: args.note.trim() } : {};
+    const out = await surface.attachVisual({ on: args.spoken.trim(), page: args.page, ...title }, ctx);
+    if (!out.ok) return { result: await failed(out, ctx, turn) };
+    turn.batch = batchIn(out.value);
+    const said = isObject(out.value) && typeof out.value.said === 'string' ? out.value.said : 'Drawn.';
+    return { result: out, say: () => said };
+  };
+
   const run: Record<string, (args: Args, ctx: C, turn: Turn) => Promise<Done>> = {
     /**
      * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
@@ -2950,6 +2974,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * `update` needs it, and a refusal passes through whole.
      */
     log: async (args, ctx, turn) => {
+      if (args.page !== undefined && args.page !== null) return pageOn(args, ctx, turn);
       const note = String(args.note ?? '').trim();
       if (!note) return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } } };
       /**

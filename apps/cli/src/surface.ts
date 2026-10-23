@@ -82,6 +82,8 @@ const LATER = [
   'inboxPatterns',
   'triage',
   'undoOwn',
+  /* A page on `log` (`attachVisual`), for a stdio agent as for one over HTTP. */
+  'attachVisual',
   'previewChange',
   'tryAutomation',
   'understandPlan',
