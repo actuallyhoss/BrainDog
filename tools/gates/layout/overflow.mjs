@@ -21,6 +21,9 @@ export const OVERFLOW = ([w, slack, docked = false]) => {
      not the work's and are not read. */
   const dock = docked ? document.querySelector('dialog.dock[open]:not(:modal)') : null;
   const edge = dock ? dock.getBoundingClientRect().left : w;
+  /* AND ONLY BESIDE IT: the top bar runs the window's width over the panel (frame B), so what ends above the panel's
+     top has nothing under it and is not the work's to keep in its column. */
+  const top = dock ? dock.getBoundingClientRect().top : -Infinity;
   const work = document.getElementById('main');
   if (dock && work && work.scrollWidth > work.clientWidth + slack) {
     hits.push(`the work scrolls sideways beside the panel (${work.scrollWidth}px in ${work.clientWidth}px)`);
@@ -55,7 +58,7 @@ export const OVERFLOW = ([w, slack, docked = false]) => {
   };
   for (const el of document.querySelectorAll('#main *, nav *, .tab-slot *')) {
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.right <= edge + 1) continue;
+    if (r.width === 0 || r.right <= edge + 1 || r.bottom <= top + 1) continue;
     if (getComputedStyle(el).position === 'fixed' || contained(el) || dock?.contains(el)) continue;
     hits.push(
       `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px` +
