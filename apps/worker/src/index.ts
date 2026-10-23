@@ -142,6 +142,8 @@ import { readSetup } from '@braindog/slash/propose';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is restoring a copy. Try again in a minute.', at: 'record' };
+/** What a record answers while its object's queue is full: a moment's wait, never a crash to quote (23 Oct, 80 at once). */
+const BUSY: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is busy for a moment. Trying again.', at: 'record', retry_after: 1 };
 
 /** The copies port `Record$` hands its record, which is `copies.ts`'s own and says it `reopens`. */
 type CloudPort = ReturnType<typeof cloudSnapshots>;
@@ -2894,6 +2896,8 @@ async function runnerOf(request: Request, env: Env, slug: string | null): Promis
 
 /** A rejection that is `Record$`'s armed refusal, `RESTORING`, and not a fault. Its sentence is the one thing that crosses. */
 const restoring = (e: unknown): boolean => e instanceof Error && e.message.includes(RESTORING.fix);
+/** The platform's "Durable Object is overloaded" rejection: the object's queue was full, so asking again soon is right. */
+const overloaded = (e: unknown): boolean => e instanceof Error && ((e as { overloaded?: unknown }).overloaded === true || /Durable Object is overloaded/u.test(e.message));
 
 /**
  * One call into a record, from a door that checks a credential there before anything is forwarded: `access`, `verify`,
@@ -3044,6 +3048,22 @@ function crashAnswer(request: Request, e: unknown, alert: (fields: { op: 'crash'
   return servesMcp(path) ? json({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'internal', data: { ref } } }, 500) : json(out, 500);
 }
 
+/**
+ * A record too busy to take one more request: 503 with `Retry-After`, a line and no alert mail. A full queue is load,
+ * not a fault; the client asks a read again after a short wait (`@braindog/client`, `call`).
+ */
+function busyAnswer(request: Request): Response {
+  let path = '/';
+  try {
+    path = new URL(request.url).pathname;
+  } catch {
+    /* As `crashAnswer`: a URL that does not parse is logged under `/`. */
+  }
+  op({ op: 'busy', where: doorPath(path) });
+  const wait: [string, string][] = [['retry-after', String(BUSY.retry_after)]];
+  return servesMcp(path) ? json({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'busy', data: { retry_after: BUSY.retry_after } } }, 503, wait) : json({ ok: false, refusal: BUSY }, 503, wait);
+}
+
 /** The methods that read, for a door with no route table to ask: `/auth/*`. */
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD']);
 
@@ -3137,7 +3157,11 @@ export default {
          `#record()` first, which rejects while a restore is armed, and this answered that 500 `INTERNAL` with the refusal's
          own sentence inside it (`test/restore-armed.test.ts`). The object's comments promise 503 `RECORD_UNAVAILABLE`,
          and 503 is what a client waits on and asks again. */
-      answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
+      answer = restoring(e)
+        ? json({ ok: false, refusal: RESTORING }, 503)
+        : overloaded(e)
+          ? busyAnswer(request)
+          : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
     /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`). */
     answer = withSignedIn(answer, request);
