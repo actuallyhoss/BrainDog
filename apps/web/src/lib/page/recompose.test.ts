@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { blockKeys, covered, planOf, rewritten, type Box } from './recompose.ts';
+import { blockKeys, covered, frameOf, planOf, rewritten, type Box } from './recompose.ts';
 
 const at = (x: number, y: number, w = 100, h = 40): Box => ({ x, y, w, h });
 
@@ -134,4 +134,41 @@ test('a place another block now takes is told from one left empty, and a block b
   assert.equal(covered(gone, [at(0, 0), at(0, 60)]), false, 'blocks above it leave the place empty');
   assert.equal(covered(gone, [at(100, 120)]), false, 'a block edge to edge beside it does not take it');
   assert.equal(covered(gone, [at(0, 159.5)]), false, 'nor does one under a pixel of it');
+});
+
+/* THE BOX A COPY IS LAID AGAINST (fluid F8). On Today's desk the page and the home page above it are `display: contents`,
+   and a frame with no box measured every block as one that cannot slide, so the tiles under an answer blinked. */
+type Fake = { parentElement: Fake | null; style: { display: string; position: string } };
+const el = (display: string, position: string, parentElement: Fake | null = null): Fake => ({ parentElement, style: { display, position } });
+
+function withStyles<T>(run: () => T): T {
+  const g = globalThis as unknown as { getComputedStyle?: (e: Fake) => Fake['style'] };
+  const was = g.getComputedStyle;
+  g.getComputedStyle = (e) => e.style;
+  try {
+    return run();
+  } finally {
+    if (was) g.getComputedStyle = was;
+    else delete g.getComputedStyle;
+  }
+}
+
+test('a page with a box of its own is its own frame', () => {
+  const page = el('block', 'static', el('block', 'relative'));
+  assert.equal(withStyles(() => frameOf(page as never)), page);
+});
+
+test('a page with no box is laid against the nearest positioned ancestor that has one', () => {
+  const board = el('grid', 'relative', el('block', 'static'));
+  const homePage = el('contents', 'relative', board);
+  const page = el('contents', 'static', homePage);
+  assert.equal(withStyles(() => frameOf(page as never)), board, 'not the home page, which has no box either');
+  /* AND A STATIC BOX ON THE WAY IS STILL PASSED. */
+  const wrap = el('block', 'static', board);
+  assert.equal(withStyles(() => frameOf(el('contents', 'static', wrap) as never)), board);
+});
+
+test('with nothing positioned above it the page is its own frame', () => {
+  const page = el('contents', 'static', el('contents', 'relative', el('block', 'static')));
+  assert.equal(withStyles(() => frameOf(page as never)), page);
 });
