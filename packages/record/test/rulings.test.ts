@@ -271,7 +271,9 @@ test('ruling 305: each of the twelve module questions is confirmed or replaced, 
   assert.equal(call('6'), 'replaced by ruling 304');
   /* AND TWO CONFIRMED CALLS THE CODE CAN SHOW: the icons are Lucide's, credited, and nothing draws a frame from another site. */
   assert.match(read('packages/render/src/glyphs/set.ts'), /Lucide, ISC License/u);
-  /* THE ONE FRAME IS A DRAWN COMPONENT'S: it runs code the record keeps, in a sandbox, in the host's own frame document, and loads nothing from another site. */
-  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && f !== 'apps/web/src/lib/page/DrawnFrame.svelte' && read(f).includes('<iframe'));
+  /* EVERY FRAME IS THE HOST'S DRAWN FRAME (a drawn component's, a visual's): it runs code the record keeps, in a sandbox, in
+     the host's own frame document, and loads nothing from another site. */
+  const host = (t: string) => [...t.matchAll(/<iframe\b[^>]*>/gu)].every((m) => m[0].includes('src={SRC}') && m[0].includes('sandbox="allow-scripts"')) && t.includes('const SRC = `${BASE}/drawn-frame`;');
+  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && read(f).includes('<iframe') && !host(read(f)));
   assert.deepEqual(framed, [], 'an outside embed is drawn in a frame');
 });

@@ -99,7 +99,7 @@ test('every option is words and not a button for a reader who may not answer, an
      says may not answer still reads words. */
   assert.match(card, /const kept = \$derived\(may === undefined && shell\.stale === true && !answerable\);/u, 'the card holds its controls for somebody the live shell said may not answer');
   assert.match(card, /const drawn = \$derived\(answerable \|\| kept\);/u);
-  assert.match(card, /function press\(way: Way\) \{\n\s+if \(kept \|\|/u, 'a control held for the kept copy answers');
+  assert.match(card, /function press\(way: Way\) \{\n(\s+if \(busy \|\| holding !== null\) return;\n)?\s+if \(kept \|\|/u, 'a control held for the kept copy answers');
   assert.match(card, /function selectWay\(way: Way\) \{\n\s+if \(kept \|\|/u, 'a choice held for the kept copy is chosen');
   /* THE SENTENCE THAT SAYS WHY HAS TO BE ON THE PAGE, over the queue, before anybody presses. */
   assert.match(
