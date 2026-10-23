@@ -1272,13 +1272,15 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     /* 2026-10-22, THE BOARD A STEP DARKER AND THE BAR ON IT (UI audit of 22 October, 26). A tile measured 1.09:1 against
        #0F121A, so in dark the tiles barely parted from the page, and the bar was a navy of its own (#171B33) that read
        as another product's. The tile stays where every ink and intent on it was solved, and the board goes down to
-       #090B10 under it; the bar is the board, and its chosen place the well's colour, as in light. */
+       #090B10 under it.
+       2026-10-23, THE FRAME ON ITS OWN INDIGO AGAIN, WITH AN EDGE (frame B, U8): the bar on the board had no edge at all,
+       so the frame is #171B33 with the rule under it, and its chosen place a soft step up that still holds ink-3 at 4.6. */
     board: '#090B10',
     tile: '#181C27',
     'tile-2': '#222837',
     hover: '#1E2331',
-    nav: '#090B10',
-    'nav-selected': '#222837',
+    nav: '#171B33',
+    'nav-selected': '#272B4A',
     rule: '#2A3141',
     'rule-strong': '#384054',
     scrim: 'rgb(5 7 12 / 0.6)',
