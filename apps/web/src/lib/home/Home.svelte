@@ -1514,11 +1514,16 @@
     align-self: stretch;
   }
 
-  /* THE LAST ROW SHARES ONE HEIGHT (Today polish 3): Arrivals, what is coming up and people, each list at the top and its
-     "N more" or "All people" pinned to the foot. */
-  .body[data-board] :global(.home-page > .page > :is([data-landed], .block-slot:is([data-key='coming-up'], [data-key='faces']))),
-  .body[data-board] > :global([data-landed]) {
+  /* THE LAST ROW SHARES ONE HEIGHT (Today polish 3): what is coming up and people, each list at the top and its "N more"
+     or "All people" pinned to the foot. NOT ARRIVALS, SINCE batch 4's look on his record: one arrival stretched to the
+     row's height left a tile of empty board, so it ends where its lines end. */
+  .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='coming-up'], [data-key='faces'])) {
     align-self: stretch;
+  }
+
+  .body[data-board] :global(.home-page > .page > [data-landed]),
+  .body[data-board] > :global([data-landed]) {
+    align-self: start;
   }
 
   .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='coming-up'], [data-key='faces'])) {
@@ -1638,8 +1643,8 @@
 
     /* WITH WHAT IS LATE THE LEFT STACK IS FOUR TRACKS: the late tile beside who is working, then Needs you over two and
        its foot beside cash. The late tile and who is working fill their track together, so neither ends short of the
-       other. AND THE TWO STACKS END ON ONE LINE (the boards' balance): the foot and cash each stretch to the last track,
-       so whichever column is the shorter takes the air at its foot rather than leaving a hole beside the other. */
+       other. THE FOOT STRETCHES TO THE LAST TRACK; CASH ENDS WHERE ITS FIGURES END, SINCE batch 4's look on his record:
+       stretched beside Late and Needs you, Cash ahead was half a column of empty tile under three figures. */
     .body[data-board]:has(> .today-late) > .today-late {
       grid-row: 1;
       grid-column: 1 / span var(--n);
@@ -1667,7 +1672,7 @@
 
     .body[data-board]:has(> .today-late) :global(.home-page > .page > .block-slot[data-key='cash']) {
       grid-row: 2 / span 3;
-      align-self: stretch;
+      align-self: start;
     }
 
     .body[data-board]:has(> .today-late):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
