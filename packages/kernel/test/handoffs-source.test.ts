@@ -12,7 +12,7 @@ import { no, ok as okResult } from '@braindog/ports';
 
 /* `pages.ts` FIRST, as `signs-page.test.ts` does, so the kernel's modules load in the order the record loads them. */
 import { readBlock, registersOfBlock, type PageBlock, type PageDeps } from '../src/pages.ts';
-import { BUILT_IN_FIGURES, HANDOFFS_OPEN, openSteps, readHandoffsOpen } from '../src/built-in-figures.ts';
+import { BUILT_IN_FIGURES, HANDOFFS_OPEN, openSteps, readHandoffsOpen, stepSaid } from '../src/built-in-figures.ts';
 import { openRecord, type Declaration, type SessionHints, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
@@ -125,4 +125,10 @@ test('about: narrows to one project, handed as its spoken id', () => {
 
 test('the block names the runs it reads', () => {
   assert.ok(registersOfBlock(TABLE).includes('session'));
+});
+
+test('A STEP AS A PERSON READS IT leaves a commit out, and keeps words that are only hex letters', () => {
+  assert.equal(stepSaid('Run the checks on master 8b1fe59 and fix what fails'), 'Run the checks on master and fix what fails');
+  assert.equal(stepSaid('Ask about the facade, then deadbeef'), 'Ask about the facade, then deadbeef');
+  assert.equal(stepSaid('Ship build 2026'), 'Ship build 2026');
 });

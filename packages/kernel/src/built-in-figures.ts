@@ -208,8 +208,8 @@ export type OpenStep = OpenHandoff & { project: string | null; repo: string | nu
 const isPath = (w: string): boolean =>
   /[\\/]/u.test(w) && (/^(?:~|\.{1,2}|[A-Za-z]:)?[\\/]/u.test(w) || (w.match(/[\\/]/gu)?.length ?? 0) >= 2 || /[\\/][^\\/]*\.[A-Za-z][A-Za-z0-9]{0,7}$/u.test(w));
 
-/** A handle the record or a tool gave, never words: a ULID, a UUID, a long hash, `tools#8`, `S42`, `wf_3fa9c2`. */
-const IDLIKE = /^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-f]{12,}|[a-z][a-z0-9_]*#[1-9][0-9]*|S[1-9][0-9]*|[a-z]+_(?=[0-9a-z]*[0-9])[0-9a-z]{6,})$/u;
+/** A handle the record or a tool gave, never words: a ULID, a UUID, a hash or a commit (`8b1fe59`), `tools#8`, `S42`, `wf_3fa9c2`. */
+const IDLIKE = /^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-f]{12,}|(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,}|[a-z][a-z0-9_]*#[1-9][0-9]*|S[1-9][0-9]*|[a-z]+_(?=[0-9a-z]*[0-9])[0-9a-z]{6,})$/u;
 
 /** A path's last plain words: the last part that holds a letter and is not a handle, its ending and joins said as spaces. */
 function lastPlainWords(path: string): string {
