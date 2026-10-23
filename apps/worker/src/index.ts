@@ -78,6 +78,7 @@ import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer }
 import { drillAnswer, drillNote, olderDrill, readDrill } from './drill-door.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { cloudSealed } from './sealed.ts';
+import { cloudVisuals } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
@@ -983,6 +984,12 @@ export class Record$ extends DurableObject<Env> {
                 },
                 (bytes) => abuseWait(this.env, 'uploadDay', api.kernel.identity()?.id ?? '', bytes),
               ),
+              /* VISUALS' PAGES BESIDE THE RECORD'S FILES, and its pictures looked up where the file door put them (`visuals.ts`). */
+              visuals: cloudVisuals(blobs, () => {
+                const record = api.kernel.identity()?.id;
+                if (!record) throw new Error('This record has not been created yet, so it keeps no visuals.');
+                return record;
+              }),
             }),
         /* DELETION, `51 §5.13`, in this order: a final copy, every other object under the
            record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed

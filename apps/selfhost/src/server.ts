@@ -57,6 +57,7 @@ import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
 import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
 import { diskSealed } from './sealed.ts';
+import { diskVisuals } from './visuals.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, leavesAsked, leftBy, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
@@ -1761,9 +1762,9 @@ export async function start(options: {
     catalogueShelf: catalogueShelfFrom(catalogueDir, options.kennel),
     snapshots: kept,
     destroy,
-    /* SEALED FILES' BYTES, IN `blobs/sealed/` BESIDE THE RECORD'S FILES (`sealed.ts`). A record held in memory has no
-       folder, so it keeps none and says so. */
-    ...(blobs === null ? {} : { sealed: diskSealed(blobs) }),
+    /* SEALED FILES' BYTES, IN `blobs/sealed/` BESIDE THE RECORD'S FILES (`sealed.ts`), and visuals' pages in `blobs/pages/`
+       (`visuals.ts`). A record held in memory has no folder, so it keeps neither and says so. */
+    ...(blobs === null ? {} : { sealed: diskSealed(blobs), visuals: diskVisuals(blobs) }),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
