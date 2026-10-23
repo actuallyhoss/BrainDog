@@ -370,21 +370,24 @@
   });
   /* THE MORE SHEET'S PROJECTS ARE THE ONES IN PLAY, AS THE SIDEBAR READS THEM (the audit of 22 October, U-A15): it
      listed only the projects with a page of their own, 5 where Today, Projects and the sidebar said 13 in play. Read
-     once the frame has settled, so the sheet holds them before it is opened; until then it lists what the rail holds. */
+     when the frame opens, beside the sidebar's own read of the same list (`readSide` asks once for both), so the sheet
+     holds them before it is opened; until the answer comes it lists what the rail holds. */
   let morePlay = $state.raw<readonly { key: string; name: string; href: string; hue: number | null }[] | null>(null);
+  let moreAsked = 0;
+  const holdsProjects = $derived(projectsPlace !== null);
   $effect(() => {
-    if (projectsPlace === null || morePlay !== null) return;
-    const base = apiBase(page.url);
-    const lists = data.lists;
-    const later = typeof requestIdleCallback === 'function' ? requestIdleCallback : (fn: () => void) => setTimeout(fn, 400);
-    later(() => {
-      void import('$lib/shell/side-read.ts')
-        .then(({ readSide }) => readSide(base, lists))
-        .then((read) => {
-          if (read !== null) morePlay = splitOf(read.rows, read.lanes).play;
-        })
-        .catch(() => {});
-    });
+    /* AGAIN WHEN THE RECORD MOVES, so a project made or parked is under More as it is in the sidebar; never on a move
+       between pages, which changes nothing in the list. */
+    void live.version;
+    if (!holdsProjects) return;
+    const [base, lists] = untrack(() => [apiBase(page.url), data.lists] as const);
+    const n = ++moreAsked;
+    void import('$lib/shell/side-read.ts')
+      .then(({ readSide }) => readSide(base, lists))
+      .then((read) => {
+        if (read !== null && n === moreAsked) morePlay = splitOf(read.rows, read.lanes).play;
+      })
+      .catch(() => {});
   });
   /** A section's own things in the More sheet: the projects in play for the Projects place, the rail's for the rest. */
   const moreThings = (section: string, list: readonly { href: string; title: string; hue?: number | undefined; icon: IconName }[]) =>

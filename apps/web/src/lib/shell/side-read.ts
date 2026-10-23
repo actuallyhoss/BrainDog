@@ -38,8 +38,19 @@ const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 type StateField = { id: string; values?: readonly string[]; labels?: Readonly<Record<string, string>> };
 
+/** A read still on its way, by the record it asks, so the sidebar and the More sheet opening together ask once. */
+const flying = new Map<string, Promise<SideRead | null>>();
+
 /** The record's projects, or `null` where it keeps no projects list or the list could not be read. */
-export async function readSide(base: string, lists: readonly { id: string }[]): Promise<SideRead | null> {
+export function readSide(base: string, lists: readonly { id: string }[]): Promise<SideRead | null> {
+  const held = flying.get(base);
+  if (held) return held;
+  const asking = readSideOnce(base, lists).finally(() => flying.delete(base));
+  flying.set(base, asking);
+  return asking;
+}
+
+async function readSideOnce(base: string, lists: readonly { id: string }[]): Promise<SideRead | null> {
   const client = createClient({ base });
   await Promise.all(lists.filter((l) => REGISTERS[l.id] === undefined).map((l) => learn(client.schema, l.id, asked).catch(() => undefined)));
   const decls = lists.flatMap((l) => (REGISTERS[l.id] ? [{ ...(REGISTERS[l.id] as unknown as CardDecl & { done?: string[] }), id: l.id }] : []));
