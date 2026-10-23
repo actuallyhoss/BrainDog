@@ -382,9 +382,14 @@
   /* WHERE A LOOK ROW'S CHANGE WOULD BE KEPT, read with the look each time the palette opens. */
   let lookKept = $state<'record' | 'pending' | 'device'>('device');
 
-  let reading: Promise<Reader> | null = null;
-  const reader = (): Promise<Reader> =>
-    (reading ??= import('../record/palette-live.ts').then((m) => m.paletteReader(page.url.origin)));
+  /* AT THE RECORD'S OWN BASE, as Slash's asks are: at the bare origin its lists' declarations and figures were a second
+     set of asks beside the screen's own (`/api/schema` and `/app/<slug>/api/schema` both, 23 Oct). One reader a base. */
+  let reading: { base: string; reader: Promise<Reader> } | null = null;
+  const reader = (): Promise<Reader> => {
+    const base = apiBase();
+    if (reading?.base !== base) reading = { base, reader: import('../record/palette-live.ts').then((m) => m.paletteReader(base)) };
+    return reading.reader;
+  };
 
   /**
    * THE RECORD'S HITS, FOR THE TEXT THEY ANSWER, and never for any other.

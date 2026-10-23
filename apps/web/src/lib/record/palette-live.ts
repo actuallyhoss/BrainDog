@@ -31,7 +31,7 @@ export const LOG_LINES = 50;
 
 const NOTHING: SearchResult = { hits: [], total: 0, groups: [] };
 
-/** A reader for one tab. `base` is the page's own origin. */
+/** A reader for one tab. `base` is the record's own (`apiBase`), so its asks share the screen's kept ones. */
 export function paletteReader(base: string, io?: Fetch): Reader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const search = searcher(base, io);
