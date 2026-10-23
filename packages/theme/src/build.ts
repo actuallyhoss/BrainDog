@@ -1276,22 +1276,27 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
        2026-10-23, THE FRAME ON ITS OWN INDIGO AGAIN, WITH AN EDGE (frame B, U8): the bar on the board had no edge at all,
        so the frame is #171B33 with the rule under it, and its chosen place a soft step up that still holds ink-3 at 4.6.
        2026-10-23, THE FRAME IN THE MARK'S RED, NOT A NAVY (his word: "red tones works better"): an oxblood that sits under
-       the red mark as its own ground, ink at 15.1 on it, and its chosen place a step up that holds ink-3 at 4.9. */
-    board: '#090B10',
-    tile: '#181C27',
-    'tile-2': '#222837',
-    hover: '#1E2331',
+       the red mark as its own ground, ink at 15.1 on it, and its chosen place a step up that holds ink-3 at 4.9.
+       2026-10-23, THE GREYS LEAN RED UNDER THE RED FRAME (his word: "since the navbar is red i need the general tones to
+       be leaning towards red instead of blue"): every neutral took hue 355 at two thirds of its saturation, its luminance
+       held, so every pair above measures as it did (ink-3 on tile 5.7, on tile-2 5.0). Status tints keep their hues.
+       The board alone is a true grey ("the main page background should be greyish not reddish"), #0B0B0B at the old
+       board's luminance, so the tiles' warmth reads against a neutral page. */
+    board: '#0B0B0B',
+    tile: '#231A1A',
+    'tile-2': '#322526',
+    hover: '#2D2021',
     nav: '#2B1418',
     'nav-selected': '#421D23',
-    rule: '#2A3141',
-    'rule-strong': '#384054',
-    scrim: 'rgb(5 7 12 / 0.6)',
-    toast: '#2B3144',
-    'on-toast': '#EDF0F7',
-    ink: '#EDF0F7',
-    'ink-2': '#BAC2D0',
-    'ink-3': '#8D96A8',
-    focus: '#EDF0F7',
+    rule: '#3C2D2F',
+    'rule-strong': '#4E3C3D',
+    scrim: 'rgb(7 7 7 / 0.6)',
+    toast: '#3D2E2F',
+    'on-toast': '#F5EEEF',
+    ink: '#F5EEEF',
+    'ink-2': '#CCBEBF',
+    'ink-3': '#A39293',
+    focus: '#F5EEEF',
     good: '#5FD08F',
     'good-tint': '#14301F',
     warn: '#F0A64B',
@@ -1299,10 +1304,10 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     info: '#7AA7FF',
     'info-tint': '#18264A',
     live: '#47D486',
-    'switch-off': '#646D82',
+    'switch-off': '#7C686A',
     knob: '#FFFFFF',
-    'segment-on': '#2E3446',
-    arrived: '#292E39',
+    'segment-on': '#403132',
+    arrived: '#352B2C',
     'red-fill': '#C2362F',
     'red-fill-hover': '#CF3F37',
     'red-fill-press': '#B02F29',
