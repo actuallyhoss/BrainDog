@@ -58,36 +58,16 @@ test('SETTINGS › HEALTH ASKS THEM, each with its part when it is asked for, on
   assert.match(area, /\{:else if area === 'health'\}\s*\{#await import\('\.\/areas\/Health\.svelte'\) then \{ default: Health \}\}<Health \{shell\} \{area\} \/>\{\/await\}/u);
 });
 
-test('THE BRIEFING IS BEHIND MORE: never handed to the reader, and drawn once, in More', () => {
+test('NO MORE FOLD AT THE FOOT OF TODAY (frame A): the briefing is neither asked nor drawn, and the page is drawn once', () => {
   /* The desk opens on what needs you, not on the briefing (roadmap slice 1a): the reader is handed no `opens`. */
   assert.doesNotMatch(home, /<PageView [^>]*opens=/u);
-  assert.equal(home.split('<brief.Part').length - 1, 1, 'the briefing is drawn once');
-  assert.equal(home.split('{@render briefed()}').length - 1, 1, 'the briefing is drawn twice, or not at all');
-  const more = home.indexOf('class="more-body"');
-  assert.ok(more > 0 && home.indexOf('{@render briefed()}') > more, 'the briefing is not inside More');
+  assert.doesNotMatch(home, /<brief\.Part|class="more-body"|moreOpen/u);
+  assert.doesNotMatch(home, /import\('\.\/(?:briefing\.ts|Briefing\.svelte)'\)/u);
   assert.equal(home.split('<PageView').length - 1, 1, 'the page is drawn once');
   const body = readFileSync(new URL('../page/PageBody.svelte', import.meta.url), 'utf8');
   /* The reader still takes what a kept page opens its board with, under the headline or over the first block. */
   assert.match(body, /const opensAt = \$derived\(opens && !arranging && headline && reading\[0\] === headline \? headline\.at : -1\);/u);
   assert.equal(body.split('{@render opens()}').length - 1, 2);
-});
-
-test('THE BRIEFING IS DRAWN WHILE ITS MODEL IS PAUSED (U2), and its paused foot is not said beside the quiet line (U7)', () => {
-  assert.match(home, /const briefShown = \$derived\(\(brief\?\.cards\.length \?\? 0\) > 0\);/u);
-  assert.match(home, /const extras = \$derived\(briefShown \? 1 : 0\);/u);
-  assert.match(home, /<brief\.Part cards=\{brief\.cards\} foot=\{quiet !== null && brief\.foot === brief\.paused \? null : brief\.foot\} \/>/u);
-});
-
-test('the briefing does not come with the screen: it is fetched when asked for, part and all', () => {
-  for (const name of ['briefing', 'Briefing']) {
-    assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);
-  }
-  assert.match(home, /import\('\.\/briefing\.ts'\)/u);
-  assert.match(home, /import\('\.\/Briefing\.svelte'\)/u);
-  /* AND IT IS ASKED ONCE THE PAGE'S OWN READ HAS GONE OUT, so the record answers the page first. */
-  const effect = home.split('$effect(').slice(1).find((e) => e.includes("tileOnce('briefing', base, ver,"));
-  assert.ok(effect, 'no effect asks for the briefing');
-  assert.match(effect, /^\(\) => \{\s*if \(data\.refused \|\| !bodyAsked\) return;/u);
 });
 
 test('the page read waits on it', () => {

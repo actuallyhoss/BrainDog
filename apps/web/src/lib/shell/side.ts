@@ -115,3 +115,42 @@ export function pinsKept(raw: string | null): string[] {
     return [];
   }
 }
+
+/** A row under Lists: where it goes, its words and glyph, and the count it carries, if any. */
+export type SideLink = { href: string; label: string; icon: string; count?: number | undefined };
+
+/** A group under Lists, folded until opened. A group of one is drawn as its row. */
+export type SideGroup = { key: string; label: string; icon: string; items: SideLink[] };
+
+/** A list as the sidebar groups it: the kernel's own (agent runs) and the ones that hold money are told apart. */
+export type SideList = {
+  id: string;
+  name: string;
+  icon: string;
+  count: number;
+  views: readonly { name: string; href: string }[];
+  kernel: boolean;
+  money: boolean;
+};
+
+/** The heading each kind of group is drawn under. */
+export type SideHeads = Record<'money' | 'kernel' | 'lists' | 'views' | 'extras', { label: string; icon: string }>;
+
+/**
+ * THE LISTS PART OF THE SIDEBAR (frame A, 23 October), in the order the More sheet read them: the places the bar leaves
+ * out (Work, People), then money's lists, the agents' own, the other lists, every saved view, and the tools. Empty groups
+ * are left out. GENERIC: a list is money's by a money field it declares and the agents' by the kernel declaring it.
+ */
+export function groupsOf(places: readonly SideLink[], lists: readonly SideList[], views: readonly SideLink[], tools: readonly SideLink[], heads: SideHeads): SideGroup[] {
+  const row = (l: SideList): SideLink => ({ href: `/r/${l.id}`, label: l.name, icon: l.icon, count: l.count });
+  const group = (key: keyof SideHeads, items: SideLink[]): SideGroup[] => (items.length > 0 ? [{ key, ...heads[key], items }] : []);
+  const saved = [...views, ...lists.flatMap((l) => l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })))];
+  return [
+    ...places.map((p) => ({ key: `place ${p.href}`, label: p.label, icon: p.icon, items: [p] })),
+    ...group('money', lists.filter((l) => !l.kernel && l.money).map(row)),
+    ...group('kernel', lists.filter((l) => l.kernel).map(row)),
+    ...group('lists', lists.filter((l) => !l.kernel && !l.money).map(row)),
+    ...group('views', saved),
+    ...group('extras', [...tools]),
+  ];
+}

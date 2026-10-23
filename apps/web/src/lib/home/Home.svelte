@@ -20,11 +20,9 @@
   without a reload and without blanking it (`listen`).
 
   TODAY'S OWN BODY IS THE DESK (roadmap slice 1a): what needs you, who is working and cash, the projects, then Arrivals,
-  what is coming up and people, on one board, and everything else behind one More. A page the person kept is drawn as
-  they laid it out, with the desk over it, and only the tiles around it fold.
-
-  ONE READ OF ITS OWN STANDS BESIDE THE PAGE, behind More: the briefing, what matters today as the record wrote it,
-  asked for beside the page and never by its read, fetched with its own part, and drawn for a record that answers any.
+  what is coming up and people, on one board. NO MORE FOLD AT ITS FOOT (frame A, 23 October): it pointed at the same
+  things the tiles and the sidebar already hold. A page the person kept is drawn as they laid it out, with the desk
+  over it.
 
   THE RECORD'S HOUSEKEEPING IS NOT HERE (the audit of 22 October, U3): what went stale, who it matched, what it found
   wrong in its own pages and notes, what the answers taught, what may be one, what has no colour and the imported rules
@@ -107,13 +105,12 @@
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { anchorsFor, inPicture, type Placed } from '$lib/home/desk-order.ts';
-  import type { BriefingRow } from '$lib/home/briefing.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
   import Icon from '$lib/ui/Icon.svelte';
 
-  import { closed, drew, holdQuiet, opened } from '../ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../ui/screen.svelte.ts';
   import { keepPart, keptPart, tileOnce, TODAY_KEPT_MS } from '$lib/home/today-kept.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
@@ -500,18 +497,14 @@
   async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
     if (slug !== null) {
       const m = await import('$lib/record/page-live.ts');
-      const asking = m.pageReader(apiBase()).read(slug);
-      bodyAsked = true;
-      return asking;
+      return m.pageReader(apiBase()).read(slug);
     }
     /* TODAY'S BODY IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an installed
        one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. A host built
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
     const m = await import('../../routes/decide/[id]/proposed.ts');
-    const asking = m.drawnOf(body, apiBase());
-    bodyAsked = true;
-    const drawn = await asking;
+    const drawn = await m.drawnOf(body, apiBase());
     if (drawn.from === 'live')
       return {
         from: 'live',
@@ -584,7 +577,6 @@
       .finally(() => {
         reading = false;
         settled = true;
-        bodyAsked = true;
         fromMemory = false;
         drewFirst();
         if (hold !== null && !hold.done) {
@@ -680,14 +672,12 @@
 
   /**
    * TODAY'S OWN BODY IS THE DESK (roadmap slice 1a, the 19 October look): what needs you, who is working and cash, the
-   * projects, then Arrivals, what is coming up and people, on one twelve-column board, and EVERYTHING ELSE FOLDED BEHIND
-   * ONE MORE: the rest of the page's blocks (`deskFolded`), the briefing, and every tile Home draws around the page.
+   * projects, then Arrivals, what is coming up and people, on one twelve-column board. The rest of the page's blocks are
+   * not drawn (`deskFolded`): the sidebar and the places hold them.
    *
-   * A PAGE THE PERSON KEPT IS THEIRS AND IS DRAWN AS THEY LAID IT OUT, every block of it; only the tiles Home draws around
-   * it fold. More is per visit: shut each time Today opens.
+   * A PAGE THE PERSON KEPT IS THEIRS AND IS DRAWN AS THEY LAID IT OUT, every block of it.
    */
   const board = $derived(declares === null);
-  let moreOpen = $state(false);
 
 
   /**
@@ -712,8 +702,7 @@
     if (!got || got.from !== 'live' || !shaped) return null;
     /* ON A PHONE NEEDS YOU SHOWS FOUR, the first with its buttons and the rest rows a tap opens (the style below), and
        its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk, at
-       the top with a button each, so the page's own late block is marked not drawn at its place and More does not say
-       it again. */
+       the top with a button each, so the page's own late block is marked not drawn at its place. */
     const lateAt = new Set(board ? (late?.at ?? []) : []);
     const blocks =
       board && (phone.current || lateAt.size > 0)
@@ -723,9 +712,8 @@
         : shaped.blocks;
     /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
        reader indexes the blocks it is handed, so the order is made here, before it. */
-    if (!board) return { blocks, folded: 0 };
-    const folded = deskFolded(blocks, moreOpen);
-    return { blocks: inPicture(folded.blocks), folded: folded.folded };
+    if (!board) return { blocks };
+    return { blocks: inPicture(deskFolded(blocks, false).blocks) };
   });
   const drawn = $derived.by((): Opened | null => {
     if (!got || got.from !== 'live' || !desked) return got;
@@ -749,25 +737,9 @@
   /* A PHONE, where Needs you shows two questions and not three (today F8). */
   const phone = new MediaQuery('(width < 600px)', false);
 
-  /**
-   * THE BRIEFING BESIDE THE PAGE (`briefing.ts`), with the part that draws it: what matters today as the record wrote it,
-   * and whether its written brief is paused, which the head says in its one quiet line (U7). `null` until it has
-   * answered, and an answer of none draws nothing.
-   *
-   * BESIDE THE PAGE READ AND NEVER IN IT, asked the moment the page's own read has gone out, so the record answers the
-   * page first. It is the one read left beside the page: what went stale, who was matched and the rest of the record's
-   * housekeeping are Settings › Health (U3), and nothing of theirs is asked here.
-   *
-   * FETCHED WHEN ASKED FOR, the reader and its part alike: this screen is the front door, and nothing here is added to
-   * what it loads first. No read of it can fail the screen, since it answers none for a host without the call, a reader
-   * it refuses and a line that dropped. ASKED AGAIN WHEN THE RECORD MOVES, and what is drawn stays until the new answer
-   * lands.
-   */
-  type BriefingPart = typeof import('./Briefing.svelte').default;
   type HandledFound = import('./handled.ts').Handled;
   type DeskPart = typeof import('./Desk.svelte').default;
   type DeskCards = import('./desk-read.ts').Cards;
-  let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; paused: string | null; Part: BriefingPart } | null>(null);
   /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
   let handled = $state.raw<HandledFound | null>(null);
   /* THE FIRST BODY WAITS FOR THE FIRST HANDLED READ, a short while at most (`HANDLED_WAIT_MS`), so the foot's line is in
@@ -778,52 +750,15 @@
   let deskHeard: () => void = () => {};
   const deskLanded = new Promise<void>((done) => (deskHeard = done));
   const HANDLED_WAIT_MS = 800;
-  /* WHETHER THE BRIEFING HAS ANSWERED, so More says one count and not a count that grows by one as it lands (VERIFY P3). */
-  let briefHeard = $state(false);
   /**
    * THE VERSION A TILE IS ASKED ONCE AT (`tileOnce`): the record's, as the poll heard it, and this tab's writes. Read in
    * each effect, so a move of the record still asks every tile again.
    */
   const asOf = (): string => `${moving.version} ${wrote()}`;
-  /* WHETHER THE PAGE'S OWN READ HAS GONE OUT, so the briefing is asked after it and the record answers the page first. */
-  let bodyAsked = $state(false);
-  $effect(() => {
-    if (data.refused || !bodyAsked) return;
-    const ver = asOf();
-    const base = apiBase();
-    let here = true;
-    /* WHAT TODAY LAST DREW OF IT, drawn at once (`today-kept.ts`); the read lands over it. */
-    type Briefed = NonNullable<typeof brief>;
-    const was = untrack(() => brief) ?? keptPart<Briefed>('brief', base);
-    brief = was;
-    if (was) briefHeard = true;
-    /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with it still on its way, and closed as fine
-       whatever came back: the briefing never refuses the screen. */
-    const at = was || copyDrawn ? null : untrack(opened);
-    /* THE QUIET MARK IS NOT TOLD while it is still to be asked, copy drawn or not (`quiet`). */
-    const quietAgain = holdQuiet();
-    const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
-      const out = await tileOnce('briefing', base, ver, () => m.readBriefingSaid(base));
-      if (here) keepPart('brief', base, (brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default }));
-    });
-    void briefing
-      .catch(() => undefined)
-      .then(() => {
-        if (here) briefHeard = true;
-        if (at !== null) closed(true, at);
-        quietAgain();
-      });
-    return () => {
-      here = false;
-      quietAgain();
-    };
-  });
 
   /**
-   * WHETHER THE MODEL THAT WRITES IS QUIET, said once under the brief (`engine-line.ts` `quietLine`, U7): not answering,
-   * his key closed, the record's own written brief paused because the model did not answer, or the month spent. The
-   * engine is asked only where a model is behind Slash; the briefing's word on its brief is read beside the page anyway.
-   * While it answers, nothing is said.
+   * WHETHER THE MODEL THAT WRITES IS QUIET (`engine-line.ts` `quietLine`, U7): not answering, his key closed, or the
+   * month spent. The engine is asked only where a model is behind Slash. While it answers, nothing is said.
    */
   let engine = $state.raw<{ health: EngineHealth | null; month: SlashStatus | null } | null>(null);
   $effect(() => {
@@ -840,7 +775,7 @@
       here = false;
     };
   });
-  const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, brief?.paused ?? null));
+  const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, null));
 
   /**
    * THE DESK ABOVE THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
@@ -920,40 +855,11 @@
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
-  /* WHETHER THE PAGE'S READER IS DRAWN. The briefing is no longer the board's first tile: it is behind More with the
-     rest, and the head's sentence says what it led with. */
+  /* WHETHER THE PAGE'S READER IS DRAWN. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
 
-  /* THE BRIEFING IS DRAWN WHATEVER ITS MODEL DOES (U2): every card the rules wrote is the record speaking, and a paused
-     model decides only that no prose of its own is shown, which the record already leaves out. */
-  const briefShown = $derived((brief?.cards.length ?? 0) > 0);
-
-  /* WHAT MORE HOLDS: the page's blocks the desk folds, and the briefing where it has a card. */
-  const extras = $derived(briefShown ? 1 : 0);
-  const folds = $derived((desked?.folded ?? 0) + extras);
-  /* WHERE THE DESK'S OWN PARTS AND MORE'S LINE STAND AMONG THE PAGE'S TILES, so the document is in the picture's order. */
+  /* WHERE THE DESK'S OWN PARTS STAND AMONG THE PAGE'S TILES, so the document is in the picture's order. */
   const anchors = $derived(anchorsFor(board ? (desked?.blocks ?? []) : [], board && reader));
-  const moreWords = { open: 'More', shut: 'Show less' } as const;
-
-  /**
-   * `j` PAST THE LAST ROW THE DESK SHOWS OPENS MORE, and the walk goes on into what it holds. The rows folded behind More
-   * (the late and urgent tasks, the work handed back) are the ones `x` ticks, and a key that walks every row of Today
-   * could not reach them while they were folded. Read after the page's own handler has moved the cursor: if it did not
-   * move, there was no row further on. Not while a box has the caret, a layer is open, or after `g`.
-   */
-  let goAt = 0;
-  function walkOn(e: KeyboardEvent) {
-    if (e.key === 'g') goAt = Date.now();
-    if (e.key !== 'j' || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
-    if (!board || moreOpen || folds === 0 || Date.now() - goAt < 1000 || typing()) return;
-    const on = e.target;
-    if (on instanceof HTMLElement && on.closest('input, textarea, select, [contenteditable], [role="grid"], dialog')) return;
-    if (document.querySelector('dialog[open]') !== null) return;
-    const was = document.querySelector('[data-row-cursor]');
-    setTimeout(() => {
-      if (!moreOpen && document.querySelector('[data-row-cursor]') === was) moreOpen = true;
-    });
-  }
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
@@ -1079,11 +985,6 @@
   {/if}
 {/snippet}
 
-<!-- WHAT MATTERS TODAY, with who wrote it, drawn once: by the page's reader, or here where none draws the blocks. -->
-{#snippet briefed()}
-  {#if brief}<brief.Part cards={brief.cards} foot={quiet !== null && brief.foot === brief.paused ? null : brief.foot} />{/if}
-{/snippet}
-
 <!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
      Height is held while it is on its way where the record has projects. -->
 {#snippet deskPart(part: 'all' | 'working' | 'projects' | 'landed' = 'all')}
@@ -1098,19 +999,6 @@
   {/if}
 {/snippet}
 
-<!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
-{#snippet moreLine()}
-  {#if folds > 0 && desked}
-    <div class="desk-foot">
-      <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-        <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
-        {#if !moreOpen}<span class="more-count num" style:visibility={briefHeard ? null : 'hidden'}>{folds}</span>{/if}
-        <Icon name="chevronDown" size="s" />
-      </button>
-    </div>
-  {/if}
-{/snippet}
-
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
 {#snippet needsFoot()}
   {#if shaped}
@@ -1118,11 +1006,11 @@
   {/if}
 {/snippet}
 
-<!-- THE DESK'S OWN PARTS AND MORE'S LINE, each where the picture shows it (`desk-order.ts`): before a tile of the page, or
+<!-- THE DESK'S OWN PARTS, each where the picture shows it (`desk-order.ts`): before a tile of the page, or
      after the page. -->
 {#snippet placedParts(list: readonly Placed[])}
   {#each list as part (part)}
-    {#if part === 'more'}{@render moreLine()}{:else if part === 'needs'}{@render needsFoot()}{:else}{@render deskPart(part)}{/if}
+    {#if part === 'needs'}{@render needsFoot()}{:else}{@render deskPart(part)}{/if}
   {/each}
 {/snippet}
 
@@ -1131,7 +1019,6 @@
   {#if here}{@render placedParts(here)}{/if}
 {/snippet}
 
-<svelte:window onkeydowncapture={walkOn} />
 
 <!-- NOT DRAWN UNTIL TODAY HAS SOMETHING TO DRAW (`shown`), a moment at most: a page of bars drawn first and then pushed
      down by the copy's desk and sentence was a jump on every warm open. Drawn at once, they arrive together. The wait is
@@ -1205,7 +1092,7 @@
 
     <!--
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
-      each where the 19 October desk puts it, and More under them. A kept page is its own board, with More under it.
+      each where the 19 October desk puts it. A kept page is its own board.
     -->
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
       <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button (U2, U-A13): beside who is working at a desk, and the
@@ -1227,14 +1114,8 @@
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
            desk the parts that are the desk's own stand among its tiles, in the order they are seen (`amid`). -->
       {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
-      <!-- THE PARTS NO TILE OF THE PAGE COMES AFTER, and EVERYTHING ELSE BEHIND ONE MORE. -->
-      {#if board}{@render placedParts(anchors.tail)}{:else}{@render moreLine()}{/if}
-      {#if moreOpen && extras > 0}
-        <div class="more-body">
-          <!-- WHAT MATTERS TODAY, with who wrote it. The page is on the board, over More. -->
-          {@render briefed()}
-        </div>
-      {/if}
+      <!-- THE PARTS NO TILE OF THE PAGE COMES AFTER. -->
+      {#if board}{@render placedParts(anchors.tail)}{/if}
     </div>
 
     <!-- AND UNDER TODAY, THE NEXT STEPS, until they are hidden. -->
@@ -1428,7 +1309,7 @@
      reader and its body give up their boxes (`display: contents`), so each block's tile is a tile of this board, and
      each is put in its row by `order`: what needs you, who is working and cash; the few key numbers where the record
      keeps any; the record's week where it keeps one;
-     the projects; Arrivals, what is coming up and people; then More, and what More opens. Not while the page is being
+     the projects; Arrivals, what is coming up and people. Not while the page is being
      arranged, where the body's own layout is what is moved.
 
      THE ROW'S SHARES ARE THE BOARD'S, by what it holds: five, four and three, and a part that is not there gives its
@@ -1477,7 +1358,7 @@
   }
 
   /* EVERYTHING ON THE BOARD IS A WHOLE ROW unless it is one of the desk's (below): bars while the page is read, the
-     page's ⋯ where a pointer cannot hover, and what More opens. Before the desk, so a bar is never under it. */
+     page's ⋯ where a pointer cannot hover. Before the desk, so a bar is never under it. */
   .body[data-board] > :global(*),
   .body[data-board] :global(.home-page > *),
   .body[data-board] :global(.home-page > .page > *) {
@@ -1486,7 +1367,7 @@
     min-inline-size: 0;
   }
 
-  /* THE PAGE'S BLOCKS THE DESK DOES NOT SHOW AT REST, drawn only once More is open, under it. */
+  /* ANY OTHER BLOCK OF THE PAGE, under the desk's own. */
   .body[data-board] :global(.home-page > .page > .block-slot) {
     grid-column: 1 / -1;
     order: 30;
@@ -1591,14 +1472,6 @@
 
   .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
     order: 10;
-  }
-
-  .body[data-board] .desk-foot {
-    order: 20;
-  }
-
-  .body[data-board] > .more-body {
-    order: 40;
   }
 
   /* A TILE LEAVING THE BOARD FADES WHERE IT STOOD: the reader lays its copy against the board, which is the box the page
@@ -1967,64 +1840,6 @@
     font-weight: var(--fw-medium);
   }
 
-  /* THE BOARD'S FOOT: More at the start, and the use case's own page at the end where the record holds one. */
-  .desk-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2) var(--sp-4);
-    min-inline-size: 0;
-  }
-
-  /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */
-  .more {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--tap);
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
-    font-weight: 600;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .more-count {
-    color: var(--ink-3);
-    font-weight: 400;
-  }
-
-  .more :global(.icon) {
-    color: var(--ink-3);
-    transition: transform var(--d-state) var(--ease-out);
-  }
-
-  .more[aria-expanded='true'] :global(.icon) {
-    transform: rotate(180deg);
-  }
-
-  .more:hover > span:first-child {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .more :global(.icon) {
-      transition: none;
-    }
-  }
-
-  .more-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
-    min-inline-size: 0;
-  }
 
   /* A QUESTION WRAPS TO THREE LINES AND NO MORE on Home; its own card on Decide says it whole. Two cut a question with
      a figure in it before the figure ("was due 4 days ago, £39. Did …") on a phone, and the figure is the question. */

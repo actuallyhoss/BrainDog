@@ -3,8 +3,8 @@
 
   FIVE PLACES, AS ON 19 OCTOBER (chosen 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
   five the top bar draws, with the rail's glyphs and words: a place whose glyph or word differs between two shapes is a
-  place learnt twice. NO MORE TAB. Work lives in Projects and on Today, and Work, People, Settings and the rest are
-  under the face at the top of each screen (`PageHead.svelte`), which opens the More sheet. Search is the 44px button
+  place learnt twice. NO MORE TAB. The Projects tab is the sidebar as a page (frame A): the projects, then Work, People
+  and every list. Settings is under the face at the top of each screen (`PageHead.svelte`). Search is the 44px button
   beside that face, never a tab.
 
   FLAT, AND DOCKED TO THE BOTTOM EDGE, on the nav's own surface with one hairline over it, as the top bar

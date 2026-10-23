@@ -849,7 +849,9 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     const reason = reasons.byDecision.get(e);
     const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
     const last = i === events.length - 1 && events.length >= WHATS_NEW_CAP;
-    return text == null ? [] : [{ e, last, item: { at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e) } }];
+    /* A QUESTION ASKED IS MARKED, so the bell can leave it to Needs you (`happened` in `shell/alerts.ts`). */
+    const asked = e.kind === 'suggest' ? { asked: true as const } : {};
+    return text == null ? [] : [{ e, last, item: { at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e), ...asked } }];
   });
 
   const out: NewsItem[] = [];

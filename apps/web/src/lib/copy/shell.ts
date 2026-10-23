@@ -213,7 +213,6 @@ export const shell = {
      with no text in it, so none of them has ever been said out loud. */
   screenshotOn: 'Screenshot mode is on.',
   screenshotOff: 'Screenshot mode is off.',
-  review: 'Review',
 
   /* the palette */
   paletteLabel: 'Search',
@@ -237,8 +236,6 @@ export const shell = {
   shareSetup: 'Share this setup',
   /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */
   today: 'Today',
-  /* The phone's More sheet, over what the rail keeps under its own More. */
-  otherPages: 'Other pages',
   /* The search button at the head of the rail, which says its two keys where the pointer rests on it. */
   searchKeys: 'Search (press / or Ctrl K)',
 

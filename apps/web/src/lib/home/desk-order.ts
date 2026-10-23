@@ -3,10 +3,9 @@
  * each tile in its row), and a keyboard walks the document and not the picture, so the document holds the tiles in the
  * order the picture shows them: what needs you, who is working, cash; the few key numbers; the record's week; the
  * projects; what landed,
- * what is coming up and a few people; then More, and what More opens.
+ * what is coming up and a few people.
  *
- * The page's tiles are the reader's, and the desk's own parts (who is working, the projects, what landed) and the More
- * line are Home's, so the page's blocks are put in the picture's order and each of Home's parts is anchored before the
+ * The page's tiles are the reader's, and the desk's own parts (who is working, the projects, what landed) are Home's, so the page's blocks are put in the picture's order and each of Home's parts is anchored before the
  * first drawn block that comes after it. A part with no block after it follows the reader.
  *
  * PURE, AND NO SVELTE, so `node --test` reads the order as it is written.
@@ -26,18 +25,17 @@ const RANKS: Readonly<Record<string, number>> = {
   faces: 10,
 };
 
-/** What a block the desk folds is ranked: after More's own line, in the order it was declared. */
+/** What a block the desk folds is ranked: after the rest, in the order it was declared. */
 export const REST = 30;
 
 /** Home's own parts, with the place each holds among the blocks. */
-export type Placed = 'needs' | 'working' | 'projects' | 'landed' | 'more';
+export type Placed = 'needs' | 'working' | 'projects' | 'landed';
 const PLACES: readonly (readonly [Placed, number])[] = [
   /* THE FOOT OF NEEDS YOU, right under its questions (or the whole tile with none to ask). */
   ['needs', 1],
   ['working', 2],
   ['projects', 7],
   ['landed', 8],
-  ['more', 20],
 ];
 
 /** A block's place in the picture, by the key it is declared under. */

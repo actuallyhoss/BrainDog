@@ -768,7 +768,8 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat
  */
 export { REDUCES } from '@braindog/kernel/constants';
 
-export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
+/** `asked`: the line is a question put to the reader, which Needs you holds and the bell does not. */
+export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info'; asked?: true };
 
 /**
  * The person ladder, closed at five: `read ⊂ append ⊂ write ⊂ decide ⊂ owner` (`20 §1`).

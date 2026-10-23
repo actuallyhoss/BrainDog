@@ -5,6 +5,9 @@
 
 export type Alert = { id: string; title: string; body: string; goto: string };
 
+/** THE BELL HOLDS WHAT HAPPENED, NEVER WHAT WAS ASKED (frame A): a question is said once, in Needs you. */
+export const happened = <N extends { asked?: true | undefined }>(news: readonly N[]): N[] => news.filter((n) => n.asked !== true);
+
 /** The first hearing only seeds what is already there, so opening the app never rings for old questions. */
 export function sift(seen: ReadonlySet<string> | null, items: readonly Alert[]): { seen: Set<string>; fresh: Alert[] } {
   const next = new Set(seen ?? []);

@@ -1,6 +1,7 @@
 <!--
-  The shell: a skip link, the rail or the tab bar, the phone's More sheet, the palette, the toast
-  stack, and one polite live region.
+  The shell: a skip link, the rail or the top bar with its sidebar, the tab bar, the palette, the toast
+  stack, and one polite live region. Frame A (23 October): the bar is where you go and asking, the sidebar on the left
+  is what you own, and the right side is only the thing you opened.
 
   THE LIVE HAIRLINE ACROSS THE TOP IS DRAWN ONLY WHILE SOMETHING IS WRONG. It
   was two pixels in the boundary colour on every screen at all times, on the argument that a
@@ -15,8 +16,8 @@
   what it is: writes will fail.
 
   THE PHONE HAS NO FLOATING SEARCH DISC. Below 900px search is the 44px button in each screen's
-  head bar (`PageHead.svelte`) and the first row of the More sheet; the disc sat over the header of
-  every screen, under the 44px floor, and twice on `/search`.
+  head bar (`PageHead.svelte`); the disc sat over the header of every screen, under the 44px floor,
+  and twice on `/search`.
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
@@ -65,12 +66,13 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import type SidebarView from '$lib/ui/Sidebar.svelte';
   import type SideBarView from '$lib/shell/SideBar.svelte';
-  import { SIDE_KEY, sideKept, splitOf } from '$lib/shell/side.ts';
+  import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
-  import { moreSheet } from '$lib/shell/more.svelte.ts';
-  import { levelWord, openRecord } from '$lib/record/switcher.ts';
-  import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { frame } from '$lib/shell/frame.svelte.ts';
+  import type { SideHeads, SideLink } from '$lib/shell/side.ts';
+  import { openRecord } from '$lib/record/switcher.ts';
+  import { WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -82,8 +84,7 @@
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import Count from '$lib/ui/Count.svelte';
-  import Icon, { type IconName } from '$lib/ui/Icon.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
@@ -161,25 +162,14 @@
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
-  let moreOpen = $state(false);
-  /* THE FACE ON A PHONE'S SCREEN ASKS FOR THE SHEET (`shell/more.svelte.ts`): it is opened here and the ask put back. */
+  /* THE FACE'S "KEYBOARD KEYS" ASKS FOR THE SHEET (`shell/frame.svelte.ts`): opened here, with this rail's `g` letters. */
   $effect(() => {
-    if (!moreSheet.asked) return;
-    moreSheet.asked = false;
-    moreOpen = true;
+    if (!frame.keys) return;
+    frame.keys = false;
+    void leadIn()
+      .then((m) => (m.sayGoto(railRows()), sheetSays++))
+      .finally(() => (keymapOpen = true));
   });
-
-  /**
-   * THE MORE SHEET IS THE PHONE'S RAIL: search at its head, the record and
-   * its switcher, the rail's groups with the rail's glyphs and counts, the current page marked, then
-   * the places the rail keeps at its foot (`PLACES`). It was a bare list of words with no glyphs, no
-   * current place, no switcher and no search.
-   *
-   * THE SWITCHER IS A DISCLOSURE, NOT A MENU. A menu is an overlay, and one opened inside a sheet is
-   * an overlay on an overlay under a thumb; the other records open in place under the record's own
-   * row instead.
-   */
-  let switching = $state(false);
 
   /* THE SAME DOOR AND THE SAME SENTENCES AS THE RAIL'S SWITCHER (`Sidebar.svelte`): the session moves to the other
      record and the app starts again at its Home, by a whole load, because every answer this tab holds was read from the
@@ -195,32 +185,11 @@
     toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
   }
 
-  /**
-   * SIGN OUT IN THE FRAME (LCH-A04): one press in the account menu, the session ends, and the sign-in screen is loaded in
-   * full (`signOutAndLeave`), so nothing this tab read under the session is drawn again. `lib/auth.ts` is imported on
-   * the press and not before, which keeps it out of the entry chunk every screen waits for. A press that did not end the
-   * session, or a chunk that would not load, leaves the page where it is and says so.
-   */
-  let signingOut = $state(false);
-  async function signOutHere() {
-    if (signingOut) return;
-    signingOut = true;
-    const out = await import('$lib/auth.ts').then((m) => m.signOutAndLeave(`${BASE}/signin`)).catch(() => null);
-    if (out?.ok) return;
-    signingOut = false;
-    toasts.push(copy.signOutFailed, { intent: 'warn' });
-  }
-
-  /* COMPARED INSIDE THE RECORD, as the rail compares: the address with the base and the slug taken off. */
-  const under = (href: string) => {
-    const where = here(page.url.pathname);
-    return where === href || where.startsWith(`${href}/`);
-  };
 
   /** The same order the rail draws, one nav and not two shapes. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
   /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`). */
-  /* UNDER THE NAMES THIS PERSON GAVE THEIR PAGES (`nav.labels`), in the rail, the top bar and the More sheet alike. */
+  /* UNDER THE NAMES THIS PERSON GAVE THEIR PAGES (`nav.labels`), in the rail, the top bar and the sidebar alike. */
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return navPrefs.relabel(data.nav.filter((n) => !n.cut && !placed.has(n.href)));
@@ -268,23 +237,20 @@
     if (toldReadable(reads, levels)) untrack(() => toldBack(base));
   });
   const inbox = $derived(waitsNow()?.inbox ?? data.inbox);
-  /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
-     has no `counts`, and is read from the two numbers it does carry. */
+  /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a tool once anything has arrived. A shell no record answered has no
+     `counts`, and is read from the two numbers it does carry. */
   const spine = $derived(spineOf(data.counts ? { ...data.counts, decide: open, inbox } : { decide: open, inbox }));
-  /* THE TOOLS UNDER MORE, IN THE ORDER A PHONE READS THEM, with the rail's glyphs and the rail's words (`Sidebar.svelte`).
-     Slash's page is Suggestions there, and Inbox joins once anything has arrived (`spineOf`). USAGE IS HERE: its
-     word is written out rather than read from `record/actions.ts`, which would carry the usage reader into the entry
-     chunk for one word. Settings goes to `/settings`, the index of areas below 900px. */
+  /* THE TOOLS, folded under Lists in the sidebar, with the rail's glyphs and words. USAGE'S WORD IS WRITTEN OUT rather
+     than read from `record/actions.ts`, which would carry the usage reader into the entry chunk for one word. */
   const USAGE = 'Usage';
-  /* SETTINGS IS NOT A TOOL: it stands at the sheet's foot with Sign out. */
-  const tools = $derived([
-    ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
-    ['/automations', copy.automations, 'refresh'],
-    ['/jobs', copy.jobs, 'play'],
-    ['/packs', copy.packs, 'packs'],
-    ['/vault', copy.vault, 'vault'],
-    ['/usage', USAGE, 'observe'],
-  ] as const);
+  const tools = $derived<SideLink[]>([
+    ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
+    { href: '/automations', label: copy.automations, icon: 'refresh' },
+    { href: '/jobs', label: copy.jobs, icon: 'play' },
+    { href: '/packs', label: copy.packs, icon: 'packs' },
+    { href: '/vault', label: copy.vault, icon: 'vault' },
+    { href: '/usage', label: USAGE, icon: 'observe' },
+  ]);
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
   $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
@@ -314,11 +280,14 @@
     const home = navPrefs.home;
     if (home !== null && home !== '/' && here(page.url.pathname) === '/' && page.url.search === '') void goto(at(home), { replaceState: true });
   });
-  /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
+  /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE SIDEBAR TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
   const hiddenCount = $derived(railNav.filter((e) => navPrefs.hidden.includes(e.href)).length);
-  /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
-  const moreLists = $derived(orderLists(data.index.registers, navPrefs.order));
+  /* THE SIDEBAR'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`), the kernel's own marked. */
+  const kernelLists = $derived(new Set(data.lists.filter((l) => l.kernel).map((l) => l.id)));
+  const sideLists = $derived(
+    orderLists(data.index.registers, navPrefs.order).map((r) => ({ id: r.id, name: r.name, icon: r.icon, count: r.count, views: r.views, kernel: kernelLists.has(r.id) })),
+  );
 
   /**
    * THE FLAT LIST, ONE RULE FOR THE RAIL, THE TOP BAR, THE TAB BAR AND THE SHEET (`flatNav` in `lib/nav.ts`): Today, the
@@ -334,7 +303,7 @@
   );
   /**
    * THE RAIL'S SECTIONS (`railOf`): the seven places, each section's own things under its name, and the
-   * rest under More. One reading for the rail, the tab bar and the More sheet, so a place is in the same spot on each.
+   * rest under More. One reading for the rail, the tab bar and the sidebar, so a place is in the same spot on each.
    */
   const rail = $derived(railOf(flat, said('decide')));
   /* A BAR HAS NO ROW FOR KILN, SO ON KILN'S PAGE ITS SECTION IS WHERE YOU ARE: the rail marks Kiln under Projects
@@ -348,8 +317,6 @@
   /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
      phone. Agents may sit past the rail's seven, so the places under More are read too. */
   const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.more])));
-  /* WHAT THE MORE SHEET HOLDS IS WHAT THE BAR ON SCREEN DOES NOT (frame F7): the tab bar's five below 900px, the top
-     bar's five above it, nothing at all beside a rail, which draws every place itself. */
   /* READ AT ONCE, so a phone's first draw is already a phone's (the Projects tab draws the list, not the desk page). */
   let narrow = $state(typeof matchMedia === 'function' && matchMedia('(width < 900px)').matches);
   $effect(() => {
@@ -360,60 +327,37 @@
     return () => mq.removeEventListener('change', set);
   });
 
-  /* THE SIDEBAR IS THE TOP BAR'S, FROM 900px UP. THE PROJECTS PLACE is the one whose own things are projects' pages, so
-     on a phone its tab opens the sidebar's list with one fact each (pick 9), and the desk keeps its page. */
-  const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && sideShown);
+  /* AND WHETHER THE SIDEBAR CAN STAND BESIDE THE WORK: from 1,280 up. Narrower it slides in from the left over the page. */
+  let deskWide = $state(typeof matchMedia === 'function' && matchMedia('(width >= 1280px)').matches);
+  $effect(() => {
+    const mq = matchMedia('(width >= 1280px)');
+    const set = (): void => void (deskWide = mq.matches);
+    set();
+    mq.addEventListener('change', set);
+    return () => mq.removeEventListener('change', set);
+  });
+
+  /* THE SIDEBAR IS THE TOP BAR'S: a column beside the work from 1,280 (`sideOn`), from 900 a drawer over the page from
+     the left (`sideOver`), never from the right, and the menu shape's one button opens the same drawer. */
+  let sideOver = $state(false);
+  const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
+  const overOn = $derived(navPrefs.shape !== 'rail' && !narrow && sideOver && !sideOn);
+  /* THE PROJECTS PLACE is the one whose own things are projects' pages, so on a phone its tab opens the sidebar as a
+     page (projects, then lists), and the desk keeps its page. */
   const projectsPlace = $derived(barPlaces.find((p) => rail.things.some(([section]) => section === p.label)) ?? null);
   const phoneProjects = $derived(navPrefs.shape !== 'rail' && narrow && projectsPlace !== null && here(page.url.pathname) === projectsPlace.href);
   $effect(() => {
-    if ((sideOn || phoneProjects) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
+    if ((sideOn || overOn || phoneProjects) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
   });
-  /* THE MORE SHEET'S PROJECTS ARE THE ONES IN PLAY, AS THE SIDEBAR READS THEM (the audit of 22 October, U-A15): it
-     listed only the projects with a page of their own, 5 where Today, Projects and the sidebar said 13 in play. Read
-     when the frame opens, beside the sidebar's own read of the same list (`readSide` asks once for both), so the sheet
-     holds them before it is opened.
-     AND NOTHING UNTIL THEN, SINCE batch 3's look on his record: the sheet listed the rail's projects while the list's answer
-     was out, 5 on Decide where every other place said 13. A count that is part of the list is never drawn: the Projects
-     section waits for the answer, and only a record whose list cannot be read lists what the rail holds. */
-  let morePlay = $state.raw<readonly { key: string; name: string; href: string; hue: number | null }[] | null>(null);
-  let moreRead = $state<'out' | 'in' | 'none'>('out');
-  let moreAsked = 0;
-  const holdsProjects = $derived(projectsPlace !== null);
-  $effect(() => {
-    /* AGAIN WHEN THE RECORD MOVES, so a project made or parked is under More as it is in the sidebar; never on a move
-       between pages, which changes nothing in the list. */
-    void live.version;
-    if (!holdsProjects) return;
-    const [base, lists] = untrack(() => [apiBase(page.url), data.lists] as const);
-    const n = ++moreAsked;
-    void import('$lib/shell/side-read.ts')
-      .then(({ readSide }) => readSide(base, lists))
-      .then((read) => {
-        if (n !== moreAsked) return;
-        if (read !== null) morePlay = splitOf(read.rows, read.lanes).play;
-        if (morePlay === null) moreRead = 'none';
-        else moreRead = 'in';
-      })
-      .catch(() => {
-        if (n === moreAsked && morePlay === null) moreRead = 'none';
-      });
-  });
-  /**
-   * A section's own things in the More sheet: the projects in play for the Projects place, the rail's for the rest, and
-   * `null` for the Projects place while its list is being read, so the sheet draws no part of it.
-   */
-  const moreThings = (section: string, list: readonly { href: string; title: string; hue?: number | undefined; icon: IconName }[]) => {
-    if (section !== projectsPlace?.label) return list;
-    if (moreRead === 'out') return null;
-    return morePlay !== null && morePlay.length > 0 ? morePlay.map((p) => ({ href: p.href, title: p.name, hue: p.hue ?? undefined, icon: 'doc' as IconName })) : list;
-  };
 
   /* THE PROJECTS AN AGENT IS AT WORK ON, by name, for the sidebar's green dots. */
   const workingOn = $derived(workingNow().map((w) => w.project));
 
-  /* HIDE OR SHOW, BY ITS BUTTON OR `[`: the column snaps and the work slides from where its edge was (`slide`). */
+  /* HIDE OR SHOW, BY ITS BUTTON OR `[`: the column snaps and the work slides from where its edge was (`slide`); under
+     1,280 the drawer opens or closes. */
   async function toggleSide(): Promise<void> {
-    if (shape !== 'bar' || narrow) return;
+    if (shape === 'rail' || narrow) return;
+    if (shape !== 'bar' || !deskWide) return void (sideOver = !sideOver);
     const was = sideShown ? sideWidth : 0;
     sideShown = !sideShown;
     keepSide();
@@ -422,13 +366,36 @@
     const now = sideShown ? sideWidth : 0;
     if (el) slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
   }
-  const onBar = $derived(new Set((narrow ? tabs : navPrefs.shape === 'rail' ? [] : barPlaces).map((i) => i.key)));
-  const moreBeyond = $derived(rail.places.filter((i) => !onBar.has(i.key)));
-  const moreViews = $derived(rail.places.flatMap((i) => rail.views[i.key] ?? []));
-  const moreOther = $derived(rail.more.filter((i) => !onBar.has(i.key)));
+
+  /**
+   * THE SIDEBAR'S LISTS (`groupsOf`): the places the bar on screen leaves out, each a row (Work with its tasks' count,
+   * People), and on a phone Activity too, which the desk's bell reaches; the places' own views; the lists; the tools.
+   * Each count is said once, so the tasks list is not a row of its own while Work counts it.
+   */
+  const onBar = $derived(new Set((narrow ? tabs : barPlaces).map((i) => i.key)));
+  const sidePlaces = $derived<SideLink[]>(
+    [...rail.places, ...rail.more]
+      .filter((i) => !onBar.has(i.key) && i.key !== 'decide' && (narrow || i.key !== 'activity'))
+      .map((i) => ({ href: i.href, label: i.label, icon: i.icon, count: i.href === WORK ? data.index.registers.find((r) => r.id === TASKS)?.count : i.count })),
+  );
+  const workCounted = $derived(sidePlaces.some((p) => p.href === WORK));
+  const sideViews = $derived<SideLink[]>(rail.places.flatMap((i) => (rail.views[i.key] ?? []).map((v) => ({ href: v.href, label: v.title, icon: 'doc' }))));
+  const listsShown = $derived(sideLists.filter((l) => !(workCounted && l.id === TASKS)));
+  /* THE GROUPS' WORDS, written out as USAGE is, so the entry carries five words and no area's copy. */
+  const sideHeads: SideHeads = {
+    money: { label: 'Money', icon: 'money' },
+    kernel: { label: 'Agent work', icon: 'session' },
+    lists: { label: 'Other lists', icon: 'rows' },
+    views: { label: 'Saved views', icon: 'doc' },
+    extras: { label: 'Tools', icon: 'packs' },
+  };
+  /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT (USE-B03): an update that adds a page lands hidden. */
+  const penWaits = $derived(penCount(data.pen, null, (id) => navPrefs.isDismissed(id)));
+  const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation' } : null);
+
   /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the bar's five places, and Settings (2.A.15). */
   const goPlaces = $derived([...barPlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings' }]);
-  /* WHERE THE TOP BAR'S WORKING CHIP GOES: the Agents place, wherever the rail put it. */
+  /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
   const agentsAt = $derived(agentsHref([...rail.places, ...rail.more]));
 
   /**
@@ -458,12 +425,9 @@
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
     if (names.length > 0) toasts.push(copy.placeArrived(names));
   });
-  /* THE PERSON READING, by the name the record told them, for the top bar's face: a guest's own name comes with `me`,
-     since `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */
+  /* THE PERSON READING, by the name the record told them, for the face: a guest's own name comes with `me`, since
+     `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */
   const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim() || (data.me.name ?? '').trim());
-
-  /* WHERE THE READER IS, for the sheet's rows: the Work screen is a place of its own, so Today is not marked on it too. */
-  const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, and the top bar's own rows on the top bar. */
   const numbered = $derived(navPrefs.shape === 'bar' ? barPlaces : rail.places);
@@ -583,11 +547,9 @@
   /**
    * WHICH SHAPE OF NAVIGATION THIS PERSON CHOSE, from `19 §3`'s three.
    *
-   * The rail is the default and stays the default. A top bar is one strip that says how many pages
-   * it has put behind More; the menu keeps nothing on screen and opens the whole sectioned list as
-   * the sheet below. Both lean on that sheet rather than on a second nav of their own, because the
-   * sheet is already every section, every list and the places the rail keeps at its foot, in the
-   * reader's own order.
+   * The top bar is the default, with the sidebar on the left; the menu keeps nothing on screen and
+   * opens that same sidebar over the page. Both lean on the sidebar rather than on a second nav of
+   * their own, because it already holds the projects, every list and the tools, in the reader's order.
    *
    * BELOW 900px NONE OF THIS APPLIES AND THE TAB BAR STAYS, which is §3's second condition and is
    * enforced in CSS a few rules down rather than here: a shape that let somebody put an
@@ -606,16 +568,14 @@
   /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
      long as this one takes to arrive, which is the window every browser gate measures in.
 
-     AND THE MORE SHEET CLOSES ON ONE, whichever of its rows started it: the sheet belongs to the
-     shell, which outlives every screen, so a row that navigated left it open over the new screen
-     unless each row closed it by hand. */
+     AND THE SIDEBAR'S DRAWER CLOSES ON ONE, whichever of its rows started it: it belongs to the shell, which outlives
+     every screen, so a row that navigated would leave it open over the new screen. */
   beforeNavigate((nav) => {
     moves += 1;
     leaving();
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
-    moreOpen = false;
-    switching = false;
+    sideOver = false;
     keepPlace(nav);
   });
 
@@ -1065,6 +1025,14 @@
   });
   const records = $derived(reachable?.records ?? data.me.records);
   const recordsRefused = $derived(reachable ? reachable.refused : data.recordsRefused);
+  /* WHAT "BRAINDOG ▾" AND THE FACE READ, on the desk's bar and in the phone's head (`shell/frame.svelte.ts`). */
+  $effect.pre(() => {
+    frame.record = data.index.name;
+    frame.records = records;
+    frame.refused = recordsRefused;
+    frame.person = personName;
+    frame.open = (r) => void openOther(r);
+  });
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   /* EVERY PLACE IN THE RAIL HAS A LETTER NOW, read from the rail by `lib/a11y/goto.ts` (EXP-D09): the seven of the old
@@ -1078,6 +1046,12 @@
 
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
+
+    /* Esc PUTS THE SIDEBAR'S DRAWER AWAY, the one layer here that is not a `<dialog>`. */
+    if (e.key === 'Escape' && sideOver) {
+      sideOver = false;
+      return;
+    }
 
     // `covered()` drops every UNMODIFIED key, which is what the line below says and not what this
     // comment used to claim: a modified chord still runs under an open layer, and Esc is the
@@ -1153,8 +1127,8 @@
       void leadIn();
       return;
     }
-    /* `[` HIDES OR SHOWS THE SIDEBAR (frame B, pick 5), a character key, so `Character keys: Off` silences it too. */
-    if (e.key === '[' && !mod && !e.altKey && shape === 'bar' && !narrow) {
+    /* `[` HIDES OR SHOWS THE SIDEBAR, a character key, so `Character keys: Off` silences it too. */
+    if (e.key === '[' && !mod && !e.altKey && shape !== 'rail' && !narrow) {
       e.preventDefault();
       void toggleSide();
       return;
@@ -1245,34 +1219,26 @@
         {#if shape === 'bar'}
           <TopBar
             entries={barPlaces}
-            record={data.index.name}
-            person={personName}
             working={workingNow()}
             agents={agentsAt}
-            {records}
             news={data.whatsNew}
-            side={{ shown: sideShown }}
+            side={{ shown: deskWide ? sideShown : sideOver }}
             onside={() => void toggleSide()}
-            onrecord={(r) => void openOther(r)}
-            onmore={() => (moreOpen = true)}
             onfind={() => (palette.open = true)}
           />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
-            the smallest chrome there is, for somebody who lives in the palette.
-
-            IT IS NAMED FOR THE SHEET IT OPENS. The control said "Menu" and opened a sheet titled
-            "More" in an early draft, which is two words for one place. `19 §9`'s rule is that the
-            interface says the word a person would say, and there is only one word here to say.
+            the smallest chrome there is, for somebody who lives in the palette. It opens the sidebar
+            over the page from the left, the one place that holds what the record owns.
           -->
-          <button type="button" class="menu-open tap" onclick={() => (moreOpen = true)}>
+          <button type="button" class="menu-open tap" aria-expanded={sideOver} onclick={() => void toggleSide()}>
             <Icon name="more" size="m" /><span>{copy.more}</span>
           </button>
         {/if}
       </div>
       {#if sideOn}
-        <!-- FRAME B'S SIDEBAR, its width held while its chunk arrives. -->
+        <!-- THE SIDEBAR, its width held while its chunk arrives. -->
         <div class="side-slot">
           {#if SideBar}
             <SideBar
@@ -1281,11 +1247,39 @@
               working={workingOn}
               version={live.version}
               projects={projectsPlace?.href ?? null}
+              places={sidePlaces}
+              owned={listsShown}
+              views={sideViews}
+              {tools}
+              heads={sideHeads}
+              pen={sidePen}
               width={sideWidth}
               onwidth={(n, done) => {
                 sideWidth = n;
                 if (done) keepSide();
               }}
+            />
+          {/if}
+        </div>
+      {:else if overOn}
+        <!-- UNDER 1,280, OR ON THE MENU SHAPE, THE SAME SIDEBAR SLIDES IN FROM THE LEFT over the page; a press beside it,
+             Esc or a move closes it. -->
+        <button type="button" class="side-scrim" aria-label={copy.close} tabindex="-1" onclick={() => (sideOver = false)}></button>
+        <div class="side-over" style:--side-col={`${sideWidth}px`}>
+          {#if SideBar}
+            <SideBar
+              base={apiBase(page.url)}
+              lists={data.lists}
+              working={workingOn}
+              version={live.version}
+              projects={projectsPlace?.href ?? null}
+              places={sidePlaces}
+              owned={listsShown}
+              views={sideViews}
+              {tools}
+              heads={sideHeads}
+              pen={sidePen}
+              width={sideWidth}
             />
           {/if}
         </div>
@@ -1330,8 +1324,8 @@
         {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
       {/if}
       {#if phoneProjects}
-        <!-- ON A PHONE THE PROJECTS TAB IS THE SIDEBAR'S LIST, one fact each (frame B, pick 9). -->
-        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} />{/if}
+        <!-- ON A PHONE THE PROJECTS TAB IS THE SIDEBAR AS A PAGE: the projects, one fact each, then the lists. -->
+        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} places={sidePlaces} owned={listsShown} views={sideViews} {tools} heads={sideHeads} pen={sidePen} />{/if}
       {:else}
         {@render children()}
       {/if}
@@ -1380,151 +1374,6 @@
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
   {#if Keymap}{#key sheetSays}<Keymap />{/key}{/if}
-</Sheet>
-
-<!--
-  MORE: WHAT THE BAR DOES NOT HOLD (frame F7, 2.A.24).
-
-  It repeated the nav and the palette: a second "Ask or change anything" field, then the five places already in the bar,
-  then words with no glyph. Now, under "BrainDog": the record and its switcher on one row; each project with its colour;
-  "Your things", which is every place the bar or the tab bar leaves out, their views, the lists and the tools; and at the
-  foot Settings and Sign out. No search: the bar and each screen's head carry it. Every row is 44 or more and wears a
-  glyph (`doc` for a page with none of its own), and the row for the screen you are on is marked: `aria-current`, the
-  selected fill and an ink glyph. A row closes the sheet by navigating (`beforeNavigate` above). From 900px it is 360
-  wide at the window's end edge.
-
-  THE LISTS COME WITH IT, because a page can be uninstalled with the pack that declared it and the lists underneath it
-  still have to be reachable.
--->
-<Sheet bind:open={moreOpen} title={copy.product}>
-  <nav class="more-nav" aria-label={copy.more}>
-    <!-- THE RECORD, AND UNDER IT THE OTHER RECORDS THIS PERSON CAN OPEN. The tile is ink with the
-         ground's letter, as the rail's is; the brand red belongs to the mark. -->
-    <div class="more-record">
-      <button type="button" class="more-row more-who" aria-expanded={switching} onclick={() => (switching = !switching)}>
-        <span class="more-tile" aria-hidden="true">{(data.index.name || copy.switchRecord).slice(0, 1)}</span>
-        <span class="more-name">{data.index.name || copy.switchRecord}</span>
-        <span class="more-fold" data-open={switching ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
-      </button>
-      {#if switching}
-        <ul class="more-list more-records">
-          {#each records as r}
-            {@const word = levelWord(r)}
-            {#if r.name !== data.index.name}
-              <li>
-                <button type="button" class="more-row" onclick={() => void openOther(r)}>
-                  <span class="more-tile" aria-hidden="true">{r.name.slice(0, 1)}</span>
-                  <span class="more-name">{r.name}</span>
-                  {#if word !== null}<span class="more-tally">{word}</span>{/if}
-                </button>
-              </li>
-            {/if}
-          {/each}
-          <!-- The host's own sentence when the records could not be listed, as the rail's switcher says it. -->
-          {#if recordsRefused}<li class="more-note">{recordsRefused}</li>{/if}
-          <li>
-            <a class="more-row" href={at('/settings/signing-in')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
-          </li>
-          <!-- NO "NEW RECORD" HERE: it opened this record's own `/start`, and it is drawn only once the host says
-               the person may make a record, which `boot` does not carry yet. The rail's copy of it went the same way. -->
-        </ul>
-      {/if}
-    </div>
-
-    <!-- THE HOLDING PEN, IN THE RAIL'S WORDS (USE-B03): an update that adds a page lands hidden, and on a phone this is
-         the one line that says so. Near the head, because it is news, and only when something waits. -->
-    {#if penCount(data.pen, null, (id) => navPrefs.isDismissed(id)) > 0}
-      <a class="more-row more-pen" href={at('/settings/navigation')}>
-        <Icon name="alert" size="m" /><span class="more-name">{suggested(penCount(data.pen, null, (id) => navPrefs.isDismissed(id)))}</span><span class="more-tally">{copy.review}</span>
-      </a>
-    {/if}
-
-    <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, in the thing's own colour. -->
-    {#each rail.things as [section, list] (section)}
-      {@const things = moreThings(section, list)}
-      {#if things !== null}
-      <h3 class="more-section">{section}</h3>
-      <ul class="more-list">
-        {#each things as entry (entry.href)}
-          <li>
-            <a class="more-row" href={at(entry.href)} aria-current={under(entry.href) ? 'page' : undefined}>
-              {#if entry.hue !== undefined}<span class="more-hue" style="--hue:{entry.hue}" aria-hidden="true"></span>{:else}<Icon name={entry.icon} size="m" />{/if}
-              <span class="more-name">{entry.title}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-      {/if}
-    {/each}
-
-    <!-- YOUR THINGS: the places the bar leaves out with their views, every list with its views, and the tools. -->
-    <h3 class="more-section">{said('lists')}</h3>
-    <ul class="more-list">
-      {#each moreBeyond as item (item.key)}
-        <li>
-          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) && !(rail.views[item.key] ?? []).some((v) => under(v.href)) ? 'page' : undefined}>
-            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
-            {#if item.count && item.key === 'decide'}<Count n={item.count} />{:else if item.count}<span class="more-tally num">{item.count}</span>{/if}
-          </a>
-        </li>
-      {/each}
-      {#each moreViews as v (v.href)}
-        <li>
-          <a class="more-row" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><Icon name="doc" size="m" /><span class="more-name">{v.title}</span></a>
-        </li>
-      {/each}
-      {#each moreLists as r}
-        <li>
-          <a class="more-row" href={at(`/r/${r.id}`)} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
-            <Icon name={r.icon} size="m" />
-            <span class="more-name">{r.name}</span>
-            <span class="more-tally num">{r.count}</span>
-          </a>
-        </li>
-        <!-- And its saved views, which are the same list with a predicate. -->
-        {#each r.views ?? [] as v}
-          <li>
-            <a class="more-row" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><Icon name="doc" size="m" /><span class="more-name">{v.name}</span></a>
-          </li>
-        {/each}
-      {/each}
-      {#each tools as [href, label, glyph] (href)}
-        <li>
-          <a class="more-row" href={at(href)} aria-current={under(href) ? 'page' : undefined}>
-            <Icon name={glyph} size="m" /><span class="more-name">{label}</span>
-          </a>
-        </li>
-      {/each}
-    </ul>
-
-    <!-- THE PLACES PAST SEVEN, AND ACTIVITY, as the rail keeps them under More. -->
-    {#if moreOther.length > 0}
-      <h3 class="more-section">{copy.otherPages}</h3>
-      <ul class="more-list">
-        {#each moreOther as item (item.key)}
-          <li>
-            <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
-              <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    <!-- AT THE FOOT, THE ACCOUNT'S TWO: Settings, and Sign out (LCH-A04), a press and not a link, 44 under a thumb. -->
-    <ul class="more-list more-places">
-      <li>
-        <a class="more-row" href={at('/settings')} aria-current={under('/settings') ? 'page' : undefined}>
-          <Icon name="settings" size="m" /><span class="more-name">{copy.settings}</span>
-        </a>
-      </li>
-      <li>
-        <button type="button" class="more-row" onclick={() => void signOutHere()} aria-busy={signingOut}>
-          <Icon name="lock" size="m" /><span class="more-name">{signingOut ? copy.signingOut : copy.signOut}</span>
-        </button>
-      </li>
-    </ul>
-  </nav>
 </Sheet>
 
 <!-- One stack, one live region, on every surface including the two that carry no shell: an action
@@ -1926,156 +1775,53 @@
     }
   }
 
-  /* ── The More sheet ─────────────────────────────────────────────────────── */
-
-  .more-nav {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-  }
-
-  /* FROM 900px THE SHEET IS 360 WIDE at the window's end edge: a list of places, not a form. */
-  @media (width >= 900px) {
-    :global(dialog:has(.more-nav)) {
-      inline-size: min(360px, calc(100vw - 2 * var(--inset)));
-    }
-  }
-
-  .more-list {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
+  /* THE SIDEBAR'S DRAWER, under 1,280 and on the menu shape: it slides in from the left over the page, under the bar,
+     on the board's own ground, and a quiet scrim over the rest takes the press that closes it. */
+  .side-scrim {
+    position: fixed;
+    inset: calc(56px + var(--shell-inset, 0px)) 0 0;
+    z-index: var(--z-sheet);
     padding: 0;
-    list-style: none;
-  }
-
-  /* ONE ROW SHAPE FOR EVERY PLACE: a glyph, the name, and a count or a level at the end. A button
-     row (the record) and a link row look the same, because both are a place to go. */
-  .more-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: var(--tap);
-    padding-inline: var(--sp-2);
-    background: none;
     border: 0;
-    border-radius: var(--r-pop);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
+    background: color-mix(in srgb, var(--ink) 16%, transparent);
+    animation: side-fade var(--d-panel) var(--ease-out);
   }
 
-  /* The glyph is quiet, and ink on the row you are on, as the rail draws it. */
-  .more-row > :global(.icon) {
-    flex: none;
-    color: var(--ink-3);
+  .side-over {
+    position: fixed;
+    inset-block: calc(56px + var(--shell-inset, 0px)) 0;
+    inset-inline-start: 0;
+    z-index: var(--z-sheet);
+    display: flex;
+    inline-size: min(var(--side-col, 248px), calc(100vw - 2 * var(--tap)));
+    background: var(--board);
+    animation: side-in var(--d-panel) var(--ease-out);
   }
 
-  .more-row[aria-current='page'] {
-    background: var(--red-tint);
+  .shell[data-shape='menu'] .side-scrim,
+  .shell[data-shape='menu'] .side-over {
+    inset-block-start: 0;
   }
 
-  .more-row[aria-current='page'] > :global(.icon) {
-    color: var(--ink);
+  :global([dir='rtl']) .side-over {
+    animation-name: side-in-rtl;
   }
 
-  .more-name {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .more-tally {
-    flex: none;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  /* The holding pen's line sits apart from the places under it, as the rail's sits apart at its foot. */
-  .more-pen {
-    margin-block-end: var(--sp-2);
-  }
-
-  /* A thing's own colour, where a place's glyph would be, as the rail draws it. */
-  .more-hue {
-    flex: none;
-    inline-size: 8px;
-    block-size: 8px;
-    margin-inline: calc((var(--icon-m) - 8px) / 2);
-    border-radius: var(--r-round);
-    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  /* The record's tile: ink with the ground's letter, the rail's own (`Sidebar.svelte`). */
-  .more-tile {
-    display: grid;
-    place-items: center;
-    flex: none;
-    inline-size: var(--icon-l);
-    block-size: var(--icon-l);
-    background: var(--ink);
-    border-radius: var(--r-xs);
-    color: var(--tile);
-    font-size: var(--fs-cap);
-    font-weight: 600;
-    line-height: 1;
-  }
-
-  .more-who {
-    font-weight: 600;
-  }
-
-  .more-fold {
-    display: inline-grid;
-    flex: none;
-    color: var(--ink-3);
-    transition: transform var(--d-state) var(--ease-out);
-  }
-
-  .more-fold[data-open] {
-    transform: rotate(180deg);
-  }
-
-  /* The other records sit under the record's row, indented to its name. */
-  .more-records {
-    padding-inline-start: var(--sp-5);
-  }
-
-  .more-note {
-    padding: var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  /* The same headings the rail carries, and they are headings: a section title, not an eyebrow. */
-  .more-section {
-    margin-block: var(--sp-4) 0;
-    padding-inline: var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: 600;
-  }
-
-  /* The places the rail keeps at its foot, apart from the record's own by a hairline. */
-  .more-places {
-    margin-block-start: var(--sp-3);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .more-row:hover {
-      background: var(--hover);
+  @keyframes side-in {
+    from {
+      translate: -100% 0;
     }
+  }
 
-    .more-row[aria-current='page']:hover {
-      background: var(--red-tint);
+  @keyframes side-in-rtl {
+    from {
+      translate: 100% 0;
+    }
+  }
+
+  @keyframes side-fade {
+    from {
+      opacity: 0;
     }
   }
 

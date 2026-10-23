@@ -1,7 +1,44 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, lanesOf, pinsKept, playSaid, sideKept, splitOf, widthOf } from './side.ts';
+import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, pinsKept, playSaid, sideKept, splitOf, widthOf, type SideList } from './side.ts';
+
+const HEADS = {
+  money: { label: 'Money', icon: 'money' },
+  kernel: { label: 'Agent work', icon: 'session' },
+  lists: { label: 'Other lists', icon: 'rows' },
+  views: { label: 'Saved views', icon: 'doc' },
+  extras: { label: 'Tools', icon: 'packs' },
+};
+const list = (id: string, o: Partial<SideList> = {}): SideList => ({ id, name: id.toUpperCase(), icon: 'rows', count: 1, views: [], kernel: false, money: false, ...o });
+
+test('lists group as the More sheet read them: places, money, the agents, the rest, views, tools', () => {
+  const groups = groupsOf(
+    [{ href: '/?work', label: 'Work', icon: 'work', count: 27 }],
+    [list('a1', { money: true }), list('r1', { kernel: true, count: 5 }), list('n1', { views: [{ name: 'Mine', href: '/p/mine' }] }), list('a2', { money: true })],
+    [{ href: '/p/board', label: 'Board', icon: 'doc' }],
+    [{ href: '/vault', label: 'Vault', icon: 'vault' }],
+    HEADS,
+  );
+  assert.deepEqual(
+    groups.map((g) => [g.label, g.items.map((i) => i.label)]),
+    [
+      ['Work', ['Work']],
+      ['Money', ['A1', 'A2']],
+      ['Agent work', ['R1']],
+      ['Other lists', ['N1']],
+      ['Saved views', ['Board', 'Mine']],
+      ['Tools', ['Vault']],
+    ],
+  );
+  assert.equal(groups[2]?.items[0]?.count, 5);
+  assert.equal(groups[1]?.items[0]?.href, '/r/a1');
+});
+
+test('an empty kind draws no group, and a kernel list that holds money stays with the agents', () => {
+  const groups = groupsOf([], [list('r1', { kernel: true, money: true })], [], [], HEADS);
+  assert.deepEqual(groups.map((g) => g.label), ['Agent work']);
+});
 
 const p = (name: string, o: Partial<{ pinned: boolean; late: number; working: boolean; moved: boolean; lane: string }> = {}) => ({
   name,

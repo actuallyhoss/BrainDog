@@ -1,15 +1,16 @@
 <!--
-  The sidebar of frame B (23 October): under the top bar, on the board, the record's projects by this week.
+  The sidebar (frame A, 23 October): what you own, under the top bar, on the board. One sidebar, on the left only.
 
-  WHAT IT HOLDS AND NOTHING ELSE (pick 2): a head ("Projects", how many are in play, and "+" to add one), then each
-  project in play as a row, by this week (pick 3: pins on top, then late, then an agent at work, then money in), with its
-  own colour and mark, a red "late" and a green working dot (pick 4). The open project shows its parts under it, the
-  tiles its page draws (`data-part`), the one in view marked. Parked and Finished fold at its foot.
+  A head ("Projects", how many are in play, and "+" to add one), then each project in play as a row, by this week (pins
+  on top, then late, then an agent at work, then money in), with its own colour and one mark: a red "late" or a green
+  working dot. The open project shows its parts under it, the tiles its page draws (`data-part`), the one in view
+  marked. Parked and Finished fold under them. Then Lists, grouped as the More sheet read them and each group folded
+  until opened, with counts (`groupsOf`); at the foot suggested changes when any, then Settings.
 
   GENERIC: whatever projects the record holds (`side-read.ts`), found by what its list declares; nothing here names one.
 
-  ON A PHONE (`phone`) IT IS THE PROJECTS TAB (pick 9): the page's head, one sentence, and the same rows with one fact
-  each in place of the dot, in a tile, with the same folds.
+  ON A PHONE (`phone`) IT IS THE PROJECTS TAB: the page's head, one sentence, and the same rows with one fact each in
+  place of the dot, in a tile, with the same folds, then the lists.
 
   ITS OWN CHUNK, loaded when the frame asks for it (`+layout.svelte`), so the shell's entry carries none of it.
 -->
@@ -18,12 +19,14 @@
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
   import { at, here as inside } from '../at.ts';
+  import { placeOf } from '../nav.ts';
   import { slotStyle } from '../home/project-cards.ts';
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, pinsKept, playSaid, splitOf, widthOf, type SideProject } from './side.ts';
+  import { REGISTERS } from '../record/held.ts';
+  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, playSaid, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
   import { readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
@@ -35,6 +38,12 @@
     projects = null,
     width = 248,
     phone = false,
+    places = [],
+    owned = [],
+    views = [],
+    tools = [],
+    heads,
+    pen = null,
     onwidth,
   }: {
     /** Where the record answers. */
@@ -50,6 +59,18 @@
     /** The width it is drawn at on a desk. */
     width?: number;
     phone?: boolean;
+    /** The places the bar leaves out (Work, People), each a row under Lists. */
+    places?: readonly SideLink[];
+    /** The record's lists that hold something, the kernel's own marked; money's is read from each declaration. */
+    owned?: readonly Omit<SideList, 'money'>[];
+    /** The places' own views (Board under Work), drawn with the saved views. */
+    views?: readonly SideLink[];
+    /** The record's tools (automations, the vault and the rest). */
+    tools?: readonly SideLink[];
+    /** The words each group is drawn under. */
+    heads?: SideHeads | undefined;
+    /** Suggested changes waiting, said as one line, and where they are reviewed. */
+    pen?: { label: string; href: string } | null;
     /** Told of a width dragged, and whether the drag is over (then it is kept). */
     onwidth?: ((n: number, done: boolean) => void) | undefined;
   } = $props();
@@ -65,6 +86,9 @@
     parts: (name: string) => `${name}, its parts`,
     resize: 'Sidebar width',
     none: 'No projects yet.',
+    lists: 'Lists',
+    review: 'Review',
+    settings: 'Settings',
   } as const;
 
   /* THE READ: the projects first, then their week. Asked again when the record's version moves, a moment after. */
@@ -94,7 +118,9 @@
           const w = await readWeek(b, got.list, play);
           if (n === asked) week = w;
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (n === asked) answered = true;
+        });
     /* THE FIRST READ AT ONCE; a re-read waits for the page that moved the version to have its own reads out first. */
     const t = setTimeout(go, untrack(() => read) === null ? 0 : 1200);
     return () => clearTimeout(t);
@@ -241,6 +267,18 @@
   }
 
   const sentence = $derived(read && split ? playSaid(split.play, read.label) : undefined);
+
+  /* THE LISTS' GROUPS, once the read has learnt every list's declaration: a list is money's by a money field it declares. */
+  const groups = $derived.by((): SideGroup[] => {
+    if (!answered || heads === undefined) return [];
+    const money = (id: string): boolean => REGISTERS[id]?.fields.some((f) => f.type === 'money') ?? false;
+    return groupsOf(places, owned.map((l) => ({ ...l, money: money(l.id) })), views, tools, heads);
+  });
+  const spot = $derived(placeOf(path, page.url.searchParams));
+  const under = (href: string): boolean => spot === href || spot.startsWith(`${href}/`);
+  /* A GROUP IS FOLDED UNTIL OPENED, and the one holding the page you are on is open. */
+  let unfolded = $state<Record<string, boolean>>({});
+  const isOpen = (g: SideGroup): boolean => unfolded[g.key] ?? g.items.some((i) => under(i.href));
 </script>
 
 {#snippet mark(p: SideProject)}
@@ -298,6 +336,52 @@
   {/if}
 {/snippet}
 
+{#snippet link(l: SideLink, nested: boolean)}
+  <li>
+    <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={under(l.href) ? 'page' : undefined}>
+      <Icon name={l.icon as IconName} size="s" /><span class="s-name">{l.label}</span>
+      {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
+    </a>
+  </li>
+{/snippet}
+
+{#snippet listed()}
+  {#if groups.length > 0}
+    <h2 class="s-title s-lists">{words.lists}</h2>
+    <ul class="s-list">
+      {#each groups as g (g.key)}
+        {#if g.items.length === 1 && g.items[0]}
+          {@render link(g.items[0], false)}
+        {:else}
+          {@const open = isOpen(g)}
+          <li>
+            <button type="button" class="s-fold s-group tap" aria-expanded={open} onclick={() => (unfolded[g.key] = !open)}>
+              <Icon name={g.icon as IconName} size="s" /><span class="s-name">{g.label}</span><span class="s-count num">{g.items.length}</span>
+              <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+            </button>
+            {#if open}
+              <ul class="s-list">
+                {#each g.items as l (l.href)}{@render link(l, true)}{/each}
+              </ul>
+            {/if}
+          </li>
+        {/if}
+      {/each}
+    </ul>
+  {/if}
+{/snippet}
+
+{#snippet end()}
+  <ul class="s-list s-end">
+    {#if pen}
+      <li>
+        <a class="s-row s-link tap" href={at(pen.href)}><Icon name="alert" size="s" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
+      </li>
+    {/if}
+    {@render link({ href: '/settings', label: words.settings, icon: 'settings' }, false)}
+  </ul>
+{/snippet}
+
 {#if phone}
   <PageHead title={words.title} {sentence} />
   <div class="s-phone">
@@ -313,6 +397,9 @@
         {@render fold('parked', split.parked, read.label('parked'), 'archive')}
         {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
       </div>
+    {/if}
+    {#if groups.length > 0}
+      <div class="s-tile s-phone-lists">{@render listed()}</div>
     {/if}
   </div>
 {:else}
@@ -336,6 +423,8 @@
           </div>
         {/if}
       {/if}
+      {@render listed()}
+      {#if answered}{@render end()}{/if}
     </div>
     <!-- THE EDGE, DRAGGED. A separator with its value is a widget, so it takes focus and the arrows move it too. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -366,7 +455,10 @@
     border-inline-end: 1px solid var(--rule);
   }
 
+  /* A COLUMN, so the foot (suggested changes, Settings) sits at the bottom when the rest is short. */
   .s-scroll {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-inline-size: 0;
     overflow-y: auto;
@@ -660,6 +752,55 @@
     scroll-margin-block-start: 80px;
   }
 
+  /* LISTS: a heading like the projects', then a row or a folded group each, a glyph where a project has its mark. */
+  .s-lists {
+    display: block;
+    margin: var(--sp-5) 0 var(--sp-2);
+    padding-inline: var(--sp-3) 0;
+  }
+
+  .s-link {
+    padding-inline-start: var(--sp-3);
+  }
+
+  .s-link[data-nested] {
+    padding-inline-start: calc(var(--sp-3) + 20px + var(--sp-2));
+  }
+
+  .s-link :global(.icon),
+  .s-group :global(.icon) {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .s-link[aria-current='page'] {
+    background: var(--nav-selected);
+  }
+
+  .s-link .s-count,
+  .s-group .s-count {
+    flex: none;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  .s-group {
+    color: var(--ink-2);
+  }
+
+  /* THE FOOT: suggested changes when any, then Settings, a hairline over them, at the bottom of the column. */
+  .s-end {
+    margin-block-start: auto;
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /* AND NEVER RIGHT UNDER WHAT COMES BEFORE IT, however long the column runs. */
+  .s-scroll > :has(+ .s-end) {
+    margin-block-end: var(--sp-5);
+  }
+
   /* ── The phone's Projects tab ── */
   .s-phone {
     padding: 0 var(--gutter) var(--sp-5);
@@ -712,6 +853,23 @@
 
   .s-phone .s-fold {
     min-block-size: 44px;
+  }
+
+  .s-phone-lists {
+    margin-block-start: var(--sp-4);
+    padding: var(--sp-2) var(--sp-2) var(--sp-3);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  .s-phone-lists .s-lists {
+    margin-block-start: var(--sp-2);
+  }
+
+  .s-phone .s-link,
+  .s-phone .s-group {
+    min-block-size: 44px;
+    font-size: var(--fs-body);
   }
 
   .s-none {

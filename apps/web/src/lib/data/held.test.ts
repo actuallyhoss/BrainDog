@@ -91,7 +91,7 @@ test('TODAY, A PAGE AND NEEDS YOU HOLD THEIR PRESSES WHILE THEY DRAW A COPY OR W
   assert.match(home, /if \(!fromCopy\) return;\n\s+return untrack\(\(\) => holdCopyMark\(\)\);/u);
   assert.match(home, /if \(!fromMemory\) return;\n\s+return untrack\(\(\) => holdPresses\(\)\);/u);
   assert.match(home, /settled = true;\n\s+fromMemory = true;/u, 'drawn from memory, held');
-  assert.match(home, /bodyAsked = true;\n\s+fromMemory = false;/u, 'let go once the read behind it has answered');
+  assert.match(home, /settled = true;\n\s+fromMemory = false;/u, 'let go once the read behind it has answered');
   const page = src('../../routes/p/[slug]/+page.svelte');
   assert.match(page, /if \(remembered === null\) return;\n\s+return untrack\(\(\) => holdPresses\(\)\);/u);
   assert.match(page, /answered\(asked, keptCopy\);\n\s+remembered = asked;/u);

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handoffAlert, instructionAlert, questionAlert, ring, sift } from './alerts.ts';
+import { handoffAlert, happened, instructionAlert, questionAlert, ring, sift } from './alerts.ts';
+
+test('the bell keeps what happened and leaves a question to Needs you', () => {
+  const news = [{ text: 'Added Rent' }, { text: 'Asked: renew the domain?', asked: true as const }, { text: 'Decided: keep it' }];
+  assert.deepEqual(happened(news).map((n) => n.text), ['Added Rent', 'Decided: keep it']);
+});
 
 test('an instruction rings at Done and Needs you only, once per state, with fixed words', () => {
   assert.equal(instructionAlert({ id: 'IN4', state: 'working' }), null);

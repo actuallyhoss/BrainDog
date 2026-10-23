@@ -20,10 +20,10 @@
   to animate its own font size, which laid the head out on every frame.
 
   BELOW 900px THE HEAD IS A PHONE'S, THREE ROWS. The bar is always a row of its own, 56 under the notch, and stays: the
-  back link (a chevron and the parent's name) or the mark and the record's name on the left, the search button and the
-  face (which opens the More sheet) on the right, each 44 square. Under it the kicker when there is one, then the name at
-  22/28, two lines at most, with its count inline and the page's actions at the end; then the sentence. The bar says the
-  title on one line once the name has gone under it, fading in over the mark and the record's name.
+  back link (a chevron and the parent's name) or "BrainDog ▾" (the record switcher) on the left, the search button and
+  the face (Settings and Sign out, never a list of everything) on the right, each 44 square. Under it the kicker when
+  there is one, then the name at 22/28, two lines at most, with its count inline and the page's actions at the end;
+  then the sentence. The bar says the title on one line once the name has gone under it, fading in over the switcher.
 
   THE SENTENCE HOLDS ITS ROOM WHILE IT IS ON ITS WAY (motion F2.2): until the screen settles a page that has not said one
   yet keeps an empty line (two on a phone), so the tiles under the head never jump down when it lands.
@@ -48,11 +48,11 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import Define from './Define.svelte';
-  import Mark from './Mark.svelte';
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
   import { palette } from '../palette/open.svelte.ts';
-  import { openMore } from '../shell/more.svelte.ts';
+  import RecordMenu from '../shell/RecordMenu.svelte';
+  import YouMenu from '../shell/YouMenu.svelte';
   import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
   import { page } from '$app/state';
@@ -189,14 +189,6 @@
   /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries the mark and the record's name. */
   const wayBack = $derived(Boolean(kicker && back));
 
-  /* THE SHELL'S WORDS FOR THE BAR: the person's first letter on the face. */
-  const shell = $derived(page.data as { me?: { person?: string; name?: string }; names?: Record<string, string> } | undefined);
-  const face = $derived.by(() => {
-    const id = shell?.me?.person;
-    const name = id && shell?.names && Object.hasOwn(shell.names, id) ? (shell.names[id] ?? '').trim() : '';
-    return (name || shell?.me?.name?.trim() || 'You').slice(0, 1).toUpperCase();
-  });
-
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
 
@@ -221,8 +213,8 @@
     <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   {:else}
     <div class="bar-lead">
-      <!-- "BRAINDOG" BESIDE THE MARK ON EVERY PHONE SCREEN (U8), never the record's name: that is under the face. -->
-      <span class="bar-brand" aria-hidden="true"><Mark height={20} /><span class="bar-record">BrainDog</span></span>
+      <!-- "BRAINDOG ▾" ON EVERY PHONE SCREEN: the record you are in and the others to switch to (frame A). -->
+      <span class="bar-brand"><RecordMenu phone /></span>
       <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
     </div>
   {/if}
@@ -233,9 +225,7 @@
         <Icon name="search" size="l" />
       </button>
     {/if}
-    <button type="button" class="me tap" aria-haspopup="dialog" aria-label={copy.more} onclick={openMore}>
-      <span class="me-face" aria-hidden="true">{face}</span>
-    </button>
+    <YouMenu phone />
   </span>
 </div>
 {#if crumb && !headless && !tiled}
@@ -694,18 +684,10 @@
       transition: opacity var(--d-swap) var(--ease-out);
     }
 
-    .bar-record {
-      min-inline-size: 0;
-      overflow: hidden;
-      font-family: var(--font-display);
-      font-size: var(--fs-head);
-      font-weight: var(--fw-semi);
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
+    /* GONE UNDER THE TITLE, the switcher takes no press meant for the title over it. */
     .head-bar[data-past] .bar-brand {
       opacity: 0;
+      pointer-events: none;
     }
 
     /* The back link: a 20px chevron and the parent's name at 15/500, 44px tall. IT TAKES THE ROOM THERE IS until the
@@ -766,8 +748,7 @@
       margin-inline-start: auto;
     }
 
-    .find,
-    .me {
+    .find {
       display: grid;
       place-items: center;
       flex: none;
@@ -779,22 +760,6 @@
       border-radius: var(--r-ctl);
       color: var(--ink);
       cursor: pointer;
-    }
-
-    .me {
-      border-radius: var(--r-round);
-    }
-
-    /* THE FACE: the person's letter in a 32px circle, the control's quiet fill. */
-    .me-face {
-      display: grid;
-      place-items: center;
-      inline-size: 32px;
-      block-size: 32px;
-      background: var(--tile-2);
-      border-radius: var(--r-round);
-      font-size: var(--fs-meta);
-      font-weight: var(--fw-semi);
     }
 
     /* THE NAME AND WHAT GOES WITH IT SCROLL AWAY WITH THE PAGE; only the bar stays. 12 under the bar, or 4 under the
