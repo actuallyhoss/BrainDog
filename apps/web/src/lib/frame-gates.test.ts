@@ -147,6 +147,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/lib/ui/Count.svelte': ['.badge[data-size=\'s\']'], // ring
   'apps/web/src/lib/ui/NewAction.svelte': ['.field[data-bad]'], // edge
   'apps/web/src/lib/ui/PageHead.svelte': ['.head-bar::before'], // line
+  'apps/web/src/lib/ui/TopBar.svelte': ['.bar-bell-dot'], // ring
   'apps/web/src/lib/ui/StateDot.svelte': ['.dot[data-state=\'open\']', '.dot[data-state=\'part\']'], // edge
   'apps/web/src/lib/work/WorkClassic.svelte': ['.capture-field:focus-within', '.find:focus-within'], // edge
   'apps/web/src/routes/automations/AutomationSentence.svelte': ['.row :global(.field:has(input[aria-invalid=\'true\']))'], // edge

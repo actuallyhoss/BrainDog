@@ -189,9 +189,8 @@
   /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries the mark and the record's name. */
   const wayBack = $derived(Boolean(kicker && back));
 
-  /* THE SHELL'S WORDS FOR THE BAR: the record's name beside the mark, and the person's first letter on the face. */
-  const shell = $derived(page.data as { me?: { person?: string; name?: string }; names?: Record<string, string>; index?: { name?: string } } | undefined);
-  const record = $derived(shell?.index?.name ?? '');
+  /* THE SHELL'S WORDS FOR THE BAR: the person's first letter on the face. */
+  const shell = $derived(page.data as { me?: { person?: string; name?: string }; names?: Record<string, string> } | undefined);
   const face = $derived.by(() => {
     const id = shell?.me?.person;
     const name = id && shell?.names && Object.hasOwn(shell.names, id) ? (shell.names[id] ?? '').trim() : '';
@@ -222,7 +221,8 @@
     <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   {:else}
     <div class="bar-lead">
-      <span class="bar-brand" aria-hidden="true"><Mark height={20} />{#if record}<span class="bar-record">{record}</span>{/if}</span>
+      <!-- "BRAINDOG" BESIDE THE MARK ON EVERY PHONE SCREEN (U8), never the record's name: that is under the face. -->
+      <span class="bar-brand" aria-hidden="true"><Mark height={20} /><span class="bar-record">BrainDog</span></span>
       <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
     </div>
   {/if}
@@ -697,7 +697,8 @@
     .bar-record {
       min-inline-size: 0;
       overflow: hidden;
-      font-size: var(--fs-body);
+      font-family: var(--font-display);
+      font-size: var(--fs-head);
       font-weight: var(--fw-semi);
       text-overflow: ellipsis;
       white-space: nowrap;

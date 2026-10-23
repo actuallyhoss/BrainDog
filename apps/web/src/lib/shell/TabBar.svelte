@@ -8,8 +8,8 @@
   beside that face, never a tab.
 
   FLAT, AND DOCKED TO THE BOTTOM EDGE, on the nav's own surface with one hairline over it, as the top bar
-  is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on wears its glyph in an
-  ink block, the Bento boards' current tab, over its word in ink; the rest are the quiet ink. The only red is the count of what waits on you, the one `Count`, cut out of its glyph.
+  is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on wears its glyph on a
+  soft fill (frame B), over its word in ink; the rest are the quiet ink. The only red is the count of what waits on you, the one `Count`, cut out of its glyph.
 
   IT HOLDS STILL WHILE A PAGE CHANGES (motion F3): named `tabbar` for the view transition, which `app.css` does not
   animate, so the page's two pictures pass under it and its labels never blink.
@@ -96,10 +96,10 @@
     font-weight: var(--fw-medium);
     line-height: calc(16 / 12);
     text-decoration: none;
-    transition: color var(--d-state) var(--ease-out);
   }
 
-  /* HERE IS INK, the word a step up and the glyph in an ink block, 44 by 28, in the tile's colour. */
+  /* HERE IS A SOFT FILL, as on the top bar (U-A12, F10): the word in ink a step up and the glyph on the nav's chosen fill,
+     44 by 28. It snaps, so the glyph never crosses its own fill on the way. */
   .tab[aria-current='page'] {
     color: var(--ink);
     font-weight: var(--fw-semi);
@@ -112,12 +112,11 @@
     inline-size: 44px;
     block-size: 28px;
     border-radius: var(--r-ctl);
-    transition: background var(--d-state) var(--ease-out);
   }
 
   .tab[aria-current='page'] .badge-slot {
-    background: var(--ink);
-    color: var(--tile);
+    background: var(--nav-selected);
+    color: var(--ink);
   }
 
   /* FIVE TABS ON A 320px PHONE ARE 64px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
