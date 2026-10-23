@@ -107,6 +107,8 @@ export type RecordDeps = {
    * `nameOf` hands it), or `null` when she may not see it or it is not there (`index.ts`, `sightOf`).
    */
   sightOf: (ctx: CallContext, target: string) => string | null;
+  /** A handle's spoken id (`SG12`, `D3`), or `null` when what was given is no handle or names nothing (`index.ts`). */
+  spokenAs: (given: string) => string | null;
   /** The sight module (`sight.ts`): which rows the caller is shown, and which they may write (`mayWrite`). */
   sight: import('../sight.ts').Sight;
   /** An owner or an Admin in a browser, and no token of any kind (`index.ts`, `team`). Absent, an owner only. */

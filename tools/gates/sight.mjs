@@ -95,6 +95,7 @@ export const ALLOWED = [
   { file: `${R}/methods/count-by.ts`, fn: 'walk', why: "Handed the caller's `kernel.scope` by `countBy`, which asks it, and reads every page under it." },
   { file: `${R}/index.ts`, fn: 'listOf', why: `${NONE}the list a spoken id names, for the MCP door's firewall to strip the fields hidden there off a row it already answered.` },
   { file: `${R}/index.ts`, fn: 'whereHeld', why: `${NONE}a block's \`where\` resolved with \`reads\` to decide whether it is refused; the block is drawn by \`heldBlock\`.` },
+  { file: `${R}/methods/visuals.ts`, fn: 'wordsOf', why: 'Names the thing a visual hangs on, only after `sightOf` admitted that same target for this caller (`thingOf`, `visual`).' },
   { file: `${R}/methods/exceptions.ts`, fn: 'rowOf', why: 'Names a row only on an exception over a list the caller reads whole (`whole`: no `kernel.scope` rule and no private row).' },
   { file: `${R}/methods/held-twice.ts`, fn: 'askFoldTwice', why: 'Folds only when every row is one the caller sees (`unseen`, asked under `kernel.scope` in `seenBy`); otherwise FORBIDDEN.' },
   { file: `${R}/methods/named-twice.ts`, fn: 'askNamedSame', why: 'Reads again, at its version, a row of a pair `seenBy` offered this caller under her grant.' },

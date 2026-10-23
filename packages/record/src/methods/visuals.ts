@@ -21,7 +21,6 @@ import {
 } from '@braindog/kernel';
 
 import { ladder } from '../ladder.ts';
-import { isHandle, spokenOf } from '../question-handles.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -100,7 +99,7 @@ const NOTHING = 'There is nothing by that name you can see. Name a task, a proje
 type On = { target: string; list: string | null; id: string; words: string };
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, scoped, sightOf, sight, no, tail, clock } = deps;
+  const { kernel, sql, guard, scoped, sightOf, spokenAs, sight, no, tail, clock } = deps;
   const trust = ladder({ sql, kernel, now: () => clock.now() });
 
   /** The writer as the record signs writes: a token by its run, a person as herself (`writerOf` in `index.ts`). */
@@ -147,7 +146,7 @@ export function methods(deps: RecordDeps) {
       return { code: 'REQUIRED_MISSING', fix: 'Say what it is on: a task, a project, a question or a decision, as it is spoken or by its name.', at: 'on' };
     const said = on.trim();
     const governed = /^(SG|D)([1-9][0-9]*)$/u.exec(said);
-    const handle = isHandle(said) ? spokenOf(sql, said) : null;
+    const handle = spokenAs(said);
     const number = governed ? said : handle;
     if (number !== null) {
       const target = `${number.startsWith('SG') ? 'suggestion' : 'decision'}:${number}`;
