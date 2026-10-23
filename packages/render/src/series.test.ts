@@ -29,7 +29,7 @@ test('in stands above the zero rule and out hangs under it, on one scale that en
   assert.equal(downB!.height, '50');
   assert.equal(plan.top, '£300');
   assert.equal(plan.bottom, '−£300');
-  assert.deepEqual(plan.ticks.map((t) => [t.y, t.label, t.zero]), [['0', '£300', false], ['50', '£0', true], ['100', '−£300', false]]);
+  assert.deepEqual(plan.ticks.map((t) => [t.y, t.label, t.zero]), [['0', '£300', false], ['50', '0', true], ['100', '−£300', false]]);
   assert.equal(plan.series[1]!.dir, 'out');
 });
 

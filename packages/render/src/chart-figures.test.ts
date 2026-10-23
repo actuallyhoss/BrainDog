@@ -73,7 +73,7 @@ test('WITH A HOME CURRENCY, AN AXIS IS COMPACT IN THE HOME SIGN: £8m, and what 
   const plan = seriesPlan(series('GBP'), true, 'GBP');
   assert.equal(plan.top, '£8m');
   assert.equal(plan.bottom, '−£4m');
-  assert.deepEqual(plan.ticks.map((t) => t.label), ['£8m', '£0', '−£4m']);
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['£8m', '0', '−£4m'], 'zero is 0 in any currency');
   assert.equal(plan.buckets[0]!.net, '£6,800,000.00', 'a net is an amount, so every minor unit');
   assert.deepEqual(plan.totals.map((t) => t.value), ['£21,600,000', '£9,100,000']);
   /* The same figures on a record whose home is another currency, or none, say which currency they are in. */
@@ -87,7 +87,7 @@ test('A HOME OF EGYPTIAN POUNDS READS AS THE WRITER WRITES IT, compact on the ax
   assert.match(plan.top, /8m$/u);
   assert.equal(plan.bottom, said(-400_000_000, 'EGP', 'EGP', 'axis'));
   assert.equal(plan.bottom.codePointAt(0), 0x2212, 'a true minus in front, never a hyphen');
-  assert.deepEqual(plan.ticks.map((t) => t.label), [800_000_000, 0, -400_000_000].map((m) => said(m, 'EGP', 'EGP', 'axis')));
+  assert.deepEqual(plan.ticks.map((t) => t.label), [800_000_000, 0, -400_000_000].map((m) => (m === 0 ? '0' : said(m, 'EGP', 'EGP', 'axis'))));
   assert.equal(plan.buckets[1]!.net, said(250_000_000, 'EGP', 'EGP', 'exact'));
 });
 

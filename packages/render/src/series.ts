@@ -305,7 +305,9 @@ export function seriesNice(v: number, whole = false): number {
  */
 function seriesScale(hi: number, lo: number, y: (v: number) => number, template: string, home: string | null | undefined): SeriesTick[] {
   const marks = hi > 0 && lo > 0 ? [hi, 0, -lo] : hi > 0 ? [hi, hi / 2, 0] : [0, -lo / 2, -lo];
-  return marks.map((v) => ({ y: at(y(v)), label: amountLike(template, v, home, 'axis'), zero: v === 0 }));
+  /* ZERO IS 0 IN ANY CURRENCY: "EGP 0" on the rule read as an amount of nothing (the look's words check), where the
+     lines above and below it already say the currency. */
+  return marks.map((v) => ({ y: at(y(v)), label: v === 0 ? '0' : amountLike(template, v, home, 'axis'), zero: v === 0 }));
 }
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */
