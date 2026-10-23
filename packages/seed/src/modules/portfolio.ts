@@ -1159,7 +1159,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { metric: 'project-last-worked:{{name}}', as: 'when', label: 'Worked on' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
-        limit: 12,
+        /* EVERY PROJECT IN PLAY OR PARKED, SINCE portfolio 1.21.0 (batch 4's look on his record): twelve by name, parked
+           among them, and the lane bar the app draws over these cards said "In play 5" where Today, the sidebar and the
+           More sheet said 13. A count read off part of a list is never drawn; a hundred is past any record's projects. */
+        limit: 100,
         /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the UI pass of 20 October: its empty line,
            the one thing to do on a page with no project, is the line's now, and a parked one is a lane of these cards. */
         when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }] },

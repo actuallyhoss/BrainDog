@@ -667,9 +667,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   said two counts; Heads up's line of bills late says the part first (`says:`). 3.17.0 IS RELEASED (the deploy of
  *   23 October holds it), so a version of its own. One figure added and nothing taken away, so a minor step that
  *   reaches a record on its own.
+ * - portfolio 1.21.0 (batch 4's look on his record): Projects' In play cards draw every project in play or parked, a
+ *   hundred at most, where they drew the first twelve by name, so the lane bar over them says In play 13 as Today and
+ *   the sidebar do, where it said 5. One block's limit raised, nothing added or taken away, so a minor step that
+ *   reaches a record on its own. 1.20.0 IS RELEASED (the deploy of 23 October holds it).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.20.0',
+  portfolio: '1.21.0',
   people: '3.5.0',
   'money-core': '3.18.0',
   estate: '2.2.0',

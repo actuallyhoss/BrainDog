@@ -1676,6 +1676,22 @@ const DECLARED: Record<string, Version> = {
       "`page.portfolio`'s cards in play read each card's line from the key number its project leads with, `kpi: headline` on the trend column over `project-done-by-week`, which a card whose project keeps none still draws; no id added or taken away -> 88ed9a4e174d8bd8",
     ],
   },
+  'portfolio@1.21.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-said metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.datapoints register.kpis register.things
+      rule.project-past-aim
+    `,
+    declares: '572c66bf9ad6163e',
+    history: [
+      "Portfolio 1.21.0 (batch 4's look on his record): `page.portfolio`'s In play cards draw a hundred at most where they drew twelve, so the lane bar over them counts every project in play; no id added or taken away -> 572c66bf9ad6163e",
+    ],
+  },
   'portfolio@1.19.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-said
