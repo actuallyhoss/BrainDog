@@ -77,7 +77,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, cardOf, cardWords, inlineOf, keptWay, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -85,6 +85,8 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
   import { presses } from '$lib/data/held.svelte.ts';
+  import { history } from '$lib/data/undo.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   let {
     question,
@@ -207,6 +209,10 @@
   let busy = $state(false);
   /** The answer held for its Undo, or `null` once it has gone or was taken back. */
   let holding = $state<Held | null>(null);
+  /* THE ANSWER WAITING OUT ITS SIX SECONDS IS ON THE TAB'S UNDO HISTORY, so ⌘Z takes it back as the Undo beside it does (fluid F15). */
+  const mark = `held:${uid}`;
+  /* AN ANSWER PRESSED WHILE THE SCREEN WAS A SAVED COPY, kept for the record: what it said, and which answer (fluid F5). */
+  let waiting = $state<{ key: string; said: string } | null>(null);
   /* THE ROW IS ON ITS WAY OUT, sent and waiting for the pointer to leave its queue, or closing (`settle.ts` `leave`). It
      carries `data-held` meanwhile, so the page reads itself again only once the row has gone and nothing moves then. */
   let leaving = $state(false);
@@ -347,8 +353,10 @@
       phase = 'answered';
       holding = hold(() => {
         holding = null;
+        history.spend(mark);
         void send(way);
       });
+      history.push({ batch: mark, said: '', local: () => void undo() });
     });
     done?.focus();
   }
@@ -378,6 +386,7 @@
     const was = holding;
     if (!was?.undo()) return;
     holding = null;
+    history.spend(mark);
     answerTakenBack(question.id);
     mergeLine = '';
     const key = chosen?.key;
@@ -386,9 +395,14 @@
   }
 
   /** An answer given. With the reason line open it changes the choice and keeps the words already typed. */
-  /* NOR WHILE THE SCREEN IS A SAVED COPY OR WHAT THIS TAB KEPT (`held.svelte.ts`): a key reaches this as a press does. */
+  /* NOR WHILE THE SCREEN IS A SAVED COPY OR WHAT THIS TAB KEPT (`held.svelte.ts`): a key reaches this as a press does. THE
+     PRESS IS KEPT, NOT DROPPED (fluid F5): it goes once the record has answered, if the same answer is still on offer. */
   function press(way: Way) {
-    if (kept || presses.held || busy || holding !== null) return;
+    if (busy || holding !== null) return;
+    if (kept || presses.held) {
+      if (phase === 'open' && onpress === undefined) waiting = { key: way.key, said: buttonSays(way) };
+      return;
+    }
     if (onpress) return onpress(way.key);
     if (phase === 'asking') {
       chosen = way;
@@ -526,6 +540,22 @@
     };
   });
 
+  /* WHAT AN ANSWER'S BUTTON SAYS, the money row's naming the amount, so a kept press goes only if the button still says it. */
+  const buttonSays = (way: Way): string => (row && way.key === primary ? amountAnswer(way.label, row.amount) : way.label);
+
+  /* THE PRESS KEPT FOR THE RECORD GOES THE MOMENT IT HAS ANSWERED, as a press does, and the six seconds of Undo are its own.
+     A question or an answer that is no longer there is said, not guessed at: the reader looks. */
+  $effect(() => {
+    if (waiting === null || kept || presses.held) return;
+    const asked = waiting;
+    waiting = null;
+    untrack(() => {
+      const way = keptWay(card.ways, asked, buttonSays);
+      if (way && answerable) press(way);
+      else toasts.push(copy.pressChanged, { intent: 'warn' });
+    });
+  });
+
   /* AND AGAIN ONCE THE KEYBOARD HAS OPENED, because it arrives after the focus that summoned it and `--kb` grows then. */
   $effect(() => {
     if (phase !== 'asking') return;
@@ -574,8 +604,9 @@
       data-recommended={way.recommended ? '' : undefined}
       id={optId(way.key)}
       data-enter={way.key === card.enter ? '' : undefined}
-      data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
-      aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
+      data-on={(chosen?.key === way.key && phase === 'asking') || waiting?.key === way.key ? '' : undefined}
+      data-keeps
+      aria-pressed={waiting?.key === way.key ? true : phase === 'asking' ? chosen?.key === way.key : undefined}
       aria-disabled={kept ? 'true' : undefined}
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
@@ -1230,7 +1261,8 @@
   }
 
   /* ONE LINE, QUIET (today F7): what the answer did, said with its object, on the second ground at the control radius,
-     with Undo while the answer waits. */
+     with Undo while the answer waits. IT IS THERE IN THE FRAME THE CARD GOES: it faded in from nothing, and for those
+     frames the answer was a hole in the page (fluid F12); the room it settles into is `settle.ts`'s. */
   .qa-done {
     display: flex;
     flex-wrap: wrap;
@@ -1244,24 +1276,11 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
-    animation: qa-in var(--d-swap) var(--ease-standard);
   }
 
   .qa-done > :global(.icon) {
     flex: none;
     color: var(--good);
-  }
-
-  @keyframes qa-in {
-    from {
-      opacity: 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .qa-done {
-      animation: none;
-    }
   }
 
   /* ── a money row (today F4) ────────────────────────────────────────────────

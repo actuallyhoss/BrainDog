@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, keptWay, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -484,4 +484,17 @@ test('AN ARRANGEMENT NAMES A PACK BY ITS NAME, never by its id, and keeps its ow
   for (const s of [said('pack', { install: 'money-core' }), said('pack', { enable: 'usecase-founder' }), said('settings', { pack: 'money-core' })]) {
     assert.doesNotMatch(s, /money-core|usecase-|#\d|—/u, s);
   }
+});
+
+/* A PRESS KEPT FOR THE RECORD (fluid F5) goes only if the same answer is still offered in the same words. */
+test('a kept press is the same answer saying the same thing, and never another one', () => {
+  const ways = [
+    { key: 'accept', label: 'Chase it' },
+    { key: 'reject', label: 'Not yet' },
+  ];
+  const said = (amount: string) => (w: { key: string; label: string }) => (w.key === 'accept' ? `${w.label} ${amount}` : w.label);
+  assert.equal(keptWay(ways, { key: 'accept', said: 'Chase it £4,800' }, said('£4,800')), ways[0]);
+  assert.equal(keptWay(ways, { key: 'accept', said: 'Chase it £4,800' }, said('£4,500')), null, 'the amount changed under the press');
+  assert.equal(keptWay(ways.slice(1), { key: 'accept', said: 'Chase it £4,800' }, said('£4,800')), null, 'the answer was taken away');
+  assert.equal(keptWay(ways, { key: 'reject', said: 'Chase it' }, said('£4,800')), null, 'a key alone is not the answer');
 });

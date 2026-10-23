@@ -5,7 +5,8 @@
  * this tab's memory of a page, and the record has not answered yet, nothing that writes can be pressed. Every control
  * stays in its live box, so nothing moves when the answer lands; it is quiet and `aria-disabled`, and a press does
  * nothing. A link still goes where it goes, and so does anything marked `data-free`, which only opens or folds what is
- * already drawn and writes nothing.
+ * already drawn and writes nothing. A control marked `data-keeps` is not turned away either: it keeps its own press and
+ * sends it once the record has answered (a question's answers, `DecisionCard.svelte`).
  *
  * WHY THE SCREEN AND NOT EACH BUTTON. Today alone draws its questions' answers, Tell, pause or stop, a figure's menu, the
  * Ask Claude line, the projects' strip and every tile behind More, each in its own component, and a project and Money
@@ -44,7 +45,8 @@ export function isControl(el: Pressed): boolean {
 
 /**
  * The control a press on `target` acts through, when it is one to hold: the nearest control at or over it inside
- * `root`, unless a link or a `data-free` mark comes first. `null` for a link, a free control, text, or anything outside.
+ * `root`, unless a link or a `data-free` mark comes first. `null` for a link, a free control, one that keeps its own
+ * press, text, or anything outside.
  */
 export function heldControl(target: Pressed | null, root: Pressed): Pressed | null {
   let found: Pressed | null = null;
@@ -55,7 +57,7 @@ export function heldControl(target: Pressed | null, root: Pressed): Pressed | nu
     if (found !== null) continue;
     if (isLink(el)) return null;
     if (isControl(el)) {
-      if (el.hasAttribute('disabled')) return null;
+      if (el.hasAttribute('disabled') || el.hasAttribute('data-keeps')) return null;
       found = el;
     }
   }

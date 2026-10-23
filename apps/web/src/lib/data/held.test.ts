@@ -102,9 +102,32 @@ test('TODAY, A PAGE AND NEEDS YOU HOLD THEIR PRESSES WHILE THEY DRAW A COPY OR W
 
 test('A QUESTION\'S ANSWER BY KEY, AND A PAGE\'S KEYS THAT WRITE, ARE HELD AS A PRESS IS', () => {
   const card = src('../decide/DecisionCard.svelte');
-  assert.match(card, /function press\(way: Way\) \{\n(\s+\/\*[^]*?\*\/\n)?\s+if \(kept \|\| presses\.held \|\|/u);
+  /* A PRESS ON THE COPY IS KEPT FOR THE RECORD, NOT DROPPED (fluid F5): it is remembered while the screen is held, and
+     nothing is answered until it is not. */
+  assert.match(card, /function press\(way: Way\) \{\n\s+if \(busy \|\| holding !== null\) return;\n\s+if \(kept \|\| presses\.held\) \{\n\s+if \(phase === 'open' && onpress === undefined\) waiting = /u);
+  assert.match(card, /if \(waiting === null \|\| kept \|\| presses\.held\) return;/u, 'and it goes only once nothing holds the screen');
   assert.match(card, /function selectWay\(way: Way\) \{\n\s+if \(kept \|\| presses\.held \|\|/u);
   const body = src('../page/PageBody.svelte');
   assert.match(body, /if \(presses\.held && HELD_KEYS\.has\(e\.key\)\) return;/u);
   assert.match(body, /const HELD_KEYS = new Set\(\['x', 'e', 'm', 'd', 'Delete', 'Backspace'\]\);/u);
+});
+
+/* A CONTROL THAT KEEPS ITS OWN PRESS IS NOT TURNED AWAY (fluid F5): a question's answer waits for the record and goes. */
+test('A CONTROL MARKED data-keeps IS LEFT TO KEEP ITS OWN PRESS, AND ITS KEYS ARE NOT HELD EITHER', () => {
+  const card = el('ARTICLE', {}, main);
+  const answer = el('BUTTON', { 'data-keeps': '' }, card);
+  assert.equal(heldControl(el('SPAN', {}, answer), main), null, 'a press on the words in it is its own');
+  assert.equal(heldControl(el('BUTTON', {}, card), main)?.nodeName, 'BUTTON', 'its neighbour with no mark is held');
+  assert.equal(heldKey({ key: 'Enter', metaKey: false, ctrlKey: false, target: answer }, main), false, 'Enter on it reaches its click');
+  const layout = src('../../routes/+layout.svelte');
+  assert.match(src('../decide/DecisionCard.svelte'), /data-keeps\n/u, 'the card marks its answers');
+  assert.ok(layout.includes('holdIn('), 'and the shell still holds the rest');
+});
+
+test('A PRESS TURNED AWAY IS SAID, AND NOT MORE THAN ONCE IN A FEW SECONDS', () => {
+  const held = src('./held.svelte.ts');
+  assert.match(held, /toasts\.push\(copy\.stillOpening\)/u);
+  assert.match(held, /if \(at - toldAt < 4_000\) return;/u);
+  assert.match(held, /turn\(e\);\n\s+told\(\);/u, 'a click and a key are both said');
+  assert.equal([...held.matchAll(/\btold\(\);/gu)].length, 2);
 });

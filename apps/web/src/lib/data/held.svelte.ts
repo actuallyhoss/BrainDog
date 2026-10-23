@@ -9,11 +9,14 @@
  * HOW. The root layout attaches `holdIn` to `#main`. While held it marks every control in it `aria-disabled` and quiet
  * (`data-held-press`, a mark it alone sets and takes back), marks the ones a screen draws while it is held, and turns
  * away every press on one before any handler hears it: a click, a key that acts as a click, a form's send, and Enter in
- * a box typed into. Nothing is taken out or put in, so nothing moves when the answer lands; a link still goes.
+ * a box typed into, and says so once in a few seconds (`told`). Nothing is taken out or put in, so nothing moves when
+ * the answer lands; a link still goes, and so does a control that keeps its own press (`data-keeps`).
  */
 
 import type { Attachment } from 'svelte/attachments';
 
+import { copy } from '../copy/frame.ts';
+import { toasts } from '../ui/toast.svelte.ts';
 import { copyMark } from './copy-mark.svelte.ts';
 import { HELD_MARK, heldControl, heldKey } from './held.ts';
 
@@ -35,6 +38,15 @@ export function holdPresses(): () => void {
     done = true;
     holds = Math.max(0, holds - 1);
   };
+}
+
+/** A PRESS TURNED AWAY IS SAID, once in a few seconds, so it is never a silence (fluid F5). */
+let toldAt = -Infinity;
+function told(): void {
+  const at = performance.now();
+  if (at - toldAt < 4_000) return;
+  toldAt = at;
+  toasts.push(copy.stillOpening);
 }
 
 /** Every element a press can act through, for the sweep; `heldControl` decides which of them is held. */
@@ -72,14 +84,18 @@ export function holdIn(on: () => boolean): Attachment<HTMLElement> {
       e.stopImmediatePropagation();
     };
     const press = (e: Event) => {
-      if (heldControl(e.target instanceof Element ? e.target : null, root) !== null) turn(e);
+      if (heldControl(e.target instanceof Element ? e.target : null, root) === null) return;
+      turn(e);
+      told();
     };
     /* A SELECT OPENS ON THE POINTER GOING DOWN, before any click. */
     const down = (e: Event) => {
       if (heldControl(e.target instanceof Element ? e.target : null, root)?.nodeName === 'SELECT') turn(e);
     };
     const key = (e: KeyboardEvent) => {
-      if (heldKey({ key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, target: e.target instanceof Element ? e.target : null }, root)) turn(e);
+      if (!heldKey({ key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, target: e.target instanceof Element ? e.target : null }, root)) return;
+      turn(e);
+      told();
     };
     root.addEventListener('click', press, true);
     root.addEventListener('mousedown', down, true);

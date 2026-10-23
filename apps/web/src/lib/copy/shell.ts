@@ -103,6 +103,10 @@ export const shell = {
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   recordNotOpened: 'That did not open. Check your connection, then try again.',
+  /* A PRESS ON A SCREEN STILL OPENING FROM THE SAVED COPY (fluid F5): a control that cannot wait says so, and an answer that
+     was kept for the record says when it was not there to give. */
+  stillOpening: 'Still opening. Press it again in a moment.',
+  pressChanged: 'This changed while you waited. Have a look.',
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
      successfully", which reports on the software rather than on the record. */

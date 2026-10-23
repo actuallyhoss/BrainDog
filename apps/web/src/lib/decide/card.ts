@@ -630,6 +630,15 @@ export function pressOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>)
 export const primaryOf = (card: Pick<Card, 'ways'>): string | null => (card.ways.find((w) => w.recommended) ?? card.ways[0])?.key ?? null;
 
 /**
+ * THE ANSWER A PRESS KEPT FOR THE RECORD ASKED FOR (fluid F5), if the card still offers it saying the same words. The press
+ * was made on the saved copy, and the record may have taken the answer away or changed what its button says (a money row
+ * names its amount): another answer is never given in its place, so the reader is told and looks.
+ */
+export function keptWay<W extends { key: string }>(ways: readonly W[], asked: { key: string; said: string }, said: (way: W) => string): W | null {
+  return ways.find((w) => w.key === asked.key && said(w) === asked.said) ?? null;
+}
+
+/**
  * THE ANSWER A FORM STARTS ON: the one Enter would give (`enter`), so the suggestion is already chosen where a key may
  * give it, and nothing is chosen where the answer is hard to undo or money moves. A question the record answers with
  * its own two (Accept, Decline) or a merge has no choice to start on: its buttons are the answers.

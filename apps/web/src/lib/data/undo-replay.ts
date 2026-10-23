@@ -29,6 +29,11 @@ export async function undoNewest(): Promise<boolean> {
   /* POPPED BEFORE THE AWAIT, so a second press while the first is out reaches the change before it, never the same one. */
   const held = history.pop();
   if (held === null) return false;
+  /* AN ANSWER STILL WAITING OUT ITS SIX SECONDS HAS NOTHING AT THE RECORD TO PUT BACK: its card takes it back, as its Undo does. */
+  if (held.local) {
+    held.local();
+    return true;
+  }
   /* THE CLIENT NEVER THROWS FOR A DEAD NETWORK: it answers `UNREACHABLE`, which `undoChange` hands on as a refusal like
      any other. So the socket is watched here, and a record that never answered keeps the change held. */
   let unreached = false;

@@ -441,6 +441,12 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   color: var(--ink);
 }
 
+/* AND THE ANSWER PRESSED WHILE THE SCREEN WAS A SAVED COPY (fluid F5): it wears the same tint at once and waits for the
+   record, so it is under way and not refused. */
+.dc-btn[data-on][aria-disabled='true'] {
+  cursor: progress;
+}
+
 @media (pointer: coarse) {
   .dc-choice {
     min-block-size: var(--tap);
