@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SLASH_BRIEF_INSTRUCTIONS, SLASH_COMPOSE_INSTRUCTIONS } from '@braindog/host/slash';
-import { createRecordApi, type CallContext, type HeadlineInput } from '@braindog/record';
+import { createRecordApi, HEADLINE_ANSWER_TOKENS, type CallContext, type HeadlineInput } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { LOOK, slashLook, workerSlashModel } from '../src/slash.ts';
@@ -57,7 +57,7 @@ const DESK = {
 
 type Asked = HeadlineInput['pages'][number];
 type Drawn = { key?: string; kind: string; heading?: string; drawn?: boolean; said?: string };
-type Run = { model: string; system: string; input: unknown; schema: unknown };
+type Run = { model: string; system: string; input: unknown; schema: unknown; maxTokens: unknown; effort: unknown };
 
 /** The key the ask handed for the part under this heading. */
 const keyOf = (p: Asked, heading: string): string => (p.blocks ?? []).find((b) => b.heading === heading)?.key ?? assert.fail(`${heading} was not handed`);
@@ -76,7 +76,7 @@ const fakeAi = (look: (page: Asked) => unknown) => {
         const system = messages[0]!.content;
         const input = JSON.parse(messages[1]!.content) as unknown;
         const schema = (inputs['response_format'] as { json_schema?: { schema?: unknown } } | undefined)?.json_schema?.schema;
-        runs.push({ model, system, input, schema });
+        runs.push({ model, system, input, schema, maxTokens: inputs['max_tokens'], effort: inputs['reasoning_effort'] });
         const answer =
           system === SLASH_COMPOSE_INSTRUCTIONS
             ? { lines: Object.fromEntries((input as HeadlineInput).pages.filter((p) => p.page === 'desk').map((p) => [p.page, look(p)])) }
@@ -125,6 +125,10 @@ test('THE DAILY LOOK ARRANGES A PAGE ON THE CLOUD: the compose answer\'s lead an
     assert.equal(composed.length, 1, 'the record\'s step never asked for the pages\' looks');
     assert.equal(composed[0]!.model, '@cf/zai-org/glm-5.3-flash');
     assert.deepEqual(composed[0]!.schema, LOOK, 'the look was not asked under its own schema');
+    /* WITH ROOM FOR THE ANSWER THE RECORD SIZED THE ASK TO AND AS MUCH AGAIN FOR THE MODEL'S THINKING, which it was told to
+       keep low: on 23 October the ask's thinking at its default and an answer for every page ran its 2,048 out. */
+    assert.ok(Number(composed[0]!.maxTokens) >= 2 * HEADLINE_ANSWER_TOKENS, `the ask's ceiling was ${String(composed[0]!.maxTokens)}`);
+    assert.equal(composed[0]!.effort, 'low');
     assert.ok((composed[0]!.input as HeadlineInput).pages.some((p) => p.page === 'desk'), 'the desk was not handed');
     /* AND WHAT IT ANSWERED IS THE RECORD'S LOOK, written by Slash. */
     assert.equal(looks().length, 1, 'no look was written from the answer');

@@ -45,6 +45,20 @@ export const HEADLINE_RAW_MOST = 200;
 /** At most this many pages go into the one nightly ask, so its input stays the size of one ask. */
 export const HEADLINE_PAGES_MOST = 24;
 
+/**
+ * THE MOST OF ONE HEADLINE ASK'S CEILING ITS ANSWER MAY TAKE, in tokens counted as the Worker counts a prompt, four bytes a
+ * token. An ask holds no more pages than the longest answer each could give fits in (`lookAnswerMost` in
+ * `compose-look.ts`); the pages left over are owed and asked on a later tick (`owedSince`), as a page whose basis moved is.
+ *
+ * WHY HALF OF THE 2,048 THE CLOUD ASKS WITH (`RECORD_TOKENS` in `apps/worker/src/slash.ts`). Its model reasons before it
+ * answers and spends that from the same ceiling (`Effort` in `apps/worker/src/inference.ts`), so the answer never has
+ * the whole of it; and a block's key or a row's handle is the kind of text that runs to fewer bytes a token than prose.
+ * On 23 October three of the night look's asks stopped at the ceiling within its first two minutes, and the one ask over
+ * every page could never have fitted: the answer it allowed, a whole look for each of 24 pages, runs to several thousand
+ * tokens (`test/headline-answer-room.test.ts`).
+ */
+export const HEADLINE_ANSWER_TOKENS = 1_024;
+
 /** The pref a page's line is kept under, as Slash's own (`pref`, person `slash`). */
 export const headlineKey = (page: string): string => `headline.${page}`;
 

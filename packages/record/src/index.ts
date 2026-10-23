@@ -172,6 +172,7 @@ import {
   HEADLINE_ASKS_DAY,
   HEADLINE_ITEMS_MOST,
   HEADLINE_LOOK_MS,
+  HEADLINE_ANSWER_TOKENS,
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
   HEADLINES_OWED,
@@ -199,7 +200,7 @@ import {
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
-import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
+import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookAnswerMost, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -293,6 +294,7 @@ export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt 
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
+  HEADLINE_ANSWER_TOKENS,
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,
   HEADLINE_OWED_MS,
@@ -4860,6 +4862,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const now = new Set(owedPages(waits, clock.now()));
       due = due.filter((d) => now.has(d.page.page));
     }
+    /* AS MANY PAGES AS THEIR LONGEST ANSWERS FIT, IN THE RAIL'S ORDER (`HEADLINE_ANSWER_TOKENS`): an answer past the ask's
+       ceiling is cut off and every page in it keeps its rules' line. The first page always goes, alone if it must. A page
+       left out was not asked, so its basis is still owed: a later tick of the day finds it (`owedSince`) and asks it. */
+    let room = HEADLINE_ANSWER_TOKENS;
+    const fits: typeof due = [];
+    for (const d of due) {
+      const most = lookAnswerMost(d.page);
+      if (fits.length > 0 && most > room) break;
+      fits.push(d);
+      room -= most;
+    }
+    due = fits;
     if (due.length === 0) return { said: [], dropped: [] };
     const input: HeadlineInput = { today, pages: due.map((d) => d.page) };
     /* COUNTED BEFORE THE MODEL IS ASKED, answered or not: the ask awaits the meter and the model, and a tick that comes in

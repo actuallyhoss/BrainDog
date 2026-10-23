@@ -42,6 +42,7 @@ import { ok } from '@braindog/ports';
 
 import {
   HEADLINE_BLOCKS_MOST,
+  HEADLINE_RAW_MOST,
   HEADLINE_ROWS_MOST,
   HOME_PAGE,
   SYSTEM_WORDS,
@@ -213,6 +214,36 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
   const at = out.findIndex((b) => b.lead === true);
   if (at > 0) out.unshift(...out.splice(at, 1));
   return { blocks: out, rows };
+}
+
+/**
+ * The longest answer one page may give the headline ask, in tokens at four bytes a token: its entry in `lines` with every
+ * part the instructions allow at its most. A line of `HEADLINE_RAW_MOST`, a lead, an order of every key it was handed and
+ * a hide of all but one, a next naming its longest handle in `NEXT_MOST` characters, and a group for each part handed one,
+ * by its longest field. A page handed no blocks (Home) answers the bare line.
+ *
+ * READ OFF WHAT THE PAGE WAS HANDED AND NOT A GUESS AT A TYPICAL ONE, because the ask's ceiling is a wall: the ask holds
+ * no more pages than this fits into `HEADLINE_ANSWER_TOKENS` (`index.ts` `slashHeadlines`), and a typical answer that
+ * fits says nothing about the night one does not.
+ */
+export function lookAnswerMost(page: HeadlinePage): number {
+  const line = 'x'.repeat(HEADLINE_RAW_MOST);
+  const keys = (page.blocks ?? []).map((b) => b.key);
+  const longest = (all: readonly string[]): string => all.reduce((a, b) => (b.length > a.length ? b : a), '');
+  const grouped = (page.blocks ?? []).filter((b) => (b.group?.length ?? 0) > 0).slice(0, LOOK_GROUPS_MOST);
+  const handles = (page.rows ?? []).map((r) => r.row);
+  const answer =
+    keys.length === 0
+      ? line
+      : {
+          headline: line,
+          lead: longest(keys),
+          order: keys,
+          hide: keys.slice(1),
+          ...(handles.length === 0 ? {} : { next: { row: longest(handles), text: 'x'.repeat(NEXT_MOST) } }),
+          ...(grouped.length === 0 ? {} : { group: Object.fromEntries(grouped.map((b) => [b.key, longest(b.group ?? [])])) }),
+        };
+  return Math.ceil(new TextEncoder().encode(JSON.stringify({ [page.page]: answer })).length / 4);
 }
 
 /** What a page's answer arranged, each part only when it passed, and why each part that did not was dropped. */
