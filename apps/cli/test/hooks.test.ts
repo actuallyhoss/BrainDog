@@ -121,14 +121,13 @@ async function stubHost(
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
       if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: FIRST, level: 'owner' } } });
       const register = String(body.register ?? new URLSearchParams(url.search).get('register'));
-      if (method === 'schema')
-        return answer({
-          ok: true,
-          value:
-            register === 'things'
-              ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
-              : { id: 'people', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', handles: 'handles', self: 'self', aliases: 'aliases' } },
-        });
+      const declOf = (id: string) =>
+        id === 'things'
+          ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
+          : { id: 'people', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', handles: 'handles', self: 'self', aliases: 'aliases' } };
+      if (method === 'schema') return answer({ ok: true, value: declOf(register) });
+      /* Every list's declaration in one read, as the record answers `schemas` with `every`. */
+      if (method === 'schemas') return answer({ ok: true, value: { lists: Object.fromEntries(registers.map((r) => [r.id, declOf(r.id)])), blocks: {} } });
       /* A project's history: made long ago with what it lists now, or at `joined`; with `joined: null`, not readable. */
       if (method === 'history' && register === 'things') {
         const seq = Number(body.seq ?? new URLSearchParams(url.search).get('seq'));
@@ -216,8 +215,8 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   /* The machine as a person names it, never its network name. */
   assert.equal(lines[0]!.includes(hostname()), false, lines[0]);
 
-  /* A question waits, so whose it is was read beside the attach. */
-  assert.deepEqual(host.seen.map((s) => s.method), ['attach', 'boot']);
+  /* THE ATTACH ALONE: the card the record draws says whose the questions are, so the start asks nothing beside it. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['attach']);
   const [attach] = host.seen;
   assert.deepEqual(attach!.body, { source: 'startup', client_id: 'claude-run-1' });
   assert.equal(attach!.headers.authorization, `Bearer ${TOKEN}`);
@@ -226,7 +225,6 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   /* Attaching finds the run by its client id, so an old run named in a file is never sent, and the session's own id is. */
   assert.equal(attach!.headers['x-braindog-session'], undefined);
   assert.equal(attach!.headers['x-braindog-client'], 'claude-run-1');
-  assert.deepEqual([host.seen[1]!.headers['x-braindog-session'], host.seen[1]!.headers['x-braindog-client']], ['S7', 'claude-run-1']);
 
   /* THE SESSION'S OWN FILE, and the folder's for a shell there, each saying the same run and where it started. */
   const file = sessionPath(env, cwd, 'claude-run-1');
@@ -337,7 +335,7 @@ test('THE START HOOK’S OWN TIME RIDES THE NEXT CALL of the same session, as a 
 
   /* A start times itself and keeps the time; it sends nothing more than it always did. */
   assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'startup' }))).code, 0);
-  assert.deepEqual(methods(), ['attach', 'boot']);
+  assert.deepEqual(methods(), ['attach']);
   /* Every call says the command's build, the checkout's here. */
   for (const s of host.seen) assert.equal(s.headers['x-braindog-cli'], 'dev+0000000', s.method);
   const first = readSession(own)?.hook_ms;
@@ -356,7 +354,7 @@ test('THE START HOOK’S OWN TIME RIDES THE NEXT CALL of the same session, as a 
 
   /* A clear is another session: the time the folder's file holds is not its to send. */
   assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-2', source: 'clear' }))).code, 0);
-  assert.deepEqual(methods(), ['attach', 'boot']);
+  assert.deepEqual(methods(), ['attach']);
   host.seen.splice(0);
 
   /* The end sends what the session still owes beside its end, and the file stops owing it. */
@@ -447,7 +445,7 @@ test('THE START HOOK SAYS IT ABOVE THE CARD, from the host’s build the bridge 
   const lines = said[0]!.trimEnd().split('\n');
   assert.equal(lines[0], `Your BrainDog command line is out of date (built 7 Oct, ${new URL(host.base).host} is on 20 Oct). Run braindog update, then start a new session.`);
   assert.equal(lines[1], 'Connected to BrainDog. Call context.');
-  assert.deepEqual(host.seen.map((s) => s.method), ['attach', 'boot'], 'saying it cost a request');
+  assert.deepEqual(host.seen.map((s) => s.method), ['attach'], 'saying it cost a request');
 
   await start('claude-new', '2026.10.20+f46ccf9');
   assert.equal(said[1]!.trimEnd(), 'Connected to BrainDog. Call context.');
@@ -603,8 +601,9 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   const host = await stubHost(t, false, true, undefined, { projects, self });
   const out = await run(['hook', 'end'], signedIn(host.base), end);
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  /* The record's projects and the owner's own row read once, when the repository joined its project, then the meets, then the end. */
-  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', ...Array<string>(10).fill('meet'), 'end']);
+  /* The record's projects and the owner's own row read once, every list's declaration in one read, when the repository
+     joined its project, then the meets, then the end. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schemas', 'list', 'list', 'history', ...Array<string>(10).fill('meet'), 'end']);
   const met = host.seen.filter((s) => s.method === 'meet');
   /* Newest first: GitHub's private address as a handle and a key, the owner's commit left out, and one person once. */
   const source = `commit ${last.slice(0, 7)} in ${name}`;
@@ -622,7 +621,7 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   const off = await stubHost(t, false, false, undefined, { projects, self });
   const quiet = await run(['hook', 'end'], signedIn(off.base), end);
   assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
-  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', 'meet', 'end']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schemas', 'list', 'list', 'history', 'meet', 'end']);
 
   /* FAIL CLOSED: no row marked the owner's, the project's history unreadable, or a time in it that is no time. Nobody is
      met, nothing is said, and the run still ends. */

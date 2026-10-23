@@ -16,7 +16,8 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { hookStart } from '../src/hooks.ts';
+import { hookStart, type WorkJob } from '../src/hooks.ts';
+import { startWork } from '../src/session-start.ts';
 import { connect, describedIn, render, skillPath, skills, syncSkills, thisMachine, type AgentIo } from '../src/skills.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -648,12 +649,18 @@ test('braindog skills sync --dry-run prints what it would do and says it was a d
 
 /* ── the start hook ────────────────────────────────────────────────────── */
 
-test('THE START HOOK SYNCS SKILLS on startup, says so as one count on the card, and not on a compaction', async (t) => {
+test('THE START HOOK SYNCS SKILLS on startup, after its card, and not on a compaction', async (t) => {
   const h = await setup(t);
   h.add(RELEASE);
   const written: string[] = [];
-  const hook = (source: string) =>
-    hookStart({ env: h.env, stdin: JSON.stringify({ cwd: h.cwd, session_id: 'claude-run-1', source }), cwd: h.cwd, home: h.home, device: 'MacBook', write: (text) => void written.push(text) });
+  /* THE WORK THE HOOK LEAVES FOR AFTER ITS CARD, done here and waited for, where a session's is a detached process. */
+  const pending: Promise<unknown>[] = [];
+  const base = h.env.BRAINDOG_HOST;
+  const work = (job: WorkJob) => void pending.push(startWork({ env: h.env, home: h.home }, { key: base, base, token: TOKEN }, job.at, job.context, job.run, Date.now() + 8_000));
+  const hook = async (source: string) => {
+    await hookStart({ env: h.env, stdin: JSON.stringify({ cwd: h.cwd, session_id: 'claude-run-1', source }), cwd: h.cwd, home: h.home, device: 'MacBook', write: (text) => void written.push(text), work });
+    await Promise.all(pending.splice(0));
+  };
 
   await hook('startup');
   const lines = (written[0] ?? '').split('\n');

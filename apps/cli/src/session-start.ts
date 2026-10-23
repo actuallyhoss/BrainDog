@@ -44,15 +44,58 @@ export type StartIo = { env: Env; home?: string | undefined };
 export const START_WORK_MS = 3_000;
 
 /**
+ * THE START HOOK'S WORK RUNS AFTER THE CARD, in a process of its own (`hooks.ts`, `spawnWork`), with this long for the
+ * whole and `WORK_STEP_MS` for each step. Inside the hook the sync and the scan held every card for up to six seconds
+ * the card never used, and on the owner's record a skills list that took 3.3 s to read never finished inside its 1.5 s,
+ * so the same work was owed again at every start (audit of 22 Oct, E2).
+ */
+export const WORK_MS = 120_000;
+export const WORK_STEP_MS = 45_000;
+
+/**
+ * Whether the start work is owed here, from the attach's context and this machine's files alone: no request.
+ *
+ * NOT WHEN THE RECORD HAS NEITHER REGISTER, and not when the tag here is the one the work last ran whole at. A place
+ * whose tag cannot be told (a skills list the context cut short) is owed once a day: after a whole run here it keeps an
+ * empty tag, and the next run is the next day's.
+ */
+export function startOwed(io: StartIo, to: Target, at: Position, context: Context, top: string | null, now: number = Date.now()): boolean {
+  const wants = (id: string) => context.registers.some((r) => r.id === id);
+  if (!wants('skills') && !wants('tools')) return false;
+  const home = io.home ?? homedir();
+  const place = placeOf(io.env, home, to, at, top);
+  const kept = readTags(home)[tagKey(place)];
+  if (underWay(kept, now)) return false;
+  if (kept === undefined || kept.owed === true) return true;
+  const tag = startTag(io.env, home, place, top, at.cwd, context);
+  if (tag !== null) return kept.tag !== tag;
+  return !(kept.tag === '' && kept.at !== undefined && dayOf(Date.parse(kept.at)) === dayOf(now));
+}
+
+/** Where the work runs, as its tag is keyed: the host, the machine, the repository's top folder (or the folder), Claude's config. */
+const placeOf = (env: Env, home: string, to: Target, at: Position, top: string | null): Place => ({
+  host: to.key,
+  machine: at.host,
+  folder: top ?? resolve(at.cwd),
+  configDir: env.CLAUDE_CONFIG_DIR || join(home, '.claude'),
+});
+
+/** The repository's top folder `at` stands in, or `null` outside one. */
+export async function topOf(at: Position): Promise<string | null> {
+  const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
+  return found === null ? null : resolve(found);
+}
+
+/**
  * Skills sync, then tools scan, at a session's start, and what each did as one item of the card's More.
  *
  * A COUNT AND NOT THE LINES. What the two did is housekeeping: files written, a row recorded, an edit proposed, which
  * the owner meets on Decide and `braindog skills sync` and `braindog tools scan` say in full. Their lines carried file
  * paths and ids, and are not what an agent starts from.
  *
- * NOTHING AT ALL WHEN THE RECORD HAS NEITHER REGISTER: no request, no file read. NOTHING EITHER WHEN THE TAG HERE IS THE
- * ONE THE WORK LAST RAN WHOLE AT: no request. Each runs on its own client and deadline, and a failure is one fixed
- * item, because an error could quote anything; a failure or a step with no time left leaves the work owed.
+ * NOTHING AT ALL WHEN IT IS NOT OWED HERE (`startOwed`): no request. Each step runs on its own client and deadline, at
+ * most `stepMs` long, and a failure is one fixed item, because an error could quote anything; a failure or a step with
+ * no time left leaves the work owed.
  *
  * `headers`, when given, are the session headers every request of the work carries, as the MCP server sends its own;
  * left out, they are Claude Code's for `run`, as the start hook has always sent them.
@@ -65,18 +108,24 @@ export async function startWork(
   run: { spoken?: string | undefined; client_id?: string | undefined },
   until: number,
   headers: Record<string, string> = sessionHeaders(at, 'claude', run, { env: io.env }),
+  stepMs: number = START_WORK_MS,
 ): Promise<string[]> {
   const wants = (id: string) => context.registers.some((r) => r.id === id);
   if (!wants('skills') && !wants('tools')) return [];
   const home = io.home ?? homedir();
-  const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
-  const top = found === null ? null : resolve(found);
+  const top = await topOf(at);
   const configDir = io.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
   /* NOTHING MOVED SINCE THE LAST TIME IT RAN WHOLE, HERE: no request, and the start is the attach alone. */
-  const place: Place = { host: to.key, machine: at.host, folder: top ?? resolve(at.cwd), configDir };
+  if (!startOwed(io, to, at, context, top)) return [];
+  const place = placeOf(io.env, home, to, at, top);
   const kept = readTags(home)[tagKey(place)];
   const before = startTag(io.env, home, place, top, at.cwd, context);
-  if (before !== null && kept !== undefined && kept.owed !== true && kept.tag === before) return [];
+  /* UNDER WAY, AND OWED UNTIL IT ENDS: a start meanwhile leaves it alone, and a run that dies is owed again later. */
+  try {
+    keepTag(home, tagKey(place), { tag: kept?.tag ?? '', owed: true, running: true });
+  } catch {
+    /* A home folder that cannot be written may run the work twice at once, as it always could. */
+  }
   const said: string[] = [];
   /* WHOLE ONLY WHEN EVERY STEP RAN TO ITS END: one that ran out of time or failed leaves the work owed. */
   let whole = true;
@@ -86,7 +135,7 @@ export async function startWork(
       whole = false;
       return;
     }
-    const ms = Math.min(START_WORK_MS, left);
+    const ms = Math.min(stepMs, left);
     const signal = AbortSignal.timeout(ms);
     try {
       const lines = await work(clientFor(to, async () => headers, signal), signal, ms);
@@ -115,10 +164,11 @@ export async function startWork(
         once: { host: to.key, hosts: hostsPath(io.env) },
       }),
     );
-  /* THE TAG AFTER THE WORK, because the work itself writes the lock files and the skill files it reads next time. */
+  /* THE TAG AFTER THE WORK, because the work itself writes the lock files and the skill files it reads next time. A
+     place whose tag cannot be told keeps an empty one with its time, which says the work ran whole here that day. */
   const after = whole ? startTag(io.env, home, place, top, at.cwd, context) : null;
   try {
-    keepTag(home, tagKey(place), after !== null ? { tag: after } : before === null && whole ? null : { tag: kept?.tag ?? '', owed: true });
+    keepTag(home, tagKey(place), after !== null ? { tag: after } : before === null && whole ? { tag: '' } : { tag: kept?.tag ?? '', owed: true });
   } catch {
     /* A home folder that cannot be written runs the work again at the next start, as it always did. */
   }
@@ -130,8 +180,14 @@ export async function startWork(
 /** Where the start work runs: the host, the machine, the repository's top folder (or the folder), and Claude's config. */
 type Place = { host: string; machine: string; folder: string; configDir: string };
 
-/** What the work last left here: the tag it ran whole at, or `owed` when it did not finish and the server owes it. */
-export type Tagged = { tag: string; at?: string; owed?: true };
+/**
+ * What the work last left here: the tag it ran whole at, or `owed` when it did not finish and the server owes it.
+ * `running` while a run of it is under way since `at`, owed until it ends, so a second start does not run it beside.
+ */
+export type Tagged = { tag: string; at?: string; owed?: true; running?: true };
+
+/** A run under way here, started less than the work's whole budget ago: one that died longer ago is owed again. */
+const underWay = (t: Tagged | undefined, now: number): boolean => t?.running === true && t.at !== undefined && now - Date.parse(t.at) < WORK_MS;
 
 /** `~/.braindog/start-tag.json`: one hash a place, never a key, a path or a row. */
 export const startTagPath = (home: string): string => join(home, '.braindog', 'start-tag.json');
@@ -148,7 +204,8 @@ function readTags(home: string): Record<string, Tagged> {
     if (!isObject(x) || !isObject(x.tags)) return {};
     const out: Record<string, Tagged> = {};
     for (const [key, t] of Object.entries(x.tags))
-      if (isObject(t) && typeof t.tag === 'string') out[key] = { tag: t.tag, ...(typeof t.at === 'string' ? { at: t.at } : {}), ...(t.owed === true ? { owed: true as const } : {}) };
+      if (isObject(t) && typeof t.tag === 'string')
+        out[key] = { tag: t.tag, ...(typeof t.at === 'string' ? { at: t.at } : {}), ...(t.owed === true ? { owed: true as const } : {}), ...(t.running === true ? { running: true as const } : {}) };
     return out;
   } catch {
     return {};
@@ -171,7 +228,8 @@ function keepTag(home: string, key: string, tagged: Tagged | null): void {
 
 /** Whether the start work here did not finish last time, so the MCP server owes it (`startFromServer`). */
 export function owedAt(home: string, place: Place): boolean {
-  return readTags(home)[tagKey(place)]?.owed === true;
+  const kept = readTags(home)[tagKey(place)];
+  return kept?.owed === true && !underWay(kept, Date.now());
 }
 
 /**

@@ -172,7 +172,7 @@ export type Project = { name: string; repos: string[]; folders: string[]; row?: 
 export type Layout = { projects: Project[]; self: Owner | null; why?: Unknown };
 
 /** The reads a harvest makes. */
-export type Reader = Pick<Client, 'boot' | 'schema' | 'list' | 'history'>;
+export type Reader = Pick<Client, 'boot' | 'schema' | 'list' | 'history'> & Partial<Pick<Client, 'schemas'>>;
 
 /** What a harvest says when the owner's own row could not be read, and so meets nobody. */
 export const noSelf = (dry: boolean, why: Unknown = 'unread'): string =>
@@ -198,6 +198,10 @@ export async function readLayout(reader: Reader): Promise<Layout> {
     if (refused(boot) && boot.refusal.code === 'UNREACHABLE') throw new Error('unreachable');
     return { projects: [], self: null, why: 'unread' };
   }
+  /* EVERY LIST'S DECLARATION IN ONE READ, so each `schema` below is answered from it: the end hook sent one read per
+     list, 27 of its 32 requests on the owner's record (audit of 22 Oct, E18). A record that cannot answer it is asked
+     list by list, as before. */
+  if (reader.schemas !== undefined) await reader.schemas().catch(() => false);
   const decls = (await Promise.all(boot.value.registers.map((r) => reader.schema(r.id)))).flatMap((d) => (d.ok && isObject(d.value) && typeof d.value.id === 'string' ? [d.value] : []));
   const [projects, self] = await Promise.all([readProjects(reader, decls), readSelf(reader, decls)]);
   return typeof self === 'string' ? { projects, self: null, why: self } : { projects, self };

@@ -9,11 +9,12 @@
  * and every sentence below is either fixed text or a host's refusal, which never carries one.
  */
 
-import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { Client, Context } from '@braindog/client';
 import { buildDay } from '@braindog/mcp/build';
@@ -28,7 +29,7 @@ import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_F
 import { seedInbox, toldAtStart } from './inbox-file.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
-import { startWork } from './session-start.ts';
+import { startOwed, startWork, topOf, WORK_MS, WORK_STEP_MS } from './session-start.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -36,8 +37,9 @@ type Env = Record<string, string | undefined>;
  * What a hook needs from its process, passed in so a test can hold all of it. `device` is the name this machine goes
  * by, when a test gives one; otherwise it is worked out (`deviceName`). `began` is when the hook began, in epoch
  * milliseconds, for a caller that is not its own process; without it the start hook counts from its process's start.
+ * `work` takes the start work the hook leaves for after the card; without it a detached process does it (`spawnWork`).
  */
-export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number; build?: string };
+export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number; build?: string; work?: (job: WorkJob) => void };
 
 /** The start hook's whole budget: git, then `attach`, well inside the twenty seconds Claude Code gives it. */
 export const HOOK_MS = 8_000;
@@ -515,10 +517,11 @@ export async function aheadCard(c: Context | undefined, moved: Moved, read: () =
  *   - `resume` within the hour of the same session last being heard from: nothing, because its card is still in the
  *     conversation. A resume after longer gets the whole card.
  *
- * ONE ROUND TRIP WHERE NOTHING MOVED (plan §4.1, his slowest start was 5.4 s). The attach answers the context, the card
- * and whether this command is behind its host; the skills sync and the tools scan run only when what they read moved
- * (`startTag` in `session-start.ts`); the time mark rides beside the attach; and the line saying this command line is out
- * of date comes from what the start already holds (`staleLine`).
+ * ONE ROUND TRIP BEFORE THE CARD (plan §4.1; the audit of 22 Oct measured 7.9 to 8.05 s for 10 of 12 starts). The
+ * attach answers the context, the card and whether this command is behind its host; the skills sync and the tools scan
+ * run after the card in a process of their own, and only when what they read moved (`startOwed` in `session-start.ts`);
+ * the time mark rides beside the attach; and the line saying this command line is out of date comes from what the start
+ * already holds (`staleLine`). A subagent is told one line and does no start work.
  *
  * WHAT EACH ONE SENDS, MEASURED on Claude Code 2.1.295 (9 October 2026; `test/fixtures/hook-events/`, and the table
  * under "The session hooks" in `docs/48-SPEC-CLI.md`). `resume` comes back here with the resumed conversation's own
@@ -631,19 +634,17 @@ export async function hookStart(io: Io): Promise<void> {
       if (said.length > 0) io.write(said.join('\n'));
       return;
     }
-    /* Only a session that begins syncs: a compaction or a clear is the same session going on (plan §4.3 step 6). */
-    const [more, decides] = await Promise.all([
-      run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startWork(io, to, at, run.context, named, began + ms) : [],
-      asksWaiting(run.context)
-        ? whoDecides(clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env }), AbortSignal.timeout(left())))
-        : null,
-    ]);
     const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
     /* FIRST, ABOVE THE CARD, as the lapse is: what to do before the work, in the words of the card's own Update line. */
     const home = io.home ?? homedir();
     const build = io.build ?? cliBuild();
     const stale = staleLine(build, shown.context, hostBuildOf(home, to.key), hostName(to.key), behindSaysIt(home, to.key, build));
-    const card = briefing(shown, where, moved, { more, ...decides });
+    const card = briefing(shown, where, moved);
+    /* A SUBAGENT WORKS FOR A RUN THAT ALREADY HOLDS THE CARD, so it is told one line, which run it is and where. */
+    if (child) {
+      seed(ids);
+      return io.write(card.split('\n')[0]!);
+    }
     /* ABOVE THE CARD, each line the record's own card does not already carry (by its instruction's name). */
     const above = heard.lines.filter((l) => {
       const named = /\((IN\d+)\)/u.exec(l)?.[1];
@@ -651,6 +652,14 @@ export async function hookStart(io: Io): Promise<void> {
     });
     seed(ids);
     io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}`);
+    /*
+     * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR (audit of 22 Oct, E2). The skills sync and the tools scan held
+     * every card for up to six seconds, and the card reads neither. Only a session that begins syncs: a compaction or a
+     * clear is the same session going on (plan §4.3 step 6). Whether it is owed is read here from the attach's context
+     * and this machine's files, with no request, so a start where nothing moved starts no process.
+     */
+    if (run.context !== undefined && (event.source === 'startup' || event.source === 'resume') && startOwed(io, to, at, run.context, await topOf(at)))
+      (io.work ?? spawnWork(io.env))({ host: to.key, at, context: run.context, run: named });
   } finally {
     /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
        beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */
@@ -667,6 +676,67 @@ export async function hookStart(io: Io): Promise<void> {
 
 /* The start work itself (`startWork`) lives in `session-start.ts`, so the MCP server can do it too for an app with no hook. */
 export { START_WORK_MS } from './session-start.ts';
+
+/**
+ * What the start hook hands the work it leaves for after the card: the host it attached to, where the session stands,
+ * the attach's context and the run. NEVER A TOKEN: the process that does the work signs in from this machine's own
+ * sign-in, as the hook did, and refuses a job for another host.
+ */
+export type WorkJob = { host: string; at: Position; context: Context; run: { spoken: string; client_id?: string } };
+
+/* The job files live beside the session files, at 0600, and each is read once and deleted. */
+const workDir = (env: Env): string => join(dirname(hostsPath(env)), 'sessions');
+
+/**
+ * The start work in a process of its own, detached, so the hook ends once the card is printed: the job written to a
+ * file beside the session files, and `braindog hook later <file>` started on it with stdio ignored.
+ */
+export const spawnWork =
+  (env: Env, cli: string = fileURLToPath(new URL('./main.ts', import.meta.url))) =>
+  (job: WorkJob): void => {
+    try {
+      const dir = workDir(env);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const file = join(dir, `later-${randomBytes(8).toString('hex')}.json`);
+      writeFileSync(file, `${JSON.stringify(job)}\n`, { mode: 0o600 });
+      const started = spawn(process.execPath, [cli, 'hook', 'later', file], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as NodeJS.ProcessEnv,
+      });
+      started.on('error', () => undefined);
+      started.unref();
+    } catch {
+      /* A process that cannot be started leaves the work for the next start, whose tag still says it is owed. */
+    }
+  };
+
+/**
+ * `braindog hook later <file>`: the start work a start hook left, done in the background. Reads the job once and deletes
+ * it, signs in as the hook did, and does the sync and the scan with a budget no card waits on (`WORK_MS`). Says nothing
+ * on any stream; what it did is one line in the hook's log.
+ */
+export async function hookWork(env: Env, file: string, home?: string): Promise<void> {
+  const at = resolve(file);
+  if (dirname(at) !== resolve(workDir(env)) || !/^later-[0-9a-f]{16}\.json$/u.test(basename(at))) return;
+  let job: WorkJob;
+  try {
+    job = JSON.parse(readFileSync(at, 'utf8')) as WorkJob;
+  } catch {
+    return;
+  } finally {
+    rmSync(at, { force: true });
+  }
+  const to = reach(env);
+  if (typeof to === 'string' || to.key !== job.host || !isObject(job.context) || !isObject(job.at)) return;
+  try {
+    const did = await startWork({ env, home }, to, job.at, job.context, job.run, Date.now() + WORK_MS, undefined, WORK_STEP_MS);
+    if (did.length > 0) hookLog(env, `At the start of ${job.run.spoken}: ${did.join(', ')}.`);
+  } catch {
+    hookLog(env, 'The start work failed, so it is owed at the next start.');
+  }
+}
 
 /* ── the people met in this session's commits ──────────────────────────── */
 

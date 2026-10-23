@@ -17,10 +17,10 @@ import { dirname, join } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
-import { hookStart } from '../src/hooks.ts';
+import { hookStart, hookWork, type WorkJob } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import type { Agent, Position } from '../src/position.ts';
-import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, startTag, startTagPath, startWork, START_WORK_MS } from '../src/session-start.ts';
+import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, startOwed, startTag, startTagPath, startWork, START_WORK_MS, WORK_MS } from '../src/session-start.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -104,6 +104,19 @@ function place(t: After) {
 }
 
 const positionAt = (cwd: string): Position => ({ cwd, repo: null, remote: null, host: MACHINE, branch: null, head: null });
+
+/**
+ * THE WORK A START HOOK LEAVES FOR AFTER ITS CARD, done here in the test's own process rather than a detached one, with
+ * `done()` to wait for it, so a test can say what it did.
+ */
+function worker(env: Record<string, string>, home: string, base: string) {
+  const pending: Promise<unknown>[] = [];
+  const to: Target = { key: base, base, token: TOKEN };
+  return {
+    work: (job: WorkJob) => void pending.push(startWork({ env, home }, to, job.at, job.context, job.run, Date.now() + 8_000)),
+    done: () => Promise.all(pending.splice(0)),
+  };
+}
 
 /* ── once a day ────────────────────────────────────────────────────────── */
 
@@ -259,7 +272,11 @@ test('THE START HOOK DOES THE WORK WHENEVER WHAT IT READS MOVED, whatever the se
   markStarted(p.home, MACHINE, kiln, 'claude', Date.now());
   markStarted(p.home, MACHINE, kiln, 'codex', Date.now());
   const written: string[] = [];
-  const hook = (id: string) => hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: (text) => void written.push(text) });
+  const w = worker(env, p.home, h.base);
+  const hook = async (id: string) => {
+    await hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: (text) => void written.push(text), work: w.work });
+    await w.done();
+  };
 
   for (const id of ['claude-run-1', 'claude-run-2']) {
     rmSync(p.skillFile, { force: true });
@@ -280,7 +297,11 @@ test('NOTHING MOVED, NOTHING ASKED: a start where the rows and the files are as 
   const h = await stubHost(t);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
-  const hook = (id: string) => hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: () => undefined });
+  const w = worker(env, p.home, h.base);
+  const hook = async (id: string) => {
+    await hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: () => undefined, work: w.work });
+    await w.done();
+  };
   const asked = () => h.seen.map((s) => s.method).filter((m) => m !== 'heard');
 
   await hook('claude-run-1');
@@ -304,6 +325,74 @@ test('NOTHING MOVED, NOTHING ASKED: a start where the rows and the files are as 
   t.after(() => void Object.assign(row, { version: 1, rev: 1 }));
   await hook('claude-run-6');
   assert.deepEqual(asked().slice(7), ['attach', 'get']);
+});
+
+test('THE CARD NEVER WAITS FOR THE WORK: it is printed before the work starts, and a subagent gets one line and no work', async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
+  const said: string[] = [];
+  const jobs: WorkJob[] = [];
+  const hook = (id: string, extra: Record<string, string> = {}) =>
+    hookStart({
+      env: { ...env, ...extra },
+      stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }),
+      cwd: kiln,
+      home: p.home,
+      device: 'MacBook',
+      write: (text) => void said.push(text),
+      /* The work is handed over and never done here: the hook must not wait for it. */
+      work: (job) => {
+        said.push('work');
+        jobs.push(job);
+      },
+    });
+  await hook('claude-run-1');
+  assert.deepEqual(said, ['Connected to BrainDog. Call context.', 'work']);
+  assert.deepEqual(h.seen.map((s) => s.method).filter((m) => m !== 'heard'), ['attach'], 'the hook asked more than the attach');
+  assert.equal(jobs[0]!.run.spoken, 'S9');
+  assert.ok(!JSON.stringify(jobs[0]).includes(TOKEN), 'the job carries the token');
+
+  said.length = 0;
+  await hook('claude-run-2', { CLAUDE_CODE_CHILD_SESSION: '1' });
+  assert.deepEqual(said, ['Connected to BrainDog. Call context.'], 'a subagent did the start work or was told more than one line');
+
+  /* THE BACKGROUND PROCESS READS ONLY A JOB FILE BESIDE THE SESSION FILES, and deletes it once read. */
+  const stray = join(p.dir, 'later-0123456789abcdef.json');
+  writeFileSync(stray, JSON.stringify(jobs[0]));
+  await hookWork(env, stray, p.home);
+  assert.ok(existsSync(stray), 'a file outside the session folder was taken as a job');
+  const job = join(p.dir, 'config', 'braindog', 'sessions', 'later-0123456789abcdef.json');
+  mkdirSync(dirname(job), { recursive: true });
+  writeFileSync(job, JSON.stringify(jobs[0]));
+  rmSync(p.skillFile, { force: true });
+  await hookWork(env, job, p.home);
+  assert.equal(existsSync(job), false, 'the job file was left behind');
+  assert.ok(existsSync(p.skillFile), 'the job was not done');
+});
+
+test('A LIST CUT SHORT IS SYNCED ONCE A DAY, and a run under way is not started again beside it', async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), CLAUDE_CONFIG_DIR: p.configDir };
+  const to: Target = { key: h.base, base: h.base, token: TOKEN };
+  const cut = { ...CONTEXT, registers: [{ ...CONTEXT.registers[0]!, truncated: true }] } as never;
+  const owed = () => startOwed({ env, home: p.home }, to, positionAt(kiln), cut, null);
+  assert.equal(owed(), true);
+  await startWork({ env, home: p.home }, to, positionAt(kiln), cut, {}, Date.now() + 8_000);
+  assert.ok(existsSync(p.skillFile));
+  assert.equal(owed(), false, 'a cut-short list was synced again the same day');
+  assert.equal(startOwed({ env, home: p.home }, to, positionAt(kiln), cut, null, Date.now() + 86_400_000), true, 'the next day did not sync');
+
+  /* A RUN UNDER WAY: what the tag file says while one is going, and again once the work's whole budget has passed. */
+  const file = startTagPath(p.home);
+  const tags = JSON.parse(readFileSync(file, 'utf8')) as { tags: Record<string, Record<string, unknown>> };
+  for (const t1 of Object.values(tags.tags)) Object.assign(t1, { owed: true, running: true, at: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify(tags));
+  assert.equal(owed(), false, 'a second run was started beside one under way');
+  assert.equal(startOwed({ env, home: p.home }, to, positionAt(kiln), cut, null, Date.now() + WORK_MS + 1_000), true, 'a run that died was never owed again');
 });
 
 test('A TAG IS THE RECORD’S ROWS AND THE MACHINE’S FILES: a cut-short list has none, and a version or a project moves it', (t) => {

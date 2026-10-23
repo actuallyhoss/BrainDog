@@ -33,7 +33,7 @@ import { automations, scripts } from './automations.ts';
 import { behindLine, doctorLine, installedBuild } from './behind.ts';
 import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
-import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
+import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
 import { codexSession, INBOX_ENTRY, notifyHook, runHook, watchHook } from './inbox-file.ts';
 import { statusline } from './statusline.ts';
@@ -807,12 +807,27 @@ async function hook(args: string[]): Promise<void> {
     notifyHook(more[0] ?? '', process.env, codexSession(process.ppid));
     return;
   }
+  /* THE START WORK A START HOOK LEFT FOR AFTER ITS CARD (`hookWork`), in this detached process: no stdin, nothing said
+     on any stream, and a budget of its own, so the hook's nine seconds below are not this one's. */
+  if (which === 'later' && more.length === 1) {
+    process.exitCode = 0;
+    await hookWork(process.env, more[0]!).catch(() => undefined);
+    setTimeout(() => process.exit(0), 1_000).unref();
+    return;
+  }
   /* NINE SECONDS AT MOST, whatever the network does (AGT-B10): the hook ends at HOOK_MS counted from the process's own
      start (`performance.now()`), inside Claude Code's ten-second timeout. The start hook's own deadline starts later,
-     so on a hung network this fires first and says the one line itself, unless a line was already written. */
+     so on a hung network this fires first and says the one line itself, or the card it holds, unless one was written. */
   let said = false;
+  let held: string | null = null;
+  const flush = (lapse: string | null) => {
+    if (held === null) return;
+    writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${held}\n`);
+    held = null;
+  };
   setTimeout(() => {
     if (which === 'start' && !said) writeFileSync(1, `${unreachable(HOOK_MS)}\n`);
+    flush(null);
     process.exit(0);
   }, Math.max(0, HOOK_MS - performance.now())).unref();
   if ((which !== 'start' && which !== 'end' && which !== 'beat') || more.length > 0) {
@@ -827,15 +842,15 @@ async function hook(args: string[]): Promise<void> {
    * included, so a quiet resume that writes nothing says nothing of it either.
    */
   /* AND ONCE A DAY, WHEN THIS COMMAND IS OLDER THAN THE HOST NEEDS, a line saying so under it (`behind.ts`): it never
-     throws, waits at most two seconds and only on the first start of a day, and rides the same one write. */
-  const behind = which === 'start' ? await behindLine({ env: process.env }) : null;
+     throws, waits at most two seconds and only on the first start of a day, and rides the same one write. ASKED BESIDE
+     THE ATTACH, not before it, so the day's first start waits for the slower of the two and not for both. */
+  const behindAsked = which === 'start' ? behindLine({ env: process.env }) : Promise.resolve(null);
   /* AND ONCE A WEEK, A QUIET `braindog doctor` (`doctorLine`): one line beside it when the run lists anything. Only from
      an installed build, as `behindLine`: a checkout run by `node` is a developer's, and its tests never touch the home. */
   const doctored = which === 'start' && installedBuild() ? doctorLine(homedir()) : null;
-  const lapse = [which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind, doctored].filter((line): line is string => line !== null).join('\n') || null;
   const write = (text: string) => {
     said = true;
-    writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
+    held = text;
   };
   try {
     let stdin = '';
@@ -849,6 +864,10 @@ async function hook(args: string[]): Promise<void> {
   } catch {
     /* The error could quote anything, so the start hook says only that it failed. */
     if (which === 'start') write('BrainDog: the start hook failed, so this session works without shared context.');
+  }
+  if (held !== null) {
+    const behind = await behindAsked;
+    flush([which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind, doctored].filter((line): line is string => line !== null).join('\n') || null);
   }
   /* SETUP SYNC'S PUSH, IN THE BACKGROUND, after the hook's own work and never waited for (`startPush`): when a session
      ends, and on the day's first start, on a machine that has joined. It reads one file and starts one process. */
