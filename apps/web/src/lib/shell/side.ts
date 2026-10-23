@@ -71,7 +71,7 @@ const digits = (n: number): string => n.toLocaleString('en-GB');
  * is on it, then money that moved; nothing for a quiet one. `tone` says which colour it is drawn in.
  */
 export function factOf(p: Pick<SideProject, 'late' | 'working' | 'moved'>): { text: string; tone: 'late' | 'live' | 'quiet' } | null {
-  if (p.late > 0) return { text: `${digits(p.late)} ${p.late === 1 ? 'task' : 'tasks'} late`, tone: 'late' };
+  if (p.late > 0) return { text: `${digits(p.late)} late`, tone: 'late' };
   if (p.working) return { text: 'An agent is on it', tone: 'live' };
   if (p.moved) return { text: 'Money in this month', tone: 'quiet' };
   return null;

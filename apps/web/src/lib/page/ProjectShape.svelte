@@ -412,7 +412,7 @@
           </Tile>
         {/if}
         {#if people.length > 0}
-          <Tile icon="user-check" title="Who is on it" count={people.length} class="t-people" id="part-people" data-part="People" data-part-icon="user-check" data-part-count={people.length}>
+          <Tile icon="user-check" title="Who is on it" count={people.length} class="t-people" id="part-people" data-part="Who is on it" data-part-icon="user-check" data-part-count={people.length}>
             <ul class="p-list">
               {#each people.slice(0, 4) as p (p.key)}
                 <li class="p-row">

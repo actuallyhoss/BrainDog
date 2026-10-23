@@ -50,8 +50,8 @@ test('parked and finished are read from the list: its done states, else retired'
 });
 
 test('one fact a project: late first, then an agent, then money, nothing for a quiet one', () => {
-  assert.deepEqual(factOf({ late: 1, working: true, moved: true }), { text: '1 task late', tone: 'late' });
-  assert.deepEqual(factOf({ late: 4, working: false, moved: false }), { text: '4 tasks late', tone: 'late' });
+  assert.deepEqual(factOf({ late: 1, working: true, moved: true }), { text: '1 late', tone: 'late' });
+  assert.deepEqual(factOf({ late: 4, working: false, moved: false }), { text: '4 late', tone: 'late' });
   assert.equal(factOf({ late: 0, working: true, moved: false })?.tone, 'live');
   assert.equal(factOf({ late: 0, working: false, moved: true })?.tone, 'quiet');
   assert.equal(factOf({ late: 0, working: false, moved: false }), null);
