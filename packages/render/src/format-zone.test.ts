@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatTyped, money, MISSING, readerZone, relative, since } from './format.ts';
+import { formatTyped, inWords, money, MISSING, readerZone, relative, since } from './format.ts';
 
 const at = (iso: string): number => Date.parse(iso);
 
@@ -28,7 +28,7 @@ test('AFRICA/CAIRO: a deadline read at 01:00 names the Cairo day, not the UTC on
   assert.equal(relative('2026-10-08', one, 'Africa/Cairo'), '1d ago');
   assert.equal(relative('2026-10-09', one, 'UTC'), 'in 1d');
   assert.equal(formatTyped('until', '2026-10-09', one, 'Africa/Cairo'), 'today', 'a typed value counts in the zone it is handed');
-  assert.equal(formatTyped('date', '2026-10-10', one, 'Africa/Cairo'), '10 Oct 2026 · in 1d');
+  assert.equal(formatTyped('date', '2026-10-10', one, 'Africa/Cairo'), '10 Oct 2026 · in 1 day', 'and in words, since a typed value is only written into a sentence');
   /* Past a day `since()` bands calendar days, and they are the reader's: 23:00 on the 8th to 01:30 on the 10th is two
      Cairo days, and one UTC day (the 8th to the 9th). */
   const evening = '2026-10-08T20:00:00Z';
@@ -94,4 +94,13 @@ test('MONEY BY ITS DIGITS keeps every old answer, and refuses what is not a whol
   for (const bad of [0.5, Number.NaN, Number.POSITIVE_INFINITY, '12.50', '1e3', ' 12', '+12', '', '-']) {
     assert.equal(money(bad, 'GBP'), MISSING, `${String(bad)} is not money`);
   }
+});
+
+test('A SENTENCE SAYS ITS TIME IN WORDS on the same ladder: "due 10 days ago", never "due 10d ago"', () => {
+  assert.equal(formatTyped('ago', '2026-10-13', at('2026-10-23T09:00:00Z'), 'Africa/Cairo'), '10 days ago');
+  assert.equal(formatTyped('until', '2026-10-24', at('2026-10-23T09:00:00Z'), 'Africa/Cairo'), 'in 1 day');
+  assert.deepEqual(
+    ['3 min ago', '1h ago', '5h ago', 'in 2w', '1mo ago', '4mo ago', '1y ago', 'today', 'just now'].map(inWords),
+    ['3 minutes ago', '1 hour ago', '5 hours ago', 'in 2 weeks', '1 month ago', '4 months ago', '1 year ago', 'today', 'just now'],
+  );
 });

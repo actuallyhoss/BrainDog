@@ -679,8 +679,29 @@ export function since(iso: string, now: number = Date.now(), zone?: string): str
   return ms > 0 ? `in ${size}` : `${size} ago`;
 }
 
-/** `date:` links to the calendar and `day:` does not — a future date raises "what else is then". */
-export const dateLong = (iso: string, now?: number, zone?: string): string => `${day(iso)} · ${relative(iso, now, zone)}`;
+/** Each short unit of the ladder as the word a sentence says. */
+const UNIT_WORDS: Readonly<Record<string, string>> = { min: 'minute', h: 'hour', d: 'day', w: 'week', mo: 'month', y: 'year' };
+
+/**
+ * A SHORT TIME SAID AS A SENTENCE SAYS IT: "10d ago" as "10 days ago", "in 1w" as "in 1 week", "5h ago" as "5 hours
+ * ago". The ladder is `relative()`'s and `since()`'s, so a sentence and the row beside it never band one day two ways;
+ * only the unit is written out. SINCE the audit of 22 October's leftovers: Money's first line said a part was "due 10d
+ * ago", the short form a row's corner may take, in a sentence a person reads aloud.
+ */
+export const inWords = (short: string): string =>
+  short.replace(/\b(\d+)\s?(min|mo|h|d|w|y)\b/u, (_, n: string, unit: string) => `${n} ${UNIT_WORDS[unit] ?? unit}${n === '1' ? '' : 's'}`);
+
+/** `relative()` in words, for a sentence: "10 days ago", "in 3 weeks", "today". */
+export const relativeWords = (iso: string, now: number = Date.now(), zone?: string): string => inWords(relative(iso, now, zone));
+
+/** `since()` in words, for a sentence: "12 minutes ago", "5 hours ago", "3 days ago". */
+export const sinceWords = (iso: string, now: number = Date.now(), zone?: string): string => inWords(since(iso, now, zone));
+
+/**
+ * `date:` links to the calendar and `day:` does not — a future date raises "what else is then". A SENTENCE'S FORM, so
+ * how far off it is is said in words ("4 Sep · in 3 days"), as the typed `until:` and `ago:` say theirs.
+ */
+export const dateLong = (iso: string, now?: number, zone?: string): string => `${day(iso)} · ${relativeWords(iso, now, zone)}`;
 
 /**
  * A size, in the unit that tells one file from another.
@@ -849,9 +870,10 @@ export function formatTyped(form: TypedForm, arg: string, now?: number, zone?: s
     case 'date':
     case 'day':
       return noon(a) === null ? null : dateLong(a, now, zone);
+    /* IN WORDS, as a sentence says it ("due 10 days ago"): a typed form is only ever written into prose. */
     case 'until':
     case 'ago':
-      return noon(a) === null ? null : relative(a, now, zone);
+      return noon(a) === null ? null : relativeWords(a, now, zone);
     /* `^[A-Z]{3}$`, WHICH IS `36 §5.6` RULE 1 — it was `[A-Za-z]`, so `{{money:129900 egp}}` drew
        `EGP 1,299.00` and the author never learned that the code is upper case. `05 §7.2`'s rule for
        this whole family is that an argument which does not parse *"renders as the author's text,
