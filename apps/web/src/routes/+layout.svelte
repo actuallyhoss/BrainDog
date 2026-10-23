@@ -65,7 +65,7 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import type SidebarView from '$lib/ui/Sidebar.svelte';
   import type SideBarView from '$lib/shell/SideBar.svelte';
-  import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
+  import { SIDE_KEY, sideKept, splitOf } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { moreSheet } from '$lib/shell/more.svelte.ts';
@@ -368,6 +368,30 @@
   $effect(() => {
     if ((sideOn || phoneProjects) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
   });
+  /* THE MORE SHEET'S PROJECTS ARE THE ONES IN PLAY, AS THE SIDEBAR READS THEM (the audit of 22 October, U-A15): it
+     listed only the projects with a page of their own, 5 where Today, Projects and the sidebar said 13 in play. Read
+     once the frame has settled, so the sheet holds them before it is opened; until then it lists what the rail holds. */
+  let morePlay = $state.raw<readonly { key: string; name: string; href: string; hue: number | null }[] | null>(null);
+  $effect(() => {
+    if (projectsPlace === null || morePlay !== null) return;
+    const base = apiBase(page.url);
+    const lists = data.lists;
+    const later = typeof requestIdleCallback === 'function' ? requestIdleCallback : (fn: () => void) => setTimeout(fn, 400);
+    later(() => {
+      void import('$lib/shell/side-read.ts')
+        .then(({ readSide }) => readSide(base, lists))
+        .then((read) => {
+          if (read !== null) morePlay = splitOf(read.rows, read.lanes).play;
+        })
+        .catch(() => {});
+    });
+  });
+  /** A section's own things in the More sheet: the projects in play for the Projects place, the rail's for the rest. */
+  const moreThings = (section: string, list: readonly { href: string; title: string; hue?: number | undefined; icon: IconName }[]) =>
+    section === projectsPlace?.label && morePlay !== null && morePlay.length > 0
+      ? morePlay.map((p) => ({ href: p.href, title: p.name, hue: p.hue ?? undefined, icon: 'doc' as IconName }))
+      : list;
+
   /* THE PROJECTS AN AGENT IS AT WORK ON, by name, for the sidebar's green dots. */
   const workingOn = $derived(workingNow().map((w) => w.project));
 
@@ -1403,7 +1427,7 @@
     {#each rail.things as [section, list] (section)}
       <h3 class="more-section">{section}</h3>
       <ul class="more-list">
-        {#each list as entry (entry.href)}
+        {#each moreThings(section, list) as entry (entry.href)}
           <li>
             <a class="more-row" href={at(entry.href)} aria-current={under(entry.href) ? 'page' : undefined}>
               {#if entry.hue !== undefined}<span class="more-hue" style="--hue:{entry.hue}" aria-hidden="true"></span>{:else}<Icon name={entry.icon} size="m" />{/if}
