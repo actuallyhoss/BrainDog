@@ -1648,10 +1648,13 @@
     overflow: hidden;
   }
 
-  /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge: the bar is the window's width from 1,280 too. */
-  .shell[data-shape='bar'] :global(dialog.dock) {
-    inset-block: calc(56px + var(--shell-inset, 0px) + var(--inset)) var(--inset);
-    block-size: auto;
+  /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge: the bar is the window's width from 1,280 too. On a phone
+     it is the bottom sheet (`Panel.svelte`, `PHONE`), which hangs from the screen's foot and is left alone. */
+  @media (width >= 900px) {
+    .shell[data-shape='bar'] :global(dialog.dock) {
+      inset-block: calc(56px + var(--shell-inset, 0px) + var(--inset)) var(--inset);
+      block-size: auto;
+    }
   }
 
   /* One control, at the start of the strip, at the size every other target in the shell is. */
