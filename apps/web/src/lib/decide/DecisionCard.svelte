@@ -87,6 +87,7 @@
   import { presses } from '$lib/data/held.svelte.ts';
   import { history } from '$lib/data/undo.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import VisualStrip from '$lib/visual/VisualStrip.svelte';
 
   let {
     question,
@@ -724,6 +725,8 @@
       <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
            where nobody did. -->
       {#if !compact && !card.why && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
+      <!-- WHAT THE QUESTION HOLDS TO LOOK AT, a still or a quiet card under it, opened full width on a press. -->
+      <VisualStrip on={question.id} {compact} />
       {#if card.merge && !compact}
         <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
       {:else if oneTap}

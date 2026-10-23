@@ -95,6 +95,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
+  import VisualStrip from '$lib/visual/VisualStrip.svelte';
   import Waffle from '$lib/viz/Waffle.svelte';
   import { words as gate } from '../words.ts';
   import Face from '$lib/ui/Face.svelte';
@@ -1003,6 +1004,8 @@
                marks round nothing read as a reason that failed to load. Nor is the sentence the record wrote for a press
                (`pressedOnly`) quoted on a reloaded receipt, as though the person had written it. -->
           {#if settled.reason.trim() !== '' && !pressedOnly(settled.reason)}<p class="settled-reason">“{settled.reason}”</p>{/if}
+          <!-- WHAT IT WAS DECIDED ON, the question's visuals, kept beside its receipt. -->
+          <VisualStrip on={question.id} />
           <p class="settled-note">{copy.immutable}</p>
           <!-- A NOTE, OFFERED AND NEVER ASKED FOR, after a decline or an edit, which are the answers somebody later asks
                about (`press.ts` `notedAfter`). One line, kept on the question's thread below, where everybody who reads
@@ -1058,6 +1061,8 @@
           {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
           <span class="gate-when">{since(question.opened, now)}</span>
         </p>
+        <!-- WHAT IT IS ASKED WITH TO LOOK AT, above the answers: a still or a quiet card, opened full width on a press. -->
+        <VisualStrip on={question.id} />
 
             <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
                  the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.

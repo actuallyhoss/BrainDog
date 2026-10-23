@@ -36,6 +36,7 @@
   import { actor } from '$lib/record/names.ts';
   import { midnightOf, type SessionRow } from '$lib/record/today-live.ts';
   import { readShape, takeShape, type ShapeRead, type WorkRow } from './shape-read.ts';
+  import VisualStrip from '../visual/VisualStrip.svelte';
   import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
   import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
   import { pathOf, trendOf } from '$lib/record/visuals.ts';
@@ -355,6 +356,8 @@
 {/if}
 {#if read}
   <div class="shape-rows" style={slotStyle(hue)}>
+    <!-- THE PROJECT'S VISUALS, its audits, plans and designs, under the hero and over the path: nothing when it holds none. -->
+    {#if register !== '' && seq > 0}<VisualStrip on="{register}#{seq}" tile />{/if}
     <ProjectVisuals
       {path}
       pathHref={workHref}

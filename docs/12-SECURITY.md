@@ -769,8 +769,13 @@ the argument is the same.
 | What goes in | the page, its pictures swapped for `data:` addresses the app read through the file door with its own sign-in (`visualDocument`), and the theme. Never a key, a token, a session, a row or an address of the record's |
 | Its page | taken whole, its `<meta>` tags taken out, and refused in words when a tag's address or a `url()` names anything but inline data, a place on the page or one of its own pictures, when it holds a link, base, frame, object or form tag, or when its script calls the network, imports, uses storage or reaches for the page around it |
 
-**What is not built:** the app's viewer, which opens a visual full width over its thing in this frame, and erasing a
-person does not yet reach a page's bytes, only the lines that name them.
+The app's viewer (`apps/web/src/lib/visual/`) shows a visual closed as its first picture, read through the file door
+as any picture is, or as a card with its title, and draws no frame until it is pressed. Open, it is this frame
+(`sandbox="allow-scripts"`, the hosts' `/app/drawn-frame`), handed the document once after the frame says it is ready
+from its own window; nothing the frame sends back is acted on, its height included, since the page scrolls inside it.
+
+**What is not built:** erasing a person does not yet reach a page's bytes, only the lines that name them; and a version
+carries no draft mark, so Keep, Try again and Throw away wait for one.
 
 ### Refusals that do not leak
 

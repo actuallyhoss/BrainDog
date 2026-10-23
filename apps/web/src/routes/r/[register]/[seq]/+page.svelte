@@ -107,6 +107,7 @@
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
+  import VisualStrip from '$lib/visual/VisualStrip.svelte';
   import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
@@ -1316,6 +1317,9 @@
         {#if pj && blocksOf(pj.facts).length > 0}
           <ProjectBlocks facts={pj.facts} data={pj.data} nextHref={pj.nextHref} format={moneySaid} />
         {/if}
+
+        <!-- WHAT IT HOLDS TO LOOK AT: the audits, plans and designs hung on it, each a still or a quiet card until pressed. -->
+        {#if live && row.seq !== null}<VisualStrip on="{id}#{row.seq}" tile />{/if}
 
         <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place

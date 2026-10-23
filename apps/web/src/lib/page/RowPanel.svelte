@@ -322,6 +322,9 @@
         </div>
       {/if}
     {/if}
+    <!-- WHAT THE ROW HOLDS TO LOOK AT, loaded with the drawer's first row and not with the page, so a page that only lists
+         its rows carries none of it. -->
+    {#await import('../visual/VisualStrip.svelte') then { default: VisualStrip }}<VisualStrip on="{r.register}#{r.seq}" />{/await}
     <form class="p-form" novalidate onsubmit={save}>
       <!-- EVERY FIELD THE LIST DECLARES, in `RowForm`'s boxes, and all of them off for a reader who may not write. A new
            row is a new form: `values` is read once, as the form draws. -->
