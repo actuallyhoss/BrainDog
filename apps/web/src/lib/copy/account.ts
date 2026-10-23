@@ -430,7 +430,7 @@ export const account = {
      The labels name the THING and not the setting: somebody choosing between these is picking
      where their navigation lives, so "Top bar" and "Side rail" are the answer and "Rail" alone is ours. */
   navShape: 'Where your navigation lives',
-  navShapeHint: 'The top bar holds your five places in one strip and puts the rest behind More. The side rail holds as many pages as you like, in sections you arrange. The menu keeps nothing on screen and opens all of them when you ask.',
+  navShapeHint: 'The top bar holds your five places in one strip, your projects in the sidebar under it, and the rest behind More. Hide the sidebar with its button or [. The menu keeps nothing on screen and opens all of them when you ask.',
   navShapeRail: 'Side rail',
   navShapeBar: 'Top bar',
   navShapeMenu: 'Menu',

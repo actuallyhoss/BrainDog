@@ -354,11 +354,15 @@
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>
     <div class="pictures" role="group" aria-label={copy.navShape}>
+      <!-- THE SIDE RAIL OF 20 OCTOBER IS RETIRED AS A CHOICE (frame B, pick 10): the top bar's sidebar holds the projects and
+           hides with `[`. Somebody still on it sees it pressed, and leaves it by picking another. -->
       {#each [['bar', copy.navShapeBar, 'grid'], ['rail', copy.navShapeRail, 'rows'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon] (v)}
+        {#if v !== 'rail' || navPrefs.shape === 'rail'}
         <button type="button" class="picture" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}>
           <span class="picture-shot" aria-hidden="true">{@render shapeOf(v)}</span>
           <span class="picture-name"><Icon name={icon} size="m" /><span>{label}</span></span>
         </button>
+        {/if}
       {/each}
     </div>
   </div>
