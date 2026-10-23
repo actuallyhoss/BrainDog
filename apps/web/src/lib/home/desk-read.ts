@@ -14,6 +14,7 @@ import { learn } from '../record/remote.ts';
 import { REGISTERS } from '../record/held.ts';
 import { readLeads } from './card-kpis.ts';
 import { cardsOf, projectsOf, withKpis, type CardDecl, type CardRow, type ProjectCard } from './project-cards.ts';
+import { knowProjects } from '../page/known-project.ts';
 
 /** The most rows of the projects list read for the desk, the limit every reader of it asks: one read serves all. */
 const READ = 500;
@@ -35,5 +36,7 @@ export async function readCards(base: string, lists: readonly { id: string; name
   );
   const { cards: plain, more } = cardsOf(decl, rows);
   const cards = withKpis(plain, leads, { home: homeCurrency(), now: recordNow() });
+  /* EACH CARD'S PAGE CAN NOW OPEN IN ITS PROJECT'S OWN SHAPE (`known-project.ts`). */
+  knowProjects(base, cards);
   return cards.length === 0 ? null : { cards, more, list: decl.id, name: lists.find((l) => l.id === decl.id)?.name ?? '' };
 }

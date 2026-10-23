@@ -48,6 +48,8 @@
   import { page } from '$app/state';
   import type { Shell } from '$lib/record/boot-live.ts';
   import Waiting from '$lib/ui/Waiting.svelte';
+  import ProjectWaiting from './ProjectWaiting.svelte';
+  import { knownRow } from './known-project.ts';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -499,7 +501,9 @@
   </div>
 {/if}
 {#if !shape && holds}
-  <div class="held"><Waiting rows={3} /></div>
+  <!-- A PROJECT THIS TAB HAS DRAWN WAITS IN ITS OWN SHAPE, the picture the page's read drew, never a list's bars. -->
+  {@const known = knownRow(apiBase(), `${register}#${seq}`)}
+  <div class="held">{#if known}<ProjectWaiting project={known} />{:else}<Waiting rows={3} />{/if}</div>
 {/if}
 
 <style>

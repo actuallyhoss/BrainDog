@@ -25,6 +25,7 @@
   import { drew } from '../ui/screen.svelte.ts';
   import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, pinsKept, playSaid, splitOf, widthOf, type SideProject } from './side.ts';
   import { readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
+  import { knowProjects } from '../page/known-project.ts';
 
   let {
     base,
@@ -87,6 +88,8 @@
           read = got;
           answered = true;
           if (got === null) return;
+          /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
+          knowProjects(b, got.rows, projects);
           const play = splitOf(got.rows, got.lanes).play;
           const w = await readWeek(b, got.list, play);
           if (n === asked) week = w;

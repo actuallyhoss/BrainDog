@@ -50,6 +50,9 @@
   import { live } from '$lib/data/live.svelte.ts';
   import Told from '$lib/home/Told.svelte';
   import type { LessonsTile } from '$lib/home/told.ts';
+  import PageHead from '$lib/ui/PageHead.svelte';
+  import ProjectWaiting from '$lib/page/ProjectWaiting.svelte';
+  import { knownProject, projectsPlace } from '$lib/page/known-project.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -118,10 +121,25 @@
   $effect(() => () => clearTimeout(holdTimer));
 
   /**
-   * WHAT IS DRAWN: this page's answer or kept copy, else the page being left for a moment, else this page's head and
-   * bars, never an empty frame (`leaving.ts`). The page being left draws under its own slug, untouched.
+   * A PROJECT THIS TAB HAS DRAWN (the sidebar, the Projects cards), whose page opens in its own shape before the record
+   * answers (`ProjectWaiting`), with its name, mark and colour, and not on the page being left: there is a picture of
+   * it to draw at once (the audit of 22 October, F4).
    */
-  const view = $derived(leaving(answer, { slug, got, reading }, waited));
+  const known = $derived(knownProject(apiBase(), `/p/${slug}`));
+  const backTo = $derived(projectsPlace(apiBase()) ?? undefined);
+  /* The way back by the place's own name, as the landed page's head says it (its section). */
+  const backName = $derived(((route.data as unknown as Shell).nav ?? []).find((n) => `/p/${n.id}` === backTo)?.title);
+  /* ITS SHAPE'S CODE IS ASKED AS IT OPENS, so the page landing does not wait on the chunk with nothing drawn. */
+  $effect(() => {
+    if (known) void import('$lib/page/ProjectShape.svelte');
+  });
+
+  /**
+   * WHAT IS DRAWN: this page's answer or kept copy, else the page being left for a moment, else this page's head and
+   * bars, never an empty frame (`leaving.ts`). The page being left draws under its own slug, untouched. A known
+   * project is not held: its own shape is drawn at once.
+   */
+  const view = $derived(leaving(answer, { slug, got, reading }, known ? HOLD_MS : waited));
 
   /**
    * THE PAGE AS THE LOCAL COPY LAST HELD IT, for a page this tab has not drawn yet (`lib/data/local.ts`): drawn while
@@ -365,11 +383,29 @@
 <!-- THE OFFER SITS UNDER THE PAGE'S OWN BLOCKS (PageView's `offer`), as one quiet line that opens on tap, so the page's
      content comes first on a phone and on a laptop alike. -->
 {#snippet offerCard()}{#if lessons}<Told tile={lessons} />{/if}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
-<div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} /></div>
+<!-- THE PROJECT IN ITS OWN SHAPE UNTIL ITS SHAPE IS READ: the page's read, and then the shape's code, draw the same. -->
+{#snippet shaped()}{#if known}<ProjectWaiting project={known} />{/if}{/snippet}
+{#if view.got === null && known && !showSource}
+  <div class="shaped">
+    <PageHead title={known.name} headless kicker={backName} back={backName ? backTo : undefined} sentence="" />
+    <div class="shaped-body">{@render shaped()}</div>
+  </div>
+{:else}
+  <div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} waiting={known ? shaped : undefined} /></div>
+{/if}
 
 <style>
   .read {
     display: contents;
+  }
+
+  /* WHERE THE PROJECT'S HERO LANDS: the board's gutter and top, as `PageBody` lays a page's blocks. */
+  .shaped {
+    min-inline-size: 0;
+  }
+
+  .shaped-body {
+    padding: var(--sp-3) var(--gutter) var(--sp-9);
   }
 
   /* WHAT EVERY AGENT IS TOLD IS THE PAGE'S LAST TILE, one tile gap under the blocks: the page's end space moves under

@@ -100,7 +100,13 @@
     offer,
     opens,
     between,
+    waiting,
   }: {
+    /**
+     * What a project's page draws while its shape's code is on its way, the project in its own shape (`ProjectWaiting`,
+     * handed in by the route so this file's chunk does not carry it). Left out, nothing is drawn there, as before.
+     */
+    waiting?: Snippet | undefined;
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
     /** The record's answer, a page it lacks or its refusal; `null` until it answers. */
@@ -820,7 +826,7 @@
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
     <!-- THE SHAPE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a project's shape, so its
          first load does not carry one. The page waits on the shape's reads either way (`shapeWaits`). -->
-    {#snippet shapeAt()}{#await import('./ProjectShape.svelte') then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
+    {#snippet shapeAt()}{#await import('./ProjectShape.svelte')}{@render waiting?.()}{:then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"

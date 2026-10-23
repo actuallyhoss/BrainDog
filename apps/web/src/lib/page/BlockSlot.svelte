@@ -70,6 +70,7 @@
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
   import KpisBlock from '$lib/kpis/KpisBlock.svelte';
   import { agentsOn, cardFactsOf, cardsOf, trendsOf, withKpis, type CardDecl, type KpiAnswered } from '$lib/home/project-cards.ts';
+  import { knowProjects } from './known-project.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { valueSaid } from '$lib/voice.ts';
   import { flip } from 'svelte/animate';
@@ -620,6 +621,10 @@
       const said = facts.get(c.seq);
       return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null, last: lasts.get(c.seq) ?? null, moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
+  });
+  /* EACH CARD'S PAGE CAN NOW OPEN IN ITS PROJECT'S OWN SHAPE (`known-project.ts`). */
+  $effect(() => {
+    if (projectCards) knowProjects(apiBase(), projectCards.map((x) => x.card));
   });
 
   /* ── the lane bar ──────────────────────────────────────────────────────────
