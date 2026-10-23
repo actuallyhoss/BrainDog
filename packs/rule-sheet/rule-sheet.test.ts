@@ -188,10 +188,10 @@ test('VALUES: every typed form with a literal draws, and a loose or broken one s
   }[];
   const typed = nodes.filter((n) => n.type === 'typed').map((n) => `${n.form} ${n.text}`);
   assert.deepEqual(typed, [
-    'date 24 Dec 2030 · in 4y',
-    'day 10 Apr 2020 · 6y ago',
-    'until in 3y',
-    'ago 7y ago',
+    'date 24 Dec 2030 · in 4 years',
+    'day 10 Apr 2020 · 6 years ago',
+    'until in 3 years',
+    'ago 7 years ago',
     'money EGP 1,299.00',
     'money GBP −42.00',
     'money CLF 100.0000',

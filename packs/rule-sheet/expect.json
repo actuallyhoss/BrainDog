@@ -140,7 +140,7 @@
       "zone": "UTC",
       "at": "2026-10-14T22:30:00Z",
       "selector": ".typed[data-form=\"day\"]",
-      "text": "15 Oct 2026 · in 1d"
+      "text": "15 Oct 2026 · in 1 day"
     },
     {
       "rule": "Values: at the same moment in Cairo, east of Greenwich, the same day is already today",
