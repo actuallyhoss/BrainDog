@@ -21,8 +21,8 @@ const money = (key: string, title: string, when: string, href = `/r/${key.replac
 });
 const task = (key: string, title: string, when: string): HomeLine => ({ key, title, when, href: `/r/${key.replace('#', '/')}`, late: true });
 
-const SALARY = money('obligations#2', 'Encore salary', '13 days late');
-const FEE = money('obligations#5', 'Prism contractor fee', '14 days late');
+const SALARY = money('obligations#2', 'Lanternfish salary', '13 days late');
+const FEE = money('obligations#5', 'Copperleaf contractor fee', '14 days late');
 const HARBOUR = money('obligations#9', 'Harbourview instalment, 2 of 40', '9 days late');
 const REFUND = task('tasks#41', 'Send Jennifer the Crumb Pass refund email', '7 days late');
 const TODAY: HomeLine = { key: 'obligations#12', title: 'Northwind premium', when: 'Due today', amount: { text: '−$287', dir: 'out' }, late: false };
@@ -30,7 +30,7 @@ const TODAY: HomeLine = { key: 'obligations#12', title: 'Northwind premium', whe
 test('THE GREETING IS BY HIS OWN CLOCK AND HIS FIRST NAME, and alone where the record knows no name', () => {
   const at = (hour: number) => new Date(2026, 9, 22, hour, 30).getTime();
   assert.equal(greetingOf(at(8), 'Sam'), 'Good morning, Sam');
-  assert.equal(greetingOf(at(12), 'Sam Zaher'), 'Good afternoon, Sam');
+  assert.equal(greetingOf(at(12), 'Sam Ridley'), 'Good afternoon, Sam');
   assert.equal(greetingOf(at(19), ' Sam '), 'Good evening, Sam');
   assert.equal(greetingOf(at(2), 'Sam'), 'Good evening, Sam');
   assert.equal(greetingOf(at(9), null), 'Good morning');
@@ -48,7 +48,7 @@ test('THREE PAYMENTS, A TASK AND QUESTIONS ARE THREE SENTENCES, each thing by na
   const brief = briefOf({ lines: [SALARY, FEE, HARBOUR, REFUND], needYou: 2, agents: ['Claude'], calm: 'Nothing needs you now.' });
   assert.equal(
     brief.text,
-    '3 payments are late: Encore salary by 13 days, Prism contractor fee by 14 days and Harbourview instalment, 2 of 40 by 9 days. ' +
+    '3 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days and Harbourview instalment, 2 of 40 by 9 days. ' +
       'Send Jennifer the Crumb Pass refund email is 7 days late. Claude is working, and 2 questions wait for you.',
   );
   /* THE ONE RED PHRASE IS THE FIRST THING THAT NEEDS HIM, and the figures are figures. */
@@ -57,8 +57,8 @@ test('THREE PAYMENTS, A TASK AND QUESTIONS ARE THREE SENTENCES, each thing by na
   assert.deepEqual(brief.parts.filter((p) => p.fig).map((p) => p.text), ['13 days', '14 days', '9 days']);
   /* EACH NAME OPENS ITS ROW, and the questions open Needs you. */
   assert.deepEqual(brief.parts.filter((p) => p.href).map((p) => [p.text, p.href]), [
-    ['Encore salary', '/r/obligations/2'],
-    ['Prism contractor fee', '/r/obligations/5'],
+    ['Lanternfish salary', '/r/obligations/2'],
+    ['Copperleaf contractor fee', '/r/obligations/5'],
     ['Harbourview instalment, 2 of 40', '/r/obligations/9'],
     ['Send Jennifer the Crumb Pass refund email', '/r/tasks/41'],
     ['2 questions', '/decide'],
@@ -66,13 +66,13 @@ test('THREE PAYMENTS, A TASK AND QUESTIONS ARE THREE SENTENCES, each thing by na
 });
 
 test('ONE PAYMENT IS ITS OWN SENTENCE, MORE THAN THREE ARE NAMED THREE AND COUNTED, and the rest past the list too', () => {
-  assert.equal(briefOf({ lines: [SALARY], needYou: 0, agents: [], calm: 'Calm.' }).text, 'Encore salary is 13 days late.');
+  assert.equal(briefOf({ lines: [SALARY], needYou: 0, agents: [], calm: 'Calm.' }).text, 'Lanternfish salary is 13 days late.');
   const five = [SALARY, FEE, HARBOUR, money('obligations#20', 'Studio rent', '3 days late'), money('obligations#21', 'Hosting', '2 days late')];
   const said = briefOf({ lines: five, more: 4, needYou: 1, agents: ['Claude', 'Codex'], calm: 'Calm.' }).text;
   assert.equal(NAMED_MOST, 3);
   assert.equal(
     said,
-    '9 payments are late: Encore salary by 13 days, Prism contractor fee by 14 days, Harbourview instalment, 2 of 40 by 9 days and 6 more. ' +
+    '9 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days, Harbourview instalment, 2 of 40 by 9 days and 6 more. ' +
       'Claude and Codex are working, and 1 question waits for you.',
   );
 });
@@ -111,8 +111,8 @@ test('A LINE A QUESTION ALREADY ASKS ABOUT IS NOT ON THE LATE TILE, by the row i
   const lines = [SALARY, FEE, HARBOUR];
   assert.deepEqual(unasked(lines, []), lines);
   assert.deepEqual(unasked(lines, [{ about: 'obligations#2' }]), [FEE, HARBOUR]);
-  assert.deepEqual(unasked(lines, [{ question: 'Prism contractor fee was due 14 days ago. Chase it?' }]), [SALARY, HARBOUR]);
-  assert.deepEqual(unasked(lines, [{ question: 'Encore salaryman?' }]), lines, 'a title is a whole word');
+  assert.deepEqual(unasked(lines, [{ question: 'Copperleaf contractor fee was due 14 days ago. Chase it?' }]), [SALARY, HARBOUR]);
+  assert.deepEqual(unasked(lines, [{ question: 'Lanternfish salaryman?' }]), lines, 'a title is a whole word');
 });
 
 test('THE LATE TILE IS IN THE BRIEF\'S ORDER: late money, then what else is late, then what is due today', () => {
@@ -131,7 +131,7 @@ test('ONE THING IN TWO LISTS IS ONE LINE, by the row a press can finish, and thi
   /* ANOTHER DAY, ANOTHER AMOUNT OR ANOTHER KIND IS ANOTHER THING. */
   assert.equal(onceEach([paid, { ...twin, day: '2026-09-09' }]).length, 2);
   assert.equal(onceEach([paid, { ...twin, money: { minor: 100, currency: 'USD' } }]).length, 2);
-  assert.equal(onceEach([paid, { key: 'tasks#3', title: 'Encore salary', when: '13 days late', day: '2026-10-09', late: true }]).length, 2);
+  assert.equal(onceEach([paid, { key: 'tasks#3', title: 'Lanternfish salary', when: '13 days late', day: '2026-10-09', late: true }]).length, 2);
   /* AND THE BRIEF SAYS IT ONCE. */
   assert.equal(briefOf({ lines: onceEach([FEE, twin, paid, HARBOUR], finishes), needYou: 0, agents: [], calm: 'Calm.' }).parts[0]?.text, '3 payments are late');
 });

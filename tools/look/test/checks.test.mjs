@@ -98,7 +98,7 @@ test('COUNTS THAT AGREE ARE SAID WITH HOW MANY KINDS OF PLACE SAID THEM', () => 
 test("THE AUDIT'S DISAGREEMENT IS FOUND: 13 in play, 8 on the lane bar and 5 on Projects, and 3 needing you where 8 do", () => {
   const today = TODAY.replace('Projects\n3\nIn play 3', 'Projects\n13\nIn play 8').replace('8 need you', '3 need you').replace('Needs you\n8', 'Needs you\n3');
   const projects = PROJECTS.replace('In play 3', 'In play 5');
-  const frame = { badges: ['3 Open questions'], more: [{ heading: 'Projects', rows: ['Crumb.gg', 'Larkspur', 'Fern', 'Encore', 'sam-site'] }] };
+  const frame = { badges: ['3 Open questions'], more: [{ heading: 'Projects', rows: ['Crumb.gg', 'Larkspur', 'Fern', 'Lanternfish', 'sam-site'] }] };
   const got = judgeCounts([shot('today', today, frame), shot('decide', DECIDE, frame), shot('projects', projects, frame)]);
   assert.equal(got['in play'].agree, false);
   assert.deepEqual(got['in play'].values, [13, 8, 5]);

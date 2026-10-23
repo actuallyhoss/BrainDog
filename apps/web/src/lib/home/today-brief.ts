@@ -84,7 +84,7 @@ function oneThing(a: HomeLine, b: HomeLine): boolean {
 }
 
 /**
- * ONE THING, ONE LINE: rows that are one payment kept in two lists (on his record the Encore salary stood twice, the
+ * ONE THING, ONE LINE: rows that are one payment kept in two lists (on his record the Lanternfish salary stood twice, the
  * same name, amount and day) are said once, by the row `keep` prefers (the one a press can finish), so the brief never
  * names a thing twice and the Late tile never shows two lines nobody can tell apart. Rows told apart by any of name,
  * day or amount stay apart, and the order is the first of each.
@@ -155,8 +155,8 @@ function workingSaid(agents: readonly string[]): string | null {
 /**
  * THE BRIEF, two or three sentences:
  *
- * 1. What money is late, by name and by how much time: "3 payments are late: Encore salary by 13 days, Prism
- *    contractor fee by 14 days and Harbourview instalment by 9 days." One alone: "Encore salary is 13 days late."
+ * 1. What money is late, by name and by how much time: "3 payments are late: Lanternfish salary by 13 days, Copperleaf
+ *    contractor fee by 14 days and Harbourview instalment by 9 days." One alone: "Lanternfish salary is 13 days late."
  * 2. What else is late: "Send Jennifer the refund email is 7 days late." or "2 other things are late, the oldest X by
  *    3 weeks.", and what is due today where room is left.
  * 3. Who is working and what waits: "Claude is working, and 3 questions wait for you."
