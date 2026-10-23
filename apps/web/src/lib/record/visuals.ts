@@ -136,6 +136,11 @@ export type PathRead = {
 export const PATH_STOPS = 6;
 const PATH_DONE = 2;
 const PATH_NEXT = 3;
+/**
+ * THE FEWEST STOPS A PATH IS DRAWN WITH: three, SINCE the audit of 22 October (U-B12). A path of two was the same two rows
+ * the work tile under it lists, a tile of scaffolding on a page that should end under 1,500px.
+ */
+const PATH_LEAST = 3;
 
 /** "3 Sep", from the renderer's one table of months (P16): Intl's en-GB writes "3 Sept". */
 export const shortDay = (day: string): string => dayShort(day.slice(0, 10));
@@ -143,7 +148,8 @@ export const shortDay = (day: string): string => dayShort(day.slice(0, 10));
 /**
  * THE PROJECT'S WORK AS A STEPPER, NOT A TIME AXIS (proj F3): its own tasks only, never its bills. The last two finished,
  * the one under way now (one an agent holds or one being done, else the soonest open), then the next three by day.
- * Fewer than two stops draw nothing. `total` is every row on the path, finished or not, for the "All 17" link.
+ * Fewer than three stops draw nothing (`PATH_LEAST`). `total` is every row on the path, finished or not, for the "All
+ * 17" link.
  */
 export function pathOf(rows: readonly { seq?: number | undefined; fields: Readonly<Record<string, unknown>> }[], p: PathRead, today: string): Path | null {
   const finish = p.done[0];
@@ -175,7 +181,7 @@ export function pathOf(rows: readonly { seq?: number | undefined; fields: Readon
     return { key: x.key, seq: x.seq, title: x.title, kind, sub: x.day ? shortDay(x.day) : now ? 'Now' : '', red: false };
   };
   const stops = [...done.slice(-PATH_DONE).map((x) => stop(x, false)), ...(moving ? [stop(moving, true)] : []), ...after.map((x) => stop(x, false))];
-  return stops.length < 2 ? null : { stops: stops.slice(-PATH_STOPS), total };
+  return stops.length < PATH_LEAST ? null : { stops: stops.slice(-PATH_STOPS), total };
 }
 
 /**

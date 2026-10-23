@@ -1,6 +1,6 @@
 /**
  * Where the record met one thing, as the page's "Where it was seen" says it (`seen.ts`): the lines and their days, the
- * cut at eight with "and N more", and every answer that draws nothing.
+ * cut at three with "and N more", and every answer that draws nothing.
  */
 
 import { test } from 'node:test';
@@ -59,17 +59,17 @@ test('ANOTHER NAME IS SAID ONCE, under the places', () => {
   assert.equal(two.also, 'Also known as Sara I. and S. Idris.', 'its own name is not another name');
 });
 
-test('EIGHT PLACES, THEN "and N more"', () => {
+test('THREE PLACES, THEN "and N more"', () => {
   const seen = Array.from({ length: 12 }, (_, n) => ({ at: `2026-08-${String(n + 10).padStart(2, '0')}T00:00:00Z`, where: `Notes: Call ${n + 1}` }));
   const found = seenOf(answer(seen));
   assert.equal(found?.places.length, SEEN_SHOWN);
-  assert.equal(found?.more, 4);
+  assert.equal(found?.more, 9);
   const out = seenLines(found, NOW);
-  assert.equal(out.lines.length, 8);
+  assert.equal(out.lines.length, 3);
   assert.equal(out.lines[0], '21 Aug · Notes: Call 12');
-  assert.equal(out.more, 'and 4 more');
-  /* EXACTLY EIGHT has no rest to count. */
-  assert.equal(seenLines(seenOf(answer(seen.slice(0, 8))), NOW).more, null);
+  assert.equal(out.more, 'and 9 more');
+  /* EXACTLY THREE has no rest to count. */
+  assert.equal(seenLines(seenOf(answer(seen.slice(0, 3))), NOW).more, null);
 });
 
 test('SEEN NOWHERE SAYS ONE SENTENCE, and draws no lines', () => {

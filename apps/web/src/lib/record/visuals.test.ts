@@ -146,8 +146,10 @@ test('THE PATH IS THE LAST TWO DONE, THE ONE NOW AND THE NEXT THREE, never a dro
   assert.equal(p.total, 8, 'every row but the dropped one, for "All 8"');
 });
 
-test('A PATH OF ONE STOP DRAWS NOTHING', () => {
+test('A PATH OF ONE STOP OR TWO DRAWS NOTHING, since the work tile under it says the same rows', () => {
   assert.equal(pathOf([row(1, 'Only', 'open', '2026-10-25')], READ, TODAY), null);
+  assert.equal(pathOf([row(1, 'One', 'open', '2026-10-25'), row(2, 'Two', 'doing', '', 'claude')], READ, TODAY), null);
+  assert.equal(pathOf([row(1, 'One', 'open', '2026-10-25'), row(2, 'Two', 'doing', '', 'claude'), row(3, 'Three', 'done', '2026-10-01')], READ, TODAY)?.stops.length, 3);
 });
 
 test('MONEY BY MONTH IS DRAWN ONLY AS A SHAPE: three months, two of them above nought (proj F8)', () => {

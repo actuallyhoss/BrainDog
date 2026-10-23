@@ -13,7 +13,7 @@
 
   HIS ALONE (`level: owner`): the record refuses `instruct` to anyone but a person, and lists the threads to the owner.
 
-  ON THE AGENTS PAGE, ONE LINE, AND WHAT HE TOLD BESIDE IT: the field, To and Send on one row, the other choices once he
+  ON THE AGENTS PAGE AND A PROJECT'S, ONE LINE, AND WHAT HE TOLD BESIDE IT: the field, To and Send on one row, the other choices once he
   starts (`Instruct`'s `line`), and the last three threads in a column of their own beside it where the tile is wide
   enough, under it where it is not. ON A PHONE THE LINE IS A PRESS THAT OPENS THE SHEET with the whole composer in it,
   so the page opens on a line and the form takes the screen only while he writes. A run row's Tell opens it too.
@@ -104,8 +104,10 @@
 
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
 
-  /* THE AGENTS PAGE'S OWN FORM: one line, what he told beside it, and the sheet on a phone. A scoped panel keeps the box. */
-  const line = $derived(run === null && project === null);
+  /* THE AGENTS PAGE'S OWN FORM: one line, what he told beside it, and the sheet on a phone. A PROJECT'S PAGE TOO, SINCE the
+     audit of 22 October (U-B12): the whole form, its To, On and When and a full-width Send, stood on every project's page
+     and was the biggest thing on a phone after the name. Only a run's own sheet keeps the box. */
+  const line = $derived(run === null);
   /* A PHONE, by the width the app's sheets turn at (`PHONE_WIDTH` in `panel.ts`), read and followed while mounted. */
   let narrow = $state(false);
   let sheetOpen = $state(false);

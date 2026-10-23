@@ -35,8 +35,12 @@ export type Seen = { name: string; also: string[]; places: SeenPlace[]; more: nu
  */
 export type SeenLines = { lines: string[]; also: string | null; more: string | null; none: string | null };
 
-/** How many places are drawn before "and N more". */
-export const SEEN_SHOWN = 8;
+/**
+ * How many places are drawn before "and N more". THREE, SINCE the audit of 22 October (U-B12): eight lines at the foot
+ * of every project's page made a page that should open on its news and end under 1,500px a long one, and the newest
+ * three say where it was seen lately.
+ */
+export const SEEN_SHOWN = 3;
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /* A row's id as the record mints one, and an address of any kind: neither is a place a person reads. */

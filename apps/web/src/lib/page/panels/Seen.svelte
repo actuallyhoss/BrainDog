@@ -2,7 +2,7 @@
   Where it was seen: the places the record met the row a page is about, newest first, in the record's own words.
 
   UNDER A SECTION THAT DECLARES `panel: seen` (`panel-of.ts`), on a person's, an organisation's or a project's page:
-  "3 Oct · Notes: Spoke to Sara at Northbank about the renewal", eight lines at most, then "and N more", and the
+  "3 Oct · Notes: Spoke to Sara at Northbank about the renewal", three lines at most, then "and N more", and the
   thing's other names in one sentence under them (`seen.ts`). What waits on the owner about it is a line too ("Waiting
   on you: ...").
 
