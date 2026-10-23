@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Each project's card on Projects draws the line of the number it leads with, where it keeps one, in place of the work finished each week.",
+  "changes": "Projects draws a card for every project in play or parked, where it drew the first twelve by name, so In play over the cards says the same number as Today and the sidebar.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -245,7 +245,7 @@
             { "metric": "project-last-worked:{{name}}", "as": "when", "label": "Worked on", "when": { "holds": [ "tasks" ] } }
           ],
           "order": [ { "field": "name", "dir": "asc" } ],
-          "limit": 12,
+          "limit": 100,
           "when": { "any": [ { "metric": "projects-live", "gt": 0 }, { "metric": "projects-parked", "gt": 0 } ] }
         },
         {
