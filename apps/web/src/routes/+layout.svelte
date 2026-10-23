@@ -371,8 +371,12 @@
   /* THE MORE SHEET'S PROJECTS ARE THE ONES IN PLAY, AS THE SIDEBAR READS THEM (the audit of 22 October, U-A15): it
      listed only the projects with a page of their own, 5 where Today, Projects and the sidebar said 13 in play. Read
      when the frame opens, beside the sidebar's own read of the same list (`readSide` asks once for both), so the sheet
-     holds them before it is opened; until the answer comes it lists what the rail holds. */
+     holds them before it is opened.
+     AND NOTHING UNTIL THEN, SINCE batch 3's look on his record: the sheet listed the rail's projects while the list's answer
+     was out, 5 on Decide where every other place said 13. A count that is part of the list is never drawn: the Projects
+     section waits for the answer, and only a record whose list cannot be read lists what the rail holds. */
   let morePlay = $state.raw<readonly { key: string; name: string; href: string; hue: number | null }[] | null>(null);
+  let moreRead = $state<'out' | 'in' | 'none'>('out');
   let moreAsked = 0;
   const holdsProjects = $derived(projectsPlace !== null);
   $effect(() => {
@@ -385,15 +389,24 @@
     void import('$lib/shell/side-read.ts')
       .then(({ readSide }) => readSide(base, lists))
       .then((read) => {
-        if (read !== null && n === moreAsked) morePlay = splitOf(read.rows, read.lanes).play;
+        if (n !== moreAsked) return;
+        if (read !== null) morePlay = splitOf(read.rows, read.lanes).play;
+        if (morePlay === null) moreRead = 'none';
+        else moreRead = 'in';
       })
-      .catch(() => {});
+      .catch(() => {
+        if (n === moreAsked && morePlay === null) moreRead = 'none';
+      });
   });
-  /** A section's own things in the More sheet: the projects in play for the Projects place, the rail's for the rest. */
-  const moreThings = (section: string, list: readonly { href: string; title: string; hue?: number | undefined; icon: IconName }[]) =>
-    section === projectsPlace?.label && morePlay !== null && morePlay.length > 0
-      ? morePlay.map((p) => ({ href: p.href, title: p.name, hue: p.hue ?? undefined, icon: 'doc' as IconName }))
-      : list;
+  /**
+   * A section's own things in the More sheet: the projects in play for the Projects place, the rail's for the rest, and
+   * `null` for the Projects place while its list is being read, so the sheet draws no part of it.
+   */
+  const moreThings = (section: string, list: readonly { href: string; title: string; hue?: number | undefined; icon: IconName }[]) => {
+    if (section !== projectsPlace?.label) return list;
+    if (moreRead === 'out') return null;
+    return morePlay !== null && morePlay.length > 0 ? morePlay.map((p) => ({ href: p.href, title: p.name, hue: p.hue ?? undefined, icon: 'doc' as IconName })) : list;
+  };
 
   /* THE PROJECTS AN AGENT IS AT WORK ON, by name, for the sidebar's green dots. */
   const workingOn = $derived(workingNow().map((w) => w.project));
@@ -1428,9 +1441,11 @@
 
     <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, in the thing's own colour. -->
     {#each rail.things as [section, list] (section)}
+      {@const things = moreThings(section, list)}
+      {#if things !== null}
       <h3 class="more-section">{section}</h3>
       <ul class="more-list">
-        {#each moreThings(section, list) as entry (entry.href)}
+        {#each things as entry (entry.href)}
           <li>
             <a class="more-row" href={at(entry.href)} aria-current={under(entry.href) ? 'page' : undefined}>
               {#if entry.hue !== undefined}<span class="more-hue" style="--hue:{entry.hue}" aria-hidden="true"></span>{:else}<Icon name={entry.icon} size="m" />{/if}
@@ -1439,6 +1454,7 @@
           </li>
         {/each}
       </ul>
+      {/if}
     {/each}
 
     <!-- YOUR THINGS: the places the bar leaves out with their views, every list with its views, and the tools. -->

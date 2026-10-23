@@ -9,7 +9,8 @@
  * and a question's id, a path, a refusal code, a raw date, an empty amount, a code quote, two machine words and a hash.
  * COUNTS: `boot` says 3 questions wait where the Needs you page holds 8, and leaves one project out of the rail. The More
  * sheet listed the rail's projects, 2 where the lane bars say 3; since batch 3 it lists the projects in play from their
- * list, as the sidebar does, so that half shows only on a screen drawn before the list's answer came back. AGES: the record's clock is put on nine days, so every figure
+ * list, as the sidebar does, and since batch 4 it draws no Projects part until that list answers, so that half of the
+ * fault no longer shows anywhere the checks read. AGES: the record's clock is put on nine days, so every figure
  * read on 2 September is ten days old with the product's own rule (stale at 14 days) still saying nothing of it.
  */
 
