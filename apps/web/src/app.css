@@ -61,9 +61,10 @@
     mix-blend-mode: normal;
   }
 
-  /* ONE MOTION PER PAGE CHANGE (motion F6, section 3): the old picture leaves fast and the new one arrives with a 4px
-     rise, so two layouts are never on screen at once. Leaving is shorter than arriving. The group itself does not move;
-     the shell waits for the new screen to say it has drawn before the new picture is taken (`+layout.svelte`). */
+  /* ONE MOTION PER PAGE CHANGE (motion F6, section 3): the old picture leaves fast and THEN the new one arrives with a 4px
+     rise, so two layouts are never on screen at once (fluid F3). Leaving is shorter than arriving, and the two together
+     last `--d-page`. The group itself does not move; the shell waits a moment for the new screen to say it has drawn
+     before the new picture is taken (`+layout.svelte`). */
   ::view-transition-group(page) {
     animation-duration: var(--d-page);
     animation-timing-function: var(--ease-out);
@@ -74,7 +75,7 @@
   }
 
   ::view-transition-new(page) {
-    animation: page-in var(--d-page) var(--ease-out) both;
+    animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
   }
 
   @keyframes page-out {
@@ -134,7 +135,9 @@
     transition: none !important;
   }
 
+  /* THE OLD PICTURE IS ON TOP, or it fades under the new one, which is drawn whole, and the change is a cut (fluid F11). */
   html[data-retheme]::view-transition-old(root) {
+    z-index: 1;
     animation: page-out var(--d-swap) var(--ease-standard) both;
     mix-blend-mode: normal;
   }
@@ -145,6 +148,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     html[data-retheme]::view-transition-old(root) {
+      z-index: auto;
       animation: none;
     }
   }

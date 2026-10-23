@@ -89,7 +89,7 @@
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
-  import { page } from '$app/state';
+  import { navigating, page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
   $effect(() => onShell('goto', (to) => {
     const path = appPath(to);
@@ -664,9 +664,9 @@
    * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (the shell holds still, what fills it recomposes).
    *
    * Where the browser has the View Transitions API, a navigation to another screen is wrapped in one: the browser
-   * takes a picture of the work as it was, Kit draws the new screen, the screen is given 250ms to draw, and the old
-   * picture leaves over `--d-exit` as the new one rises in over `--d-page` (`app.css`). The tab bar and the toasts are
-   * named and held still. `#main` is
+   * takes a picture of the work as it was, Kit draws the new screen, the screen is given a moment to draw
+   * (`DRAWN_WITHIN_MS`), and the old picture leaves over `--d-exit` before the new one rises in, the two together
+   * lasting `--d-page` (`app.css`). The tab bar and the toasts are named and held still. `#main` is
    * named `page` for as long as that takes and the root is told not to animate (`app.css`), so the rail, the strip and
    * a docked panel do not take part. A browser without it gets the cut it always had, with `arrive`'s settle.
    *
@@ -682,6 +682,9 @@
    * navigation before the first one drew), ends the transition and says nothing on the console.
    */
   let crossing: ViewTransition | null = null;
+  /* HOW LONG THE FADE WAITS FOR THE NEW SCREEN TO SAY IT HAS DRAWN. The browser draws nothing while it waits, so the wait is
+     a freeze (fluid F1): a screen this tab has seen draws within a frame or two, and one that must read first never does. */
+  const DRAWN_WITHIN_MS = 50;
   onNavigate((nav) => {
     if (typeof document.startViewTransition !== 'function') return;
     /* Asked for less motion: the page just changes, no fade stands in for it. */
@@ -693,9 +696,9 @@
       const moving = document.startViewTransition(async () => {
         done();
         await nav.complete.catch(() => undefined);
-        /* THE NEW PICTURE IS THE REAL PAGE: the screen is given up to 250ms to say it has drawn (`data-screen`), so the
-           fade never ends on a half-built page (motion F6). */
-        await waitFor(() => scroller()?.dataset.screen !== undefined, 250);
+        /* THE NEW PICTURE IS THE REAL PAGE when it is quick to draw: the screen is given `DRAWN_WITHIN_MS` to say so
+           (`data-screen`), so the fade does not end on a half-built page it had in hand (motion F6). */
+        await waitFor(() => scroller()?.dataset.screen !== undefined, DRAWN_WITHIN_MS);
       });
       crossing = moving;
       moving.ready.catch(() => undefined);
@@ -872,7 +875,12 @@
   });
 
   /* A SHELL DRAWN FROM THE LAST COPY IS REPLACED ONCE `boot` ANSWERS, and from here, after the first navigation has drawn:
-     the load that drew it asked `boot` and must not invalidate before that navigation lands (`+layout.ts`). */
+     the load that drew it asked `boot` and must not invalidate before that navigation lands (`+layout.ts`).
+
+     NOR OVER A MOVE IN FLIGHT: an `invalidate` takes the place of a navigation under way (Kit's `_invalidate`), so a tap on a
+     place made while `boot` was out went nowhere (fluid F6). That move's own load reads the live `boot`, kept by now. */
+  const replaceNow = (heard: boolean, stale: boolean | undefined, moving: boolean): boolean => heard && stale === true && !moving;
+  let bootHeard = $state(false);
   $effect(() => {
     if (data.stale !== true) return;
     const base = untrack(() => apiBase(page.url));
@@ -880,12 +888,16 @@
     void import('$lib/record/boot-live.ts')
       .then((m) => m.readBoot(base))
       .then(() => {
-        if (!gone) void invalidate('braindog:boot');
+        if (!gone) bootHeard = true;
       })
       .catch(() => undefined);
     return () => {
       gone = true;
+      bootHeard = false;
     };
+  });
+  $effect(() => {
+    if (replaceNow(bootHeard, data.stale, navigating.to !== null)) void invalidate('braindog:boot');
   });
 
   /* THE LOCAL COPY IS CLAIMED BY THE READER A LIVE BOOT NAMES, never by a drawn copy: another person, record or scope

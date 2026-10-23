@@ -1,0 +1,75 @@
+/**
+ * The shell's moves stay smooth (fluid F1, F3, F6, F11, F12).
+ *
+ * A press lights at once and the page changes with no pause: the shell waits only a moment for a new screen to say it
+ * has drawn, the old picture leaves before the new one arrives (never two titles), a stale shell is replaced only when
+ * nothing is moving (or it takes the tap that came with it), and a theme change fades the old window over the new one.
+ * Read out of the shell and the sheet as text, and the one rule that is code is cut out and run (`place-arrived.test.ts`).
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
+const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+const shell = read('./+layout.svelte');
+const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
+const sheet = read('../app.css');
+const css = sheet.replace(/\/\*[\s\S]*?\*\//gu, '');
+
+const tokens = read('../../../../packages/skin/tokens.css');
+const token = (name: string): number => {
+  const m = new RegExp(`${name}:\\s*(\\d+)ms`, 'u').exec(tokens);
+  assert.ok(m, `${name} is a millisecond token`);
+  return Number(m[1]);
+};
+
+test('a new screen is given a moment to say it has drawn, not a quarter second', () => {
+  const wait = /const DRAWN_WITHIN_MS = (\d+);/u.exec(code);
+  assert.ok(wait, 'the wait has a name');
+  assert.ok(Number(wait[1]) <= 60, 'a press never freezes for long');
+  assert.match(code, /await waitFor\(\(\) => scroller\(\)\?\.dataset\.screen !== undefined, DRAWN_WITHIN_MS\);/u);
+});
+
+test('a stale shell is replaced once the record has answered and nothing is moving', () => {
+  const from = code.indexOf('const replaceNow =');
+  assert.notEqual(from, -1, 'the shell has no `replaceNow`');
+  const plain = stripTypeScriptTypes(code.slice(from, code.indexOf(';\n', from) + 1));
+  const replaceNow = new Function(`${plain}\nreturn replaceNow;`)() as (heard: boolean, stale: boolean | undefined, moving: boolean) => boolean;
+  assert.equal(replaceNow(true, true, false), true);
+  assert.equal(replaceNow(true, true, true), false, 'a tap that is on its way is not taken over');
+  assert.equal(replaceNow(false, true, false), false, 'the record has not answered');
+  assert.equal(replaceNow(true, false, false), false);
+  assert.equal(replaceNow(true, undefined, false), false);
+  assert.match(code, /import \{ navigating, page \} from '\$app\/state';/u);
+  assert.match(code, /replaceNow\(bootHeard, data\.stale, navigating\.to !== null\)/u);
+});
+
+test('the old picture leaves before the new one arrives, and the two last no longer than a page change', () => {
+  const old = /::view-transition-old\(page\) \{\s*animation: page-out var\((--d-\w+)\)/u.exec(css);
+  const now = /::view-transition-new\(page\) \{\s*animation: page-in calc\(var\((--d-\w+)\) - var\((--d-\w+)\)\) var\(--ease-out\) var\((--d-\w+)\) both;/u.exec(css);
+  assert.ok(old && now, 'both pictures are timed');
+  assert.equal(now[2], old[1], 'the new picture takes what is left after the old one');
+  assert.equal(now[3], old[1], 'and starts when the old one has gone');
+  assert.equal(token(now[1]!), token('--d-page'));
+  assert.ok(token('--d-page') <= 250, 'nothing is over 250ms');
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\s*::view-transition-old\(page\),\s*::view-transition-new\(page\) \{\s*animation: none;/u);
+});
+
+test('a theme change fades the old window over the new one, and is cut when asked for less motion', () => {
+  assert.match(css, /html\[data-retheme\]::view-transition-old\(root\) \{\s*z-index: 1;/u);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\s*html\[data-retheme\]::view-transition-old\(root\) \{\s*z-index: auto;\s*animation: none;/u);
+});
+
+test('an answer taken leaves no receipt fade of its own', () => {
+  const card = read('../lib/decide/DecisionCard.svelte');
+  assert.doesNotMatch(card, /qa-in(?![\w-])/u, 'the receipt replaces the card in place; it does not fade in again');
+});
+
+test('a figure that goes fades quickly, and not at all when asked for less motion', () => {
+  const figure = read('../lib/ui/Figure.svelte');
+  assert.match(figure, /out:leave/u);
+  assert.match(figure, /duration: still\(\) \? 0 : ms\('--d-exit', 90\)/u);
+});
