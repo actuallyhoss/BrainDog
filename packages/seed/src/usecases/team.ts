@@ -30,8 +30,8 @@ const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycl
  * NO INVITATION ROW SINCE 2.21.0. It opened Settings, People, where a free record's invitation is refused, so every
  * fresh team record had a button on Home that ended in a refusal. Only the host knows whether this record takes a
  * second person (the record's `invitations`), and a block's `when:` reads a figure or the reader, never the host, so
- * the row cannot be drawn only where it works. The one row left says instead that a team of people needs Cloud and a
- * team of agents does not.
+ * the row cannot be drawn only where it works. The one row left says that a team of agents works on any record, and
+ * nothing of people, since 2.22.0: "a team of people needs Cloud" sold what brain.dog does not.
  */
 const CONNECT = '/settings/agents';
 
@@ -221,8 +221,11 @@ export const TEAM = {
      standup skill stops saying it does either; Bring the team in loses Invite your team, which ended in a refusal on
      a free record. A row and two words changed, declarations added, so still the minor step 2.21.0 is. And the KPI
      plan's K3-C: the project page it embeds draws Key numbers, the project's own key numbers (`kpis`, `for: project`),
-     the whole width under Waiting on you. A block added, nothing taken away. */
-  version: '2.21.0',
+     the whole width under Waiting on you. A block added, nothing taken away.
+     2.22.0: Bring the team in says only that a team of agents works on any record, and no longer that a team of people
+     needs Cloud, which brain.dog does not sell and where inviting people is held (the audit of 22 October, U-C4). One
+     line's words, so a patch would do; a minor step, since 2.21.0 is live on brain.dog. */
+  version: '2.22.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -478,7 +481,7 @@ export const TEAM = {
             icon: 'user-plus',
             span: 12,
             authored: [
-              { cells: ['Connect an agent', CONNECT, 'A team of agents works on any record. A team of people needs Cloud.'] },
+              { cells: ['Connect an agent', CONNECT, 'A team of agents works on any record.'] },
             ],
           },
           {

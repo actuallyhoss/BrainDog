@@ -20,7 +20,10 @@
   import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
   import { arrivalsOf, freshOf, groupSaid, type Landed } from './landed.ts';
 
-  let { rows, review = 0 }: { rows: readonly Landed[]; review?: number } = $props();
+  /* `self` IS THE READER'S OWN NAME, which their own lines' face is drawn from: "You" drew a Y beside their own name on a
+     first Today ("Y Maya You", the audit of 22 October, U-C4). */
+  let { rows, review = 0, self = null }: { rows: readonly Landed[]; review?: number; self?: string | null } = $props();
+  const faceOf = (r: { who: string; kind?: string | undefined }): string => (r.kind === 'you' && self !== null && self.trim() !== '' ? self : r.who);
 
   const words = {
     title: 'Arrivals',
@@ -60,7 +63,7 @@
       {#each lines as r (r.key)}
         <li class="l-row" data-arrived={fresh.has(r.key) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
           <span class="l-at num">{r.at}</span>
-          <span class="l-face"><Face name={r.who} kind={r.kind} run={r.run} size="s" /></span>
+          <span class="l-face"><Face name={faceOf(r)} kind={r.kind} run={r.run} size="s" /></span>
           {#if 'group' in r}
             <span class="l-what" dir="auto">
               <button type="button" class="l-open tap" data-free aria-expanded={open.has(r.key)} aria-label={groupSaid(r)} onclick={() => toggle(r.key)}

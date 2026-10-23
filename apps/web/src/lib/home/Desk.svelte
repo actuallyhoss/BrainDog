@@ -50,4 +50,4 @@
 
 {#if part === 'all' || part === 'working'}<WorkingNow {rows} />{/if}
 {#if cards && (part === 'all' || part === 'projects')}<ProjectCards cards={cards.cards} more={cards.more} list={cards.list} name={cards.name} {working} />{/if}
-{#if part === 'all' || part === 'landed'}<Landed rows={landed} {review} />{/if}
+{#if part === 'all' || part === 'landed'}<Landed rows={landed} {review} self={me !== null && Object.hasOwn(names, me) ? (names[me] ?? null) : null} />{/if}

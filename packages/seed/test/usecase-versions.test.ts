@@ -1685,6 +1685,30 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 2.21.0 (the KPI plan of 21 October, K3-C; commit 63423720 holds 2.20.0): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> 28ca804962485e64",
     ],
   },
+  /* BRING THE TEAM IN SAYS NOTHING OF CLOUD (the audit of 22 October, U-C4). 2.21.0 is live on brain.dog. */
+  'team@2.22.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+      rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day
+      script.plan_follows_ticket
+    `,
+    declares: 'd08d7e5234994c4b',
+    history: [
+      "`page.home-team`'s Bring the team in says only that a team of agents works on any record, where it added that a team of people needs Cloud; no id added or taken away -> d08d7e5234994c4b",
+    ],
+  },
   'business@1.6.0': {
     holds: `
       page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with

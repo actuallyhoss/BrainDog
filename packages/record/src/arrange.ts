@@ -2196,7 +2196,9 @@ export function arranger(d: ArrangeDeps) {
             const { deleted_at, ...patch } = (isMap(r.patch) ? r.patch : {}) as Body;
             let version = Number(r.version);
             let out: ReturnType<Kernel['update']> | null = null;
-            const by = { actor, batch, cascade: false, note: 'Changed by a plan accepted on Decide.' };
+            /* NO NOTE OF ITS OWN: the feed says a note in the verb's place, and "You Changed by a plan accepted on Decide"
+               named a place that is Needs you now (the audit of 22 October, U-C4). The batch ties the plan's writes. */
+            const by = { actor, batch, cascade: false };
             if (Object.keys(patch).length > 0) out = kernel.update(register, r.at, patch as never, { ...by, version });
             if (out?.ok) version = out.value.version;
             if (deleted_at !== undefined && (out === null || out.ok)) out = kernel.update(register, r.at, { deleted_at } as never, { ...by, version });
@@ -2216,7 +2218,8 @@ export function arranger(d: ArrangeDeps) {
             const target = made[Number(to)];
             if (target) fields[field] = target.spoken;
           }
-          const out = kernel.create(register, fields as never, { actor, batch, note: 'Added from a plan accepted on Decide.' });
+          /* No note either way: the feed reads "You added Ada", not "You Added from a plan accepted on Decide." */
+          const out = kernel.create(register, fields as never, { actor, batch });
           if (!out.ok) {
             const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE' as const, fix: 'The record moved while the plan was written. Accept it again.' };
             halted.refusal = { ...refusal, at: `body.rows[${i}]${refusal.at ? `.${refusal.at}` : ''}` };

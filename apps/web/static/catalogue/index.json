@@ -4191,8 +4191,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.21.0",
+      "latest": "2.22.0",
       "versions": [
+        {
+          "version": "2.22.0",
+          "checksum": "43e1a1dbea71b94ba422715b359ad9a260000e946487a4b445c738295bd17780",
+          "bytes": 36485,
+          "published_at": "2026-10-23T08:00:52.314Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.21.0",
           "checksum": "81388bdbfecf70c5ecd805d7cf7e5dfcccf35e50d8499c59a5959b984dbb8ea3",
