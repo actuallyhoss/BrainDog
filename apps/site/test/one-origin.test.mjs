@@ -163,12 +163,12 @@ test('app.html loads /signed-in.js from this origin, under script-src self, with
 
 /**
  * THE VISIT COUNT RUNS UNDER THE SAME POLICY (batch 103b, LAUNCH 103 job 9). `/seen.js` posts to this origin's
- * `/api/seen` and nowhere else, with no cookie. Counting is on in production (`COUNT_VISITS`, 23 October), so app.html
- * loads it `defer` from this origin and it never holds up the first paint.
+ * `/api/seen` and nowhere else, with no cookie. It is not loaded until counting is switched on in production
+ * (`COUNT_VISITS`), so app.html does not name it yet; the day it does, it loads it `defer` from this origin.
  */
-test('app.html loads /seen.js deferred, and /seen.js posts only to this origin', () => {
+test('app.html does not load /seen.js yet, and /seen.js posts only to this origin', () => {
   const shell = text('src/app.html').replace(/<!--[\s\S]*?-->/g, ' ');
-  assert.match(shell, /<script src="\/seen\.js" defer><\/script>/, 'app.html does not load /seen.js deferred, so no visit is counted');
+  assert.doesNotMatch(shell, /\/seen\.js/, 'app.html loads /seen.js while counting is off, so every page posts to a door that answers nothing');
 
   const script = text('static/seen.js').replace(/\/\*[\s\S]*?\*\//g, ' ');
   const urls = [...script.matchAll(/fetch\(\s*'([^']*)'/g)].map((m) => m[1]);

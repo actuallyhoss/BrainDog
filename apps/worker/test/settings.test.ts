@@ -98,7 +98,6 @@ const CASES: Record<string, Case> = {
   RP_ID: { kind: 'quiet', door: METHODS, why: 'unset, the passkeys’ relying party is PUBLIC_HOST' },
   AI_GATEWAY: { kind: 'quiet', door: HEALTH, why: 'unset, a model call goes to Workers AI with no gateway' },
   AGE_RECIPIENT: { kind: 'quiet', door: HEALTH, why: 'empty takes unsealed copies, which the config names as the choice' },
-  COUNT_VISITS: { kind: 'quiet', door: HEALTH, why: 'anything but yes counts nothing, and /api/seen answers 204' },
   SLASH_ENDPOINT: { kind: 'quiet', door: HEALTH, why: 'this Worker does not read it; deploy-parity and the site’s claims do' },
   SLASH_INCLUDED: { kind: 'quiet', door: HEALTH, why: 'anything but yes is the included model switched off, the state the config ships dark' },
   SLASH_INCLUDED_MONTH_NEURONS: { kind: 'quiet', door: HEALTH, why: 'unset falls back to the ceiling written in slash.ts' },

@@ -67,11 +67,11 @@ test('/signed-in.js imports nothing and names the one cookie', () => {
   assert.ok(SCRIPT.includes(`'${SIGNED_IN}'`), 'signed-in.js reads a cookie other than bd_in');
 });
 
-test('app.html loads /signed-in.js in the head, blocking, then /seen.js deferred, and carries no inline script', () => {
+test('app.html loads /signed-in.js in the head, blocking, and carries no inline script', () => {
   const head = APP_HTML.slice(APP_HTML.indexOf('<head>'), APP_HTML.indexOf('</head>'));
   assert.ok(head.includes('<script src="/signed-in.js"></script>'), 'the head does not load /signed-in.js as a plain blocking script');
   const scripts = APP_HTML.match(/<script\b[^>]*>/g) ?? [];
-  assert.deepEqual(scripts, ['<script src="/signed-in.js">', '<script src="/seen.js" defer>'], 'app.html carries a script of its own besides /signed-in.js and the deferred visit count');
+  assert.deepEqual(scripts, ['<script src="/signed-in.js">'], 'app.html carries a script of its own besides /signed-in.js');
   assert.ok(!APP_HTML.includes('\u2014'), 'app.html ships an em dash in its bytes');
 });
 
