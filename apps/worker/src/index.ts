@@ -143,7 +143,7 @@ import { readSetup } from '@braindog/slash/propose';
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is restoring a copy. Try again in a minute.', at: 'record' };
 /** What a record answers while its object's queue is full: a moment's wait, never a crash to quote (23 Oct, 80 at once). */
-const BUSY: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is busy for a moment. Trying again.', at: 'record', retry_after: 1 };
+const BUSY: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is busy for a moment. Try again in a few seconds.', at: 'record', retry_after: 1 };
 
 /** The copies port `Record$` hands its record, which is `copies.ts`'s own and says it `reopens`. */
 type CloudPort = ReturnType<typeof cloudSnapshots>;

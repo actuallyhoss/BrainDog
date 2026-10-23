@@ -1019,6 +1019,22 @@ const unreachable = (why: string): Refusal => ({
 });
 
 /**
+ * A RECORD TOO BUSY TO TAKE A REQUEST (503, its object's queue full) IS ASKED AGAIN, a read only, twice at most, after a
+ * jittered wait that doubles, so a burst of tabs does not come back in step (23 Oct: 80 crashes in two seconds).
+ */
+export const BUSY_TRIES = 2;
+const busyWait = (attempt: number): number => 400 * 2 ** attempt * (0.5 + Math.random());
+let BUSY_WAIT = busyWait;
+/** How long a busy read waits before its next try, by try; `null` puts the jittered wait back. For tests. */
+export function busyWaits(wait: ((attempt: number) => number) | null): void {
+  BUSY_WAIT = wait ?? busyWait;
+}
+const pause = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
+/** Whether an answer is a record too busy to take it (the Worker's 503 `RECORD_UNAVAILABLE` with `retry_after`). */
+export const busy = (out: Result<unknown>): boolean =>
+  !out.ok && 'refusal' in out && out.refusal.code === 'RECORD_UNAVAILABLE' && typeof out.refusal.retry_after === 'number';
+
+/**
  * Whether a parsed body is an answer at all, in one place for both doors.
  *
  * THE SHAPE IS CHECKED, not assumed. A proxy that returns its own error page with a 200 would
@@ -1333,6 +1349,8 @@ let EVERY = new Map<string, Every>();
 const SCHEMAS_WAVE_MOST = 100;
 /** Refusals that say the host has no `schemas` at all. */
 const NO_SCHEMAS = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
+/** Refusals that say nothing about the lists asked, only about the host now: never asked again once a list. */
+const TRANSIENT = new Set(['UNREACHABLE', 'INTERNAL', 'RECORD_UNAVAILABLE', 'RATE_LIMITED']);
 
 /**
  * The app's word on the record's declarations, or `null` where it has none to give.
@@ -1708,7 +1726,9 @@ export function createClient(options: ClientOptions) {
         );
         if (!out.ok) {
           const refusal = 'refusal' in out ? out.refusal : undefined;
-          if (refusal?.code === 'UNREACHABLE') {
+          /* A HOST DOWN, BUSY OR CRASHED SAYS THE SAME FOR EVERY LIST: asked once a list, a failed wave of 28 became 28
+             more requests into the record that had just failed it (23 Oct, the overload). */
+          if (refusal === undefined || TRANSIENT.has(refusal.code)) {
             for (const register of part) tell(register, out);
             return;
           }
@@ -1827,17 +1847,24 @@ export function createClient(options: ClientOptions) {
     const done = (): void => {
       if (leaving && OUTGOING.delete(leaving)) tell();
     };
+    /* A READ ANSWERED 503 IS ASKED AGAIN (`BUSY_TRIES`); a write never is, since it may have landed before the 503. */
+    const reads = !WRITES.has(name) || POST_READS.has(name);
     try {
-      res = await doFetch(url.toString(), {
-        ...(leaving ? { signal: leaving.signal } : {}),
-        method: writes ? 'POST' : 'GET',
-        headers: {
-          ...(writes ? { 'content-type': 'application/json' } : {}),
-          ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
-        },
-        ...(sent !== undefined ? { body: sent } : {}),
-        ...(outlives ? { keepalive: true } : {}),
-      });
+      for (let attempt = 0; ; attempt += 1) {
+        res = await doFetch(url.toString(), {
+          ...(leaving ? { signal: leaving.signal } : {}),
+          method: writes ? 'POST' : 'GET',
+          headers: {
+            ...(writes ? { 'content-type': 'application/json' } : {}),
+            ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+          },
+          ...(sent !== undefined ? { body: sent } : {}),
+          ...(outlives ? { keepalive: true } : {}),
+        });
+        if (res.status !== 503 || !reads || attempt >= BUSY_TRIES || LEAVING) break;
+        await res.body?.cancel().catch(() => undefined);
+        await pause(BUSY_WAIT(attempt));
+      }
     } catch (e) {
       done();
       return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
@@ -1884,15 +1911,22 @@ export function createClient(options: ClientOptions) {
   async function hostDoor<T>(
     path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping',
     args: Record<string, unknown>,
+    how: { busy?: () => void } = {},
   ): Promise<Result<T>> {
     OUT.clear();
-    const out = await hostAnswer<T>(() =>
+    const ask = () =>
       doFetch(`${base}/api/${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(args),
-      }),
-    );
+      });
+    let out = await hostAnswer<T>(ask);
+    /* SLASH'S READ IS A READ: a busy record is asked again as `send` asks one, and the screen is told it is waiting. */
+    for (let attempt = 0; path === 'slash/read' && busy(out) && attempt < BUSY_TRIES && !LEAVING; attempt += 1) {
+      how.busy?.();
+      await pause(BUSY_WAIT(attempt));
+      out = await hostAnswer<T>(ask);
+    }
     /* A DOOR MAY WRITE ROWS (a key kept, a proposal filed), so the kept reads go, as after any write. */
     SENT += 1;
     return out;
@@ -1963,7 +1997,7 @@ export function createClient(options: ClientOptions) {
      * A browser session and this origin, like the key doors. 501 `NOT_IN_THIS_BUILD` on a host with no model behind it,
      * which `version().slash` already says as `false`, and 422 `SLASH_BUDGET_SPENT` once the month's asks are used.
      */
-    slashRead: (question: string) => hostDoor<Reading>('slash/read', { question }),
+    slashRead: (question: string, how: { busy?: () => void } = {}) => hostDoor<Reading>('slash/read', { question }, how),
     /**
      * Slash's source, the model it names, and this month's asks, against the cap on the included model and uncapped on
      * his own key. Any signed-in person may ask; the palette asks on open, which also builds the engine so the first

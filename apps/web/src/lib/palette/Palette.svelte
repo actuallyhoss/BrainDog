@@ -197,7 +197,7 @@
    */
   /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
   type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
-  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null; reading?: Reading | null } | null>(null);
+  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null; reading?: Reading | null; busy?: boolean } | null>(null);
   const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
   /* THE RECORD ON SCREEN, AT ITS OWN BASE. `page.url.origin` asked `/api/slash/*` at the bare host, which on the Cloud is
@@ -205,7 +205,13 @@
   const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: apiBase() }));
   const slashAsk = latest((question: string) =>
     client()
-      .then((c) => c.slashRead(question))
+      .then((c) =>
+        c.slashRead(question, {
+          busy: () => {
+            if (slash?.question === question && slash.drawn === null) slash.busy = true;
+          },
+        }),
+      )
       .catch(unreached),
   );
   /* PASS 2 THROUGH ITS OWN `latest`, so a proposal written for an older question is dropped exactly as pass 1's rows are.
@@ -1454,7 +1460,7 @@
       {#if slashShown.fix !== null}
         <p class="p-none">{slashShown.fix}</p>
       {:else if slashShown.drawn === null}
-        <p class="p-none" role="status">{copy.slashAsking}</p>
+        <p class="p-none" role="status">{slashShown.busy ? copy.slashBusy : copy.slashAsking}</p>
       {:else}
         <!-- NO ROW IS NOT NOTHING WHEN A FIGURE WAS READ: pass 2 is asked on that figure (`secondPass`), and a line saying
              nothing answers would sit above the answer it gives. -->

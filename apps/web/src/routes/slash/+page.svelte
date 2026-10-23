@@ -139,7 +139,7 @@
    * absent, not disabled (`23 §8`).
    */
   type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
-  type Answered = { question: string; drawn: Drawn | null; fix: string | null; second: Second | null };
+  type Answered = { question: string; drawn: Drawn | null; fix: string | null; second: Second | null; busy?: boolean };
 
   let door: ReturnType<typeof createClient> | null = null;
   const modelHere = $derived(page.data.slash === true);
@@ -267,7 +267,11 @@
     let shown: Answered = { question: q, drawn: null, fix: null, second: null };
     answer = shown;
     try {
-      const out = await door.slashRead(q);
+      const out = await door.slashRead(q, {
+        busy: () => {
+          if (answer?.question === q && answer.drawn === null) answer = { ...answer, busy: true };
+        },
+      });
       if (!out.ok) {
         answer = { ...shown, fix: 'refusal' in out ? out.refusal.fix : copy.slashNothing };
         return;
@@ -419,7 +423,7 @@
             {#if answer.fix !== null}
               <p class="slash-said" role="status">{answer.fix}</p>
             {:else if answer.drawn === null}
-              <p class="slash-said" role="status">{copy.slashAsking}</p>
+              <p class="slash-said" role="status">{answer.busy ? copy.slashBusy : copy.slashAsking}</p>
             {:else}
               <!-- THE SOURCE, BEFORE ANY SENTENCE: where Slash looked, and how many rows came back. -->
               {#if answer.drawn.where !== null || answer.drawn.q !== null}

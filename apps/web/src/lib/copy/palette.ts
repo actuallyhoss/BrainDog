@@ -47,6 +47,8 @@ export const palette = {
      The fold's last line is `23 §6`'s, with a colon for the dash. */
   askSlash: (text: string) => `Ask Slash: ${text}`,
   slashAsking: 'Slash is reading the record.',
+  /* WHILE A BUSY RECORD IS ASKED AGAIN (the client's 503 retry): calm, and never the crash sentence to quote. */
+  slashBusy: 'BrainDog is busy. Trying again.',
   slashWhere: 'Slash looked for',
   slashSearched: (q: string) => `Slash searched the record for “${q}”`,
   slashFound: 'What Slash found',
