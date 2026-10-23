@@ -353,6 +353,43 @@ test('A CHAT-COMPLETIONS ANSWER THAT LANDS ON THE CEILING AND SAYS `stop` IS NOT
 });
 
 /**
+ * A ROW THAT REASONS IS ASKED TO THINK LITTLE, BECAUSE ITS THINKING IS SPENT FROM THE ANSWER'S CEILING. `glm-5.3-flash`
+ * reasons at `max` unless told otherwise, and the binding counts `reasoning_tokens` inside `completion_tokens`, so the
+ * written brief, an answer of three short sentences, stopped at the 2,048-token ceiling every half hour on 22 and 23
+ * October. Red before: no `reasoning_effort` was sent, and the sentence named the ceiling and not what spent it.
+ */
+test('THE REASONING ROW IS SENT `reasoning_effort: low` AND A ROW THAT DOES NOT REASON IS SENT NONE', async () => {
+  const chat = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 5, completion_tokens: 4 },
+  }));
+  await aiInference(chat.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  assert.equal(chat.seen[0]?.inputs['reasoning_effort'], 'low');
+  assert.equal(chat.seen[0]?.inputs['max_tokens'], 64, 'the ceiling is the one asked for, thinking and answer together');
+
+  const text = answering(() => ({ response: '{"kind":"invoice","actionable":true}', usage: { prompt_tokens: 5, completion_tokens: 4 } }));
+  await aiInference(text.env).complete(ask);
+  assert.equal('reasoning_effort' in (text.seen[0]?.inputs ?? {}), false);
+});
+
+test('AN ANSWER CUT OFF AT THE CEILING SAYS HOW MUCH OF IT WAS THINKING, where the platform counted it', async () => {
+  const cut = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
+    usage: { prompt_tokens: 412, completion_tokens: 64, completion_tokens_details: { reasoning_tokens: 58 } },
+  }));
+  const got = await aiInference(cut.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  assert.equal(codeOf(got), 'PROPOSAL_SCHEMA');
+  assert.match(fixOf(got), /stopped at the 64-token ceiling, 58 of them its reasoning, so what came back/u);
+
+  const silent = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
+    usage: { prompt_tokens: 412, completion_tokens: 64 },
+  }));
+  const plain = await aiInference(silent.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  assert.match(fixOf(plain), /stopped at the 64-token ceiling, so what came back/u, 'no count is no claim');
+});
+
+/**
  * A ROW THAT IS NOT A LIST OF NUMBERS IS THE SAME FAILURE AS A BATCH OF THE WRONG LENGTH, and the
  * first draft refused one and quietly filed the other. `embed` guarded the count because the
  * caller writes `entry_vec` by position, then handed each row to a quantiser that dropped every

@@ -149,7 +149,9 @@ async function askOnce(route, url) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messages: PROMPT, max_tokens: MAX_TOKENS, response_format: formatFor(route.shape) }),
+    /* AND THE ROW'S OWN `reasoning_effort` (`Effort` in `inference.ts`), so the check asks as the Worker asks: at the
+       model's default the thinking alone runs a 120-token ceiling out and the route reads cut off whatever it would answer. */
+    body: JSON.stringify({ messages: PROMPT, max_tokens: MAX_TOKENS, response_format: formatFor(route.shape), ...(route.effort ? { reasoning_effort: route.effort } : {}) }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const said = await res.text();

@@ -108,7 +108,26 @@ export type AiDeps = { fetch?: typeof fetch | undefined; log?: ((line: string) =
  * 231.8 × $0.011 / 1,000 = $0.00255. The table reproduces the published figure to the cent it is
  * quoted at, so the arithmetic below is the same arithmetic `08 §6` costed the product with.
  */
-type Rate = { provider: string; shape: Shape; inPerM: number; outPerM: number };
+type Rate = { provider: string; shape: Shape; inPerM: number; outPerM: number; effort?: Effort | undefined };
+
+/**
+ * HOW HARD A ROW THAT REASONS IS ASKED TO THINK BEFORE IT ANSWERS, sent as `reasoning_effort`. Absent on a row that does not
+ * reason, and nothing is sent for it.
+ *
+ * `glm-5.3-flash` REASONS, AT `max` UNLESS TOLD OTHERWISE, AND ITS THINKING IS SPENT FROM THE SAME CEILING AS ITS ANSWER.
+ * The model's page (developers.cloudflare.com/workers-ai/models/glm-5.3-flash, read 23 October) lists reasoning as `low`,
+ * `high`, `max` (default) and says it cannot be disabled; the binding's own `ChatCompletionsCommonOptions` declares
+ * `reasoning_effort`, and its `CompletionUsage` counts `reasoning_tokens` inside `completion_tokens`. So `max_tokens` bounds
+ * the thinking and the answer together. Measured on the live record on 22 and 23 October: the written brief, whose whole
+ * answer is three sentences of at most 200 characters (`SLASH_WRITTEN_INSTRUCTIONS`), well under 300 tokens, stopped at
+ * the 2,048-token ceiling every half hour (its `WRITTEN_RETRY_MS`), so what ran the ceiling out was the thinking before
+ * it and not the answer.
+ *
+ * `low` AND NOT `max`: every call this adapter makes pins a JSON schema and is read once by code, nothing here reads the
+ * reasoning, and the platform bills it as output. The ceiling and its worst-case price are unchanged (`complete` still
+ * counts `maxTokens` whole), so this costs no estimate its honesty; it only leaves the answer the room it was sized for.
+ */
+type Effort = 'low' | 'high' | 'max';
 
 /**
  * WHICH OF WORKERS AI'S TWO REQUEST AND ANSWER SHAPES A ROW SPEAKS, AND IT IS NOT A DETAIL. The
@@ -135,7 +154,7 @@ type Shape = 'text' | 'chat';
 
 const MODELS: Record<string, Rate> = {
   'llama-3.2-1b': { provider: '@cf/meta/llama-3.2-1b-instruct', shape: 'text', inPerM: 2_455, outPerM: 18_273 },
-  'glm-5.3-flash': { provider: '@cf/zai-org/glm-5.3-flash', shape: 'chat', inPerM: 13_636, outPerM: 45_455 },
+  'glm-5.3-flash': { provider: '@cf/zai-org/glm-5.3-flash', shape: 'chat', inPerM: 13_636, outPerM: 45_455, effort: 'low' },
 };
 
 /**
@@ -373,13 +392,17 @@ const formatFor = (shape: Shape, schema: JsonSchema): Record<string, unknown> =>
  * how a monthly total comes out confidently wrong. The rate table is used to REFUSE a call, where
  * being approximately right before spending is the whole value, and never to report one after.
  */
-type Read = { text: string; usage: Usage; cutOff: boolean | null };
+type Read = { text: string; usage: Usage; cutOff: boolean | null; thought: number };
 
+/* `thought` IS THE PART OF `usage.out` THE PLATFORM SAYS WAS REASONING (`completion_tokens_details.reasoning_tokens`), 0
+   where it says nothing, so a cut-off answer can say whether the thinking or the answer ran the ceiling out. */
 const readAnswer = (shape: Shape, raw: unknown): Read => {
   const answer = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const reported = answer['usage'];
   const tokens = (reported !== null && typeof reported === 'object' ? reported : {}) as Record<string, unknown>;
   const usage: Usage = { in: count(tokens['prompt_tokens']), out: count(tokens['completion_tokens']), neurons: null };
+  const details = tokens['completion_tokens_details'];
+  const thought = count(details !== null && typeof details === 'object' ? (details as Record<string, unknown>)['reasoning_tokens'] : undefined);
 
   /* `response` IS AN OBJECT, NOT A STRING, WHEN THE PLATFORM HONOURED `response_format`: Workers AI's JSON mode hands the
      parsed value back (its own example answers `"response": { "name": "India", ... }`). Read as a string only, every
@@ -389,7 +412,7 @@ const readAnswer = (shape: Shape, raw: unknown): Read => {
   if (shape === 'text') {
     const response = answer['response'];
     const text = typeof response === 'string' ? response : response !== null && typeof response === 'object' ? JSON.stringify(response) : '';
-    return { text, usage, cutOff: null };
+    return { text, usage, cutOff: null, thought };
   }
 
   const choices = answer['choices'];
@@ -398,7 +421,7 @@ const readAnswer = (shape: Shape, raw: unknown): Read => {
     | undefined;
   const content = first?.message?.content;
   const why = first?.finish_reason;
-  return { text: typeof content === 'string' ? content : '', usage, cutOff: typeof why === 'string' ? why === 'length' : null };
+  return { text: typeof content === 'string' ? content : '', usage, cutOff: typeof why === 'string' ? why === 'length' : null, thought };
 };
 
 /** `clamp(round(x × 127), −127, 127)` of `51 §5.11` step 4: one signed byte per dimension, and −128 is never produced. */
@@ -462,10 +485,12 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): Inference {
         messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
         max_tokens: req.maxTokens,
         response_format: formatFor(rate.shape, req.schema),
+        /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
+        ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
       });
       if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);
 
-      const { text, usage, cutOff } = readAnswer(rate.shape, got.answer);
+      const { text, usage, cutOff, thought } = readAnswer(rate.shape, got.answer);
 
       /* TRUNCATION IS TOLD APART FROM A BAD ANSWER IN THE SENTENCE, AND IT IS CHECKED FIRST. A
          generation cut off at the ceiling is usually half a JSON document, so it fails the parse as
@@ -474,9 +499,15 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): Inference {
          same half-written object is reported as JSON that could not be read, which is true and
          useless. Where the shape reports it, `cutOff` is the platform's own word; where it does
          not, the completion count against the ceiling is the only signal there is, and an absent
-         `usage` counts as zero and therefore makes no claim either way. */
+         `usage` counts as zero and therefore makes no claim either way. AND THE SENTENCE SAYS HOW MUCH
+         OF THE CEILING WAS THINKING where the platform counted it (`Effort`): a reasoning row spends
+         its ceiling on both, and the two send a reader to different places again, the effort or the
+         size of what was asked for. */
       if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens))
-        return schemaFailed<Completion>(req.model, `it stopped at the ${req.maxTokens}-token ceiling, so what came back is the beginning of a document rather than one`);
+        return schemaFailed<Completion>(
+          req.model,
+          `it stopped at the ${req.maxTokens}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
+        );
 
       let parsed: unknown;
       try {
