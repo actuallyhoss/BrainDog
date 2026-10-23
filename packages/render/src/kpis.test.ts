@@ -241,3 +241,14 @@ test('with no fix given the stale line is said and nothing is pressed; Today row
   assert.match(body, /<p class="kpi-why" data-state="stale">Not updated for 19 days<\/p>/u);
   assert.doesNotMatch(body, /<button/u);
 });
+
+test('AN OLD READING SAYS ITS DAY: past a week and on its rhythm it is not stale, and still says when it was read', () => {
+  const old = kpiView({ name: 'Members', unit: 'people', every: '1w', points: days([300, 318], '2026-10-11', 7) }, { now: NOW });
+  assert.equal(old.stale, null);
+  assert.equal(old.aged, 'Last reading 11 Oct');
+  const fresh = kpiView({ name: 'Members', unit: 'people', every: '1w', points: days([300, 318], '2026-10-19', 7) }, { now: NOW });
+  assert.equal(fresh.aged, '');
+  const quiet = kpiView({ name: 'Members', unit: 'people', points: days([300, 318], '2026-09-20', 7) }, { now: NOW });
+  assert.ok(quiet.stale, 'past fourteen days with no rhythm it is stale');
+  assert.equal(quiet.aged, '', 'and stale already says since when');
+});

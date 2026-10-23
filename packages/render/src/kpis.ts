@@ -131,6 +131,8 @@ export type KpiView = {
   change: KpiChange | null;
   target: KpiTarget | null;
   stale: KpiStale | null;
+  /** `Last reading 2 Sep`, when the newest reading is older than `KPI_AGED_DAYS` and the KPI is not stale, else ''. */
+  aged: string;
   chart: KpiChart | null;
   /** `2 readings in EUR left out`, when a money KPI was handed another currency. */
   left: string;
@@ -150,6 +152,12 @@ export const KPI_CHART_POINTS = 3;
 export const KPI_LATE_PERIODS = 2;
 /** With no cadence, stale after this many days. */
 export const KPI_QUIET_DAYS = 14;
+/**
+ * A reading older than this many days says its day, stale or not (the audit of 22 October, U6: "a number older than a
+ * week says how old it is"). Stale is the rhythm's verdict, with a fix; this is only the age, said once beside the figure.
+ */
+export const KPI_AGED_DAYS = 7;
+export const kpiAgedSaid = (day: string): string => `Last reading ${day}`;
 /** The project page's tile: the lead and at most this many more. */
 export const KPIS_MORE = 5;
 /** Today: at most this many rows. */
@@ -443,6 +451,8 @@ export function kpiView(k: KpiInput, opts: KpisOptions = {}): KpiView {
   const fix = KPI_FIX[k.source ?? 'typed'];
   const stale: KpiStale | null =
     newest === null ? { said: KPI_NO_VALUE, fix } : now - newest > limit ? { said: kpiStaleSaid(kpiDay(newest, now)), fix } : null;
+  /* OLD BUT NOT STALE SAYS ITS DAY: a weekly number read nine days ago is on its rhythm and still nine days old. */
+  const aged = stale === null && newest !== null && now - newest > KPI_AGED_DAYS * DAY ? kpiAgedSaid(kpiDay(newest, now)) : '';
 
   /* A TODAY ROW'S SPARK IS WHOLE PERIODS ONLY. The period still running is a faint dot past the last whole one, which a
      tile explains with its "so far" line; a row says no "so far", so on Hours billed it was a stray dot right of the
@@ -473,6 +483,7 @@ export function kpiView(k: KpiInput, opts: KpisOptions = {}): KpiView {
     change,
     target: targetView,
     stale,
+    aged,
     chart,
     left: money && left > 0 ? kpiLeftSaid(left, otherCurrency(k)) : '',
     why: k.why ?? '',

@@ -130,6 +130,8 @@
       {:else}
         <span class="kpi-against">{k.when}</span>
       {/if}
+      <!-- AN OLD READING SAYS ITS DAY beside the change it is read against (`aged`, more than a week). -->
+      {#if k.aged && k.change}<span class="kpi-against" data-old="">{k.aged}</span>{/if}
     </p>
   {/if}
 {/snippet}
@@ -205,6 +207,7 @@
             {@render figure(k)}
             {#if k.why}
               <p class="kpi-why" data-state={state(k)}>{k.why}</p>
+              {#if k.aged}<p class="kpi-meta"><span class="kpi-against" data-old="">{k.aged}</span></p>{/if}
             {:else}
               {@render change(k)}
             {/if}
