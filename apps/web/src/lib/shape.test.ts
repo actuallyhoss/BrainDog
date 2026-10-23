@@ -29,6 +29,12 @@ test('THE REFERENCE SENTENCE: a studio, two people, monthly billing, side projec
   assert.deepEqual(writable(s), []);
 });
 
+test('A NAME ENDS AT A FULL STOP: "my partner Ada. We send invoices" is Ada, never "Ada. We" (U-C3)', () => {
+  const read = shape('I run a small design studio with my partner Ada. We send invoices in naira.');
+  const people = read.rows.filter((r) => r.register === 'people').map((r) => r.fields.name);
+  assert.deepEqual(people, ['Ada']);
+});
+
 test('NOTHING TYPED declines, and says why', () => {
   for (const blank of ['', '   ', '\n\t']) assert.deepEqual(read(blank), { currency: null, packs: [], rows: [], heard: [], team: null, declined: 'empty' });
 });

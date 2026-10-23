@@ -112,8 +112,9 @@ const BILLING = /\b(?:invoic(?:e|es|ed|ing)|bill(?:s|ed|ing)?|retainers?|charg(?
 /* ── names ────────────────────────────────────────────────────────────── */
 
 /* A capitalised word in any script: `Kiln`, `Élodie`, `O'Neill`. Never a currency code before a
-   figure, or "Halden EGP 5,000" would be somebody called Halden EGP. */
-const CAP = "(?![A-Z]{3}\\s?\\d)\\p{Lu}[\\p{L}\\p{M}\\d'’.-]*";
+   figure, or "Halden EGP 5,000" would be somebody called Halden EGP. A FULL STOP ENDS IT unless a letter follows
+   (`St.Clair`): "my partner Ada. We send invoices" was a person called "Ada. We" (the audit of 22 October, U-C3). */
+const CAP = "(?![A-Z]{3}\\s?\\d)\\p{Lu}(?:[\\p{L}\\p{M}\\d'’-]|\\.(?=\\p{L}))*";
 /* Up to three words, `&` allowed between them: `Pell & Vine`. */
 const NAME = `${CAP}(?:\\s+(?:&\\s+)?(?!I\\b|And\\b)${CAP}){0,2}`;
 const LIST = `(${NAME}(?:(?:\\s*,\\s*|\\s+and\\s+)${NAME})*)`;

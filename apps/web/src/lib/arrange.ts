@@ -19,7 +19,8 @@
  * A plain `.ts` so `node --test` can hold it; the screen only calls it.
  */
 
-import { arrange, MODULE_ORDER, USE_CASES, type Arrangement, type UseCase } from '@braindog/seed/usecases';
+import { AGENTS_SIGNALS } from '@braindog/seed/packs/modules';
+import { arrange as arrangeAll, MODULE_ORDER, USE_CASES, type Arrangement, type UseCase } from '@braindog/seed/usecases';
 
 import type { Offer } from './shape.ts';
 import type { CatalogueUsecase } from './start/offer.ts';
@@ -67,6 +68,26 @@ const frontOf = (h: Heard): UseCase => ({
   links: [],
   over: {},
 });
+
+/**
+ * AN AGENT IS THE AGENTS ADD-ON'S WORD, NEVER A USE CASE'S (the audit of 22 October, U-C3): "what my agents did" made a
+ * one-person record a team's, with Cycles, a Cycle plan and Cycle days. The add-on hears the words its own signals say
+ * (`AGENTS_SIGNALS`), so a use case is ranked on the rest of what it heard, by the same order `arrange` keeps.
+ */
+const ADDON_WORDS: ReadonlySet<string> = new Set(AGENTS_SIGNALS.map((w) => w.toLowerCase()));
+
+function arrange(said: string, cases: readonly UseCase[]): Arrangement {
+  const all = arrangeAll(said, cases);
+  const ranked = all.ranked
+    .map((r, i) => {
+      const why = r.why.filter((w) => !ADDON_WORDS.has(w.text.toLowerCase()));
+      return { r: { ...r, score: why.length, why }, said: why.reduce((n, w) => n + w.text.length, 0), i };
+    })
+    .sort((a, b) => b.r.score - a.r.score || b.said - a.said || a.i - b.i)
+    .map((x) => x.r);
+  const top = ranked[0];
+  return { pick: top && top.score > 0 ? top.usecase : null, ranked };
+}
 
 /** The use cases listened for: the shipped ones, then each catalogue one this build does not already ship. */
 function casesOf(heard: readonly Heard[] | undefined): readonly UseCase[] {

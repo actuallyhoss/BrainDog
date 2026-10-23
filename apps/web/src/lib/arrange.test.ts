@@ -47,7 +47,19 @@ test('EACH REASON IS A PHRASE OF THE SENTENCE IT IS SAID AGAINST, which is turn 
   assert.equal(quiet.from, "I'm a student");
   for (const r of quiet.ranked) for (const w of r.why) assert.equal(quiet.from.slice(w.at, w.at + w.text.length), w.text);
 
-  assert.deepEqual(arrangeTurns('', ABOUT), { ...arrange(ABOUT), from: ABOUT }, 'with no turn one, the reading is the one it always was');
+  /* WITH NO TURN ONE, THE READING IS `arrange`'S, less the words the Agents add-on hears (U-C3): the same pick. */
+  const alone = arrangeTurns('', ABOUT);
+  assert.equal(alone.from, ABOUT);
+  assert.equal(alone.pick, arrange(ABOUT).pick, 'with no turn one, the reading is the one it always was');
+});
+
+test('AN AGENT IS THE AGENTS ADD-ON\'S WORD: "what my agents did" makes no team of one person (U-C3)', () => {
+  const said = "I build two apps and run a small agency on the side. I want to see what's due, what my agents did, and how much money is left.";
+  const read = arrangeTurns('', said);
+  assert.notEqual(read.pick?.usecase, 'team', read.pick?.usecase);
+  assert.ok(read.ranked.every((r) => r.why.every((w) => w.text.toLowerCase() !== 'agents')));
+  /* A team says so in its own words, and is still a team. */
+  assert.equal(arrangeTurns('', 'Our team runs sprints and a backlog of tickets with our agents').pick?.usecase, 'team');
 });
 
 /* THE SENTENCE IS THE PICK'S, NOT ANY USE CASE'S. The first cut chose turn two whenever anything at all

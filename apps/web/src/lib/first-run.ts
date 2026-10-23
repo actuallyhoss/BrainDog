@@ -37,8 +37,10 @@ export const firstRun = {
   /* WHERE SIMPLE RULES READ IT FOR ANY OTHER CAUSE: no model on this host, no press yet, a refusal or a silence. Said on
      the build beside the words, so a thin reading is never taken for the most this can do. */
   readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',
-  /* BEFORE THE PRESS, UNDER THE FIELD: what Next does with the words, said while the host may have a model to read them. */
-  readOnPress: "When you press That's me, a model reads what you wrote once, to set this up. Nothing is kept until you keep it.",
+  /* BEFORE THE PRESS, UNDER THE FIELD: what the press does with the words, and never who reads them. It said "a model
+     reads what you wrote" on a host where no model does, above "Simple rules read this" (the audit of 22 October, U-C3):
+     which reads them is said after, by what read them. */
+  readOnPress: "Pressing That's me sets this up from what you wrote. Nothing is kept until you keep it.",
 
   /* POINT AT AN EXPORT: a file from another app, read on this device and shown before anything is saved. */
   exportPoint: 'Or bring in a file',
