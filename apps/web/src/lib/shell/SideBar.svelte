@@ -866,9 +866,12 @@
     margin-block-start: var(--sp-2);
   }
 
+  /* A FOLD AND A ROW SHARE ONE LINE OF GLYPHS AND NAMES. */
   .s-phone .s-link,
   .s-phone .s-group {
+    gap: var(--sp-3);
     min-block-size: 44px;
+    padding-inline-start: var(--sp-3);
     font-size: var(--fs-body);
   }
 
