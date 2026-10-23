@@ -171,3 +171,22 @@ test('WITH TWO BOOKS, the line says the money there is and the books it is kept 
   bill(k, 900_000, 12);
   assert.deepEqual(bodies(k), [BOOKS]);
 });
+
+test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, and Heads up says it first', async () => {
+  const k = await record();
+  account(k, 'Current account', gbp(500_000));
+  const part = (what: string, due: number, state = 'open'): void =>
+    void value(k.create('installments', { what, plan: 'Harbourview', number: 2, parts: 40, direction: 'out', amount: gbp(48_000), due: day(due), state }, OWNER));
+  part('Harbourview part 1', -40, 'paid');
+  part('Harbourview part 2', -10);
+  part('Harbourview part 3', -3);
+  part('Harbourview part 4', 20);
+  assert.equal(figure(k, 'installments-late'), 2, 'two parts are open past their day');
+  const [lead] = leads(k, 'money');
+  assert.equal(lead?.values?.['installments-late.first'], 'Harbourview part 2', 'the part late longest leads');
+  assert.deepEqual(lead?.values?.['installments-late.first_amount'], gbp(48_000));
+  assert.equal(lead?.values?.['installments-late.first_due'], day(-10));
+  type Said = Drawn & { says_at?: number };
+  const heads = value<{ blocks: Said[] }>(k.page('money')).blocks.find((b) => typeof b.says_at === 'number');
+  assert.match(heads?.body ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u, 'Heads up says the late part first');
+});
