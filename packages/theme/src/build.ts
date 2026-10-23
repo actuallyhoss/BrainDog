@@ -1274,13 +1274,15 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
        as another product's. The tile stays where every ink and intent on it was solved, and the board goes down to
        #090B10 under it.
        2026-10-23, THE FRAME ON ITS OWN INDIGO AGAIN, WITH AN EDGE (frame B, U8): the bar on the board had no edge at all,
-       so the frame is #171B33 with the rule under it, and its chosen place a soft step up that still holds ink-3 at 4.6. */
+       so the frame is #171B33 with the rule under it, and its chosen place a soft step up that still holds ink-3 at 4.6.
+       2026-10-23, THE FRAME IN THE MARK'S RED, NOT A NAVY (his word: "red tones works better"): an oxblood that sits under
+       the red mark as its own ground, ink at 15.1 on it, and its chosen place a step up that holds ink-3 at 4.9. */
     board: '#090B10',
     tile: '#181C27',
     'tile-2': '#222837',
     hover: '#1E2331',
-    nav: '#171B33',
-    'nav-selected': '#272B4A',
+    nav: '#2B1418',
+    'nav-selected': '#421D23',
     rule: '#2A3141',
     'rule-strong': '#384054',
     scrim: 'rgb(5 7 12 / 0.6)',
