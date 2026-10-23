@@ -1221,6 +1221,11 @@ function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown;
     const l = left.get(key);
     const a = after.get(key);
     const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
+    /* A PART WHOSE DAY HAS GONE IS LATE, in Today's words and the danger colour (the audit of 22 October, U4): "Next EGP
+       467,915 on 13 Oct" stood in grey under a plan nine days after that day. Today is the reader's day at `now`. */
+    const wall = new Date(now);
+    const today = `${wall.getFullYear()}-${String(wall.getMonth() + 1).padStart(2, '0')}-${String(wall.getDate()).padStart(2, '0')}`;
+    if (iso < today) return `${part ? `${part.text} ` : ''}{{bad:${lateSaid(iso, today)}}}, due ${on}`;
     return part ? `Next ${part.text} on ${on}` : `Next on ${on}`;
   };
 }

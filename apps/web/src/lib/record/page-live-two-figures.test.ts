@@ -324,3 +324,13 @@ test('a plan with no day says nothing under its bar, and two cells draw the trac
   const two = tile([{ key: 'Flat', value: 4 }], [{ key: 'Flat', value: 6 }]);
   assert.deepEqual(tracks(two), [['Flat', '4', '6']]);
 });
+
+test('A NEXT PART WHOSE DAY HAS GONE IS LATE: how late in the danger colour, then the day it was due', () => {
+  const block = withNext(
+    { day: [{ key: 'Harbourview', value: DAY('2026-10-03') }], left: [{ key: 'Harbourview', value: 900_000 }], after: [{ key: 'Harbourview', value: 450_000 }] },
+    [{ key: 'Harbourview', value: 4 }],
+    [{ key: 'Harbourview', value: 1 }],
+  );
+  const [said] = tracks(block).map((t) => t[3]);
+  assert.match(said ?? '', /^£4,500(\p{Z}GBP)? \{\{bad:10 days late\}\}, due 3 Oct$/u);
+});
