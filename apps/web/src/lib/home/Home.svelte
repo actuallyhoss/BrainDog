@@ -2186,10 +2186,19 @@
       line-height: var(--lh-head, 24px);
     }
   }
-  /* A name in a sentence is still a target: on a touch screen its box grows to the tap height without moving a line. */
+  /* A name in a sentence is still a target: on a touch screen an unseen box gives it the tap height without moving a line. */
   @media (pointer: coarse) {
     .brief-link {
-      padding-block: calc((var(--tap, 44px) - 1lh) / 2 + 1px);
+      position: relative;
+    }
+    .brief-link::before {
+      content: '';
+      position: absolute;
+      inset-block-start: 50%;
+      inset-inline-start: 50%;
+      inline-size: max(100%, var(--tap, 44px));
+      block-size: var(--tap, 44px);
+      transform: translate(-50%, -50%);
     }
   }
 </style>
