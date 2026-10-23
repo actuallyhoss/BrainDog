@@ -309,3 +309,5 @@ export {
   type DrawnTheme,
 } from './drawn.ts';
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';
+/* A visual a thing carries, drawn in the same frame: its page with its pictures inline, whole width. */
+export { pictureData, swapPictures, visualDocument } from './visual.ts';

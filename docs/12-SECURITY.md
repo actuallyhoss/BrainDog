@@ -754,6 +754,24 @@ The frame loads when it nears the screen, so a page holding one opens as fast as
 a picture of the component drawn first, before it comes alive on touch; and the shelf
 does not yet keep a drawn component's version and who made it beside it.
 
+### A visual: a page a thing carries
+
+*Added October 23rd 2026, checked against `packages/kernel/src/visual.ts`, `packages/record/src/methods/visuals.ts`,
+`packages/render/src/visual.ts` and both hosts' `visuals.ts`.* A visual is a whole page (HTML with its style and script)
+and the pictures it names, hung on a task, a project, a question or a decision by a person or an agent
+(`attachVisual`, `braindog attach`, or `log` with `page`). It is drawn in the same frame as a drawn component, and
+the argument is the same.
+
+| Held | How |
+|---|---|
+| Where the bytes are | its page in the host's file store by its hash (`<record>/a/pages/` on the Cloud, `blobs/pages/` on a self-host), under the files' prefix and never at the files' door, which answers one path segment of 64 hex characters. Its pictures are files put through the file door first: 2 MB each, sniffed as PNG, JPEG, GIF, WebP or AVIF, never SVG. The record keeps only lines naming them by hash: a page at most 512 KB, 100 pictures and 20 MB a version, 512 MB of visuals a record |
+| Who may hang one | what `log` asks of a task or a project (`append` on its list, a thing she may write, an agent's note floor), and what `propose` asks of a question or a decision. A thing she may not see is answered as one that is not there |
+| What goes in | the page, its pictures swapped for `data:` addresses the app read through the file door with its own sign-in (`visualDocument`), and the theme. Never a key, a token, a session, a row or an address of the record's |
+| Its page | taken whole, its `<meta>` tags taken out, and refused in words when a tag's address or a `url()` names anything but inline data, a place on the page or one of its own pictures, when it holds a link, base, frame, object or form tag, or when its script calls the network, imports, uses storage or reaches for the page around it |
+
+**What is not built:** the app's viewer, which opens a visual full width over its thing in this frame, and erasing a
+person does not yet reach a page's bytes, only the lines that name them.
+
 ### Refusals that do not leak
 
 Carried from the predecessor, where each was earned:
