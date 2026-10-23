@@ -267,6 +267,23 @@ export function costRows(sql: WaitSql): CostRows {
   };
 }
 
+/** `costRows` read once a list, for one pass over a queue that writes nothing meanwhile: each question asked again. */
+export function costRowsOnce(sql: WaitSql): CostRows {
+  const rows = costRows(sql);
+  const withheld = new Map<string, readonly string[]>();
+  const held = new Map<string, boolean>();
+  return {
+    withheld: (register) => {
+      if (!withheld.has(register)) withheld.set(register, rows.withheld(register));
+      return withheld.get(register)!;
+    },
+    held: (register) => {
+      if (!held.has(register)) held.set(register, rows.held!(register));
+      return held.get(register)!;
+    },
+  };
+}
+
 /** Whether the list named by `register` (an SQL expression) holds a row that is not removed. `costRows` and `COST_SQL` both read through it. */
 const heldRowSql = (register: string): string => `EXISTS (SELECT 1 FROM entry e WHERE e.register = ${register} AND e.deleted_at IS NULL)`;
 

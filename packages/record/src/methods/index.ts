@@ -195,6 +195,8 @@ export type RecordDeps = {
    * because a page nobody checked may open onto nothing.
    */
   withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
+  /** The open questions held for the record's version (`openNow` in `index.ts`), so a briefing weighs the queue once. */
+  openSuggestions?: (() => ReturnType<Kernel['openSuggestions']>) | undefined;
   /** The host's answer to whether it can make a read-only link (`shareable`). Absent is no. */
   shares?: (() => import('./shares.ts').SharesAnswer) | undefined;
   /**

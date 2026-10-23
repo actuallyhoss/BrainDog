@@ -24,7 +24,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
 import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
-import { agentOf, kindsOfProposal, ownerIn, recordReader, rungOf, shapeIn, stampOf, tokenOfRun } from './change-kind.ts';
+import { agentOf, kindsOfProposal, ownerIn, recordReader, rungOf, shapeIn, stampOf, tokenOfRun, type KindReader } from './change-kind.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { pairsReads, type PairsDecl } from './pairs.ts';
@@ -32,7 +32,7 @@ import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { causeFault, causeOf, canon, noop } from './cause.ts';
-import { costOf, costRows, optionCosts, pickCost, WAIT_RANK_SQL, WAIT_SQL, waitParams, WAITS, type Cost } from './weigh.ts';
+import { costOf, costRows, costRowsOnce, optionCosts, pickCost, WAIT_RANK_SQL, WAIT_SQL, waitParams, WAITS, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
 import { dayIn } from './finished.ts';
@@ -308,14 +308,16 @@ export function listGovernance(
   /* WHAT EACH QUESTION COSTS TO GET WRONG, said by the record and never left to the reader. A body alone cannot say
      which fields a list's history withholds, so a browser weighing the raw row called a patch of a hidden field a row
      change while the card and the counts called it hard to undo. A decision or a prediction has nothing left to weigh. */
-  const withheld = costRows(deps.sql);
+  const withheld = costRowsOnce(deps.sql);
   /* AND WHAT EACH OPTION COSTS TO HAVE PICKED (`option_costs`, by the option's id), on a question of options: one hard
      option no longer makes the question `undo`, so the reader marks the option that is hard and words only that press. */
+  /* ONE READER A WRITER for the whole queue (`recordReader`): each question built its own and asked who its run is again. */
+  const readers = new Map<string, KindReader>();
   return ok(
     out.map(({ waits, ...r }) => ({
       ...r,
       ...(typeof waits === 'string' ? { waits } : {}),
-      cost: costOfRow(deps.sql, r, withheld),
+      cost: costOfRow(deps.sql, r, withheld, readers),
       ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body, withheld) } : {}),
     })),
   );
@@ -325,11 +327,14 @@ export function listGovernance(
  * The band of one suggestion row, by the rule the queue's card reads it by (`index.ts`, `whole`): money is always hard
  * to undo, a money field cleared included, which no body spells and so the ladder is asked; `costOf` says the rest.
  */
-function costOfRow(sql: Sql, row: Record<string, unknown>, withheld: ReturnType<typeof costRows>): Cost {
+function costOfRow(sql: Sql, row: Record<string, unknown>, withheld: ReturnType<typeof costRows>, readers?: Map<string, KindReader>): Cost {
   const kind = String(row.body_kind ?? '');
   const body = row.body;
   if (kind === 'rowset' && body !== null && typeof body === 'object' && !Array.isArray(body)) {
-    const floors = kindsOfProposal(kind, body as Record<string, unknown>, recordReader(sql, String(row.opened_by ?? '')));
+    const by = String(row.opened_by ?? '');
+    const reader = readers?.get(by) ?? recordReader(sql, by);
+    readers?.set(by, reader);
+    const floors = kindsOfProposal(kind, body as Record<string, unknown>, reader);
     if (floors.some((k) => k.floor === 'money')) return 'undo';
   }
   return costOf(kind, body, withheld);

@@ -576,11 +576,19 @@ export function recordReader(sql: Sql, actor: string): KindReader {
       ? sql.one<{ id: string; fields: string }>('SELECT id, fields FROM entry WHERE register = ? AND seq = ?', at.slice(0, hash), Number(at.slice(hash + 1)))
       : sql.one<{ id: string; fields: string }>('SELECT id, fields FROM entry WHERE id = ? AND register = ?', at, list);
   };
+  /* ONE READ OF A LIST'S SHAPE AND OF A ROW'S MAKER FOR AS LONG AS THIS READER LASTS (one weighing): a queue's rowsets
+     asked both again for every row they named. */
+  const shapes = new Map<string, ReturnType<typeof shapeIn>>();
+  const makers = new Map<string, string | null>();
   return {
-    shape: (list) => shapeIn(sql, list),
+    shape: (list) => {
+      if (!shapes.has(list)) shapes.set(list, shapeIn(sql, list));
+      return shapes.get(list)!;
+    },
     madeBy: (list, at) => {
       const row = rowAt(list, at);
-      const maker = row === undefined ? null : madeByIn(sql, row.id);
+      if (row !== undefined && !makers.has(row.id)) makers.set(row.id, madeByIn(sql, row.id));
+      const maker = row === undefined ? null : makers.get(row.id)!;
       return actor === SLASH && maker !== null && ownerIn(sql, maker) ? null : maker;
     },
     fieldsOf: (list, at) => {

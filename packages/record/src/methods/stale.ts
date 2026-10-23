@@ -170,7 +170,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
 
   /* THE QUESTIONS THAT WAITED, each held to what the caller is shown (`sightOf`) and called by the name they are handed.
      One put off to a day still ahead is not open, so it is not here (`openSuggestions`). */
-  const open = kernel.openSuggestions();
+  const open = deps.openSuggestions?.() ?? kernel.openSuggestions();
   const shown = (open.ok ? open.value : []).flatMap((q) => {
     const id = String(q.id ?? '');
     const at = Date.parse(String(q.opened_at ?? ''));

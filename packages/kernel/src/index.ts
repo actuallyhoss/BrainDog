@@ -1656,7 +1656,34 @@ export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {
   return makeKernel(sql, clock, state, opts);
 }
 
-function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOptions) {
+/** Whether a statement only reads: a `SELECT`. Anything else is taken as a write. */
+const reads = (text: string): boolean => /^\s*select\b/iu.test(text);
+
+function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOptions) {
+  /* WHAT ONE OUTERMOST TRANSACTION HOLDS (one snapshot), dropped by any write inside it: which lists hold rows private
+     from a viewer, and a row's spoken name. `boot` and a briefing asked each again a question, a line and a row. */
+  let moment: { hidden: Map<string, boolean>; names: Map<string, string>; drop: () => void } | null = null;
+  const newMoment = () => {
+    const m = { hidden: new Map<string, boolean>(), names: new Map<string, string>(), drop: () => void (m.hidden.clear(), m.names.clear()) };
+    return m;
+  };
+  /* EVERY STATEMENT THAT IS NOT A SELECT DROPS WHAT ONE TRANSACTION HOLDS (`moment`), so a read kept for one snapshot is
+     never answered across a write made inside it. */
+  const sql: Sql = {
+    exec: (text, ...params) => {
+      moment?.drop();
+      raw.exec(text, ...params);
+    },
+    all: (text, ...params) => {
+      if (!reads(text)) moment?.drop();
+      return raw.all(text, ...params);
+    },
+    one: (text, ...params) => {
+      if (!reads(text)) moment?.drop();
+      return raw.one(text, ...params);
+    },
+    transactionSync: (fn) => raw.transactionSync(fn),
+  };
   /* THE INSTANT `backdate` HOLDS, while a history is being written, and `null` the rest of the time. */
   let held: number | null = null;
   /* THE NEWEST INSTANT `backdate` HAS HELD, which no later one may go behind. */
@@ -1840,10 +1867,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (depth > 0) return fn();
     return sql.transactionSync(() => {
       depth++;
+      moment = newMoment();
       try {
         return fn();
       } finally {
         depth--;
+        moment = null;
       }
     });
   };
@@ -2043,10 +2072,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /** A row as a person says it, `S42` or `things#3`, or its id when the row is gone. */
   function nameOf(id: string): string {
+    /* HELD ONLY AGAINST THE LISTS AS INSTALLED: a plan swaps `registers` (`againstPlan`), and a prefix may differ there. */
+    const names = planned === null ? moment?.names : undefined;
+    const was = names?.get(id);
+    if (was !== undefined) return was;
     const row = byId(id, true);
-    if (!row || row.seq === null) return id;
-    const prefix = registers.get(row.register)?.seq_prefix;
-    return prefix && prefix !== '#' ? `${prefix}${row.seq}` : `${row.register}#${row.seq}`;
+    const prefix = row ? registers.get(row.register)?.seq_prefix : undefined;
+    const name = !row || row.seq === null ? id : prefix && prefix !== '#' ? `${prefix}${row.seq}` : `${row.register}#${row.seq}`;
+    names?.set(id, name);
+    return name;
   }
 
   /**
@@ -2087,11 +2121,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* `scope` BELOW IS THE ONE READ-SCOPE HELPER; the private clause is part of the rule it hands `list` and `count` (`ruleOf`). */
 
   /** Whether any row (of one list, when named) is private to somebody other than the viewer, which is when a scope has anything to leave out. */
-  const anyHiddenFrom = (viewer: string | undefined, register?: string): boolean =>
-    viewer !== undefined &&
-    (register === undefined
-      ? sql.one('SELECT 1 AS y FROM entry_private WHERE person_id <> ? LIMIT 1', viewer)
-      : sql.one('SELECT 1 AS y FROM entry_private p JOIN entry e ON e.id = p.entry_id WHERE p.person_id <> ? AND e.register = ? LIMIT 1', viewer, register)) !== undefined;
+  const anyHiddenFrom = (viewer: string | undefined, register?: string): boolean => {
+    if (viewer === undefined) return false;
+    const key = `${viewer}\n${register ?? ''}`;
+    const was = moment?.hidden.get(key);
+    if (was !== undefined) return was;
+    const now =
+      (register === undefined
+        ? sql.one('SELECT 1 AS y FROM entry_private WHERE person_id <> ? LIMIT 1', viewer)
+        : sql.one('SELECT 1 AS y FROM entry_private p JOIN entry e ON e.id = p.entry_id WHERE p.person_id <> ? AND e.register = ? LIMIT 1', viewer, register)) !== undefined;
+    moment?.hidden.set(key, now);
+    return now;
+  };
 
   /**
    * THE ONE READ-SCOPE HELPER every reader asks for a list, in place of `whereFor(ctx.wheres, register)`: the caller's
@@ -9469,11 +9510,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     pages: (opts: { hostSources?: PageDeps['hostSources'] } = {}) => {
       /* ONE READ OF THE DECLARATIONS FOR EVERY PAGE (`declaredOnce`): each page asked every figure again. */
       const deps = declaredOnce({ ...pageDeps(), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) });
-      const near = beside(deps);
+      /* WHICH LISTS A PAGE READS IS DECLARATIONS ONLY, so it is asked of the figures kept for this revision
+         (`declaredKept`), as `blockRegisters` asks: each filled page read every figure's row and live target again. */
+      const kept = declaredKept();
+      const near = { ...beside(kept), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) };
       return resolvePages(deps).map((p) => ({
         slug: p.slug,
         title: p.decl.title,
-        registers: registersOf(p.decl, deps.metric, near),
+        registers: registersOf(p.decl, kept.metric, near),
         /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
         nav: navOf(p.decl.nav),
         /* AND WHICH ROW IT IS A PAGE OF, which is not one of the registers above: those are the
@@ -11833,7 +11877,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const last = new Map(
         sql
           .all<{ target: string; kind: string; ts: string; to_v: string | null }>(
-            "SELECT target, kind, ts, to_v FROM event WHERE rowid IN (SELECT MAX(rowid) FROM event WHERE target_kind = 'pack' AND kind IN ('retire', 'install', 'uninstall') GROUP BY target)",
+            /* BY THE TARGET'S INDEX (`event_target`), as every pack line is aimed at `pack:<id>`: the kind alone scanned the
+               whole log, three times a `boot` and once after every request (`firstPartyTick`), 60 ms a time at 150k lines. */
+            "SELECT target, kind, ts, to_v FROM event WHERE rowid IN (SELECT MAX(rowid) FROM event WHERE target GLOB 'pack:*' AND target_kind = 'pack' AND kind IN ('retire', 'install', 'uninstall') GROUP BY target)",
           )
           .map((e) => [e.target.slice('pack:'.length), e]),
       );
@@ -12167,6 +12213,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean } = {}): Entry | null =>
       readOut(get(ref, opts), opts.reads),
+    /**
+     * Many rows by id at once, each answered as `get` answers it: one statement per 500 ids where `get` asked one a row.
+     * A ref that is spoken (`S4`, `tasks#3`) is asked through `get` itself, so it means what it always meant.
+     */
+    getEach: (refs: readonly string[], opts: { includeDeleted?: boolean } = {}): Map<string, Entry | null> => {
+      const out = new Map<string, Entry | null>();
+      const ids: string[] = [];
+      for (const ref of new Set(refs)) {
+        if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts)));
+        else ids.push(ref);
+      }
+      for (let i = 0; i < ids.length; i += 500)
+        for (const row of sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids.slice(i, i + 500)))) {
+          const entry = hydrate(row);
+          out.set(entry.id, !opts.includeDeleted && entry.deleted_at ? null : readOut(entry));
+        }
+      for (const id of ids) if (!out.has(id)) out.set(id, null);
+      return out;
+    },
     list,
     /** What points at one row, from the `to:` every `ref` field already declares. */
     backlinks,

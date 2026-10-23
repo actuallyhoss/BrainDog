@@ -182,7 +182,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
    * it was stamped with, and one with none stands alone. A question with no words is left out: there is nothing to say.
    */
   const asked = (ctx: CallContext): BriefFact[] => {
-    const open = kernel.openSuggestions();
+    const open = deps.openSuggestions?.() ?? kernel.openSuggestions();
     if (!open.ok) return [];
     const shown = open.value
       .map((q) => ({ q, id: String(q.id ?? ''), opened: String(q.opened_at ?? '') }))
@@ -304,7 +304,8 @@ export function methods(deps: RecordDeps) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const nowMs = clock.now();
-      const facts = briefFactsFor(deps, ctx, nowMs);
+      /* ONE SNAPSHOT, so the kernel asks once a list which rows are private (`moment`), not once a fact. */
+      const facts = kernel.transaction(() => briefFactsFor(deps, ctx, nowMs));
       /* NO MODEL IS ASKED HERE. What one answered at the last write is read out of the model's own prefs, and it stands
          only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
       /* AND ONLY THROUGH THE LENS IT WAS WRITTEN THROUGH (`briefLensOf`, T16): a reader whose facts happen to equal the

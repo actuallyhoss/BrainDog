@@ -217,14 +217,18 @@ export function readSight(kernel: Kernel) {
   const lines = (ctx: Sighted, batch: readonly Line[]): LineSight => {
     const read = new Map<string, Entry | null>();
     const by = new Map<string, string[]>();
+    const about: string[] = [];
     for (const e of batch) {
       const target = e.target ?? '';
       const colon = target.indexOf(':');
       const kind = e.target_kind ?? (colon > 0 ? target.slice(0, colon) : null);
-      if (kind !== 'entry') continue;
-      const id = colon > 0 ? target.slice(colon + 1) : target;
+      if (kind === 'entry') about.push(colon > 0 ? target.slice(colon + 1) : target);
+    }
+    /* EVERY ROW THE BATCH NAMES IN ONE READ (`getEach`): one a line was 400 reads for Today's news. */
+    const held = kernel.getEach(about, { includeDeleted: true });
+    for (const id of about) {
       if (read.has(id)) continue;
-      const row = kernel.get(id, { includeDeleted: true });
+      const row = held.get(id) ?? null;
       read.set(id, row);
       if (!row) continue;
       const ids = by.get(row.register);
