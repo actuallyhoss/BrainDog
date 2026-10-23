@@ -59,6 +59,7 @@ test('HIS AGENT\'S "MARK … DONE?" SETTLES ON THE NEXT SWEEP, ONE LINE IN HANDL
   const handled = value<{ rows: { decision: string; line: string; why: string }[] }>(await api.handled({}, owner));
   assert.equal(handled.rows.length, 1);
   assert.equal(handled.rows[0]!.line, 'Mark Ship the build done');
+  assert.ok(!/\brows?\b/u.test(handled.rows[0]!.why), `the rule's own reason was said: ${handled.rows[0]!.why}`);
   assert.equal(api.kernel.get(`tasks#${ship.seq}`)?.state, 'done');
   const decision = handled.rows[0]!.decision;
   const plan = value<{ hash: string }>(api.kernel.undoPlan({ decision }));

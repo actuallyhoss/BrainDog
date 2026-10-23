@@ -1756,8 +1756,13 @@ export function handledOn(sql: Sql): boolean {
   return v === undefined ? true : v.trim() !== 'false';
 }
 
-/** The words a handled change is shown with when the question carried no reason of its own. */
-const HANDLED_REASON = 'It only arranges your own rows, and every change can be undone.';
+/**
+ * The reason a handled change is kept with when the question carried none of its own. It is the rule's, not the
+ * change's, so `handled` never shows it to a person: a line says what was done, and why only when the question said.
+ * The earlier wording is kept on decisions made before, and `HANDLED_REASONS` names both.
+ */
+export const HANDLED_REASON = 'BrainDog tidied this itself, and it can be undone.';
+export const HANDLED_REASONS: readonly string[] = [HANDLED_REASON, 'It only arranges your own rows, and every change can be undone.'];
 
 /** The verbs that only arrange a row: an edit, a tag, a move to another state. Adding, deleting, notes and installs are not. */
 const ARRANGES = (verb: string): boolean => verb === 'edit' || verb === 'tag' || verb.startsWith('move:');

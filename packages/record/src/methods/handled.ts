@@ -10,7 +10,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { HANDLED_RULE } from '@braindog/kernel';
+import { HANDLED_REASONS, HANDLED_RULE } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -64,7 +64,10 @@ export function methods(deps: RecordDeps) {
         if (typeof list !== 'string' || readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0) continue;
         const line = lineOf(f.question);
         if (line === '') continue;
-        rows.push({ decision: f.id, line, why: lineOf(f.reason), at: f.ts });
+        /* THE RULE'S OWN REASON IS NO REASON: four lines in a row said the same sentence about rows. Only a reason the
+           question carried is said. */
+        const why = HANDLED_REASONS.includes(f.reason.trim()) ? '' : lineOf(f.reason);
+        rows.push({ decision: f.id, line, why, at: f.ts });
       }
       return { ok: true, value: { rows: rows.slice(0, HANDLED_MOST), more: Math.max(0, rows.length - HANDLED_MOST) } };
     },
