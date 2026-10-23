@@ -225,7 +225,7 @@
     return previewOf(accent !== null || moreContrast ? null : booted, inUse, fallback);
   });
 
-  /* TWO PREVIEWS FROM 1100PX, LIGHT THEN DARK (agents F26): the scheme in use is the page's own tokens, and the other is
+  /* TWO PREVIEWS FROM 1280PX, LIGHT THEN DARK (agents F26): the scheme in use is the page's own tokens, and the other is
      solved. On a phone one, the scheme picked. Where the other cannot be solved truly it is not drawn. */
   const previews = $derived(
     (['light', 'dark'] as const)
@@ -513,7 +513,7 @@
   }
 
   /* ONE COLUMN ON A PHONE, THE PREVIEW FIRST: a person sees what they are changing before the choices that change it.
-     From 1100px up the choices stand beside it, and the preview stays in view while they are pressed. */
+     From 1280px up the choices stand beside it, and the preview stays in view while they are pressed. */
   .looks {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -532,7 +532,8 @@
     display: none;
   }
 
-  @media (width >= 1100px) {
+  /* BESIDE THE CHOICES FROM 1,280: the sidebar under the bar (frame B) takes its column first. */
+  @media (width >= 1280px) {
     .looks {
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: start;

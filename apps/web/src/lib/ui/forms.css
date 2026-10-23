@@ -3,8 +3,8 @@
  *
  * A screen imports this sheet and wears the classes; nothing here draws a field (`controls.css` does).
  *
- *   .form-two     From 1100px up, two columns: the fields at most 640 wide in the first, help or a preview in the second,
- *                 32 apart. Under 1100 it is one column, as a phone reads it.
+ *   .form-two     From 1280px up, two columns: the fields at most 640 wide in the first, help or a preview in the second,
+ *                 32 apart. Under 1280 it is one column, as a phone reads it.
  *   .form-checks  A group of checkboxes, as many 180px columns as fit, 8 between rows and 16 between columns.
  *   .form-number  A number field, 120 wide: a figure does not need a sentence's width.
  *   .form-submit  The submit row, inside the tile at its foot, on the start edge under the first column, the primary
@@ -19,7 +19,8 @@
     min-inline-size: 0;
   }
 
-  @media (width >= 1100px) {
+  /* FROM 1,280, where the sidebar under the bar (frame B) still leaves the second column room for a 180px check. */
+  @media (width >= 1280px) {
     .form-two {
       grid-template-columns: minmax(0, 640px) minmax(0, 1fr);
       column-gap: var(--sp-6);
