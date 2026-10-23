@@ -932,7 +932,8 @@ function leadSentence(template: string, readAs: (path: string) => string | null 
     return v === UNNAMED ? '' : (v ?? null);
   };
   const stands = (clause: string): boolean => {
-    const holes = [...clause.matchAll(HOLE)].map((m) => m[1]!);
+    /* `{{bad:late}}` IS THE AUTHOR'S WORD IN THE DANGER COLOUR, no figure: it neither holds a clause up nor takes it away. */
+    const holes = [...clause.matchAll(HOLE)].map((m) => m[1]!).filter((h) => !h.startsWith('bad:'));
     if (holes.length === 0) return true;
     if (holes.some((h) => read(h) === UNNAMED)) return true;
     const figures = holes.map((h) => said(h));

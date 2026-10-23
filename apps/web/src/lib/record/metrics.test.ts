@@ -528,11 +528,11 @@ test("A WALK THAT OPENS FROM ONE BOOK'S CASH IS A TEMPLATE, though it has no whe
 
 test('A LEAD OF TWO SENTENCES LOSES A SENTENCE WHOLE, and a typed hole stands or goes with its path', async () => {
   const { leadOf } = await import('./metrics.ts');
-  const body = 'Cash is {{cash-now}} across {{cash-accounts}} account(s). {{parts-late.first}} is late: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.';
+  const body = 'Cash is {{cash-now}} across {{cash-accounts}} account(s). {{parts-late.first}} is {{bad:late}}: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.';
   const late: Record<string, string> = { 'cash-now': '£33,850', 'cash-accounts': '2', 'parts-late.first': 'Copperleaf part 2', 'parts-late.first_amount': '£480', 'parts-late.first_due': '2026-10-13' };
   assert.equal(
     leadOf(body, (p) => late[p] ?? null),
-    'Cash is {{cash-now}} across {{cash-accounts}} accounts. {{parts-late.first}} is late: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.',
+    'Cash is {{cash-now}} across {{cash-accounts}} accounts. {{parts-late.first}} is {{bad:late}}: {{parts-late.first_amount}}, due {{ago:parts-late.first_due}}.',
   );
   const none: Record<string, string> = { 'cash-now': '£33,850', 'cash-accounts': '1' };
   assert.equal(leadOf(body, (p) => none[p] ?? null), 'Cash is {{cash-now}} across {{cash-accounts}} account.');
