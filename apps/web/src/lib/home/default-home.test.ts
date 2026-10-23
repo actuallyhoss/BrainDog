@@ -107,6 +107,8 @@ test('THE DESK FOLDS WHAT IT DOES NOT SHOW AT REST, at its place, and More opens
   assert.equal(open.folded, 3);
   assert.deepEqual(open.blocks, blocks);
   assert.ok(DESK_KEYS.every((k) => onDesk({ key: k })));
+  /* A LIST OF TASKS STAYS ON THE DESK, so `x` reaches its rows. */
+  assert.equal(deskFolded([{ key: undefined, kind: 'todo', drawn: true }], false).blocks[0]!.drawn, true);
 });
 
 test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its own words and never by its name', () => {

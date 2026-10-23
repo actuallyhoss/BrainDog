@@ -182,11 +182,14 @@ export const onDesk = (b: { key?: string | undefined }): boolean => typeof b.key
  * TODAY'S BLOCKS WITH THE REST FOLDED: while More is shut, every drawn block the desk does not show at rest is marked
  * not drawn, at its place, so every write still finds its block by index. `folded` is how many that is, which More
  * says. Open, the blocks are as they came. A NEW OBJECT ONLY WHERE ONE FOLDS.
+ *
+ * A LIST OF TASKS NEVER FOLDS (frame A, 23 October): the urgent tasks and the work handed back are the rows `x` ticks,
+ * and with no More to open they would be on no screen a key could reach. They stand under the desk.
  */
-export function deskFolded<B extends { key?: string | undefined; drawn: boolean }>(blocks: readonly B[], open: boolean): { blocks: B[]; folded: number } {
+export function deskFolded<B extends { key?: string | undefined; kind?: string; drawn: boolean }>(blocks: readonly B[], open: boolean): { blocks: B[]; folded: number } {
   let folded = 0;
   const out = blocks.map((b) => {
-    if (!b.drawn || onDesk(b)) return b;
+    if (!b.drawn || onDesk(b) || b.kind === 'todo') return b;
     folded += 1;
     return open ? b : { ...b, drawn: false };
   });
