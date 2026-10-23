@@ -109,7 +109,7 @@ import { ERASE_CHECK_MS, ERASE_ROWS_MOST, fleetFailure, nightlyWalk, reconcileEr
 import { ladder } from './ladder.ts';
 import { rewrapRecord } from './rewrap.ts';
 import { workerSigner } from './sign.ts';
-import { dumpOf, prefixOf, r2Snapshots, type Dump } from './snapshots.ts';
+import { prefixOf, r2Snapshots, steady, streamDumpOf, type Kept } from './snapshots.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
 import type { GrantDeps } from './vault.ts';
 import { passphraseRoot } from './vault.ts';
@@ -857,7 +857,7 @@ export class Record$ extends DurableObject<Env> {
       ? lazily(() => {
           const record = api.kernel.identity()?.id;
           if (!record) throw new Error('This record has not been created yet, so it keeps no copies.');
-          return cloudSnapshots(blobs, this.#arming(), (at, bookmark) => dumpOf(api, at, bookmark), {
+          return cloudSnapshots(blobs, this.#arming(), (at, bookmark) => streamDumpOf(api, at, bookmark), {
             record,
             now: () => Date.now(),
             recipient: this.env.AGE_RECIPIENT ?? '',
@@ -1671,27 +1671,31 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * The whole record as a `.brain`, for the nightly copy. `51 §5.12` steps 3 and 4, in one call.
+   * The night's copy of this record, put in the bucket by this object, for the nightly walk. `51 §5.12` steps 3 to 6.
    *
-   * THE OBJECT DUMPS AND SIGNS, AND THE WORKER WRITES IT DOWN. The record performs no I/O, which is
-   * the same seam `lease` above draws for the outbox: the object holds the rows and the signing key,
-   * the Worker holds the bucket. An R2 put from inside here would give the record a reason to hold a
-   * binding, and `ADR-062` is the argument for why it must not.
+   * THE OBJECT WRITES IT AND HANDS BACK ONLY WHAT IT CAME TO. It handed the whole file back as one RPC value, and on
+   * 22 Oct a 39.7 MB record was refused at 32 MiB, every night. So the file streams out of this object's own SQLite
+   * through the `r2Snapshots` the walk wrote with, to the same keys and recipient, and only `{ key, bytes, rows }` crosses.
    *
    * THE BOOKMARK IS TAKEN IN THE SAME CALL as the dump rather than before it, so the point-in-time
    * the copy is paired with is a moment this object was already at, and not one a round trip ago.
    * A deployment whose storage has no bookmarks answers `null`, and the copy is still a copy.
    */
-  async dump(at: string): Promise<Dump> {
+  async snapshot(record: string, at: string): Promise<Kept> {
     if (this.#gone) throw new Error(DELETED.fix);
+    const blobs = this.env.BLOBS;
+    if (!blobs) throw new Error('This deployment has no bucket, so there is nowhere to put a copy.');
     const api = await this.#record();
-    let bookmark: string | undefined;
-    try {
-      bookmark = await this.ctx.storage.getCurrentBookmark();
-    } catch {
-      /* PITR is not on every deployment, and a copy without a bookmark is still a copy. */
-    }
-    return dumpOf(api, at, bookmark);
+    const copies = r2Snapshots(blobs, { recipient: this.env.AGE_RECIPIENT ?? '' });
+    return steady(async () => {
+      let bookmark: string | undefined;
+      try {
+        bookmark = await this.ctx.storage.getCurrentBookmark();
+      } catch {
+        /* PITR is not on every deployment, and a copy without a bookmark is still a copy. */
+      }
+      return copies.take(record, await streamDumpOf(api, at, bookmark));
+    });
   }
 
   /**
@@ -3194,7 +3198,9 @@ async function nightly(env: Env): Promise<void> {
   }
   const blobs = env.BLOBS;
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const copies = r2Snapshots(blobs, { recipient: env.AGE_RECIPIENT ?? '' });
+  /* BUILT FOR ITS REFUSAL ONLY: a recipient that will not do stops the walk here, once. Each record puts its own copy
+     with the same recipient (`Record$.snapshot`). */
+  r2Snapshots(blobs, { recipient: env.AGE_RECIPIENT ?? '' });
   /* ONE INSTANT FOR THE WHOLE WALK, so every copy taken tonight is filed under tonight's date even
      when the walk crosses midnight UTC. Two dates in one run would leave a day with two copies and
      the next with none, and the retention count would be counting nights that are not nights. */
@@ -3226,7 +3232,7 @@ async function nightly(env: Env): Promise<void> {
      morning after, and the ops record's note when `OPS_RECORD` names one. */
   const walked = await nightlyWalk({
     records: async (cursor) => directory.listRecords(cursor),
-    snapshot: async (record) => copies.take(record, await stub(record).dump(at)),
+    snapshot: async (record) => stub(record).snapshot(record, at),
     /* AND THE RECORD TOLD WHAT ITS COPY CAME TO, so its Settings can say when and how large, and a failed night reaches
        the person whose copy it was as one fault (LCH-C03). */
     kept: async (record, copy) => stub(record).nightCopy({ kept: copy }),

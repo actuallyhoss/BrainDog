@@ -14,13 +14,13 @@
  * `.brain`, and `03-DOG-FORMAT` §1 spends a paragraph on the rename. A nightly copy of the pages
  * would leave out every row the business is made of.
  *
- * THE RECORD MAKES NO OUTBOUND CALL AND THIS FILE IS PART OF WHY. The Durable Object hands back the
- * bytes it dumped; the put, the list and the prune happen in the Worker with the Worker's binding,
- * the way `deliver.ts` does the outbox's I/O. And nothing here imports `cloudflare:`: R2 arrives as
- * the five methods below and not one more, so every rule worth testing runs in a bare Node process.
- * The one exception is a copy the record asks for itself, before a restore or by hand: that runs
- * inside the object through `copies.ts`, because the restore it pairs with can only be armed there,
- * and it seals through `write` below so there is still one sealing path.
+ * THE RECORD'S OWN CODE MAKES NO OUTBOUND CALL. The put, the list and the prune are this file's,
+ * handed a binding the way `deliver.ts` does the outbox's I/O, and nothing here imports `cloudflare:`:
+ * R2 arrives as the five methods below and not one more, so every rule worth testing runs in a bare
+ * Node process. Every copy now runs inside the record's object, the night's too (`Record$.snapshot`),
+ * because a dump handed back over RPC is refused past 32 MiB and the streamed one reads the object's
+ * own SQLite; a copy the record asks for itself goes through `copies.ts`, and all of them seal
+ * through `write` below so there is still one sealing path.
  *
  * A NAMED RECIPIENT SEALS, AND A RECIPIENT THAT WILL NOT DO STOPS THE WALK BEFORE IT STARTS.
  * `53 §5.4` wants the cloud copy sealed to `AGE_RECIPIENT`, and `seal.ts` writes age v1 to it. Until
@@ -30,6 +30,7 @@
  * variable. Neither is ever a plaintext object in a bucket the operator believes is sealed.
  */
 
+import { RecordChanged, type StreamedBrainl } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { recipientOf, sealStreamTo, type Plain, type Sealed } from './seal.ts';
@@ -56,6 +57,9 @@ export const KEEP = 30;
  * and `test/snapshots-peak.test.ts` read 133 MiB peak resident for
  * that code against 93 streamed, 13 above the string. Raising this raises the string first, at up to
  * two bytes of string per byte of file.
+ *
+ * A STREAMED DUMP (`streamDumpOf`) HAS NO CEILING, because it is never one string anywhere: the
+ * record's copy is made from that, and this bounds only a dump handed over as text.
  */
 export const CEILING = 40 * 1024 * 1024;
 
@@ -112,7 +116,12 @@ export type StreamBlobs = Omit<Blobs, 'put'> & {
 };
 
 /** What the kernel dumped, ready to be written. `rows` is counted here so the metadata is not a second count. */
-export type Dump = { text: string; rows: number; at: string; bookmark?: string | undefined };
+export type TextDump = { text: string; rows: number; at: string; bookmark?: string | undefined };
+
+/** The same, read from the record a piece at a time (`streamDumpOf`), so no copy is ever one string or one RPC value. */
+export type FileDump = { file: Plain; rows: number; at: string; bookmark?: string | undefined };
+
+export type Dump = TextDump | FileDump;
 
 /** What one night left behind. */
 export type Kept = { key: string; bytes: number; rows: number; at: string };
@@ -224,6 +233,35 @@ function streamOf(plain: Plain): Sealed {
   return { length: plain.length, stream };
 }
 
+/** A streamed dump read into one buffer, for a bucket that cannot take a stream: Node, or a test's own `seal`. */
+function whole(plain: Plain): Uint8Array {
+  const out = new Uint8Array(plain.length);
+  for (let at = 0; at < out.length; at += PIECE) plain.read(out.subarray(at, Math.min(out.length, at + PIECE)));
+  return out;
+}
+
+/**
+ * A dump whose own failure is kept, so a put that failed because the record could not be read says why, whatever the
+ * bucket made of the broken stream, and a `RecordChanged` reaches `steady` as itself.
+ */
+function watched(plain: Plain): Plain & { instead(e: unknown): never } {
+  let failed: unknown;
+  return {
+    length: plain.length,
+    read(out) {
+      try {
+        plain.read(out);
+      } catch (e) {
+        failed ??= e;
+        throw e;
+      }
+    },
+    instead(e) {
+      throw failed ?? e;
+    },
+  };
+}
+
 /** A sealed stream read into the one buffer it describes, for a bucket that cannot take a stream. */
 async function drain(sealed: Sealed): Promise<Uint8Array> {
   const out = new Uint8Array(sealed.length);
@@ -271,7 +309,7 @@ export async function dumpOf(
   api: { kernel: { export(opts: { redactGrants?: boolean; actor?: string }): Promise<Result<string[]>> } },
   at: string,
   bookmark?: string | undefined,
-): Promise<Dump> {
+): Promise<TextDump> {
   const out = await api.kernel.export({ redactGrants: false, actor: 'system' });
   if (!out.ok) throw new Error(`the record would not export: ${fixOf(out)}`);
   /* A ROW OF RECORD IS A LINE UNDER A TABLE THAT IS NOT ONE OF THE FILE'S OWN. This counted every
@@ -285,6 +323,36 @@ export async function dumpOf(
     else if (!line.startsWith('#') && !table.startsWith('dog_')) rows++;
   }
   return { text: out.value.join('\n'), rows, at, ...(bookmark === undefined ? {} : { bookmark }) };
+}
+
+/**
+ * The same dump, read from the record a piece at a time (`exportStream`), with the same options, event and rows. What
+ * every copy of a record is made from: `dumpOf` holds the file whole, and handed back over RPC it was refused past 32 MiB.
+ */
+export async function streamDumpOf(
+  api: { kernel: { exportStream(opts: { redactGrants?: boolean; actor?: string }): Promise<Result<StreamedBrainl>> } },
+  at: string,
+  bookmark?: string | undefined,
+): Promise<FileDump> {
+  const out = await api.kernel.exportStream({ redactGrants: false, actor: 'system' });
+  if (!out.ok) throw new Error(`the record would not export: ${fixOf(out)}`);
+  /* THE ROWS `dumpOf` COUNTS, read off the manifest: every table's but the `dog_` ones that describe the file. */
+  const rows = out.value.tables.reduce((n, t) => (t.name.startsWith('dog_') ? n : n + t.rows), 0);
+  return { file: out.value, rows, at, ...(bookmark === undefined ? {} : { bookmark }) };
+}
+
+/** How many times one copy is read before a record that would not hold still for it is a failure. */
+export const TRIES = 3;
+
+/** A copy taken again when the record changed between its two reads (`RecordChanged`): a write mid-copy costs a read, not the copy. */
+export async function steady<T>(take: () => Promise<T>): Promise<T> {
+  for (let n = 1; ; n++) {
+    try {
+      return await take();
+    } catch (e) {
+      if (!(e instanceof RecordChanged) || n >= TRIES) throw e;
+    }
+  }
 }
 
 /**
@@ -377,8 +445,8 @@ export function r2Snapshots(
        done with it: a probe dropped the caller's reference before `take` ran and the
        suspended frame still held the parameter, 120.8 MiB either way. So what can be cut is only
        what is made beside it, and here that is a count and then one 64 KiB piece per pull. */
-    const utf8 = plainOf(dump.text);
-    if (utf8.length > CEILING)
+    const utf8 = watched('file' in dump ? dump.file : plainOf(dump.text));
+    if (!('file' in dump) && utf8.length > CEILING)
       throw new Error(
         `snapshot over 40 MiB: this record dumped ${String(utf8.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
       );
@@ -411,7 +479,7 @@ export function r2Snapshots(
          to avoid, on the deployments that chose not to seal. */
       const body = stream ? await stream(utf8) : streamOf(utf8);
       const r2 = blobs as StreamBlobs;
-      await r2.put(key, fixed(body.stream, body.length), { customMetadata: meta });
+      await r2.put(key, fixed(body.stream, body.length), { customMetadata: meta }).catch(utf8.instead);
       if (pointer) {
         const copy = await r2.get(key);
         if (!copy?.body) throw new Error(`the copy just written to ${key} could not be read back to point latest at it`);
@@ -421,7 +489,7 @@ export function r2Snapshots(
     }
     /* NO `FixedLengthStream`, which is Node, or a test's own `seal`: one buffer, put once for the
        copy and again for `latest` when it moves, as before streaming. */
-    const file = new TextEncoder().encode(dump.text);
+    const file = 'file' in dump ? whole(utf8) : new TextEncoder().encode(dump.text);
     const body = stream ? await drain(await stream(file)) : seal ? await seal(file) : file;
     await blobs.put(key, body, { customMetadata: meta });
     if (pointer) await blobs.put(latestKey, body, { customMetadata: meta });

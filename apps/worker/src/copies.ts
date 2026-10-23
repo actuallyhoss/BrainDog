@@ -7,8 +7,8 @@
  * object's own `ctx.storage` and nothing outside the object can call it, and the record takes its
  * `before-restore` copy in the same call that arms the restore, so the copy and the bookmark are
  * one moment and not two ends of a round trip to the Worker with writes landing in between. The
- * nightly walk is unchanged: it still asks the object for a dump and puts it from the Worker with
- * `r2Snapshots` (`snapshots.ts`), and a night taken through this port lands under the same key.
+ * nightly walk has the object put its night with `r2Snapshots` (`Record$.snapshot`), and a night
+ * taken through this port lands under the same key.
  *
  * WHY THAT STILL KEEPS THE RECORD FREE OF I/O. `packages/record` names no bucket, imports no
  * binding and reaches no storage method; it calls `take`, `list` and `restore` on whatever the host
@@ -31,7 +31,7 @@
 
 import type { Snapshot, Snapshots } from '@braindog/ports';
 
-import { KEEP, prefixOf, r2Snapshots, type Blobs, type Dump, type Fixed, type Seal, type StreamBlobs } from './snapshots.ts';
+import { KEEP, prefixOf, r2Snapshots, steady, type Blobs, type Dump, type Fixed, type Seal, type StreamBlobs } from './snapshots.ts';
 
 /**
  * How far back a copy can be gone back to in place: thirty days, the window Cloudflare keeps a
@@ -173,26 +173,29 @@ export function cloudSnapshots(
       if (!LABEL.test(label)) throw new Error(`A label is one short lower-case word, such as nightly or final, and ${JSON.stringify(label)} is not.`);
       const at = new Date(o.now()).toISOString();
       const day = at.slice(0, 10);
-      /* THE BOOKMARK BEFORE THE DUMP, as `Record$.dump` takes it, and a storage with no PITR still
-         gets its copy: it is a file that imports, only not one to go back to in place. */
-      let bookmark: string | undefined;
-      try {
-        bookmark = await storage.getCurrentBookmark();
-      } catch {
-        bookmark = undefined;
+      /* THE NAME BEFORE THE DUMP, so nothing is awaited between a streamed dump's two reads but the copy itself. */
+      let id = `${label}-${day}`;
+      if (label !== 'nightly') {
+        const taken = new Set((await held()).map((c) => c.id));
+        for (let n = 2; taken.has(id); n++) id = `${label}-${day}-${String(n)}`;
       }
-      const dumped = await dump(at, bookmark);
+      /* THE BOOKMARK BEFORE THE DUMP, as `Record$.snapshot` takes it, and a storage with no PITR still
+         gets its copy: it is a file that imports, only not one to go back to in place. Both again when the
+         record changed under the copy (`steady`). */
+      const kept = await steady(async () => {
+        let bookmark: string | undefined;
+        try {
+          bookmark = await storage.getCurrentBookmark();
+        } catch {
+          bookmark = undefined;
+        }
+        return r2.write(o.record, id, await dump(at, bookmark), label === 'nightly');
+      });
 
       if (label === 'nightly') {
-        const id = `nightly-${day}`;
-        const kept = await r2.write(o.record, id, dumped, true);
         await r2.prune(o.record);
         return { id, at, bytes: kept.stored };
       }
-      const taken = new Set((await held()).map((c) => c.id));
-      let id = `${label}-${day}`;
-      for (let n = 2; taken.has(id); n++) id = `${label}-${day}-${String(n)}`;
-      const kept = await r2.write(o.record, id, dumped, false);
       if (label === 'before-restore') before = id;
       else await pruneOthers(KEEP);
       return { id, at, bytes: kept.stored };

@@ -891,7 +891,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 | Scheduled actions per alarm | ≤ 5 runs (`ALARM_RUNS`) × ≤ 4 requests (one and three redirects) = 20 subrequests; ≤ 5 × 10 s = 50 s wall | the platform's per-invocation limits · asserted in `test/actions.test.ts` |
 | Subrequests per invocation | 1,000 (paid) — the cron fan-out stops at 900 records | 25 §9 · counted in `scheduled()` |
 | Memory per isolate | 128 MB — **which is why `export` streams pages of ≤ 1,000 rows** through a `TransformStream` and never buffers a record | 01 §2, 33 §9 · a 10 GB record exports without an OOM in staging |
-| Snapshot buffer | ≤ 40 MiB plaintext (§10) — age has no streaming mode this spec relies on | §13 A12 · the refusal sentence appears above the cap |
+| Snapshot buffer | none for a record's copy: the object streams its own SQLite, sealed, into one known-length R2 put (`Record$.snapshot`), and only `{ key, bytes, rows }` crosses RPC's 32 MiB value limit; ≤ 40 MiB for a dump handed over as text (§10) | §13 A12 · `test/snapshots-rpc.test.ts` copies a record past 32 MiB |
 | Attachment · webhook · email body | 2 MB · 1 MB · 5 MiB, checked against `Content-Length` before buffering | 12 §8, 10 §8, 01 §5 |
 | Queue message | ≈ 60 bytes against a 128 KB cap | 26 §2.2 |
 | Runner attachment | ≤ 16,384 bytes; ours is two ids | 26 §2.3 |
@@ -1010,8 +1010,9 @@ with `deploy-parity`.
   caller needs per-method RPC typing the generic cannot give.
 - `ponytail:` no per-socket subscription filter — every `/ws` client gets every `{ version, registers }`; add
   `serializeAttachment({ registers })` when a record has more than ~40 registers and the refetch fan-out shows in `ms`.
-- `ponytail:` the snapshot buffers ≤ 40 MiB plaintext and refuses above it; stream through R2 multipart when
-  `age-encryption` exposes streaming encryption (§13 A12) or a record over 40 MiB exists.
+- `ponytail:` a record's copy reads it twice (`exportStream`: count and hash, then write and check) and is taken again
+  when a write lands between the reads, `TRIES` = 3 times; a record written through all three fails that night with
+  the sentence. Hold writes for the copy if that is ever seen.
 - `ponytail:` the cron fan-out is one invocation up to 900 records; page across `scheduled()` runs with the
   Directory cursor when the 901st record signs up.
 - `ponytail:` no Workflow; triage is synchronous inside `arrive` and the model-backed proposal is an `infer.draft`

@@ -275,7 +275,7 @@ test('GOING BACK: THE RECORD AS IT IS IS PUT FIRST, THEN THE CHOSEN COPY\'S OWN 
 });
 
 test('A COPY WITH NO BOOKMARK, OR ONE PAST THE THIRTY DAYS, IS REFUSED IN A SENTENCE AND NOTHING IS ARMED', async () => {
-  // A deployment whose storage has no PITR still writes copies (`Record$.dump` says so), and they
+  // A deployment whose storage has no PITR still writes copies (`Record$.snapshot` says so), and they
   // carry no bookmark. Past thirty days the platform no longer holds the point a bookmark names.
   // Either one armed would restart the object into whatever the platform does with a bookmark it
   // cannot honour, which nobody here can measure, so neither is ever handed over.
