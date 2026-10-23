@@ -176,3 +176,16 @@ test('ANOTHER READER LEAVES EVERY LIST UNTAKEN, since what one reader may read i
     assert.deepEqual(h.asked, ['schema tasks']);
     readAs('');
   }));
+
+test('THE FIRST READER NAMED TAKES EVERY LIST ASKED BESIDE BOOT: the same sign-in asked both, so nothing is asked twice', () =>
+  on(async () => {
+    const h = host();
+    const c = createClient({ base: 'https://a.example', fetch: h.fetch });
+    let land: (r: Response) => void = () => {};
+    void c.schemas(new Promise<Response>((done) => (land = done)));
+    readAs('owner');
+    land(Response.json({ ok: true, value: { lists: { tasks: DECL('tasks') }, refused: {}, blocks: BLOCKS } }));
+    assert.deepEqual(await c.schema('tasks'), { ok: true, value: { ...DECL('tasks'), blocks: BLOCKS } });
+    assert.deepEqual(h.asked, [], 'the first naming asked every list again');
+    readAs('');
+  }));

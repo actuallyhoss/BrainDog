@@ -16,8 +16,8 @@ import { rowHref } from '../record/row-href.ts';
 import { figureReader } from '../../routes/r/[register]/[seq]/figures.ts';
 import { lanesOf, type Lanes, type SideProject } from './side.ts';
 
-/** The most projects read: more than any record holds, and the read stays one call. */
-const READ = 200;
+/** The most projects read: more than any record holds, and the limit the desk and the pages ask, so all share one read. */
+const READ = 500;
 
 /** A project as read, before the week and this device's pins are put on it. */
 export type SideRow = Omit<SideProject, 'late' | 'moved' | 'working' | 'pinned'> & { seq: number };

@@ -1580,15 +1580,21 @@ export function keepReads(on: boolean): void {
 /**
  * Name who reads through this tab from now on: an app keeping reads names the person a live boot answered for, with
  * their role, their shares' epoch and who the record is seen as. Somebody else drops every kept read and schema.
+ *
+ * THE FIRST NAMING KEEPS EVERY LIST'S DECLARATION ASKED BESIDE `boot` (`EVERY`): it was asked with the same sign-in as
+ * the `boot` that named the reader, so it is theirs. Dropped there, every cold open asked all of them a second time,
+ * 32 KB on a lived-in record and 38.6 KB on the owner's, the same answer twice (audit of 22 Oct, E3 and E20).
  */
 export function readAs(reader: string): void {
   if (reader === READER) return;
+  const first = READER === '';
   READER = reader;
   REGRANTS += 1;
   READS = new Map();
   OUT = new Map();
   SCHEMAS = new WeakMap();
-  EVERY = new Map();
+  if (first) for (const every of EVERY.values()) every.regrants = REGRANTS;
+  else EVERY = new Map();
   FLYING = new WeakMap();
 }
 

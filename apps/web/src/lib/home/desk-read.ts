@@ -15,8 +15,8 @@ import { REGISTERS } from '../record/held.ts';
 import { readLeads } from './card-kpis.ts';
 import { cardsOf, projectsOf, withKpis, type CardDecl, type CardRow, type ProjectCard } from './project-cards.ts';
 
-/** The most rows of the projects list read for the desk. */
-const READ = 200;
+/** The most rows of the projects list read for the desk, the limit every reader of it asks: one read serves all. */
+const READ = 500;
 
 export type Cards = { cards: ProjectCard[]; more: number; list: string; name: string };
 
