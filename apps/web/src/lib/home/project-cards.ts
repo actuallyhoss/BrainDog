@@ -75,8 +75,13 @@ export const takenBackFree = (card: Pick<ProjectCard, 'draft' | 'made'>, nowMs: 
 /** The lanes that are not on the desk. */
 export const OFF_DESK: ReadonlySet<string> = new Set(['retired', 'parked']);
 
-/** How many cards the desk draws; the rest are one link away. */
-export const DESK_MOST = 8;
+/**
+ * How many cards the desk draws; the rest are one link away. EVERY PROJECT IN PLAY, SINCE THE AUDIT OF 22 OCTOBER (U5):
+ * eight were drawn of thirteen, so the lane bar said "In play 8" over a record, a Projects page and a sidebar that said
+ * 13, and the five left off were the ones the order put last. A count is the record's, so the desk draws them all, up to
+ * a page of them.
+ */
+export const DESK_MOST = 24;
 
 /** The list that holds projects, by what it declares, or `null` where the record keeps none. */
 export const projectsOf = <D extends Pick<CardDecl, 'scopes'>>(decls: readonly D[]): D | null => decls.find((d) => d.scopes !== undefined) ?? null;
