@@ -60,6 +60,8 @@ export type LinesPlan = {
   trend: 'up' | 'down' | 'flat' | '';
   /** The label of the comparison line the change is measured against. */
   against: string;
+  /** The point the lead's value was read at, as printed (`27 Sep`), or '' when there is no lead. */
+  last: string;
   /** No value anywhere: the chart is a sentence. */
   empty: boolean;
   /**
@@ -156,6 +158,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
   const primary = named.findIndex((l) => !l.was);
   const compared = named.findIndex((l) => l.was);
   let now = '';
+  let lastAt = '';
   let then = '';
   let change = '';
   let trend: LinesPlan['trend'] = '';
@@ -163,6 +166,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
     const last = lastOf(values[primary]!);
     if (last >= 0) {
       now = (body[last]?.[primary + 1] ?? '').trim();
+      lastAt = (body[last]?.[0] ?? '').trim();
       if (compared >= 0) {
         /* THE SAME POINT OF THE PERIOD BEFORE, or its last value before that point when the day itself is a gap. */
         const earlier = values[compared]!.slice(0, last + 1);
@@ -218,6 +222,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
     change,
     trend,
     against: compared >= 0 ? named[compared]!.label : '',
+    last: lastAt,
     empty: every.length === 0,
     single,
     sentence,
@@ -242,7 +247,42 @@ export function linesNearest(plan: Pick<LinesPlan, 'points'>, fraction: number):
   return Math.max(0, Math.min(n - 1, Math.round(fraction * (n - 1))));
 }
 
+/** A reading older than this many days says how old it is beside the lead (the audit of 22 October, U6). */
+export const LINES_OLD_DAYS = 7;
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_MS = 86_400_000;
+
+/** A point's label as a day (UTC midnight): `27 Sep`, `27 Sep 2025` or `2026-09-27`, a year left out being the latest not after `now`. */
+function labelDay(label: string, now: number): number | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(label);
+  if (iso) return Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const m = /^(\d{1,2}) ([A-Z][a-z]{2})(?: (\d{4}))?$/u.exec(label);
+  const month = m ? MONTH_NAMES.indexOf(m[2]!) : -1;
+  if (!m || month < 0) return null;
+  const today = new Date(now);
+  const year = m[3] ? Number(m[3]) : today.getUTCFullYear();
+  const at = Date.UTC(year, month, Number(m[1]));
+  return !m[3] && at > now + DAY_MS ? Date.UTC(year - 1, month, Number(m[1])) : at;
+}
+
+/**
+ * HOW OLD THE LEAD IS, WHEN IT IS OLD: "Last reading 27 Sep, 26 days ago" once the newest point of the first current
+ * line is more than `LINES_OLD_DAYS` days before `now`, and '' while it is fresh, when no clock is given, or when the
+ * point is no day (a month's bucket). A chart whose line stopped weeks ago drew its last figure as today's (the audit of
+ * 22 October, U-B4), with only the page's foot saying when numbers last arrived.
+ */
+export function linesAge(plan: Pick<LinesPlan, 'last'>, now?: number): string {
+  if (now === undefined || plan.last === '') return '';
+  const day = labelDay(plan.last, now);
+  if (day === null) return '';
+  const today = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate());
+  const days = Math.round((today - day) / DAY_MS);
+  return days > LINES_OLD_DAYS ? `${LINES_LAST} ${plan.last}, ${days} days ago` : '';
+}
+
 /** The renderer's own words, as `series.ts` keeps its own: it imports nothing from the app. */
+export const LINES_LAST = 'Last reading';
 export const LINES_NONE = 'Nothing to draw yet: no point here has a value.';
 export const LINES_NOTHING = 'no values';
 /** NOT "The numbers", which is what a page of tiles is headed: a chart's fold holds the points it was drawn from. */

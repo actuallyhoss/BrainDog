@@ -81,3 +81,16 @@ test('ONE READING IS A FIGURE, its value and when it was read, and not a chart o
   assert.equal(linesOnly(costs.single!, true), 'Costs, 2 Sep, the only reading');
   assert.match(toHTML(parse('```lines | Revenue and costs\nDay | Revenue | Costs\n2 Sep |  | £5\n```')), /<span class="lines-against">Costs, 2 Sep, the only reading<\/span>/u);
 });
+
+test('AN OLD READING SAYS ITS AGE: a line that stopped weeks ago says when, and a fresh one says nothing', async () => {
+  const { linesAge, linesPlan } = await import('./lines.ts');
+  const now = Date.UTC(2026, 9, 23, 12);
+  const rows = [['Day', 'Players'], ['26 Sep', '5,100'], ['27 Sep', '5,683'], ['28 Sep', '—']];
+  const plan = linesPlan(rows);
+  assert.equal(plan.last, '27 Sep');
+  assert.equal(linesAge(plan, now), 'Last reading 27 Sep, 26 days ago');
+  assert.equal(linesAge(linesPlan([['Day', 'Players'], ['20 Oct', '9'], ['22 Oct', '10']]), now), '');
+  assert.equal(linesAge(plan), '', 'with no clock it says nothing');
+  assert.equal(linesAge(linesPlan([['Month', 'Players'], ['Aug', '9'], ['Sep', '10']]), now), '', 'a month is no day');
+  assert.equal(linesAge(linesPlan([['Day', 'Players'], ['30 Dec', '9'], ['31 Dec', '10']]), Date.UTC(2027, 0, 20)), 'Last reading 31 Dec, 20 days ago');
+});

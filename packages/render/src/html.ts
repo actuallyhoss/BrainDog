@@ -42,7 +42,7 @@ import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
-import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
+import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
@@ -1535,12 +1535,14 @@ function lines(b: Block, o: RenderOptions): string {
     return `<div class="prop lines" data-single=""><p class="lines-lead"><span class="lines-now num">${escape(plan.single.value)}</span><span class="lines-against">${escape(
       linesOnly(plan.single, Boolean(b.heading)),
     )}</span></p></div>`;
+  /* AN OLD READING SAYS ITS AGE beside the figure it leads with (`linesAge`). */
+  const age = linesAge(plan, o.now);
   const lead = plan.now
     ? `<p class="lines-lead"><span class="lines-now num">${escape(plan.now)}</span>${
         plan.change
           ? `<span class="lines-change num" data-trend="${plan.trend}">${escape(plan.change)}</span><span class="lines-against">${LINES_AGAINST} ${escape(plan.against)}, <span class="num">${escape(plan.then)}</span></span>`
           : ''
-      }</p>`
+      }${age ? `<span class="lines-against" data-old="">${escape(age)}</span>` : ''}</p>`
     : '';
   const legend = `<ul class="lines-legend">${plan.lines
     .map((l) => `<li class="lines-key"${l.was ? ' data-was=""' : ''} data-step="${l.step}"><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">${escape(l.label)}</span></li>`)

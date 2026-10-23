@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
+  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
   import { linesTrend } from '../src/lines-trend.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -24,6 +24,8 @@
   const was = $derived(plan.lines.filter((l) => l.was));
   const current = $derived(plan.lines.filter((l) => !l.was));
   const trend = $derived(linesTrend(plan));
+  /* AN OLD READING SAYS ITS AGE beside the figure it leads with (`linesAge`). */
+  const age = $derived(linesAge(plan, opts.now));
 
   /** Where along the chart the pointer is, from 0 to 1, or `null` when it is not over it. */
   let scrub = $state<number | null>(null);
@@ -44,7 +46,7 @@
   <div class="prop lines">
     {#if plan.now}
       <p class="lines-lead">
-        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}
+        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
       </p>
     {/if}
     <ul class="lines-legend">
