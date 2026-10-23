@@ -118,6 +118,24 @@ test('MONEY OPENS ON ITS CASH: a late instalment leads no page past the walk of 
   assert.equal(keysOf(his.blocks)[1], instalments, 'his own arrangement is his');
 });
 
+test('WHAT A PAGE FOLDS AWAY NEVER LEADS IT, nor does the rules\' look hide the fold: only his own look may', () => {
+  const blocks = keyed(
+    block({ kind: 'note', lead: true, body: 'Nobody is at work' }),
+    block({ kind: 'section', heading: 'At work' }),
+    block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [] }),
+    block({ kind: 'section', heading: 'Earlier', fold: true }),
+    block({ kind: 'table', source: 'register.tasks', heading: 'Old runs', rows: [row('tasks', 3, { what: 'Ran yesterday', by: '2026-10-01' })], matched: 1 }),
+  );
+  const [, , , earlier, old] = keysOf(blocks);
+  assert.equal(composeLook(input(blocks)).lead, undefined, 'the rules never pick a folded block to lead, however late');
+  const stored = applyLook(blocks, { look: 'desk', basis: 'rold', by: 'rule', lead: old!, hide: [earlier!] });
+  assert.equal(stored.look.lead, undefined, 'a look stored before the rule does not lead with it');
+  assert.notEqual(stored.blocks.find((b) => b.key === earlier)?.drawn, false, 'and the fold stays drawn');
+  assert.equal(keysOf(stored.blocks).indexOf(old!), 4);
+  const his = applyLook(blocks, { look: 'desk', basis: 'rhis', by: 'owner', lead: old! });
+  assert.equal(his.look.lead, old, 'his own arrangement is his');
+});
+
 test('LATE BEATS NEEDS-YOU BEATS CHANGED BEATS FIGURES, inside a group, and the most pressing block leads', () => {
   const blocks = keyed(
     block({ kind: 'note', lead: true, body: 'Your desk' }),

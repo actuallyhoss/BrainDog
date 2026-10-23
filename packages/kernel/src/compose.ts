@@ -522,6 +522,21 @@ function lateSaid(late: Late, today: string): string {
 }
 
 /**
+ * WHETHER A BLOCK STANDS UNDER A FOLDED HEADING: the nearest heading above it in its own column says `fold`. SINCE the
+ * audit of 22 October (U12, U-A10): the rules' look on an owner's Agents page led with the folded Earlier runs, six
+ * cards of runs from yesterday, and hid the Earlier heading over them, so the page opened on old runs as its lead. What
+ * a page folds away is never what the rules lead with, and a heading the page folds is never one the rules hide.
+ */
+function underFold(blocks: readonly BlockResult[], i: number): boolean {
+  for (let j = i - 1; j >= 0; j -= 1) {
+    const b = blocks[j]!;
+    if (areaOf(b) !== areaOf(blocks[i]!) || b.kind !== 'section') continue;
+    return b.fold === true;
+  }
+  return false;
+}
+
+/**
  * THE RULES' LOOK FOR A PAGE, from the page as read and nothing else.
  *
  * - THE LEAD is the most pressing block of the main column, when something in it is late, waiting or changed. It goes
@@ -547,7 +562,7 @@ export function composeLook(input: ComposeInput): LookBody {
   /* THE LEAD. */
   let leadAt = -1;
   blocks.forEach((b, i) => {
-    if (areaOf(b) !== 'main' || STAYS.has(b.kind) || pinned.has(keys[i]!) || keptInPlace(i) || weighed[i]!.rank < RANK.changed) return;
+    if (areaOf(b) !== 'main' || STAYS.has(b.kind) || pinned.has(keys[i]!) || keptInPlace(i) || underFold(blocks, i) || weighed[i]!.rank < RANK.changed) return;
     if (leadAt === -1 || weighed[i]!.rank > weighed[leadAt]!.rank) leadAt = i;
   });
   if (leadAt !== -1) {
@@ -749,7 +764,8 @@ export function applyLook(read: readonly BlockResult[], look: LookBody, page: { 
      a look Slash wrote is held to it here, as the rules hold themselves. The person's own look is his. */
   const queues = look.by === 'owner' ? new Set<string>() : queuesKept(look.look, blocks);
   const kept = (k: string): boolean => queues.has(k);
-  const asked = look.lead !== undefined && at.has(look.lead) && !kept(look.lead) ? look.lead : undefined;
+  /* NOR, UNLESS IT IS HIS OWN, WITH WHAT THE PAGE FOLDS AWAY (`underFold`): a look stored before that rule still names it. */
+  const asked = look.lead !== undefined && at.has(look.lead) && !kept(look.lead) && (owns || !underFold(blocks, at.get(look.lead)!)) ? look.lead : undefined;
 
   /* ORDER, A GROUP AT A TIME: the blocks between two headings in one column, as the rules order them. Named across two
      groups, each block keeps its own heading and takes its place among the others named under it, so a look can never
@@ -796,7 +812,9 @@ export function applyLook(read: readonly BlockResult[], look: LookBody, page: { 
      is his. */
   const waiting = (b: BlockResult): boolean => look.by !== 'owner' && isQueue(b) && b.drawn !== false && !drewNothing(b);
   const fixed = (b: BlockResult): boolean => pins.has(keyOf(b)) || b.refusals.length > 0 || b.lead === true || keyOf(b) === lead || waiting(b);
-  const hide = new Set(unique(look.hide ?? []).filter((k) => at.has(k) && !fixed(blocks[at.get(k)!]!)));
+  /* A FOLDED HEADING IS THE PAGE'S OWN WAY OF KEEPING ITS BLOCKS OUT OF THE WAY, and only his own look hides it. */
+  const foldKept = (b: BlockResult): boolean => !owns && b.kind === 'section' && b.fold === true;
+  const hide = new Set(unique(look.hide ?? []).filter((k) => at.has(k) && !fixed(blocks[at.get(k)!]!) && !foldKept(blocks[at.get(k)!]!)));
   out.forEach((b, i) => {
     if (b.kind !== 'section' || !hide.has(keyOf(b))) return;
     const held: BlockResult[] = [];
