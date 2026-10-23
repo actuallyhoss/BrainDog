@@ -33,13 +33,14 @@
  * customer's file contains.
  */
 
-import type { Refusal, Sql } from '@braindog/ports';
+import type { Param, Refusal, Row, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
 import { SEAT_KERNEL_REGISTERS } from './migrations/0044_seat.ts';
 import { SIGNS_KEY } from './signs.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
 import { isShape } from './shape.ts';
+import { Sha256 } from './sha256.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 
@@ -169,7 +170,12 @@ export function projection(sql: Sql, table: TableShape, redactGrants = false): s
     .all<Record<string, unknown>>(
       `SELECT ${cols} FROM ${table.name}${table.where ? ` WHERE ${table.where}` : ''} ORDER BY ${order}`,
     )
-    .map((row) => JSON.stringify(table.columns.map((c) => (blank?.has(c) ? null : encode(row[c])))));
+    .map((row) => lineOf(table, row, blank));
+}
+
+/** One row as the file holds it, a sealed column blanked when `blank` names it. `projection`'s and `streamBrainl`'s. */
+function lineOf(table: TableShape, row: Record<string, unknown>, blank: ReadonlySet<string> | null): string {
+  return JSON.stringify(table.columns.map((c) => (blank?.has(c) ? null : encode(row[c]))));
 }
 
 /**
@@ -401,9 +407,226 @@ export async function signBrainl(lines: readonly string[], sign: Signer): Promis
   const signed = await sign(manifestBytes(lines));
   if (!signed) return [...lines];
 
-  /* The table's own column order: `alg, key_id, public_key, sig, signed_at`. */
-  const row = JSON.stringify(['ed25519', signed.keyId, signed.publicKey, signed.sig, signed.signedAt]);
-  return [...lines.slice(0, at + 1), row, ...lines.slice(at + 1)];
+  return [...lines.slice(0, at + 1), sigLine(signed), ...lines.slice(at + 1)];
+}
+
+/** The one `dog_sig` row, in the table's own column order: `alg, key_id, public_key, sig, signed_at`. */
+const sigLine = (signed: Signature): string => JSON.stringify(['ed25519', signed.keyId, signed.publicKey, signed.sig, signed.signedAt]);
+
+/** A `.brain` read front to back and never held whole: what `streamBrainl` answers. */
+export type StreamedBrainl = {
+  /** Bytes in the whole file, counted before the first is read. */
+  length: number;
+  /** Each table the manifest names, with the rows it says the table holds. */
+  tables: { name: string; rows: number }[];
+  /** Fills `out` with exactly the next `out.length` bytes of the file. */
+  read(out: Uint8Array): void;
+};
+
+/** A streamed copy that saw the record change between its two reads, so the file it was writing is not one moment. */
+export class RecordChanged extends Error {
+  override readonly name = 'RecordChanged';
+}
+
+/** How far one read reaches: keys read ahead, and characters of rows brought back at once (always one row). */
+export type PageSize = { look: number; slice: number };
+
+const PAGE: PageSize = { look: 8192, slice: 2 * 1024 * 1024 };
+
+const LF = new Uint8Array([10]);
+
+/**
+ * `keys` past `last` in `ORDER BY keys`, which puts NULL first. Row values when nothing in `last` is NULL, because an
+ * index can seek on them; spelled out with `IS` when something is, because any comparison with NULL is NULL.
+ */
+function past(keys: readonly string[], last: readonly Param[]): { where: string; params: Param[] } {
+  if (!last.includes(null)) return { where: `(${keys.join(', ')}) > (${keys.map(() => '?').join(', ')})`, params: [...last] };
+  const params: Param[] = [];
+  const from = (i: number): string => {
+    const key = keys[i] ?? '';
+    const value = last[i] ?? null;
+    if (value !== null) params.push(value);
+    const over = value === null ? `${key} IS NOT NULL` : `${key} > ?`;
+    if (i === keys.length - 1) return over;
+    if (value !== null) params.push(value);
+    const same = value === null ? `${key} IS NULL` : `${key} = ?`;
+    return `(${over} OR (${same} AND ${from(i + 1)}))`;
+  };
+  return { where: from(0), params };
+}
+
+/**
+ * Every row of `table` as its line, in `projection`'s order, and never the whole table at once: the keys and sizes of
+ * the next `look` rows, then the rows, as many as fit in `slice`. A rowid table is fetched by rowid, which a full-text
+ * table can look up and cannot range over, and the rowid is the last key, so rows sharing a key keep one order.
+ */
+function* rowsOf(sql: Sql, table: TableShape, blank: ReadonlySet<string> | null, page: PageSize): Generator<string, void, undefined> {
+  const named = (name: string): string => `"${name}"`;
+  const ddl = sql.one<{ sql: string | null }>('SELECT sql FROM sqlite_master WHERE name = ?', table.name)?.sql ?? '';
+  const rowid = !/\bWITHOUT\s+ROWID\b/iu.test(ddl);
+  const keys = [...table.pk.map(named), ...(rowid ? ['rowid'] : [])];
+  const order = keys.join(', ');
+  const marks = keys.map(() => '?').join(', ');
+  const from = `FROM ${named(table.name)}`;
+  const only = table.where ? `(${table.where})` : null;
+  const cols = table.columns.map(named).join(', ');
+  const picked = keys.map((key, i) => `${key} AS __k${String(i)}`).join(', ');
+  const size = table.columns.map((c) => `coalesce(length(${named(c)}), 0)`).join(' + ');
+  const keyOf = (row: Row): Param[] => keys.map((_, i) => row[`__k${String(i)}`] ?? null);
+  const sizeOf = (row: Row | undefined): number => Number(row?.__size ?? 0);
+  let last: Param[] | null = null;
+  for (;;) {
+    const after = last === null ? null : past(keys, last);
+    const where = [only, after?.where ?? null].filter((w): w is string => w !== null);
+    const looked = sql.all<Row>(
+      `SELECT ${picked}, ${size} AS __size ${from}${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ${String(page.look)}`,
+      ...(after?.params ?? []),
+    );
+    for (let i = 0; i < looked.length; ) {
+      let end = i + 1;
+      let chars = sizeOf(looked[i]);
+      while (end < looked.length && chars + sizeOf(looked[end]) <= page.slice) chars += sizeOf(looked[end++]);
+      const slice = looked.slice(i, end);
+      const low = i > 0 ? keyOf(looked[i - 1]!) : last;
+      const rows = rowid
+        ? sql.all<Record<string, unknown>>(
+            `SELECT ${cols} ${from} WHERE rowid IN (SELECT value FROM json_each(?))${only ? ` AND ${only}` : ''} ORDER BY ${order}`,
+            `[${slice.map((row) => String(row[`__k${String(keys.length - 1)}`])).join(',')}]`,
+          )
+        : sql.all<Record<string, unknown>>(
+            `SELECT ${cols} ${from} WHERE ${[only, low === null ? null : `(${order}) > (${marks})`, `(${order}) <= (${marks})`].filter((w): w is string => w !== null).join(' AND ')} ORDER BY ${order}`,
+            ...(low ?? []),
+            ...keyOf(slice[slice.length - 1]!),
+          );
+      for (const row of rows) yield lineOf(table, row, blank);
+      i = end;
+    }
+    if (looked.length < page.look) return;
+    last = keyOf(looked[looked.length - 1]!);
+  }
+}
+
+/**
+ * The file `exportBrainl` and `signBrainl` make, joined by LF, as bytes read front to back: the same bytes, never whole.
+ *
+ * THE ROWS ARE READ TWICE, because the manifest comes before the rows it hashes. The first read awaits nothing, so the
+ * manifest is one moment of the record; the second is the copy, each table hashed again and held to the first, and a
+ * table that changed in between throws `RecordChanged` rather than finish a file that is two moments.
+ */
+export async function streamBrainl(
+  sql: Sql,
+  transaction: <T>(fn: () => T) => T,
+  opts: { sections?: readonly Section[]; redactGrants?: boolean; sign?: Signer | undefined; page?: PageSize | undefined } = {},
+): Promise<StreamedBrainl> {
+  const page = opts.page ?? PAGE;
+  const wanted = new Set<Section>(opts.sections ?? TRAVELS);
+  wanted.add('header');
+  const all = tables(sql);
+  const body = all.filter((t) => wanted.has(t.section) && t.name !== 'dog_manifest' && t.name !== 'dog_sig');
+  const redact = opts.redactGrants === true;
+  const rowsIn = (t: TableShape): Iterable<string> =>
+    redact && SEALED_TABLES.has(t.name) ? [] : rowsOf(sql, t, redact ? (SEALED[t.name] ?? null) : null, page);
+  const encoder = new TextEncoder();
+
+  const first = new Map<string, { rows: number; bytes: number; sha: string }>();
+  for (const table of body) {
+    const hash = new Sha256();
+    let rows = 0;
+    let bytes = 0;
+    for (const line of rowsIn(table)) {
+      const encoded = encoder.encode(line);
+      if (rows > 0) hash.update(LF);
+      hash.update(encoded);
+      bytes += encoded.length;
+      rows++;
+    }
+    /* A PAGE THAT MISSED A ROW WOULD STILL MAKE A FILE THAT VERIFIES, so the count is held to the table's own. */
+    const held = redact && SEALED_TABLES.has(table.name) ? 0 : (sql.one<{ n: number }>(`SELECT count(*) AS n FROM "${table.name}"${table.where ? ` WHERE ${table.where}` : ''}`)?.n ?? 0);
+    if (Number(held) !== rows) throw new Error(`The copy read ${String(rows)} of the ${String(held)} rows ${table.name} holds, so it stopped before writing anything.`);
+    first.set(table.name, { rows, bytes, sha: hash.hex() });
+  }
+
+  transaction(() => {
+    sql.exec('DELETE FROM dog_manifest');
+    for (const [name, sum] of first) sql.exec('INSERT INTO dog_manifest (table_name, rows, sha256) VALUES (?, ?, ?)', name, sum.rows, sum.sha);
+    sql.exec('DELETE FROM dog_sig');
+  });
+
+  const ordered = [...all.filter((t) => t.name !== 'dog_sig'), ...all.filter((t) => t.name === 'dog_sig')];
+  const shape = all.find((t) => t.name === 'dog_manifest');
+  const manifest = shape ? projection(sql, shape) : [];
+  const signed = opts.sign && all.some((t) => t.name === 'dog_sig') ? await opts.sign(manifestBytes(['#table dog_manifest', ...manifest])) : null;
+  const sig = signed ? sigLine(signed) : null;
+  const head = (t: TableShape): string => `#table ${t.name} ${t.columns.join(',')}`;
+
+  const size = (line: string): number => encoder.encode(line).length;
+  let length = size('#dogl 1');
+  for (const table of ordered) {
+    if (!wanted.has(table.section)) continue;
+    length += 1 + size(head(table));
+    if (table.name === 'dog_sig') length += sig === null ? 0 : 1 + size(sig);
+    else if (table.name === 'dog_manifest') for (const line of manifest) length += 1 + size(line);
+    else length += (first.get(table.name)?.rows ?? 0) + (first.get(table.name)?.bytes ?? 0);
+  }
+
+  const changed = (what: string): RecordChanged =>
+    new RecordChanged(`The record changed while it was being copied (${what}), so that copy was stopped: a copy is one moment of the record or nothing.`);
+
+  function* pieces(): Generator<Uint8Array, void, undefined> {
+    yield encoder.encode('#dogl 1');
+    for (const table of ordered) {
+      if (!wanted.has(table.section)) continue;
+      yield LF;
+      yield encoder.encode(head(table));
+      if (table.name === 'dog_sig') {
+        if (sig !== null) yield* [LF, encoder.encode(sig)];
+        continue;
+      }
+      if (table.name === 'dog_manifest') {
+        for (const line of manifest) yield* [LF, encoder.encode(line)];
+        continue;
+      }
+      const was = first.get(table.name);
+      const hash = new Sha256();
+      let rows = 0;
+      for (const line of rowsIn(table)) {
+        const encoded = encoder.encode(line);
+        if (rows > 0) hash.update(LF);
+        hash.update(encoded);
+        rows++;
+        yield LF;
+        yield encoded;
+      }
+      if (rows !== was?.rows || hash.hex() !== was.sha) throw changed(table.name);
+    }
+  }
+
+  const source = pieces();
+  let piece: Uint8Array = new Uint8Array(0);
+  let at = 0;
+  let sent = 0;
+  return {
+    length,
+    tables: body.map((t) => ({ name: t.name, rows: first.get(t.name)?.rows ?? 0 })),
+    read(out) {
+      if (sent + out.length > length) throw new RangeError(`${String(out.length)} bytes were asked of a copy with ${String(length - sent)} left.`);
+      for (let n = 0; n < out.length; ) {
+        if (at === piece.length) {
+          const next = source.next();
+          if (next.done) throw changed(`it ended ${String(length - sent - n)} bytes short of the ${String(length)} it was counted at`);
+          piece = next.value;
+          at = 0;
+          continue;
+        }
+        const take = Math.min(piece.length - at, out.length - n);
+        out.set(piece.subarray(at, at + take), n);
+        at += take;
+        n += take;
+      }
+      sent += out.length;
+      if (sent === length && (at < piece.length || !source.next().done)) throw changed(`it ran past the ${String(length)} bytes it was counted at`);
+    },
+  };
 }
 
 /** `03 §4`: the first 16 hex of SHA-256 over the public key. */

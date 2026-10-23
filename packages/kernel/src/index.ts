@@ -83,7 +83,7 @@ import {
   type RunRow,
   type Taken,
 } from './handoff.ts';
-import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
+import { checkBrainl, exportBrainl, importBrainl, signBrainl, streamBrainl, tables as fileTables, type ImportReport, type Section, type Signer, type StreamedBrainl } from './brainl.ts';
 import { settleSealed } from './sealed.ts';
 import {
   drainSchedule,
@@ -378,6 +378,7 @@ import { extensions } from './api/index.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
+export { RecordChanged, type StreamedBrainl } from './brainl.ts';
 export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type ShapeOptions } from './shape.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 
@@ -9363,6 +9364,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return (subject || line || 'An arrival from the inbox').slice(0, 200);
   };
 
+  /** The `export` event both exports write before a row is read, whole (`export`) or a piece at a time (`exportStream`). */
+  const exportEvent = (opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string }): void =>
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'export', NULL, NULL, ?)",
+      mint(),
+      instant(clock.now()),
+      opts.actor ?? 'system',
+      `sections ${(opts.sections ?? ['all']).join(', ')}${opts.redactGrants === true ? ', grants redacted' : ''}`,
+    );
+
   const kernel = {
     transaction,
     allocate,
@@ -11181,16 +11192,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          credential; `export` copies every one of them and wrote nothing at all — so the one read
          that gets the most out was the one read that could not answer "did anything leave". 12 §6's
          first rule is that a vault whose reads are not audited cannot answer that question. */
-      sql.exec(
-        "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'export', NULL, NULL, ?)",
-        mint(),
-        instant(clock.now()),
-        opts.actor ?? 'system',
-        `sections ${(opts.sections ?? ['all']).join(', ')}${opts.redactGrants === true ? ', grants redacted' : ''}`,
-      );
+      exportEvent(opts);
       return exportBrainl(sql, transaction, opts)
         .then((lines) => (signer ? signBrainl(lines, signer) : lines))
         .then((lines) => ok(lines));
+    },
+
+    /**
+     * The same file as `export`, with the same event, read a piece at a time (`streamBrainl`): a copy of a record too
+     * large to hold whole, or to hand anywhere as one value, is made from this.
+     */
+    exportStream(opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string } = {}): Promise<Result<StreamedBrainl>> {
+      const refused = schemaRefusal(state);
+      if (refused) return Promise.resolve(refused as Result<StreamedBrainl>);
+      exportEvent(opts);
+      return streamBrainl(sql, transaction, { ...opts, sign: signer }).then((file) => ok(file));
     },
 
     /**
