@@ -17,7 +17,7 @@
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
 -->
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { markOf } from '@braindog/skin/agent-marks.ts';
@@ -75,6 +75,13 @@
 
   let heard = $state<Heard[]>([]);
   const sign = $derived(signOf(heard));
+  /* THE YES OR NO ALONE, which the poll hangs on: `signOf` makes a new object each time, and an effect over it ran
+     again on every answer. A kept read answers from memory at once, so that loop never let the page paint (U-C1). */
+  const connected = $derived(sign.connected);
+
+  /** The same calls, heard at the same times: a kept read's answer moves nothing. */
+  const same = (a: readonly Heard[], b: readonly Heard[]): boolean =>
+    a.length === b.length && a.every((h, i) => h.tile === b[i]?.tile && h.app === b[i]?.app && h.machine === b[i]?.machine && h.at === b[i]?.at);
 
   /* THE LIVE CHANNEL THE CONNECT SHEET USES, and no faster; it stops for good once an agent has been heard. */
   const listen = listenFor(createClient({ base: apiBase() }));
@@ -84,12 +91,16 @@
     asking = true;
     const said = await listen(false);
     asking = false;
-    if (said) heard = heardOf(said.rows);
-    if (signOf(heard).connected) step('agent_connected');
+    if (!said) return;
+    const next = heardOf(said.rows);
+    if (same(next, heard)) return;
+    heard = next;
+    if (signOf(next).connected) step('agent_connected');
   }
   $effect(() => {
-    if (sign.connected) return;
-    return poll(() => void ask());
+    if (connected) return;
+    /* `untrack`, as the connect sheet asks: what an ask reads never starts the poll again. */
+    return poll(() => untrack(() => void ask()));
   });
 </script>
 
