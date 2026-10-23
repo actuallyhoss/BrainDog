@@ -22,6 +22,7 @@
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
+  import { drew } from '../ui/screen.svelte.ts';
   import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, pinsKept, playSaid, splitOf, widthOf, type SideProject } from './side.ts';
   import { readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
 
@@ -67,6 +68,11 @@
 
   /* THE READ: the projects first, then their week. Asked again when the record's version moves, a moment after. */
   let read = $state.raw<SideRead | null>(null);
+  /* ON A PHONE THIS IS THE SCREEN, so it says it drew once its first read has answered, as a route does (`data-screen`). */
+  let answered = $state(false);
+  $effect(() => {
+    if (phone && answered) drew('ready');
+  });
   let week = $state.raw<Week>(new Map());
   let asked = 0;
   $effect(() => {
@@ -79,6 +85,7 @@
         .then(async (got) => {
           if (n !== asked) return;
           read = got;
+          answered = true;
           if (got === null) return;
           const play = splitOf(got.rows, got.lanes).play;
           const w = await readWeek(b, got.list, play);
