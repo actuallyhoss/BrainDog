@@ -229,6 +229,24 @@ const versionIn = (m: Message): string | undefined => {
 /** Whether a result answered under `version` says `resultType`, as `rpc.ts` decides it: the stateless revision or later. */
 const stateless = (version: string | undefined): boolean => version === undefined || (/^\d{4}-\d{2}-\d{2}$/.test(version) && version >= VERSIONS[0]);
 
+/**
+ * A tool's answer as Claude Code's model should read it: the short lines alone, without the JSON copy beside them.
+ *
+ * CLAUDE CODE HANDS ITS MODEL `structuredContent` WHEN A RESULT HAS ONE, in place of the text (audit of 22 Oct, E5: 659
+ * answers in his sessions, every one read as JSON, 1.5 to 4 times the tokens). So the lines BrainDog writes for a model
+ * never reached one, and what he told a run from the app, which rides on the text of the next answer, was marked seen
+ * by a model that was never shown it. The copy stays for a refusal, for a call that asked `format: "full"`, for a
+ * card's answer, and for every other app, which may draw it.
+ */
+export function linesForModel(reply: Reply, client: ClientInfo, message: Message): Reply {
+  if (!/^claude[\s._-]*code/iu.test(client.name ?? '') || message.method !== 'tools/call' || !('result' in reply) || !isObject(reply.result)) return reply;
+  const args = isObject(message.params) && isObject(message.params.arguments) ? message.params.arguments : {};
+  const { structuredContent: copy, ...rest } = reply.result;
+  const text = Array.isArray(rest.content) && rest.content.some((c) => isObject(c) && c.type === 'text' && typeof c.text === 'string' && c.text !== '');
+  if (copy === undefined || !text || rest.isError === true || args.format === 'full' || (isObject(copy) && isObject(copy.card))) return reply;
+  return { ...reply, result: rest };
+}
+
 /** A tool call refused, in the shape the host answers one: the refusal as the text, and whole beside it. */
 const toolRefusal = (id: Id, refusal: Refusal, version: string | undefined): Reply => ({
   jsonrpc: '2.0',
@@ -734,7 +752,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       version = agreed(reply) ?? version;
       reply = listChanged(reply);
     }
-    await send(reply);
+    await send(linesForModel(reply, client, message));
   };
 
   for await (const line of createInterface({ input: io.input, crlfDelay: Infinity })) {

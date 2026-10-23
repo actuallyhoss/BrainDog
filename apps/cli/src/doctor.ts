@@ -203,7 +203,20 @@ function hooksOf(file: string): { event: string; command: string }[] {
 }
 
 /** BrainDog's own hook for an event, by its script's name and its last word, as `install` tells one (`isOurs`). */
-const isOurHook = (command: string, which: 'start' | 'end'): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
+const isOurHook = (command: string, which: string): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
+
+/**
+ * THE FOUR HOOKS BESIDE THE START AND THE END, by their event and word as `install` writes them. Without the prompt and
+ * tool hooks what he tells a run from the app waits for the run's next BrainDog call, and two of his three profiles had
+ * the start and end hooks only (audit of 22 Oct, E5). Named only where the start hook is there, so a profile BrainDog
+ * was never installed in says so once.
+ */
+const OTHER_HOOKS = [
+  { event: 'UserPromptSubmit', which: 'prompt', says: "BrainDog's prompt hook is missing, so what you tell a run reaches it only on its next BrainDog call" },
+  { event: 'PreToolUse', which: 'tool', says: "BrainDog's tool hook is missing, so a stop you send waits for the run's next BrainDog call" },
+  { event: 'Stop', which: 'stop', says: "BrainDog's stop hook is missing, so a run may end its turn while it owes you a reply" },
+  { event: 'PostToolUse', which: 'beat', says: "BrainDog's beat hook is missing, so a run that only edits files reads as quiet" },
+] as const;
 
 /** Whether a profile's settings hold both of BrainDog's hooks, read as `profileOf` reads them. */
 export function hooksThere(dir: string): boolean {
@@ -293,6 +306,8 @@ function profileOf(dir: string, home: string): { state: Profile; places: Place[]
   if (server === 'other') places.push({ kind: 'profile', file: serversFile, entry: 'mcpServers.braindog', says: "BrainDog's server runs another copy of the command" });
   if (!state.start) places.push({ kind: 'profile', file: settings, entry: 'hooks.SessionStart', says: "BrainDog's start hook is missing" });
   if (!state.end) places.push({ kind: 'profile', file: settings, entry: 'hooks.SessionEnd', says: "BrainDog's end hook is missing" });
+  if (state.start)
+    for (const h of OTHER_HOOKS) if (!commands.some((c) => isOurHook(c, h.which))) places.push({ kind: 'profile', file: settings, entry: `hooks.${h.event}`, says: h.says });
   return { state, places };
 }
 

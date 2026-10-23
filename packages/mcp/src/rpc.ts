@@ -871,12 +871,16 @@ async function dispatch<C>(
       if (w === null) return said(Object.keys(meta).length === 0 ? body : { ...body, _meta: meta });
       watch.stamp = w.stamp;
       let content = body.content;
+      let structured = body.structuredContent;
       if (says) for (const p of w.pending) watch.shown.add(p.id);
       else {
         const refusedFor = refused(out.result) ? out.result.refusal.code : undefined;
         const added = piggyback(w, watch.shown, refusedFor);
         for (const id of added.shown) watch.shown.add(id);
         if (added.lines.length > 0) content = [{ type: 'text', text: `${body.content[0]?.text ?? ''}\n${added.lines.join('\n')}` }];
+        /* AND IN THE JSON COPY, because an app that hands its model the copy and not the text (Claude Code does, audit of
+           22 Oct, E5) showed it none of this, while the record heard it was seen. */
+        if (added.lines.length > 0 && isObject(structured)) structured = { ...structured, new_for_you: added.lines };
         /* AND THE RECORD HEARS IT WAS SEEN, in a tool answer, never waited on: the app says "Seen by S883 in a tool answer". */
         if (added.shown.length > 0 && typeof surface.instructionsMine === 'function') {
           try {
@@ -886,7 +890,7 @@ async function dispatch<C>(
           }
         }
       }
-      return said({ ...body, content, _meta: { ...meta, braindog: { stamp: w.stamp, pending: w.pending, stop: w.stop } } });
+      return said({ ...body, content, ...(structured === body.structuredContent ? {} : { structuredContent: structured }), _meta: { ...meta, braindog: { stamp: w.stamp, pending: w.pending, stop: w.stop } } });
     }
 
     /* THE PROMPTS (plan §6.3): start, wrap and ask, which a client shows as commands and which cost the tool list nothing. */

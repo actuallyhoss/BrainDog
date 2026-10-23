@@ -74,6 +74,10 @@ const ours = {
   hooks: {
     SessionStart: [{ hooks: [{ type: 'command', command: hookCommand('start', scripts), timeout: 10 }] }],
     SessionEnd: [{ hooks: [{ type: 'command', command: hookCommand('end', scripts), timeout: 10 }] }],
+    PostToolUse: [{ hooks: [{ type: 'command', command: hookCommand('beat', scripts), timeout: 10 }] }],
+    UserPromptSubmit: [{ hooks: [{ type: 'command', command: hookCommand('prompt', scripts), timeout: 5 }] }],
+    PreToolUse: [{ hooks: [{ type: 'command', command: hookCommand('tool', scripts), timeout: 5 }] }],
+    Stop: [{ hooks: [{ type: 'command', command: hookCommand('stop', scripts), timeout: 5 }] }],
   },
 };
 
@@ -182,6 +186,15 @@ test('A PROFILE WITHOUT BRAINDOG IS LISTED: no server, and the hook that is miss
   assert.equal(out.code, 1);
   assert.ok(out.report.places.some((x) => x.kind === 'profile' && x.entry === 'mcpServers.braindog'));
   assert.ok(out.report.places.some((x) => x.kind === 'profile' && x.entry === 'hooks.SessionEnd'));
+});
+
+test('A PROFILE WITH THE START AND END HOOKS ONLY IS LISTED: what he tells a run would wait for its next call', () => {
+  const home = newHome();
+  json(join(home, '.claude-studio', 'settings.json'), { hooks: { SessionStart: ours.hooks.SessionStart, SessionEnd: ours.hooks.SessionEnd } });
+  const out = doctor([], { ...quiet, home, env: {}, crontab: () => null });
+  assert.equal(out.code, 1);
+  const named = out.report.places.filter((x) => x.kind === 'profile' && x.entry.startsWith('hooks.')).map((x) => x.entry);
+  assert.deepEqual(named, ['hooks.UserPromptSubmit', 'hooks.PreToolUse', 'hooks.Stop', 'hooks.PostToolUse']);
 });
 
 test('EVERY PROFILE IN THE HOME IS FOUND: .claude and each .claude-<name> that holds settings', () => {

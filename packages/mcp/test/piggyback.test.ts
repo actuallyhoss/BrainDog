@@ -57,6 +57,9 @@ test('A NEW INSTRUCTION RIDES ON THE NEXT TOOL ANSWER, once, in his words, and t
   const last = told.content[0]!.text.split('\n').at(-1)!;
   assert.match(last, /^New for you: Teodor \(IN1\): "Merge wave 1, then stop"\. Take it: instructions \{take:"IN1"\}\.$/u);
   assert.ok(last.length <= 200);
+  /* AND IN THE JSON COPY, which is what Claude Code hands its model in place of the text. */
+  assert.deepEqual(told.structuredContent.new_for_you, [last]);
+  assert.equal(quiet.structuredContent.new_for_you, undefined, 'the copy said something new with nothing waiting');
   assert.notEqual(told._meta?.braindog?.stamp, before, 'the stamp did not move');
   assert.deepEqual(told._meta?.braindog?.pending.map((p) => p.id), ['IN1']);
 

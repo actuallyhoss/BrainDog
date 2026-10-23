@@ -25,7 +25,7 @@ import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { openKeyStore, recordKeys } from '../../selfhost/src/keys.ts';
 import { start } from '../../selfhost/src/server.ts';
 import { cacheFile, readDoorCache, writeDoorCache } from '../src/bridge-cache.ts';
-import { attaches, mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
+import { attaches, linesForModel, mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
 import { readSession, sessionPath, writeSession } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
@@ -578,4 +578,20 @@ test('ATTACHED MEANS A HOST SESSION ID AND A TOOL CALL, or the run the start hoo
   assert.equal(attaches('initialize', { 'x-braindog-client': 'c1', 'x-braindog-session': 'S4' }), true);
   assert.equal(attaches('tools/call', { 'x-braindog-session': 'S4' }), false);
   assert.equal(attaches(undefined, {}), false);
+});
+
+test('CLAUDE CODE IS HANDED THE LINES, not the JSON copy it would give its model, and what he told the run with them', () => {
+  const told = 'New for you: Sam (IN1): "Merge wave 1, then stop". Take it: instructions {take:"IN1"}.';
+  const answer = { content: [{ type: 'text', text: `Tasks, 1 open\n${told}` }], structuredContent: { rows: [{ id: 'e_1' }], new_for_you: [told] } };
+  const reply = { jsonrpc: '2.0' as const, id: 3, result: answer };
+  const call = (args: Record<string, unknown> = {}) => ({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'list', arguments: args } });
+  const code = { name: 'claude-code', version: '2.1.308' };
+  assert.deepEqual(linesForModel(reply, code, call()), { jsonrpc: '2.0', id: 3, result: { content: answer.content } });
+  /* The copy stays where it is asked for, drawn, or read by another app, and on a refusal. */
+  assert.deepEqual(linesForModel(reply, code, call({ format: 'full' })), reply);
+  assert.deepEqual(linesForModel(reply, { name: 'cursor' }, call()), reply);
+  const card = { ...reply, result: { ...answer, structuredContent: { ...answer.structuredContent, card: { kind: 'decision' } } } };
+  assert.deepEqual(linesForModel(card, code, call()), card);
+  const refusal = { ...reply, result: { ...answer, isError: true } };
+  assert.deepEqual(linesForModel(refusal, code, call()), refusal);
 });
