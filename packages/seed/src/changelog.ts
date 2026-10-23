@@ -270,6 +270,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.15.0',
+      notes: 'On Agents, the questions your agents asked are headed Your agents asked, so the count beside them is no longer read as everything that needs you.',
+    },
+    {
       version: '1.14.0',
       notes:
         'Agents opens on how many are at work, on how many machines and how many wait on you, the same number as the top bar. At work lists one line a run by machine, with Tell, Pause and Stop behind its menu. Tell an agent is one line, with what you told beside it. Left for the next run shows each step once, with Take and Drop. Today’s runs draws the day a lane an agent and names each run by what it did. Machines and profiles sit at the foot.',

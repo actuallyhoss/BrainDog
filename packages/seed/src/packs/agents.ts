@@ -497,10 +497,11 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
       /* WHAT A RUN ASKED YOU, FIRST OF THE GROUPS, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
          drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
-         none of them a run's, the queue has nothing in it and is not drawn. */
+         none of them a run's, the queue has nothing in it and is not drawn. NAMED FOR WHO ASKED, SINCE 1.15.0 (the audit
+         of 22 October, U5): headed Needs you, it counted 2 beside a badge, a Today tile and Decide that counted all 6. */
       {
         kind: 'queue',
-        heading: 'Needs you',
+        heading: 'Your agents asked',
         icon: 'ask',
         span: 12,
         source: 'governance.open',
@@ -943,8 +944,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      with what he told beside it; Left for the next run is the host's (`panel: left-steps`), one line a step with Take and
      Drop; Today's runs draws the day as lanes a kind of agent and titles each run by what it did, and the declared
      lanes, one a run, went; and Machines and profiles is a quiet tile at the foot (`panel: machines`). No list, field
-     or figure goes. */
-  manifest: { id: 'agents', version: '1.14.0', requires: ['register.things'] },
+     or figure goes.
+     1.15.0 IS WORDS, SO IT IS MINOR (the audit of 22 October, U5): the queue of what runs asked is headed Your agents
+     asked, where it said Needs you over a count of the questions runs opened, which is not what needs you. */
+  manifest: { id: 'agents', version: '1.15.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
