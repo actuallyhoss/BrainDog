@@ -121,8 +121,9 @@ export function methods(deps: RecordDeps) {
     }
   };
 
-  /** A thing in words: its title and its list, or the question it asks. Never its id. */
-  const wordsOf = (target: string): string => {
+  /** A thing in words: its title and its list, or the question it asks. Never its id, and nothing this caller may not see. */
+  const wordsOf = (ctx: CallContext, target: string): string => {
+    if (sightOf(ctx, target) === null) return 'it';
     if (target.startsWith('entry:')) {
       const row = kernel.get(target.slice('entry:'.length));
       const title = row === null ? null : kernel.titleOfRow(row.id);
@@ -150,12 +151,12 @@ export function methods(deps: RecordDeps) {
     const number = governed ? said : handle;
     if (number !== null) {
       const target = `${number.startsWith('SG') ? 'suggestion' : 'decision'}:${number}`;
-      return sightOf(ctx, target) === null ? { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' } : { target, list: null, id: number, words: wordsOf(target) };
+      return sightOf(ctx, target) === null ? { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' } : { target, list: null, id: number, words: wordsOf(ctx, target) };
     }
     const row = kernel.get(said);
     if (row !== null) {
       const target = `entry:${row.id}`;
-      return sightOf(ctx, target) === null ? { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' } : { target, list: row.register, id: row.id, words: wordsOf(target) };
+      return sightOf(ctx, target) === null ? { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' } : { target, list: row.register, id: row.id, words: wordsOf(ctx, target) };
     }
     /* BY ITS NAME, as `get` takes one (plan §4.3): the one thing whose title is these words, case and spacing aside. */
     if (said.length > 200) return { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' };
@@ -168,7 +169,7 @@ export function methods(deps: RecordDeps) {
       return { code: 'NAME_AMBIGUOUS', fix: `${picked.length} things are called ${clip(said, 60)}: ${handles.join(', ')}. Say which by how it is spoken.`, at: 'on', allowed: handles };
     }
     const one = kernel.get(picked[0]!.id)!;
-    return { target: `entry:${one.id}`, list: one.register, id: one.id, words: wordsOf(`entry:${one.id}`) };
+    return { target: `entry:${one.id}`, list: one.register, id: one.id, words: wordsOf(ctx, `entry:${one.id}`) };
   };
 
   /** Why this caller may not hang a visual on this thing, or `null`: what a note asks of a task, what `propose` asks of a question. */
@@ -323,7 +324,7 @@ export function methods(deps: RecordDeps) {
       if (bytes === null) return no('REF_UNKNOWN', 'This version is named here and its page is not on this host. Hand it in again.', { at: 'version' });
       return ok({
         id: whole.id,
-        on: wordsOf(whole.target),
+        on: wordsOf(ctx, whole.target),
         title: one.title,
         version: one.n,
         by: one.by,
