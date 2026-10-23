@@ -274,6 +274,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.16.0',
+      notes: 'Agents opens on who is at work and on what, such as Claude on Lanternfish, where it counted the machines they were on. Under it, how many runs are waiting for your reply.',
+    },
+    {
       version: '1.15.0',
       notes: 'On Agents, the questions your agents asked are headed Your agents asked, so the count beside them is no longer read as everything that needs you.',
     },

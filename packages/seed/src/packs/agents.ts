@@ -470,30 +470,25 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          ones Left for the next run draws. Until then it read this pack's `runs-left-next`, every stopped run with a
          step written, so a step a later run had taken was still counted and the line disagreed with the briefing.
 
-         ON HOW MANY MACHINES, AND WHO WAITS ON YOU, SINCE 1.14.0 (the Agents page's lead, "12 at work on 4 machines, 1
-         waiting on you"): three notes on the record's `machines-working`, exactly one drawn, since nobody at work is on
-         no machine and one machine is said in words. Every number is the record's own, by the one clock the rail's
-         count is (`runs-working`, `runs-waiting`), so the line and the pill at the top cannot say two numbers. */
+         ON HOW MANY MACHINES, AND WHO WAITS ON YOU, SINCE 1.14.0: three notes on the record's `machines-working`. WHO IS AT
+         WORK ON WHAT, SINCE 1.16.0 (the audit of 22 October, U12): the line counted machines ("1 at work on one machine")
+         over a tile that listed runs, and never said who or on what. Two notes on the record's `runs-working`, exactly
+         one drawn, the first naming each agent at work and its project ("Claude on Lanternfish is at work"). Every
+         number is the record's own, by the one clock the rail's count is (`runs-working`, `runs-waiting`), so the line
+         and the pill at the top cannot say two numbers. */
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'machines-working', gt: 1 },
-        body: '{{runs-working}} at work on {{machines-working}} machines, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
+        when: { metric: 'runs-working', gt: 0 },
+        body: '{{runs-working.names}} is at work. {{runs-waiting}} run(s) are waiting for your reply, {{handoffs-open}} step(s) left for the next run',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'machines-working', is: 1 },
-        body: '{{runs-working}} at work on one machine, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
-      },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'machines-working', is: 0 },
-        body: 'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run',
+        when: { metric: 'runs-working', is: 0 },
+        body: 'No agent is at work right now. {{runs-waiting}} run(s) are waiting for your reply, {{handoffs-open}} step(s) left for the next run',
       },
       /* WHAT A RUN ASKED YOU, FIRST OF THE GROUPS, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
          drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
@@ -946,8 +941,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      lanes, one a run, went; and Machines and profiles is a quiet tile at the foot (`panel: machines`). No list, field
      or figure goes.
      1.15.0 IS WORDS, SO IT IS MINOR (the audit of 22 October, U5): the queue of what runs asked is headed Your agents
-     asked, where it said Needs you over a count of the questions runs opened, which is not what needs you. */
-  manifest: { id: 'agents', version: '1.15.0', requires: ['register.things'] },
+     asked, where it said Needs you over a count of the questions runs opened, which is not what needs you.
+     1.16.0 IS WORDS, SO IT IS MINOR (the audit of 22 October, U12): the page's line names who is at work on what, from
+     the record's `runs-working`, where it counted the machines they were on. */
+  manifest: { id: 'agents', version: '1.16.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
