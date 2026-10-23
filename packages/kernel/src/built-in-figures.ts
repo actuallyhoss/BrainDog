@@ -1076,16 +1076,17 @@ function spokenTitle(sql: Sql, spoken: string): string | null {
  */
 function workingSaid(sql: Sql, runs: readonly { fields: Readonly<Record<string, Json>> }[]): string | undefined {
   const said = (v: Json | undefined): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined);
-  const each = [
-    ...new Set(
-      runs.map((r) => {
-        const who = agentOf({ agent: said(r.fields.agent), client: said(r.fields.client) }).name;
-        const project = said(r.fields.project);
-        const on = project === undefined ? null : (spokenTitle(sql, project) ?? (SPOKEN_ROW_AT.test(project) ? null : project));
-        return on ? `${who} on ${on}` : who;
-      }),
-    ),
-  ];
+  /* ONE PROJECT IS SAID ONCE, with every agent at work on it before it: "Claude and Codex on Kiln", not "Claude on Kiln
+     and Codex on Kiln". */
+  const on = new Map<string, Set<string>>();
+  for (const r of runs) {
+    const who = agentOf({ agent: said(r.fields.agent), client: said(r.fields.client) }).name;
+    const project = said(r.fields.project);
+    const title = project === undefined ? '' : (spokenTitle(sql, project) ?? (SPOKEN_ROW_AT.test(project) ? '' : project));
+    on.set(title, (on.get(title) ?? new Set<string>()).add(who));
+  }
+  const and = (words: readonly string[]): string => (words.length === 1 ? words[0]! : `${words.slice(0, -1).join(', ')} and ${words.at(-1)!}`);
+  const each = [...on].map(([title, who]) => (title === '' ? and([...who]) : `${and([...who])} on ${title}`));
   if (each.length === 0) return undefined;
   if (each.length > 3) return `${each.slice(0, 2).join(', ')} and ${each.length - 2} more`;
   return each.length === 1 ? each[0]! : `${each.slice(0, -1).join(', ')} and ${each.at(-1)!}`;

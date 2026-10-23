@@ -316,7 +316,8 @@ test('MACHINES-WORKING AND RUNS-WAITING COUNT BY THE SAME CLOCK AS RUNS-WORKING'
 });
 
 /* THE AGENTS PAGE SAYS WHO IS AT WORK ON WHAT (the audit of 22 October, U12): `{{runs-working.names}}`, each agent and
-   project once, by the project's name, and the agent alone where its run is in no project. */
+   project once, by the project's name, every agent on one project before it, and the agent alone where its run is in no
+   project. */
 test('RUNS-WORKING NAMES WHO IS AT WORK ON WHAT, each once, by the project\'s name', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
@@ -333,6 +334,8 @@ test('RUNS-WORKING NAMES WHO IS AT WORK ON WHAT, each once, by the project\'s na
   run('codex', null);
   run('claude', 'things#2', 30);
   assert.equal(names(), 'Claude on Lanternfish, Codex on Copperleaf and Codex', 'two runs of one agent on one project are said once, and a quiet run not at all');
+  run('codex', 'things#1');
+  assert.equal(names(), 'Claude and Codex on Lanternfish, Codex on Copperleaf and Codex', 'a project two agents are at work on is said once');
   sql.close();
 });
 
