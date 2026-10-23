@@ -63,7 +63,7 @@ test('EVERY KIND FINDS WHAT THE AUDIT FOUND ON HIS SCREENS, planted in a sentenc
 const CLEAN = [
   'Thursday 3 September',
   '8 need you. £7,200 owed to you is late, and £10,540 you owe. 2 agents are working.',
-  '3 about money, £7,239 in all. 5 quick ones.',
+  '8 need you: 3 about money, £7,239 in all, and 5 quick ones.',
   'Invoice 2026-041: brand system',
   'Invoice 2026-049: type licensing',
   'Chase £4,800',

@@ -170,11 +170,15 @@
      reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
      Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: recordNow(), lead, file: fileAt }));
-  const from = $derived([card.by.app, card.by.run].filter((s): s is string => s !== null));
+  /* WHO ASKED IS A NAME AND THE APP, NEVER THE RUN'S TITLE (the audit of 22 October, U-A7): "Built the big round on master
+     lo…" cut at 24 characters said nothing, and on a phone it wrapped. The run is named on the question's own page. */
+  const from = $derived([card.by.app].filter((s): s is string => s !== null));
   /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
   const inline = $derived(inlineOf(card, compact));
   /* The one the row fills with the accent: the suggested answer, or the first. */
   const primary = $derived(primaryOf(card));
+  /** What the filled answer does, in its own words, where it says: the line under a row of buttons. */
+  const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
   /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
   const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !drawn));
   /* THE ANSWER CHOSEN: the reader's, or the one the form starts on (the suggestion, where a key may give it). */
@@ -700,9 +704,16 @@
          one column in the order a question is read: who asked, the question, why, the answers, the buttons, what it
          changes. -->
     <div class="dc-main">
+      <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
+           is kept on it, unseen, for the keys and the ranking. -->
+      <h3 class="queue-question" dir="auto">
+        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+            class="qa-joined num">{queueWords.joined(card.joined)}</span
+          >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+      </h3>
       {#if !compact}
-        <!-- WHO ASKED, WHERE AND WHEN, one quiet line over the question at every width: the face and name, the app it ran
-             in and the run, each only where it has a name. "Asked by" is said to a screen reader, where the eye reads
+        <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence
+             (the audit of 22 October, U-A7): the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
              the line's place. The band is kept here for the keys and the ranking, and said in the answering button's
              words instead. -->
         <p class="queue-by">
@@ -713,13 +724,6 @@
           {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
         </p>
       {/if}
-      <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
-           is kept on it, unseen, for the keys and the ranking. -->
-      <h3 class="queue-question" dir="auto">
-        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
-            class="qa-joined num">{queueWords.joined(card.joined)}</span
-          >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
-      </h3>
       {#if decidesLine}<p class="qa-later" dir="auto">{decidesLine}</p>{/if}
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
       <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
@@ -812,6 +816,9 @@
           {/if}
           {@render later()}
         </div>
+        <!-- WHAT THE FILLED ANSWER DOES, one line under the row (U-A9), where its answers each carry one: "File them" says
+             what filing does before the press, as its rectangle did. -->
+        {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
       {/if}
       {#if phase === 'asking' && chosen}
         <form class="qa-reason" onsubmit={submit}>
@@ -908,8 +915,9 @@
     order: 2;
   }
 
-  /* THE BULK BOX SITS AT THE END OF THE BY-LINE, on its line, as the skin set it when the by-line was the card's own. */
-  .dc:has(> .qa-select) > .dc-main > .queue-by {
+  /* THE BULK BOX SITS AT THE END OF THE QUESTION'S FIRST LINE, since the question leads the card (U-A7); it sat at the end
+     of the by-line while the by-line was the card's first. */
+  .dc:has(> .qa-select) > .dc-main > .queue-question {
     grid-row: 1;
     grid-column: 1;
   }
@@ -1376,14 +1384,22 @@
     }
   }
 
-  /* ASK ME LATER (today F11): the clock and its words, quiet, at the end of the row of answers; 44 tall under a thumb. */
+  /* ASK ME LATER (today F11): the clock and its words, quiet, at the end of the row of answers; 44 tall under a thumb.
+     RIGHT AFTER THE LAST ANSWER (U-A7), never pushed to the far edge, where it sat alone on a row of its own. */
   .dc-actions > :global(.dc-later) {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
     padding-inline: var(--sp-2);
-    margin-inline-start: auto;
     color: var(--ink-2);
+  }
+
+  /* THE LINE OF WHAT THE FILLED ANSWER DOES, quiet, under the row. */
+  .dc-does {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 1.4;
   }
 
   @media (pointer: coarse) {

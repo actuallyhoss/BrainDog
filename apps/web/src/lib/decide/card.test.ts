@@ -309,7 +309,8 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.equal(inlineOf(cardOf(named(2), { now })), true, 'Chase it and Not yet are two buttons');
   assert.equal(inlineOf(cardOf(named(3), { now })), true);
   assert.equal(inlineOf(cardOf(named(4), { now })), false, 'a fourth answer keeps the form');
-  assert.equal(inlineOf(cardOf(ask({ options: ask().options.map((o) => ({ ...o, recommended: false })) }), { now })), false, 'an answer with a line of what it does keeps the form’s rectangles');
+  /* ONE ANSWER GRAMMAR (U-A9): answers that each say what they do are a row too, the first filled, its line under the row. */
+  assert.equal(inlineOf(cardOf(ask({ options: ask().options.map((o) => ({ ...o, recommended: false })) }), { now })), true, 'an answer with a line of what it does is a button, not a box that reads like text');
   assert.equal(inlineOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), true, 'Accept and Decline were always buttons');
   /* COMPACT, OUTSIDE DECIDE, the line of what each does waits on the question's page, and only a fourth answer does not fit. */
   assert.equal(inlineOf(cardOf(ask(), { now }), true), true);
@@ -348,8 +349,11 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
   assert.equal(pressOf(cardOf(described(2, { cost: 'undo' }), { now })), false, 'an answer that is hard to undo is two presses');
   assert.equal(pressOf(cardOf(described(2, { cost: 'shape' }), { now })), true, 'a band that only warns does not ask for two');
   assert.equal(pressOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), false, 'the record’s own two are a row of buttons');
-  /* THE ROW OF BUTTONS IS STILL ONLY FOR NAMES: an answer with a line stays a full-width rectangle that says it. */
-  assert.equal(inlineOf(cardOf(described(2), { now })), false);
+  /* ONE ANSWER GRAMMAR SINCE U-A9: an answer with a line is a button in the row too, and a hard one keeps the form. */
+  assert.equal(inlineOf(cardOf(described(2), { now })), true);
+  assert.equal(inlineOf(cardOf(described(3), { now })), true);
+  assert.equal(inlineOf(cardOf(described(4), { now })), false, 'a fourth answer is a list to weigh');
+  assert.equal(inlineOf(cardOf(described(2, { cost: 'undo' }), { now })), false, 'an answer hard to undo is chosen, then given');
   assert.equal(inlineOf(cardOf(ask(), { now })), true, 'a suggested answer is the button, not a rectangle');
 
   const card = src('./DecisionCard.svelte');
@@ -370,10 +374,14 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
   assert.match(form, /@media \(pointer: coarse\) \{\n\s+\.dc-choice \{\n\s+min-block-size: var\(--tap\);/u, 'a choice under a thumb is shorter than a thumb');
 });
 
-test('WHO ASKED IS ONE LINE OVER THE QUESTION AT EVERY WIDTH, and the side is drawn only with something in it', () => {
+test('EVERY CARD STARTS WITH ITS SENTENCE: who asked is one line under the question, and the side is drawn only with something in it', () => {
   const card = src('./DecisionCard.svelte');
-  assert.match(card, /<div class="dc-main">\n\s+\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
-  assert.ok(card.indexOf('<p class="queue-by">') < card.indexOf('<h3 class="queue-question"'), 'who asked does not lead the question');
+  assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<h3 class="queue-question" dir="auto">/u, 'a card starts with who asked, not its sentence (U-A7)');
+  assert.match(card, /\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
+  const article = card.indexOf('<div class="dc-main">');
+  assert.ok(card.indexOf('<h3 class="queue-question"', article) < card.indexOf('<p class="queue-by">', article), 'who asked leads the question');
+  /* NAME AND APP, NEVER THE RUN'S TITLE CUT AT 24 CHARACTERS. */
+  assert.match(card, /const from = \$derived\(\[card\.by\.app\]\.filter/u);
   assert.match(card, /const side = \$derived\(!compact && \(card\.why !== '' \|\| changesAny\)\);/u);
   assert.match(card, /\{#if side\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-side">/u, 'a side is drawn for who asked alone');
   assert.match(card, /data-side=\{side \? '' : undefined\}/u);

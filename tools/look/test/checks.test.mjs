@@ -67,6 +67,9 @@ test('THE COUNTS ARE READ WHERE THE PRODUCT SAYS THEM: the lane bar, the Project
 test("NEEDS YOU'S LINE IS BOTH GROUPS, or the one it has", () => {
   assert.equal(countsIn('3 about money, £7,239 in all. 5 quick ones.')['need you'][0].n, 8);
   assert.equal(countsIn('5 quick ones.')['need you'][0].n, 5);
+  /* THE LINE AS IT IS SAID SINCE U-A7, the count first: both readings are 8, and they agree. */
+  assert.deepEqual(countsIn('8 need you: 3 about money, £7,239 in all, and 5 quick ones.')['need you'].map((c) => c.n), [8, 8]);
+  assert.deepEqual(countsIn('6 need you, all quick ones.')['need you'].map((c) => c.n), [6]);
   assert.equal(countsIn('1 about money, £40 in all.')['need you'][0].n, 1);
   assert.deepEqual(countsIn('Nothing needs you today')['need you'], []);
 });

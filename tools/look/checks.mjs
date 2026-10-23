@@ -120,7 +120,8 @@ export function countsIn(whole, frame = {}) {
   const text = (frame.decor ?? []).reduce((t, d) => t.split(d).join(' '), String(whole));
   for (const [thing, readers] of Object.entries(READERS))
     for (const [at, re] of readers) for (const m of text.matchAll(re)) out[thing].push({ at, n: num(m[1]) });
-  /* NEEDS YOU'S OWN LINE says two groups ("3 about money, £7,239 in all. 5 quick ones."), and what needs you is both. */
+  /* NEEDS YOU'S OWN LINE says two groups ("8 need you: 3 about money, £7,239 in all, and 5 quick ones."), and what needs
+     you is both. */
   const money = /\b(\d[\d,]*) about money\b/u.exec(text);
   const quick = /\b(\d[\d,]*) quick ones?\b/u.exec(text);
   if (money || quick) out['need you'].push({ at: 'the Needs you line', n: num(money?.[1] ?? 0) + num(quick?.[1] ?? 0) });

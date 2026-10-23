@@ -132,8 +132,8 @@ test('the record draws the page: the first question whole, the rest after it onc
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
   assert.equal(note?.drawn, false);
   assert.equal(shaped.open, 3);
-  assert.equal(shaped.sentence.text, '3 quick ones.');
-  assert.equal(shaped.sentence.needs, '3 quick ones');
+  assert.equal(shaped.sentence.text, '3 need you, all quick ones.');
+  assert.equal(shaped.sentence.needs, '3 need you');
   /* EACH QUESTION ONCE, IN ITS GROUP: none of these moves money, so Money draws nothing and Quick holds all three. */
   const moneyIds = (money?.queue ?? []).map((q) => q.id);
   const quickIds = (quick?.queue ?? []).map((q) => q.id);
@@ -177,19 +177,19 @@ const queueBlock = (queue: QueueQuestion[], total: number, lead = false): LiveBl
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
-test('the head says the two groups in digits (today F12): how many about money and what they come to, then the quick ones', () => {
+test('the head says how many need you, then the two groups in digits (today F12, U-A7): about money and what they come to, then the quick ones', () => {
   const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
-  assert.equal(shaped.sentence.text, '5 quick ones.');
-  assert.equal(shaped.sentence.needs, '5 quick ones');
+  assert.equal(shaped.sentence.text, '5 need you, all quick ones.');
+  assert.equal(shaped.sentence.needs, '5 need you');
   const bills = [
     { ...question('m1'), question: 'Invoice 2026-041: brand system was due 38 days ago, GBP 4,800.00. Chase it?' },
     { ...question('m2'), question: 'Invoice 2026-046: retainer, August was due 9 days ago, GBP 2,400.00. Chase it?' },
     { ...question('m3'), question: 'Ledger Post, sending plan was due 4 days ago, GBP 39.00. Did it go through?' },
   ];
   const mixed = decideDrawn([noteBlock(), queueBlock([...bills, ...qs], 8, true), queueBlock([...bills, ...qs], 8)], CLOCK);
-  assert.match(mixed.sentence.text, /^3 about money, [^.]*7,239[^.]* in all\. 5 quick ones\.$/u);
-  assert.equal(mixed.sentence.needs, '3 about money');
+  assert.match(mixed.sentence.text, /^8 need you: 3 about money, [^.]*7,239[^.]* in all, and 5 quick ones\.$/u);
+  assert.equal(mixed.sentence.needs, '8 need you');
   /* NONE MOVES MONEY, so Quick holds every one, once, and Money draws nothing. */
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q1', 'q2', 'q3', 'q4', 'q5']);
   assert.equal(shaped.blocks[2]?.total, 5);
@@ -197,7 +197,7 @@ test('the head says the two groups in digits (today F12): how many about money a
   assert.equal(shaped.open, 5);
 
   const one = decideDrawn([noteBlock(), queueBlock([question('q1', 'undo')], 1, true), queueBlock([question('q1', 'undo')], 1)], CLOCK);
-  assert.equal(one.sentence.text, '1 quick one.');
+  assert.equal(one.sentence.text, '1 needs you, a quick one.');
   /* A GROUP THAT HOLDS NOTHING IS NOT DRAWN, the question is drawn once, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
   assert.equal(one.blocks[1]?.drawn, false);
@@ -211,7 +211,7 @@ test('the head counts every open question by the record’s count, not the few d
   const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
   const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
   const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK, undefined, null, LATE);
-  assert.equal(shaped.sentence.text, '12 quick ones.');
+  assert.equal(shaped.sentence.text, '12 need you, all quick ones.');
   assert.equal(shaped.open, 12);
 });
 
@@ -220,7 +220,7 @@ test('with boot\'s waits the head says the record\'s one count, and the calm lin
   /* THE BADGE'S NUMBER (`waits`), not the three the queue drew, and its late and hard counts. */
   const waits = { questions: 25, late: 10, hard: 2, inbox: 32 };
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 3, true), queueBlock(qs, 3)], CLOCK, () => '', waits, LATE);
-  assert.equal(shaped.sentence.text, '25 quick ones.');
+  assert.equal(shaped.sentence.text, '25 need you, all quick ones.');
   assert.equal(shaped.open, 25);
   /* NO QUESTION BUT 32 ARRIVALS: "Nothing waits on you" would be false. */
   const inbox = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 32 }, LATE);

@@ -586,11 +586,15 @@ export const INLINE_MOST = 3;
  * there a line of what each does is left to the question's own page, one press away, and only a fourth answer still
  * sends the reader there to choose.
  */
-export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact = false): boolean {
+export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>, compact = false): boolean {
   if (card.merge !== null) return false;
   if (card.decline !== null) return true;
   if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
-  return compact || suggestsOf(card) || card.ways.every((w) => w.because === '' && w.shows === null);
+  if (compact || suggestsOf(card) || card.ways.every((w) => w.because === '' && w.shows === null)) return true;
+  /* ONE ANSWER GRAMMAR (the audit of 22 October, U-A9): two or three answers that each say what they do, none hard to
+     undo and none a picture, are a row of buttons too, the first filled, with what it does said under the row. They
+     were two bordered boxes that pressed like text and moved 200 entries on one press. */
+  return pressOf(card) && card.ways.every((w) => w.shows === null);
 }
 
 /**

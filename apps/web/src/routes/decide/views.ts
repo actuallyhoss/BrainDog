@@ -328,14 +328,19 @@ function amountIn(q: QueueQuestion): { minor: number; currency: string } | null 
 }
 
 /**
- * NEEDS YOU'S LINE (today F12): how many are about money and what they come to, then how many quick ones; digits always.
- * The sum is said only where every money question names its amount, and per currency, never added across.
+ * NEEDS YOU'S LINE (today F12): one sentence that says how many need you, then how many are about money and what they
+ * come to, then how many quick ones; digits always. The sum is said only where every money question names its amount,
+ * and per currency, never added across.
+ *
+ * IT LEADS WITH THE COUNT, IN RED, SINCE THE AUDIT OF 22 OCTOBER (U-A7): "3 quick ones." was a category's label and not
+ * a sentence. Now "8 need you: 3 about money, £7,239 in all, and 5 quick ones.", or "6 need you, all quick ones."
  */
 export function groupSentence(money: readonly QueueQuestion[], quick: readonly QueueQuestion[], quickCount = quick.length): { text: string; needs: string } {
-  const parts: string[] = [];
-  let needs = '';
+  const total = money.length + Math.max(0, quickCount);
+  if (total === 0) return { text: '', needs: '' };
+  const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you`;
+  let sum = '';
   if (money.length > 0) {
-    needs = `${money.length.toLocaleString('en-GB')} about money`;
     const amounts = money.map(amountIn);
     const sums = new Map<string, number>();
     if (amounts.every((a) => a !== null)) for (const a of amounts) sums.set(a!.currency, (sums.get(a!.currency) ?? 0) + a!.minor);
@@ -343,14 +348,12 @@ export function groupSentence(money: readonly QueueQuestion[], quick: readonly Q
       const exp = exponentOf(currency);
       return writeAmount({ minor: Math.round(minor / 10 ** exp) * 10 ** exp, currency }, homeCurrency(), 'read')?.text ?? '';
     });
-    parts.push(said.length > 0 && said.every((x) => x !== '') ? `${needs}, ${said.join(' and ')} in all.` : `${needs}.`);
+    if (said.length > 0 && said.every((x) => x !== '')) sum = `, ${said.join(' and ')} in all`;
   }
-  if (quickCount > 0) {
-    const q = `${quickCount.toLocaleString('en-GB')} quick ${quickCount === 1 ? 'one' : 'ones'}`;
-    if (needs === '') needs = q;
-    parts.push(`${q}.`);
-  }
-  return { text: parts.join(' '), needs };
+  if (quickCount <= 0) return { text: `${needs}, ${money.length === 1 ? 'about money' : 'all about money'}${sum}.`, needs };
+  const quickSaid = `${quickCount.toLocaleString('en-GB')} quick ${quickCount === 1 ? 'one' : 'ones'}`;
+  if (money.length === 0) return { text: `${needs}, ${quickCount === 1 ? 'a quick one' : 'all quick ones'}.`, needs };
+  return { text: `${needs}: ${money.length.toLocaleString('en-GB')} about money${sum}, and ${quickSaid}.`, needs };
 }
 
 export function decideDrawn(
@@ -430,7 +433,8 @@ export function decideDrawn(
       ...(qs.length === 0 ? { drawn: false } : {}),
     } as LiveBlock;
   });
-  /* THE LINE SAYS THE TWO GROUPS (today F12): "3 about money, £7,239 in all. 5 quick ones." The red is on the money. */
+  /* THE LINE SAYS HOW MANY, THEN THE TWO GROUPS (today F12, U-A7): "8 need you: 3 about money, £7,239 in all, and 5
+     quick ones." The red is on how many. */
   if (waits) open = waits.questions;
   /* THE QUICK ONES ARE EVERY OPEN QUESTION THAT IS NOT ABOUT MONEY, by the record's count where it says more than the
      queue held. */
