@@ -103,10 +103,15 @@ const tab: Visibility = {
     document.addEventListener('visibilitychange', fn);
     window.addEventListener('focus', fn);
     window.addEventListener('blur', fn);
+    /* A TOUCH OR A KEY is somebody reading again, so a poll gone quiet is quick again (`live.ts`, `idle`). */
+    window.addEventListener('pointerdown', fn, { passive: true });
+    window.addEventListener('keydown', fn, { passive: true });
     return () => {
       document.removeEventListener('visibilitychange', fn);
       window.removeEventListener('focus', fn);
       window.removeEventListener('blur', fn);
+      window.removeEventListener('pointerdown', fn);
+      window.removeEventListener('keydown', fn);
     };
   },
 };
@@ -134,6 +139,8 @@ function asker(base: string): () => Promise<number> {
       if ('refusal' in out && endedBy(out.refusal)) end(out.refusal.fix);
       /* A RATE LIMIT SAYS HOW LONG TO WAIT, and the poll waits that long without calling the tab offline. */
       if ('refusal' in out && out.refusal.code === 'RATE_LIMITED') throw new Wait(Number(out.refusal.retry_after) || 60);
+      /* A BUSY RECORD IS NOT OFFLINE either: it answered, and asked for a few seconds (the Worker's 503). */
+      if ('refusal' in out && out.refusal.code === 'RECORD_UNAVAILABLE') throw new Wait(Math.max(5, Number(out.refusal.retry_after) || 0));
       throw new Error('the record did not answer its version');
     }
     /* A RECORD WHOSE FORMAT MOVED UNDER THE LOCAL COPY wipes what it kept (`local.ts`). */

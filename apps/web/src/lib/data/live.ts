@@ -67,6 +67,8 @@ export type Poll = {
   every?: number;
   /** The longest a failing poll waits between asks: a minute. */
   most?: number;
+  /** The longest a focused tab waits while nothing changes: each unchanged answer stretches `fast` by half, to this. */
+  idle?: number;
   timers: Timers;
   visible: Visibility;
   /** Called with the new version when it differs from the last one heard, and not for the first. */
@@ -82,7 +84,7 @@ export function delayOf(base: number, failures: number, most: number, wait: numb
 }
 
 /** Start polling. The function it returns stops it, and an answer landing after that is dropped. */
-export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timers, visible, onChange, onState }: Poll): () => void {
+export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, idle = 6_000, timers, visible, onChange, onState }: Poll): () => void {
   let stopped = false;
   /* ONE ASK AT A TIME. The next ask is scheduled when the last one answers, never on a fixed beat, so a slow host is
      asked no faster than it answers, and two answers can never land in the wrong order. */
@@ -92,6 +94,9 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timer
   let cancel: (() => void) | null = null;
   let failures = 0;
   let wait: number | null = null;
+  /* UNCHANGED ANSWERS IN A ROW. A focused tab asked 40 times a minute while nothing moved (23 Oct, 203 asks in 8 minutes
+     beside the overload); now it stretches to `idle` and is quick again on a change, a wake or a touch. */
+  let quiet = 0;
 
   const become = (next: LiveState) => {
     if (next === state) return;
@@ -99,7 +104,7 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timer
     onState?.(next);
   };
 
-  const base = () => (visible.focused?.() ? fast : every);
+  const base = () => (visible.focused?.() ? Math.min(Math.max(fast, idle), fast * 1.5 ** quiet) : every);
 
   function schedule() {
     cancel?.();
@@ -122,7 +127,10 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timer
       become('open');
       /* THE FIRST ANSWER IS THE BASELINE. The screen was drawn a moment ago, so calling it a change would have every
          list re-ask the question it has only just answered. */
-      if (last !== undefined && version !== last) onChange(version);
+      if (last !== undefined && version !== last) {
+        quiet = 0;
+        onChange(version);
+      } else if (last !== undefined) quiet += 1;
       last = version;
     } catch (e) {
       if (stopped) return;
@@ -154,9 +162,16 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timer
       return;
     }
     if (woke) {
+      quiet = 0;
       cancel?.();
       cancel = null;
       void check();
+      return;
+    }
+    /* A TOUCH ON A FOCUSED TAB THAT HAD GONE QUIET asks soon again; once quick, further touches move nothing. */
+    if (now.focused && quiet > 0 && !out) {
+      quiet = 0;
+      schedule();
       return;
     }
     if (!out) schedule();

@@ -174,10 +174,10 @@ test('a failed ask is offline, an answer is open, and each is said once', async 
   stop();
 });
 
-test('a focused tab asks about every 1.5 s, a blurred one every 15 s, and taking focus asks at once', async () => {
+test('a focused tab asks about every 1.5 s while the record moves, a blurred one every 15 s, and taking focus asks at once', async () => {
   const timers = clock();
   const t = tab(false, true);
-  const a = asker([1]);
+  const a = asker(Array.from({ length: 40 }, (_, i) => i));
   const stop = poller({ ask: a.ask, timers, visible: t, onChange: () => {} });
   await settle();
   assert.equal(a.calls, 1);
@@ -334,4 +334,49 @@ test('an ended refusal wipes both copies and draws the ended screen; the worker 
   assert.match(worker, /res\.status === 401 \|\| accessEnded\(res\.headers\)/, 'the worker deletes its copy on the header');
   assert.equal(accessEnded(new Headers({ 'x-braindog-access': 'ended' })), true);
   assert.equal(accessEnded(new Headers()), false);
+});
+
+test('A FOCUSED TAB WHERE NOTHING MOVES STRETCHES TO SIX SECONDS, and a change or a touch makes it quick again', async () => {
+  const timers = clock();
+  const t = tab(false, true);
+  const a = asker([1, 1, 1, 1, 1, 1, 1, 1, 2, 2]);
+  const stop = poller({ ask: a.ask, timers, visible: t, onChange: () => {} });
+  await settle();
+  const at: number[] = [];
+  let seen = a.calls;
+  for (let ms = 0; ms < 40_000; ms += 50) {
+    timers.advance(50);
+    await settle();
+    if (a.calls !== seen) (seen = a.calls), at.push(timers.now());
+  }
+  const gaps = at.slice(1).map((v, i) => v - at[i]!);
+  assert.deepEqual(gaps.slice(0, 4), [2_250, 3_400, 5_100, 6_000], 'each unchanged answer stretches the wait by half, to six seconds (on the 50 ms clock)');
+  assert.equal(gaps[7], 1_500, 'a change is quick again');
+  /* A TOUCH ON A QUIET TAB: the next ask is the quick one from now. */
+  await run(timers, 10_000);
+  const before = a.calls;
+  t.focus(true);
+  await run(timers, 1_500);
+  assert.equal(a.calls, before + 1, 'a touch on a quiet tab asks within 1.5 s');
+  stop();
+});
+
+test('A BUSY RECORD IS NOT OFFLINE: the poll waits as it was told', async () => {
+  const timers = clock();
+  const states: LiveState[] = [];
+  let calls = 0;
+  const ask = async () => {
+    calls++;
+    if (calls === 2) throw new Wait(5);
+    return 1;
+  };
+  const stop = poller({ ask, timers, visible: tab(false, true), onChange: () => {}, onState: (s) => states.push(s) });
+  await settle();
+  await run(timers, 1_500);
+  await run(timers, 4_900);
+  assert.equal(calls, 2, 'nothing asked inside the five seconds');
+  await run(timers, 200);
+  assert.equal(calls, 3);
+  assert.deepEqual(states, []);
+  stop();
 });
