@@ -1132,6 +1132,19 @@
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
+      /* OUT OF ITS BAR (U13): from 900px, where the bar's ask field is drawn, the palette opens over it, its top and end
+         edge on the field's, and grows down from there; anywhere else it is the centred box. */
+      const field = document.querySelector<HTMLElement>('[data-palette-from="bar"]');
+      const r = field && field.getClientRects().length > 0 && innerWidth >= 900 ? field.getBoundingClientRect() : null;
+      if (r) {
+        const rtl = getComputedStyle(field!).direction === 'rtl';
+        el.dataset.from = 'bar';
+        const end = Math.round(rtl ? r.left : innerWidth - r.right);
+        el.setAttribute('style', `--from-top: ${Math.round(r.top)}px; --from-end: ${end}px; --from-w: ${Math.round(r.width)}px`);
+      } else {
+        delete el.dataset.from;
+        el.removeAttribute('style');
+      }
       el.showModal();
       overlays.open();
       /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
@@ -1599,6 +1612,17 @@
 
   .palette[open] {
     display: flex;
+  }
+
+  /* OPENED FROM THE BAR'S FIELD (U13): over it, its end edge on the field's, at least 520 wide, growing down. */
+  .palette:global([data-from='bar']) {
+    inset-block-start: var(--from-top);
+    inset-inline: auto var(--from-end);
+    inline-size: min(560px, max(var(--from-w), 520px), calc(100vw - 2 * var(--sp-4)));
+    max-block-size: min(560px, calc(100dvh - var(--from-top) - var(--sp-6)));
+    margin: 0;
+    border-radius: var(--r-pop);
+    transform-origin: top;
   }
 
   .palette:not([open]) {
