@@ -30,7 +30,9 @@
  * variable. Neither is ever a plaintext object in a bucket the operator believes is sealed.
  */
 
-import { RecordChanged, type StreamedBrainl } from '@braindog/kernel';
+/* A TYPE ONLY: the kernel loaded beside the sealer raised its peak by 15 MiB (`test/seal-memory.test.ts`), so `steady`
+   knows a `RecordChanged` by its name. */
+import type { StreamedBrainl } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { recipientOf, sealStreamTo, type Plain, type Sealed } from './seal.ts';
@@ -350,7 +352,7 @@ export async function steady<T>(take: () => Promise<T>): Promise<T> {
     try {
       return await take();
     } catch (e) {
-      if (!(e instanceof RecordChanged) || n >= TRIES) throw e;
+      if (!(e instanceof Error && e.name === 'RecordChanged') || n >= TRIES) throw e;
     }
   }
 }
