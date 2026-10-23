@@ -263,6 +263,15 @@ test('A NOTE THAT ONLY SAYS NOUGHT IS NOT SAID: a clause whose figures are all 0
   assert.equal(noteOf('{{agents}} of them by an agent', said), '');
 });
 
+test('A NOTE NAMING A FIGURE THAT DID NOT READ SAYS NOTHING OF IT: "Lasts to" and a dash was a hole under Cash now', async () => {
+  const { noteOf } = await import('./metrics.ts');
+  const figures: Record<string, string | null> = { 'runs-out-on': null, accounts: '3' };
+  const said = (id: string) => figures[id] ?? null;
+  assert.equal(noteOf('Lasts to {{runs-out-on}}', said), '');
+  assert.equal(noteOf('in {{accounts}} account(s), lasts to {{runs-out-on}}', said), 'in 3 accounts');
+  assert.ok(!noteOf('Lasts to {{runs-out-on}}', said).includes(MISSING));
+});
+
 test('a figure that is a day is said as one, with its year only when that is not the year it is', () => {
   const now = Date.UTC(2026, 9, 7, 12);
   const days = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;

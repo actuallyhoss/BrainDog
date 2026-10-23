@@ -833,9 +833,11 @@ export function withParam(decl: MetricDecl, it: string): MetricDecl {
 /**
  * A figure's own note, with each `{{id}}` it names written as that figure, and `N thing(s)` said properly.
  *
- * `in {{cash-accounts}} account(s), as of {{cash-as-of}}` is the line under Cash now. A figure the note
- * names that cannot be read is the em dash, as it is everywhere else, and `(s)` after a number is the
+ * `in {{cash-accounts}} account(s), as of {{cash-as-of}}` is the line under Cash now, and `(s)` after a number is the
  * one plural the sentence needs: `1 account`, `2 accounts`.
+ *
+ * A FIGURE THE NOTE NAMES THAT CANNOT BE READ TAKES ITS CLAUSE WITH IT, as it does in a lead (`leadOf`): "Lasts to"
+ * and a dash under Cash now, on a record whose money outlasts the walk, said a hole where there was nothing to say.
  */
 export function noteOf(template: string, said: (id: string) => string | null | typeof UNNAMED): string {
   /* A CLAUSE THAT ONLY SAYS NOUGHT IS LEFT OUT. "0 with an agent, 0 kept for later" under a new record's Open tasks is
@@ -844,7 +846,7 @@ export function noteOf(template: string, said: (id: string) => string | null | t
   const FIGURE = /\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu;
   const kept = template.split(/,\s+/u).filter((clause) => {
     const ids = [...clause.matchAll(FIGURE)].map((m) => m[1]!);
-    return ids.length === 0 || ids.some((id) => said(id) !== '0');
+    return ids.length === 0 || (ids.every((id) => said(id) !== null) && ids.some((id) => said(id) !== '0'));
   });
   /* A PATH THAT NAMES NOTHING (`UNNAMED`) IS THE AUTHOR'S OWN WORDS, printed as written, never the dash a figure that
      could not be read gets: the dash would say a figure is missing where the author's typo is. */
@@ -852,7 +854,7 @@ export function noteOf(template: string, said: (id: string) => string | null | t
     .join(', ')
     .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => {
       const v = said(id);
-      return v === UNNAMED ? id : (v ?? '—');
+      return v === UNNAMED ? id : (v ?? '');
     })
     .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : `${word}s`}`)
     .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
