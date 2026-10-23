@@ -524,6 +524,32 @@
         .catch(() => {});
     });
   });
+  /* WHO WORKED ON EACH LAST, from the runs (`card-life.ts`), for each card's live line, again when the record moves. */
+  let lasts = $state.raw<ReadonlyMap<number, { agent: string; name: string; said: string }>>(new Map());
+  /* AND THE DAY EACH ROW LAST CHANGED, which a block's rows do not carry: what a card with nothing else is quiet since. */
+  let moved = $state.raw<ReadonlyMap<number, string>>(new Map());
+  $effect(() => {
+    const said = cardSeqs;
+    void liveRecord.version;
+    if (said === '') return;
+    untrack(() => {
+      const list = said.split(':')[0]!;
+      const title = REGISTERS[list]?.title ?? 'name';
+      const named = (block.entries ?? []).flatMap((e) =>
+        typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null
+          ? [{ seq: e.seq, id: typeof (e as { id?: unknown }).id === 'string' ? (e as { id: string }).id : null, name: String((e.fields as Record<string, unknown>)[title] ?? '').trim() }]
+          : [],
+      );
+      void import('$lib/home/card-life.ts')
+        .then((m) => Promise.all([m.readLastRuns(apiBase(), list, named), m.readMoved(apiBase(), list)]))
+        .then(([got, days]) => {
+          if (said !== cardSeqs) return;
+          lasts = got;
+          moved = days;
+        })
+        .catch(() => {});
+    });
+  });
   /* THE KEY NUMBER EACH CARD LEADS WITH (`card-kpis.ts`), read beside the cards and again when the record moves; a card
      whose project keeps none says what it did. */
   let leads = $state.raw<readonly KpiAnswered[]>([]);
@@ -557,7 +583,7 @@
     return cards.map((c) => {
       const f = c.figure ? fieldDecl(list, c.figure.field) : undefined;
       const said = facts.get(c.seq);
-      return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
+      return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null, last: lasts.get(c.seq) ?? null, moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
 

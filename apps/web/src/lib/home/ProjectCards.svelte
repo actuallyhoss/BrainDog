@@ -29,6 +29,7 @@
   import { untrack } from 'svelte';
   import { live } from '$lib/data/live.svelte.ts';
   import { latesOf } from './card-late.ts';
+  import { readLastRuns, type LastRun } from './card-life.ts';
 
   let {
     cards,
@@ -79,6 +80,20 @@
       void latesOf(apiBase(), list, said.split(',').map(Number))
         .then((got) => {
           if (said === seqs) lates = got;
+        })
+        .catch(() => {});
+    });
+  });
+  /* WHO WORKED ON EACH LAST, from the runs (`card-life.ts`), for each card's live line, again when the record moves. */
+  let lasts = $state.raw<ReadonlyMap<number, LastRun>>(new Map());
+  $effect(() => {
+    const said = seqs;
+    void live.version;
+    if (said === '') return;
+    untrack(() => {
+      void readLastRuns(apiBase(), list, cards.filter((c) => !c.draft))
+        .then((got) => {
+          if (said === seqs) lasts = got;
         })
         .catch(() => {});
     });
@@ -152,7 +167,7 @@
               {#if failed}<span class="d-fail" role="alert">{failed}</span>{/if}
             </div>
           {:else}
-            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late }} label={label(c)} agents={agentsOn(c.name, working)} />
+            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late, last: lasts.get(c.seq) ?? c.last ?? null }} label={label(c)} agents={agentsOn(c.name, working)} />
           {/if}
         </li>
       {/each}

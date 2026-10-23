@@ -23,7 +23,7 @@ export type CardDecl = {
   fields: readonly { id: string; type: string }[];
 };
 
-export type CardRow = { seq: number; id?: string | undefined; fields: Readonly<Record<string, unknown>>; created_at?: string | undefined };
+export type CardRow = { seq: number; id?: string | undefined; fields: Readonly<Record<string, unknown>>; created_at?: string | undefined; updated_at?: string | undefined };
 
 /** One project as a card: its name, mark, hue, one line, next step and, if it has money, one figure. */
 export type ProjectCard = {
@@ -43,6 +43,10 @@ export type ProjectCard = {
   late: number;
   /** How long since anybody worked on it, as the record said it ("2 days"), and whether that is past its thirty days. */
   worked: { said: string; quiet: boolean } | null;
+  /** Who worked on it last and how long ago, from the runs (`card-life.ts`), where one named it. */
+  last?: { agent: string; name: string; said: string } | null;
+  /** The day the row itself last changed, YYYY-MM-DD: what a card with no other sign of life is quiet since. */
+  moved?: string | null;
   /** What it is in a line: drawn on a draft's card only, since a project's page says it in its hero. */
   brief: string | null;
   next: string | null;
@@ -136,6 +140,28 @@ export function workedSaid(w: { said: string; quiet: boolean }): string {
 }
 
 /**
+ * THE ONE LIVE LINE AT A CARD'S FOOT, SINCE the audit of 22 October (U5): who is on it now, else who worked on it last
+ * from the runs ("Claude worked on it 2 hours ago"), else how long since its work moved ("Worked on 2 days ago"), else
+ * the day the project itself last changed ("Quiet since 28 Sep"). Six of eight cards said a name and a lane and nothing
+ * else, so a card with no number, money or next step now says the newest sign of life the record holds, and every card
+ * says one. `null` only for a draft's card, which says what it is in its own words.
+ */
+export type Life =
+  | { kind: 'working'; said: string }
+  | { kind: 'run'; said: string; agent: string }
+  | { kind: 'worked'; said: string; quiet: boolean }
+  | { kind: 'quiet'; said: string };
+
+export function lifeOf(card: Pick<ProjectCard, 'worked' | 'last' | 'moved'>, agents: readonly { name: string }[]): Life | null {
+  const names = [...new Set(agents.map((a) => a.name))];
+  if (names.length > 0) return { kind: 'working', said: `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]} working` };
+  if (card.last) return { kind: 'run', said: `${card.last.name} worked on it ${card.last.said}`, agent: card.last.agent };
+  if (card.worked) return { kind: 'worked', said: workedSaid(card.worked), quiet: card.worked.quiet };
+  if (card.moved) return { kind: 'quiet', said: `Quiet since ${daySaid(card.moved)}` };
+  return null;
+}
+
+/**
  * The row's hue where it holds a number, else the hue its name is drawn in on the rail and in Today's tasks (`hueFor`);
  * an empty field is not hue 0. EVERY PROJECT IN ITS OWN COLOUR, SINCE the audit of 22 October (U5, U-B13): most
  * projects on a record keep no hue, so five of eight cards on Today were grey on grey, and a project's dot in a task
@@ -189,6 +215,7 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
       seq: r.seq,
       draft: f.draft === true,
       made: typeof r.created_at === 'string' ? r.created_at : null,
+      moved: typeof r.updated_at === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(r.updated_at) ? r.updated_at.slice(0, 10) : null,
     };
   });
   return { cards, more: Math.max(0, live.length - cards.length) };

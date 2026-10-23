@@ -16,9 +16,11 @@
        with no money leads with how far along it is instead ("35%", "of the way"), so no card has a hole;
     C  the meter, "60% · aiming 20 Sep";
     D  the next step after an arrow, two lines at most;
-    E  pinned to the foot: who is on it, and how long since anybody worked on it. Not on a phone, where Today's Working
-       now and the project's page say the agents.
-  No brief: the project's page says what it is in its hero.
+    E  pinned to the foot, ITS ONE LIVE LINE (`lifeOf`, the audit of 22 October, U5): who is on it now, else who worked on
+       it last from the runs, else how long since its work moved, else since when it has been quiet, with a face or a
+       dot in its colour. On a phone too, since on an empty card it is the one thing said.
+  No brief: the project's page says what it is in its hero. NO HEIGHT OF ITS OWN, SINCE the same audit: every card was
+  248px whatever it held, so a name and a lane sat over 170px of white; a row is as tall as its tallest card.
 
   NOTHING LIFTS (SF15): under the pointer the fill takes 5% of the project's colour (8% dark) over `--d-state`, pressed
   10% (12% dark) over `--d-press`, and the focus is the one ring. A figure that changes while the card is on screen
@@ -34,7 +36,7 @@
   import { homeCurrency } from '$lib/record/api.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { Sparkline } from '$lib/viz/index.ts';
-  import { HEALTH, daySaid, slotStyle, workedSaid, type ProjectCard } from '$lib/home/project-cards.ts';
+  import { HEALTH, daySaid, lifeOf, slotStyle, workedSaid, type ProjectCard } from '$lib/home/project-cards.ts';
 
   let {
     card,
@@ -69,9 +71,10 @@
     if (leadsWithProgress) return aim ? aim.charAt(0).toUpperCase() + aim.slice(1) : '';
     return aim ? `${card.progress}% · ${aim}` : `${card.progress}%`;
   });
-  const names = $derived([...new Set(agents.map((a) => a.name))]);
-  const whoSaid = $derived(names.length === 0 ? '' : `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]} working`);
-  const worked = $derived(card.worked ? workedSaid(card.worked) : '');
+  /* ITS ONE LIVE LINE (`lifeOf`): who is on it, who worked on it last, how long since its work moved, or since when it
+     has been quiet. How long since its work moved stands beside who is on it now, as before. */
+  const life = $derived(lifeOf(card, agents));
+  const worked = $derived(life?.kind === 'working' && card.worked ? workedSaid(card.worked) : '');
   const named = $derived(
     [
       card.name,
@@ -156,13 +159,19 @@
   {#if card.next}
     <span class="pc-next"><Icon name="arrow" size="m" /><span class="sr">Next step: </span><span class="pc-next-words" dir="auto">{card.next}</span></span>
   {/if}
-  {#if agents.length > 0 || worked}
-    <span class="pc-foot">
-      {#if agents.length > 0}
+  {#if life}
+    <span class="pc-foot" data-life={life.kind}>
+      {#if life.kind === 'working'}
         <span class="faces">{#each agents.slice(0, 3) as a (a.agent)}<AgentFace agent={a.agent} run="" live="working" size="xs" />{/each}</span>
-        <span class="pc-quiet pc-who">{whoSaid}</span>
+        <span class="pc-quiet pc-who">{life.said}</span>
+        {#if worked}<span class="pc-quiet pc-worked" data-quiet={card.worked?.quiet ? '' : undefined}>{worked}</span>{/if}
+      {:else if life.kind === 'run'}
+        <span class="faces"><AgentFace agent={life.agent} run="" live="stopped" size="xs" /></span>
+        <span class="pc-quiet pc-who">{life.said}</span>
+      {:else}
+        <span class="pc-mark" aria-hidden="true"></span>
+        <span class="pc-quiet pc-who" data-quiet={life.kind === 'worked' && life.quiet ? '' : undefined}>{life.said}</span>
       {/if}
-      {#if worked}<span class="pc-quiet pc-worked" data-quiet={card.worked?.quiet ? '' : undefined}>{worked}</span>{/if}
     </span>
   {/if}
 </a>
@@ -174,7 +183,6 @@
     display: flex;
     flex-direction: column;
     block-size: 100%;
-    min-block-size: 248px;
     box-sizing: border-box;
     padding: 20px;
     border-radius: var(--r-tile);
@@ -480,8 +488,19 @@
     margin-inline-start: auto;
   }
 
-  .pc-worked[data-quiet] {
+  .pc-worked[data-quiet],
+  .pc-who[data-quiet] {
     color: var(--red);
+  }
+
+  /* A LINE WITH NO FACE BEFORE IT WEARS THE PROJECT'S COLOUR as a dot, so every card's live line is in its own colour. */
+  .pc-mark {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    margin-inline: 4px;
+    border-radius: var(--r-round);
+    background: var(--ph);
   }
 
   [data-arrived] {
@@ -519,10 +538,9 @@
     }
   }
 
-  /* ── a phone: 16 round, the figure at 24, one line of next step, no foot ── */
+  /* ── a phone: 16 round, the figure at 24, one line of next step, the live line without its rule ── */
   @media (width < 640px) {
     .pcard {
-      min-block-size: 0;
       padding: 16px;
     }
 
@@ -554,7 +572,13 @@
       line-clamp: 1;
     }
 
+    /* THE LIVE LINE STAYS ON A PHONE, under no rule: it is the one thing an empty card says. */
     .pc-foot {
+      padding-block-start: 0;
+      border-block-start: 0;
+    }
+
+    .pc-worked {
       display: none;
     }
   }
