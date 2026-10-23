@@ -13,7 +13,7 @@ import { FILING_FIGURES } from './filing.ts';
 import { FLOW_FIGURES } from './flow.ts';
 import { BOOK_FIGURES } from './books.ts';
 import { BUDGET_FIGURES } from './budgets.ts';
-import { INSTALMENTS_FIGURES } from './instalments.ts';
+import { INSTALMENTS_FIGURES, LATE_PART_FIGURES } from './instalments.ts';
 import { NEXT_PART_FIGURES, PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
@@ -73,6 +73,10 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      and what is left once that part is paid, which Instalments says under each bar. LAST, so every figure above keeps its
      place in the document. */
   ...NEXT_PART_FIGURES,
+
+  /* THE PARTS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4): what Money's first line and Heads up name when
+     a part's day has gone. LAST, so every figure above keeps its place in the document. */
+  ...LATE_PART_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

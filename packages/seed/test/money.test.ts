@@ -951,10 +951,15 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.equal(lead.values?.['cash-now.moved'], `${-moved}% down`);
   /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
      that clause and keeps the rest. */
+  const [money, late] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
   assert.deepEqual(
-    lead.body?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
+    money?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
     [['cash-now', 'cash-accounts'], ['cash-now.moved']],
   );
+  /* AND THE PART THAT IS LATE, A SENTENCE OF ITS OWN SINCE money-core 3.18.0, which the sample has none of: its figures
+     hold no value here, so the app leaves the sentence out whole (`leadOf`). */
+  assert.match(late ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u);
+  assert.equal(reading(k, 'installments-late'), 0, 'the sample has a part late');
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
   for (const metric of ['cash-now', 'runway-days'])
@@ -1315,13 +1320,14 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true ? (b.body?.includes('{{cash-now}}') ? undefined : 'kept in') : (b.heading ?? '')));
+      .map((b) => (b.lead === true ? (b.body?.startsWith('Cash is {{cash-now}}') ? undefined : 'kept in') : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
   made('Home');
   const two = drawn();
-  assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
-  /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0: two counts, never the sum. */
+  assert.ok(!two.includes(undefined), 'the line of one book is still said over two');
+  /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0, and how much there is, since 3.18.0 (the
+     audit of 22 October, U4): what each book holds is still the tile under it. */
   assert.equal(two[0], 'kept in');
   /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever a page declares it, and Money declares it nowhere since REC-B23
      step 7. The filter stays for a look that puts the questions first while there are any (`look.<page>`'s `lead`,

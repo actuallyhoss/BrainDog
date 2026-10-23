@@ -3,6 +3,14 @@
 const ONE_BOOK = { metric: 'books-held', lt: 2 };
 const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.';
 
+/**
+ * AND A PART THAT IS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4: "Money's first line says how much he
+ * has and that the part is late"): the part late longest by its name, what it is and how long since its day, as a
+ * sentence of its own after the money. Its figures are `installments-late`'s first row, so on a record with nothing
+ * late the sentence has no figure that reads and goes whole (`leadOf`), and the line is what it was.
+ */
+const LATE_PART = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+
 export const HEADLINE: Record<string, unknown>[] = [
   {
     /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
@@ -25,19 +33,24 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: ONE_BOOK,
-    body: WHAT_THERE_IS,
+    body: `${WHAT_THERE_IS}${LATE_PART}`,
   },
   {
     /* WITH TWO BOOKS OR MORE THE LINE SAYS WHERE THE MONEY IS KEPT, AND NO SUM, SINCE money-core 3.17.0. No block here
        was the page's lead on such a record, so the app said its own filler under the page's name: "One screen that
        gathers what you keep an eye on: figures, tables and notes." Two counts, the books and the accounts that count as
        cash, and never an amount: one figure over two books adds a company's money to a person's own, which is why the
-       line above goes. What each book holds is the tile under it (`by-book.ts`). */
+       line above goes. What each book holds is the tile under it (`by-book.ts`).
+
+       AND HOW MUCH, SINCE money-core 3.18.0 (the audit of 22 October, U4, his call taken as suggested): a line of two
+       counts and no amount opened the page of a finance app, and the one total stood inside the chart. Cash now leads,
+       as Cash ahead's own today already says it, with the books it is kept in after it; what each book holds is still
+       the tile under it. Then the part that is late, as on one book. */
     kind: 'note',
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).',
+    body: `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE_PART}`,
   },
   /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
      lasts, which are the three figures the line above says, so a person read them twice before reading anything
@@ -69,7 +82,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
        the cash alone and no answer stands a screen away from a second one. */
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
-    body: WHAT_THERE_IS,
+    body: `${WHAT_THERE_IS}${LATE_PART}`,
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
@@ -82,7 +95,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.`,
+    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.${LATE_PART}`,
   },
   HEADLINE[1]!,
 ];

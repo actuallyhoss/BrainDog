@@ -661,11 +661,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   nought red is "Nothing on this record needs a look", its groups are Needs a look, All good and Not checked yet, and
  *   the run of good days says every check passed. Words inside `page.health` only, no id added or taken away, so a
  *   minor step that reaches a record on its own.
+ * - money-core 3.18.0 (the audit of 22 October, U4): a part of a plan whose day has gone is late. `installments-late`
+ *   counts the parts still open past their day, going out, and its first row is the part late longest; Money's first
+ *   line says it by name after the money, and with two books the line says the money there is (`cash-now`) where it
+ *   said two counts; Heads up's line of bills late says the part first (`says:`). 3.17.0 IS RELEASED (the deploy of
+ *   23 October holds it), so a version of its own. One figure added and nothing taken away, so a minor step that
+ *   reaches a record on its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.20.0',
   people: '3.5.0',
-  'money-core': '3.17.0',
+  'money-core': '3.18.0',
   estate: '2.2.0',
   work: '1.19.0',
 };

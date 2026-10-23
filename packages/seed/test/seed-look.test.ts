@@ -176,7 +176,10 @@ test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
   assert.equal(home().title, 'Today');
 });
 
-test('MONEY WITH TWO BOOKS OPENS ON WHERE THE MONEY IS KEPT, two counts and no sum, and with one book on its cash', async () => {
+/* AND HOW MUCH THERE IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): with two books the line leads with Cash
+   now, and every line ends on the part that is late, a sentence the app leaves out while none is. */
+const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and with one book on its cash', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };
   const leads = (): Lead[] => (drawnOn(k, 'money') as Lead[]).filter((b) => b.kind === 'note' && b.lead === true);
@@ -188,12 +191,19 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE THE MONEY IS KEPT, two counts and no s
   account('Everyday', own, 'GBP');
   /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
      (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), ['Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.']);
+  assert.deepEqual(leads().map((b) => b.body), [`Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`]);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), ['Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).'], 'one lead, and never the sum over two books');
-  assert.deepEqual(two[0]!.values, { 'books-held': 2, 'cash-accounts': 2 });
+  assert.deepEqual(two.map((b) => b.body), [`You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
+  assert.deepEqual(two[0]!.values, {
+    'books-held': 2,
+    'cash-accounts': 2,
+    'cash-now': [
+      { amount: 250_000, currency: 'GBP' },
+      { amount: 250_000, currency: 'USD' },
+    ],
+  });
   /* AND THE PAGE IS STILL WITHIN WHAT A PAGE DECLARES. */
   assert.ok(value<{ blocks: unknown[] }>(k.page('money')).blocks.length <= 24);
 });

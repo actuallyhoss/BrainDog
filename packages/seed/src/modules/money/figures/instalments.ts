@@ -37,3 +37,24 @@ export const INSTALMENTS_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 };
+
+/**
+ * THE PARTS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4): a part still open whose day has gone, going out.
+ * A part was called "next", in grey, nine days after its day, while a late bill was red in Heads up and on Today. Its
+ * rows name the part Money's first line says (`{{installments-late.first}}`, the one late longest), with its amount and
+ * its day, and Heads up's line says the same. Its own export, declared last in Money (`figures/index.ts`), so every
+ * figure a record already holds keeps its place in the document.
+ */
+export const LATE_PART_FIGURES: Record<string, SeedMetric> = {
+  'installments-late': {
+    metric: 'installments-late',
+    name: 'Instalments late',
+    source: 'register.installments',
+    where: 'state is open, direction is out, due before today',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};

@@ -9,10 +9,10 @@
  * from the built document and the built-in list, never from a list kept in this file.
  *
  * WHAT IS READ, AS THE RECORD READS IT (`pathsOf` in `packages/kernel/src/pages.ts`): a block's heading, body, empty
- * sentence, the cells a person wrote, the note under a figure and a column's label, with code spans lifted out. A typed
- * form (`{{money:amount}}`) is read by its argument. What a name may be (`pathOf` there): a figure, `<figure>.change` or
- * the rows it counts (`.first`, `.names`, `.more`, `.since`), or a count of one of Money's own lists, whole or by a state
- * its list declares. ON A PAGE OF EACH ROW (`for:`), a field of that row and `spoken` are filled first, everywhere on the
+ * sentence and each sentence of its `says`, the cells a person wrote, the note under a figure and a column's label, with
+ * code spans lifted out. A typed form (`{{money:amount}}`) is read by its argument. What a name may be (`pathOf` there):
+ * a figure, `<figure>.change` or the rows it counts (`.first`, `.names`, `.more`, `.since`, and `.first_<field>`, a field
+ * of the first of them), or a count of one of Money's own lists, whole or by a state its list declares. ON A PAGE OF EACH ROW (`for:`), a field of that row and `spoken` are filled first, everywhere on the
  * page (`fill`), so `{{name}}` there is the book's name and not a figure. A name anywhere else on a page is never filled,
  * and printed as written, so it is a fault wherever it is.
  */
@@ -32,7 +32,7 @@ const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct'
 /** What `<figure>.<part>` may ask besides the figure itself. */
 const FIGURE_PARTS = new Set(['change', 'moved', 'first', 'names', 'more', 'since']);
 /** Where on a page the record fills a name from the figures: the places `pathsOf` reads. */
-const SAID = [/\.blocks\[\d+\]\.(?:heading|body|empty)$/, /\.cells\[\d+\]\.note$/, /\.columns\[\d+\]\.label$/, /\.authored\[\d+\]\.cells\[\d+\]$/];
+const SAID = [/\.blocks\[\d+\]\.(?:heading|body|empty)$/, /\.blocks\[\d+\]\.says\[\d+\]\.body$/, /\.cells\[\d+\]\.note$/, /\.columns\[\d+\]\.label$/, /\.authored\[\d+\]\.cells\[\d+\]$/];
 
 /** Every string under `value`, with where it is. */
 function* strings(value: unknown, at: string): Generator<[string, string]> {
@@ -60,6 +60,12 @@ export function unresolved(doc: { declarations: Decl[] }): string[] {
     if (parts.length !== 2) return false;
     const [head, tail] = parts as [string, string];
     if (FIGURE_PARTS.has(tail) && isFigure(head)) return true;
+    /* `first_<field>` IS ONE FIELD OF THE FIRST ROW A FIGURE COUNTS, a field its list declares (`rowsValue`). */
+    if (tail.startsWith('first_')) {
+      const source = doc.declarations.find((d) => d.metric === head)?.source;
+      const list = typeof source === 'string' && source.startsWith('register.') ? lists.get(source.slice('register.'.length)) : undefined;
+      return ((list?.fields as Field[] | undefined) ?? []).some((f) => f.id === tail.slice('first_'.length));
+    }
     return lists.has(head) && (tail === 'count' || statesOf(head).includes(tail));
   };
   const out: string[] = [];

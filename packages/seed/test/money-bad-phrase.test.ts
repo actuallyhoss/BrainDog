@@ -19,11 +19,20 @@ import { HEADS_UP } from '../src/modules/money/pages/parts/heads-up.ts';
 /* "LATE", THE WORD EVERY OTHER SCREEN USES (the UI pass of 20 October, money F5), where it said "past their due date". */
 const LATE = 'late';
 
-/** The one line of Heads up drawn on this figure. */
+/**
+ * The one line of Heads up drawn on this figure: its body, or, for a line of several sentences (`says`), the one said
+ * when nothing else holds, which is the last. Bills late is such a line since money-core 3.18.0, its first sentences
+ * the part of a plan that is late.
+ */
 const bodyOn = (metric: string): string => {
-  const lines = HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric === metric);
+  const on = (when: unknown): boolean => {
+    const w = when as { metric?: string; any?: unknown[] } | undefined;
+    return w?.metric === metric || (Array.isArray(w?.any) && w.any.some(on));
+  };
+  const lines = HEADS_UP.filter((b) => on(b.when));
   assert.equal(lines.length, 1, `one line of Heads up is drawn on ${metric}`);
-  const body = lines[0]!.body;
+  const says = lines[0]!.says as { body: string }[] | undefined;
+  const body = says ? says.at(-1)!.body : lines[0]!.body;
   assert.equal(typeof body, 'string');
   return body as string;
 };

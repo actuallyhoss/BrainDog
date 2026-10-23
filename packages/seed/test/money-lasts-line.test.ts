@@ -93,9 +93,12 @@ const bill = (k: Kernel, amount: number, due: number): void =>
 /* EACH LINE ENDS ON HOW LONG THE CASH LASTS WITH NO INCOME, since money-core 3.17.0 (money-lasts-no-income-95), BUT
    THE ONE WHERE THE WALK GOES UNDER: there the Lasts tile says it, beside the day on what is due (the UI pass of 20
    October, money F3), and the line says what there is. */
-const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.';
-const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.';
-const BOOKS = 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).';
+/* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0 (the audit of 22 October, U4): a sentence of its own,
+   which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
+const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+const WHAT_THERE_IS = `Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.${LATE}`;
+const LASTS = `Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`;
+const BOOKS = `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -159,7 +162,7 @@ test('A RECORD WITH NO ACCOUNT IS NOT TOLD ITS MONEY LASTS', async () => {
   assert.deepEqual(bodies(k).filter((b) => /lasts the year/u.test(b ?? '')), [], 'there is no money to last');
 });
 
-test('WITH TWO BOOKS, the line says where the money is kept and adds it into no sentence, whether it lasts or not', async () => {
+test('WITH TWO BOOKS, the line says the money there is and the books it is kept in, whether it lasts or not', async () => {
   const k = await record();
   const book = (name: string): string => value<{ id: string }>(k.create('books', { name }, OWNER)).id;
   account(k, 'Company account', gbp(500_000), { book: book('Northwind Ltd') });

@@ -59,12 +59,25 @@ export const HEADS_UP: Record<string, unknown>[] = [
     when: { metric: 'late-in', gt: 0 },
   },
   {
+    /* A PART OF A PLAN THAT IS LATE IS LATE AS A BILL IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): first
+       in this line, by name, with its amount and its day, and the bills after it. One line and not a second, because
+       Money is at the twenty-four blocks a page declares: the sentence said is the first of `says` that holds. */
     kind: 'note',
     tone: 'bad',
     span: 12,
     area: 'rail',
-    body: 'Bills {{bad:late}}: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)',
-    when: { metric: 'overdue', gt: 0 },
+    says: [
+      {
+        when: { all: [{ metric: 'installments-late', gt: 0 }, { metric: 'overdue', gt: 0 }] },
+        body: '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. Bills late too: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)',
+      },
+      {
+        when: { metric: 'installments-late', gt: 0 },
+        body: '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. [See it](/r/installments?f=state:is:open&f=direction:is:out&f=due:before:today)',
+      },
+      { body: 'Bills {{bad:late}}: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)' },
+    ],
+    when: { any: [{ metric: 'overdue', gt: 0 }, { metric: 'installments-late', gt: 0 }] },
   },
   {
     /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0 (REC-A13 job 2): an import

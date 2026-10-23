@@ -834,6 +834,25 @@ const STALE_LINE = "The oldest balance in Cash now was last confirmed on {{cash-
 const ACTS = / \[(?:See them|Update balances)\]\([^)]*\)$/u;
 /* And Bills and invoices said one of it as `item`, before P25 named it `bill or invoice`. */
 const itemAgain = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).map((d) => (d.one === 'bill or invoice' ? { ...d, one: 'item' } : d)) });
+/**
+ * MONEY 3.18.0 COMES OFF FIRST (the audit of 22 October, U4): no figure of the parts late, the lines with no sentence of
+ * the part after the money and the line for two books its two counts again, and Heads up's line of bills late alone.
+ */
+const LATE_PART_18 = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+const BILLS_LATE_17 = 'Bills {{bad:late}}: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)';
+const withoutLatePart = (doc: Body): Body =>
+  withPage(
+    doc,
+    'money',
+    (now) =>
+      now.map((b) => {
+        if (b.lead === true && typeof b.body === 'string')
+          return { ...b, body: b.body.startsWith('You have') ? 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).' : b.body.replace(LATE_PART_18, '') };
+        if (Array.isArray(b.says)) return { kind: b.kind, tone: b.tone, span: b.span, area: b.area, body: BILLS_LATE_17, when: { metric: 'overdue', gt: 0 } };
+        return b;
+      }),
+    (d) => d.metric !== 'installments-late',
+  );
 const withoutUiPassR3 = (doc: Body): Body =>
   withPage(itemAgain(doc), 'money', (now) =>
     now
@@ -932,7 +951,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(raw)))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(raw))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
