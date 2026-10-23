@@ -1,11 +1,12 @@
 /**
  * Which projects are cards on the desk and what a card says: parked and retired ones are not cards, earning leads
- * building, the brief is clean, a row with no hue is drawn in none, and the list is found by what it declares.
+ * building, the brief is clean, a row with no hue is drawn in its name's, and the list is found by what it declares.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { hueFor } from '../ui/hue.ts';
 import { REGISTERS } from '../record/held.ts';
 import { learnRowPages } from '../record/row-href.ts';
 import type { RegisterDecl } from '../record/schema.ts';
@@ -55,11 +56,11 @@ test('a row with no name is not a card, and the card count is capped with the re
   assert.equal(more, 3);
 });
 
-test('the hue is the row\'s own and an empty one is none, never zero', () => {
+test('the hue is the row\'s own, and an empty one is never zero but the hue its name is drawn in everywhere', () => {
   const { cards } = cardsOf(decl, [row(1, { name: 'A', lane: 'building', hue: 210 }), row(2, { name: 'B', lane: 'building', hue: null }), row(3, { name: 'C', lane: 'building' })]);
   assert.deepEqual(
     cards.map((c) => c.hue),
-    [210, null, null],
+    [210, hueFor('B'), hueFor('C')],
   );
 });
 

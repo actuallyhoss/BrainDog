@@ -11,7 +11,7 @@ import { cardLayout, dayShort, kpiView, trendOf, type KpiInput } from 'braindog-
 import { briefFromNote } from '../record/brief.ts';
 import { actor } from '../record/names.ts';
 import { rowHref, rowScreen } from '../record/row-href.ts';
-import { slotOf } from '../ui/face.ts';
+import { hueFor, slotOf } from '../ui/face.ts';
 
 /** What of a list's declaration decides its cards. */
 export type CardDecl = {
@@ -30,7 +30,7 @@ export type ProjectCard = {
   key: string;
   name: string;
   mark: string;
-  /** The row's own hue, or `null` where it has none: the card is then drawn in no colour rather than a made-up one. */
+  /** The row's own hue, else the one its name is drawn in everywhere (`hueOf`). */
   hue: number | null;
   lane: string;
   /** How it is going, the stored value (`on_track`, `at_risk`, `off_track`), or '' where nobody said. */
@@ -135,11 +135,18 @@ export function workedSaid(w: { said: string; quiet: boolean }): string {
   return `Worked on ${/ago$/u.test(t) ? t : `${t} ago`}`;
 }
 
-/** The row's hue where it holds a number, else `null`; an empty field is not hue 0. */
-export function hueOf(decl: Pick<CardDecl, 'identity'>, fields: Readonly<Record<string, unknown>>): number | null {
+/**
+ * The row's hue where it holds a number, else the hue its name is drawn in on the rail and in Today's tasks (`hueFor`);
+ * an empty field is not hue 0. EVERY PROJECT IN ITS OWN COLOUR, SINCE the audit of 22 October (U5, U-B13): most
+ * projects on a record keep no hue, so five of eight cards on Today were grey on grey, and a project's dot in a task
+ * was not its card's colour. Only a row with no name is drawn in none.
+ */
+export function hueOf(decl: Pick<CardDecl, 'identity'> & { title?: string | undefined }, fields: Readonly<Record<string, unknown>>): number | null {
   const v = fields[decl.identity?.accent ?? 'hue'];
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : Number.NaN;
-  return Number.isFinite(n) ? n : null;
+  if (Number.isFinite(n)) return n;
+  const name = decl.title ? said(fields[decl.title]) : '';
+  return name === '' ? null : hueFor(name);
 }
 
 /**
