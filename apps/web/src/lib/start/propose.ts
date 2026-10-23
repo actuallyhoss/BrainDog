@@ -169,8 +169,14 @@ function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean,
   const pointed = new Set(kept.packs.filter((p) => p.why.length > 0).map((p) => p.id));
   /* `toTurnOn` ADDS PEOPLE FOR A NAME, and a declined reading has no packs, so a name alone still keeps People. */
   const heard = toTurnOn(kept, named, offers).filter((id) => pointed.has(id) || (named && !kept.packs.some((p) => p.id === id)));
+  /* AND MONEY SAID IS MONEY KEPT, whoever claims the word (the audit of 22 October, U-C2): "we send invoices in naira"
+     made an agency's record whose use case keeps hours and no money, and Money was nowhere on its first Today. A part
+     that keeps money and that the words pointed at comes when nothing the use cases bring keeps money. */
+  const chosen = u ? [...modulesFor(u, heard), ...beside.flatMap((b) => b.modules)] : heard;
+  const money = read.packs.find((p) => p.why.length > 0 && keepsMoney(p.id) && !chosen.includes(p.id));
+  const keeps = chosen.some((id) => keepsMoney(id));
   /* A CATALOGUE PACK THE SENTENCE ASKED FOR IS KEPT beside the use case's modules, since `modulesFor` keeps any pack. */
-  return closeOver(u ? [...modulesFor(u, heard), ...beside.flatMap((b) => b.modules)] : heard, offers);
+  return closeOver(money !== undefined && !keeps ? [...chosen, money.id] : chosen, offers);
 }
 
 /**

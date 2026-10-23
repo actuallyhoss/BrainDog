@@ -1355,3 +1355,13 @@ for (const s of READ_SET.sentences.filter((x) => x.trap !== undefined)) {
     t.diagnostic(`not held yet (${waits}): ${wrong.join('; ')}`);
   });
 }
+
+/* MONEY SAID IS MONEY KEPT (the audit of 22 October, U-C2): a catalogue use case that keeps hours and claims "invoices"
+   left an agency that sends invoices with no Money on its first Today. */
+test('AN AGENCY THAT SENDS INVOICES KEEPS MONEY, though a use case that keeps no money claims the word', () => {
+  const hours = { id: 'hours-kept', signals: ['retainers', 'clients', 'invoices'], modules: ['people'] };
+  const said = "I'm Sam. I run a small design studio with my partner Ada. We have six clients on retainers and send invoices in naira.";
+  const p = propose(said, { ...CTX, currency: 'NGN', catalogue: [hours] });
+  assert.equal(p.usecase, 'hours-kept');
+  assert.ok(p.modules.includes('money-core'), p.modules.join(', '));
+});

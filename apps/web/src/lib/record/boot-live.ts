@@ -989,8 +989,12 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
      keeps the page, as above. */
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
   const named = new Map(b.registers.map((r) => [r.name.trim().toLowerCase(), r.id]));
+  /* AND A PAGE THAT NAMES ITS PLACE ON THE RAIL (`nav.place`) NEVER WAITS (the audit of 22 October, U-C2). On day one
+     every list is empty, so every place a person asked for (Money, Projects, Agents) waited, and their first Today drew
+     Today, Needs you and People and nothing they had named. A place opens on its first entry; only a side page waits. */
   const waiting = (p: NonNullable<Boot['pages']>[number]) => {
     if (!p.nav || p.nav.section === copy.viewsSection) return false;
+    if (typeof p.nav.place === 'number') return false;
     const said: readonly unknown[] | null | undefined = p.lists;
     if (said === null) return !(typeof p.list === 'string' && theirs.has(p.list));
     if (Array.isArray(said)) {

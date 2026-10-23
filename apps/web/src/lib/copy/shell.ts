@@ -319,6 +319,8 @@ export const shell = {
    * had been asked for. The heading says what was typed, and the links under it are the likeliest of what is here.
    */
   noPageCalled: (name: string) => `No page called ${name}`,
+  /** A place with nothing in it yet, by its own first step where it has one: "Nothing here yet. Add an account to start." */
+  emptyPlace: (step: string | null) => (step === null ? 'Nothing here yet.' : `Nothing here yet. ${step} to start.`),
   nearPages: 'The closest pages here:',
   /**
    * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.

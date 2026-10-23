@@ -45,6 +45,16 @@ test('rail-has-rows: a place with one list that holds something, or a page that 
   assert.equal(check(SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': { Accounts: [{ name: 'Cash', tags: [] }] } } })).pass, true);
 });
 
+test('rail-has-rows: a place the record declares stands empty on day 0, and a side page over nothing is still red', () => {
+  const check = firstScreen['rail-has-rows'];
+  const ready = check(SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': EMPTY }, places: ['/app/p/money'] }));
+  assert.equal(ready.pass, true, ready.saw);
+  assert.match(ready.saw, /^in the rail, Money opens on a first entry$/u);
+  const board = check(SCREEN({ roles: [...THREE, MONEY, row('Board', '/app/p/board')], behind: { '/app/p/money': EMPTY, '/app/p/board': { Tasks: 0 } }, places: ['/app/p/money'] }));
+  assert.equal(board.pass, false);
+  assert.match(board.saw, /^Board \(Tasks holds nothing\) is in the rail with nothing to show$/u);
+});
+
 test('rail-has-rows: a rail of only Today, Decide and People is read, and green', () => {
   const r = firstScreen['rail-has-rows'](SCREEN({ roles: [...THREE, ...DOORS] }));
   assert.equal(r.pass, true, r.saw);
@@ -212,7 +222,8 @@ test('the phone\'s tab bar is a navigation whose tabs say where they go', async 
   const html = await markupOf('lib/shell/TabBar.svelte', { tabs: PLACES, more: false }, { data: DATA, path: '/app/' });
   const snap = { path: '/app/', width: 390, ...readMarkup(html), counts: {}, behind: { '/app/p/money': EMPTY }, owner: true };
   assert.deepEqual(snap.roles.filter((r) => r.role === 'link').map((r) => [r.name, r.href, r.landmark]), PLACES.map((p) => [p.label, `/app${p.href}`, 'navigation']));
-  assert.ok(snap.roles.some((r) => r.role === 'button' && r.name === 'More' && r.landmark === 'navigation'));
+  /* NO MORE TAB since frame B: the rest is under the face at the top of each screen. */
+  assert.ok(!snap.roles.some((r) => r.role === 'button' && r.name === 'More' && r.landmark === 'navigation'));
   assert.match(firstScreen['rail-has-rows'](snap).saw, /^Money \(.+\) is in the phone's places with nothing to show$/u);
 });
 

@@ -200,6 +200,8 @@ export async function screensOf(shot) {
   const props = await railProps(shell);
   const counts = await countsOf(shot, shot.boot);
   const behind = await behindOf(shot, shell, BASE);
+  /* THE PLACES THE RECORD DECLARES, by where their rows go: a page that names its spot on the rail (`nav.place`). */
+  const places = (shot.boot?.pages ?? []).filter((p) => typeof p?.nav?.place === 'number').map((p) => `${BASE}/p/${p.slug}`);
   const owner = shell.me?.owner === true;
   const out = [];
 
@@ -207,17 +209,17 @@ export async function screensOf(shot) {
   const rail = await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path: home });
   const today = await todayMarkup(shot, shell, home);
   const signs = today.signs === undefined ? {} : { signs: today.signs };
-  out.push({ path: home, width: WIDTH, ...readMarkup(`${rail}<main>${today.markup}</main>`), counts, behind, ...signs, owner, drew: today.why === null ? 'the rail and Today' : `the rail (${today.why})` });
+  out.push({ path: home, width: WIDTH, ...readMarkup(`${rail}<main>${today.markup}</main>`), counts, behind, places, ...signs, owner, drew: today.why === null ? 'the rail and Today' : `the rail (${today.why})` });
 
   const first = (shell.index.registers ?? [])[0];
   if (first) {
     const path = `${BASE}/r/${first.id}`;
-    out.push({ path, width: WIDTH, ...readMarkup(await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path })), counts, behind, owner, drew: `the rail on ${first.name}, its lists open` });
+    out.push({ path, width: WIDTH, ...readMarkup(await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path })), counts, behind, places, owner, drew: `the rail on ${first.name}, its lists open` });
   }
 
   /* THE PHONE: Today over the tab bar, which holds the rail's first places (`tabsOf`, as the shell feeds `TabBar`). */
   const { tabsOf } = await web('lib/nav.ts');
   const bar = await markupOf('lib/shell/TabBar.svelte', { tabs: tabsOf(props.places), more: false }, { data: shell, path: home });
-  out.push({ path: home, width: PHONE, ...readMarkup(`<main>${today.markup}</main>${bar}`), counts, behind, ...signs, owner, drew: today.why === null ? 'Today and the tab bar' : `the tab bar (${today.why})` });
+  out.push({ path: home, width: PHONE, ...readMarkup(`<main>${today.markup}</main>${bar}`), counts, behind, places, ...signs, owner, drew: today.why === null ? 'Today and the tab bar' : `the tab bar (${today.why})` });
   return out;
 }

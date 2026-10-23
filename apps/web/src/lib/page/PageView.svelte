@@ -387,6 +387,19 @@
   const fromPack = $derived(!!live && typeof (live.page.page as { pack?: unknown }).pack === 'string');
   const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 
+  /**
+   * A PLACE WITH NOTHING IN IT YET SAYS SO IN ONE SENTENCE, by its own first step (the audit of 22 October, U-C2): Money
+   * on a new record drew its name and an Add an account box over an empty board. Only where every block the page
+   * declares draws nothing but a box to add the first entry, and never on a row's own page.
+   */
+  const blank = $derived.by(() => {
+    if (!live || about !== null || arranging || showSource) return null;
+    const judged = judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs));
+    if (judged.length === 0 || judged.some((b) => b.drawn && b.kind !== 'capture')) return null;
+    const step = judged.find((b) => b.drawn && b.kind === 'capture' && typeof b.heading === 'string')?.heading;
+    return copy.emptyPlace(typeof step === 'string' && step.trim() !== '' ? step.trim() : null);
+  });
+
   /* ── arranging a home ──────────────────────────────────────────────────────
      TODAY AND DECIDE ARRANGE THEIR BODY, NOT WHAT THEIR SCREEN DREW (`home-arrange.ts`): the mode reads the body again,
      one block for each it declares, and a body nobody installed yet is installed by the first Done. */
@@ -693,7 +706,7 @@
     count={declared?.count?.value}
     title={live.page.page.title}
     headless={projectPage && !arranging && !showSource}
-    sentence={projectPage ? '' : undefined}
+    sentence={projectPage ? '' : (blank ?? undefined)}
     define={headlined ? undefined : 'page'}
     below={headBelow && !tiled ? declaredBelow : undefined}
     {tiled}

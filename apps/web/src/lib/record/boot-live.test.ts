@@ -375,6 +375,23 @@ test('A PLACE OVER SEVERAL LISTS IS JUDGED BY THE LIST ITS SECTION IS NAMED AS: 
   assert.ok(at(1).includes('/p/ledger'));
 });
 
+test('A PAGE THAT NAMES ITS PLACE ON THE RAIL NEVER WAITS: Money and Projects stand on day 0, a side page still waits', () => {
+  /* A new record asked for Money and Projects: every list is empty, and before U-C2 neither was in the bar. */
+  const money = { slug: 'money', title: 'Money', nav: { section: 'Money', order: 10, place: 40 }, icon: null, list: null, lists: ['accounts'] };
+  const projects = { slug: 'projects', title: 'Projects', nav: { section: 'Projects', order: 5, place: 30 }, icon: null, list: 'projects', lists: null };
+  const board = { slug: 'board', title: 'Board', nav: { section: 'Work', order: 20 }, icon: null, list: null, lists: ['tasks'] };
+  const nav = layoutOf({
+    ...BOOT,
+    registers: [
+      { id: 'accounts', name: 'Accounts', count: 0 },
+      { id: 'projects', name: 'Projects', count: 0 },
+      { id: 'tasks', name: 'Tasks', count: 0 },
+    ],
+    pages: [money, projects, board],
+  } as never).nav.map((n) => n.href);
+  assert.deepEqual(nav, ['/p/money', '/p/projects']);
+});
+
 test('A PLACE THAT SAYS ITS LISTS IS JUDGED BY ALL OF THEM: off the rail while every one is empty, on it at the first row in any', () => {
   /* Sam's Work reads tasks and milestones, and `boot` now says both (`lists`), so no section name is guessed at. */
   const work = { slug: 'work', title: 'Work', nav: { section: 'Work', order: 10 }, icon: null, list: null, lists: ['tasks', 'milestones'] };

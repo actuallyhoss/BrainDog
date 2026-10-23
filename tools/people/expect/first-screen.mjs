@@ -14,6 +14,8 @@
  *   is a count, or the entries themselves as `{ name, tags }` where the rig read them.
  * - `behind`: what each row of the rail stands on, keyed by the row's `href`: the lists its page reads (or the list
  *   itself), each under its name with how much it holds. `{}` for a page that reads no list.
+ * - `places`: the rows' `href`s that are places of the record by their own declaration (a page that names its spot on
+ *   the rail, `nav.place`): Money, Projects, Agents. Such a place stands on day 0 with nothing in it.
  * - `signs`: how many of the record's vital signs read red, or `null` where it holds no page they are shown on.
  * - `owner`: whether the reader owns the record, where the rig knows; left out, nothing is judged by it.
  *
@@ -138,7 +140,11 @@ const some = (names, most = 3) => (names.length > most ? `${names.slice(0, most)
  * (`snap.behind`, else the list of its name in `counts`). Today, Decide and People are always there. A row whose page
  * reads lists and finds every one of them empty has nothing to show, and is red; one that reads no list has nothing to
  * be empty. A link that is no place (New list, the account, an agent at work) is known by where it goes and is left
- * alone, so a rail of only the three is read and green: that is what the first minute should hold.
+ * alone, so a rail of only the three is read and green.
+ *
+ * A PLACE THE RECORD DECLARES (`snap.places`) MAY STAND EMPTY, since the audit of 22 October (U-C2): a person who asked
+ * for Money, Projects and Agents found none of them on their first Today, because each waited for its first row. Such
+ * a place opens on its first entry, so it is no red; a side page over nothing (Board, Cycle plan) still is.
  */
 function drawnRows(snap, links) {
   const rows = new Map();
@@ -147,19 +153,26 @@ function drawnRows(snap, links) {
   const empty = [];
   const unread = [];
   const full = [];
+  const ready = [];
+  const declared = new Set(snap.places ?? []);
   for (const [href, r] of rows) {
     const own = [r.name, bare(r.name)].find((n) => countOf(snap.counts, n) !== undefined);
     const reads = snap.behind?.[href] ?? (own === undefined ? undefined : { [own]: countOf(snap.counts, own) });
     /* A LIST'S ROW SAYS ITS COUNT AFTER ITS NAME: "Orders 2" is Orders, unless a list is called just that. */
     const name = Object.keys(reads ?? {}).some((k) => same(k, r.name)) ? r.name : bare(r.name);
     if (reads === undefined) unread.push(name);
-    else if (Object.keys(reads).length > 0 && Object.values(reads).every((v) => size(v) === 0)) empty.push(`${name} (${some(Object.keys(reads))} ${Object.keys(reads).length === 1 ? 'holds' : 'hold'} nothing)`);
-    else if (!full.includes(name)) full.push(name);
+    else if (Object.keys(reads).length > 0 && Object.values(reads).every((v) => size(v) === 0)) {
+      if (declared.has(href)) ready.includes(name) || ready.push(name);
+      else empty.push(`${name} (${some(Object.keys(reads))} ${Object.keys(reads).length === 1 ? 'holds' : 'hold'} nothing)`);
+    } else if (!full.includes(name)) full.push(name);
   }
   if (empty.length > 0) return fail('rail-has-rows', `${and(empty)} ${empty.length === 1 ? 'is' : 'are'} in ${where} with nothing to show`);
   if (unread.length > 0) return unseen('rail-has-rows', `the rig did not read what stands behind ${some(unread)} in ${where}`);
-  if (full.length === 0) return pass('rail-has-rows', `${where} ${where === 'the rail' ? 'holds' : 'hold'} no place besides ${and(ALWAYS)}`);
-  return pass('rail-has-rows', `${and(full)} ${full.length === 1 ? 'is' : 'are'} in ${where}, each with something in it`);
+  const opens = ready.length === 0 ? '' : `${and(ready)} ${ready.length === 1 ? 'opens' : 'open'} on a first entry`;
+  if (full.length === 0 && ready.length === 0) return pass('rail-has-rows', `${where} ${where === 'the rail' ? 'holds' : 'hold'} no place besides ${and(ALWAYS)}`);
+  if (full.length === 0) return pass('rail-has-rows', `in ${where}, ${opens}`);
+  const held = `${and(full)} ${full.length === 1 ? 'is' : 'are'} in ${where}, each with something in it`;
+  return pass('rail-has-rows', opens === '' ? held : `${held}, and ${opens}`);
 }
 
 /** The first few words around a match, for `saw`. */
