@@ -127,6 +127,7 @@
   import { wantsDeclared } from './declared.ts';
   import { liveOverlay, run, UNDO_MS, type Sent } from '$lib/data/optimistic.svelte.ts';
   import { ARRIVED_MS } from '$lib/data/optimistic.ts';
+  import { swapInPlace } from '$lib/ui/motion.ts';
   import OfferCard from '$lib/design/OfferCard.svelte';
   import { offerActs, offerFor } from '$lib/design/pen.ts';
   import { penWords } from '$lib/design/words.ts';
@@ -1691,6 +1692,8 @@
       if (asked === was) clearReceipt(seq);
     };
     const out = await writes().create(id, fields);
+    /* THE TYPED LINE AND THE RECORD'S ROW ARE ONE ROW: the swap is drawn where it stands, with neither leaving nor arriving. */
+    if (out.ok && asked === was) swapInPlace();
     unline();
     if (!out.ok) {
       missed(was, out);

@@ -5,6 +5,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { ms, msIn } from './motion.ts';
 
 test('seconds and milliseconds both read as milliseconds', () => {
@@ -22,4 +24,25 @@ test('an unset or unreadable token is the fallback', () => {
 
 test('with no document the fallback stands', () => {
   assert.equal(ms('--d-rows', 180), 180);
+});
+
+/* A TYPED LINE AND THE RECORD'S ROW THAT LANDS FOR IT ARE ONE ROW (fluid F9): while the swap is drawn nothing leaves,
+   opens or slides, and the next change moves as ever. */
+test('a swap in place draws still, and is lifted once it has been drawn', async () => {
+  const { rowIn, rowOut, settle, swapInPlace } = await import('./motion.ts');
+  const node = { offsetHeight: 40 } as unknown as Element;
+  assert.ok((rowIn(node).duration ?? 0) > 0, 'a row added moves');
+  assert.ok((rowOut(node).duration ?? 0) > 0, 'a row taken away moves');
+  swapInPlace();
+  assert.equal(rowIn(node).duration, 0, 'the landed row does not open');
+  assert.equal(rowOut(node).duration, 0, 'the typed line does not close');
+  assert.equal(settle().duration, 0, 'the rows beside them do not slide');
+  await new Promise((done) => setTimeout(done, 5));
+  assert.ok((rowIn(node).duration ?? 0) > 0, 'the next row added moves again');
+  assert.ok(settle().duration > 0);
+});
+
+test('the typed line is swapped in place only when the record has answered it', () => {
+  const page = readFileSync(fileURLToPath(new URL('../../routes/r/[register]/+page.svelte', import.meta.url)), 'utf8');
+  assert.match(page, /const out = await writes\(\)\.create\(id, fields\);\n\s+\/\*[^]*?\*\/\n\s+if \(out\.ok && asked === was\) swapInPlace\(\);\n\s+unline\(\);/u);
 });

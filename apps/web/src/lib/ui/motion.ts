@@ -15,11 +15,24 @@
  * is the only thing laid out. Under reduced motion it is a 120ms fade and nothing moves.
  */
 
+import { tick } from 'svelte';
 import { cubicIn, quartOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
 
 /** Whether the reader asked for less motion. */
 export const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * A ROW THAT TAKES ANOTHER'S PLACE CHANGES WHERE IT STANDS (fluid F9): a typed line and the record's row that lands for it
+ * are one row, and one leaving while the other arrived drew two rows over each other for a fifth of a second. The screen
+ * says so just before it swaps them, and the change that follows is drawn still: nothing leaves, nothing opens, nothing
+ * slides. Lifted once that change has been drawn, so the next row added or taken away moves as ever.
+ */
+let swapping = false;
+export function swapInPlace(): void {
+  swapping = true;
+  void tick().then(() => void (swapping = false));
+}
 
 /** The fade that stands in for every move under reduced motion. */
 export const FADE = 120;
@@ -44,6 +57,7 @@ export const ms = (name: string, fallback: number): number => {
 
 /** A row arriving: its height opens and it fades in. `quartOut` stands for `--ease-out`. */
 export function rowIn(node: Element): TransitionConfig {
+  if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   return { duration: ms('--d-rows', 180), easing: quartOut, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
@@ -51,10 +65,11 @@ export function rowIn(node: Element): TransitionConfig {
 
 /** A row leaving: the same height closing, accelerating away (`cubicIn` stands for `--ease-in`). */
 export function rowOut(node: Element): TransitionConfig {
+  if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   return { duration: ms('--d-rows', 180), easing: cubicIn, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
 }
 
 /** Neighbours closing the gap: pass to `animate:flip`. Instant under reduced motion. */
-export const settle = (): { duration: number; easing: (t: number) => number } => ({ duration: still() ? 0 : ms('--d-rows', 180), easing: quartOut });
+export const settle = (): { duration: number; easing: (t: number) => number } => ({ duration: swapping || still() ? 0 : ms('--d-rows', 180), easing: quartOut });
