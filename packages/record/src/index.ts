@@ -269,6 +269,7 @@ export type { PenItem } from './emergent.ts';
    mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
 export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type SealedStore } from './methods/sealed.ts';
+export type { AttachVisualArgs, PictureNamed, VisualAttached, VisualListed, VisualRead, VisualStore } from './methods/visuals.ts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
@@ -2017,6 +2018,11 @@ export type RecordDeps = {
    */
   sealed?: SealedStore | undefined;
   /**
+   * Where this host keeps visuals' pages, and the file store their pictures are in (`methods/visuals.ts`). Absent,
+   * `attachVisual` and `visual` refuse `NOT_IN_THIS_BUILD`, and `visuals` still lists what the log names.
+   */
+  visuals?: import('./methods/visuals.ts').VisualStore | undefined;
+  /**
    * Why this host cannot take an invitation, or `null` when it can.
    *
    * THE HOST KNOWS AND THE RECORD DOES NOT. An invitation is spent by signing in, and only a host knows whether
@@ -2299,7 +2305,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -9134,7 +9140,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up

@@ -85,6 +85,7 @@ import { methods as sharing } from './sharing.ts';
 import { methods as schemasMethods } from './schemas.ts';
 import { methods as chatAnswer } from './chat-answer.ts';
 import { methods as sealedMethods } from './sealed.ts';
+import { methods as visualsMethods } from './visuals.ts';
 /* END METHODS */
 
 /**
@@ -200,6 +201,10 @@ export type RecordDeps = {
   decideAs?: ((args: { id: string; decide: { option: string; reason: string } }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
   /** Where this host keeps sealed bytes (`sealed.ts`). Absent, the four sealed methods keep and hand back none. */
   sealed?: import('./sealed.ts').SealedStore | undefined;
+  /** Where this host keeps visuals' pages, and the file store their pictures are in (`visuals.ts`). Absent, none are kept. */
+  visuals?: import('./visuals.ts').VisualStore | undefined;
+  /** Who a write is by, as `index.ts`'s `writerOf` says it: a token by its run. Absent, the caller's own name. */
+  writer?: ((ctx: CallContext) => import('@braindog/kernel').WriteContext) | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -267,6 +272,7 @@ export function methods(deps: RecordDeps) {
     ...schemasMethods(deps),
     ...chatAnswer(deps),
     ...sealedMethods(deps),
+    ...visualsMethods(deps),
     /* END METHODS */
   };
 }
