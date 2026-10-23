@@ -144,10 +144,11 @@ test("the footer is Product, Who it's for and Help, plain links and no blurb (si
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
       ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
-      ["Who it's for", ['Small businesses', 'Teams and agencies', 'Developers']],
+      /* NO TEAMS WHILE INVITING PEOPLE IS HELD (U-C5): its page answers 404, so the footer draws no link to it. */
+      ["Who it's for", ['Small businesses', 'Developers']],
       ['Help', ['Docs', 'Support', 'Legal']],
     ],
   );
-  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/for/teams', '/docs/agents/connect']);
+  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/docs/agents/connect']);
   assert.ok(!('tagline' in shell.footer), 'the footer carries no blurb');
 });

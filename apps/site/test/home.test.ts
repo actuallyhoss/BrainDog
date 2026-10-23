@@ -44,9 +44,9 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
   assert.equal(home.who.title, "Who it's for");
   assert.deepEqual(
     [home.who.small.title, home.who.build.title, home.who.team.title],
-    ['Run a small business', 'Build with AI', 'Work as a team or agency'],
+    ['Run a small business', 'Build with AI', 'Run client work with your agents'],
   );
-  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.team.href], ['/for/founders', '/agents', '/for/teams']);
+  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.team.href], ['/for/founders', '/agents', '/agents']);
   assert.equal(home.chores.title, 'It does the chores. You make the calls.');
   assert.equal(
     home.chores.say,

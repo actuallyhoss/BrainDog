@@ -51,12 +51,15 @@ export const home = {
       link: 'Connect your tools',
       href: '/agents',
     },
+    /* ONE PERSON AND THEIR AGENTS, SINCE THE AUDIT OF 22 OCTOBER (U-C5): "Work as a team or agency" sold what brain.dog
+       holds while invitations wait, and its page is held. One person running client work with Claude, Cursor and Codex
+       is true today. */
     team: {
-      title: 'Work as a team or agency',
-      say: "Give each client a project. Everyone sees what's next, and every change has a name on it.",
-      line: 'Dana moved Onboarding copy to review · 10:05',
-      link: 'For teams and agencies',
-      href: '/for/teams',
+      title: 'Run client work with your agents',
+      say: "Give each client a project. Your agents see what's next, and every change has a name on it.",
+      line: 'Claude moved Onboarding copy to review · 10:05',
+      link: 'How agents work with you',
+      href: '/agents',
     },
   },
 

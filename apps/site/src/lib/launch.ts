@@ -1,7 +1,11 @@
 import { cases } from './copy/cases.ts';
 
-/** The two pages written for one kind of person that a visitor reaches (D5); the rest are in `HELD`. */
-export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
+/**
+ * The one page written for one kind of person that a visitor reaches (D5); the rest are in `HELD`. /for/teams IS HELD
+ * TOO SINCE THE AUDIT OF 22 OCTOBER (U-C5, his call 10 taken as suggested): it sold working as a team while brain.dog
+ * holds invitations, so a team that signed up from it could not do what it showed.
+ */
+export const FOR_SHOWN: readonly string[] = ['/for/founders'];
 
 /**
  * What is true on launch day and not before, one flag per fact.
@@ -31,7 +35,8 @@ export type LaunchFlag = keyof typeof LAUNCH;
  * The addresses held until the site is public. The changelog and its feed since W.170, because the site was not
  * deployed publicly yet, and the packs with the site's design ("Packs and the
  * changelog stay held"), the Mac download until a signed build exists, and the pages for personal records, students
- * and new projects (D5, 20 October: the slogan is about a business, and those pull the other way). The pricing page
+ * and new projects (D5, 20 October: the slogan is about a business, and those pull the other way), and the page for
+ * teams while inviting people is held (U-C5, 22 October). The pricing page
  * came back on 20 October as the one-plan early access page with no prices (D2). The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/packs/` reads); only
  * what a visitor can reach is held. A pack's own page (`/packs/<id>`) is never prerendered while `/packs` is held.
  *
