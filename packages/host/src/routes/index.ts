@@ -65,6 +65,7 @@ import { ROUTES as SHARING } from './sharing.ts';
 import { ROUTES as SCHEMAS } from './schemas.ts';
 import { ROUTES as SEALED } from './sealed.ts';
 import { ROUTES as VISUALS } from './visuals.ts';
+import { ROUTES as METRICS } from './metrics.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -121,5 +122,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...SCHEMAS,
   ...SEALED,
   ...VISUALS,
+  ...METRICS,
   /* END ROUTES */
 ];

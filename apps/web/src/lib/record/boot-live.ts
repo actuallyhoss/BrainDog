@@ -14,7 +14,7 @@
  * state rather than about whether there is one. `forget` drops the answer after a write that changes it.
  */
 
-import { batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
+import { batchMetrics, batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel/constants';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
@@ -316,6 +316,8 @@ function earlyBoot(url: string): Promise<Response> | null {
  */
 export function firstOpen(base: string): void {
   batchSchemas(true);
+  /* AND THE FIGURES A SCREEN ASKS TOGETHER GO AS ONE `metrics` (the sidebar's one a project, a project page's own). */
+  batchMetrics(true);
   const url = `${base}/api/schemas?every=true`;
   const held = (globalThis as { __bdSchemas?: { url?: unknown; at?: unknown } }).__bdSchemas;
   if (!held || held.url !== url || !(held.at instanceof Promise)) return;

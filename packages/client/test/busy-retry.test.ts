@@ -7,7 +7,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { batchSchemas, busy, busyWaits, createClient, forgetSchemas, type Result } from '../src/index.ts';
+import type { Result } from '@braindog/ports';
+
+import { batchSchemas, busy, busyWaits, createClient, forgetSchemas } from '../src/index.ts';
 
 const BUSY = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is busy for a moment. Try again in a few seconds.', at: 'record', retry_after: 1 } };
 

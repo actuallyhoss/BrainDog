@@ -1335,6 +1335,27 @@ let BATCHING = false;
 export function batchSchemas(on: boolean): void {
   BATCHING = on;
 }
+
+/**
+ * FIGURES ASKED TOGETHER GO AS ONE READ (`metrics`), for an app that turns it on (`batchMetrics`): the sidebar asked
+ * `metric` once a project in play and a project page four more, up to seventeen requests queued on one record beside a
+ * page load (23 Oct, the overload). Each `metric` asked within `METRIC_WAVE_MS` of the first joins one wave, by host
+ * and token across every client of the tab, and each asker is answered as `metric` would have answered it. A wave of
+ * one is `metric`; a host without `metrics` is asked once a figure from then on.
+ */
+let METRIC_BATCHING = false;
+/** Send the figures asked together as one read from now on, or once a figure again (`false`). */
+export function batchMetrics(on: boolean): void {
+  METRIC_BATCHING = on;
+}
+/** How long a wave of figures waits for more to join it: a page's own reads land within it, a click never does. */
+export const METRIC_WAVE_MS = 40;
+/** The most figures one `metrics` names, as the record takes them (`METRICS_MOST`). */
+const METRICS_WAVE_MOST = 50;
+type MetricWave = { asked: Map<string, ((r: Result<unknown>) => void)[]>; send: (name: string, args: Record<string, unknown>) => Promise<Result<unknown>> };
+let METRIC_WAVES = new Map<string, MetricWave>();
+/** The hosts that answered `metrics` as a method they do not have. */
+let NO_METRICS = new Set<string>();
 /**
  * EVERY LIST'S DECLARATION, ASKED ONCE BESIDE `boot` (`schemas`), by host and token: a first screen's lists are
  * then learnt from it as they are asked, and none waits for `boot` to say which lists there are and then for their
@@ -1400,6 +1421,8 @@ let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
 
 /** Drop every kept schema, as the app's `forget` does on a record switch and a sign-out, so the next ask goes out. */
 export function forgetSchemas(): void {
+  METRIC_WAVES = new Map();
+  NO_METRICS = new Set();
   SCHEMAS = new WeakMap();
   EVERY = new Map();
   FLYING = new WeakMap();
@@ -1431,7 +1454,7 @@ export function forgetSchemas(): void {
 export const KEPT_READ_MS = 300_000;
 /** The reads that may be kept, by name. */
 const KEEPS = new Set([
-  'get', 'list', 'countBy', 'history', 'backlinks', 'page', 'pages', 'previewPage', 'metric', 'figures', 'governance', 'packs', 'actions',
+  'get', 'list', 'countBy', 'history', 'backlinks', 'page', 'pages', 'previewPage', 'metric', 'metrics', 'figures', 'governance', 'packs', 'actions',
   'automations', 'examples', 'briefing', 'namedTwice', 'handled', 'textFaults', 'learned', 'matched', 'skillsBehind', 'huesWanted',
   'learningsTwice', 'stale', 'heldTwice', 'instructionList',
 ]);
@@ -1745,6 +1768,59 @@ export function createClient(options: ClientOptions) {
             const refusal = said.refused?.[register];
             if (refusal !== undefined) return tell(register, { ok: false, refusal });
             return alone(register);
+          }),
+        );
+      }),
+    );
+  }
+
+  /** One figure, sent with every other asked within `METRIC_WAVE_MS` through any client of this host (`batchMetrics`). */
+  function inMetricWave(metric: string): Promise<Result<unknown>> {
+    const key = `${base} ${options.token ?? ''}`;
+    return new Promise((done) => {
+      let wave = METRIC_WAVES.get(key);
+      if (wave === undefined) {
+        const made: MetricWave = { asked: new Map(), send: (name, args) => call<unknown>(name, args) };
+        METRIC_WAVES.set(key, (wave = made));
+        setTimeout(() => {
+          if (METRIC_WAVES.get(key) === made) METRIC_WAVES.delete(key);
+          void sendMetricWave(key, made);
+        }, METRIC_WAVE_MS);
+      }
+      const waiting = wave.asked.get(metric);
+      if (waiting) waiting.push(done);
+      else wave.asked.set(metric, [done]);
+    });
+  }
+
+  /** A wave of figures, sent: as `metric` for one figure or a host without `metrics`, else as `metrics`. */
+  async function sendMetricWave(key: string, wave: MetricWave): Promise<void> {
+    const tell = (id: string, r: Result<unknown>) => (wave.asked.get(id) ?? []).forEach((done, i) => done(i === 0 ? r : (structuredClone(r) as Result<unknown>)));
+    const alone = (id: string) => wave.send('metric', { metric: id }).then((r) => tell(id, r), (e) => tell(id, { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }));
+    const ids = [...wave.asked.keys()].sort();
+    if (ids.length === 1 || NO_METRICS.has(key)) return void (await Promise.all(ids.map(alone)));
+    const parts: string[][] = [];
+    for (let i = 0; i < ids.length; i += METRICS_WAVE_MOST) parts.push(ids.slice(i, i + METRICS_WAVE_MOST));
+    await Promise.all(
+      parts.map(async (part) => {
+        const out = (await wave.send('metrics', { metrics: part }).catch((e: unknown): Result<never> => ({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }))) as Result<{ readings?: Record<string, unknown>; refused?: Record<string, Refusal> }>;
+        if (!out.ok) {
+          const refusal = 'refusal' in out ? out.refusal : undefined;
+          /* A HOST OLDER THAN `metrics` IS ASKED ONCE A FIGURE; any other refusal is the answer for every figure in it. */
+          if (refusal && NO_SCHEMAS.has(refusal.code)) {
+            NO_METRICS.add(key);
+            return void (await Promise.all(part.map(alone)));
+          }
+          for (const id of part) tell(id, out);
+          return;
+        }
+        const said = out.value ?? {};
+        await Promise.all(
+          part.map((id) => {
+            if (said.readings && Object.hasOwn(said.readings, id)) return tell(id, { ok: true, value: said.readings[id] });
+            const refusal = said.refused?.[id];
+            if (refusal !== undefined) return tell(id, { ok: false, refusal });
+            return alone(id);
           }),
         );
       }),
@@ -2276,7 +2352,7 @@ export function createClient(options: ClientOptions) {
         ...(filter && Object.keys(filter).length ? { filter } : {}),
         ...(opts.walk === undefined ? {} : { walk: String(opts.walk) }),
       }),
-    metric: (metric: string) => call<unknown>('metric', { metric }),
+    metric: (metric: string) => (METRIC_BATCHING && !NO_METRICS.has(`${base} ${options.token ?? ''}`) ? inMetricWave(metric) : call<unknown>('metric', { metric })),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
     figures: () => call<FigureEntry[]>('figures'),
     /** What the caller may read, in one read: the fixed addresses, lists, pages, figures and skills by name. READ+. */

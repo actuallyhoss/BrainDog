@@ -86,6 +86,7 @@ import { methods as schemasMethods } from './schemas.ts';
 import { methods as chatAnswer } from './chat-answer.ts';
 import { methods as sealedMethods } from './sealed.ts';
 import { methods as visualsMethods } from './visuals.ts';
+import { methods as metricsMethods } from './metrics.ts';
 /* END METHODS */
 
 /**
@@ -201,6 +202,8 @@ export type RecordDeps = {
    * outside the app (`chat-answer.ts`), with the context it built from a spent card grant. Absent, that press is refused.
    */
   decideAs?: ((args: { id: string; decide: { option: string; reason: string } }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
+  /** The record's own `metric`, every check it makes, which `metrics` answers each figure with. Absent, `metrics` is refused. */
+  metricAs?: ((args: { metric: string }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
   /** Where this host keeps sealed bytes (`sealed.ts`). Absent, the four sealed methods keep and hand back none. */
   sealed?: import('./sealed.ts').SealedStore | undefined;
   /** Where this host keeps visuals' pages, and the file store their pictures are in (`visuals.ts`). Absent, none are kept. */
@@ -275,6 +278,7 @@ export function methods(deps: RecordDeps) {
     ...chatAnswer(deps),
     ...sealedMethods(deps),
     ...visualsMethods(deps),
+    ...metricsMethods(deps),
     /* END METHODS */
   };
 }
