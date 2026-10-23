@@ -137,7 +137,7 @@ test('A DAY IN ANOTHER YEAR CARRIES ITS YEAR in the sentence over the chart, and
   const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
   assert.match(plan.said, /^Goes under on \d+ (Nov|Dec)$/u, plan.said);
   const year = forecastModel(rowsOf(MEASURED, 'EGP 900,000.00').map((r) => (r[0] === 'horizon' ? ['horizon', '120', '', ''] : r)))!;
-  assert.equal(forecastPlan(year, scenario(year, baseKnobs(year)), null).said, 'Stays above zero to 11 Feb 2027');
+  assert.equal(forecastPlan(year, scenario(year, baseKnobs(year)), null).said, 'Stays above zero to 11 Feb 2027, as far as the chart goes');
 });
 
 test('THE DANGER TINT IS ONLY THE PART UNDER ZERO: a walk that never goes under draws none of it', () => {

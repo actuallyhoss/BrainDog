@@ -1280,7 +1280,12 @@ export const FORECAST_SAME = 'Goes under on the same day as before';
 export const FORECAST_NO_LONGER = 'No longer goes under';
 export const FORECAST_STILL = 'Still stays above zero';
 export const forecastUnder = (day: string): string => `Goes under on ${day}`;
-export const forecastAbove = (day: string): string => `Stays above zero to ${day}`;
+/**
+ * A WALK THAT STAYS ABOVE SAYS HOW FAR THE CHART LOOKS, since the audit of 22 October (U-B5): Money's Lasts walks a year
+ * and said "Lasts past 23 Oct 2027" over this chart's ten weeks saying "Stays above zero to 1 Jan 2027", one walk read
+ * as two answers. The day is where the chart stops, not where the money does.
+ */
+export const forecastAbove = (day: string): string => `Stays above zero to ${day}, as far as the chart goes`;
 export const forecastSooner = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'} sooner than before`;
 export const forecastLater = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'} later than before`;
 export const forecastNow = (day: string): string => `Now goes under on ${day}`;
