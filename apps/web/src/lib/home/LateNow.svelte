@@ -236,4 +236,12 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
   }
+  /* A row's name is a target: on a touch screen it takes the full tap height. */
+  @media (pointer: coarse) {
+    .ln-title {
+      display: flex;
+      align-items: center;
+      min-block-size: var(--tap, 44px);
+    }
+  }
 </style>

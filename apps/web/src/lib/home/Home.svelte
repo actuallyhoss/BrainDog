@@ -2186,4 +2186,10 @@
       line-height: var(--lh-head, 24px);
     }
   }
+  /* A name in a sentence is still a target: on a touch screen its box grows to the tap height without moving a line. */
+  @media (pointer: coarse) {
+    .brief-link {
+      padding-block: calc((var(--tap, 44px) - 1lh) / 2 + 1px);
+    }
+  }
 </style>
