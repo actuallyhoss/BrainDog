@@ -23,6 +23,7 @@ import { extension as jobs } from './jobs.ts';
 import { extension as quiet } from './quiet.ts';
 import { extension as retype } from './retype.ts';
 import { extension as personName } from './person-name.ts';
+import { extension as visuals } from './visuals.ts';
 /* END EXTENSIONS */
 
 export function extensions(parts: KernelParts) {
@@ -37,6 +38,7 @@ export function extensions(parts: KernelParts) {
     ...quiet(parts),
     ...retype(parts),
     ...personName(parts),
+    ...visuals(parts),
     /* END EXTENSIONS */
   };
 }

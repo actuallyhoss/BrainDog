@@ -119,6 +119,10 @@ export type KernelParts = {
    * FOR `rehearse`, which must refuse to run inside a write (`api/rehearse.ts`).
    */
   depth: () => number;
+  /** Who signs what a context says: a token's run, found or opened with its heartbeat moved, or `actor`. In a transaction only. */
+  signedBy: (w: WriteContext) => string;
+  /** The refusal for a token whose call names a run another key opened, or `null`. */
+  foreignRun: <T>(w: WriteContext) => Result<T> | null;
   /**
    * The kernel's caches, taken out and put back whole.
    *

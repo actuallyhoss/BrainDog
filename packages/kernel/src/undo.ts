@@ -29,6 +29,9 @@
  * Installing hashes, which is asynchronous, and the undo is one synchronous transaction, so it is two calls:
  * `undoStaged` checks and hashes what would go back, and `undoApply` handed its answer writes it with the rest.
  *
+ * AND A VISUAL GOES BACK TO THE VERSION IT STOOD AT. A visual is lines in the log (`visual.ts`), so the undo appends one
+ * line saying the version before, or that it is taken away, and never removes a line: a version stays in its history.
+ *
  * TWO STEPS AND A HASH, so a person sees what will happen before it does. `undoPlan` reads and writes nothing and
  * answers plain lines in names, never ids, with a hash of exactly what it would do. `undoApply` works the plan out
  * again inside one transaction and refuses when its hash is not the one the person saw (`PLAN_STALE`): something moved
@@ -58,6 +61,7 @@ import { reopenedTail } from './ingest.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { attempt } from './tx.ts';
+import { VISUAL_FIELD, isVersion, visualLines, visualSaid, visualStanding, type VisualLine } from './visual.ts';
 
 /* ── what is asked and what is answered ──────────────────────────────────── */
 
@@ -465,7 +469,7 @@ type Stop = { id: string; state: string; step: UndoStep };
  * `lines` are the ones the plan puts back from, only the row's under `scope.row`; `every` is every line of the scope's
  * batches, which the ladder reads for who made each.
  */
-type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; declares: Declared[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
+type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; declares: Declared[]; visuals: Pictured[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
 
 /** One declaration an accepted change replaced, and the earlier version the undo installs again as a new one. */
 type Declared = {
@@ -659,7 +663,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       else leftAlone.add(id);
       continue;
     }
-    notes += evs.filter((e) => e.kind === 'note').length;
+    notes += evs.filter((e) => e.kind === 'note' && !isVisualLine(e)).length;
     const changes = evs.filter((e) => e.kind !== 'note');
     if (changes.length === 0) continue;
     if (!row) {
@@ -873,10 +877,11 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
 
   /* A DECLARATION IS NOBODY'S ONE ROW, so under `row` none goes back and none is spoken of. */
   const declares = only.value === null ? declaredIn(sql, lines, opts, (title, why) => skip(undefined, title, why)) : [];
+  const visuals = picturedIn(sql, lines, keys, opts, (title, why) => skip(undefined, title, why));
 
   /* THE ORDER IT IS WRITTEN IN, and so the order it is read in: rows back first, values next, removals last. */
   work.sort((a, b) => rank(a) - rank(b) || (a.remove && b.remove ? b.made - a.made : 0));
-  const steps = [...work.flatMap((w) => w.steps), ...declares.map((d) => d.step), ...stops.map((s) => s.step)];
+  const steps = [...work.flatMap((w) => w.steps), ...declares.map((d) => d.step), ...visuals.map((v) => v.step), ...stops.map((s) => s.step)];
   const count = steps.length;
   /* ANY OF ITS BATCHES, since a run's own bookkeeping batches are never put back and so never marked. */
   /* UNDER `row`, ONLY WHEN AN UNDO HAS PUT THAT ROW BACK SINCE: another row's undo marks the batch too, and the mark
@@ -907,9 +912,65 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       ...(only.value === null ? {} : { only: only.value }),
       /* ONLY WHEN THERE IS ONE, so a plan with none has the hash it always had. */
       ...(declares.length === 0 ? {} : { declares: declares.map((d) => [d.id, d.installed, d.prior]) }),
+      ...(visuals.length === 0 ? {} : { visuals: visuals.map((v) => [v.field, v.head, v.back]) }),
     } as unknown as Json),
   );
-  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, keys, lines, every, decisions });
+  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, visuals, keys, lines, every, decisions });
+}
+
+/* ── a visual a change drew ──────────────────────────────────────────────── */
+
+/** Whether a line is one of a visual's (`visual.ts`), which the plan puts back as a visual and never counts as a note. */
+const isVisualLine = (l: Line): boolean => l.kind === 'note' && typeof l.field === 'string' && l.field.startsWith(VISUAL_FIELD);
+
+/** One visual the scope drew on, and the version it goes back to: `back` is a version line, `null` takes it away. */
+type Pictured = { target: string; field: string; head: number; back: string | null; keys: string[]; step: UndoStep };
+
+/**
+ * The visuals the scope drew, each back to where it stood before. One somebody changed since is left with who; one an
+ * undo of this scope already put back is passed over in silence.
+ */
+function picturedIn(sql: Sql, lines: readonly Line[], keys: readonly string[], opts: UndoOptions, skip: (title: string, why: string) => void): Pictured[] {
+  const groups = new Map<string, Line[]>();
+  for (const l of lines) if (isVisualLine(l) && l.target !== null) groups.set(`${l.target} ${l.field}`, [...(groups.get(`${l.target} ${l.field}`) ?? []), l]);
+  if (groups.size === 0) return [];
+  const undoneBy = new Set(
+    sql.all<{ b: string }>('SELECT by_batch AS b FROM undone WHERE batch IN (SELECT value FROM json_each(?))', JSON.stringify(keys)).map((r) => r.b),
+  );
+  const out: Pictured[] = [];
+  for (const [, mine] of groups) {
+    const target = mine[0]!.target!;
+    const field = mine[0]!.field!;
+    /* A list she cannot read is left out without a word, as its rows are. */
+    if (target.startsWith('entry:') && opts.reads) {
+      const list = sql.one<{ r: string }>('SELECT register AS r FROM entry WHERE id = ?', target.slice('entry:'.length))?.r;
+      if (list !== undefined && !opts.reads(list)) continue;
+    }
+    const all: VisualLine[] = visualLines(sql, target, field);
+    const first = mine[0]!.rowid;
+    const last = mine[mine.length - 1]!.rowid;
+    const since = all.filter((l) => l.rowid > last);
+    const title = [...all].reverse().map((l) => visualSaid(l.to_v)).find(isVersion)?.title ?? 'a visual';
+    /* LINES SINCE THAT LEFT IT WHERE THE SCOPE LEFT IT change nothing it would put back: a version drawn and undone. */
+    const now = visualStanding(all);
+    if (since.length > 0 && now !== visualStanding(all.filter((l) => l.rowid <= last))) {
+      if (since.every((l) => l.batch !== null && undoneBy.has(l.batch))) continue;
+      skip(title, `${whoIn(sql, since[since.length - 1]!.actor)} has changed it since`);
+      continue;
+    }
+    const back = visualStanding(all.filter((l) => l.rowid < first));
+    if (back === now) continue;
+    const line = back === null ? `Takes the visual ${named(title)} away.` : `Puts the earlier version of the visual ${named(title)} back.`;
+    out.push({
+      target,
+      field,
+      head: all[all.length - 1]!.rowid,
+      back,
+      keys: [...new Set(mine.map(keyOf))],
+      step: { do: back === null ? 'remove' : 'set', title, label: 'visual', line },
+    });
+  }
+  return out;
 }
 
 /* ── a declaration a change replaced ─────────────────────────────────────── */
@@ -1217,7 +1278,7 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
   return attempt(sql, parts.transaction, () => {
     const got = worked(sql, scope, opts);
     if (!got.ok) return got;
-    const { plan, work, stops, declares, keys, lines, every, decisions } = got.value;
+    const { plan, work, stops, declares, visuals, keys, lines, every, decisions } = got.value;
     if (typeof hash !== 'string' || hash !== plan.hash)
       return no<UndoApplied>('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
 
@@ -1301,6 +1362,26 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       }
     }
 
+    /* ── the visuals, each one line saying the version it stands at again, or that it is taken away ── */
+    const picturedBack = new Set<string>();
+    for (const v of visuals) {
+      slashMayWrite(actor, 'note');
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note, batch) VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?)",
+        parts.mint(),
+        at,
+        actor,
+        v.target,
+        v.target.slice(0, v.target.indexOf(':')),
+        v.field,
+        jcs((v.back === null ? { gone: true } : { back: v.back }) as Json),
+        PUT_BACK,
+        batch,
+      );
+      done.push(v.step);
+      for (const k of v.keys) picturedBack.add(k);
+    }
+
     for (const s of stops) {
       sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL, payload = json_set(payload, '$.cancelled', ?) WHERE id = ? AND state IN ('pending','failed')", at, s.id);
       sql.exec("UPDATE schedule SET state = 'done' WHERE kind = 'retry' AND key = ? AND state IN ('pending','failed','paused')", `outbox:${s.id}`);
@@ -1321,6 +1402,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
        `row`, that is the batches that wrote the row, not every one of a run's. */
     /* A DECLARATION PUT BACK MARKS ITS DECISION'S BATCH, with the kinds its rows gave it and none of its own. */
     for (const k of declaredBack) if (!kinds.has(k)) kinds.set(k, new Set());
+    /* A VISUAL PUT BACK MARKS ITS BATCH THE SAME WAY, with no kind: a visual changes no value, so no rung climbed on it. */
+    for (const k of picturedBack) if (!kinds.has(k)) kinds.set(k, new Set());
     if (stops.length > 0 && kinds.size === 0) for (const k of scope.row === undefined ? keys : [...new Set(lines.map(keyOf))]) kinds.set(k, new Set());
     /* A SECOND UNDO OF THE SAME BATCH, putting back what the first left, adds its kinds to the mark the first made: the
        ladder reads one line per batch, and a kind put back later is as undone as one put back first. Who made it and

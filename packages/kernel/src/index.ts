@@ -420,6 +420,20 @@ export { CAUSE, MOOT_GONE, MOOT_HELD, canon as canonValue, causeFault, causeOf, 
 /* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */
 export { PERSON_NAME_SUPPORT, personNameOf, placeholderName } from './api/person-name.ts';
 export { COMMENT_MOST } from './api/comments.ts';
+export {
+  PICTURE_NAME,
+  VISUAL_FIELD,
+  VISUAL_PAGE_MOST,
+  VISUAL_PICTURE_TYPES,
+  VISUAL_PICTURES_BYTES_MOST,
+  VISUAL_PICTURES_MOST,
+  VISUAL_RECORD_MOST,
+  VISUAL_TITLE_MOST,
+  visualPage,
+  type VisualBody,
+  type VisualPicture,
+} from './visual.ts';
+export type { VisualHeld, VisualVersion, VisualWhole } from './api/visuals.ts';
 export { ACTION_VERBS, ACTION_LEVELS, ACTION_AS, ACTION_KEYS, ACTIONS_MOST, BLOCK_VERBS, actionsBody, cutActions, type ActionVerb, type ActionLevel, type DeclaredAction, type OfferedAction, type VerbName } from './row-actions.ts';
 /* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
 export {
@@ -12630,6 +12644,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     observe: kernel.observe,
     reload,
     depth: () => depth,
+    signedBy,
+    foreignRun,
     caches: {
       save: () => ({ registers, prefixes, planned }),
       restore: (saved) => {
