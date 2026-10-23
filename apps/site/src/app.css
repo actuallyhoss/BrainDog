@@ -849,9 +849,10 @@
     }
   }
 
+  /* A PHONE'S BANDS SIT CLOSER (the audit of 22 October, U-C10): six bands at 48 each way were a screen of ground. */
   @media (max-width: 760px) {
     .band[class*='band--'] {
-      padding-block: 48px;
+      padding-block: 40px;
     }
 
     .ftile {

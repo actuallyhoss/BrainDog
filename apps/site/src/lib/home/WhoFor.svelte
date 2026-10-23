@@ -3,14 +3,20 @@
   well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
   hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for client work. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
+
+  CLIENT WORK IS DRAWN WITH AGENTS, SINCE THE AUDIT OF 22 OCTOBER (U-C5): one person and Claude, Cursor and Codex is what
+  brain.dog takes today, so the faces are the makers' marks, never colleagues.
+
+  ON A PHONE, THREE PLAIN LINES (U-C10): each tile is its icon and its way on, one line with an arrow, and the title is
+  said to a screen reader. The cards and their sentences were most of a screen at 390.
 -->
 <script lang="ts">
+  import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
   import { spark } from '$lib/desk/draw.ts';
 
   const w = home.who;
-  import AgentMark from '$lib/AgentMark.svelte';
   /* The small business's drawing: the cash over three months, as a shape and never as money. */
   const cash = spark([48.2, 47.1, 46.4], 220, 56);
   /* The agents a client's work is done with, by their makers' marks. */
@@ -227,33 +233,40 @@
     }
   }
 
-  /* ON A PHONE each tile is its icon, title, line and way on: the drawings are a desk's luxury. */
+  /* ON A PHONE each tile is one plain line, its icon and its way on with the arrow (U-C10): the drawings and the sentences
+     are a desk's luxury, and the title is said to a screen reader. */
   @media (max-width: 760px) {
-    .draw {
+    .draw,
+    .say {
       display: none;
     }
 
     .trio {
-      gap: 12px;
-      margin-block-start: 24px;
+      gap: 8px;
+      margin-block-start: 20px;
     }
 
-    /* The icon sits beside the title, so a tile is four short lines. */
     .ftile {
       display: grid;
       grid-template-columns: 40px minmax(0, 1fr);
       align-items: center;
       column-gap: 12px;
+      padding-block: 12px;
     }
 
     h3 {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
       margin: 0;
-      font-size: var(--t-site-22);
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
 
-    .say,
     .go {
-      grid-column: 1 / -1;
+      align-self: center;
+      font-size: var(--t-site-16);
     }
   }
 </style>

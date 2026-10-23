@@ -118,6 +118,8 @@ export const home = {
 
   faq: {
     title: 'Questions',
+    /* The disclosure the questions after the first three sit behind. */
+    more: 'More questions',
     aside: 'Anything else? Write to',
     email: SUPPORT_EMAIL,
     questions: [

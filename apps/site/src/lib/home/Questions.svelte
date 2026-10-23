@@ -2,13 +2,28 @@
   Questions (site 2a section 7): a FAQ-style accordion. The heading and the support address on the left, five
   native disclosures on the right, the first open, each a flat tile whose chevron turns in 160ms. A disclosure opens
   and shuts with no script, and every answer is in the HTML.
+
+  THREE, THEN MORE QUESTIONS (the audit of 22 October, U-C10): the rest sit behind one plain disclosure, so a phone reads
+  three questions and not five before the footer.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
 
   const q = home.faq;
+  /** How many questions are drawn before More questions. */
+  const FIRST = 3;
 </script>
+
+{#snippet asked(item: (typeof q.questions)[number], open: boolean)}
+  <details {open}>
+    <summary>{item.q}<Icon name="chevron-down" /></summary>
+    <p>
+      {item.a}
+      {#if 'link' in item && item.link}<a class="more" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
+    </p>
+  </details>
+{/snippet}
 
 <section class="band band--faq" aria-labelledby="faq-title">
   <div class="wrap reveal cols">
@@ -17,15 +32,15 @@
       <p class="aside">{q.aside} <a href="mailto:{q.email}">{q.email}</a>.</p>
     </div>
     <div class="c8 qs">
-      {#each q.questions as item, i (item.q)}
-        <details open={i === 0}>
-          <summary>{item.q}<Icon name="chevron-down" /></summary>
-          <p>
-            {item.a}
-            {#if 'link' in item && item.link}<a class="more" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
-          </p>
+      {#each q.questions.slice(0, FIRST) as item, i (item.q)}{@render asked(item, i === 0)}{/each}
+      {#if q.questions.length > FIRST}
+        <details class="rest">
+          <summary class="rest-open">{q.more}<Icon name="chevron-down" /></summary>
+          <div class="rest-qs">
+            {#each q.questions.slice(FIRST) as item (item.q)}{@render asked(item, false)}{/each}
+          </div>
         </details>
-      {/each}
+      {/if}
     </div>
   </div>
 </section>
@@ -91,8 +106,24 @@
     transition: rotate 160ms ease-out;
   }
 
-  details[open] summary :global(.icon) {
+  details[open] > summary :global(.icon) {
     rotate: 180deg;
+  }
+
+  /* MORE QUESTIONS IS A PLAIN LINE, not a tile: the questions it opens are the tiles. */
+  .rest {
+    background: none;
+  }
+
+  .rest-open {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  .rest-qs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
 
   summary:focus-visible {

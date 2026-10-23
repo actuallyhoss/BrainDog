@@ -324,6 +324,8 @@
       margin-block-start: 24px;
     }
 
+    /* The question says itself on a phone; its reason is the desk's (U-C10). */
+    .why,
     .item:nth-child(n + 3) {
       display: none;
     }

@@ -610,10 +610,12 @@
     }
   }
 
-  /* THE PHONE: the app's phone layout in a 540px frame that clips, the places pinned as its bottom bar. */
+  /* THE PHONE: Today alone, in a 380px frame that clips, SINCE THE AUDIT OF 22 OCTOBER (U-C10). The places pinned as its
+     bottom bar and the frame's 540px made the hero a screen and a half before the first band; the desk at 760 and up
+     keeps its five places. */
   @media (max-width: 760px) {
     .win {
-      block-size: 540px;
+      block-size: 380px;
     }
 
     .app-top {
@@ -633,58 +635,9 @@
       font-size: var(--t-site-13);
     }
 
-    .working {
-      display: none;
-    }
-
+    .working,
     .places {
-      position: absolute;
-      inset-inline: 0;
-      inset-block-start: 476px;
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 0;
-      block-size: 64px;
-      background: var(--desk-nav);
-      border-block-start: 1px solid var(--rule);
-    }
-
-    .desk-tab {
-      flex-direction: column;
-      justify-content: center;
-      gap: 4px;
-      block-size: 64px;
-      padding: 0;
-      border-radius: 0;
-      color: var(--muted);
-      font-size: var(--t-site-12);
-      font-weight: 500;
-    }
-
-    .cap {
-      display: block;
-    }
-
-    .desk-tab[aria-selected='true'] {
-      background: none;
-      color: var(--ink);
-    }
-
-    .tab-icon :global(.icon) {
-      inline-size: 24px;
-      block-size: 24px;
-    }
-
-    /* The tab bar's count (SPEC 2.A.2 `size="s"`): 18px, over the icon's corner, cut out of the bar. */
-    .count {
-      position: absolute;
-      inset-block-start: 6px;
-      inset-inline-start: calc(50% + 4px);
-      min-inline-size: 18px;
-      block-size: 18px;
-      padding-inline: 5px;
-      line-height: 18px;
-      box-shadow: 0 0 0 2px var(--desk-nav);
+      display: none;
     }
 
     .face {
@@ -692,7 +645,7 @@
     }
 
     .desk-pane {
-      padding: 4px 12px 76px;
+      padding: 4px 12px 16px;
     }
 
     .win :global(.grid) {
