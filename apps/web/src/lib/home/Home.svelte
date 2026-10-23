@@ -960,8 +960,8 @@
 
   /**
    * TODAY SPEAKS FIRST (the audit of 22 October, U2): on the board, over the tiles, a greeting by the time of day and his
-   * name, then two or three sentences that name what is late and what needs him (`today-brief.ts`), and one quiet line
-   * while the model that writes is not answering (`quiet`, U7). The head keeps only the phone's bar, and the date and the
+   * name, and nothing more since 23 October (DIRECTION §51): what is late and what needs him are the tiles' to say. The
+   * head keeps only the phone's bar, and the date and the
    * sun glyph go: the tab already says where he is. Not on a first Today, which opens on its card, nor a kept page, which
    * is drawn as its owner laid it out.
    */
