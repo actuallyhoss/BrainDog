@@ -52,6 +52,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   team: [
     {
+      version: '2.22.0',
+      notes: 'Bring the team in says that a team of agents works on any record, and no longer that a team of people needs Cloud.',
+    },
+    {
       version: '2.21.0',
       notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. Runs on lists the project's own keys, tools and skills, six of each with who used each and when, then up to five shared by every project. Home says what stopped reporting, under Gone quiet. The burn-down on Home fills itself each morning, with no agent needed.",
     },
