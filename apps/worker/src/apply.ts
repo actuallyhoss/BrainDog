@@ -223,7 +223,8 @@ export async function opsApplications(request: Request, deps: OpsApplyDeps): Pro
  * is answered once, at minting.
  *
  * WITH AN `email`, ONE CODE, MAILED. `count` is 1 or left out; `days` is thirty when left out, so the letter can say when
- * it ends; the note is the operator's or `invite: <email>`. The link is mailed (`invite.ready`), a waiting application
+ * it ends; the note is the operator's or `invite: <email>`. The link is mailed (`invite.ready`, greeting the name a
+ * waiting application of that address gave), a waiting application
  * of that address is marked invited with the code's ref (`apply.invited`), and the answer is `{ links, ends_at, mailed }`.
  *
  * ANSWERED WHATEVER `SIGNUP` SAYS, so the codes can be made before the host is switched to `invite`.
@@ -257,7 +258,13 @@ export async function opsInvite(request: Request, deps: OpsApplyDeps): Promise<R
   const [code] = out.value.codes;
   if (to === null || code === undefined) return json({ ok: true, value: { links, ends_at: out.value.ends_at } }, 200);
   const left = daysOf(out.value.ends_at, deps.now());
-  const mailed = await deps.mail(to, left === undefined ? { link: linkOf(deps.origin, code) } : { link: linkOf(deps.origin, code), days: left });
+  /* THE LETTER GREETS THE NAME THEY APPLIED WITH (the audit of 22 October, U-C16), and "Hi there" only without one. */
+  const name = (await deps.applications({ flow: 'apply.list' })).find((row) => row.email === to && row.state === 'waiting')?.name;
+  const mailed = await deps.mail(to, {
+    link: linkOf(deps.origin, code),
+    ...(left === undefined ? {} : { days: left }),
+    ...(name ? { name } : {}),
+  });
   await deps.applications({ flow: 'apply.invited', email: to, ref: await refOf(code) });
   return json({ ok: true, value: { links, ends_at: out.value.ends_at, mailed } }, 200);
 }

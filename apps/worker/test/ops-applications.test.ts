@@ -129,6 +129,8 @@ test('A DIRECT INVITATION BY ADDRESS MAILS ONE CODE AND MARKS A WAITING APPLICAT
     assert.equal(c.letters().length, 1);
     assert.equal(c.letters()[0]?.to, 'leo@example.test');
     assert.ok(String(c.letters()[0]?.text).includes(links[0] ?? '-'));
+    /* The letter greets the name the application gave, not "Hi there". */
+    assert.ok(String(c.letters()[0]?.text).startsWith('Hi Leo Brandt,'), String(c.letters()[0]?.text));
     const [row] = await c.listed();
     assert.equal(row?.state, 'invited');
     const codes = (await c.call('/account/ops/invite')).out.value?.['codes'] as { ref: string; note: string }[];

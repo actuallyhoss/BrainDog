@@ -393,18 +393,19 @@ const aside = (text: string): string =>
   `<p class="bd-dim" style="margin:0 0 12px;font-family:${FONT};font-size:14px;line-height:21px;color:${L.dim}">${h(text)}</p>`;
 
 /**
- * THE ONE BUTTON, BULLETPROOF. Everywhere but Outlook for Windows it is a padded link painted as an ink pill; Outlook
- * draws no padding on a link and no radius on anything, so it gets a VML round rectangle of its own, sized from the
- * label because VML cannot size to its text. Both are one link to the same address, and the whole pill is the target.
+ * THE ONE BUTTON, BULLETPROOF. Everywhere but Outlook for Windows it is a padded link painted as an ink rectangle with
+ * the app's 8px corners (the audit of 22 October, U-C16; it was a pill); Outlook draws no padding on a link and no
+ * radius on anything, so it gets a VML round rectangle of its own, sized from the label because VML cannot size to its
+ * text. Both are one link to the same address, and the whole button is the target.
  */
 const button = (label: string, href: string): string => {
   const width = Math.min(520, Math.max(180, Math.round(label.length * 8.6 + 56)));
   return (
     `<table role="presentation" class="bd-btn-wrap" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;border-collapse:separate">` +
-    `<tr><td class="bd-btn" align="center" bgcolor="${L.ink}" style="border-radius:999px;background-color:${L.ink}">` +
-    `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h(href)}" style="height:46px;v-text-anchor:middle;width:${width}px" arcsize="50%" stroke="f" fillcolor="${L.ink}"><w:anchorlock/><center style="color:${L.bg};font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600">${h(label)}</center></v:roundrect><![endif]-->` +
+    `<tr><td class="bd-btn" align="center" bgcolor="${L.ink}" style="border-radius:8px;background-color:${L.ink}">` +
+    `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h(href)}" style="height:46px;v-text-anchor:middle;width:${width}px" arcsize="17%" stroke="f" fillcolor="${L.ink}"><w:anchorlock/><center style="color:${L.bg};font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600">${h(label)}</center></v:roundrect><![endif]-->` +
     `<!--[if !mso]><!-->` +
-    `<a href="${h(href)}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;color:${L.bg};text-decoration:none;border-radius:999px;mso-hide:all">${h(label)}</a>` +
+    `<a href="${h(href)}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;color:${L.bg};text-decoration:none;border-radius:8px;mso-hide:all">${h(label)}</a>` +
     `<!--<![endif]-->` +
     `</td></tr></table>`
   );
