@@ -315,6 +315,27 @@ test('MACHINES-WORKING AND RUNS-WAITING COUNT BY THE SAME CLOCK AS RUNS-WORKING'
   sql.close();
 });
 
+/* THE AGENTS PAGE SAYS WHO IS AT WORK ON WHAT (the audit of 22 October, U12): `{{runs-working.names}}`, each agent and
+   project once, by the project's name, and the agent alone where its run is in no project. */
+test('RUNS-WORKING NAMES WHO IS AT WORK ON WHAT, each once, by the project\'s name', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([PROJECTS]));
+  value(k.create('things', { name: 'Lanternfish' }, { actor: 'p_1' }));
+  value(k.create('things', { name: 'Copperleaf' }, { actor: 'p_1' }));
+  const run = (agent: string, project: string | null, minutesAgo = 2) =>
+    value(k.create('session', { doing: 'Work', agent, state: 'active' }, { actor: 'p_1', stamp: { last_seen: new Date(NOW - minutesAgo * 60_000).toISOString(), ...(project ? { project } : {}) } }));
+  const names = () => k.block({ kind: 'note', body: 'At work: {{runs-working.names}}.' } as PageBlock).values?.['runs-working.names'];
+  assert.equal(names(), undefined, 'nobody at work names nobody');
+  run('claude', 'things#1');
+  run('claude', 'things#1');
+  run('codex', 'things#2');
+  run('codex', null);
+  run('claude', 'things#2', 30);
+  assert.equal(names(), 'Claude on Lanternfish, Codex on Copperleaf and Codex', 'two runs of one agent on one project are said once, and a quiet run not at all');
+  sql.close();
+});
+
 /* ── where things apply (AGT-D01) ─────────────────────────────────────────── */
 
 const PROJECTS: Declaration = {

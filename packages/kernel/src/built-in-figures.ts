@@ -86,7 +86,7 @@ import { DOOR_KEPT_DAYS, DOOR_WINDOW_DAYS, doorMarks } from './door.ts';
 import { openHandoffs, type OpenHandoff } from './handoff.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { liveStateOf, presentRuns, workingRuns } from './presence.ts';
-import { SESSION, SESSION_PREFIX, isRunName } from './session.ts';
+import { SESSION, SESSION_PREFIX, agentOf, isRunName } from './session.ts';
 import type { Json } from './coerce.ts';
 import { intervalMs } from './pull.ts';
 /* `key-scan.ts` IMPORTS ONLY `coerce.ts` AT RUN TIME, and `coerce.ts` only types, so this adds no load ring. */
@@ -1044,8 +1044,51 @@ export function readRunsWorking(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl?
     const present = presentRuns(sql, ctx.nowMs);
     const open = new Set(present.map((r) => `${SESSION_PREFIX}${String(r.seq)}`));
     n = present.filter((r) => liveStateOf(r, ctx.nowMs) === 'waiting' && !open.has(said(r.fields.parent) ?? '')).length;
-  } else n = workingRuns(sql, ctx.nowMs).length;
+  } else {
+    const runs = workingRuns(sql, ctx.nowMs);
+    n = runs.length;
+    const read: Reading = { value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] };
+    return withNames(ok(read), workingSaid(sql, runs));
+  }
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
+}
+
+/** A spoken id, `things#4`: the list before the `#` and the row's number after it. */
+const SPOKEN_ROW_AT = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
+
+/** The name of the row a spoken id names, by its list's title field, or `null` where it names none. */
+function spokenTitle(sql: Sql, spoken: string): string | null {
+  const m = SPOKEN_ROW_AT.exec(spoken.trim());
+  if (!m) return null;
+  const title = sql.one<{ t: string | null }>(
+    "SELECT json_extract(body, '$.title') AS t FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 AND json_valid(body) ORDER BY version DESC LIMIT 1",
+    `register.${m[1]!}`,
+  )?.t;
+  if (typeof title !== 'string' || !/^[a-z][a-z0-9_]*$/.test(title)) return null;
+  const row = sql.one<{ v: string | null }>(`SELECT json_extract(fields, '$.${title}') AS v FROM entry WHERE register = ? AND seq = ? AND deleted_at IS NULL`, m[1]!, Number(m[2]));
+  return typeof row?.v === 'string' && row.v.trim() !== '' ? row.v.trim() : null;
+}
+
+/**
+ * WHO IS AT WORK ON WHAT, IN WORDS, for `{{runs-working.names}}`: "Claude Code on BrainDog and Codex on Kiln", each agent
+ * and project once, the agent alone where its run is in no project, and past three "and 2 more". SINCE the audit of 22
+ * October (U12): the Agents page's line counted machines ("1 at work on one machine") and never said who or on what.
+ */
+function workingSaid(sql: Sql, runs: readonly { fields: Readonly<Record<string, Json>> }[]): string | undefined {
+  const said = (v: Json | undefined): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined);
+  const each = [
+    ...new Set(
+      runs.map((r) => {
+        const who = agentOf({ agent: said(r.fields.agent), client: said(r.fields.client) }).name;
+        const project = said(r.fields.project);
+        const on = project === undefined ? null : (spokenTitle(sql, project) ?? (SPOKEN_ROW_AT.test(project) ? null : project));
+        return on ? `${who} on ${on}` : who;
+      }),
+    ),
+  ];
+  if (each.length === 0) return undefined;
+  if (each.length > 3) return `${each.slice(0, 2).join(', ')} and ${each.length - 2} more`;
+  return each.length === 1 ? each[0]! : `${each.slice(0, -1).join(', ')} and ${each.at(-1)!}`;
 }
 
 /**
