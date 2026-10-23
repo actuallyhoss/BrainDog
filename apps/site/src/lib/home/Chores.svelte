@@ -4,7 +4,8 @@
 
   THE QUESTIONS HERE ARE NOT THE DESK'S (site F1): the desk's Today already shows Northbound and Dana, so this band
   asks the two only a person decides (a merge and a key), from their own store (`asked` in `desk/needs.svelte.ts`).
-  Answer yes and the question moves across with an Undo, a 200ms slide and nothing else (site F25).
+  Answer yes and the question moves across with an Undo, a 200ms slide and nothing else (site F25). One question is drawn
+  at a time, and a line under it says how many more wait, so the count beside the heading is one a reader can see.
 
   FINISHED WITHOUT SCRIPTING. The HTML holds both questions and all four chores, each with its reason. The answer and
   Undo buttons are drawn only once the script runs, so a reader without it meets no control that does nothing.
@@ -74,6 +75,7 @@
               </li>
             {/each}
           </ul>
+          {#if open.length > 1}<p class="after">{words.after(open.length - 1)}</p>{/if}
         {/if}
       </div>
       <div class="done c5">
@@ -184,6 +186,12 @@
   .why {
     color: var(--ink2);
     font-size: var(--t-site-14);
+  }
+
+  .after {
+    margin-block-start: 12px;
+    color: var(--muted);
+    font-size: var(--t-site-13);
   }
 
   .acts {

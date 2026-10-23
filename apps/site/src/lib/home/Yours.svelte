@@ -28,11 +28,7 @@
     <article class="ftile c5 free">
       <h3>{f.title}</h3>
       <p class="say">{f.say}</p>
-      <ul class="figs">
-        <li><b>{f.every}</b></li>
-        <li><b class="num">{TABLE.free.agents}</b><span>{f.tools}</span></li>
-        <li><b class="num">{TABLE.free.credits}</b><span>{f.asks}</span></li>
-      </ul>
+      <p class="figs">{f.figures(TABLE.free.agents, TABLE.free.credits)}</p>
       <div class="go-btn"><Start /></div>
     </article>
   </div>
@@ -124,31 +120,10 @@
   }
 
   .figs {
-    display: grid;
-    grid-template-columns: repeat(3, auto);
-    justify-content: start;
-    gap: 24px;
-    margin: 24px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .figs li {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    margin: 16px 0 0;
+    color: var(--on-night);
     font-size: var(--t-site-17);
-  }
-
-  .figs b {
-    font: 600 28px/1 var(--head);
-    letter-spacing: -0.035em;
-  }
-
-  .figs span {
-    max-inline-size: 11em;
-    color: var(--on-night-2);
-    font-size: var(--t-site-13);
+    line-height: 1.45;
   }
 
   .go-btn {
@@ -174,18 +149,6 @@
 
     .mine li {
       font-size: var(--t-site-16);
-    }
-
-    .figs {
-      gap: 16px;
-    }
-
-    .figs b {
-      font-size: var(--t-site-22);
-    }
-
-    .figs span {
-      max-inline-size: 8em;
     }
 
     .go-btn :global(.btn) {

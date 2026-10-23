@@ -93,9 +93,11 @@ export type Parts = (string | Figure)[];
 /**
  * TODAY'S ONE LINE, as the app's Today says it: the date over the page's name, and one sentence whose first phrase is what needs her, in red. The count is the desk's own (`needs.svelte.ts`), so
  * `NEEDS` here is what it starts at; the other two figures open the Agents place and the cash's evidence.
+ *
+ * THE DATE IS THE VISITOR'S OWN DAY (`dateSaid`), drawn on their device once the page runs, SINCE THE AUDIT OF 22
+ * OCTOBER (U-C15): "Thursday 19 March" was printed into the page in October. With scripting off no date is drawn.
  */
-export const BRIEF: { date: string; agents: Lead; cash: Lead } = {
-  date: 'Thursday 19 March',
+export const BRIEF: { agents: Lead; cash: Lead } = {
   agents: { text: '2 agents', go: 'agents' },
   cash: { text: '14 months', key: 'cash' },
 };
@@ -568,3 +570,6 @@ export const MAKES: Make[] = [
     where: 'Pocketlab',
   },
 ];
+
+/** A day as the app's Today says it over its name: "Friday 23 October". */
+export const dateSaid = (now: Date): string => new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);

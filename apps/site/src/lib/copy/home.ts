@@ -72,6 +72,9 @@ export const home = {
     /* The figures beside the two headings, and the line the drawing says once nothing waits. */
     today: (n: number) => `${n} today`,
     empty: 'Nothing needs you. Everything else is handled.',
+    /* The line under the one question drawn, so the count beside the heading is what a reader can account for (the
+       audit of 22 October, U-C15). */
+    after: (n: number) => (n === 1 ? '1 more waits after this one.' : `${n} more wait after this one.`),
     askedBy: 'asked by',
     undo: 'Undo',
   },
@@ -108,10 +111,9 @@ export const home = {
   free: {
     title: 'Free while in early access.',
     say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready.",
-    /* The figures are `TABLE.free`'s; these are only their labels. */
-    every: 'Every feature',
-    tools: 'AI tools',
-    asks: 'questions to Slash a month',
+    /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the audit of 22 October, U-C15; the
+       site's own rule, §47): "Every feature, 3 AI tools and 20 questions to Slash a month." */
+    figures: (tools: number, asks: number): string => `Every feature, ${tools} AI tools and ${asks} questions to Slash a month.`,
   },
 
   faq: {

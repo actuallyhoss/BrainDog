@@ -20,7 +20,8 @@
   import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
   import Mark from '../Mark.svelte';
-  import { BRIEF, FOUNDER, TODAY, slotVars } from '../demo/maya.ts';
+  import { onMount } from 'svelte';
+  import { FOUNDER, TODAY, dateSaid, slotVars } from '../demo/maya.ts';
   import Agents from './Agents.svelte';
   import Ask from './Ask.svelte';
   import Money from './Money.svelte';
@@ -35,6 +36,9 @@
   const tabs: Record<string, HTMLButtonElement> = {};
 
   const count = $derived(needs.open.length);
+  /* THE VISITOR'S OWN DAY on the phone's bar, once the page runs (U-C15). */
+  let date = $state('');
+  onMount(() => void (date = dateSaid(new Date())));
 
   function show(tab: Tab, focus = false): void {
     chosen = tab;
@@ -69,7 +73,7 @@
 <div class="win desk" class:slashing={asking} data-desk>
   <div class="app-top">
     <span class="who"><Mark height={20} tone="inherit" /><span class="who-name">{DESK.brand}</span></span>
-    <span class="phone-date">{BRIEF.date}</span>
+    <span class="phone-date">{date}</span>
     <div class="places" role="tablist" aria-label={DESK.places}>
       {#each TABS as tab, i}
         <button

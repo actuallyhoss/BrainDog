@@ -138,7 +138,7 @@ export const trust = {
       nightsFrom: '30 nights ago',
       nightsTo: 'Last night',
       nightsRead: 'The last 30 copies are kept, and each one is sealed.',
-      signin: ['Sign in with a passkey', 'Or email me a link', 'No password, anywhere'],
+      signin: ['A passkey first', 'Or a link by email', 'No password, anywhere'],
       signinLabel: 'Signing in: a passkey first, an emailed link as the fallback, and no password field',
       /* The token's reach, row by row, as ADR-060 draws it: the first three a token may do, the rest only a person. */
       reach: {

@@ -1,19 +1,20 @@
 <!--
   "Who it's for" (site F2, 2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
   well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
-  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for a team. The words are
+  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for client work. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
-  import { PEOPLE, slotVars } from '$lib/demo/maya.ts';
   import { spark } from '$lib/desk/draw.ts';
 
   const w = home.who;
+  import AgentMark from '$lib/AgentMark.svelte';
   /* The small business's drawing: the cash over three months, as a shape and never as money. */
   const cash = spark([48.2, 47.1, 46.4], 220, 56);
-  const faces = (['dana', 'leo', 'sam'] as const).map((id) => PEOPLE[id]);
+  /* The agents a client's work is done with, by their makers' marks. */
+  const agents = (['claude', 'cursor', 'codex'] as const);
 </script>
 
 <section class="band band--who" aria-labelledby="who-title">
@@ -49,7 +50,7 @@
         <p class="say">{w.team.say}</p>
         <div class="draw">
           <p class="faces" aria-hidden="true">
-            {#each faces as f (f.initials)}<span class="face" style={slotVars(f.slot)}>{f.initials}</span>{/each}
+            {#each agents as id (id)}<span class="face"><AgentMark {id} size={16} /></span>{/each}
           </p>
           <p class="moved">{w.team.line}</p>
         </div>

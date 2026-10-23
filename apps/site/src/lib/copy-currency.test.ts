@@ -103,8 +103,7 @@ const WORD: Record<string, string> = { agents: 'agents', credits: 'questions', r
 const said: string[] = [
   JSON.stringify({ pricing: p, slash: slashPage }),
   ...p.early.plan.lines(TABLE.free),
-  `${TABLE.free.agents} ${site.free.tools}`,
-  `${TABLE.free.credits} ${site.free.asks}`,
+  site.free.figures(TABLE.free.agents, TABLE.free.credits),
   ...PLANS.flatMap((pl) => [pl.price, pl.unit, pl.for]),
   ...[cardsFor({ billing: false }), cardsFor({ billing: true })].flat().flatMap((card) => [
     `${card.price} ${card.per}`,

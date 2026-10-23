@@ -78,9 +78,11 @@
             <p class="fact-text">{passkey.text}</p>
           </div>
           <div class="signin" role="img" aria-label={d.signinLabel}>
-            <span class="drawn ink" aria-hidden="true"><Icon name="key" size="m" />{d.signin[0]}</span>
-            <span class="drawn" aria-hidden="true"><Icon name="mail" size="m" />{d.signin[1]}</span>
-            <span class="no-password" aria-hidden="true"><Icon name="x" size="m" />{d.signin[2]}</span>
+            {#each d.signin as way, i (way)}
+              <span class="way" class:not={i === 2} aria-hidden="true">
+                <span class="glyph" class:ink={i === 0}><Icon name={i === 0 ? 'key' : i === 1 ? 'mail' : 'x'} /></span>{way}
+              </span>
+            {/each}
           </div>
         </section>
       {/if}
@@ -151,7 +153,7 @@
           <p class="fact-text">{exported.text}</p>
           <div class="export" role="img" aria-label={exported.text}>
             <span class="export-row" aria-hidden="true">
-              <span class="glyph on-tile"><Icon name="download" /></span>
+              <span class="glyph"><Icon name="download" /></span>
               <span class="export-words">
                 <span class="export-name">{d.exportName}</span>
                 <span class="export-note">{d.exportNote}</span>
@@ -384,30 +386,6 @@
     color: var(--page);
   }
 
-  .glyph.on-tile {
-    background: var(--tile);
-  }
-
-  /* A DRAWN BUTTON: the product's rectangle, pressed by nobody, because it is a picture. */
-  .drawn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-block-size: 40px;
-    padding-inline: 16px;
-    background: var(--board);
-    border-radius: 8px;
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 500;
-  }
-
-  .drawn.ink {
-    background: var(--ink);
-    color: var(--page);
-  }
-
   /* ── One database per record ─────────────────────────────────────────── */
 
   /* FOUR RECORDS, EACH ITS OWN: a gap between every pair and no line across it, which is the whole of the claim. */
@@ -509,27 +487,26 @@
 
   /* ── A passkey ───────────────────────────────────────────────────────── */
 
+  /* THE WAYS IN, AS LINES AND NOT BUTTONS (the audit of 22 October, U-C15): a drawn button nobody can press read as one
+     that does nothing. Each way is its glyph and its words, the way the sealed keys are drawn beside it. */
   .signin {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 16px;
-    background: var(--board);
-    border-radius: 12px;
+    gap: 12px;
   }
 
-  .signin .drawn:not(.ink) {
-    background: var(--tile);
-  }
-
-  .no-password {
-    display: inline-flex;
+  .way {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-block-size: 40px;
+    gap: 12px;
+    color: var(--ink);
+    font-size: var(--t-site-15);
+    font-weight: 500;
+  }
+
+  .way.not {
     color: var(--muted);
-    font-size: var(--t-site-small);
+    font-weight: 400;
   }
 
   /* ── What a token can do ─────────────────────────────────────────────── */
@@ -585,14 +562,14 @@
     margin-block-start: auto;
   }
 
+  /* THE FILE, AS A LINE BETWEEN RULES and not a filled box, so it reads as what export gives and not a button (U-C15). */
   .export-row {
     display: flex;
     align-items: center;
     gap: 12px;
     align-self: stretch;
-    padding: 12px;
-    background: var(--board);
-    border-radius: 12px;
+    padding-block: 12px;
+    border-block: 1px solid var(--rule);
   }
 
   .export-words {

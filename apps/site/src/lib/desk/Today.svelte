@@ -11,7 +11,8 @@
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
-  import { BRIEF, EVIDENCE, NEEDS, PROJECT_ORDER, PROJECTS, TODAY, slotVars } from '../demo/maya.ts';
+  import { onMount } from 'svelte';
+  import { BRIEF, EVIDENCE, NEEDS, PROJECT_ORDER, PROJECTS, TODAY, dateSaid, slotVars } from '../demo/maya.ts';
   import { AREA, area, spark } from './draw.ts';
   import { needs } from './needs.svelte.ts';
   import { DESK, type Tab } from './words.ts';
@@ -25,9 +26,12 @@
 
   let behind = $state(false);
   const evidence = EVIDENCE.cash;
+  /* THE VISITOR'S OWN DAY, once the page runs; the line holds its height before, so nothing moves when it lands. */
+  let date = $state('');
+  onMount(() => void (date = dateSaid(new Date())));
 </script>
 
-<p class="date">{BRIEF.date}</p>
+<p class="date">{date || '\u00a0'}</p>
 <div class="hello">
   <h2 class="greet"><Icon name="today" />{DESK.tabs.today}</h2>
   <p class="line">
