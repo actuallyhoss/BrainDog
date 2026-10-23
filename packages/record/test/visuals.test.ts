@@ -189,3 +189,13 @@ test("THE OWNER'S UNDO PUTS IT BACK TOO, and leaves it when somebody drew on it 
   assert.equal(plan.steps.length, 0);
   assert.match(plan.skipped[0]!.why, /has changed it since/u);
 });
+
+test('EACH VERSION NAMES THE WRITE IT WAS MADE IN, so the app undoes the newest from the visual alone', async () => {
+  const { api, ticket } = await record();
+  const first = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>One</h1>', title: 'Plan' }, owner));
+  const second = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>Two</h1>', title: 'Plan' }, owner));
+  const read = value<{ versions: { version: number; batch: string | null }[] }>(await api.visual({ id: first.visual }, owner));
+  assert.deepEqual(read.versions.map((v) => [v.version, v.batch]), [[1, first.batch], [2, second.batch]]);
+  const plan = value<{ hash: string; steps: unknown[] }>(await api.undo({ batch: read.versions[1]!.batch!, dry: true }, owner));
+  assert.equal(plan.steps.length, 1);
+});

@@ -68,7 +68,10 @@ export type VisualListed = {
   pictures: VisualPicture[];
 };
 
-/** One visual whole as `visual` answers it: the version asked, its page's text, and every version without theirs. */
+/**
+ * One visual whole as `visual` answers it: the version asked, its page's text, and every version without theirs. Each
+ * version names the write it was made in (`batch`), which `undo` takes back, so the app's Undo needs no receipt.
+ */
 export type VisualRead = {
   id: string;
   on: string;
@@ -78,7 +81,7 @@ export type VisualRead = {
   at: string;
   page: string;
   pictures: VisualPicture[];
-  versions: { version: number; title: string; by: string; at: string; bytes: number; pictures: number }[];
+  versions: { version: number; title: string; by: string; at: string; bytes: number; pictures: number; batch: string | null }[];
 };
 
 const SHA = /^[0-9a-f]{64}$/;
@@ -328,7 +331,7 @@ export function methods(deps: RecordDeps) {
         at: one.at,
         page: TEXT.decode(bytes),
         pictures: one.pictures,
-        versions: whole.versions.map((v) => ({ version: v.n, title: v.title, by: v.by, at: v.at, bytes: v.bytes, pictures: v.pictures.length })),
+        versions: whole.versions.map((v) => ({ version: v.n, title: v.title, by: v.by, at: v.at, bytes: v.bytes, pictures: v.pictures.length, batch: v.batch })),
       });
     },
   };

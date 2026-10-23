@@ -25,8 +25,8 @@ import {
   type VisualPicture,
 } from '../visual.ts';
 
-/** One version as it is read back: its line, who made it and when, and what it holds. */
-export type VisualVersion = VisualBody & { line: string; n: number; by: string; at: string };
+/** One version as it is read back: its line, who made it and when, what it holds, and the write an undo takes back. */
+export type VisualVersion = VisualBody & { line: string; n: number; by: string; at: string; batch: string | null };
 
 /** One visual on a thing: where it stands now, and how many versions it has had. */
 export type VisualHeld = { id: string; target: string; title: string; now: VisualVersion; versions: number; made_by: string; made_at: string };
@@ -58,7 +58,7 @@ function versionsIn(lines: readonly VisualLine[]): VisualVersion[] {
   const out: VisualVersion[] = [];
   for (const l of lines) {
     const said = visualSaid(l.to_v);
-    if (isVersion(said)) out.push({ ...said, line: l.id, n: out.length + 1, by: l.actor, at: l.ts });
+    if (isVersion(said)) out.push({ ...said, line: l.id, n: out.length + 1, by: l.actor, at: l.ts, batch: l.batch });
   }
   return out;
 }
