@@ -78,7 +78,7 @@
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
-  import { homePage, said as voiced } from '../voice.svelte.ts';
+  import { said as voiced } from '../voice.svelte.ts';
   import { spineOf, type SpineCounts } from '../spine.ts';
   import type { List, Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
@@ -329,7 +329,8 @@
   }
   $effect(() => {
     if (!open || !isLive) return;
-    const slug = homeSlugOf(homePage(), shell.pages ?? []);
+    /* THE PAGE HOME DRAWS (U1): a page kept by hand, else the desk, and never a use case's own Home page. */
+    const slug = homeSlugOf(null, shell.pages ?? []);
     const key = `${apiBase(page.url)} ${slug ?? ''} ${addLists.map((l) => l.id).join(',')}`;
     if (key === intoFor) return;
     intoFor = key;

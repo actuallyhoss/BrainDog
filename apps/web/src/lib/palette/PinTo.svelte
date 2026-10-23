@@ -19,7 +19,6 @@
   import Sheet from '../ui/Sheet.svelte';
   import { toasts } from '../ui/toast.svelte.ts';
   import { listName } from '../record/names.ts';
-  import { homePage } from '../voice.svelte.ts';
   import { pinnable, words, type PinPage, type PinSheet } from './pin.ts';
 
   let {
@@ -50,7 +49,7 @@
       const { readBoot } = await import('../record/boot-live.ts');
       const booted = await readBoot(apiBase());
       if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
-      else next = await (await import('./pin.ts')).pinSheet(apiBase(), register, homePage());
+      else next = await (await import('./pin.ts')).pinSheet(apiBase(), register);
     } catch {
       next = { from: 'refused', fix: words.failed };
     }

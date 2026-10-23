@@ -178,7 +178,7 @@ test('PROSE PINS AS A NOTE HOLDING THE TEXT, THE DAY AND {inferred}', () => {
 test('PINNED TO TODAY: one page write, the list added to what Today requires, the rows read live, and Undo puts it back', async () => {
   const k = await record();
   const { io, asked } = served(k);
-  const sheet = await pinSheet(BASE, 'tasks', null, io);
+  const sheet = await pinSheet(BASE, 'tasks', io);
   assert.equal(sheet.from, 'live', JSON.stringify(sheet));
   if (sheet.from !== 'live') return;
   /* TODAY FIRST, and every page, including the one that does not read Tasks yet. */
@@ -220,7 +220,7 @@ test('PINNED TO TODAY: one page write, the list added to what Today requires, th
 test('A PAGE THAT READS THE LIST ALREADY keeps its requires as they were, and a note goes on any page and requires nothing', async () => {
   const k = await record();
   const { io, asked } = served(k);
-  const sheet = await pinSheet(BASE, 'tasks', null, io);
+  const sheet = await pinSheet(BASE, 'tasks', io);
   assert.ok(sheet.from === 'live');
   const work = sheet.pages.find((p) => p.slug === 'work')!;
   asked.length = 0;
@@ -229,7 +229,7 @@ test('A PAGE THAT READS THE LIST ALREADY keeps its requires as they were, and a 
   assert.equal(asked.filter((m) => m === 'setDeclaration').length, 1);
   assert.deepEqual(stored(k, 'work').requires, ['register.tasks']);
 
-  const notes = await pinSheet(BASE, null, null, io);
+  const notes = await pinSheet(BASE, null, io);
   assert.ok(notes.from === 'live');
   const noted = await pinTo(BASE, notes.pages[0]!, { kind: 'note', text: 'One job is slow.' }, CLOCK, io);
   assert.equal(noted.from, 'written', JSON.stringify(noted));
@@ -241,7 +241,7 @@ test('A PAGE THAT READS THE LIST ALREADY keeps its requires as they were, and a 
 test('A PAGE THAT CHANGED UNDER THE SHEET IS REFUSED in the sheet\'s words, and nothing is written', async () => {
   const k = await record();
   const { io, asked } = served(k);
-  const sheet = await pinSheet(BASE, 'tasks', null, io);
+  const sheet = await pinSheet(BASE, 'tasks', io);
   assert.ok(sheet.from === 'live');
   const today = { ...sheet.pages[0]!, drawn: 0, spans: [] };
   asked.length = 0;
@@ -249,4 +249,21 @@ test('A PAGE THAT CHANGED UNDER THE SHEET IS REFUSED in the sheet\'s words, and 
   assert.deepEqual(out, { from: 'refused', fix: bindWords.moved });
   assert.equal(asked.includes('setDeclaration'), false);
   assert.equal(words.pinned('Today'), 'Pinned to Today.');
+});
+
+test('A USE CASE\'S OWN HOME PAGE IS NO TODAY: it is offered under its own name, after the page Home draws', async () => {
+  const k = await record();
+  const put = await k.install([
+    {
+      id: 'page.home-studio',
+      kind: 'page',
+      body: { page: 'home-studio', title: 'Studio', requires: ['register.tasks'], blocks: [{ kind: 'table', source: 'register.tasks', columns: [{ field: 'what' }] }] },
+    } as never,
+  ]);
+  assert.ok(put.ok, JSON.stringify(put));
+  const { io } = served(k);
+  const sheet = await pinSheet(BASE, 'tasks', io);
+  assert.ok(sheet.from === 'live');
+  assert.equal(sheet.pages[0]!.slug, 'home', 'the page Home draws comes first, not the use case\'s');
+  assert.ok(sheet.pages.some((p) => p.slug === 'home-studio' && p.title === 'Studio'));
 });

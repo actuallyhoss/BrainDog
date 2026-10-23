@@ -108,11 +108,12 @@ export type PinSheet = { from: 'live'; name: string | null; pages: PinPage[]; de
  * EVERY PAGE, NOT ONLY THE ONES THAT READ THE LIST: a pin is a person saying "keep this here", and the write adds the
  * list to a page that lacks it. A page drawn once per row is left out by `pagesReader`, as for "Put this on a page".
  *
- * TODAY IS THE PAGE HOME DRAWS, by Home's own rule (`homeSlugOf`): `useCase` is the speaking use case's Home page
- * (`homePage()` in `voice.svelte.ts`), else the record's `home`. So the page a person knows as Today comes first,
- * whichever use case named it, and a record whose Today is the house page it does not store has no Today to offer.
+ * TODAY IS THE PAGE HOME DRAWS, by Home's own rule (`homeSlugOf` with no use case, as `Home.svelte` reads it): the
+ * record's `home` where a person kept one, and nothing else. A use case's own Home page never stands in for the desk
+ * since the audit of 22 October (U1), so it is offered as the page it is, under its own name, and Pin to Today no longer
+ * writes onto the Solo founder's page. A record whose Today is the desk, which it does not store, has no Today to offer.
  */
-export async function pinSheet(base: string, register: string | null, useCase: string | null, io?: Fetch): Promise<PinSheet> {
+export async function pinSheet(base: string, register: string | null, io?: Fetch): Promise<PinSheet> {
   const [read, declared] = await Promise.all([
     pagesReader(base, io).read(),
     register === null ? Promise.resolve(null) : (schemaOf(base, register, io) as Promise<ListDecl | null>),
@@ -127,7 +128,7 @@ export async function pinSheet(base: string, register: string | null, useCase: s
     version: p.version,
     requires: Array.isArray(p.body.requires) ? (p.body.requires as unknown[]).filter((r): r is string => typeof r === 'string') : [],
   }));
-  const today = homeSlugOf(useCase, pages.map((p) => p.slug));
+  const today = homeSlugOf(null, pages.map((p) => p.slug));
   const first = pages.filter((p) => p.slug === today);
   const name = register === null ? null : typeof declared?.name === 'string' && declared.name !== '' ? declared.name : listName(register);
   return { from: 'live', name, pages: [...first, ...pages.filter((p) => p.slug !== today)], declared };
