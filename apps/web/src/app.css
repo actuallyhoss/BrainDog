@@ -137,7 +137,7 @@
 
   /* THE OLD PICTURE IS ON TOP, or it fades under the new one, which is drawn whole, and the change is a cut (fluid F11). */
   html[data-retheme]::view-transition-old(root) {
-    z-index: 1;
+    z-index: var(--z-raise);
     animation: page-out var(--d-swap) var(--ease-standard) both;
     mix-blend-mode: normal;
   }

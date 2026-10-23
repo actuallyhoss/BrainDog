@@ -59,7 +59,7 @@ test('the old picture leaves before the new one arrives, and the two last no lon
 });
 
 test('a theme change fades the old window over the new one, and is cut when asked for less motion', () => {
-  assert.match(css, /html\[data-retheme\]::view-transition-old\(root\) \{\s*z-index: 1;/u);
+  assert.match(css, /html\[data-retheme\]::view-transition-old\(root\) \{\s*z-index: var\(--z-raise\);/u);
   assert.match(css, /prefers-reduced-motion: reduce\) \{\s*html\[data-retheme\]::view-transition-old\(root\) \{\s*z-index: auto;\s*animation: none;/u);
 });
 
