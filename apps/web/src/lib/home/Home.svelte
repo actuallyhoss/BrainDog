@@ -46,9 +46,8 @@
   import { onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { heard, homePage, said } from '$lib/voice.svelte.ts';
+  import { heard, said } from '$lib/voice.svelte.ts';
   import { homeSlugOf } from '$lib/voice.ts';
-  import { useCaseName } from '@braindog/seed/usecases/names';
   import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import { may } from '$lib/record/may.ts';
@@ -168,20 +167,11 @@
    * ONLY A PAGE THE PERSON KEPT IS DRAWN IN THE DESK'S PLACE (U1). A use case's own `home-<id>` page never replaces the
    * desk: on his record the Solo founder's report page stood where Today should be, with its tables, a by-book chart and
    * "Needs your call", and no desk change since 19 October ever reached it. The desk draws on every record, and the use
-   * case's page stays a page of the record, one link away (`useCasePage`). A page kept by hand, `home`, is still drawn as
-   * it was laid out, and only a page the record holds is asked for.
+   * case's page stays a page of the record, in the nav and the palette, and Today never links to it: the desk's foot
+   * said "The Solo founder page" on his record, which sent him from Today to the page it had replaced (batch 4's look).
+   * A page kept by hand, `home`, is still drawn as it was laid out, and only a page the record holds is asked for.
    */
   const declares = $derived(homeSlugOf(null, data.pages));
-
-  /**
-   * THE USE CASE'S OWN PAGE, held and not drawn here: the one link the desk keeps to it, by the use case's name ("Solo
-   * founder"). `null` where the record holds none, or where a page kept by hand is drawn instead of the desk.
-   */
-  const useCasePage = $derived.by(() => {
-    const slug = homePage();
-    if (slug === null || declares !== null || !data.pages.includes(slug)) return null;
-    return { href: `/p/${slug}`, name: useCaseName(slug.replace(/^home-/u, '')) };
-  });
 
   /* ── a first Today: use case 6, steps 5 and 6 (planner-45, the onboarding target) ──────────────────── */
 
@@ -1110,17 +1100,13 @@
 
 <!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
 {#snippet moreLine()}
-  {#if (folds > 0 && desked) || useCasePage}
+  {#if folds > 0 && desked}
     <div class="desk-foot">
-      {#if folds > 0 && desked}
-        <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-          <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
-          {#if !moreOpen}<span class="more-count num" style:visibility={briefHeard ? null : 'hidden'}>{folds}</span>{/if}
-          <Icon name="chevronDown" size="s" />
-        </button>
-      {/if}
-      <!-- THE USE CASE'S OWN PAGE, ONE LINK AWAY (U1): what only it draws is there, and the desk stays the desk. -->
-      {#if useCasePage}<a class="desk-own tap" href={inApp(useCasePage.href)}>{words.useCasePage(useCasePage.name)}<Icon name="arrow" size="s" /></a>{/if}
+      <button type="button" class="more" data-free aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+        <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
+        {#if !moreOpen}<span class="more-count num" style:visibility={briefHeard ? null : 'hidden'}>{folds}</span>{/if}
+        <Icon name="chevronDown" size="s" />
+      </button>
     </div>
   {/if}
 {/snippet}
@@ -1984,23 +1970,6 @@
     justify-content: space-between;
     gap: var(--sp-2) var(--sp-4);
     min-inline-size: 0;
-  }
-
-  /* ONE QUIET LINK, as a tile's own: 13/500 in the second ink, its arrow after it. */
-  .desk-own {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    margin-inline-start: auto;
-    border-radius: var(--r-xs);
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    text-decoration: none;
-  }
-
-  .desk-own:hover {
-    color: var(--ink);
   }
 
   /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */

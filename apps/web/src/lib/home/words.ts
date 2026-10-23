@@ -53,9 +53,6 @@ export const words = {
   /* WHO SAID THE LINE UNDER THE TITLE, when the model did (`home-line.ts`): shown on hover or focus, never at rest. */
   byline: 'Slash · today',
 
-  /** The one link the desk keeps to a use case's own page, which never takes the desk's place: "The Solo founder page". */
-  useCasePage: (name: string) => `The ${name} page`,
-
   /* A RECORD WITH LISTS AND NOTHING PINNED, WAITING OR DUE: one calm sentence and one line on what fills the page. */
   nothingNow: 'Nothing needs you right now.',
   /** Needs you's tile on Today with nothing to ask (today F13). */
