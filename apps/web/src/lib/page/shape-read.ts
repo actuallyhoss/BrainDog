@@ -16,6 +16,9 @@
  */
 
 import { createClient } from '@braindog/client';
+import { sinceWords } from 'braindog-render';
+
+import { actor } from '../record/names.ts';
 
 import { REGISTERS } from '../record/held.ts';
 import { figureReader, openWorkOf, viaOf, WORK_READ, type OpenWork, type Via } from '../../routes/r/[register]/[seq]/figures.ts';
@@ -51,10 +54,23 @@ export type ShapeRead = {
   noun: string;
   /** The runs on this project heard from today. */
   sessions: SessionRow[];
+  /** Who worked on it last and how long ago in words, from its newest run on any day: the hero's news. */
+  last: { name: string; said: string } | null;
   /** The key number its card leads with, as the `kpis` source answered it, where it keeps one. */
   kpi: KpiAnswered | null;
   now: number;
 };
+
+/** The newest run of those read (newest first), as the hero says it: who, and how long ago in words. */
+export function lastOf(runs: readonly { fields?: Readonly<Record<string, unknown>>; updated_at?: string }[], now: number): { name: string; said: string } | null {
+  for (const r of runs) {
+    const at = String(r.fields?.last_seen ?? r.updated_at ?? '').trim();
+    if (!Number.isFinite(Date.parse(at))) continue;
+    const agent = String(r.fields?.agent ?? '').trim() || 'other';
+    return { name: actor(agent).name, said: sinceWords(at, now) };
+  }
+  return null;
+}
 
 /* A read that fails is a read that said nothing: the blocks it feeds go without it and the others still draw. */
 const quiet = <T>(p: Promise<T>, none: T): Promise<T> => p.catch(() => none);
@@ -136,7 +152,8 @@ export async function readShape(base: string, r: string, n: number, title = ''):
     open,
     noun: (work ? (REGISTERS[work]?.name ?? '') : '').toLowerCase(),
     sessions: sessionsOf(runGot, midnightOf(now), now),
-    kpi: (kpi as KpiAnswered | null | undefined) ?? null,
+    last: lastOf(runGot, now),
+    kpi:(kpi as KpiAnswered | null | undefined) ?? null,
     now,
   };
 }

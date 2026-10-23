@@ -6,7 +6,7 @@
   this says already.
 
   THE HERO HOLDS THE NAME (proj F7): the 56px well and the `h1` at 34 side by side, where it stands under the name ("Earning
-  · ● At risk · since Mar 2024"), what it is in a line with the late phrase in the red, the next step once as its last
+  · ● At risk · since Mar 2024"), one line of news with the late phrase in the red (`heroOf`), the next step once as its last
   line, and three figures on the right: what it earned in a year, how far along it is as a ring in the project's colour,
   and who works on it now. WHERE THE PROJECT KEEPS KEY NUMBERS, THE FIRST FIGURE IS THE ONE ITS CARD LEADS WITH (the KPI
   plan of 21 October, 2.5): its name, the figure, how it moved, and its own line, as the card says it (`cardKpiOf`). Its colour is the project's slot (`slotStyle`), the same `--ph` its card is drawn in.
@@ -151,13 +151,17 @@
     const aim = read?.fields.aim;
     return typeof v === 'number' && Number.isFinite(v) ? { value: v, aim: typeof aim === 'string' && aim !== '' ? daySaid(aim) : null } : null;
   });
-  const hero = $derived(shape && read ? heroOf({ facts: shape.facts, figure: lead, open: read.open, noun: read.noun, format: said, progress }) : null);
+  const hero = $derived(shape && read ? heroOf({ facts: shape.facts, figure: lead, open: read.open, noun: read.noun, format: said, progress, last: read.last }) : null);
   /* THE KEY NUMBER IT LEADS WITH, planned as its card plans it, and in the money figure's place: one number leads. */
   const kpiLead = $derived(read?.kpi ? cardKpiOf(read.kpi, { home: homeCurrency(), now: read.now }) : null);
   type Shown = NonNullable<typeof hero>['figures'][number] | { key: 'kpi'; kpi: NonNullable<typeof kpiLead> };
-  const figs = $derived<Shown[]>(hero ? (kpiLead ? [{ key: 'kpi', kpi: kpiLead }, ...hero.figures.filter((f) => f.key !== 'money')] : hero.figures) : []);
   /* HOW MUCH OF ITS WORK IS DONE, for the ring where nobody typed how far along it is: done of done and open. */
   const doneCount = $derived(read?.via ? read.rows.filter((x) => x.fields[read!.via!.state.id] === read!.via!.done[0]).length : 0);
+  /* A RING OF DONE WORK ONLY FROM FIVE TASKS, AND NEVER AT NOUGHT, SINCE the audit of 22 October (U-B7): "How far along
+     0%, 0 of 1 done" stood on a live project earning every month. Typed progress is the row's own and always drawn. */
+  const RING_FROM = 5;
+  const ringSays = (f: { key: string; total?: number }): boolean => f.key !== 'open' || (doneCount > 0 && doneCount + (f.total ?? 0) >= RING_FROM);
+  const figs = $derived<Shown[]>(hero ? (kpiLead ? [{ key: 'kpi' as const, kpi: kpiLead }, ...hero.figures.filter((f) => f.key !== 'money')] : hero.figures).filter(ringSays) : []);
   /* WHERE IT STANDS: its lane, how it is going with its dot, and since when, in the list's own words. */
   const status = $derived.by(() => {
     if (!read || !decl) return { lane: '', health: null as { word: string; tone: string } | null, since: '' };
@@ -256,6 +260,9 @@
   const RUNS_ICON: Record<string, 'key' | 'skill' | 'plug'> = { key: 'key', skill: 'skill' };
   const runsIcon = (kind: string | undefined) => RUNS_ICON[Object.keys(RUNS_ICON).find((k) => (kind ?? '').toLowerCase().includes(k)) ?? ''] ?? 'plug';
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
+  /* FOUR OF WHAT IT RUNS ON, AND HOW MANY MORE, SINCE the audit of 22 October (U-B10, U-B12): eight keys in two columns,
+     each with "Key" under it and nothing saying eight more were left out, on a page that should end under 1,500px. */
+  const RUNS_ON_SHOWN = 4;
 
   /* ── working here now ── */
   /* HIS ALONE TO TELL: the composer is the owner's; anyone who reads the runs sees who is on it. */
@@ -284,7 +291,7 @@
 
 {#if drawsHero && hero && read}
   <section class="hero" aria-label={name} style={slotStyle(hue)} id="part-overview" data-part="Overview" data-part-icon="eye">
-    <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="s" /></span>
+    <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="xl" /></span>
     <div class="h-name">
       <h1 class="h-title" dir="auto">{name}</h1>
       {#if status.lane || status.health || status.since}
@@ -455,10 +462,11 @@
         {#if runsOn.length > 0}
           <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsOn.length}>
             <ul class="r-list" data-wide={todayAlone ? undefined : ''}>
-              {#each runsOn.slice(0, todayAlone ? 4 : 8) as x (x.key)}
+              {#each runsOn.slice(0, RUNS_ON_SHOWN) as x (x.key)}
                 <li class="r-row"><Icon name={runsIcon(x.kind)} size="s" /><span class="r-name" dir="auto">{x.title}</span>{#if x.kind}<span class="r-kind">{singular(x.kind)}</span>{/if}</li>
               {/each}
             </ul>
+            {#if runsOn.length > RUNS_ON_SHOWN}<p class="r-more">and {runsOn.length - RUNS_ON_SHOWN} more</p>{/if}
           </Tile>
         {/if}
         {#if todayAlone}
@@ -506,14 +514,15 @@
   /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient.
      8% IN BOTH SCHEMES. Dark took 12%, and the late count's `--red` over it read 4.2 to 4.4 to 1 for every slot, the
      amber and the lime lowest; at 8% the lightest slot keeps it over 4.5, and the tint still reads as the project's. */
-  /* THE BENTO BOARDS' LEAD TILE (22 October): the project's well and name on one small row, its status beside the name,
-     and the sentence under them at 40/44 and 600 (32/36 on a phone), which is what the screen opens on. The name was a
-     34px title over a 17px line, which read the name first and the news second. */
+  /* THE NAME FIRST, THEN ONE LINE OF NEWS, SINCE the audit of 22 October (U6, U-B7). The bento boards' lead tile of the
+     same day put the name small and the sentence under it at 40px, and on a record whose sentence was what the project
+     is, every page opened on a tagline at headline size. Now the 56 well and the name at 34/40 in the display face (28/34
+     on a phone) with where it stands under it, and the news at 17 under them: what is late, and who worked on it last. */
   .hero {
     --ph: var(--ink);
     --h-wash: 8%;
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     column-gap: 12px;
     row-gap: 12px;
     align-items: center;
@@ -529,9 +538,8 @@
 
   .h-name {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 2px var(--sp-3);
+    flex-direction: column;
+    gap: 2px;
     min-inline-size: 0;
   }
 
@@ -540,9 +548,11 @@
     margin: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--fs-head);
+    font-family: var(--font-display);
+    font-size: var(--fs-page);
     font-weight: 600;
-    line-height: calc(24 / 17);
+    letter-spacing: -0.02em;
+    line-height: 34px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -576,26 +586,24 @@
     background: var(--warn);
   }
 
+  /* THE ONE LINE OF NEWS, at the size of a line read, not a headline: the name is what the page opens on. */
   .h-say {
     grid-column: 1 / -1;
-    max-inline-size: 24em;
     margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-hero-phone);
-    font-weight: 600;
-    line-height: 34px;
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+    color: var(--ink-2);
+    font-size: var(--fs-head);
+    line-height: 24px;
     overflow-wrap: anywhere;
   }
 
   .fig {
     color: var(--ink);
-    font-weight: inherit;
+    font-weight: 600;
   }
 
   .late {
     color: var(--red);
+    font-weight: 600;
   }
 
   .h-next {
@@ -784,7 +792,7 @@
       padding: 24px;
     }
 
-    .h-say {
+    .h-title {
       font-size: var(--fs-hero);
       line-height: 40px;
     }
@@ -835,7 +843,7 @@
   /* FROM 1100px THE FIGURES STAND ON THE RIGHT, three tiles 168 wide over the hero's three rows. */
   @media (width >= 1100px) {
     .hero {
-      grid-template-columns: 40px minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: start;
     }
 
@@ -1075,6 +1083,12 @@
   }
 
   .r-kind {
+    font-size: var(--fs-meta);
+  }
+
+  .r-more {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 

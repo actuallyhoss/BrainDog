@@ -156,12 +156,16 @@ const pounds = (minor: number): string => `£${(minor / 100).toLocaleString('en-
 const said = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join('');
 const claude = { agent: 'claude', project: 'Kiln', doing: 'Variable axis QA', key: 'S1', name: 'Claude', run: 'S1', live: 'working' as const };
 
-test('THE HERO SAYS WHAT IT IS AND WHAT IS LATE, and never its money, who is on it or the next step', () => {
+test('THE HERO SAYS ITS NEWS, WHAT IS LATE, and never its money, who is on it now, the next step or a tagline over news', () => {
   const facts: Facts = { ...none, brief: ['A variable type family, licensed direct'], next: 'Settle the licence', money: moneyLines({ in: { value: 120000, currency: 'GBP' }, owed: { value: 405000, currency: 'GBP' } }), agents: { now: [claude], runs: [row] } };
-  const hero = heroOf({ facts, figure: { minor: 1840000, currency: 'GBP', label: 'Earned in a year' }, open: { total: 8, agents: 2, late: 1, atLeast: false }, noun: 'tasks', format: pounds, progress: { value: 60, aim: '20 Sep' } });
-  assert.deepEqual(hero.sentences.map(said), ['A variable type family, licensed direct.', '1 of 8 tasks is late.']);
-  assert.ok(!hero.sentences.flat().some((p) => /Settle|£|Claude/u.test(p.text)), 'the next step, the money and the agents are each said once elsewhere');
-  assert.deepEqual(hero.sentences[1]!.filter((p) => p.late).map((p) => p.text), ['1 of 8 tasks is late'], 'only the late phrase is red');
+  const hero = heroOf({ facts, figure: { minor: 1840000, currency: 'GBP', label: 'Earned in a year' }, open: { total: 8, agents: 2, late: 1, atLeast: false }, noun: 'tasks', format: pounds, progress: { value: 60, aim: '20 Sep' }, last: { name: 'Claude', said: '2 hours ago' } });
+  assert.deepEqual(hero.sentences.map(said), ['1 of 8 tasks is late.']);
+  assert.ok(!hero.sentences.flat().some((p) => /Settle|£|Claude|variable/u.test(p.text)), 'the next step, the money, who is on it now and what it is are each said elsewhere');
+  assert.deepEqual(hero.sentences[0]!.filter((p) => p.late).map((p) => p.text), ['1 of 8 tasks is late'], 'only the late phrase is red');
+  const nobody = heroOf({ facts: { ...facts, agents: { now: [], runs: [row] } }, figure: null, open: { total: 8, agents: 2, late: 1, atLeast: false }, noun: 'tasks', format: pounds, last: { name: 'Claude', said: '2 hours ago' } });
+  assert.deepEqual(nobody.sentences.map(said), ['1 of 8 tasks is late.', 'Claude worked on it 2 hours ago.'], 'with nobody on it now, who worked on it last is the news');
+  const calm = heroOf({ facts: { ...facts, agents: { now: [], runs: [] } }, figure: null, open: null, noun: 'tasks', format: pounds });
+  assert.deepEqual(calm.sentences.map(said), ['A variable type family, licensed direct.'], 'what it is only where there is no news');
   assert.deepEqual(hero.figures.map((f) => f.key), ['money', 'along', 'working']);
   assert.deepEqual(hero.figures[0], { key: 'money', label: 'Earned in a year', minor: 1840000, currency: 'GBP' });
   assert.deepEqual(hero.figures[1], { key: 'along', label: 'How far along', value: 60, aim: '20 Sep' });

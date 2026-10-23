@@ -280,6 +280,8 @@ export type HeroSource = {
   format: (minor: number, currency: string) => string;
   /** How far along it says it is, 0 to 100, and the day it aims for said short ("20 Sep"), where the row keeps them. */
   progress?: { value: number; aim: string | null } | null;
+  /** Who worked on it last and how long ago in words, from its newest run ("Claude", "2 hours ago"), where one is. */
+  last?: { name: string; said: string } | null;
 };
 
 export const HERO_WORDS = {
@@ -297,6 +299,8 @@ export const HERO_WORDS = {
   /* EVERYTHING NOT WITH AN AGENT IS YOURS, so the split says only the agents' half ("6 you" is not English). */
   split: (agents: number): string => `${agents} with agent${agents === 1 ? '' : 's'}`,
   runs: (n: number): string => (n === 1 ? '1 run on it' : `${n} runs on it`),
+  /* WHO WORKED ON IT LAST, in the hero's one line of news. */
+  worked:(name: string, ago: string): string => `${name} worked on it ${ago}.`,
   nobody: 'Nobody right now',
 } as const;
 
@@ -304,18 +308,25 @@ export const HERO_WORDS = {
 const stopped = (s: string): string => (/[.!?…]$/u.test(s) ? s : `${s}.`);
 
 /**
- * THE HERO BAND (proj F7 and section 4): what it is in a line, and what is late in the list's own noun with the late
- * phrase in the red, then three figures. NOT ITS MONEY AND NOT WHO IS ON IT: the Money tile says the money and the
- * Working now figure and the Work tile say the agents, so each is said once on the page (proj F1). Never the next
- * step, which the hero's last line says once. Nothing to say is nothing drawn.
+ * THE HERO BAND (proj F7 and section 4): one line of news, what is late in the list's own noun with the late phrase in
+ * the red, then three figures. NOT ITS MONEY: the Money tile says the money, so it is said once on the page (proj F1).
+ * Never the next step, which the hero's last line says once. Nothing to say is nothing drawn.
+ *
+ * NEWS, NOT A TAGLINE, SINCE the audit of 22 October (U6, U-B7): the line under the name was what the project is, a
+ * description that never changes, at headline size ("Cozy bakery idle game inside Discord... A cozy bakery idle game
+ * played inside Discord."), with the name small beside it. Now it says what is late and who worked on it last ("1 of 1
+ * tasks is late. Claude worked on it 2 days ago."), and what it is only where there is no news, so a page still says
+ * something.
  */
 export function heroOf(s: HeroSource): Hero {
   const { facts } = s;
   const sentences: HeroPart[][] = [];
-  const brief = facts.brief.join(' ').trim();
-  if (brief !== '') sentences.push([{ text: stopped(brief) }]);
   const late = s.open && s.open.late > 0 ? HERO_WORDS.late(s.open.late, s.open.total, s.noun) : null;
   if (late) sentences.push([{ text: late.charAt(0).toUpperCase() + late.slice(1), late: true }, { text: '.' }]);
+  /* WHO WORKED ON IT LAST, while nobody is on it now: who is, the Working now figure beside it says. */
+  if (facts.agents.now.length === 0 && s.last) sentences.push([{ text: HERO_WORDS.worked(s.last.name, s.last.said) }]);
+  const brief = facts.brief.join(' ').trim();
+  if (sentences.length === 0 && brief !== '') sentences.push([{ text: stopped(brief) }]);
 
   const figures: HeroFigure[] = [];
   const now = facts.agents.now;
