@@ -99,7 +99,7 @@
   import { afterNavigate } from '$app/navigation';
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
-  import { briefOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked, type Brief, type BriefPart } from '$lib/home/today-brief.ts';
+  import { greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
   import { verbOf } from '$lib/home/late-verb.ts';
   import LateNow from '$lib/home/LateNow.svelte';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
@@ -993,16 +993,6 @@
   const queued = $derived(shaped?.blocks.find((b) => b.key === 'needs-you')?.queue ?? []);
   const lateShown = $derived(inBriefOrder(unasked(lateLines, queued)));
 
-  /* WHO IS WORKING, BY NAME and each once, for the brief's last sentence. */
-  const agentsNow = $derived([...new Set(workingTile.filter((r) => r.live === 'working').map((r) => r.agent))]);
-  /* THE ONE COUNT OF WHAT NEEDS HIM, the badge's: `boot`'s questions and what agents asked back, else the queue's own. */
-  const needing = $derived(waits ? waits.questions + (waits.told ?? 0) : (shaped?.blocks.find((b) => b.key === 'needs-you')?.total ?? 0));
-
-  /* THE BRIEF THE RULES WRITE, from the late list and what waits; the model's line stands in its place when it wrote one. */
-  const ruled = $derived<Brief | null>(
-    shaped ? briefOf({ lines: lateLines, more: late?.more ?? 0, needYou: needing, inbox: waits?.inbox ?? 0, agents: agentsNow, calm: nothing }) : null,
-  );
-
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
   const lands = $derived(landing(data));
 
@@ -1097,14 +1087,6 @@
   {#if lead}
     {#each partsOf(lead.text, lead.needs || undefined) as part, n (n)}{#if part.needs && NEEDS_DOOR.test(part.text)}<a class="home-needs tap" href={inApp('/decide')} data-needs>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
   {/if}
-{/snippet}
-
-<!--
-  THE RULES' BRIEF (U2): its figures at 600 in the ink, the one phrase that needs him in the red, and each thing it names
-  a quiet link to its own row; "3 questions" is the door to Needs you.
--->
-{#snippet ruledSaid(parts: readonly BriefPart[])}
-  {#each parts as part, n (n)}{#if part.href}<a class="brief-link" href={inApp(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span class="brief-needs" data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
 {/snippet}
 
 <!-- WHAT MATTERS TODAY, with who wrote it, drawn once: by the page's reader, or here where none draws the blocks. -->
@@ -1225,17 +1207,13 @@
     {#if !board}{@render deskPart('all')}{/if}
 
     <!--
-      TODAY SPEAKS FIRST (U2): the greeting, the screen's `h1`, and under it the brief, the model's line when it wrote one
-      today and the rules' sentences otherwise, then one quiet line while the model that writes is not answering (U7).
-      While the brief is on its way the room its words take is held.
+      TODAY SPEAKS FIRST (U2), AND ONLY TO GREET (23 October, his word: the sentence under it "summarizes everything that's
+      already shown in the late"): the greeting is the screen's `h1`, and what is late, what needs him and who is working
+      are the tiles under it, said once there and not twice.
     -->
     {#if headed}
       <header class="today-head">
         <h1 class="today-hi" tabindex="-1">{greeting}</h1>
-        <p class="today-brief">
-          {#if slashed}{@render slashSaid()}{:else if ruled}{@render ruledSaid(ruled.parts)}{:else}<span class="today-held" aria-hidden="true">{waitsLine?.text ?? nothing}</span>{/if}
-        </p>
-        {#if quiet && !slashed}<p class="today-quiet" role="status">{quiet}</p>{/if}
       </header>
     {/if}
 
@@ -1356,8 +1334,7 @@
   /* ── the head: the greeting and the brief (U2) ─────────────────────────── */
 
   /* ON THE BOARD, NOT ON A TILE (the approved look of 19 October): the greeting at 34/40 in the display face (28/34 on a
-     phone, `--fs-hero`), the brief at 17/26 in the second ink with its figures at 600 in the ink and the one phrase that
-     needs him in the red, and the quiet line under it at 13 in the quiet ink. */
+     phone, `--fs-hero`). */
   .today-head {
     display: grid;
     gap: var(--sp-2);
@@ -1377,54 +1354,6 @@
   .today-hi:focus:not(:focus-visible) {
     /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
     outline: none;
-  }
-
-  .today-brief {
-    max-inline-size: 60em;
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-head);
-    line-height: 26px;
-    text-wrap: pretty;
-  }
-
-  .today-brief :global(.home-fig) {
-    color: var(--ink);
-  }
-
-  .brief-needs,
-  .brief-link[data-needs] {
-    color: var(--red);
-    font-weight: var(--fw-semi);
-  }
-
-  /* WHAT IT NAMES IS A QUIET LINK TO ITS ROW: the words in the ink, underlined in the rule colour, the ink under the
-     pointer. */
-  .brief-link {
-    border-radius: var(--r-xs);
-    color: var(--ink);
-    text-decoration: underline;
-    text-decoration-color: var(--rule);
-    text-underline-offset: 4px;
-  }
-
-  .brief-link:hover {
-    text-decoration-color: currentColor;
-  }
-
-  .brief-link[data-needs] {
-    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
-  }
-
-  .today-quiet {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .today-held {
-    visibility: hidden;
   }
 
   @media (width < 640px) {
@@ -2184,21 +2113,6 @@
     .body :global(.queue > .qa:first-child .queue-question) {
       font-size: var(--fs-head);
       line-height: var(--lh-head, 24px);
-    }
-  }
-  /* A name in a sentence is still a target: on a touch screen an unseen box gives it the tap height without moving a line. */
-  @media (pointer: coarse) {
-    .brief-link {
-      position: relative;
-    }
-    .brief-link::before {
-      content: '';
-      position: absolute;
-      inset-block-start: 50%;
-      inset-inline-start: 50%;
-      inline-size: max(100%, var(--tap, 44px));
-      block-size: var(--tap, 44px);
-      transform: translate(-50%, -50%);
     }
   }
 </style>
