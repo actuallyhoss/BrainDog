@@ -13,9 +13,17 @@
 
   ONE MOTION AND NO LAYOUT: both figures sit in one grid cell, so the box is the wider of the two for the moment they
   overlap and the line never reflows. Under `prefers-reduced-motion` the figure simply changes.
+
+  THE OLD FIGURE LEAVES OVER `--d-exit` WHILE THE NEW ONE RISES (fluid F12), or the count was empty for a frame: the 8
+  gone and the 7 not yet in. It was removed at once and the new one began at nothing.
 -->
 <script lang="ts">
+  import { ms, still } from './motion.ts';
+
   let { value }: { value: string | number } = $props();
+
+  /* Opacity only, in the exit step; for a reader who asked for less motion the figure is simply gone. */
+  const leave = (_figure: Element) => ({ duration: still() ? 0 : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
 
   /* Not state: read once as each figure element is made, so a figure already drawn never gains the roll. */
   const drawn = { yet: false };
@@ -26,7 +34,7 @@
   const said = $derived(typeof value === 'number' ? value.toLocaleString('en') : value);
 </script>
 
-<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined}>{said}</span>{/key}</span>
+<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined} out:leave>{said}</span>{/key}</span>
 
 <style>
   .fig {
