@@ -436,18 +436,24 @@ const PAGE: PageSize = { look: 8192, slice: 2 * 1024 * 1024 };
 const LF = new Uint8Array([10]);
 
 /**
- * `keys` past `last` in `ORDER BY keys`, which puts NULL first. Row values when nothing in `last` is NULL, because an
- * index can seek on them; spelled out with `IS` when something is, because any comparison with NULL is NULL.
+ * `keys` past `last` (`>`), or up to it (`<=`), in `ORDER BY keys`, which puts NULL first. A row value against the one
+ * JSON array `last` binds as, read back by position, because an index can seek on that and no statement grows a mark
+ * per key (`param-sweep.test.ts`). Spelled out with `IS` when a value is NULL, which compares as NULL, or is not one
+ * JSON carries; `<=` only ever bounds a WITHOUT ROWID key, which SQLite holds NOT NULL.
  */
-function past(keys: readonly string[], last: readonly Param[]): { where: string; params: Param[] } {
-  if (!last.includes(null)) return { where: `(${keys.join(', ')}) > (${keys.map(() => '?').join(', ')})`, params: [...last] };
+function beyond(keys: readonly string[], last: readonly Param[], op: '>' | '<='): { where: string; params: Param[] } {
+  if (last.every((v) => typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)))) {
+    const read = keys.map((_, i) => `json_extract(j, '$[${String(i)}]')`).join(', ');
+    return { where: `(${keys.join(', ')}) ${op} (SELECT ${read} FROM (SELECT ? AS j))`, params: [JSON.stringify(last)] };
+  }
   const params: Param[] = [];
   const from = (i: number): string => {
     const key = keys[i] ?? '';
     const value = last[i] ?? null;
+    const end = i === keys.length - 1;
     if (value !== null) params.push(value);
-    const over = value === null ? `${key} IS NOT NULL` : `${key} > ?`;
-    if (i === keys.length - 1) return over;
+    const over = value === null ? (op === '>' ? `${key} IS NOT NULL` : end ? `${key} IS NULL` : '0') : `${key} ${end ? op : op === '>' ? '>' : '<'} ?`;
+    if (end) return over;
     if (value !== null) params.push(value);
     const same = value === null ? `${key} IS NULL` : `${key} = ?`;
     return `(${over} OR (${same} AND ${from(i + 1)}))`;
@@ -466,7 +472,6 @@ function* rowsOf(sql: Sql, table: TableShape, blank: ReadonlySet<string> | null,
   const rowid = !/\bWITHOUT\s+ROWID\b/iu.test(ddl);
   const keys = [...table.pk.map(named), ...(rowid ? ['rowid'] : [])];
   const order = keys.join(', ');
-  const marks = keys.map(() => '?').join(', ');
   const from = `FROM ${named(table.name)}`;
   const only = table.where ? `(${table.where})` : null;
   const cols = table.columns.map(named).join(', ');
@@ -476,7 +481,7 @@ function* rowsOf(sql: Sql, table: TableShape, blank: ReadonlySet<string> | null,
   const sizeOf = (row: Row | undefined): number => Number(row?.__size ?? 0);
   let last: Param[] | null = null;
   for (;;) {
-    const after = last === null ? null : past(keys, last);
+    const after = last === null ? null : beyond(keys, last, '>');
     const where = [only, after?.where ?? null].filter((w): w is string => w !== null);
     const looked = sql.all<Row>(
       `SELECT ${picked}, ${size} AS __size ${from}${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ${String(page.look)}`,
@@ -488,15 +493,17 @@ function* rowsOf(sql: Sql, table: TableShape, blank: ReadonlySet<string> | null,
       while (end < looked.length && chars + sizeOf(looked[end]) <= page.slice) chars += sizeOf(looked[end++]);
       const slice = looked.slice(i, end);
       const low = i > 0 ? keyOf(looked[i - 1]!) : last;
+      const above = rowid || low === null ? null : beyond(keys, low, '>');
+      const top = rowid ? null : beyond(keys, keyOf(slice[slice.length - 1]!), '<=');
       const rows = rowid
         ? sql.all<Record<string, unknown>>(
             `SELECT ${cols} ${from} WHERE rowid IN (SELECT value FROM json_each(?))${only ? ` AND ${only}` : ''} ORDER BY ${order}`,
             `[${slice.map((row) => String(row[`__k${String(keys.length - 1)}`])).join(',')}]`,
           )
         : sql.all<Record<string, unknown>>(
-            `SELECT ${cols} ${from} WHERE ${[only, low === null ? null : `(${order}) > (${marks})`, `(${order}) <= (${marks})`].filter((w): w is string => w !== null).join(' AND ')} ORDER BY ${order}`,
-            ...(low ?? []),
-            ...keyOf(slice[slice.length - 1]!),
+            `SELECT ${cols} ${from} WHERE ${[only, above?.where ?? null, top?.where ?? null].filter((w): w is string => w !== null).join(' AND ')} ORDER BY ${order}`,
+            ...(above?.params ?? []),
+            ...(top?.params ?? []),
           );
       for (const row of rows) yield lineOf(table, row, blank);
       i = end;
