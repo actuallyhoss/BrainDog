@@ -39,7 +39,7 @@
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { daySaid } from '@braindog/where';
-import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
+import { day as longDay, money, parse, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
@@ -75,7 +75,7 @@ import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
-import { latestText, linesAndLatest, linesText, measuresOf, tileRows } from './measures.ts';
+import { allStale, latestText, linesAndLatest, linesText, measuresOf, staleTilesText, tileRows } from './measures.ts';
 
 /**
  * Where a list of links points and the money field each linked row holds, or `null` when the field is not such a list.
@@ -1374,7 +1374,10 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
      measures reported once after them as one list of their readings (`linesAndLatest`). */
   if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length) {
     const { lines, latest } = linesAndLatest(measuresFor(block), block.readOnce);
-    return parse([linesText(lines, latest), latestText(latest, lines.length > 0, lines)].filter(Boolean).join('\n\n'), { page: true });
+    /* EVERY LINE OLDER THAN A WEEK IS A TILE THAT SAYS ITS AGE (`staleTilesText`), never a chart drawn as this month's. */
+    const nowMs = Date.parse(block.stale_at);
+    const drawnLines = allStale(lines, nowMs) ? staleTilesText(lines, (at) => sinceWords(at, nowMs)) : linesText(lines, latest);
+    return parse([drawnLines, latestText(latest, lines.length > 0, lines)].filter(Boolean).join('\n\n'), { page: true });
   }
   /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its
      accessible name (`captioned` leaves it off the figure), and without it the field asks "Add to Tasks" where

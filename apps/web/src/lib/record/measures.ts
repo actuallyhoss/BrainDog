@@ -177,6 +177,33 @@ export function tileRows(measures: readonly Measure[]): string[] {
   });
 }
 
+/** How old a measure's newest reading may be before its chart is a stale one: a week, as every age on a screen is said. */
+export const STALE_AFTER_MS = 7 * 86_400_000;
+
+/** Whether every measure with a line stopped arriving more than a week before `nowMs`: a block of old charts. */
+export const allStale = (measures: readonly Measure[], nowMs: number): boolean =>
+  measures.length > 0 && Number.isFinite(nowMs) && measures.every((m) => m.latest !== null && nowMs - Date.parse(m.latest.at) > STALE_AFTER_MS);
+
+/**
+ * NUMBERS THAT STOPPED ARRIVING, AS TILES THAT SAY THEIR AGE, SINCE the audit of 22 October (U6, U-B4): a project whose
+ * numbers stopped 24 days ago drew five 30-day charts, each a short line in its first week and a dashed month after it,
+ * so a reading from 28 Sep looked like this week's. Where every line in a block is older than a week, each measure is
+ * a tile: its last reading, and under it the day and how long ago in words ("28 Sep, 4 weeks ago"). No small line: a
+ * few points at the start of a month drew a stroke that read as a climb this week. As many `stat` fences as six tiles
+ * a fence takes (`KINDS.stat.rows`).
+ */
+export function staleTilesText(measures: readonly Measure[], ago: (iso: string) => string): string {
+  const shared = sharedNames(measures);
+  const rows = measures.map((m) => {
+    const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
+    const said = m.latest ? `${dayLabel(m.latest.day)}, ${ago(m.latest.at)}` : '';
+    return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(said)}`;
+  });
+  const fences: string[] = [];
+  for (let i = 0; i < rows.length; i += TILES_MOST) fences.push(['```stat', ...rows.slice(i, i + TILES_MOST), '```'].join('\n'));
+  return fences.join('\n\n');
+}
+
 /**
  * The `lines` fences: one chart a measure, the period as the line and the period before as the dashed one, each under
  * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`), and

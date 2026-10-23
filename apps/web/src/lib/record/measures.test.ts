@@ -11,7 +11,7 @@ import { parse, type Block } from 'braindog-render';
 import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
-import { changeLine, figureOf, linesText, measuresOf, periodOf, tileRows } from './measures.ts';
+import { allStale, changeLine, figureOf, linesText, measuresOf, periodOf, staleTilesText, tileRows } from './measures.ts';
 import { blockOf } from './page-live.ts';
 import type { RegisterDecl } from './schema.ts';
 
@@ -215,4 +215,27 @@ test('a bar over a list of links in two currencies is one bar chart a currency, 
   const one = toSegments({ ...read, linked, fx: { home: 'GBP', rates } });
   assert.deepEqual(cells(one), [['Northwind Labs | GBP 20,400.00', 'Harbour Studio | GBP 9,100.00']], 'the dollars converted at the latest rate');
   assert.match(JSON.stringify(one), /1 Sep 2026/u);
+});
+
+test('NUMBERS THAT STOPPED A WEEK AGO OR MORE ARE TILES THAT SAY THEIR AGE, never a month of chart drawn as this one', () => {
+  const rows = [point('Players', 40, day(2)), point('Players', 52, day(3)), point('Servers', 7, day(2)), point('Servers', 9, day(3))];
+  const late = Date.UTC(2026, 8, 28, 12);
+  const old = measuresOf(rows, FIELDS, late, 30, 'Numbers', { tz: 'UTC' });
+  assert.ok(allStale(old, late), 'both stopped 25 days ago');
+  assert.ok(!allStale(measuresOf(rows, FIELDS, Date.UTC(2026, 8, 4, 12), 30, 'Numbers', { tz: 'UTC' }), Date.UTC(2026, 8, 4, 12)), 'a reading from yesterday is not stale');
+  const text = staleTilesText(old, () => '25 days ago');
+  const tiles = parse(text, { page: true }).filter((s): s is Block => s.type === 'block');
+  assert.deepEqual(tiles.map((b) => b.kind), ['stat']);
+  assert.deepEqual(
+    tiles[0]!.rows.map((r) => r.cells.slice(0, 3).join(' | ')),
+    ['Players | 52 | 3 Sep, 25 days ago', 'Servers | 9 | 3 Sep, 25 days ago'],
+  );
+  const many = measuresOf(
+    Array.from({ length: 8 }, (_, i) => point(`Measure ${i + 1}`, i, day(3))),
+    FIELDS,
+    late,
+    30,
+    'Numbers',
+  );
+  assert.deepEqual(parse(staleTilesText(many, () => 'ago'), { page: true }).filter((s): s is Block => s.type === 'block').map((b) => b.rows.length), [6, 2], 'six tiles a fence');
 });

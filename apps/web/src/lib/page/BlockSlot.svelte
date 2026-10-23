@@ -495,7 +495,42 @@
       ? openInPlace(drawn.segments, draw({ ...block, fold: false }, emptied).segments, groupsOpen)
       : null,
   );
-  const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? drawn.segments.map((segment) => ({ kind: 'segment', segment })));
+  /* ── a wall of charts, folded ──────────────────────────────────────────────
+     A BLOCK OF LINES SHOWS ITS FIRST ROW OF CHARTS AND FOLDS THE REST IN PLACE, the measures reported once with them, one
+     press away (the audit of 22 October, U6, U-B4): a project's Numbers was twelve near-identical charts over a list of
+     seventeen readings, 4,032px of page, with the news at the top and its money seventeenth. Nothing is cut; the press
+     says how many more there are, and once open it stays open. Numbers that stopped arriving are tiles that say their
+     age (`staleTilesText`), four of them before the fold. A block with two charts or four tiles or fewer, and a list of
+     four readings or fewer, is drawn whole. */
+  const LINES_SHOWN = 2;
+  const TILES_SHOWN = 4;
+  const ONCE_SHOWN = 4;
+  const linesFold = $derived.by(() => {
+    if (block.kind !== 'lines' || open || grouped) return null;
+    const rowsOf = (kind: string) => drawn.segments.reduce((n, s) => n + (s.type === 'block' && s.kind === kind ? s.rows.length : 0), 0);
+    const charts = drawn.segments.filter((s) => s.type === 'block' && s.kind === 'lines').length;
+    const tiles = rowsOf('stat');
+    const once = rowsOf('spec');
+    const cut = charts > LINES_SHOWN || tiles > TILES_SHOWN;
+    const onceShown = cut ? 0 : Math.min(once, ONCE_SHOWN);
+    const hidden = Math.max(0, charts - LINES_SHOWN) + Math.max(0, tiles - TILES_SHOWN) + (once - onceShown);
+    return hidden > 0 ? { charts: LINES_SHOWN, tiles: TILES_SHOWN, once: onceShown, more: hidden } : null;
+  });
+  const linesShown = (segments: typeof drawn.segments): typeof drawn.segments => {
+    const fold = linesFold;
+    if (!fold) return segments;
+    let charts = 0;
+    const left = { stat: fold.tiles, spec: fold.once };
+    return segments.flatMap((s): (typeof drawn.segments)[number][] => {
+      if (s.type !== 'block') return [s];
+      if (s.kind === 'lines') return ++charts <= fold.charts ? [s] : [];
+      if (s.kind !== 'stat' && s.kind !== 'spec') return [s];
+      const room = left[s.kind];
+      left[s.kind] = Math.max(0, room - s.rows.length);
+      return room > 0 ? [{ ...s, rows: s.rows.slice(0, room) }] : [];
+    });
+  };
+  const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? linesShown(drawn.segments).map((segment) => ({ kind: 'segment', segment })));
   /* ── projects as cards ─────────────────────────────────────────────────────
      A CARDS BLOCK OVER THE PROJECTS LIST IS DRAWN AS THE ONE PROJECT CARD (`ui/ProjectCard.svelte`), the card Today's desk
      draws (the plan of 20 October: one card everywhere). The list is found by what it declares (`scopes`), never by its
@@ -793,6 +828,7 @@
       {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}
     {/if}
   {/each}
+  {#if linesFold}<button type="button" class="block-more tap" data-lines-more onclick={() => (open = true)}>{words.moreNumbers(linesFold.more)}</button>{/if}
 {/if}
 
 <!-- WHAT A PRESSED HOLE DOES (`opts.hole`), where the page writes. Nothing is drawn until one is pressed. -->
