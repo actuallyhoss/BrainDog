@@ -120,7 +120,7 @@
   <div class="row2" data-alone={path && hasMoney ? undefined : ''}>
     {#if path}
       <div class="vis path">
-        <Tile icon="observe" title="Path" href={pathHref ?? undefined} hrefLabel={pathHref ? `All ${path.total}` : undefined}>
+        <Tile icon="observe" title="Path" href={pathHref ?? undefined} hrefLabel={pathHref ? `All ${path.total}` : undefined} id="part-path" data-part="Path" data-part-icon="observe">
           <ol class="steps" aria-label="Path" style:--stops={path.stops.length} style:--done={doneCount} data-many={path.stops.length > 5 ? '' : undefined}>
             {#each path.stops as s (s.key)}
               {@const href = stopHref(s.seq)}
@@ -138,7 +138,7 @@
     {/if}
     {#if hasMoney}
       <div class="vis money">
-        <Tile icon="money" title="Money">
+        <Tile icon="money" title="Money" id="part-money" data-part="Money" data-part-icon="money">
           <div class="mb">
           {#if lead}
             <p class="m-figure" data-arrived={arrived.has('money:lead') ? '' : undefined}>

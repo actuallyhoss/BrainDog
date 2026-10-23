@@ -64,6 +64,8 @@
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import type SidebarView from '$lib/ui/Sidebar.svelte';
+  import type SideBarView from '$lib/shell/SideBar.svelte';
+  import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { moreSheet } from '$lib/shell/more.svelte.ts';
@@ -87,7 +89,7 @@
   import Pull from '$lib/ui/Pull.svelte';
   import { holdIn, presses } from '$lib/data/held.svelte.ts';
   import { drewFirst } from '$lib/data/first-drawn.ts';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { navigating, page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
@@ -122,6 +124,26 @@
   $effect(() => {
     if (shape === 'rail' && Sidebar === null) void import('$lib/ui/Sidebar.svelte').then((m) => (Sidebar = m.default));
   });
+
+  /* FRAME B'S SIDEBAR (23 October): under the top bar, the record's projects. Shown or hidden and its width are this
+     device's (pick 5), read before the first draw so the work does not jump; its chunk loads only once it is drawn. */
+  const sideFirst = (() => {
+    try {
+      return sideKept(localStorage.getItem(SIDE_KEY));
+    } catch {
+      return sideKept(null);
+    }
+  })();
+  let sideShown = $state(!sideFirst.hidden);
+  let sideWidth = $state(sideFirst.width);
+  let SideBar = $state<typeof SideBarView | null>(null);
+  function keepSide(): void {
+    try {
+      localStorage.setItem(SIDE_KEY, JSON.stringify({ hidden: !sideShown, width: sideWidth }));
+    } catch {
+      /* A browser that keeps nothing keeps the sidebar as it is for this tab. */
+    }
+  }
 
   /* These surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
      `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
@@ -328,7 +350,8 @@
   const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.more])));
   /* WHAT THE MORE SHEET HOLDS IS WHAT THE BAR ON SCREEN DOES NOT (frame F7): the tab bar's five below 900px, the top
      bar's five above it, nothing at all beside a rail, which draws every place itself. */
-  let narrow = $state(false);
+  /* READ AT ONCE, so a phone's first draw is already a phone's (the Projects tab draws the list, not the desk page). */
+  let narrow = $state(typeof matchMedia === 'function' && matchMedia('(width < 900px)').matches);
   $effect(() => {
     const mq = matchMedia('(width < 900px)');
     const set = (): void => void (narrow = mq.matches);
@@ -336,6 +359,29 @@
     mq.addEventListener('change', set);
     return () => mq.removeEventListener('change', set);
   });
+
+  /* THE SIDEBAR IS THE TOP BAR'S, FROM 900px UP. THE PROJECTS PLACE is the one whose own things are projects' pages, so
+     on a phone its tab opens the sidebar's list with one fact each (pick 9), and the desk keeps its page. */
+  const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && sideShown);
+  const projectsPlace = $derived(barPlaces.find((p) => rail.things.some(([section]) => section === p.label)) ?? null);
+  const phoneProjects = $derived(navPrefs.shape !== 'rail' && narrow && projectsPlace !== null && here(page.url.pathname) === projectsPlace.href);
+  $effect(() => {
+    if ((sideOn || phoneProjects) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
+  });
+  /* THE PROJECTS AN AGENT IS AT WORK ON, by name, for the sidebar's green dots. */
+  const workingOn = $derived(workingNow().map((w) => w.project));
+
+  /* HIDE OR SHOW, BY ITS BUTTON OR `[`: the column snaps and the work slides from where its edge was (`slide`). */
+  async function toggleSide(): Promise<void> {
+    if (shape !== 'bar' || narrow) return;
+    const was = sideShown ? sideWidth : 0;
+    sideShown = !sideShown;
+    keepSide();
+    await tick();
+    const el = document.getElementById('main');
+    const now = sideShown ? sideWidth : 0;
+    if (el) slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
+  }
   const onBar = $derived(new Set((narrow ? tabs : navPrefs.shape === 'rail' ? [] : barPlaces).map((i) => i.key)));
   const moreBeyond = $derived(rail.places.filter((i) => !onBar.has(i.key)));
   const moreViews = $derived(rail.places.flatMap((i) => rail.views[i.key] ?? []));
@@ -1067,6 +1113,12 @@
       void leadIn();
       return;
     }
+    /* `[` HIDES OR SHOWS THE SIDEBAR (frame B, pick 5), a character key, so `Character keys: Off` silences it too. */
+    if (e.key === '[' && !mod && !e.altKey && shape === 'bar' && !narrow) {
+      e.preventDefault();
+      void toggleSide();
+      return;
+    }
     if (e.key === '/') {
       e.preventDefault();
       palette.open = true;
@@ -1125,7 +1177,7 @@
        first third. That is the artefact somebody hands an accountant. -->
   <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
-  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
+  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape} data-side={sideOn ? '' : undefined} style:--side-col={sideOn ? `${sideWidth}px` : undefined}>
     {#if shape === 'rail'}
       <div class="rail-slot" bind:this={railSlot}>
         {#if Sidebar}
@@ -1153,10 +1205,15 @@
         {#if shape === 'bar'}
           <TopBar
             entries={barPlaces}
-            record={data.index.name || personName}
+            record={data.index.name}
             person={personName}
             working={workingNow()}
             agents={agentsAt}
+            {records}
+            news={data.whatsNew}
+            side={{ shown: sideShown }}
+            onside={() => void toggleSide()}
+            onrecord={(r) => void openOther(r)}
             onmore={() => (moreOpen = true)}
             onfind={() => (palette.open = true)}
           />
@@ -1174,6 +1231,25 @@
           </button>
         {/if}
       </div>
+      {#if sideOn}
+        <!-- FRAME B'S SIDEBAR, its width held while its chunk arrives. -->
+        <div class="side-slot">
+          {#if SideBar}
+            <SideBar
+              base={apiBase(page.url)}
+              lists={data.lists}
+              working={workingOn}
+              version={live.version}
+              projects={projectsPlace?.href ?? null}
+              width={sideWidth}
+              onwidth={(n, done) => {
+                sideWidth = n;
+                if (done) keepSide();
+              }}
+            />
+          {/if}
+        </div>
+      {/if}
     {/if}
 
     <!--
@@ -1213,7 +1289,12 @@
       {#if data.me.grant !== undefined && !data.me.owner}
         {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
       {/if}
-      {@render children()}
+      {#if phoneProjects}
+        <!-- ON A PHONE THE PROJECTS TAB IS THE SIDEBAR'S LIST, one fact each (frame B, pick 9). -->
+        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} />{/if}
+      {:else}
+        {@render children()}
+      {/if}
     </main>
     {/key}
   </div>
@@ -1529,29 +1610,48 @@
     padding: var(--inset) var(--inset) 0;
   }
 
-  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the nav's surface with one hairline under it in light; in dark the surface
-     alone parts it from the board (frame F4). Its own gutter lines its edges up with the work under it. The Mac app's
-     title bar is paid here, once: the work under the bar pays none. */
+  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the nav's surface with one hairline under it, in light and in dark: in dark
+     the nav is its own indigo and the hairline is its edge (frame B, U8). The Mac app's title bar is paid here, once:
+     the work under the bar pays none. */
   .shell[data-shape='bar'] .bar-slot {
     position: relative;
     z-index: var(--z-palette);
+    grid-column: 1 / -1;
+    grid-row: 1;
     padding: var(--shell-inset, 0px) 0 0;
     background: var(--nav);
     border-block-end: 1px solid var(--rule);
   }
 
-  :global(html[data-scheme='dark']) .shell[data-shape='bar'] .bar-slot {
-    border-block-end-color: transparent;
+  .shell[data-shape='bar'] .body {
+    --shell-inset: 0px;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :global(html:not([data-scheme])) .shell[data-shape='bar'] .bar-slot {
-      border-block-end-color: transparent;
+  /* FRAME B: THE SIDEBAR'S COLUMN UNDER THE BAR, its width the device's (`--side-col`), nothing when it is hidden. Below
+     900px there is no bar and no sidebar, and the rule further down gives the work the one column. */
+  @media (width >= 900px) {
+    .shell[data-shape='bar'] {
+      grid-template-columns: var(--side-col, 0px) minmax(0, 1fr);
+    }
+
+    .shell[data-shape='bar'] .body {
+      grid-column: 2;
+      grid-row: 2;
     }
   }
 
-  .shell[data-shape='bar'] .body {
-    --shell-inset: 0px;
+  .side-slot {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    min-block-size: 0;
+    overflow: hidden;
+  }
+
+  /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge: the bar is the window's width from 1,280 too. */
+  .shell[data-shape='bar'] :global(dialog.dock) {
+    inset-block: calc(56px + var(--shell-inset, 0px) + var(--inset)) var(--inset);
+    block-size: auto;
   }
 
   /* One control, at the start of the strip, at the size every other target in the shell is. */
@@ -1758,19 +1858,21 @@
       grid-template-columns: auto minmax(0, 1fr) var(--dock-col, 0px);
     }
 
-    .shell[data-shape='bar'],
     .shell[data-shape='menu'] {
       grid-template-columns: minmax(0, 1fr) var(--dock-col, 0px);
     }
 
-    .shell[data-shape='bar'] .bar-slot,
     .shell[data-shape='menu'] .bar-slot {
       grid-area: 1 / 1;
     }
 
-    .shell[data-shape='bar'] .body,
     .shell[data-shape='menu'] .body {
       grid-area: 2 / 1;
+    }
+
+    /* FRAME B: the bar over every column, the sidebar, the work, and the docked panel's column at the end. */
+    .shell[data-shape='bar'] {
+      grid-template-columns: var(--side-col, 0px) minmax(0, 1fr) var(--dock-col, 0px);
     }
 
     .body {

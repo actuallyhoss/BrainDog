@@ -1083,6 +1083,7 @@
   :global(.block-slot.block-slot:has(> .project-cards)) {
     padding: 0;
     background: none;
+    container-type: inline-size;
   }
 
   /* AS WIDE AS ITS LANES at a desk, so the bar is a control and not a rule across the page; a phone's is the page's
@@ -1103,8 +1104,9 @@
     }
   }
 
-  /* ONE GRID FOR THE ONE CARD (proj section 4): four across from 1280, three from 1024, two from 640, one below, gap 12.
-     Fewer cards than columns leave the row short: a card is the same width on every screen and in every lane. */
+  /* ONE GRID FOR THE ONE CARD (proj section 4), gap 12. Fewer cards than columns leave the row short. COUNTED BY THE ROOM
+     THE CARDS HAVE, not the window's, since the sidebar of frame B takes some of it: a card never narrower than its
+     figure row (about 330), so four from 1,360, three from 1,020, two from 600, one below. */
   .project-cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1119,19 +1121,19 @@
     min-inline-size: 0;
   }
 
-  @media (width >= 640px) {
+  @container (width >= 600px) {
     .project-cards {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (width >= 1024px) {
+  @container (width >= 1020px) {
     .project-cards {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
-  @media (width >= 1280px) {
+  @container (width >= 1360px) {
     .project-cards {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }

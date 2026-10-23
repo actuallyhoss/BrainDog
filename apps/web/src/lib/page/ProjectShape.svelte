@@ -282,7 +282,7 @@
 </script>
 
 {#if drawsHero && hero && read}
-  <section class="hero" aria-label={name} style={slotStyle(hue)}>
+  <section class="hero" aria-label={name} style={slotStyle(hue)} id="part-overview" data-part="Overview" data-part-icon="eye">
     <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="s" /></span>
     <div class="h-name">
       <h1 class="h-title" dir="auto">{name}</h1>
@@ -372,7 +372,7 @@
       <div class="shape-row" data-alone={workLists && people.length > 0 ? undefined : ''}>
         {#if workLists}
           {@const w = workLists}
-          <Tile icon="task" title={workDecl?.name ?? HERO_WORDS.open} href={workHref ?? undefined} hrefLabel={workHref ? 'All' : undefined} class="t-work" data-arrived={arrived.has('open-list') ? '' : undefined}>
+          <Tile icon="task" title={workDecl?.name ?? HERO_WORDS.open} href={workHref ?? undefined} hrefLabel={workHref ? 'All' : undefined} class="t-work" data-arrived={arrived.has('open-list') ? '' : undefined} id="part-work" data-part={workDecl?.name ?? HERO_WORDS.open} data-part-icon="task" data-part-count={w.total}>
             {#snippet actions()}
               <span class="w-count num">{w.total} open{#if w.late > 0}, <span class="late">{w.late} late</span>{/if}</span>
             {/snippet}
@@ -409,7 +409,7 @@
           </Tile>
         {/if}
         {#if people.length > 0}
-          <Tile icon="user-check" title="Who is on it" count={people.length} class="t-people">
+          <Tile icon="user-check" title="Who is on it" count={people.length} class="t-people" id="part-people" data-part="People" data-part-icon="user-check" data-part-count={people.length}>
             <ul class="p-list">
               {#each people.slice(0, 4) as p (p.key)}
                 <li class="p-row">
@@ -450,7 +450,7 @@
     {#if runsOn.length > 0 || todayAlone}
       <div class="shape-row half" data-alone={runsOn.length > 0 && todayAlone ? undefined : ''}>
         {#if runsOn.length > 0}
-          <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs">
+          <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsOn.length}>
             <ul class="r-list" data-wide={todayAlone ? undefined : ''}>
               {#each runsOn.slice(0, todayAlone ? 4 : 8) as x (x.key)}
                 <li class="r-row"><Icon name={runsIcon(x.kind)} size="s" /><span class="r-name" dir="auto">{x.title}</span>{#if x.kind}<span class="r-kind">{singular(x.kind)}</span>{/if}</li>
@@ -459,7 +459,7 @@
           </Tile>
         {/if}
         {#if todayAlone}
-          <Tile icon="session" title="Agents here today" class="t-today">
+          <Tile icon="session" title="Agents here today" class="t-today" id="part-agents" data-part="Agents" data-part-icon="session">
             {@render dayBar(read.now)}
             {@render todayList(sessions)}
           </Tile>
@@ -472,7 +472,7 @@
          THE DAY BAR ON TOP when a run was here today, and with nobody on it now, who was: the one tile for the agents. -->
     {#key read.key}
       {#if band}
-        <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here>
+        <Tile icon="session" title={here > 0 ? hereWords.working : hereWords.tell(name)} count={here > 0 ? here : undefined} class="t-here" data-working-here id="part-agents" data-part="Agents" data-part-icon="session" data-part-live={here > 0 ? '' : undefined}>
           {#if sessions.length > 0}
             {@render dayBar(read.now)}
             {#if here === 0}{@render todayList(sessions)}{/if}
