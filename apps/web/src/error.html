@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <!--
+      WHAT A START THAT FAILED DRAWS (the scope of 24 October, E42; fluid F17): when the app's own code cannot be
+      fetched, SvelteKit cannot draw `+error.svelte` and draws this page instead. It drew the browser's bare "500
+      Internal Error" until now.
+
+      THE SYSTEM'S OWN GROUND AND INK, LIGHT AND DARK, AND NO LITERAL COLOUR. This page is drawn when the app's
+      stylesheet may not have arrived, so it cannot read a token; `Canvas` and `CanvasText` follow the reader's light or
+      dark as the shell's first paint does (`app.html`), and the theme stays the one place a colour is written.
+    -->
+    <meta name="color-scheme" content="light dark" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>BrainDog</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: Canvas;
+        color: CanvasText;
+        font-family: Geist, 'Geist Fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+
+      main {
+        box-sizing: border-box;
+        min-block-size: 100dvh;
+        display: grid;
+        place-content: center;
+        gap: 12px;
+        padding: 24px 16px;
+        max-inline-size: 480px;
+        margin-inline: auto;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: Lexend, 'Lexend Fallback', system-ui, sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      p {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      a {
+        color: LinkText;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>BrainDog did not start</h1>
+      <p>Your record is safe. The app's own files did not arrive, which is most often the connection.</p>
+      <p><a href="">Reload</a></p>
+    </main>
+  </body>
+</html>

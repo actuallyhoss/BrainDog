@@ -246,7 +246,7 @@
   const tools = $derived<SideLink[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
     { href: '/automations', label: copy.automations, icon: 'refresh' },
-    { href: '/jobs', label: copy.jobs, icon: 'play' },
+    /* NO JOBS: its list of runs lives on Agents now, which the top bar holds, and `/jobs` only sent him there (E48). */
     { href: '/packs', label: copy.packs, icon: 'packs' },
     { href: '/vault', label: copy.vault, icon: 'vault' },
     { href: '/usage', label: USAGE, icon: 'observe' },
