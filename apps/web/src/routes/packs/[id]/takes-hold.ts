@@ -34,6 +34,21 @@ const joined = (names: readonly string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
 /**
+ * WHEN THE SETTINGS TAKE HOLD, SAID ONCE AT THE FOOT (Y10): the line under every setting was the same line fourteen
+ * times on the Money add-on. Only the ones that wait are named. `null` when nothing is known yet or nothing is set.
+ */
+export function holdsFoot(holds: Readonly<Record<string, TakesHold>> | null, names: Readonly<Record<string, string>>, title: string): string | null {
+  if (holds === null) return null;
+  const keys = Object.keys(holds);
+  if (keys.length === 0) return null;
+  const waiting = keys.filter((k) => holds[k] === 'next-update');
+  if (waiting.length === 0) return 'Each setting takes effect as soon as it is saved.';
+  if (waiting.length === keys.length) return `Each setting takes effect when ${title} next updates.`;
+  const said = joined(waiting.map((k) => names[k] ?? k));
+  return `Each setting takes effect as soon as it is saved, but ${said} ${waiting.length === 1 ? 'waits' : 'wait'} until ${title} next updates.`;
+}
+
+/**
  * The toast after a save: what was saved, then, when any of it waits, when it takes hold. Settings that take hold now
  * add nothing, since the screen already shows them changed.
  */

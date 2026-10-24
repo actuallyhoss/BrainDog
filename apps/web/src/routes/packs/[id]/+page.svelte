@@ -40,7 +40,8 @@
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
-  import { answersIn, declarationsOf, savedSaid, takesHoldSaid, type TakesHold } from './takes-hold.ts';
+  import { answersIn, declarationsOf, holdsFoot, savedSaid, type TakesHold } from './takes-hold.ts';
+  import { foldOf, sharedNotes } from './fold.ts';
   import { lineSaid, pairsOf, rateNote, rateSaid, readRates, type PairRead } from './rates.ts';
   import { Sparkline } from '$lib/viz/index.ts';
   import { kennelFetch, publishedText } from '$lib/market/publish.ts';
@@ -306,6 +307,14 @@
   });
 
   const entries = $derived(Object.entries(settings?.config ?? {}));
+  /* THE BLANK LIMITS FOLD, AND WHAT EVERY SETTING SHARES IS SAID ONCE AT THE FOOT (Y10): the Money add-on was fourteen
+     empty boxes, each with the same two lines under it. */
+  const fold = $derived(foldOf(entries, settings?.values ?? {}));
+  let unfoldedMore = $state(false);
+  const shared = $derived(sharedNotes(entries));
+  const foot = $derived(holdsFoot(holds ?? null, Object.fromEntries(entries.map(([k, d]) => [k, labelOf(k, d)])), name));
+  /** Drawn: not folded, or the fold is open, or it holds a change or a refusal somebody must see. */
+  const drawnHere = (key: string): boolean => unfoldedMore || !fold.folded.includes(key) || key in pending.values || key in pending.wrong || fixAt === key;
   /* A LIST'S LINES ARE COMPARED HERE, and its blank draft is kept out of `changesOf`, which would read the empty box as
      the setting cleared. A list that held nothing and still holds nothing has not moved. */
   const pending = $derived.by(() => {
@@ -468,7 +477,7 @@
               {@const segmented = decl.type === 'enum' && (decl.values?.length ?? 0) <= 4}
               <!-- THE ONE USE CASE ON SPEAKS whatever `speaks` holds, which is written down only once two are on. -->
               {@const only = key === SPEAKS && alone}
-              {#if d}
+              {#if d && drawnHere(key)}
                 <div class="setting" data-kind={decl.type === 'bool' ? 'switch' : undefined}>
                   {#if decl.type === 'bool' || segmented || isList(decl)}
                     <span class="setting-label" id="set-{key}-label">{label}</span>
@@ -569,7 +578,7 @@
                           id="set-{key}"
                           type="text"
                           inputmode="decimal"
-                          placeholder={heldElsewhere(settings, key) ?? undefined}
+                          placeholder={heldElsewhere(settings, key) ?? words.notSet}
                           value={d.text}
                           oninput={(e) => (d.text = typed(e))}
                           aria-invalid={why ? 'true' : undefined}
@@ -625,13 +634,19 @@
                   </div>
 
                   {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
-                  {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
-                  {#if holds?.[key]}<p class="setting-note">{takesHoldSaid(holds[key], name)}</p>{/if}
+                  {#if decl.note && !shared.includes(decl.note)}<p class="setting-note">{decl.note}</p>{/if}
                   {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
                 </div>
               {/if}
             {/each}
 
+            {#if fold.folded.length > 0 && !unfoldedMore}
+              <div class="more-limits">
+                <Button weight="bare" onclick={() => (unfoldedMore = true)}>{fold.label}<span class="num quiet-part">{fold.folded.length}</span></Button>
+              </div>
+            {/if}
+            {#each shared as note (note)}<p class="setting-note">{note}</p>{/each}
+            {#if foot}<p class="setting-note">{foot}</p>{/if}
             <div class="settings-actions">
               <Button weight="primary" type="submit" disabled={!dirty || held || busy}>{words.save}</Button>
               {#if signin}
@@ -976,6 +991,12 @@
 
   .setting-said:empty {
     display: none;
+  }
+
+  /* THE FOLD'S COUNT BESIDE ITS WORDS, quiet. */
+  .more-limits .quiet-part {
+    margin-inline-start: var(--sp-2);
+    color: var(--ink-3);
   }
 
   .settings-actions {
