@@ -12140,28 +12140,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       const source = String(said.source);
 
-      const found = runFor(ctx, hints, `opened: ${source}`);
-      if (!found.ok) return tail(found as Result<never>);
-      const { run, spoken, opened } = found.value;
-      /* WHAT HE TOLD THIS RUN IS SEEN AT ITS START (plan §2.3 A), each marked `start` before the briefing that lists it:
-         one sent to the run by name is taken as it is first seen, so the card says it is in hand. */
-      for (const i of toldTo(readable, ctx, kernel.instructionFor({}, spoken))) kernel.seenInstruction(i.id, spoken, 'start');
-      /* THE BRIEFING FOR THE RUN JUST NAMED, so the start hook prints it from this one answer. */
-      const briefed = (): Context => briefing({ ...ctx, session: { ...hints, spoken } });
-      if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run), context: briefed() }));
+      /* ONE TRANSACTION FOR THE WHOLE START: the run found or opened, what he told it marked seen, its row moved, and the
+         briefing read in the same moment as those writes. Each was a transaction of its own. A refusal is answered as
+         it was, and what was written before it stands as it did. */
+      return tail(
+        kernel.transaction((): Result<Attached> => {
+          const found = runFor(ctx, hints, `opened: ${source}`);
+          if (!found.ok) return found as Result<never>;
+          const { run, spoken, opened } = found.value;
+          /* WHAT HE TOLD THIS RUN IS SEEN AT ITS START (plan §2.3 A), each marked `start` before the briefing that lists it:
+             one sent to the run by name is taken as it is first seen, so the card says it is in hand. */
+          for (const i of toldTo(readable, ctx, kernel.instructionFor({}, spoken))) kernel.seenInstruction(i.id, spoken, 'start');
+          /* THE BRIEFING FOR THE RUN JUST NAMED, so the start hook prints it from this one answer. */
+          const briefed = (): Context => briefing({ ...ctx, session: { ...hints, spoken } });
+          if (opened) return ok({ session: run, spoken, resumed: false, project: projectOf(run), context: briefed() });
 
-      /* THE RUN'S OWN ROW, written as the run: the ladder finds it again from the same hints, signs the
-         edit with it, moves `last_seen`, and places it again when it came back by its client id. */
-      const patch: Patch = {};
-      for (const key of POSITION) if (typeof hints[key] === 'string' && hints[key] !== run.fields[key]) patch[key] = hints[key];
-      /* `other` SAYS NOTHING ABOUT WHO THE RUN IS, so it never writes over a kind the run already has: a client that
-         names no agent re-attaching a Claude run left it a nameless one. */
-      if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
-      if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
-      if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
-      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
-      if (!out.ok) return tail(out as Result<never>);
-      return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value), context: briefed() }));
+          /* THE RUN'S OWN ROW, written as the run: the ladder finds it again from the same hints, signs the
+             edit with it, moves `last_seen`, and places it again when it came back by its client id. */
+          const patch: Patch = {};
+          for (const key of POSITION) if (typeof hints[key] === 'string' && hints[key] !== run.fields[key]) patch[key] = hints[key];
+          /* `other` SAYS NOTHING ABOUT WHO THE RUN IS, so it never writes over a kind the run already has: a client that
+             names no agent re-attaching a Claude run left it a nameless one. */
+          if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
+          if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
+          if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
+          const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
+          if (!out.ok) return out as Result<never>;
+          return ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value), context: briefed() });
+        }),
+      );
     },
 
     /**
