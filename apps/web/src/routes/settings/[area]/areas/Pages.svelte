@@ -66,10 +66,12 @@
     opensOn: 'Opens on',
     homeSet: (name: string) => `BrainDog opens on ${name} now.`,
     pages: 'Your pages',
-    inNav: 'In your nav',
-    inNavHint: 'Move a page up or down under its heading, or hide it. Nothing is deleted.',
-    other: 'Not in your nav',
-    otherHint: 'Hidden pages, and pages the nav has no room for. Show one and it returns to the place it had.',
+    inNav: 'In the sidebar and the bar',
+    inNavHint: 'Move one up or down, or hide it. Nothing is deleted.',
+    other: 'Add a page',
+    otherHint: 'Pages you hid, and every page not in the sidebar. Show one and it goes back where it was.',
+    find: 'Find a page',
+    noMatch: 'No page is called that',
     nothingOut: 'Every page is in your nav',
     up: (title: string) => `Move ${title} up`,
     down: (title: string) => `Move ${title} down`,
@@ -255,7 +257,10 @@
      pages drawn and the pages it adds come to the count over the section. */
   const FOLD = 8;
   let unfolded = $state(false);
-  const othersShown = $derived(unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
+  /* ADD A PAGE FINDS BY NAME (U-C8): typing narrows every page not in the sidebar, folded ones too. */
+  let finding = $state('');
+  const found = (p: Listed): boolean => finding.trim() === '' || `${navPrefs.labelOf(p.href, p.own)} ${p.own}`.toLowerCase().includes(finding.trim().toLowerCase());
+  const othersShown = $derived(finding.trim() !== '' ? others.filter(found) : unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
   /* WHAT IS IN THE NAV NOW, and the pages hidden from it, which "Not in your nav" leads with. */
   const navShown = $derived(ordered.filter((p) => !navPrefs.isHidden(p.href)));
   const hiddenRows = $derived(ordered.filter((p) => navPrefs.isHidden(p.href)));
@@ -466,7 +471,7 @@
 {/if}
 
 {#if drawn('nav')}
-  <Tile icon="rows" title={words.inNav} count={navShown.length}>
+  <Tile icon="rows" title={words.inNav}>
     <p class="hint">{words.inNavHint}</p>
     {#if navShown.length === 0}
       <Empty kind="cleared" title={words.none} body={words.noneWhy} />
@@ -482,15 +487,19 @@
 
 {#if drawn('others')}
   <div id="hidden">
-    <Tile icon="eye" title={words.other} count={outCount}>
+    <Tile icon="plus" title={words.other}>
       <p class="hint">{words.otherHint}</p>
       {#if outCount === 0}
         <p class="nothing-out">{words.nothingOut}</p>
       {:else}
+        <div class="find">
+          <input class="field-input" type="search" aria-label={words.find} placeholder={words.find} autocomplete="off" spellcheck="false" bind:value={finding} />
+        </div>
+        {#if finding.trim() !== '' && hiddenRows.filter(found).length + othersShown.length === 0}<p class="nothing-out">{words.noMatch}</p>{/if}
         <ul class="ledger ledger-lead pages">
-          {#each hiddenRows as p (p.href)}{@render pageRow(p)}{/each}
+          {#each hiddenRows.filter(found) as p (p.href)}{@render pageRow(p)}{/each}
           {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
-          {#if others.length > othersShown.length}
+          {#if finding.trim() === '' && others.length > othersShown.length}
             <!-- THE REST IS A ROW LIKE THE OTHERS, its chevron saying a press opens more. -->
             <li class="page-row page-fold">
               <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
@@ -552,6 +561,14 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lh-body);
+  }
+
+  .find {
+    margin-block-end: var(--sp-3);
+  }
+
+  .find input {
+    inline-size: 100%;
   }
 
   .nothing-out {

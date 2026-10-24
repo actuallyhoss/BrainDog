@@ -1,7 +1,7 @@
 <!--
-  Settings > Navigation: what the app opens on, the phone bar drawn live with its switches, the pages in the nav and the
-  ones not in it (Pages folded in here, UI pass 20 Oct, agents F14 and F18), where the navigation lives, the switch that
-  lets the record offer anything, and the holding pen itself.
+  Settings > Navigation, for the one frame (§52, nav A): what the app opens on, one list of what is in the sidebar and
+  the bar with its order and Hide, then Add a page with a search, and the suggestions with the switch that stops them.
+  The phone bar, its switches and the shape picker went with the frame of 23 October (U-C8).
 
   EVERY SETTING HERE IS THE PERSON'S OWN ON A RECORD (`nav-prefs.svelte.ts`): the shape is `nav.shape`, the switch is
   `pen.suggest`, and every "Not this one" is appended to `pen.dismissed`, so a choice made on the laptop holds on the
@@ -12,8 +12,8 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { said as voiceSaid } from '$lib/voice.svelte.ts';
-  import { navShapeSignals, recommendNavShape, type NavShape } from '$lib/design/nav-shape.ts';
-  import { glyphOf, iconOf, penCount, shapeOffer, waiting, type Offer, type PenItem } from '$lib/design/pen.ts';
+  import type { NavShape } from '$lib/design/nav-shape.ts';
+  import { glyphOf, iconOf, penCount, waiting, type Offer, type PenItem } from '$lib/design/pen.ts';
   import { cardWords, todayOf } from '$lib/decide/card.ts';
   import { shortDay } from 'braindog-render';
   import { penWords } from '$lib/design/words.ts';
@@ -21,9 +21,7 @@
   import { forget } from '$lib/record/boot-live.ts';
   import type { Rehearsed } from '../../../decide/[id]/proposed.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { navPrefs, TABS_MOST, type Saved } from '$lib/nav-prefs.svelte.ts';
-  import { arrange, tabsOf, type FlatItem } from '$lib/nav.ts';
-  import type { IconName } from '$lib/ui/icons.ts';
+  import { navPrefs, type Saved } from '$lib/nav-prefs.svelte.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -42,13 +40,6 @@
      order of the pages, which says what a press does in the person's own page names. */
   const words = {
     offers: 'Suggestions',
-    bar: 'Phone bar',
-    barHint: 'Today is always first, then up to four more. The bar above is what a phone draws.',
-    barOn: (title: string) => `${title} on the phone bar`,
-    barFull: 'Today is always first. Four at most after it; turn one off first.',
-    barReset: 'Use the default bar',
-    barNow: 'The phone bar as it is now',
-    under: (section: string) => `In ${section}`,
   };
 
   /** A refusal is the record's own sentence, and a change it kept is said only once it kept it. */
@@ -57,74 +48,7 @@
     else if (done !== undefined) toasts.push(done);
   };
 
-  /**
-   * THE PAGES OF THE NAV, IN THE ORDER IT DRAWS THEM, under the names this person gave them.
-   *
-   * THE RAIL'S OWN SET (`+layout.svelte`): a page the budget cut is drawn by its strip of tabs and not the rail, and a
-   * saved view is drawn under its list. A page one row made is left to its list's page, as the flat nav leaves it, so
-   * moving it here would move nothing anybody sees. Arranged with the hidden ones in, so the order kept places a hidden
-   * page where it was when it is shown again; drawn without them, since they have their own section below.
-   */
-  const views = $derived(new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href))));
-  const arranged = $derived(arrange(navPrefs.relabel(shell.nav.filter((e) => !e.cut && !e.row && !views.has(e.href))), navPrefs.order));
-  const shown = $derived(
-    arranged.flatMap(([section, list]) => {
-      const seen = list.filter((e) => !navPrefs.isHidden(e.href));
-      return seen.length > 0 ? [[section, seen] as const] : [];
-    }),
-  );
-
-  /**
-   * THE PHONE BAR, DRAWN AS IT IS (agents F18). Today is always first; after it, the four the person picked, or with none
-   * picked the default `tabsOf` (`lib/nav.ts`) draws: Needs you, then Projects, Money and Agents by their sections, then
-   * the next pages in the nav's order. The switches start as the bar is, so turning one on or off changes one tab, and a
-   * fifth is refused in words beside its switch rather than silently dropping three.
-   */
-  const NEEDS = '/decide';
-  type BarRow = { href: string; title: string; icon: IconName; section?: string | undefined };
-  const barRows = $derived<BarRow[]>([
-    { href: NEEDS, title: voiceSaid('decide'), icon: 'inbox' },
-    ...shown.flatMap(([section, list]) => list.map((p) => ({ href: p.href, title: p.title, icon: p.icon as IconName, section }))),
-  ]);
-  const plain = (x: string | undefined): string => (x ?? '').trim().toLowerCase();
-  /* THE DEFAULT IS `tabsOf`'S OWN ANSWER, asked of these pages as the rail hands them: Today, Needs you by its key, each
-     section's first page by its section, and every other page as itself. One rule for the bar and this screen. */
-  const defaultBar = $derived.by((): string[] => {
-    const led = new Set<string>();
-    const main: FlatItem[] = [
-      { key: 'today', href: '/', label: copy.today, icon: 'today', near: [] },
-      ...barRows.map((r): FlatItem => {
-        const section = plain(r.section);
-        const lead = r.href !== NEEDS && section !== '' && !led.has(section);
-        if (lead) led.add(section);
-        return { key: r.href === NEEDS ? 'decide' : lead ? `section:${section}` : `page:${r.href}`, href: r.href, label: r.title, icon: r.icon, near: [] };
-      }),
-    ];
-    return tabsOf(main, TABS_MOST + 1)
-      .slice(1)
-      .map((i) => i.href);
-  });
-  const picked = $derived(navPrefs.tabs.filter((h) => barRows.some((r) => r.href === h)));
-  const barNow = $derived(picked.length > 0 ? picked : defaultBar);
-  const sameBar = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((h, i) => h === b[i]);
-  const isDefault = $derived(sameBar(barNow, defaultBar));
-  const barFull = $derived(barNow.length >= TABS_MOST);
-  const onBar = (href: string): boolean => barNow.includes(href);
-  /* THE PREVIEW: Today and the four, each its glyph over its caption, as the tab bar draws them. */
-  const preview = $derived<BarRow[]>([
-    { href: '/', title: copy.today, icon: 'today' },
-    ...barNow.flatMap((h) => barRows.filter((r) => r.href === h)),
-  ]);
-  function flipBar(href: string) {
-    const next = onBar(href) ? barNow.filter((h) => h !== href) : [...barNow, href];
-    /* BACK TO THE DEFAULT IS NO PICK AT ALL, so a bar that matches it follows it when the record's places change. */
-    void navPrefs.setTabs(sameBar(next, defaultBar) ? [] : next).then((saved) => said(saved));
-  }
-
   const navShapeLabel = (s: NavShape): string => (s === 'rail' ? copy.navShapeRail : s === 'bar' ? copy.navShapeBar : copy.navShapeMenu);
-
-  /* THE SHAPE, AS THE RECORD KEEPS IT. Picking one writes `nav.shape`, and the shell redraws from the same field. */
-  const pickShape = (v: NavShape) => void navPrefs.setShape(v).then((saved) => said(saved));
 
   /* THE SWITCH. Off empties the pen and stops it refilling; the record's own offers come back with the next `boot`, so it
      is read again once the switch is kept. */
@@ -137,29 +61,8 @@
     }
   }
 
-  /**
-   * THE DESIGN AGENT'S NAVIGATION RECOMMENDATION, the one offer the browser may add (`nav-shape.ts`), and only while the
-   * record sends no shape of its own (`waiting`). Icons and every other kind are the record's to offer.
-   *
-   * It reads the screen as well as the record: below `SHAPE_MIN_WIDTH` the tab bar is drawn whatever is chosen, so it
-   * answers nothing there. It is compared with the shape set now, so choosing the
-   * recommended shape by hand makes the offer go on its own rather than nag about a choice just made.
-   *
-   * THE SHAPE SOMEBODY CHOSE, NOT THE ONE DRAWN (`navPrefs.chosen`). The drawn shape is the rail for a record that never
-   * chose, and handed in, it said that record had picked the rail by hand: the top bar is offered only to a rail
-   * somebody picked, so it was offered to every record that never chose at all.
-   */
-  const navRec = $derived(
-    recommendNavShape(
-      navShapeSignals(
-        shell.nav,
-        shell.index.registers.length,
-        { nav: navPrefs.order, navShape: navPrefs.chosen },
-        typeof window === 'undefined' ? undefined : window.innerWidth,
-      ),
-    ),
-  );
-  const shapeRow = $derived(navRec === null ? null : shapeOffer(navRec, copy.navShapeRecommend));
+  /* THE SHAPE IS NO LONGER OFFERED (U-C8): the frame is one, so the pen holds only what the record offers. */
+  const shapeRow = null;
 
   /* KEPT IN THIS VISIT, each with the one call that puts it back. The record stops offering a kept item on the next
      `boot`, so without this the row and its Put back would vanish together. */
@@ -272,102 +175,12 @@
   }
 </script>
 
-<!--
-  WHERE THE NAVIGATION LIVES, which is this area's own subject.
-
-  `19 §3` carries five shapes and three conditions. Two of the five are not choices: the tab bar is what a narrow screen
-  gets whatever is picked here, and the collapsed rail is a width rather than a shape. The three that are choices are
-  here, and the phone sentence says what a phone draws rather than letting the choice look ignored there.
--->
-<!-- ONE SHAPE, DRAWN: the ground, the navigation where that shape puts it, and a page beside or under it. Shapes, never
-     words, so it is hidden from a screen reader; the button it sits in names the shape. -->
-{#snippet shapeOf(v: NavShape)}
-  <span class="nav-look" data-shape={v}>
-    {#if v === 'rail'}
-      <span class="nav-chrome nav-rail"><span class="nav-mark"></span><span class="nav-place" data-on></span><span class="nav-place"></span><span class="nav-place"></span><span class="nav-place"></span></span>
-    {:else if v === 'bar'}
-      <span class="nav-chrome nav-bar"><span class="nav-mark"></span><span class="nav-place" data-on></span><span class="nav-place"></span><span class="nav-place"></span></span>
-    {:else}
-      <span class="nav-chrome nav-menu"><span class="nav-lines"></span></span>
-    {/if}
-    <span class="nav-page">
-      <span class="nav-title"></span>
-      <span class="nav-tiles"><span class="nav-tile"></span><span class="nav-tile"></span></span>
-      <span class="nav-row"></span>
-      <span class="nav-row"></span>
-    </span>
-  </span>
-{/snippet}
-
 <!-- WHAT THE APP OPENS ON, first: Pages folded in here (agents F14). -->
 <Pages {shell} {area} part="opens" />
-
-<!-- THE PHONE BAR, drawn live above one switch for each page: his pick wins over the five of 19 October. -->
-{#snippet barSwitch(r: BarRow)}
-  <button
-    type="button"
-    class="switch"
-    role="switch"
-    aria-checked={onBar(r.href)}
-    aria-label={words.barOn(r.title)}
-    disabled={!onBar(r.href) && barFull}
-    onclick={() => flipBar(r.href)}><span class="switch-track"></span></button
-  >
-{/snippet}
-<Tile icon="monitor" title={words.bar}>
-  {#snippet actions()}
-    {#if !isDefault}<Button size="sm" weight="quiet" onclick={() => void navPrefs.setTabs([]).then((saved) => said(saved))}>{words.barReset}</Button>{/if}
-  {/snippet}
-  <div class="bar-preview" role="img" aria-label={`${words.barNow}: ${preview.map((t) => t.title).join(', ')}`}>
-    {#each preview as t, i (t.href)}
-      <span class="bar-slot" data-on={i === 0 ? '' : undefined}><Icon name={t.icon} size="m" /><span class="bar-cap">{t.title}</span></span>
-    {/each}
-  </div>
-  <!-- WHEN THE BAR IS FULL THE LINE SAYS SO ONCE, over the switches it disables, rather than under each of them. -->
-  <p class="hint" role="status">{barFull ? words.barFull : words.barHint}</p>
-  <ul class="bar-rows">
-    {#each barRows as r (r.href)}
-      {@const line = r.section && plain(r.section) !== plain(r.title) ? words.under(r.section) : undefined}
-      <li class="switch-row bar-row">
-        <span class="bar-row-main">
-          <IconWell name={r.icon} />
-          <span class="switch-row-words">
-            <span class="switch-row-title">{r.title}</span>
-            {#if line}<span class="bar-row-line">{line}</span>{/if}
-          </span>
-        </span>
-        {@render barSwitch(r)}
-      </li>
-    {/each}
-  </ul>
-</Tile>
 
 <!-- THE PAGES IN THE NAV, their order and Hide, then every page not in it with the way back (Pages folded in here). -->
 <Pages {shell} {area} part="nav" />
 <Pages {shell} {area} part="others" />
-
-<!--
-  WHERE THE NAVIGATION LIVES. `19 §3` carries five shapes and three conditions; the three that are choices are here,
-  and on a phone, which always draws the tab bar, it is one sentence.
--->
-<Tile icon="rows" title={copy.navShape}>
-  <div class="wide-only">
-    <p class="hint">{copy.navShapeHint}</p>
-    <div class="pictures" role="group" aria-label={copy.navShape}>
-      <!-- THE SIDE RAIL OF 20 OCTOBER IS RETIRED AS A CHOICE (frame B, pick 10): the top bar's sidebar holds the projects and
-           hides with `[`. Somebody still on it sees it pressed, and leaves it by picking another. -->
-      {#each [['bar', copy.navShapeBar, 'grid'], ['rail', copy.navShapeRail, 'rows'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon] (v)}
-        {#if v !== 'rail' || navPrefs.shape === 'rail'}
-        <button type="button" class="picture" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}>
-          <span class="picture-shot" aria-hidden="true">{@render shapeOf(v)}</span>
-          <span class="picture-name"><Icon name={icon} size="m" /><span>{label}</span></span>
-        </button>
-        {/if}
-      {/each}
-    </div>
-  </div>
-  <p class="hint phone-only">{copy.navShapeOnPhone}</p>
-</Tile>
 
 <!--
   THE SWITCH THIS AREA WAS ADDED TO HOLD (`19 §2`, `29 §4`: "one global switch, the same shape as Character keys: off").
@@ -386,15 +199,13 @@
   >
 {/snippet}
 
-<Tile icon="learning" title={words.offers}>
-  <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
-</Tile>
 
 <!--
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
   it", "Keep it" and "Not this one". Nothing in it is ever applied without the second (`19 §3`).
 -->
-<Tile icon="inbox" title={copy.suggested} count={waitingCount}>
+<Tile icon="inbox" title={words.offers} count={waitingCount}>
+  <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
   {#if !navPrefs.suggest}
     <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the empty states precisely so that
          "nothing has happened yet" and "you turned this off" cannot read the same. -->
@@ -508,212 +319,6 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-  }
-
-  /* THE PHONE'S ONE SENTENCE ABOUT THE SHAPE, where the picker is not drawn. */
-  @media (width >= 900px) {
-    .phone-only {
-      display: none;
-    }
-  }
-
-  /* ── one shape of the navigation, drawn in proportions of the picture's own width (`cqi`) ── */
-
-  .nav-look {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    gap: 4cqi;
-    padding: 4cqi;
-    background: var(--board);
-  }
-
-  .nav-look[data-shape='rail'] {
-    grid-template-columns: 23cqi minmax(0, 1fr);
-  }
-
-  .nav-look[data-shape='bar'] {
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .nav-look[data-shape='menu'] {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-  }
-
-  /* THE CHROME IS THE NAV'S OWN SURFACE, flat with its hairline, as the shell's is now: no glass, no shadow. */
-  .nav-chrome {
-    display: flex;
-    gap: 2.2cqi;
-    background: var(--nav);
-    outline: 0.4cqi solid var(--rule);
-  }
-
-  .nav-rail {
-    flex-direction: column;
-    padding: 3cqi 2.2cqi;
-    border-radius: 3.4cqi;
-  }
-
-  .nav-bar {
-    align-items: center;
-    padding: 1.8cqi 2.4cqi;
-    border-radius: 3.4cqi;
-  }
-
-  .nav-menu {
-    display: grid;
-    place-items: center;
-    inline-size: 7cqi;
-    block-size: 7cqi;
-    border-radius: 50%;
-  }
-
-  .nav-lines {
-    inline-size: 3cqi;
-    block-size: 2.4cqi;
-    border-block: 0.5cqi solid var(--ink);
-  }
-
-  .nav-mark {
-    flex: none;
-    inline-size: 5.4cqi;
-    block-size: 3.8cqi;
-    border-radius: 1cqi;
-    background: var(--red-fill);
-  }
-
-  .nav-rail .nav-mark {
-    margin-block-end: 1.4cqi;
-  }
-
-  .nav-place {
-    display: flex;
-    align-items: center;
-    gap: 1.6cqi;
-  }
-
-  .nav-place::before {
-    content: '';
-    flex: none;
-    inline-size: 3.6cqi;
-    block-size: 3.6cqi;
-    border-radius: 1.1cqi;
-    background: color-mix(in srgb, var(--ink) 14%, transparent);
-  }
-
-  .nav-place::after {
-    content: '';
-    flex: 1;
-    max-inline-size: 9cqi;
-    min-inline-size: 5cqi;
-    block-size: 1.3cqi;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--ink) 22%, transparent);
-  }
-
-  .nav-place[data-on]::before,
-  .nav-place[data-on]::after {
-    background: var(--ink);
-  }
-
-  .nav-page {
-    display: flex;
-    flex-direction: column;
-    gap: 2.4cqi;
-    min-inline-size: 0;
-  }
-
-  .nav-title {
-    inline-size: 26cqi;
-    block-size: 3.4cqi;
-    border-radius: 1cqi;
-    background: var(--ink);
-  }
-
-  .nav-tiles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2.4cqi;
-  }
-
-  .nav-tile {
-    block-size: 14cqi;
-    border-radius: 3cqi;
-    background: var(--tile);
-  }
-
-  .nav-row {
-    block-size: 1.4cqi;
-    inline-size: 60%;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--ink) 20%, transparent);
-  }
-
-  /* ── the phone bar ── */
-
-  /* THE BAR AS A PHONE DRAWS IT: five equal slots on the nav's surface, a 20px glyph over a 12px caption, Today in ink
-     and the rest in the second ink, as `TabBar.svelte` draws the bar you are not on. 390 wide at most, so it reads as the
-     phone's and not as a toolbar across the desk. */
-  .bar-preview {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    max-inline-size: 390px;
-    margin-block-end: var(--sp-4);
-    padding-block: var(--sp-2);
-    background: var(--nav);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-pop);
-  }
-
-  .bar-slot {
-    display: grid;
-    justify-items: center;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-    color: var(--ink-2);
-  }
-
-  .bar-slot[data-on] {
-    color: var(--ink);
-  }
-
-  .bar-cap {
-    max-inline-size: 100%;
-    overflow: hidden;
-    font-size: var(--fs-cap);
-    font-weight: 500;
-    line-height: 16px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .bar-slot[data-on] .bar-cap {
-    font-weight: 600;
-  }
-
-  .bar-rows {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .bar-row-main {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .bar-row-main > :global(.well) {
-    flex: none;
-    margin-block-start: -4px;
-  }
-
-  .bar-row-line {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
   }
 
   .pen-acts {
