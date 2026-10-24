@@ -743,8 +743,42 @@ export async function hookWork(env: Env, file: string, home?: string): Promise<v
 /** The most authors one session's end sends to `meet`. */
 export const MET_PER_SESSION = 10;
 
-/** A repository the session's commits are read from: its folder, its name, and the commit the session started at. */
-export type MovedRepo = { dir: string; repo: string; from: string };
+/**
+ * A repository the session's commits are read from: its folder, its name, and the commit the session started at.
+ * `whole` reads every commit since the repository joined its project instead (`wholeToday`), once a day a folder.
+ */
+export type MovedRepo = { dir: string; repo: string; from: string; whole?: true };
+
+/** Where the day each folder's authors were last read whole is kept, beside the hosts file. */
+export const peopleDayPath = (env: Env): string => join(dirname(hostsPath(env)), 'people-day.json');
+
+/**
+ * THE REPOSITORIES TO READ WHOLE TODAY (scope B35): every author since the repository joined its project, not only this
+ * session's, once a day a folder, so somebody who committed between his sessions is met too. The day is written for
+ * each one marked, and a file that does not read is no day. Never throws.
+ */
+export function wholeToday(env: Env, moved: readonly MovedRepo[], now: number = Date.now()): MovedRepo[] {
+  const file = peopleDayPath(env);
+  const today = new Date(now).toISOString().slice(0, 10);
+  let kept: Record<string, unknown> = {};
+  try {
+    const x = JSON.parse(readFileSync(file, 'utf8')) as unknown;
+    if (x !== null && typeof x === 'object' && !Array.isArray(x)) kept = x as Record<string, unknown>;
+  } catch {
+    kept = {};
+  }
+  const out = moved.map((m) => (kept[m.dir] === today ? m : { ...m, whole: true as const }));
+  if (out.some((m) => m.whole)) {
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      const next = Object.fromEntries([...Object.entries(kept).filter(([, d]) => d === today), ...out.map((m) => [m.dir, today] as const)].slice(-200));
+      writeFileSync(file, `${JSON.stringify(next)}\n`);
+    } catch {
+      /* A day not written reads the folder whole again at the next end, which meets nobody twice. */
+    }
+  }
+  return out;
+}
 
 /**
  * The authors of several logs in `LOG_FORMAT`, each with its repository's name, newest commit first within each, each
@@ -806,7 +840,7 @@ export async function harvest(moved: readonly MovedRepo[], reader: Reader | null
   /* ONE COMMIT COUNTS ONCE, by its hash, however many checkouts under this folder hold it. */
   const counted = new Map<string, Set<string>>();
   const [logs, own] = await Promise.all([
-    Promise.all(listed.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `--since=${m.since}`, `${m.from}..HEAD`), repo: m.repo }))),
+    Promise.all(listed.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `--since=${m.since}`, m.whole === true ? 'HEAD' : `${m.from}..HEAD`), repo: m.repo }))),
     ownerOf(self, listed.map((m) => m.dir)),
     ...listed.map((m) => commitsBy(m.dir, m.since, counted)),
   ]);
@@ -909,7 +943,7 @@ export async function hookEnd(io: Io): Promise<void> {
      write, and one landing after the end would bring a run that waits as a handoff back to active. Only for a session
      that stands in a repository, whose own settings they are. */
   const listed = here.repo === null ? null : sendCommands(io, to, at, run, [file, sessionPath(io.env, event.cwd)], Math.max(1, until - Date.now()));
-  if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
+  if (moved.length > 0) await harvest(wholeToday(io.env, moved), client, (args) => client.call('meet', args), until);
   await listed;
   const where = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
   const ended = await client.call('end', where);

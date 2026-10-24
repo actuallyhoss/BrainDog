@@ -72,11 +72,22 @@ export function isAgent(name: string, address: string): boolean {
 
 /* ── authors ───────────────────────────────────────────────────────────── */
 
-/** The `git log` format every reader here asks for: name, address, full commit, author date. */
-export const LOG_FORMAT = '--format=%an%x1f%ae%x1f%H%x1f%aI';
+/**
+ * The `git log` format every reader here asks for: name, address, full commit, author date, and the commit's
+ * `Co-authored-by:` trailers, one record separator apart, so a pair's second author is somebody in the work too
+ * (scope B35). The first four fields stay where they were, so a reader of them alone reads as before.
+ */
+export const COAUTHORS = '%(trailers:key=Co-authored-by,valueonly,unfold,separator=%x1e)';
+export const LOG_FORMAT = `--format=%an%x1f%ae%x1f%H%x1f%aI%x1f${COAUTHORS}`;
 
-/** One commit's author as `git log` gave it, with the key they are known by. */
-export type Authored = { name: string; email: string; key: string; commit: string; at: string };
+/** One commit's author as `git log` gave it, with the key they are known by. `co` when a trailer named them. */
+export type Authored = { name: string; email: string; key: string; commit: string; at: string; co?: true };
+
+/** A `Co-authored-by:` value, `Name <address>`, as a name and an address; `null` for one with no address. */
+export function coAuthorOf(said: string): { name: string; email: string } | null {
+  const m = /^\s*(.*?)\s*<([^<>\s]+@[^<>\s]+)>\s*$/u.exec(said);
+  return m ? { name: m[1]!, email: m[2]! } : null;
+}
 
 /**
  * The authors of a log in `LOG_FORMAT`, newest first, with the machines, the owner by any key or name of his, and
@@ -85,11 +96,17 @@ export type Authored = { name: string; email: string; key: string; commit: strin
 export function authoredIn(log: string, own: Owner): Authored[] {
   const out: Authored[] = [];
   for (const line of log.split('\n')) {
-    const [name = '', email = '', commit = '', at = ''] = line.split('\x1f').map((s) => s.trim());
+    const [name = '', email = '', commit = '', at = '', co = ''] = line.split('\x1f').map((s) => s.trim());
     if (!commit) continue;
     const key = keyOf('email', email);
-    if (key === null || isMachine(name, email) || isOwner(own, key, name)) continue;
-    out.push({ name, email: email.toLowerCase(), key, commit, at });
+    if (key !== null && !isMachine(name, email) && !isOwner(own, key, name)) out.push({ name, email: email.toLowerCase(), key, commit, at });
+    /* AND EACH CO-AUTHOR THE COMMIT NAMES, held to the same: no machine, not the owner, an address or nobody. */
+    for (const said of co.split('\x1e')) {
+      const who = coAuthorOf(said);
+      const coKey = who === null ? null : keyOf('email', who.email);
+      if (who === null || coKey === null || coKey === key || isMachine(who.name, who.email) || isOwner(own, coKey, who.name)) continue;
+      out.push({ name: who.name, email: who.email.toLowerCase(), key: coKey, commit, at, co: true });
+    }
   }
   return out;
 }
@@ -105,14 +122,18 @@ export const MIN_COMMITS = 2;
  * people's history, and one `git pull` would otherwise make every upstream contributor somebody in the work.
  */
 export async function commitsBy(dir: string, since: string, into = new Map<string, Set<string>>()): Promise<Map<string, Set<string>>> {
-  const log = await git(dir, 'log', '--format=%ae%x1f%H', `--since=${since}`, 'HEAD');
+  const log = await git(dir, 'log', `--format=%ae%x1f%H%x1f${COAUTHORS}`, `--since=${since}`, 'HEAD');
   for (const line of (log ?? '').split('\n')) {
-    const [email = '', commit = ''] = line.split('\x1f').map((x) => x.trim());
-    const key = keyOf('email', email);
-    if (key === null || !commit) continue;
-    const seen = into.get(key) ?? new Set<string>();
-    seen.add(commit);
-    into.set(key, seen);
+    const [email = '', commit = '', co = ''] = line.split('\x1f').map((x) => x.trim());
+    if (!commit) continue;
+    /* A CO-AUTHOR'S COMMIT COUNTS FOR THEM TOO, so two pairings are somebody in the work as two commits are. */
+    for (const address of [email, ...co.split('\x1e').map((s) => coAuthorOf(s)?.email ?? '')]) {
+      const key = keyOf('email', address);
+      if (key === null) continue;
+      const seen = into.get(key) ?? new Set<string>();
+      seen.add(commit);
+      into.set(key, seen);
+    }
   }
   return into;
 }
@@ -128,7 +149,7 @@ export function meetingOf(a: Authored, repo: string): Meeting {
     ...(handle === undefined ? { email: a.email } : { handle }),
     keys: [a.key],
     kind: 'person',
-    source: `commit ${a.commit.slice(0, 7)} in ${repo}`,
+    source: `${a.co === true ? 'co-author of commit' : 'commit'} ${a.commit.slice(0, 7)} in ${repo}`,
   };
 }
 
