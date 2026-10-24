@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, pinsKept, playSaid, sideKept, splitOf, widthOf, type SideList } from './side.ts';
+import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
 
 const HEADS = {
   money: { label: 'Money', icon: 'money' },
@@ -109,4 +109,10 @@ test('what the device keeps is read safely', () => {
   assert.deepEqual(sideKept('not json'), { hidden: false, width: SIDE_START });
   assert.deepEqual(pinsKept('["/p/a","/p/a",3,"b"]'), ['/p/a']);
   assert.deepEqual(pinsKept('{'), []);
+});
+
+test('a name typed as a slug is said in words, and any other name is kept as written (E2)', () => {
+  assert.equal(shownName('sam-site'), 'Sam site');
+  assert.equal(shownName('money_core'), 'Money core');
+  for (const kept of ['Studio site', 'Otters.gg', 'Encore', 'iOS app', 'roomy', 'crumb.gg', 'Sam-site']) assert.equal(shownName(kept), kept);
 });

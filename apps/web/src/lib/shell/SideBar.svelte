@@ -26,7 +26,7 @@
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
   import { REGISTERS } from '../record/held.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, playSaid, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
+  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
   import { readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
@@ -231,8 +231,8 @@
 
   /* A MARK: the glyph the row names where it may be one, else the name's first letter (`ProjectWell`'s rule). */
   const markFor = (p: Pick<SideProject, 'mark' | 'name'>): { glyph?: IconName; letter?: string } => {
-    const m = markOf(p.mark, p.name);
-    return m !== null && m.length > 1 && isGlyph(m) ? { glyph: m as IconName } : { letter: m ?? p.name.slice(0, 1) };
+    const m = markOf(p.mark, shownName(p.name));
+    return m !== null && m.length > 1 && isGlyph(m) ? { glyph: m as IconName } : { letter: m ?? shownName(p.name).slice(0, 1) };
   };
 
   /* THE WIDTH, DRAGGED FROM THE EDGE BETWEEN 220 AND 320 (pick 5), or moved by the arrows a step at a time. */
@@ -288,11 +288,12 @@
 
 {#snippet row(p: SideProject, fact: boolean)}
   {@const here = openOf(p)}
+  {@const name = shownName(p.name)}
   <li class="s-item" data-open={here && !phone ? '' : undefined}>
     <a class="s-row tap" href={at(p.href)} aria-current={here ? 'page' : undefined}>
       {#if !phone}<span class="s-caret" aria-hidden="true"><Icon name={here ? 'chevronDown' : 'chevron'} size="s" /></span>{/if}
       {@render mark(p)}
-      <span class="s-name" dir="auto">{p.name}</span>
+      <span class="s-name" dir="auto">{name}</span>
       {#if fact}
         {@const f = factOf(p)}
         {#if f}<span class="s-fact" data-tone={f.tone}>{f.text}</span>{/if}
@@ -303,12 +304,12 @@
       {/if}
     </a>
     {#if !phone}
-      <button type="button" class="s-pin tap" data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(p.name) : words.pin(p.name)} title={p.pinned ? words.unpin(p.name) : words.pin(p.name)} onclick={() => pin(p.href)}>
+      <button type="button" class="s-pin tap" data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p.href)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25zM12 13.75v5.5" /></svg>
       </button>
     {/if}
     {#if here && !phone && parts.length > 0}
-      <ul class="s-parts" aria-label={words.parts(p.name)}>
+      <ul class="s-parts" aria-label={words.parts(name)}>
         {#each parts as part (part.id)}
           <li>
             <button type="button" class="s-part tap" aria-current={inView === part.id ? 'location' : undefined} onclick={() => toPart(part.id)}>
