@@ -99,6 +99,9 @@ export type Thread = {
   updated_at: string;
   seen: { run: string; how: SeenHow; at: string }[];
   receipts: Receipts | null;
+  /** The questions it lets the run that takes it answer, with his answer, and the ones answered; absent from an older host. */
+  answers?: { question: string; option: string }[];
+  answered?: string[];
 };
 
 /** A run the page knows by handle: its agent kind, project and branch, read from presence or its own row. */
@@ -437,9 +440,33 @@ export const scopedThreads = (threads: readonly Thread[], scope: { run?: string 
       (scope.run == null || t.to_run === scope.run || t.taken_by === scope.run || t.seen_by === scope.run || (t.seen ?? []).some((s) => s.run === scope.run)),
   );
 
+/** One question his words name for the run to answer, with the answer he gave it (D8). */
+export type NamedAnswer = { question: string; option: string };
+
+/* "ACCEPT SG243", "DECLINE SG12", "ANSWER SG7 WITH SHIP": a verb right before the question, or `answer ... with`. */
+const ANSWER_SAID = /\b(accept|approve|decline|reject)\s+(SG[1-9][0-9]*)\b|\banswer\s+(SG[1-9][0-9]*)\s+with\s+([A-Za-z0-9_:-]{1,80})/giu;
+/* A "DON'T" OR "NEVER" JUST BEFORE IT says he did not mean it as an answer, so none is given. */
+const NOT_SAID = /\b(?:don'?t|do\s+not|never|not)\s*$/iu;
+
+/**
+ * The questions his words name for the run that takes it to answer, each once, the first answer kept (D8). The record
+ * checks each against the question as it stands and refuses one it does not take, in words the box shows him.
+ */
+export function answersSaid(said: string): NamedAnswer[] {
+  const out: NamedAnswer[] = [];
+  for (const m of said.matchAll(ANSWER_SAID)) {
+    if (NOT_SAID.test(said.slice(Math.max(0, m.index - 12), m.index))) continue;
+    const question = (m[2] ?? m[3] ?? '').toUpperCase();
+    const option = (m[1] ?? m[4] ?? '').toLowerCase();
+    if (question !== '' && option !== '' && !out.some((a) => a.question === question)) out.push({ question, option });
+  }
+  return out;
+}
+
 /** What `instruct` is sent for the composer as it stood and the words he typed. */
-export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenKey' | 'machineKey' | 'seatKey'>, said: string): Record<string, string> {
-  const args: Record<string, string> = { said: said.trim() };
+export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenKey' | 'machineKey' | 'seatKey'>, said: string): Record<string, string | NamedAnswer[]> {
+  const named = answersSaid(said);
+  const args: Record<string, string | NamedAnswer[]> = { said: said.trim(), ...(named.length === 0 ? {} : { answers: named }) };
   if (view.toKey.startsWith('run:')) return { ...args, to: 'run', to_run: view.toKey.slice('run:'.length), when: 'now' };
   if (view.toKey.startsWith('agent:')) Object.assign(args, { to: 'agent', to_agent: view.toKey.slice('agent:'.length) });
   else args.to = 'anyone';
@@ -551,6 +578,12 @@ export function threadOf(
     trail.push(`Seen by ${runSaid(t.seen_by, runs, projects)} at ${hm(t.seen_at)}, ${controlWords.how[t.seen_how]}`);
   }
   if (t.taken_by !== null && t.taken_at !== null && !seenRuns.some((s) => s.run === t.taken_by && s.at === t.taken_at)) trail.push(`Taken by ${runSaid(t.taken_by, runs, projects)} at ${hm(t.taken_at)}`);
+  /* WHAT IT LETS THE RUN ANSWER, by name, and which it has (D8). */
+  const named = (t.answers ?? []).map((a) => a.question);
+  if (named.length > 0) {
+    const done = named.filter((q) => (t.answered ?? []).includes(q));
+    trail.push(done.length === named.length ? `Answered ${named.join(', ')} as you said` : `Lets it answer ${named.join(', ')}${done.length > 0 ? ` (${done.join(', ')} done)` : ''}`);
+  }
   if (t.state === 'withdrawn') trail.push(`Taken back ${hm(t.updated_at)}`);
   if (t.state === 'expired') trail.push(`No run took it in ${String(WAIT_DAYS)} days`);
 
@@ -688,7 +721,7 @@ export function control(base: string, io?: Fetch) {
       );
       return out.ok ? { ok: true, value: out.value.rows, places: placesFrom(out.value.places) } : out;
     },
-    async send(args: Record<string, string>): Promise<Out<Thread>> {
+    async send(args: Record<string, unknown>): Promise<Out<Thread>> {
       return outOf<Thread>(await c.instruct(args as unknown as Parameters<typeof c.instruct>[0]), 'That could not be sent.');
     },
     async takeBack(id: string): Promise<Out<Thread>> {

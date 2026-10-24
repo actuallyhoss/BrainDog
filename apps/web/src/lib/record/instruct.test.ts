@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {
   PICK_FIRST,
   ageSaid,
+  answersSaid,
   agoSaid,
   composerOf,
   doingSaid,
@@ -289,4 +290,23 @@ test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones q
   const silent = run({ run: 'S5', state: 'waiting', quiet_s: 42 * 3600 });
   const unsaid = run({ run: 'S6', state: 'waiting' });
   assert.deepEqual(onDeskOf([...ROWS, quiet, silent, unsaid]).map((r) => r.run), ['S1', 'S2', 'S4']);
+});
+
+/* ── an order that names questions (D8) ─────────────────────────────────── */
+
+test('HIS WORDS NAME THE QUESTIONS THE RUN MAY ANSWER, each with his answer, and a "don\'t" names none', () => {
+  assert.deepEqual(answersSaid('accept SG243'), [{ question: 'SG243', option: 'accept' }]);
+  assert.deepEqual(answersSaid('Decline sg12, then answer SG7 with ship. Accept SG12 too'), [
+    { question: 'SG12', option: 'decline' },
+    { question: 'SG7', option: 'ship' },
+  ]);
+  assert.deepEqual(answersSaid("Don't accept SG243 yet, look at SG244"), []);
+  assert.deepEqual(answersSaid('Tidy the ledger'), []);
+  const c = composerOf(PICK_FIRST, ROWS, PROJECTS);
+  assert.deepEqual(instructArgs(c, 'accept SG243').answers, [{ question: 'SG243', option: 'accept' }]);
+  assert.equal('answers' in instructArgs(c, 'Ship it'), false, 'words that name no question send none');
+
+  /* AND HIS THREAD SAYS WHAT IT LETS THE RUN ANSWER, then that it was. */
+  assert.match(threadOf(thread({ answers: [{ question: 'SG243', option: 'accept' }], answered: [] }), ctx).trail, /Lets it answer SG243$/u);
+  assert.match(threadOf(thread({ answers: [{ question: 'SG243', option: 'accept' }], answered: ['SG243'] }), ctx).trail, /Answered SG243 as you said$/u);
 });
