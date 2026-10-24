@@ -25,8 +25,13 @@ const timeOf = (iso: string): number => Date.parse(iso);
 /**
  * A CHANGE'S WORDS AFTER WHO MADE IT: the record's "created" reads "added this", so the first line of a row's history
  * says "BrainDog added this" (money F9). Every other note is the record's own.
+ *
+ * A NOTE THAT OPENS ON ITS VERB FOLLOWS THE NAME IN LOWER CASE (the audit of 25 October, Z23): an import writes
+ * "Imported again from Sam Brain.", and the line read "An agent Imported again from Sam Brain." A note that opens on
+ * a name keeps it.
  */
-export const noteSaid = (note: string): string => (note === 'created' ? 'added this' : note);
+export const noteSaid = (note: string): string =>
+  note === 'created' ? 'added this' : /^[A-Z][a-z]+ed\b/u.test(note) ? `${note[0]!.toLowerCase()}${note.slice(1)}` : note;
 
 /**
  * THE HISTORY AND THE COMMENTS AS ONE LIST, NEWEST FIRST.
