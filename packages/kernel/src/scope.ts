@@ -32,12 +32,15 @@ export type Resolved = {
   ambiguous: string[];
 };
 
-/** A project as `matchProject` reads it: its id, its spoken id, and the repositories and folders it lists. */
-export type Candidate = { id: string; spoken: string; repos: readonly string[]; folders: readonly string[] };
+/**
+ * A project as `matchProject` reads it: its id, its spoken id, the repositories and folders it lists, and its name when
+ * the list names a title field, which a run's own folder may be called (`folderNamed`).
+ */
+export type Candidate = { id: string; spoken: string; repos: readonly string[]; folders: readonly string[]; name?: string };
 
 const GLOBAL: Resolved = { project: null, ambiguous: [] };
 
-type Holders = ReadonlyMap<string, { id: string; seq_prefix?: string; scopes?: ScopesDecl }>;
+type Holders = ReadonlyMap<string, { id: string; seq_prefix?: string; scopes?: ScopesDecl; title?: string }>;
 
 /**
  * The record's projects, from the one active register declaring `scopes:`, read whole; `null` when none declares it.
@@ -63,7 +66,8 @@ function projectsOf(sql: Sql, registers: Holders): Candidate[] | null {
     )
     .map((row) => {
       const fields = JSON.parse(row.fields) as Record<string, Json>;
-      return candidateOf(row.id, `${said}${row.seq}`, texts(fields, repos), texts(fields, folders));
+      const name = home.title === undefined ? undefined : fields[home.title];
+      return candidateOf(row.id, `${said}${row.seq}`, texts(fields, repos), texts(fields, folders), typeof name === 'string' ? name : undefined);
     });
 }
 
@@ -78,8 +82,39 @@ export const isFolderPlace = (said: string): boolean => /^(?:\/|~\/|[A-Za-z]:[\\
  * owner's BrainDog lists `/Users/…/braindog` in its repositories: read as a repository it matched no remote and no name,
  * so not one run in that checkout was ever placed, and the command line already read it as a folder (`apps/cli`).
  */
-export function candidateOf(id: string, spoken: string, repos: readonly string[], folders: readonly string[]): Candidate {
-  return { id, spoken, repos: repos.filter((r) => !isFolderPlace(r)), folders: [...folders, ...repos.filter(isFolderPlace)] };
+export function candidateOf(id: string, spoken: string, repos: readonly string[], folders: readonly string[], name?: string): Candidate {
+  return { id, spoken, repos: repos.filter((r) => !isFolderPlace(r)), folders: [...folders, ...repos.filter(isFolderPlace)], ...(name === undefined ? {} : { name }) };
+}
+
+/** A name with case and punctuation folded away: `Brain-Dog`, `braindog` and `BrainDog` are one. */
+export const folded = (said: string): string => said.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * What a project's name folds to as a folder may be called: the name, and the name with a domain ending left off, as a
+ * service is matched to a project (`backfill.ts`, 3): `Oxbow.gg` is the `oxbow` folder as much as `oxbowgg`.
+ */
+export function namedAs(name: string): string[] {
+  const whole = folded(name);
+  const base = /^(.+)\.[a-z]{2,}$/iu.exec(name.trim())?.[1];
+  const bare = base === undefined ? '' : folded(base);
+  return [...new Set([whole, bare].filter((n) => n !== ''))];
+}
+
+/**
+ * The one project a run's own folder is called (scope D5): its name (`namedAs`), or a bare repository it lists, case and
+ * punctuation folded. Only for a run that says no remote and no repository of another spelling, which is where
+ * `sam/lantern` and somebody else's `lantern` would part; `null` when none or two match. The nightly walk places a
+ * finished run by this (`exactFolder`), and the ladder a working one, so a run at work in `~/Code/oxbow` is Oxbow.gg's
+ * while it works and not only once it has stopped.
+ */
+export function folderNamed(projects: readonly Candidate[], where: Whereabouts): Candidate | null {
+  if (where.remote?.trim() || !where.cwd?.trim()) return null;
+  const last = folded(lastSpelled(where.cwd));
+  if (last === '' || (where.repo?.trim() && folded(where.repo) !== last)) return null;
+  const hits = projects.filter(
+    (p) => (p.name !== undefined && namedAs(p.name).includes(last)) || p.repos.some((r) => bare(r) && folded(r.trim().replace(/\.git$/iu, '')) === last),
+  );
+  return hits.length === 1 ? hits[0]! : null;
 }
 
 /**
@@ -87,8 +122,11 @@ export function candidateOf(id: string, spoken: string, repos: readonly string[]
  *
  *   1. The one active register declaring `scopes:` holds the projects. None, and every run is global.
  *   2. A remote equal to a `repos` entry, as `host/owner/name`, wins.
- *   3. Then a `folders` entry the working folder is in, and the longest such folder.
+ *   3. Then a `folders` entry the working folder is in, and the longest such folder; one listed from home (`~/…`) is
+ *      read under the home the working folder is in.
  *   4. Then a repository name equal to a bare name a project lists among its repositories (`portage`).
+ *   4b. Then, with no remote and no other repository name, the run's own folder called what one project is called, or
+ *      a bare repository it lists (`folderNamed`, scope D5), unless a name up its path points at another project.
  *   5. Two projects matching at the same rung, or with folders of the same length, leave the run
  *      global and are named in `ambiguous`, because picking one would file work under a guess.
  *   6. And a match by last name alone (`matchProject`) is never settled: the project or projects it
@@ -134,8 +172,12 @@ export function matchProject(projects: readonly Candidate[], where: Whereabouts)
   if (cwd) {
     let best = -1;
     let hits: Candidate[] = [];
+    /* A FOLDER LISTED FROM HOME, `~/Code/copperleaf`, IS UNDER THE RUN'S OWN HOME, which its working folder says
+       (`homeIn`): read as written it was under nothing, so two projects listing theirs so placed no run by folder. */
+    const home = homeIn(cwd);
+    const placeOf = (f: string): string => (home !== null && /^~(?:\/|$)/u.test(f) ? `${home}${f.slice(1)}` : f);
     for (const p of projects) {
-      const longest = Math.max(-1, ...p.folders.map(pathKey).filter((f) => under(cwd, f)).map((f) => f.length));
+      const longest = Math.max(-1, ...p.folders.map((f) => pathKey(placeOf(pathKey(f)))).filter((f) => under(cwd, f)).map((f) => f.length));
       if (longest > best) [best, hits] = [longest, [p]];
       else if (longest === best && longest >= 0) hits.push(p);
     }
@@ -148,16 +190,24 @@ export function matchProject(projects: readonly Candidate[], where: Whereabouts)
   const claimed = projects.filter((p) => p.repos.some((r) => bare(r) && names.has(lastName(r))));
   if (claimed.length) return settle(claimed, 'repo');
 
+  /* A RUN'S OWN FOLDER CALLED WHAT ONE PROJECT IS CALLED (scope D5), as the nightly walk already places a finished run.
+     The walk leaves a working run to this ladder, and the ladder had no such rung, so a run at work in such a folder was
+     on no project for as long as it worked (24 Oct, H26: two of three runs at work named none). */
+  const own = folderNamed(projects, where);
+
   /* THE REPOSITORY'S OWN NAME FIRST, THEN THE NEAREST FOLDER UP THE PATH, and the first that points anywhere is the
      question: a checkout's own name says more than the `Developer` or the home folder it sits in, and reading every
      folder up the path at once turned "Is this BrainDog?" into "Which one?" for a run under a folder some other project
      also lists. */
   const up = cwd.split('/').filter((part) => part !== '' && !/^[a-z]:$/u.test(part)).reverse();
+  let guess: Candidate[] = [];
   for (const name of [...names, ...up.map((part) => part.toLowerCase())]) {
-    const guessed = projects.filter((p) => [...p.folders, ...p.repos.filter((r) => bare(r) || !remote)].some((place) => lastName(place) === name));
-    if (guessed.length) return { project: null, ambiguous: guessed.map((p) => p.spoken) };
+    guess = projects.filter((p) => [...p.folders, ...p.repos.filter((r) => bare(r) || !remote)].some((place) => lastName(place) === name));
+    if (guess.length) break;
   }
-  return GLOBAL;
+  /* AND IT SETTLES ONLY WHERE NO GUESS POINTS ELSEWHERE, as the walk asks it. */
+  if (own !== null && guess.every((p) => p.id === own.id)) return settle([own], 'folder');
+  return guess.length ? { project: null, ambiguous: guess.map((p) => p.spoken) } : GLOBAL;
 }
 
 /**
@@ -334,6 +384,11 @@ function pathKey(said: string): string {
     .replace(/\\/g, '/')
     .replace(/^([A-Za-z]):/, (_, drive: string) => `${drive.toLowerCase()}:`)
     .replace(/\/+$/, '');
+}
+
+/** The home folder a working folder is in, as macOS, Linux and Windows place one, or `null` for one in none. */
+function homeIn(cwd: string): string | null {
+  return /^(?:\/Users\/[^/]+|\/home\/[^/]+|\/root|[a-z]:\/Users\/[^/]+)(?=\/|$)/iu.exec(cwd)?.[0] ?? null;
 }
 
 /** Whether `cwd` is `folder` or inside it. Case is ignored on a drive-letter path, as Windows ignores it. */

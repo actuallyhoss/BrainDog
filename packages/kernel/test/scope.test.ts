@@ -153,10 +153,28 @@ test('A FOLDER MATCHES as Windows writes it, and the longest folder wins', async
   assert.equal(at('C:\\Repos\\other'), 'things#2 by folder');
   assert.equal(at('C:\\Repos\\braindogs'), 'things#2 by folder', 'a longer name is not a folder inside');
   assert.equal(at('/home/sam/studio/src'), 'things#3 by folder');
-  /* CASE IS IGNORED ON A DRIVE LETTER ONLY, so this is no folder of Studio's; its own name points at Studio, as a
-     question and never a placing. */
-  assert.deepEqual(placed(k, { cwd: '/HOME/sam/studio' }), { project: null, ambiguous: ['things#3'] });
+  /* CASE IS IGNORED ON A DRIVE LETTER ONLY, so this is no folder of Studio's; the name up its path points at Studio, as
+     a question and never a placing. (A run whose OWN folder is called Studio is Studio's, scope D5, below.) */
+  assert.deepEqual(placed(k, { cwd: '/HOME/sam/studio/src' }), { project: null, ambiguous: ['things#3'] });
   assert.equal(at('D:\\tmp'), null);
+  sql.close();
+});
+
+test('A RUN AT WORK IN A FOLDER CALLED WHAT ONE PROJECT IS CALLED IS THAT PROJECT\'S, as the nightly walk places it (D5, H26)', async () => {
+  const { k, sql } = await record();
+  value(k.create('things', { name: 'Oxbow.gg', repos: ['oxbow-bot', 'oxbow-app'] }, OWNER));
+  value(k.create('things', { name: 'Copperleaf', folders: ['~/Code/copperleaf'] }, OWNER));
+  /* ITS OWN FOLDER, case, punctuation and a domain ending aside; a run further down it is not. */
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/oxbow' }), { project: 'things#4 by folder', ambiguous: [] });
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/Studio' }), { project: 'things#3 by folder', ambiguous: [] });
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/oxbow/app/src' }), { project: null, ambiguous: [] });
+  /* NEVER WITH A REMOTE, nor a repository of another spelling: those are where somebody else's `oxbow` parts. */
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/oxbow', remote: 'gitlab.com/someone/oxbow' }), { project: null, ambiguous: [] });
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/oxbow', repo: 'bot' }), { project: null, ambiguous: [] });
+  /* A FOLDER LISTED FROM HOME IS UNDER THE RUN'S OWN HOME, on any machine's. */
+  assert.deepEqual(placed(k, { cwd: '/Users/mara/Code/copperleaf/web' }), { project: 'things#5 by folder', ambiguous: [] });
+  assert.deepEqual(placed(k, { cwd: '/home/teo/Code/copperleaf' }), { project: 'things#5 by folder', ambiguous: [] });
+  assert.deepEqual(placed(k, { cwd: '/srv/Code/copperleaf/web' }), { project: null, ambiguous: ['things#5'] });
   sql.close();
 });
 

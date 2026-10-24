@@ -69,7 +69,7 @@ import type { Entry, Patch, RegisterDecl, WriteContext } from './index.ts';
 import { COUNTERPARTY } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { meetsRole, orgRole, type OrgFields, type RoleList } from './roles.ts';
-import { candidateOf, matchProject, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
+import { candidateOf, matchProject, namedAs, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
 import { SESSION, isStale } from './session.ts';
 
 /** Who the walk writes as: a mechanism (`pairs.ts`'s `isMechanism`), which the feed files with the rules. */
@@ -961,14 +961,15 @@ const folded = (said: string): string => said.normalize('NFKC').toLowerCase().re
 
 /**
  * The one project whose name, or a bare repository it lists, the run's own folder is called, case and punctuation
- * folded; `null` when the run says a remote or a repository name of another spelling, or when none or two match.
+ * folded and a name's domain ending left off (`namedAs`); `null` when the run says a remote or a repository name of
+ * another spelling, or when none or two match. The ladder asks the same of a working run (`folderNamed` in `scope.ts`).
  */
 function exactFolder(projects: ProjectsList, where: Whereabouts): Candidate | null {
   if (where.remote !== undefined || where.cwd === undefined) return null;
   const last = folded(lastSpelled(where.cwd));
   if (last === '' || (where.repo !== undefined && folded(where.repo) !== last)) return null;
   const hits = projects.candidates.filter(
-    (c) => folded(projects.names.get(c.id) ?? '') === last || c.repos.some((r) => !/[\\/:]/u.test(r.trim()) && folded(r.replace(/\.git$/iu, '')) === last),
+    (c) => namedAs(projects.names.get(c.id) ?? '').includes(last) || c.repos.some((r) => !/[\\/:]/u.test(r.trim()) && folded(r.replace(/\.git$/iu, '')) === last),
   );
   return hits.length === 1 ? hits[0]! : null;
 }
