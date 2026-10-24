@@ -14,8 +14,8 @@
 
   A CHANGE IS SEEN AT ONCE. After a save the shell is asked again (`forget` and `invalidateAll`), which reads the voice
   and the labels again (`voice.svelte.ts` `listen`) and the record's currency (`Boot.record.currency`), so the rail,
-  the list's heading, Today's headings and every sum on Money redraw without a visit to the add-on. Each save toasts
-  Undo, which sends what was held before.
+  the list's heading, Today's headings and every sum on Money redraw without a visit to the add-on. Words save as they
+  are typed and say Saved, with Undo; a currency change toasts its Undo.
 
   AN OWNER CHANGES THEM; everybody else reads them. A setting is the record's, for everyone, and `setPackConfig` is
   the owner's call, so a member sees each value and no control.
@@ -101,8 +101,8 @@
     ownerOnly: (name: string) => `The words your ${name} setup gave this record. Only the owner changes them.`,
     more: (n: number) => (n === 1 ? 'Show 1 more line' : `Show ${n} more lines`),
     fewer: 'Show fewer',
-    save: 'Save',
-    saved: 'Saved. Every screen uses your words now.',
+    saved: 'Saved',
+    saving: 'Saving',
     oneOf: (one: string) => `One is called ${one}`,
     /* SAID BEFORE THE CURRENCY MOVES, with the limits typed in the old one, by their own names. The record holds them in
        the new one at the day's rate (`declare.ts` `liveTarget`), and with no home currency it has nothing to hold them in. */
@@ -292,17 +292,35 @@
       return;
     }
     voice = out.value;
-    typed = {};
-    oneTyped = {};
+    /* WHAT WAS TYPED WHILE IT SAVED STAYS TYPED: only a box whose words went is let go. */
+    typed = Object.fromEntries(Object.entries(typed).filter(([k, v]) => !(k in values) || (values[k] ?? '') !== v.trim()));
+    if (Object.keys(typed).length === 0) oneTyped = {};
     if (!undoing && out.value.changed.length > 0) {
       const back = undoOf(before, values);
-      toasts.push(words.saved, { intent: 'good', undo: () => void sendWords(back, true) });
+      saveSaid = 'saved';
+      undoLast = () => void sendWords(back, true);
     }
     await kept();
+    if (dirty) soon();
+  }
+
+  /* SAVED AS YOU TYPE (U-C8): a pause of most of a second sends what changed, and the line under the lists says Saved,
+     with Undo for the last save. There is no Save button to forget. */
+  let saveSaid = $state<'' | 'saving' | 'saved'>('');
+  let undoLast = $state<(() => void) | null>(null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function soon(): void {
+    clearTimeout(timer);
+    saveSaid = 'saving';
+    timer = setTimeout(() => {
+      if (dirty) void sendWords({ ...pending });
+      else saveSaid = '';
+    }, 700);
   }
 
   function submit(e?: Event): void {
     e?.preventDefault();
+    clearTimeout(timer);
     if (dirty) void sendWords({ ...pending });
   }
 
@@ -329,8 +347,7 @@
         value={valueIn(w)}
         placeholder={w.fallback}
         maxlength={most}
-        disabled={busy}
-        oninput={(e) => (typed[w.setting] = typedIn(e))}
+        oninput={(e) => ((typed[w.setting] = typedIn(e)), soon())}
       />
     </div>
   </div>
@@ -381,45 +398,31 @@
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
                   <IconWell name={iconOf(l.list)} />
+                  <!-- ONE ROW A LIST, RENAMED IN PLACE (U-C8): the name, and its singular offered from it as it is typed. A list
+                       the use case gives only a singular says which list it is, with that one word to rename. -->
                   {#if l.name}
                     {@const name = l.name}
-                    <div class="field-row">
-                      <label class="field-row-label" for="w-{name.setting}">{words.called}</label>
-                      <div class="field">
-                        <input
-                          class="field-input"
-                          id="w-{name.setting}"
-                          type="text"
-                          value={valueIn(name)}
-                          placeholder={name.fallback}
-                          disabled={busy}
-                          oninput={(e) => rename(l.list, name, l.one, typedIn(e))}
-                        />
-                      </div>
-                    </div>
-                  {:else}
-                    <!-- A LIST THE USE CASE GIVES ONLY A SINGULAR STILL SAYS WHICH LIST IT IS. -->
-                    <span class="list-name">{nameOf(l.list)}</span>
-                  {/if}
-                  {#if l.one}
+                    <input
+                      class="field-input list-in"
+                      id="w-{name.setting}"
+                      type="text"
+                      aria-label={words.called}
+                      value={valueIn(name)}
+                      placeholder={name.fallback}
+                      oninput={(e) => (rename(l.list, name, l.one, typedIn(e)), soon())}
+                    />
+                  {:else if l.one}
                     {@const one = l.one}
-                    <div class="field-row">
-                      <label class="field-row-label" for="w-{one.setting}">{words.one}</label>
-                      <div class="field">
-                        <input
-                          class="field-input"
-                          id="w-{one.setting}"
-                          type="text"
-                          value={valueIn(one)}
-                          placeholder={one.fallback}
-                          disabled={busy}
-                          oninput={(e) => {
-                            typed[one.setting] = typedIn(e);
-                            oneTyped[l.list] = true;
-                          }}
-                        />
-                      </div>
-                    </div>
+                    <span class="list-name">{nameOf(l.list)}</span>
+                    <input
+                      class="field-input list-in"
+                      id="w-{one.setting}"
+                      type="text"
+                      aria-label={words.one}
+                      value={valueIn(one)}
+                      placeholder={one.fallback}
+                      oninput={(e) => ((typed[one.setting] = typedIn(e)), (oneTyped[l.list] = true), soon())}
+                    />
                   {/if}
                 </div>
               {/each}
@@ -441,9 +444,9 @@
           </Tile>
         {/if}
 
-        <div class="save">
-          <Button weight="primary" type="submit" disabled={!dirty || busy} aria-busy={busy}>{words.save}</Button>
-        </div>
+        <p class="save" role="status">
+          {#if saveSaid === 'saving'}{words.saving}{:else if saveSaid === 'saved'}{words.saved}{#if undoLast}{' '}<Button weight="bare" size="sm" onclick={() => (undoLast?.(), (undoLast = null), (saveSaid = ''))}>{copy.undo}</Button>{/if}{/if}
+        </p>
       </form>
     {:else}
       {#if spoken.lists.length > 0}
@@ -543,19 +546,29 @@
     gap: var(--sp-5);
   }
 
-  .lists,
   .lines {
     display: grid;
     gap: var(--sp-4);
     max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
-  /* A LIST'S TWO WORDS SIDE BY SIDE after its well, read as one line: "Called Bakes, one is called bake". */
-  .list-words {
+  /* ONE ROW A LIST, 8 APART: the well and the name in place. */
+  .lists {
     display: grid;
-    grid-template-columns: var(--well) repeat(2, minmax(0, 1fr));
-    align-items: end;
-    column-gap: var(--sp-3);
+    gap: var(--sp-2);
+    max-inline-size: calc(var(--measure) + var(--sp-9));
+  }
+
+  /* A LIST IS ITS WELL AND ITS NAME, typed over in place; a list named only by its singular shows its name before it. */
+  .list-words {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .list-in {
+    flex: 1;
+    min-inline-size: 0;
   }
 
   .list-name {
@@ -567,9 +580,6 @@
     font-weight: 500;
   }
 
-  .list-words > :global(.well) {
-    margin-block-end: calc((var(--ctl-h) - var(--well)) / 2);
-  }
 
   .fold {
     margin-block-start: var(--sp-2);
@@ -577,6 +587,12 @@
 
   .save {
     display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .said {
@@ -651,18 +667,8 @@
     display: none;
   }
 
-  /* ON A PHONE A LIST'S SECOND WORD GOES UNDER ITS FIRST, both starting where the well ends. */
+  /* ON A PHONE THE CURRENCY PICKER GOES UNDER ITS LABEL, starting where the well ends. */
   @media (width < 520px) {
-    .list-words {
-      grid-template-columns: var(--well) minmax(0, 1fr);
-      row-gap: var(--sp-2);
-    }
-
-    .list-words > :global(.field-row + .field-row),
-    .list-words > .list-name + :global(.field-row) {
-      grid-column: 2;
-    }
-
     .pick {
       grid-template-columns: var(--well) minmax(0, 1fr);
       row-gap: var(--sp-2);
