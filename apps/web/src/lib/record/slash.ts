@@ -175,7 +175,7 @@ export type Drafted = {
 };
 
 /** `slashDraft`'s whole answer: who drafted, the drafts that drew clean, and a sentence for each that did not. */
-export type DraftedAll = { by: string; drafts: Drafted[]; dropped: string[] };
+export type DraftedAll = { by: string; drafts: Drafted[]; dropped: string[]; cost?: { asks: number; tokens: number; said: string } };
 
 /**
  * What the owner described, drafted and checked, filing nothing. `page` is the page it is about, by its address, and is

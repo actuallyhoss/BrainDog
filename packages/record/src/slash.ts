@@ -2251,10 +2251,22 @@ export type SlashDrafted = {
   by: string;
   drafts: { question: string; change: { to: SlashDecl | { declarations: SlashDecl[] } }; rows: SlashRows; preview: SlashPreview }[];
   dropped: string[];
+  /** What asking the model for these cost, said plainly (`costSaid`). Absent when the model was not asked. */
+  cost?: DraftCost;
 };
 
+/**
+ * WHAT A DRAFT COST (§45 "Thinking and cost": "each draft says what it cost"): the asks of the model it took, the first
+ * and each repair, which is what the month's allowance counts, and the record's estimate of what was sent and came back
+ * (bytes over three, as the ledger settles it). `said` is the line a person reads beside the draft.
+ */
+export type DraftCost = { asks: number; tokens: number; said: string };
+
+/** The line a draft's cost is said in: the asks it took of the month's allowance, never the host's units. */
+export const costSaid = (asks: number): string => `This cost about ${asks === 1 ? 'one' : asks.toLocaleString('en-GB')} of the month's asks of the model.`;
+
 /** What `describe` answers: the drafts that drew clean, why each other one went, and whether the record was too large to send. */
-export type SlashDescribed = { by: string; drafts: DescribedDraft[]; dropped: string[]; large: boolean };
+export type SlashDescribed = { by: string; drafts: DescribedDraft[]; dropped: string[]; large: boolean; cost?: DraftCost };
 
 /** What every sentence ends on when a description came to nothing. */
 export const DESCRIBED_NOTHING = 'nothing was drafted from what you described.';
@@ -2591,6 +2603,10 @@ export async function describe(deps: {
   let refused: { draft: SlashDraft & { rows: SlashRows }; said: string; faults: { at: string; fix: string }[] }[] = [];
   let large = false;
   let stopped = false;
+  /* WHAT THE ASKING COST, counted as the ledger counts it: an ask that answered, and bytes over three each way. */
+  let spentAsks = 0;
+  let spentTokens = 0;
+  const tokensOf = (v: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(v) ?? '').length / 3);
   for (let asks = 0; asks <= SLASH_REPAIRS_MOST && (asks === 0 || refused.length > 0); asks++) {
     const input: SlashModelInput =
       asks === 0 ? deps.input : { ...deps.input, repair: { drafts: refused.map((r) => answered(r.draft, r.said)), refusals: refused.flatMap((r) => r.faults) } };
@@ -2603,6 +2619,8 @@ export async function describe(deps: {
         break;
       }
       raw = got.raw;
+      spentAsks += 1;
+      spentTokens += tokensOf(input) + tokensOf(raw);
     } catch (e) {
       /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and is said as a record too large, not as a model
          that might answer next time (`index.ts` `slashFile` keeps the full account of why). */
@@ -2654,7 +2672,7 @@ export async function describe(deps: {
   for (const r of refused) dropped.push(`"${r.draft.question}" was dropped, because the record refused it: ${r.faults[0]?.fix ?? 'it would not draw.'}`);
   const drafts = clean;
   if (drafts.length === 0 && !stopped) dropped.push(`The model proposed nothing Slash could use, so ${DESCRIBED_NOTHING}`);
-  return { by: drafts.length > 0 ? deps.name : 'rules', drafts, dropped, large };
+  return { by: drafts.length > 0 ? deps.name : 'rules', drafts, dropped, large, ...(spentAsks > 0 ? { cost: { asks: spentAsks, tokens: spentTokens, said: costSaid(spentAsks) } } : {}) };
 }
 
 /** What `describe` kept, as `slashDraft` answers it: the question, the change, the rows and what it drew. */
@@ -2667,6 +2685,7 @@ export const draftedOf = (d: SlashDescribed): SlashDrafted => ({
     preview: x.preview,
   })),
   dropped: d.dropped,
+  ...(d.cost === undefined ? {} : { cost: d.cost }),
 });
 
 /** What a body is about, for recognising it once asked: the pack it names, the use case, or the pages it adds. */

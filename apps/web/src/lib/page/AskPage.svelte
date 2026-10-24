@@ -60,6 +60,8 @@
   let rules = $state(false);
   let answered = $state(false);
   let dropped = $state.raw<string[]>([]);
+  /** What asking the model cost, as the record said it (§45: "each draft says what it cost"), or `null` when it was not asked. */
+  let cost = $state<string | null>(null);
   let shown = $state.raw<Shown[]>([]);
   let chosen = $state(0);
 
@@ -89,6 +91,7 @@
     if (sending || text === '') return;
     sending = true;
     fix = null;
+    cost = null;
     const mine = ++sends;
     try {
       const body = built === undefined ? undefined : ((await built()) ?? undefined);
@@ -101,6 +104,7 @@
       }
       rules = byRules(out.drafted);
       dropped = out.drafted.dropped;
+      cost = out.drafted.cost?.said ?? null;
       shown = out.drafted.drafts.map((draft, i) => ({ key: mine * 1000 + i, draft, drawn: null, kept: null, said: null, busy: false }));
       chosen = 0;
       /* DRAWN THROUGH DECIDE'S OWN PREVIEW, loaded on the first send and not with every page. The record drew each
@@ -187,6 +191,10 @@
       <ul class="ask-dropped">
         {#each dropped as d (d)}<li class="ask-said">{d}</li>{/each}
       </ul>
+    {/if}
+
+    {#if cost !== null}
+      <p class="ask-said ask-cost">{cost}</p>
     {/if}
 
     {#if rules && onsource}

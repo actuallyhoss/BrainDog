@@ -160,6 +160,32 @@ test('slashDraft ANSWERS THE DRAFTS WITH THEIR ROWS AND WHAT THEY DREW, and file
   sql.close();
 });
 
+test('A MODEL-MADE DRAFT PASSES THE DESIGN CHECK, mended when it painted its own colour, AND SAYS WHAT IT COST', async () => {
+  const code = (colour: string) => `<p style="color:${colour}">x</p><script>braindog.on(function (d) { if (d.rows.length === 0) return; });</script>`;
+  const page = (colour: string) => ({
+    id: 'page.desk',
+    kind: 'page',
+    body: {
+      page: 'desk',
+      title: 'Desk',
+      requires: ['register.tasks'],
+      blocks: [
+        { kind: 'note', lead: true, span: 12, body: '{{tasks.count}} step(s) so far.' },
+        { kind: 'drawn', heading: 'Steps', span: 12, source: 'register.tasks', columns: [{ field: 'what' }], code: code(colour) },
+      ],
+    },
+  });
+  const { heard, model } = listening((input) => drafted(input.repair === undefined ? page('#ff0000') : page('var(--ink)')));
+  const { api, sql } = await record(model);
+  const out = value<Drafted & { cost?: { asks: number; said: string } }>(await api.slashDraft({ asked: 'A desk with a drawing of the steps.' }, OWNER));
+  assert.equal(heard.length, 2, 'the colour was not handed back to be mended');
+  assert.ok(heard[1]!.repair!.refusals.some((r) => /would not read in both light and dark/u.test(r.fix)), JSON.stringify(heard[1]!.repair!.refusals));
+  assert.equal(out.drafts.length, 1);
+  assert.equal(out.cost?.asks, 2);
+  assert.equal(out.cost?.said, "This cost about 2 of the month's asks of the model.");
+  sql.close();
+});
+
 test('slashDraft HANDS THE MODEL THE PAGE A DESCRIPTION IS ABOUT, and refuses one she cannot open before anything is asked', async () => {
   const { heard, model } = listening(() => ({ drafts: [] }));
   const { api, sql } = await record(model);
