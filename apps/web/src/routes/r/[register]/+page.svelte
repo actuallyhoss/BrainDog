@@ -102,6 +102,7 @@
   import ListPeople from './parts/ListPeople.svelte';
   import { orgFieldOf } from './people.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
+  import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListBoard from './parts/ListBoard.svelte';
   import ListSummary from './parts/ListSummary.svelte';
   import ViewSwitch from './parts/ViewSwitch.svelte';
@@ -1452,16 +1453,28 @@
   });
   /* NAMED BY THE RECORD THAT DREW THEM. `result.names` is the record's own title for every row a
      ref on this list points at, and `null` only before the first answer has landed. */
-  /* AND A READING'S VALUE CARRIES ITS UNIT (Y17): "16.4%", where the "%" sat in a field no column drew. */
+  /* AND A READING'S VALUE CARRIES ITS UNIT (Y17): "16.4%", where the "%" sat in a field no column drew. AND AN AMOUNT
+     SAYS WHICH WAY IT WENT (Y19), "−EGP 279.03" and "+EGP 600.00", as Money's page says it. */
   const readings = $derived(readingsOf(decl));
+  const amountAt = $derived.by(() => {
+    const f = wayField(decl) ? amountField(decl) : undefined;
+    return f ? columns.findIndex((c) => c.field === f.id) : -1;
+  });
   const rows = $derived.by(() => {
     const shown = result.entries.slice(0, DOM_CAP);
     const drawn = toRows(id, shown, columns, now, result.names ?? undefined);
     const at = readings ? columns.findIndex((c) => c.field === readings.value) : -1;
-    if (!readings || at < 0) return drawn;
+    if (at < 0 && amountAt < 0) return drawn;
     return drawn.map((r, n) => {
-      const said = shown[n] ? valueSaid(shown[n].fields, readings) : null;
-      return said === null ? r : { ...r, cells: r.cells.map((c, i) => (i === at ? said : c)) };
+      const e = shown[n];
+      if (!e) return r;
+      const said = readings && at >= 0 ? valueSaid(e.fields, readings) : null;
+      const way = amountAt >= 0 ? wayOf(decl, e.fields) : null;
+      if (said === null && way === null) return r;
+      return {
+        ...r,
+        cells: r.cells.map((c, i) => (i === at && said !== null ? said : i === amountAt && typeof c === 'string' ? signedSaid(c, way) : c)),
+      };
     });
   });
 

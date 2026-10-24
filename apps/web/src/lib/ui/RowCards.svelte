@@ -58,6 +58,7 @@
   import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
   import { scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
+  import { amountField, wayOf } from '$lib/record/money-way.ts';
   import type { Names } from '$lib/record/remote.ts';
   import { flip } from 'svelte/animate';
   import Face from './Face.svelte';
@@ -300,6 +301,9 @@
     return /^part(?:$|[_\s-])/iu.test(value) ? 'part' : 'open';
   };
 
+  /* THE FIGURE SAYS WHICH WAY IT WENT where it is the amount the list leads with and the list says a way (Y19). */
+  const signs = $derived(figure !== undefined && amountField(decl)?.id === figure);
+
   /* THE FIGURES ARE ONE SET (2.A.7): every one without pence where all are whole, and every one with two places where any
      has pence, so the column reads digit under digit. */
   const pence = $derived.by(() => {
@@ -348,7 +352,8 @@
             {@const value = e.fields[figure]}
             <span class="card-figure" dir={dirOf(register, figure)}>
               {#if figureLabel}<span class="card-figure-label">{figureLabel}</span>{/if}
-              {#if isMoney(value)}<Money minor={value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
+              <!-- AND WHICH WAY IT WENT (Y19), as Money's page says it: "−EGP 279.03" out and "+EGP 600.00" in. -->
+              {#if isMoney(value)}{@const way = signs ? wayOf(decl, e.fields) : null}{#if way === 'in'}+{/if}<Money minor={way === 'out' ? -Math.abs(value.amount) : value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}
           <!-- THE DOT AND ITS WORD, THE DATE THE WORD IS ABOUT, AND ONE DETAIL. `data-intent` is on the

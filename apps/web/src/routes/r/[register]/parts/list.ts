@@ -12,6 +12,7 @@
 import { day, exponentOf, money, shortDay, since, symbolFigure, type Tone } from 'braindog-render';
 import { copy } from '../../../../lib/copy.ts';
 import { seqWidth } from '../../../../lib/record/api.ts';
+import { wayField } from '../../../../lib/record/money-way.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
 import { orgFieldOf } from '../people.ts';
@@ -819,13 +820,8 @@ export const withoutZeros = (text: string): string => text.replace(/\.0+(?!\d)/u
  * divides the money, so it is totalled as one.
  */
 export function directionOf(decl: RegisterDecl | undefined, figure: FieldDecl | undefined): FieldDecl | undefined {
-  if (!decl || !figure) return undefined;
-  const choices = decl.fields.filter((f) => f.type === 'enum' && !f.retired && f.id !== decl.state && (f.values?.length ?? 0) >= 2);
-  const declared = choices.find((f) => f.qualifies === figure.id);
-  if (declared) return declared;
-  if (figure.type !== 'money') return undefined;
-  const two = choices.filter((f) => f.required && f.values?.length === 2);
-  return two.length === 1 ? two[0] : undefined;
+  /* ONE READING OF IT, which the cards' and the table's sign read too (`money-way.ts`). */
+  return figure ? wayField(decl, figure) : undefined;
 }
 
 /** One side of a list's number: the declared value it is for (`null` for rows that hold none), its rows and their sum. */
