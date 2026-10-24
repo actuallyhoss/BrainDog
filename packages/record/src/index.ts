@@ -4765,7 +4765,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the record's reading is the page's: `deadlines` up to tomorrow, overdue first; `governance.open`, ranked; and
    * `sessions.live` that are active. A source this record cannot read is nothing pressing, never a refusal.
    */
-  const pressingRead = (today: string): Pressing => {
+  const pressingRead = (today: string, questionsMost = 50): Pressing => {
     const drawn = (block: Record<string, unknown>): ReturnType<Kernel['block']> | null => {
       try {
         const got = kernel.block(block as never, { viewer: NOBODY });
@@ -4780,7 +4780,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (title === '' || day === '') return [];
       return [{ list: String(r.fields.list), title, when: (day < today ? 'late' : day === today ? 'today' : 'tomorrow') as HeadlineItem['when'] }];
     });
-    const asked = drawn({ kind: 'queue', source: 'governance.open', limit: 50 });
+    const asked = drawn({ kind: 'queue', source: 'governance.open', limit: questionsMost });
     const questions = (asked?.queue ?? []).map((q) => ({ list: q.list ?? null, question: q.question.trim().slice(0, 200) })).filter((q) => q.question !== '');
     /* HOW MANY WAIT AND WHO IS WORKING ARE `waiting()`'S, the counts `boot` sends the rail, so Home's line says the badge's
        number: `state is active` counted a run silent for hours as working, and the queue's own count was a second one. */
@@ -5237,7 +5237,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(HOME_PAGE)]);
     const today = slashDay();
     if (stored === null || stored.day !== today || !wholeRecord(ctx)) return null;
-    const home = homeReading(pressingRead(today));
+    /* HOME'S LINE IS WRITTEN FROM THE FIRST QUESTION ALONE (`homeReading`), so only the first is drawn whole: on every read
+       of Today's body this drew fifty again beside the page's own queue. */
+    const home = homeReading(pressingRead(today, 1));
     return home !== null && homeBasis(home, today) === stored.basis ? stored.text : null;
   };
 
