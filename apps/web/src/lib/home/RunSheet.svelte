@@ -25,7 +25,8 @@
   } = $props();
 </script>
 
-<Sheet bind:open {title}>
+<!-- READ FIRST, TYPED INTO SECOND (Y25): the caret does not jump to the message box as it opens. -->
+<Sheet bind:open {title} caret={false}>
   {#if open}
     <div class="run-sheet" data-run-sheet>
       <PresencePanel owner {run} />

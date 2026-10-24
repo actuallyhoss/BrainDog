@@ -45,6 +45,7 @@
     subtitle,
     kind,
     fit = false,
+    caret = true,
     onclose,
     children,
     footer,
@@ -56,6 +57,11 @@
     kind?: 'menu' | undefined;
     /** A short sheet, a choice and a button: from 900 up the drawer is as tall as what it holds, hung from the top. */
     fit?: boolean | undefined;
+    /**
+     * Whether the caret goes to the first field as it opens (the default). Off for a sheet that is read first and typed
+     * into second, the run sheet from Today, whose message box opened in a heavy focus ring (Y25).
+     */
+    caret?: boolean | undefined;
     /** For a caller whose open state is derived from something else, a peeked row's number, say. */
     onclose?: (() => void) | undefined;
     children: Snippet;
@@ -110,7 +116,7 @@
        * nothing to type into, and moving focus off the close button there would take away the one
        * control somebody arrived wanting.
        */
-      el.querySelector<HTMLElement>('.sheet-body input, .sheet-body select, .sheet-body textarea')?.focus();
+      if (caret) el.querySelector<HTMLElement>('.sheet-body input, .sheet-body select, .sheet-body textarea')?.focus();
       /* The slide starts past the edge, so one that waits too long for its first frame is ended in place. */
       unstall(el);
     } else if (!open && el.open) {

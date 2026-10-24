@@ -13,7 +13,7 @@
  * Places (`instructionList`'s `places`); an instruction to anyone but a named run then reaches only the runs there.
  *
  * SAID HONESTLY, PATH BY PATH (§2.3, §2.4). What happens next is said for the run it will reach: Claude Code with our
- * hooks sees an instruction within about 15 seconds, at its next prompt or tool call, and is stopped at its next tool
+ * hooks sees an instruction within about 15 seconds, at its next step, and is stopped at its next tool
  * call; an agent without them (`reach: next_call`) sees it and is stopped only at its next BrainDog call, and keeps
  * editing until then. The record says which (`presence.reach`), so this file never guesses from the agent's name.
  *
@@ -326,7 +326,7 @@ export function reachLine(rows: readonly LiveRun[]): string | null {
   return hooks.length === 0 ? `Pause and Stop reach ${tail}` : `Pause and Stop reach ${andList(hooks)} at the next tool call, through the hooks; ${tail}`;
 }
 
-const reachSoon = (r: LiveRun): string => (r.reach === 'hooks' ? 'within about 15 seconds, at its next prompt or tool call' : 'at its next BrainDog call, and not before');
+const reachSoon = (r: LiveRun): string => (r.reach === 'hooks' ? 'within about 15 seconds, at its next step' : 'at its next BrainDog call, and not before');
 
 /** A live run's label in "To": its agent and project, and its branch when another run of the same agent is there too. */
 function runChoice(r: LiveRun, all: readonly LiveRun[], projects: ReadonlyMap<string, Project>): InstructChoice {
@@ -492,7 +492,13 @@ export function instructArgs(view: Pick<InstructView, 'toKey' | 'onKey' | 'whenK
 /* ── the runs open now ──────────────────────────────────────────────────── */
 
 /** One run row, worded: who, what it said, where, how long, what it holds from him, and what can stop it. */
-export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: ReadonlyMap<string, Project>, threads: readonly Thread[] = []): PresenceView {
+export function presenceOf(
+  r: LiveRun,
+  rows: readonly LiveRun[],
+  projects: ReadonlyMap<string, Project>,
+  threads: readonly Thread[] = [],
+  { bare = false }: { bare?: boolean } = {},
+): PresenceView {
   const name = agentNamed(r.agent) ?? (r.name?.trim() || controlWords.aRun);
   const project = r.project === null ? null : (projects.get(r.project) ?? null);
   const helpers = rows.filter((h) => h.parent === r.run);
@@ -509,7 +515,8 @@ export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: Reado
     project: project ? { name: project.name, slot: slotOf(project.hue) } : null,
     /* THE PROFILE IT RUNS UNDER, BY NAME, where it is one of his own and not the default one (migration 44). */
     /* "verified" FIRST WHERE ITS KEY PROVES ITS APP (H19): "Claude Code · verified · as studio · main". */
-    meta: [r.verified === true ? 'verified' : null, r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
+    /* `bare`, ONE RUN ON TODAY'S SHEET (Y25): no profile and no branch, which are where it runs and not what it does. */
+    meta: [r.verified === true ? 'verified' : null, !bare && r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, bare ? null : r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
       .filter((x): x is string => !!x)
       .join(' · '),
     live: r.state === 'working' || r.state === 'thinking' ? r.state : 'waiting',
@@ -519,12 +526,11 @@ export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: Reado
         ? null
         : `+${plural(helpers.length, 'helper')}${branches.length > 0 ? `, on ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${String(branches.length - 3)} more` : ''}` : ''}`,
     stopped: r.stopped,
-    reach: hooks
-      ? `Pause and Stop reach ${name} at its next tool call, through its hooks.`
-      : `${name} has no hooks here, so it keeps working until its next BrainDog call. Pause and Stop reach it there.`,
+    /* WHEN, NOT HOW (Y25): "its next tool call, through its hooks" was plumbing on the run's own sheet. */
+    reach: hooks ? 'Pause and Stop take effect at its next step.' : `${name} keeps working until it next checks in with BrainDog. Pause and Stop take effect then.`,
     confirm: {
       stop: hooks
-        ? `Stop ${name}${on}? Its next tool call is refused, and it is asked to reply and end.`
+        ? `Stop ${name}${on}? Its next step is refused, and it is asked to reply and end.`
         : `Stop ${name}${on}? It keeps editing until its next BrainDog call; there it is refused and asked to reply and end.`,
       pause: hooks
         ? `Pause ${name}${on}? Its tools are held from its next call until you resume it.`

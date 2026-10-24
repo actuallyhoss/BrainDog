@@ -110,7 +110,7 @@ test('TO OFFERS WHOEVER IS NEXT, EACH KIND OF AGENT AND EACH LIVE RUN BY NAME, n
 test('NOW IS OFFERED ONLY WHILE A RUN IT WOULD REACH IS LIVE, and is then the first choice', () => {
   const live = composerOf({ to: 'agent:claude', on: 'things#1', when: null }, ROWS, PROJECTS);
   assert.deepEqual([live.when, live.whenKey], [['now', 'next'], 'now']);
-  assert.match(live.next, /^Goes to Claude on Kiln, working now: it sees this within about 15 seconds, at its next prompt or tool call\./u);
+  assert.match(live.next, /^Goes to Claude on Kiln, working now: it sees this within about 15 seconds, at its next step\./u);
   const quiet = composerOf({ to: 'agent:claude', on: 'things#3', when: null }, ROWS, PROJECTS);
   assert.deepEqual([quiet.when, quiet.whenKey], [['next'], 'next']);
   assert.equal(quiet.next, 'The next Claude run on Portage gets this when it starts or next checks in. It waits up to 14 days.');
@@ -121,7 +121,7 @@ test('NOW IS OFFERED ONLY WHILE A RUN IT WOULD REACH IS LIVE, and is then the fi
 test('WHAT HAPPENS NEXT IS SAID FOR HOW THE RUN IS REACHED: hooks within seconds, otherwise its next BrainDog call', () => {
   const claude = composerOf({ to: 'run:S1', on: '', when: null }, ROWS, PROJECTS);
   assert.deepEqual([claude.onKey, claude.onFixed, claude.when], ['things#1', true, ['now']]);
-  assert.equal(claude.next, 'Claude on Kiln sees this within about 15 seconds, at its next prompt or tool call.');
+  assert.equal(claude.next, 'Claude on Kiln sees this within about 15 seconds, at its next step.');
   const codex = composerOf({ to: 'run:S2', on: '', when: null }, ROWS, PROJECTS);
   assert.equal(codex.next, 'Codex on Kiln sees this at its next BrainDog call, and not before.');
   const many = composerOf({ to: 'anyone', on: 'things#1', when: 'now' }, ROWS, PROJECTS);
@@ -176,12 +176,19 @@ test('A RUN ROW IS THE AGENT, WHAT IT SAID, WHERE AND WHEN, its helpers folded u
   assert.equal(row.href, '/r/session/1');
 });
 
+test('A RUN DRAWN ALONE, ON TODAY\'S SHEET, SAYS NO PROFILE AND NO BRANCH (Y25)', () => {
+  const bare = presenceOf({ ...CLAUDE, seat: 'harbour', verified: true }, ROWS, PROJECTS, [], { bare: true });
+  assert.equal(bare.meta, 'verified · running 3 h 30 min · heard 3 min ago');
+  assert.doesNotMatch(bare.meta, /harbour|axis-qa/u);
+});
+
 test('EVERY ROW SAYS HONESTLY WHAT CAN STOP IT: hooks at its next tool call, or only its next BrainDog call', () => {
   const claude = presenceOf(CLAUDE, ROWS, PROJECTS);
-  assert.equal(claude.reach, 'Pause and Stop reach Claude at its next tool call, through its hooks.');
-  assert.match(claude.confirm.stop, /^Stop Claude on Kiln\? Its next tool call is refused/u);
+  /* NO PLUMBING WORDS (Y25): "tool call" and "hooks" said how, where he needs only when. */
+  assert.equal(claude.reach, 'Pause and Stop take effect at its next step.');
+  assert.match(claude.confirm.stop, /^Stop Claude on Kiln\? Its next step is refused/u);
   const codex = presenceOf(CODEX, ROWS, PROJECTS);
-  assert.equal(codex.reach, 'Codex has no hooks here, so it keeps working until its next BrainDog call. Pause and Stop reach it there.');
+  assert.equal(codex.reach, 'Codex keeps working until it next checks in with BrainDog. Pause and Stop take effect then.');
   assert.match(codex.confirm.stop, /keeps editing until its next BrainDog call/u);
 });
 

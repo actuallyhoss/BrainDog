@@ -123,7 +123,8 @@
   listen(load, () => pressing.size > 0);
 
   const viewOf = (r: LiveRun): PresenceView => {
-    const v = presenceOf(r, rows, projects, threads);
+    /* ONE RUN ALONE (Today's sheet) SAYS NO PROFILE AND NO BRANCH (Y25). */
+    const v = presenceOf(r, rows, projects, threads, { bare: run !== null });
     return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
