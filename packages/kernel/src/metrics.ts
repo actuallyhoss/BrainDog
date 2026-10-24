@@ -791,9 +791,22 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
  * a day with no local midnight (`America/Santiago` on 6 September 2026 starts at 01:00, 04:00 UTC).
  * Both were measured against `Intl` when this was written, as were both New York and London changes.
  */
+/* ONE FORMATTER A ZONE, made the first time it is asked and kept: making one is most of what a date said here costs,
+   and a page of figures asked it hundreds of times over the one zone. What it formats is the same either way. */
+const clockFormats = new Map<string, Intl.DateTimeFormat>();
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+const formatIn = (kept: Map<string, Intl.DateTimeFormat>, tz: string, make: () => Intl.DateTimeFormat): Intl.DateTimeFormat => {
+  let made = kept.get(tz);
+  if (made === undefined) {
+    made = make();
+    kept.set(tz, made);
+  }
+  return made;
+};
+
 const offsetAt = (ms: number, tz: string): number => {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    formatIn(clockFormats, tz, () => new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       .formatToParts(new Date(ms))
       .map((p) => [p.type, Number(p.value)]),
   ) as Record<string, number>;
@@ -801,7 +814,7 @@ const offsetAt = (ms: number, tz: string): number => {
 };
 
 const localDate = (ms: number, tz: string): string =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+  formatIn(dayFormats, tz, () => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })).format(new Date(ms));
 
 const dayStartsAt = (day: string, tz: string): string => {
   const midnight = Date.parse(`${day}T00:00:00Z`);
