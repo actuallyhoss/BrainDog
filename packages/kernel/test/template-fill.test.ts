@@ -223,3 +223,9 @@ test("A TEMPLATE OVER A LIST OF STEPS KEEPS THE LIST'S OWN ORDER, and a step wit
   assert.deepEqual(titles, ['Ranked first', ...NAMES.map((n) => `First for ${n}`), 'Unranked']);
   sql.close();
 });
+
+test("A TEMPLATE'S {{seq}} IS ITS ROW'S OWN NUMBER, so a page draws its row and not every row of that name", () => {
+  const row = { id: 'r1', register: 'parts', seq: 7, fields: { name: 'Rent' }, state: null, version: 1, created_at: '', updated_at: '', deleted_at: null };
+  assert.deepEqual(fill({ where: 'seq is {{seq}}', heading: '{{name}}' }, row), { where: 'seq is 7', heading: 'Rent' });
+  assert.deepEqual(fill({ where: 'seq is {{seq}}' }, { ...row, seq: null }), { where: 'seq is {{seq}}' }, 'a row with no number leaves the hole');
+});

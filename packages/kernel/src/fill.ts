@@ -105,6 +105,9 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
        finds its runs by `project is {{spoken}}`. A register with its own prefix would need its
        declaration here; the projects register has none. */
     if (key === 'spoken') return row ? row.register + '#' + String(row.seq) : null;
+    /* THE ROW'S OWN NUMBER, so a template page draws its own row by `seq is {{seq}}`: a bill's title is "Rent" on every
+       month's bill, and a block over `what is {{what}}` drew all of them. A field cannot be called `seq`. */
+    if (key === 'seq') return row && typeof row.seq === 'number' ? row.seq : null;
     /* OWN PROPERTIES ONLY. `{{constructor}}` read the prototype and filled a heading with source code. */
     const value = row && Object.hasOwn(row.fields, key) ? row.fields[key] : undefined;
     return value === undefined ? null : value;
