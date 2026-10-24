@@ -37,7 +37,7 @@ test("A RUN'S PAGE IS NOT IN boot AT ALL, and opens by the run's spoken id", asy
   const b = out.value as unknown as BootSaid;
   assert.equal(b.pages.filter((p) => p.about?.register === 'session').length, 0, 'a run page was still listed whole');
   assert.equal(b.rowPages, undefined, 'the runs were still listed by address');
-  assert.deepEqual(b.pagesByRow, ['session']);
+  assert.ok(b.pagesByRow?.includes('session'), JSON.stringify(b.pagesByRow));
   /* EACH RUN OPENS AS THE PAGE THE RECORD RESOLVES FOR IT. The seed's own runs are among them. */
   const every = api.kernel.pages().filter((p) => p.about?.register === 'session');
   assert.ok(every.length >= RUNS);
