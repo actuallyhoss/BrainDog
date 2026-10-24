@@ -76,6 +76,15 @@ test('THE RECORD IS NAMED FOR THE BUSINESS HEARD FIRST, then the person, then th
   assert.equal(namesHeard(propose('I am Dana, I run Kiln Studio and we bill Fenwick £2,000 a month', CTX)).business, 'Kiln Studio');
 });
 
+test('WITH NO NAME HEARD THE TRADE NAMES THE RECORD, never the email (audit C, X2)', () => {
+  const p = propose('I run a small ceramics studio with two potters. I lose track of kiln firings and who owes me money.', CTX);
+  assert.equal(p.title, 'Ceramics studio');
+  assert.deepEqual(namesHeard(p), { person: null, business: 'Ceramics studio' });
+  assert.deepEqual(recordNames(namesHeard(p), 'nadia@pots.example'), ['ceramics-studio', 'nadia']);
+  /* A NAME HEARD STILL COMES FIRST: "Mariam's Candles" is the title she is shown, and the address is hers as before. */
+  assert.equal(namesHeard(propose("I'm Mariam. I run a small candle shop", CTX)).business, null);
+});
+
 test('THE RECORD IS NEVER NAMED FOR A CLIENT OR A VENDOR, only for what the person runs', () => {
   /* WHAT A MODEL MAY HAND BACK, list by list: none of these is the person's, and the record's name is public. */
   const theirs = [

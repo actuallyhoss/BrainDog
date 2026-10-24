@@ -54,6 +54,8 @@ export const words = {
   keepSignedInPaid: 'You are signed in, so the payment comes next.',
   /** While the record's name is chosen from what was heard; then its title, with a way to change it. */
   calledFinding: 'Choosing a name from what you said',
+  /** Over the name, so the box says whose name it is. */
+  calledLabel: "Your BrainDog's name",
   change: 'Change',
   send: 'Email me a link',
   sending: 'Sending',

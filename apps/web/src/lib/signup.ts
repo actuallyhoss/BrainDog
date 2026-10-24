@@ -238,12 +238,15 @@ const sameName = (v: unknown): string => (typeof v === 'string' ? v.trim().repla
  * person pays is somebody else's name, and the record's name is public in its address. A project that carries the same
  * name as one of those is left out too: a project called Fenwick beside a client called Fenwick is the client's work.
  */
-export function namesHeard(p: { name: string | null; rows: readonly { register: string; fields: Record<string, unknown> }[] }): HeardNames {
+export function namesHeard(p: { name: string | null; rows: readonly { register: string; fields: Record<string, unknown> }[]; title?: string | null }): HeardNames {
   const list = projects();
   const ours = (r: { register: string }): boolean => list !== null && r.register === list;
   const others = new Set(p.rows.filter((r) => !ours(r)).flatMap((r) => [sameName(r.fields.name), sameName(r.fields.what)].filter((n) => n !== '')));
   const run = p.rows.find((r) => ours(r) && sameName(r.fields.name) !== '' && !others.has(sameName(r.fields.name)));
-  return { person: p.name, business: run ? String(run.fields.name).trim() : null };
+  /* WITH NOBODY NAMED, THE TRADE THE RECORD IS CALLED (audit C, X2): "a small ceramics studio" is ceramics-studio, where
+     the address was the email's local part. Her own trade, never anybody else's, since `titleOf` reads only "I run". */
+  const trade = p.name === null && typeof p.title === 'string' && p.title.trim() !== '' ? p.title.trim() : null;
+  return { person: p.name, business: run ? String(run.fields.name).trim() : trade };
 }
 
 /**

@@ -1336,6 +1336,8 @@
         {#if nameByHand}
           <NameField bind:value={slug} bind:free id="up-name" />
         {:else if naming || read?.title || slug !== ''}
+          <!-- WHAT THE BOX HOLDS (audit C, X2): a name alone in a box read as anybody's, the email's local part above all. -->
+          <p class="field-label kept-label">{words.calledLabel}</p>
           <div class="kept-head">
             <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
             {#if !naming && slug !== ''}<button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
@@ -1877,6 +1879,10 @@
 
   .kept:empty {
     display: none;
+  }
+
+  .kept-label {
+    margin: 0;
   }
 
   .kept-head {
