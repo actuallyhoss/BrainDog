@@ -79,8 +79,8 @@ test('the Nadia sentence on a fresh shop record is a client, an order from her a
     settled: TODAY,
     party: { $row: 0 },
   });
-  assert.equal(paid!.said, 'EGP\u00a0900.00 in, by InstaPay');
-  assert.equal(paid!.detail, 'into Bills and invoices, marked paid');
+  assert.equal(paid!.said, 'EGP\u00a0900.00 from Nadia, by InstaPay');
+  assert.equal(paid!.detail, 'paid, kept in Bills and invoices');
   /* Nothing is missing, so one press adds all three. */
   assert.deepEqual(paid!.missing, []);
 });
@@ -95,8 +95,8 @@ test('a record that holds an account keeps the payment on its Ledger, filed to t
   assert.equal(paid.fields.state, 'cleared');
   assert.equal(paid.fields.account, 'accounts#1');
   assert.equal(paid.fields.what, 'Payment from Nadia, by InstaPay');
-  assert.equal(paid.said, 'EGP\u00a0900.00 in, by InstaPay');
-  assert.equal(paid.detail, 'into Ledger, marked paid');
+  assert.equal(paid.said, 'EGP\u00a0900.00 from Nadia, by InstaPay');
+  assert.equal(paid.detail, 'paid, kept in Ledger');
   assert.deepEqual(paid.missing, []);
 });
 
@@ -154,7 +154,7 @@ test('an amount with a currency word keeps it, and one with none takes the recor
   assert.deepEqual(euros!.fields.amount, { amount: 5000, currency: 'EUR' });
   const code = tellRead('Omar paid USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(code!.fields.amount, { amount: 120050, currency: 'USD' });
-  assert.equal(code!.said, '$1,200.50\u00a0USD in, by card');
+  assert.equal(code!.said, '$1,200.50\u00a0USD from Omar, by card');
   const pounds = tellRead('Omar paid 300 pounds', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(pounds!.fields.amount, { amount: 30000, currency: 'EGP' });
 });
@@ -275,4 +275,28 @@ test("AN AMOUNT SAID BESIDE AN ORDER WITH NO PAYMENT IS WHAT IT COMES TO (uc6-wa
     assert.equal(rows.some((r) => r.register === 'obligations' || r.register === 'transactions'), false, tail);
     assert.deepEqual(left, [], tail);
   }
+});
+
+/* A STRANGER'S FIRST REAL THING (audit C, X8): it was "EGP 1,200.00 in / into Bills and invoices", with no Lina, and the
+   order left as "Not placed". "N things for X" is an order from X, and "she paid" after it is X paying for it. */
+test('"14 MUGS FOR LINA, SHE PAID 1200" IS ONE ORDER FROM LINA, paid, on the day the clause names', () => {
+  const { rows, left } = tellRead('Firing on Thursday: 14 mugs for Lina, she paid 1200 already', fresh);
+  assert.deepEqual(left, []);
+  assert.deepEqual(rows.map((r) => r.register), ['people', 'orders', 'obligations']);
+  assert.deepEqual(rows[0]!.fields, { name: 'Lina', role: 'client' });
+  const order = rows[1]!;
+  assert.deepEqual(order.fields, { what: 'mugs', who: { $row: 0 }, how_many: 14, due: '2026-10-08', paid: { amount: 120000, currency: 'EGP' } });
+  assert.equal(order.said, 'An order from Lina');
+  assert.equal(order.detail, '14 mugs, due tomorrow, paid');
+  const paid = rows[2]!;
+  assert.deepEqual(paid.fields.party, { $row: 0 });
+  assert.equal(paid.said, 'EGP 1,200.00 from Lina');
+  assert.equal(paid.detail, 'paid, kept in Bills and invoices');
+  /* ONE LINE A PERSON READS, never "in" over "into". */
+  for (const r of rows) assert.doesNotMatch(`${r.said} ${r.detail}`, /\bin\b.*\binto\b/u);
+});
+
+test('a thing "for" a day or for somebody unnamed is no order from anybody', () => {
+  assert.ok(!tellRead('14 mugs for Friday', fresh).rows.some((r) => r.register === 'people'));
+  assert.ok(!tellRead('Glaze 14 mugs for the market', fresh).rows.some((r) => r.register === 'people'));
 });

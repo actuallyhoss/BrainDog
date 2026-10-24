@@ -383,6 +383,12 @@ const PAID = /^(?:paid|pays|sent|transferred)\b\s*/iu;
 const GOT = /^(?:received|got)\b\s*/iu;
 const SPENT = /^(?:i|we)\s+(?:paid|spent|sent|transferred)\b\s*|^spent\b\s*/iu;
 const QTY = /^(\d{1,4}|a dozen|a couple of|a couple|dozen|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|an?)\s+/iu;
+/* A COUNT OF THINGS FOR SOMEBODY NAMED IS AN ORDER FROM THEM (audit C, X8): "14 mugs for Lina", "two vases for Omar
+   Said". Only a count said in figures or words, never "a" alone, and only before a name, so "14 mugs for Friday" and
+   "glaze 14 mugs for the market" are nobody's order. */
+const SAID_COUNT = ['a dozen', 'dozen', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'].map((w) => `[${w[0]}${w[0]!.toUpperCase()}]${w.slice(1)}`).join('|');
+/* Case kept, since the name is told by its capital: "for Lina and Omar" is never one person called "Lina And Omar". */
+const FOR_SOMEBODY = new RegExp(`(?:^|[\\s:])((?:\\d{1,4}|${SAID_COUNT})\\s+[^,.;:!?]+?)\\s+for\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 const METHOD = new RegExp(`\\b(?:on|by|via|through|with|over|using)\\s+(${NAME}|cash|card|bank transfer|transfer|wallet)\\b`, 'u');
 /* The act a payment opens on, taken off before what is left says what it was for. */
 const ACT = /^(?:(?:i|we)\s+)?(?:paid|pays|spent|sent|transferred|received|got)\b\s*/iu;
@@ -463,12 +469,25 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       c = after;
     } else if (PRONOUN.test(c) && acts(c.replace(PRONOUN, ''))) {
       c = c.replace(PRONOUN, '');
-      someone = true;
+      /* "SHE" AFTER AN ORDER IS WHOEVER PLACED IT, where nobody else was named since (audit C, X8): "14 mugs for Lina,
+         she paid 1200" is Lina paying. Somebody nobody named stays somebody. */
+      if (subject === null || lastOrder === null) someone = true;
     }
     /* WHAT AN ORDER COMES TO, said beside it with no payment (uc6-walk-50): "Salma wants 6 amber jars for Saturday,
        1,350 not paid yet", "..., EGP 1,350", "..., total 1,350". It is the order's total, in the record's currency
        when none is written, so the Orders page can say who still owes. A clause with anything else in it is not this. */
     if (!self && !acts(c) && totalOf(c)) continue;
+    const forSomebody = !self && !acts(c) ? FOR_SOMEBODY.exec(c) : null;
+    if (forSomebody && aName(forSomebody[2]!)) {
+      const before = rows.length;
+      subject = forSomebody[2]!;
+      if (room(2)) personOf(subject);
+      /* The day may sit outside the order's words, as a label before it: "Firing on Thursday: 14 mugs for Lina". */
+      const around = oneLine(`${c.slice(0, forSomebody.index)} ${c.slice(forSomebody.index + forSomebody[0].length)}`);
+      if (readOrder(forSomebody[1]!.trim(), subject, around)) continue;
+      rows.length = before;
+      for (const [name, at] of made) if (at >= before) made.delete(name);
+    }
     if (!self && !acts(c)) {
       left.push(whole);
       continue;
@@ -530,11 +549,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   }
 
   /** "3 vanilla jars for Friday", after the word that says it is wanted. False when it could not be placed. */
-  function readOrder(phrase: string, who: string | null): boolean {
+  function readOrder(phrase: string, who: string | null, around = ''): boolean {
     const l = orderList(opts.lists);
     const fresh = who !== null && people !== undefined && !knownAs(who, opts.people ?? []) && !sharedBy(who, opts.people ?? []) && !made.has(words(who));
     if (!l || !room(fresh ? 2 : 1)) return false;
-    const { day, rest } = takeDay(phrase, opts.today);
+    const own = takeDay(phrase, opts.today);
+    const { day, rest } = own.day === null && around !== '' ? { day: takeDay(around, opts.today).day, rest: own.rest } : own;
     const q = QTY.exec(rest);
     const count = q ? (/^\d+$/.test(q[1]!) ? Number(q[1]) : COUNTS[q[1]!.toLowerCase()]) : undefined;
     const thing = trimWords(q ? rest.slice(q[0].length) : rest);
@@ -634,8 +654,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     rows.push({
       register: l.id,
       fields,
-      said: `${spelled(amount, currency)} ${into ? 'in' : 'out'}${by ? `, by ${by}` : who ? `, from ${who}` : ''}`,
-      detail: `into ${l.name}${settled ? ', marked paid' : ''}`,
+      /* ONE LINE, READ AS A PERSON SAYS IT (audit C, X8): "EGP 1,200.00 from Lina", then "paid, kept in Bills and
+         invoices", where it said "EGP 1,200.00 in" over "into Bills and invoices". */
+      said: `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : 'out'}${by ? `, by ${by}` : ''}`,
+      detail: `${settled ? 'paid, ' : ''}kept in ${l.name}`,
       icon: iconOf(l),
       missing: missingOf(l, fields),
     });
