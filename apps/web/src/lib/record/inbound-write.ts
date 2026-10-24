@@ -39,6 +39,17 @@ import { wroteOutside } from '@braindog/client';
 export const mailUrl = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}/in/email/${token}`;
 
 /**
+ * THE ONE COMMAND THAT PRINTS A SELF-HOST'S MAIL ADDRESS (audit 25 October, X25), run on the machine BrainDog runs on.
+ *
+ * A self-host has no door that reads an address back, and none is wanted: the token is a file, `<data>/<slug>/
+ * inbound.token`, that `braindog init` wrote (`apps/selfhost/src/main.ts`). So the address is this origin's mail door
+ * with that file's contents after it, and the command says exactly that. The data folder is `BRAINDOG_DATA`, `/data`
+ * where it is not set, as the host reads it.
+ */
+export const addressCommand = (origin: string, slug: string): string =>
+  `echo "${mailUrl(origin, `$(cat \${BRAINDOG_DATA:-/data}/${slug}/${words.tokenFile})`)}"`;
+
+/**
  * What the screen shows after a press, and every arm is a sentence rather than a failure.
  *
  * `signin` IS ITS OWN KIND, for the reason `device.ts` gives it one: the door wants an owner whose last sign-in is
@@ -159,5 +170,4 @@ export const words = {
      gate's `dev-name`), and set apart it is the thing a person types. */
   unrouted: 'This host does not make forwarding addresses over the web. On a self-host the address is a file beside the record, named:',
   tokenFile: 'inbound.token',
-  unroutedDoes: 'Writing it registers an address, writing it again replaces it, and deleting it stops forwarded mail.',
 } as const;

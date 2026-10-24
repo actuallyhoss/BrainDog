@@ -163,12 +163,12 @@
   }
 </script>
 
+<!-- THE LINE FIRST, THEN ITS BUTTON (audit 25 October, X26): "New web address" in the heading's corner wrapped to a row of
+     its own on a phone, above the sentence that says what it makes. -->
 <Tile class="section" data-surface="tile" title={copy.doorsTitle}>
-  {#snippet actions()}
-    {#if owner}<Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button>{/if}
-  {/snippet}
   <div class="section-body">
     <p class="hint">{copy.doorsHow}</p>
+    {#if owner}<div class="row-actions"><Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button></div>{/if}
     {#if !owner}
       <p class="hint">{levelWords.ownersOnly}</p>
     {:else if listed === null}

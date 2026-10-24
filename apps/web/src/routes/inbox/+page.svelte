@@ -70,7 +70,10 @@
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
   import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
-  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
+  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietOf, sourcesOf } from './sources.ts';
+  import { addressCommand } from '$lib/record/inbound-write.ts';
+  import { bareOrigin } from '../settings/[area]/settings-state.svelte.ts';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import { panelOf, type PatternReport } from './patterns.ts';
   import type { Review } from './review.ts';
 
@@ -324,6 +327,13 @@
   /* NOTHING HAS EVER COME IN, by the record's own tally, so the board is the one tile that says so. A pattern waiting
      on Decide is something to show, so it keeps the board. */
   const never = $derived(patterns.length === 0 && nothingEver(tally, ways, INBOX.length));
+  /* THE ONE STEP TO AN ADDRESS, by the host (X25): a self-host's is printed by one command on its machine. */
+  const quiet = $derived(
+    quietOf(
+      route.data.host === 'cloud' || route.data.host === 'self-host' ? route.data.host : undefined,
+      typeof route.data.index?.slug === 'string' && typeof location !== 'undefined' ? addressCommand(bareOrigin(), route.data.index.slug) : null,
+    ),
+  );
   let series = $state<{ state: Series; items: SettledItem[]; cursor: number | null } | null>(null);
   let seriesFix = $state<string | null>(null);
   let seriesOlder = $state(false);
@@ -750,8 +760,8 @@
     <!-- ONE TILE, AND THE ONE THING TO DO: nothing has reached this record's inbox by any way, so the ways in, the
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
-      <Empty kind="no-data-yet" glyph="mail" title={quietWords.title} body={quietWords.why}>
-        {#snippet actions()}<Button weight="primary" href="/settings/ingest">{quietWords.add}</Button>{/snippet}
+      <Empty kind="no-data-yet" glyph="mail" title={quiet.title} body={quiet.why}>
+        {#snippet actions()}{#if quiet.command}<CodeLine text={quiet.command} />{/if}<Button weight="primary" href="/settings/ingest">{quiet.add}</Button>{/snippet}
       </Empty>
     </div>
   {:else}

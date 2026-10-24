@@ -8,7 +8,8 @@ import { test } from 'node:test';
 
 import { readFileSync } from 'node:fs';
 
-import { EVERYDAY, SOURCE_DAYS, countSaid, drawsLine, lastSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
+import { EVERYDAY, SOURCE_DAYS, countSaid, drawsLine, lastSaid, nothingEver, quietOf, sourcesOf } from './sources.ts';
+import { addressCommand } from '../../lib/record/inbound-write.ts';
 
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 const NOON = at(2026, 10, 7);
@@ -63,7 +64,7 @@ test('an inbox nothing has ever reached is one fact, told by the record\'s own t
   assert.equal(nothingEver(none, sourcesOf([{ channel: 'email', ts: iso(at(2026, 10, 6)) }], NOON), 0), false);
   /* A RECORD THAT ANSWERED NO TALLY IS NOT SAID TO BE EMPTY: a quiet fortnight is not nothing yet. */
   assert.equal(nothingEver(null, quiet, 0), false);
-  assert.doesNotMatch(`${quietWords.title} ${quietWords.why} ${quietWords.add}`, /—|\brow\b|entity/u);
+  for (const q of [quietOf('cloud', null), quietOf('self-host', 'echo x')]) assert.doesNotMatch(`${q.title} ${q.why} ${q.add}`, /—|\brow\b|entity/u);
 });
 
 test('the page draws that inbox as one tile, in place of the two tiles and the empty state under them', () => {
@@ -75,9 +76,29 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   const one = markup.slice(never, markup.indexOf('{:else}', never));
   assert.equal(one.match(/<Empty\b/gu)?.length, 1);
   assert.doesNotMatch(one, /<Tile\b/u, 'the one tile still draws the ways in or the rules beside it');
-  assert.match(one, /title=\{quietWords\.title\} body=\{quietWords\.why\}/u);
-  assert.match(one, /<Button weight="primary" href="\/settings\/ingest">\{quietWords\.add\}<\/Button>/u, "the one thing to do is the primary (first F13)");
+  assert.match(one, /title=\{quiet\.title\} body=\{quiet\.why\}/u);
+  assert.match(one, /<Button weight="primary" href="\/settings\/ingest">\{quiet\.add\}<\/Button>/u, "the one thing to do is the primary (first F13)");
+  /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy (X25). */
+  assert.match(one, /\{#if quiet\.command\}<CodeLine text=\{quiet\.command\}/u, 'the self-host command is not drawn to copy');
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
   assert.match(markup, /\{:else if INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);
+});
+
+/* ── the audit of 25 October, X25: the empty Inbox shows the one step to an address ─────────────────────────────── */
+
+test('X25: the empty Inbox says how to get the address, never "this BrainDog\'s address" with no address', () => {
+  const cloud = quietOf('cloud', null);
+  assert.doesNotMatch(cloud.why, /Forward mail to this BrainDog's address/u);
+  assert.match(cloud.why, /What comes in/u, 'the Cloud is not told where the address is made');
+  assert.equal(cloud.add, 'Set up an address');
+  assert.equal(cloud.command, null);
+
+  const cmd = addressCommand('https://studio.example', 'the-studio');
+  assert.equal(cmd, 'echo "https://studio.example/in/email/$(cat ${BRAINDOG_DATA:-/data}/the-studio/inbound.token)"');
+  const self = quietOf('self-host', cmd);
+  assert.equal(self.command, cmd);
+  assert.match(self.why, /machine BrainDog runs on/u);
+  /* A HOST THAT DID NOT SAY WHICH IT IS IS TOLD THE CLOUD'S WAY, which needs no command. */
+  assert.equal(quietOf(undefined, cmd).command, null);
 });

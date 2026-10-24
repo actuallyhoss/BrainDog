@@ -134,9 +134,18 @@ export function nothingEver(
   return ways === null || ways.every((w) => w.last === null);
 }
 
-/** The one tile's words: what the inbox is for, by the ways in a person has, and the press that adds one. */
-export const quietWords = {
-  title: 'Nothing has come in yet',
-  why: "Forward mail to this BrainDog's address and it lands here.",
-  add: 'Add a way in',
-} as const;
+/** The one tile's words: what the inbox is for, the one step to an address, and the press that adds a way in. */
+export type Quiet = { title: string; why: string; add: string; command: string | null };
+
+/**
+ * THE ONE STEP TO AN ADDRESS (audit 25 October, X25). It said "Forward mail to this BrainDog's address" and never said
+ * the address, and no door reads one back: the Cloud makes one on a press in What comes in, and a self-host's is a
+ * file on its machine, printed by one command (`addressCommand`). A host that has not said which it is is told the
+ * Cloud's way, which asks nothing of a machine it may not have.
+ */
+export function quietOf(host: 'cloud' | 'self-host' | undefined, command: string | null): Quiet {
+  const title = 'Nothing has come in yet';
+  if (host === 'self-host' && command)
+    return { title, why: "Run this on the machine BrainDog runs on to print this BrainDog's mail address, then forward mail to it.", add: 'Other ways in', command };
+  return { title, why: 'Make a mail address in What comes in, forward mail to it, and it lands here.', add: 'Set up an address', command: null };
+}

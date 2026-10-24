@@ -10,7 +10,7 @@
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so a fresh sign-in means one thing on every screen. */
   import { reprove } from '$lib/record/vault.ts';
   /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the section below. */
-  import { mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
+  import { addressCommand, mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -181,7 +181,9 @@
     openInbox: 'Open the Inbox',
     /* WHERE THE HOST HAS NO DOOR (agents F27): one plain sentence, and on the hosted service no file a person cannot
        reach. */
-    unrouted: 'Forwarding addresses are set up on the machine BrainDog runs on, in a file named',
+    /* THE SELF-HOST CARD IS ONE SENTENCE AND THE COMMAND TO COPY (audit 25 October, X25): it named a file and what
+       writing and deleting it do, and never the address. */
+    unrouted: "This BrainDog's mail address is kept on the machine it runs on. Run this there to print it:",
     unroutedHosted: 'Forwarding addresses are not offered here yet.',
   };
 </script>
@@ -287,8 +289,8 @@
       {#if shell.host === 'cloud'}
         <p class="hint">{words.unroutedHosted}</p>
       {:else}
-        <p class="hint">{words.unrouted} <CodeLine inline text={mailWords.tokenFile} />.</p>
-        <p class="hint">{mailWords.unroutedDoes}</p>
+        <p class="hint">{words.unrouted}</p>
+        <CodeLine text={addressCommand(origin, shell.index.slug)} />
       {/if}
     {:else if mintsHere === true && !anOwner}
       <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
