@@ -67,6 +67,7 @@ import { ROUTES as SEALED } from './sealed.ts';
 import { ROUTES as VISUALS } from './visuals.ts';
 import { ROUTES as METRICS } from './metrics.ts';
 import { ROUTES as READS } from './reads.ts';
+import { ROUTES as TODAY } from './today.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -125,5 +126,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...VISUALS,
   ...METRICS,
   ...READS,
+  ...TODAY,
   /* END ROUTES */
 ];

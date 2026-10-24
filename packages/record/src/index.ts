@@ -241,6 +241,7 @@ import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from
 import { drawingsOf, drewDraft, drewFiled } from './drew.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
+import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -10102,6 +10103,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The methods a read is counted for (`seenWhat`), each wrapped once the record is built. */
   const SEEN_METHODS = ['list', 'get', 'history', 'backlinks', 'search', 'page'] as const;
 
+  /** The methods `today` asks for each tile's part (`today.ts`); set once `api` and its wrappers are. */
+  let todayAsks: TodayAsks | null = null;
   /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
   let pageAgain: (args: { slug: string; filter?: unknown; walk?: unknown }, ctx: CallContext) => Promise<Result<unknown>> = () =>
     Promise.resolve(no('INTERNAL', 'The record is still starting.'));
@@ -11422,6 +11425,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           { at: 'blocks' },
         );
       return ok(sight.mask(ctx, answer));
+    },
+
+    /**
+     * `{ body }`: Today's body drawn as `previewPage` draws it, with every tile's part beside it in the same answer
+     * (`today.ts`): what BrainDog did itself, what is shared out, and the project cards' late work, runs and key numbers.
+     * READ+, and it changes nothing. Each part is its own method's answer to this caller; one refused is `null`.
+     */
+    async today(args: { body?: unknown } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['body']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const body = said.body;
+      if (body === null || typeof body !== 'object' || Array.isArray(body))
+        return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
+      if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
+      return todayOf(todayAsks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
     },
 
     /** One figure, by the id a `stat` cell names. */
@@ -14900,6 +14921,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return out instanceof Promise ? out.then((v: unknown) => sight.maskMoney(ctx, v)) : sight.maskMoney(ctx, out);
     };
   }
+  /* TODAY ASKS EACH PART AS IT IS ASKED ALONE, wrappers and all (`today.ts`). */
+  todayAsks = { previewPage: api.previewPage as never, handled: api.handled as never, sharedOut: api.sharedOut as never, list: api.list as never };
   return api;
 }
 
