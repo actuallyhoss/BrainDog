@@ -9,7 +9,9 @@
  * person decide in BrainDog; write short and plain for a phone. `budget.test.ts` holds the 512.
  *
  * WHAT IS LEFT AFTER THEM IS WHAT HOLDS ACROSS TOOLS: how an answer reads, the credential rule, when a learning is worth
- * keeping, and what a refusal hands back. Money, compare-and-set and the handoff's manners moved to the descriptions of
+ * keeping, and what a refusal hands back. The learning line says WHEN, not only when not (scope B30): "only if a future
+ * session would otherwise get it wrong" was read as "never", and 904 runs wrote none; and it names `topic` as the
+ * skill's name, which is what drafts a skill's next version at the daily look. Money, compare-and-set and the handoff's manners moved to the descriptions of
  * the tools they are about (`index.ts`), where a model reads them when it picks the tool.
  *
  * AND ONE LINE SAYS WHOM TO MEET, because the record understands the people and organisations in the work only as well
@@ -30,7 +32,7 @@ export const INSTRUCTIONS = [
   'Reads answer in short lines; format "full" gives JSON.',
   'Meet everyone you work with or hear of, with an email or handle.',
   'A credential never goes in a row, note or call. Deposit a key with braindog keys put <label>, which reads standard input.',
-  'Record a learning only if a future session would otherwise get it wrong; say how in because.',
+  'After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.',
   'A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.',
 ].join('\n');
 
@@ -66,7 +68,7 @@ const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => str
       'Wrap up this session with BrainDog:',
       '1. If you took an instruction, answer it: instructions {reply:"<its id>", said:"<what you did, one line>", state:"done"}, or needs_you or declined with why.',
       '2. Call handoff with {next:"<the one next step>"}, and tried for each dead end. If you finished a task, handoff {done:"<task>", note:"<how>"}.',
-      '3. Add a learning only if a future session would otherwise get it wrong, with the failure in because.',
+      '3. If you fixed a surprise or hit a dead end a later session would repeat, create a learning with topic, the skill it bears on, and the failure in because.',
     ].join('\n'),
   ask: (a) =>
     [

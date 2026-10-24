@@ -154,6 +154,8 @@ test('EVERY TOOL HAS A TITLE A PERSON READS, in plain words that name none of th
    allowed for. A ceiling of their own, so they cannot grow by quietly spending the tools' share. */
 test('the instructions are at or under 400 tokens, and each tool description under 200', () => {
   assert.ok(tokenBudget(INSTRUCTIONS) <= 400, `the instructions are ${tokenBudget(INSTRUCTIONS)} tokens`);
+  /* THE LEARNING LINE SAYS WHEN, and names topic as the skill's name (scope B30): "only if" was read as never. */
+  assert.ok(INSTRUCTIONS.split('\n').includes('After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.'));
   for (const tool of TOOLS) {
     const tokens = tokenBudget(tool.description);
     assert.ok(tokens < 200, `${tool.name} is ${tokens} tokens, and it is in every turn`);
