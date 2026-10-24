@@ -36,12 +36,12 @@
   "0035_repeat_marks.ts": {"checksum":"3a20ff1e7c457006847bbcf6c94d8b9098a28fb89dc03dd3fabf2f52c7bbc056","applied":true,"rehearsed":null},
   "0036_runs_before.ts": {"checksum":"79f2a5a10de5583e63aebab7c7177d4a15f842c6b242ed106e4e6076dc1af9df","applied":true,"rehearsed":null,"waived":{"at":"2026-10-09","by":"owner","why":"Shipped on the owner's word without a rehearsal: the live build could not export a copy and the night copy needs his backup key"}},
   "0037_cause_answered.ts": {"checksum":"6100f6cabd9b9b2398f29baef4eb095d8b95085399d917a9e45cb5a006b35d39","applied":true,"rehearsed":null,"waived":{"at":"2026-10-09","by":"owner","why":"Shipped on the owner's word without a rehearsal: the live build could not export a copy and the night copy needs his backup key"}},
-  "0038_pack_waiting.ts": {"checksum":"6a6292768d541c8e5f90e7fd963740ade6330b5fae8d30e83c302af039325fdf","applied":false,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
-  "0039_entry_made_index.ts": {"checksum":"9d0617ace0339a272e2fb49f0b5ee7eba678c96821915f7dfc58826be5931814","applied":false,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
-  "0040_entry_private.ts": {"checksum":"4bd3c2bd0ec090a5e4c00b39b66cdbc6b9038ae3d0d8507493e7846a33221732","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
-  "0041_entry_private_travels.ts": {"checksum":"abad798381d8853a454c9a448f5a7cba70a4ae12055c24cd768c553650bc59eb","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
-  "0042_agents.ts": {"checksum":"c77b8b32f8e4edaf87bfe119734a1fab98cf43fb2b0431330291f7e693c11739","applied":false,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
-  "0043_share.ts": {"checksum":"5cbc45a76a0cd39f93608139ad71e01d81743950b52d57cc0529578ce0296e5c","applied":false,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
-  "0044_seat.ts": {"checksum":"ca4c846cd796b620b1a62ddc8d32412fd55fe13a4032990af6094e097b307117","applied":false,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}},
-  "0045_sealed.ts": {"checksum":"f1ef4ba3b49675bb1f2282f2e2238e27ce2660cfd26b8be9dd93e108e9120393","applied":false,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}}
+  "0038_pack_waiting.ts": {"checksum":"6a6292768d541c8e5f90e7fd963740ade6330b5fae8d30e83c302af039325fdf","applied":true,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
+  "0039_entry_made_index.ts": {"checksum":"9d0617ace0339a272e2fb49f0b5ee7eba678c96821915f7dfc58826be5931814","applied":true,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
+  "0040_entry_private.ts": {"checksum":"4bd3c2bd0ec090a5e4c00b39b66cdbc6b9038ae3d0d8507493e7846a33221732","applied":true,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
+  "0041_entry_private_travels.ts": {"checksum":"abad798381d8853a454c9a448f5a7cba70a4ae12055c24cd768c553650bc59eb","applied":true,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
+  "0042_agents.ts": {"checksum":"c77b8b32f8e4edaf87bfe119734a1fab98cf43fb2b0431330291f7e693c11739","applied":true,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
+  "0043_share.ts": {"checksum":"5cbc45a76a0cd39f93608139ad71e01d81743950b52d57cc0529578ce0296e5c","applied":true,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
+  "0044_seat.ts": {"checksum":"ca4c846cd796b620b1a62ddc8d32412fd55fe13a4032990af6094e097b307117","applied":true,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}},
+  "0045_sealed.ts": {"checksum":"f1ef4ba3b49675bb1f2282f2e2238e27ce2660cfd26b8be9dd93e108e9120393","applied":true,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}}
 }
