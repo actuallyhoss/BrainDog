@@ -625,6 +625,34 @@ export function newestFirst<T extends { at: string; seq: number }>(log: readonly
   return [...log].sort((a, b) => when(b.at) - when(a.at) || b.seq - a.seq);
 }
 
+/** How far apart a question's close and its decision may be and still be one press. */
+export const SETTLE_TWIN_MS = 60_000;
+
+/**
+ * ONE LINE PER DECISION. Answering a question writes two lines to the log, the decision and the question closing, by
+ * the same person on the same question in the same second, and Activity drew both: "Closed “Keep 6 key numbers for
+ * Crumb.gg?…”" over "Decided “Keep 6 key numbers for Crumb.gg?…”" at 20:31 (the audit of 25 October, Z34,
+ * `audit-390-light.png`). The close is folded into its decision, which keeps its own words and takes the close's note
+ * ("Answered in one press, with no reason given") where it has none. A close with no decision beside it, a question
+ * withdrawn or one that lapsed, is drawn as it was.
+ */
+export function oneDecision<T extends Pick<AuditEvent, 'at' | 'by' | 'kind' | 'target' | 'note'>>(log: readonly T[]): T[] {
+  const when = (e: T): number => Date.parse(e.at);
+  const twin = (close: T, decide: T): boolean =>
+    decide.kind === 'decide' && close.target !== undefined && decide.target === close.target && decide.by === close.by && Math.abs(when(decide) - when(close)) <= SETTLE_TWIN_MS;
+  const folded = new Map<T, string>();
+  const gone = new Set<T>();
+  for (const e of log) {
+    if (e.kind !== 'resolve') continue;
+    const decided = log.find((d) => twin(e, d));
+    if (decided === undefined) continue;
+    gone.add(e);
+    if (decided.note.trim() === '' && e.note.trim() !== '' && !folded.has(decided)) folded.set(decided, e.note);
+  }
+  if (gone.size === 0) return [...log];
+  return log.filter((e) => !gone.has(e)).map((e) => (folded.has(e) ? { ...e, note: folded.get(e)! } : e));
+}
+
 /* ── one line's identity, and the page read again ──────────────────────── */
 
 /**

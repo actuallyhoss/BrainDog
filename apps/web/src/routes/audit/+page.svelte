@@ -63,6 +63,7 @@
   import {
     awaySaid,
     newestFirst,
+    oneDecision,
     below,
     byWhoOf,
     burstsOf,
@@ -416,7 +417,8 @@
    */
   const everything = $derived(route.url.searchParams.has('everything'));
   /* NEWEST FIRST BY WHEN, AND THEN BY VERSION (`newestFirst`), before anything is grouped under an hour. */
-  const kept = $derived(newestFirst(changesOf(LOG, everything)));
+  /* ONE LINE PER DECISION (`oneDecision`): a question's close is folded into the decision written beside it. */
+  const kept = $derived(newestFirst(oneDecision(changesOf(LOG, everything))));
   const bookkept = $derived(LOG.filter((e) => isBookkeeping(e)).length);
   const hiddenNow = $derived(everything ? 0 : bookkept);
   /* THE SWITCH IS OFFERED WHERE THERE ARE BOOKS TO SHOW: lines this page held back, or a record holding agent runs,
