@@ -325,48 +325,17 @@ test('WITH THE HEADLINES’ SHARE OF THE MONTH SPENT THE MODEL IS NOT ASKED: the
   r.ledger.close();
 });
 
-test('THE BRIEF A MODEL WRITES AS SENTENCES, THROUGH THE CLIENT: asked once the rows have stood still, on the background allowance, and the read answers it filled from the record', async () => {
-  const r = await briefed('cards', true);
-  /* BEFORE ANY ASK the rules' cards speak, and a read asks nobody. */
-  const rules = value<WrittenBriefing>(await r.mine.briefing());
-  assert.ok(rules.cards.length > 0 && rules.cards.every((c) => c.by === 'rule'), JSON.stringify(rules));
-  assert.equal(rules.written ?? null, null);
-  assert.equal(r.asks().length, 0, 'a read asked a model');
-
-  /* THE FIRST TICK ONLY NOTES THAT THE ROWS MOVED; THE ASK WAITS FOR THEM TO STAND STILL. */
-  assert.ok((await r.api.slashTick()).ran);
-  assert.equal(r.asks().length, 0, 'the first tick asked before the rows stood still');
-  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
-  await r.api.slashTick();
-  assert.equal(r.asks().length, 1, 'the tick asks once');
-  assert.ok(r.asks()[0]!.input.facts!.some((f) => f.title === 'Studio rent'));
-  assert.doesNotMatch(JSON.stringify(r.asks()[0]!.input), /bills#|rec_|p_1/u);
-  const counted = r.spent();
-  assert.ok(counted >= 1, 'the ask was not counted in the ledger');
-  assert.equal(r.his(), 0);
-
-  const brief = value<WrittenBriefing>(await r.mine.briefing());
-  assert.equal(brief.written?.sentences.map((x) => x.parts.map((p) => p.text).join('')).join(' '), 'Studio rent is 1 day late.');
-  assert.equal(brief.paused ?? null, null);
-  /* A SECOND TICK WITH NOTHING MOVED ASKS NOTHING. */
-  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
-  await r.api.slashTick();
-  assert.equal(r.asks().length, 1);
-  assert.equal(r.spent(), counted);
-  r.sql.close();
-  r.ledger.close();
-});
-
-test('A MODEL THAT WRITES NO SENTENCES LEAVES THE RULES’ CARDS, and the read says the written brief is paused', async () => {
-  const r = await briefed('down', true);
-  await r.api.slashTick();
-  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
-  await r.api.slashTick();
-  assert.equal(r.asks().length, 1);
-  const brief = value<WrittenBriefing>(await r.mine.briefing());
-  assert.ok(brief.cards.length > 0 && brief.cards.every((c) => c.by === 'rule'), JSON.stringify(brief));
-  assert.equal(brief.written ?? null, null);
-  assert.match(brief.paused ?? '', /^The written brief is paused/u);
-  r.sql.close();
-  r.ledger.close();
+test('A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT (DIRECTION §51), THROUGH THE CLIENT: ticks ask nothing and the rules cards speak', async () => {
+  for (const kind of ['cards', 'down'] as const) {
+    const r = await briefed(kind, true);
+    await r.api.slashTick();
+    r.clock.advance(WRITTEN_QUIET_MS + 1_000);
+    await r.api.slashTick();
+    assert.equal(r.asks().length, 0, 'a tick asked a model for the written brief');
+    const brief = value<WrittenBriefing>(await r.mine.briefing());
+    assert.ok(brief.cards.length > 0 && brief.cards.every((c) => c.by === 'rule'), JSON.stringify(brief));
+    assert.equal(brief.written ?? null, null);
+    r.sql.close();
+    r.ledger.close();
+  }
 });
