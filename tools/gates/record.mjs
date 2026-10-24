@@ -486,7 +486,7 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
  *
  * NO ANSWER IS WRITTEN OR REWRITTEN FOR THE CLOUD (PRF-B05). `boot` from the `cloud` variant had `host: 'cloud'` put
  * into it here and Billing was one fixed line, `{ records: [], open: false }`; both are the Worker's own answers now.
- * THE ANSWERS MADE HERE are a self-host's `POST /api/seen` (the Worker's 204, below) and its `GET /account/records`,
+ * THE ANSWERS MADE HERE are a self-host's `POST /api/seen` (an empty answer, below) and its `GET /account/records`,
  * for the reason `recordsAnswer` gives, the second only
  * while the gate is speaking as the owner: with `bearer: false` the self-host answers for itself, 401 to nobody and
  * the person's own records once they have signed in.
@@ -510,10 +510,11 @@ export async function forward(req, res, base, { bearer = true } = {}) {
   }
   /* AND A SELF-HOST'S `POST /api/seen`, the site's visit count (`apps/site/static/seen.js`). Only the Worker serves the
      site and counts it (`apps/worker/src/seen.ts`), and every way out there is the same 204; a self-host has no such
-     method and answered 404, a console error on every site page a gate opened. The Cloud answers for itself. */
+     method and answered 404, a console error on every site page a gate opened. The Cloud answers for itself. Answered
+     empty with the server's own default status, since `seen.js` reads nothing back and only a failure is a fault. */
   if (cookie === undefined && req.method === 'POST' && /^\/+api\/seen\/?$/u.test(new URL(req.url ?? '/', base).pathname)) {
     req.resume();
-    res.writeHead(204, { 'cache-control': 'no-store' });
+    res.setHeader('cache-control', 'no-store');
     res.end();
     return;
   }

@@ -287,13 +287,13 @@ test('THE FACTS SAY HOW MANY PAGES THE MODEL WROTE NOW, from the count the lint 
   k.setPref('slash', 'headlines.held', { day: '2026-10-09', written: 9, pages: 14 });
   const green = readModelSign(k, sql, NOW);
   assert.equal(green.state, 'green');
-  assert.equal(green.facts[0], 'Page headlines: 9 of 14 pages written by the model now.');
+  assert.equal(green.facts?.[0], 'Page headlines: 9 of 14 pages written by the model now.');
   /* ON A WEEK NOBODY ASKED, still said: the lines on the pages are the model's or not whatever this week asked. */
   const bare = await fresh();
   bare.k.setPref('slash', 'headlines.held', { day: '2026-10-08', written: 0, pages: 1 });
   assert.deepEqual(readModelSign(bare.k, bare.sql, NOW).facts, ['Page headlines: 0 of 1 page written by the model now.']);
   /* A COUNT FROM THREE DAYS AGO IS NOT "NOW", and a kernel with no prefs says nothing of the pages. */
   k.setPref('slash', 'headlines.held', { day: '2026-10-06', written: 9, pages: 14 });
-  assert.ok(!readModelSign(k, sql, NOW).facts.some((f) => f.startsWith('Page headlines')));
-  assert.ok(!readModelSign({ signRead: k.signRead }, sql, NOW).facts.some((f) => f.startsWith('Page headlines')));
+  assert.ok(!(readModelSign(k, sql, NOW).facts ?? []).some((f) => f.startsWith('Page headlines')));
+  assert.ok(!(readModelSign({ signRead: k.signRead }, sql, NOW).facts ?? []).some((f) => f.startsWith('Page headlines')));
 });
