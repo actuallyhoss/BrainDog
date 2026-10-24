@@ -169,6 +169,38 @@ function ownWords(name: string, args: Record<string, unknown>, out: Said, sent: 
  * overwrites a value and says so, by OpenAI's rule that being able to undo a change does not make it safe. `undo` puts
  * back only the caller's own write and deletes nothing else. None reaches past the record, so `openWorldHint` is false.
  */
+/**
+ * THE TOOLS A SESSION USES BEFORE IT KNOWS WHAT IT NEEDS, which a host that defers tools behind a search loads at once
+ * (`anthropic/alwaysLoad`, Claude Code's per-tool key). Half the tool searches his sessions made from 15 October were
+ * spent loading these five, and `context` is the first call of every session, so it waited on a search every time.
+ * Every other tool stays found by search, with a few words that find it (`anthropic/searchHint`).
+ */
+export const ALWAYS_LOADED: ReadonlySet<string> = new Set(['context', 'search', 'list', 'get', 'handoff']);
+
+/** The words a host's tool search finds each deferred tool by, past its name and description. */
+export const SEARCH_HINTS: Readonly<Record<string, string>> = {
+  create: 'add new row task note person money',
+  update: 'edit change fix row field',
+  log: 'note comment page html attach',
+  propose: 'ask person decide suggest',
+  undo: 'revert put back',
+  record_index: 'registers lists fields schema',
+  activity: 'history changes recent',
+  governance: 'decisions waiting questions',
+  triage: 'inbox arrivals file',
+  meet: 'person contact email org',
+  instructions: 'told stop pause inbox',
+};
+
+/** A tool's own `_meta` on the list: its card, and whether a host loads it at once or finds it by search. */
+function toolMeta(name: string): Record<string, unknown> | undefined {
+  const meta: Record<string, unknown> = {
+    ...(CARD_OF_TOOL[name] === undefined ? {} : cardMeta(CARD_OF_TOOL[name]!)),
+    ...(ALWAYS_LOADED.has(name) ? { 'anthropic/alwaysLoad': true } : SEARCH_HINTS[name] === undefined ? {} : { 'anthropic/searchHint': SEARCH_HINTS[name] }),
+  };
+  return Object.keys(meta).length === 0 ? undefined : meta;
+}
+
 export const listedTool = (t: Tool) => ({
   name: t.name,
   title: t.title,
@@ -178,8 +210,8 @@ export const listedTool = (t: Tool) => ({
   annotations: t.writes
     ? { readOnlyHint: false, destructiveHint: t.destructive === true, idempotentHint: t.idempotent === true, openWorldHint: false }
     : { readOnlyHint: true, openWorldHint: false },
-  /* A CARD IS ATTACHED BY `_meta`; a host that does not know the key ignores it and shows the text lines. */
-  ...(CARD_OF_TOOL[t.name] === undefined ? {} : { _meta: cardMeta(CARD_OF_TOOL[t.name]!) }),
+  /* A CARD IS ATTACHED BY `_meta`, and so is how a host loads it; a host that does not know a key ignores it. */
+  ...((meta) => (meta === undefined ? {} : { _meta: meta }))(toolMeta(t.name)),
 });
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);

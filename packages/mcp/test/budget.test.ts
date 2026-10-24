@@ -56,12 +56,17 @@
  * agent with no folder, Claude.ai or ChatGPT, says what the person is working on, which is the one thing that places
  * its run. Its line says no more than when to send it ("No folder: what they work on"), the `start` prompt, which costs
  * the list nothing, says the rest, and `context`'s description lost "else". It measured 2,760.
+ *
+ * WHAT A TURN PAYS FOR IS WHAT THE MODEL READS, SO A TOOL'S `_meta` IS LEFT OUT (24 October, scope H15). A host reads
+ * `_meta` and hands the model the name, title, description, schema and hints: a card's resource address and whether a
+ * host loads a tool at once (`anthropic/alwaysLoad`) or finds it by search (`anthropic/searchHint`) never reach a turn.
+ * The ceiling did not move; the two cards' `_meta` it used to count came out of the figure, which measured 2,656.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { handle, type Reply } from '../src/rpc.ts';
+import { ALWAYS_LOADED, SEARCH_HINTS, handle, type Reply } from '../src/rpc.ts';
 import { INSTRUCTIONS } from '../src/instructions.ts';
 import { FOLDED, TEMPLATES, TOOLS, tools } from '../src/index.ts';
 import { stub } from './stub.ts';
@@ -80,6 +85,12 @@ const listed = async () => {
   return paid;
 };
 
+/** The list as the model reads it: each tool without the `_meta` only its host reads. */
+const modelFacing = async () => {
+  const { tools: all, ...rest } = (await listed()) as { tools: Record<string, unknown>[] };
+  return { ...rest, tools: all.map(({ _meta: _host, ...tool }) => tool) };
+};
+
 test('the estimator is the one 44 §5.8 specifies, on its own worked examples', () => {
   /* 9 and not the 8 that 44's inline note says: the same section counts `_` as punctuation on
      purpose, so REGISTER is 4, the underscore 1 and UNKNOWN 4. The rule is kept and the note is wrong. */
@@ -90,7 +101,7 @@ test('the estimator is the one 44 §5.8 specifies, on its own worked examples', 
 });
 
 test(`tools/list and the instructions together are at or under ${CEILING} tokens`, async (t) => {
-  const text = JSON.stringify(await listed());
+  const text = JSON.stringify(await modelFacing());
   const tokens = tokenBudget(text) + tokenBudget(INSTRUCTIONS);
   t.diagnostic(`tools/list: ${tokenBudget(text)} tokens, ${text.length} bytes; instructions ${tokenBudget(INSTRUCTIONS)}; together ${tokens}`);
   assert.ok(tokens <= CEILING, `the tool list and the instructions are ${tokens} tokens, over the ${CEILING} every turn pays`);
@@ -173,4 +184,23 @@ test('money is said where it is written, with its currency\'s own decimals, not 
   assert.match(fields, /JPY 0/);
   assert.match(fields, /KWD 3/);
   assert.match(String((TOOLS.find((t) => t.name === 'update')?.input as { properties: { patch: { description: string } } }).properties.patch.description), /As create takes fields/);
+});
+
+test('THE TOOLS A SESSION STARTS WITH LOAD AT ONCE, and every other listed tool is found by search with its own words', async () => {
+  const listedTools = ((await listed()) as { tools: { name: string; _meta?: Record<string, unknown> }[] }).tools;
+  const names = listedTools.map((t) => t.name);
+  assert.ok(ALWAYS_LOADED.has('context'), 'context, the first call of every session, waits on a tool search');
+  for (const core of ALWAYS_LOADED) assert.ok(names.includes(core), `${core} is loaded at once but not listed`);
+  for (const t of listedTools) {
+    const always = t._meta?.['anthropic/alwaysLoad'];
+    const hint = t._meta?.['anthropic/searchHint'];
+    if (ALWAYS_LOADED.has(t.name)) assert.equal(always, true, `${t.name} is not loaded at once`);
+    else {
+      assert.equal(always, undefined, `${t.name} is loaded at once`);
+      assert.equal(typeof hint, 'string', `${t.name} has no words a search finds it by`);
+      assert.ok(String(hint).length <= 40, `${t.name}'s search words are ${String(hint).length} characters`);
+    }
+  }
+  /* A hint for a tool that is not listed is a leftover. */
+  for (const name of Object.keys(SEARCH_HINTS)) assert.ok(names.includes(name), `${name} has search words and is not listed`);
 });

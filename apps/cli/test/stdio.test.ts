@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { TOOLS, tools, type McpSurface } from '@braindog/mcp';
-import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
+import { ALWAYS_LOADED, INSTRUCTIONS, SEARCH_HINTS, VERSIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 import { serveStdio } from '../src/stdio.ts';
 
@@ -308,6 +308,14 @@ const cardMetaOf = (kind: string) => ({
   'openai/outputTemplate': `ui://braindog/${kind}.skybridge.html`,
   'openai/widgetAccessible': true,
 });
+/** The `_meta` a tool is listed with: its card, and whether a host loads it at once or finds it by its search words. */
+const metaOf = (name: string): Record<string, unknown> | undefined => {
+  const meta = {
+    ...(CARDS[name] === undefined ? {} : cardMetaOf(CARDS[name]!)),
+    ...(ALWAYS_LOADED.has(name) ? { 'anthropic/alwaysLoad': true } : SEARCH_HINTS[name] === undefined ? {} : { 'anthropic/searchHint': SEARCH_HINTS[name] }),
+  };
+  return Object.keys(meta).length === 0 ? undefined : meta;
+};
 
 test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {
   const host = await stubHost(t);
@@ -352,7 +360,7 @@ test('initialize and tools/list answer without touching the host, and the list i
         annotations: tool.writes
           ? { readOnlyHint: false, destructiveHint: tool.destructive === true, idempotentHint: tool.idempotent === true, openWorldHint: false }
           : { readOnlyHint: true, openWorldHint: false },
-        ...(CARDS[tool.name] === undefined ? {} : { _meta: cardMetaOf(CARDS[tool.name]!) }),
+        ...((meta) => (meta === undefined ? {} : { _meta: meta }))(metaOf(tool.name)),
       },
       `${tool.name} did not survive the pipe as it was declared`,
     );
