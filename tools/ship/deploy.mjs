@@ -353,6 +353,20 @@ say(
 say('      (first: it holds when a migration, a Durable Object class or a store version shipped, and says why)');
 say(`    (cd apps/worker && pnpm exec wrangler rollback ${live.APP_PREVIOUS || '<app version>'} --env production --message "Rolled back by hand" --yes)`);
 say(`    (cd apps/site && pnpm exec wrangler rollback ${live.SITE_PREVIOUS || '<site version>'} --env production --message "Rolled back by hand" --yes)`);
+
+/* THE STATUS GOES INTO BRAINDOG WITH EACH DEPLOY, so the loop folder on this Mac is not its only copy. The same title is
+   the visual's next version (an unchanged page writes nothing), and a failed attach is said and never turns a deploy red. */
+const STATUS_PAGE = process.env.BRAINDOG_STATUS_PAGE || join(ROOT, 'loop/status/index.html');
+const STATUS_ON = process.env.BRAINDOG_STATUS_ON || 'things#21';
+const attachStatus = ['attach', STATUS_PAGE, '--on', STATUS_ON, '--title', 'Status'];
+if (!existsSync(STATUS_PAGE)) say(`  status: no page at ${relative(ROOT, STATUS_PAGE)}, so none was attached`);
+else if (DRY) say(`  status: WOULD RUN braindog ${attachStatus.join(' ')}`);
+else if (state.failed || refusals.length > 0) say('  status: not attached, since this deploy is not green');
+else {
+  const a = spawnSync('braindog', attachStatus, { cwd: ROOT, encoding: 'utf8', timeout: 120_000 });
+  const said = `${a.stdout ?? ''}${a.stderr ?? ''}`.split('\n').filter((l) => l.trim() !== '' && !/ExperimentalWarning|trace-warnings/.test(l));
+  say(`  status: ${a.status === 0 ? said.join(' ') : `not attached (${said.at(-1) ?? a.error?.message ?? `exit ${a.status}`})`}`);
+}
 say(`  log: ${relative(ROOT, LOG)}\n`);
 
 /* THE CLI COPIES "Build the CLI for the site" PUT IN THE SITE. On a runner the next checkout's clean removes them; here
