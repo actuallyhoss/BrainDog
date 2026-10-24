@@ -281,7 +281,7 @@ export type RecordSurface = {
   /** Fault `lens.firewall`, raised when a door's firewall took a hidden field off a method's answer (`serveApi`, `serveMcp`). */
   firewalled?(method: string, stripped: readonly string[]): void;
   boot(ctx: never): Promise<Result<unknown>>;
-  version(ctx: never): Promise<Result<unknown>>;
+  version(ctx: never, args?: never): Promise<Result<unknown>>;
   schema(args: never, ctx: never): Promise<Result<unknown>>;
   get(args: never, ctx: never): Promise<Result<unknown>>;
   list(args: never, ctx: never): Promise<Result<unknown>>;
@@ -402,7 +402,7 @@ export type RecordSurface = {
 export function handlersFor(api: RecordSurface): Record<string, Handler> {
   const handlers: Record<string, Handler> = {
     boot: (_a, ctx) => api.boot(ctx as never),
-    version: (_a, ctx) => api.version(ctx as never),
+    version: (a, ctx) => api.version(ctx as never, a as never),
     schema: (a, ctx) => api.schema(a as never, ctx as never),
     get: (a, ctx) => api.get(a as never, ctx as never),
     list: (a, ctx) => api.list(a as never, ctx as never),

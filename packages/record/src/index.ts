@@ -731,6 +731,10 @@ RETURNING n, until`;
 
 /** How long a fact a read is written from is held while the record's version stands (`heldFor`): 30 s, plan §4.1. */
 const HELD_MS = 30_000;
+/** The most log lines `version` reads to say which lists moved; past it, it says it cannot (`movedSince`). */
+const MOVED_LINES_MOST = 200;
+/** What a line may be about and move no list: a question, a decision, an arrival. */
+const MOVES_NO_LIST = new Set(['suggestion', 'decision', 'arrival']);
 /** One held fact: the version and the moment it was worked out at, and what it came to. */
 type Held<T> = { version: string; at: number; value: T };
 
@@ -1900,6 +1904,13 @@ export type Version = {
    * what it now holds (sharing plan §2.8). Absent for anybody who holds no share, the owner among them.
    */
   grant?: Grant;
+  /**
+   * WHICH LISTS MOVED SINCE THE VERSION ASKED ABOUT (`since`, scope 2026-10-24 A14), so a tab drops only what it kept over
+   * them: the lists whose rows a line since then wrote, `[]` when only questions or arrivals moved, and `null` when it
+   * cannot say (a declaration changed, a line it cannot place, too many lines, or a caller whose version is not the
+   * log's). Only when asked, so `version`'s own keys are as `33 §4` names them.
+   */
+  moved?: string[] | null;
 };
 
 /**
@@ -8021,6 +8032,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * going off, an access change) might, so she is walked on down as before. The event at the remembered top is read
    * back by id, so a log that was replaced underneath (a restore) is walked cold rather than trusted.
    */
+  /**
+   * The lists whose rows moved since `since`, for `version` (`Version.moved`): read off the log's lines above it, each row's
+   * line by the row it names. A line about a question, a decision, an arrival or a feed's pull moves no list; any other line, one about a
+   * row the record no longer holds, more than `MOVED_LINES_MOST` lines, or a caller whose version is not the log's top,
+   * is `null`, which a tab reads as everything.
+   */
+  const movedSince = (ctx: CallContext, since: unknown): string[] | null => {
+    if (typeof since !== 'number' || !Number.isSafeInteger(since) || since < 0 || !holdsRowids(ctx)) return null;
+    const lines = sql.all<{ kind: string; target_kind: string | null; register: string | null }>(
+      `SELECT e.kind, e.target_kind, en.register FROM event e LEFT JOIN entry en ON e.target_kind = 'entry' AND en.id = substr(e.target, 7)
+        WHERE e.rowid > ? ORDER BY e.rowid LIMIT ?`,
+      since,
+      MOVED_LINES_MOST + 1,
+    );
+    if (lines.length > MOVED_LINES_MOST) return null;
+    const moved = new Set<string>();
+    for (const line of lines) {
+      if (line.target_kind === 'entry' && line.register !== null) moved.add(line.register);
+      /* A SCHEDULED ACTION'S OWN LINE (`pull`, on its declaration) moves no list: what it filed has lines of its own. */
+      else if (!MOVES_NO_LIST.has(line.target_kind ?? '') && !(line.kind === 'pull' && line.target_kind === 'declaration')) return null;
+    }
+    return [...moved].sort();
+  };
+
   const versionFor = (ctx: CallContext): number => {
     if (holdsRowids(ctx)) return kernel.version();
     const top = kernel.version();
@@ -14554,13 +14589,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /** What this record is at, and what is reading it. `33 §4`, line 356. */
-    async version(ctx: CallContext): Promise<Result<Version>> {
+    async version(ctx: CallContext, args?: { since?: unknown }): Promise<Result<Version>> {
       /* `scoped`, AS `boot` ASKS: whoever may open the app may poll it. A colleague held to named lists, a guest among
          them, holds nothing record-wide, and `guard` refused the poll that tells their tab the grant moved. */
       const stop = scoped(ctx, 'read');
+      const since = args?.since;
       return stop
         ? { ok: false, refusal: stop }
         : ok({
+            ...(since === undefined || since === null ? {} : { moved: movedSince(ctx, since) }),
             version: versionFor(ctx),
             format: FORMAT_VERSION,
             kernel: KERNEL_MIGRATION,
