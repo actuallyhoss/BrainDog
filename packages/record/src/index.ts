@@ -6765,7 +6765,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * read and never changed: the readers below filter and map it into answers of their own.
    */
   const pagesHeld = new Map<string, Held<ReturnType<Kernel['pages']>>>();
-  const pagesNow = (): ReturnType<Kernel['pages']> => heldFor(pagesHeld, '', () => kernel.pages());
+  /* AND THE ROW EACH PAGE OF A ROW THAT COMES AND GOES WAS LAST SEEN AT (scope 2026-10-24 H18), by its address, kept past
+     the version that listed it: `page` hands it to the kernel, which reads that row alone and checks it still holds the
+     address (`rowPageAt`), so opening one run's page never resolves every run's. */
+  const rowAt = new Map<string, { register: string; seq: number }>();
+  const pagesNow = (): ReturnType<Kernel['pages']> =>
+    heldFor(pagesHeld, '', () => {
+      const every = kernel.pages();
+      rowAt.clear();
+      for (const p of every) if (p.fleeting && p.about !== null && p.about.seq !== null) rowAt.set(p.slug, { register: p.about.register, seq: p.about.seq });
+      return every;
+    });
 
   /**
    * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held (`heldFor`): `boot` read every one three times, for the rail's
@@ -10910,7 +10920,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          kernel's, unchanged: somebody who reads the whole record with no level of their own on any list reads every
          list alike, and `scoped` above already asked that of them, so the list is not built for them. */
       const everyList = wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).length === 0;
-      const listed = everyList ? null : kernel.pages();
+      const listed = everyList ? null : pagesNow();
       const seen = listed?.find((p) => p.slug === args.slug);
       if (listed && (!seen || !seesPage(ctx, seen))) {
         const shown = new Set(listed.filter((p) => seesPage(ctx, p)).map((p) => p.slug));
@@ -10927,7 +10937,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          as `heldBlock` holds them, with her own read mark on a feed. */
       const reader = pageReader(ctx);
       const host = pageHost(ctx);
-      let out = kernel.page(args.slug, filter, { ...reach, reader, ...pageCut(ctx), ...host });
+      const about = rowAt.get(args.slug);
+      let out = kernel.page(args.slug, filter, { ...reach, reader, ...pageCut(ctx), ...host, ...(about ? { about } : {}) });
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
@@ -10939,7 +10950,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
-        out = kernel.page(args.slug, kept, { ...reach, reader, ...pageCut(ctx), ...host });
+        out = kernel.page(args.slug, kept, { ...reach, reader, ...pageCut(ctx), ...host, ...(about ? { about } : {}) });
       }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and

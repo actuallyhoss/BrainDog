@@ -1493,17 +1493,53 @@ export { RAIL_PAGES, railRoom };
  * how many open rows hold each. A field the page does not filter on is not applied, and a value the field cannot hold
  * is answered as no choice, so an address kept from before a page changed still opens it.
  */
-export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
+/**
+ * THE PAGE OF ONE ROW THAT COMES AND GOES, FOUND BY ITS ADDRESS AND THE ROW THE HOST LAST SAW AT IT (scope 2026-10-24
+ * H18), or `null` when that row no longer holds that address. Such pages claim last (`claimRank`), so the address one
+ * holds turns on every steadier page and on earlier rows of its own kind alone: the steadier ones are resolved, the row
+ * is read by its number, and its claim is made as `resolvePages` makes it. A row an earlier one shares a name with is
+ * numbered there, which this answers as a different address, so the caller resolves them all as before. A read of one
+ * run's page filled a page for each of 908 runs on his record.
+ */
+function rowPageAt(deps: PageDeps, slug: string, about: { register: string; seq: number }): ReturnType<typeof resolvePages>[number] | null {
+  const decls = deps.pages();
+  const over = decls.filter((d) => claimRank(d) === 2 && d.for?.register === about.register);
+  if (over.length !== 1) return null;
+  const decl = over[0]!;
+  const schema = deps.schemaOf(about.register);
+  const title = deps.titleOf(about.register);
+  if (!schema || !title) return null;
+  const said = predicateOf(decl.for!.where, schema, deps.ctx);
+  if (said.bad.length) return null;
+  const bySeq: Predicate = { field: 'seq', is: about.seq };
+  const got = deps.list({ register: about.register, where: said.predicate ? { all: [said.predicate, bySeq] } : bySeq, limit: 1 });
+  if (!got.ok || got.value.rows.length !== 1) return null;
+  const row = got.value.rows[0]!;
+  const taken = new Set(resolvePages({ ...deps, pages: () => decls.filter((d) => claimRank(d) < 2) }).map((p) => p.slug));
+  const base = slugify(String(row.fields[title] ?? '')) || `${about.register}-${row.seq}`;
+  let claimed = base;
+  if (taken.has(base)) {
+    claimed = `${base}-${row.seq}`;
+    for (let n = 2; taken.has(claimed); n += 1) claimed = `${base}-${row.seq}-${n}`;
+  }
+  if (claimed !== slug) return null;
+  const keyed: PageDecl = Array.isArray(decl.blocks) ? { ...decl, blocks: keyedBlocks(decl.blocks) } : decl;
+  return { slug, decl: fill(keyed, row) as PageDecl, row };
+}
+
+export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<string, string>>, about?: { register: string; seq: number }): Result<PageResult> {
   /* A RUN IS READ ONCE FOR THE PAGE (`runsOnce`), whichever of its blocks names it first. */
   const deps = runsOnce(host);
   /* A PAGE SOMEBODY WROTE IS FOUND AMONG THE WRITTEN ONES ALONE (scope 2026-10-24 A9). They claim their addresses before
      any template does (`resolvePages`), so which address each holds never turns on a template's rows, and resolving every
      page to find one filled a page for every row of every template: on his record a read of the Agents page filled one
      for each of 908 runs, 1,410 ms of the record's time. A slug none of them holds is looked for among them all. */
-  const written = host.resolved === undefined ? resolvePages({ ...deps, pages: () => deps.pages().filter((d) => !d.for) }) : null;
+  /* AND A RUN'S PAGE, WHEN THE HOST SAYS WHICH ROW HELD ITS ADDRESS (`rowPageAt`), is found by that row alone. */
+  const atRow = about !== undefined && host.resolved === undefined ? rowPageAt(deps, slug, about) : null;
+  const written = atRow === null && host.resolved === undefined ? resolvePages({ ...deps, pages: () => deps.pages().filter((d) => !d.for) }) : null;
   const mine = written?.find((p) => p.slug === slug && !p.refusal);
-  const every = mine !== undefined ? written! : (host.resolved?.() ?? resolvePages(deps));
-  const found = mine ?? every.find((p) => p.slug === slug);
+  const every = atRow !== null ? [atRow] : mine !== undefined ? written! : (host.resolved?.() ?? resolvePages(deps));
+  const found = atRow ?? mine ?? every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
      named after the row's title, so listing those slugs listed every row title of every templated list, and this
      function cannot tell who is asking. Measured: a member invited to Obligations alone asked for `nope` and was handed

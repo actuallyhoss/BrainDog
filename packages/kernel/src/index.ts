@@ -9636,6 +9636,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         viewer?: string | undefined;
         /** What of the reads across the record she is shown (`PageSees`), or nothing for the owner. */
         sees?: PageSees | undefined;
+        /** The row the host last saw at this address, when it is a page of a row that comes and goes (`rowPageAt`). */
+        about?: { register: string; seq: number } | undefined;
       } = {},
     ): Result<PageResult> =>
       readPage(
@@ -9652,6 +9654,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         },
         slug,
         filter,
+        opts.about,
       ),
 
     /**
