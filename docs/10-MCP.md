@@ -188,7 +188,7 @@ are in `allowed` ([44-SPEC-MCP](44-SPEC-MCP.md) §5.6).
 
 ### Receipts, the way back, and hints
 
-Every write answers with a **receipt**: its first line as it was said in names, then the call that takes it back, as in *Receipt: Added Invoice 12. To undo, call undo with batch "..."*. The `batch` is an opaque handle and no credential is ever in a receipt. A write that made no batch says so rather than offering an undo that would fail, and a `propose` points to its `withdraw` instead. `create`, `update`, `log`, `triage`, `handoff`, `propose` and `meet` carry one; `undo` does not, being the way back itself.
+Every write answers with a **receipt**: its first line as it was said in names, then the call that takes it back, as in *Receipt: Added Invoice 12. To undo, call undo with batch "..."*, kept whole in `structuredContent.receipt`. The text says the first line once, so its receipt line is the call alone: *Receipt: To undo, call undo with batch "..."*. The `batch` is an opaque handle and no credential is ever in a receipt. A write that made no batch says so rather than offering an undo that would fail, and a `propose` points to its `withdraw` instead. `create`, `update`, `log`, `triage`, `handoff`, `propose` and `meet` carry one; `undo` does not, being the way back itself.
 
 **`undo({ batch, dry? })`** puts back one write made by the caller's own run. It is refused for anyone else's writes, and the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not marked destructive. A surface whose record has no `undoOwn` answers that the owner can put it back from the app.
 

@@ -79,7 +79,7 @@ test('WITHDRAW BY ANOTHER RUN IS REFUSED in the record\'s sentence, and the run 
 
   const mine = await mcp.answer('propose', { withdraw: id }, claude);
   assert.ok(mine.result.ok, mine.text);
-  assert.equal(mine.text, `Taken back: Add the launch checklist to Lanternfish? (${id}). It is gone from Decide.\nReceipt: Taken back: Add the launch checklist to Lanternfish? (${id}). It is gone from Decide. Nothing was written, so there is nothing to undo.`);
+  assert.equal(mine.text, `Taken back: Add the launch checklist to Lanternfish? (${id}). It is gone from Decide.\nReceipt: Nothing was written, so there is nothing to undo.`);
   assert.equal(open(sql), 0);
 
   /* AND THE CAUSE IS FREE AGAIN: the next proposal with it files a new question rather than joining a closed one. */

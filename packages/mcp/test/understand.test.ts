@@ -178,7 +178,7 @@ test('MEET FOLLOWS A MERGED ROW TO THE ONE KEPT and says them by name, from the 
   assert.equal(value.name, 'Priya Raman');
   assert.equal(value.merged_from, 'P9');
   assert.doesNotMatch(JSON.stringify(value), /[0-9A-HJKMNP-TV-Z]{26}/u, 'the answer carried a row id');
-  assert.equal(said.text, `Matched Priya Raman (Lanternfish, Copperleaf) by email; Priya R. (P9) was merged into them · P6\nReceipt: Matched Priya Raman (Lanternfish, Copperleaf) by email; Priya R. (P9) was merged into them · P6. No undo handle came back for this one; the owner can put it back from the app.`);
+  assert.equal(said.text, `Matched Priya Raman (Lanternfish, Copperleaf) by email; Priya R. (P9) was merged into them · P6\nReceipt: No undo handle came back for this one; the owner can put it back from the app.`);
 });
 
 test('A NAME ALONE IS NOTED, and the answer says what would add them', async () => {
@@ -189,7 +189,7 @@ test('A NAME ALONE IS NOTED, and the answer says what would add them', async () 
     }).surface,
   );
   const said = await mcp.answer('meet', { name: 'Priya', where: 'a note in Lanternfish' }, { who: 'agent' });
-  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: Noted Priya on Lanternfish; add an email or handle to add them. No undo handle came back for this one; the owner can put it back from the app.`);
+  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: No undo handle came back for this one; the owner can put it back from the app.`);
 });
 
 test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', async () => {

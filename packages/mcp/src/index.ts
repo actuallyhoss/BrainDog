@@ -485,7 +485,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND `topic`, WHAT THE PERSON IS WORKING ON, which an agent with no folder says on its first call (Claude.ai,
        ChatGPT, any remote client): with no repository, remote or folder it is the one thing that places its run, in the
        project of that name or the first one formed from it. An agent that sends none is asked for it in the answer. */
-    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' }, topic: str('No folder: what they work on') }),
+    input: obj({ task: str('Whole, with its version.'), project: str('By name, when the folder is in none.'), topic: str('No folder: what they work on') }),
     quiet: ['depth', 'since'],
     writes: false,
   },
@@ -536,7 +536,7 @@ export const TOOLS: readonly Tool[] = [
     /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
        `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
     description:
-      'Rows of one register, newest first. where is a predicate tree: {"field":"state","is":"open"}.',
+      'Rows of one register, newest first. where filters, as {"field":"state","is":"open"}.',
     input: obj(
       {
         register: { type: 'string' },
@@ -554,7 +554,7 @@ export const TOOLS: readonly Tool[] = [
            had been told twenty. The four tokens it costs are 2,761 against the 2,760 `budget.test.ts` holds, so one
            came off `fields` below ("answered" became "kept"), and the two together measure 2,760. `search` keeps
            "Default 20.", which is still the whole truth of it. */
-        limit: int('1 to 100. Up to 60 whole, else 20.'),
+        limit: int('Up to 60 whole, else 20.'),
         cursor: { type: 'string' },
         /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
            `clipped: true`, so an agent that needs the whole write-up names its field here or reads the row with `get`. */
@@ -573,7 +573,7 @@ export const TOOLS: readonly Tool[] = [
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
     /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
-    input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.') }, ['q']),
+    input: obj({ q: { type: 'string' }, limit: int('Default 20.') }, ['q']),
     writes: false,
   },
   {
@@ -812,7 +812,7 @@ export const TOOLS: readonly Tool[] = [
     /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
        writes go back; the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not
        destructive in the spec's sense. */
-    description: 'Put back your own write, by its receipt\'s batch. Refused for anyone else\'s.',
+    description: 'Put back your own write, by its receipt\'s batch.',
     input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
     writes: true,
     idempotent: true,
@@ -3344,7 +3344,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
          this caller may read or a figure one typo from one it may. A word that is neither has no corrected call. */
       if (QUALIFIED.test(said.toLowerCase())) return callOf(name, { ...args, spoken: said.toLowerCase() });
       if (PREFIXED.test(said.toUpperCase())) return callOf(name, { ...args, spoken: said.toUpperCase() });
-      if (!NAMED.test(said)) return undefined;
+      /* A NAME NOTHING IS CALLED IS LOOKED FOR BY ITS WORDS (audit D, W14): the sentence said "search finds it" and the
+         refusal carried no call, so an agent wrote the search itself or resent the get. */
+      if (!NAMED.test(said)) return name === 'get' && said !== '' && !FIGURE.test(said) ? callOf('search', { q: said.slice(0, 100) }) : undefined;
       if ((await listsOf()).some((r) => r.id === said)) return callOf('list', { register: said });
       if (name !== 'get') return undefined;
       const figures = await figuresFor(ctx, async () => []);
@@ -3466,12 +3468,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const value = result.ok ? result.value : undefined;
     /* THE LOOK'S OWN READS, a `boot` for the people and one of the runs, are made only for an answer said in words. */
     /* EVERY WRITE ENDS WITH ITS RECEIPT: what changed in names, and the one call that takes it back. */
-    const receipted = (s: Said, line: string | null, inText: boolean): Said =>
-      line === null ? s : { ...s, ...(inText ? { text: `${s.text}\n${line}` } : {}), structured: { ...s.structured, receipt: line } };
+    const receipted = (s: Said, line: string | null, short: string | null): Said =>
+      line === null ? s : { ...s, ...(short !== null ? { text: `${s.text}\n${short}` } : {}), structured: { ...s.structured, receipt: line } };
     const receiptOn = (line: string): string | null => (RECEIPTED.has(name) ? line : null);
-    if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), false);
+    if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), null);
     const body = done.say(await lookOf(ctx, turn, done.names));
-    return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), true);
+    return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), receiptOf(name, body, turn, value, true));
   };
 
   /** The register a conflict's row is in, from the call that met it: the one `update` named, else the one `create` did. */
@@ -4004,17 +4006,21 @@ const RECEIPTED: ReadonlySet<string> = new Set(['create', 'update', 'log', 'tria
  *
  * NO CREDENTIAL CAN BE IN IT, because it quotes only the answer's own line, which says names and never a stored value,
  * and the batch, an opaque handle. A write with no batch says so rather than offering an undo that would fail.
+ *
+ * `inText` LEAVES THE FIRST LINE OUT (audit D, W15): in the text the receipt sits under that very line, so every write
+ * answered it twice. `structuredContent.receipt` keeps it whole, for a client that shows the receipt alone.
  */
-function receiptOf(name: string, said: string, turn: Turn, value: unknown): string {
+function receiptOf(name: string, said: string, turn: Turn, value: unknown, inText = false): string {
   const first = (said.split('\n')[0] ?? '').trim().replace(/[.\s]+$/u, '');
   const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
-  if (turn.batch !== undefined) return `Receipt: ${did}. To undo, call undo with batch "${turn.batch}".`;
-  if (turn.asks !== undefined) return `Receipt: ${did}. To take it back, call propose with withdraw "${turn.asks}".`;
+  const head = inText && first !== '' ? 'Receipt:' : `Receipt: ${did}.`;
+  if (turn.batch !== undefined) return `${head} To undo, call undo with batch "${turn.batch}".`;
+  if (turn.asks !== undefined) return `${head} To take it back, call propose with withdraw "${turn.asks}".`;
   /* A PROPOSAL THE LADDER LET THROUGH WAS WRITTEN (`landed`, or the `rung` it went through on), so it is not said to have written nothing. */
   const ruled = ruledOf(value);
   const landed = ruled !== null && !('filed' in ruled);
-  if (!landed && (name === 'propose' || (isObject(value) && 'filed' in value))) return `Receipt: ${did}. Nothing was written, so there is nothing to undo.`;
-  return `Receipt: ${did}. No undo handle came back for this one; the owner can put it back from the app.`;
+  if (!landed && (name === 'propose' || (isObject(value) && 'filed' in value))) return `${head} Nothing was written, so there is nothing to undo.`;
+  return `${head} No undo handle came back for this one; the owner can put it back from the app.`;
 }
 
 /** The tools whose arguments go to the record whole, which names a key its method does not take in its own sentence. */
