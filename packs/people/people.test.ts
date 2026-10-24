@@ -217,8 +217,8 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      the version the module is at and nothing a record already holds is changed in place. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.people);
   /* 3.6.0 SINCE 24 October (things, not rows): Everyone as faces, the owner left off. 3.5.0 is released. 3.7.0
-     SINCE 24 October (C33): Scripts is a page. */
-  assert.equal(doc.version, '3.7.0');
+     SINCE 24 October (C33): Scripts is a page. 3.8.0 SINCE 25 October (Y2): an organisation can be retired. */
+  assert.equal(doc.version, '3.8.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

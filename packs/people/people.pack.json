@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "Scripts is a page like any other: every script, what starts it and where it stands, which you can change by saying how.",
+  "changes": "An organisation can be retired: it keeps its payments and is no longer listed on People. A shop met by a name a card text cut short is asked about once in Needs you, to fold it into the shop whose whole name it is, or retire it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -79,7 +79,8 @@
         "domain": "domain",
         "merged_into": "merged_into",
         "met": "met",
-        "projects": "projects"
+        "projects": "projects",
+        "retired": "retired_on"
       },
       "delete": "refuse_while_referenced",
       "fields": [
@@ -113,6 +114,7 @@
         },
         { "id": "met", "label": "Seen in", "type": "list", "of": "text" },
         { "id": "merged_into", "label": "Merged into", "type": "ref", "to": "organisations" },
+        { "id": "retired_on", "label": "Retired on", "type": "day" },
         { "id": "note", "label": "Notes", "type": "document" },
         { "id": "tags", "type": "list", "of": "text" }
       ]
@@ -177,7 +179,7 @@
           "icon": "building",
           "span": 6,
           "source": "register.organisations",
-          "where": "merged_into is empty",
+          "where": "merged_into is empty, retired_on is empty",
           "when": { "metric": "organisations-count", "gt": 0 },
           "columns": [
             { "field": "name", "label": "Organisation", "width": "minmax(14ch,2fr)" },
@@ -575,7 +577,7 @@
       "metric": "organisations-count",
       "name": "Organisations",
       "source": "register.organisations",
-      "where": "merged_into is empty",
+      "where": "merged_into is empty, retired_on is empty",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
