@@ -29,6 +29,7 @@ import { slotOf } from '../ui/face.ts';
 import { undoChange } from './undo-write.ts';
 import { machineSaid } from './machine-name.ts';
 import type { Fetch } from './boot-live.ts';
+import { rowsOf as tabRows } from '../data/ref-rows.ts';
 
 /* ── what the record answers ────────────────────────────────────────────── */
 
@@ -750,7 +751,8 @@ export function control(base: string, io?: Fetch) {
     /**
      * The projects "On" offers, by the handle runs hold them by (`<list>#1`): the list the runs name and every list the
      * tab has learnt declares `scopes`, never one named here, read whole, its title field said and its hue kept for the
-     * dot.
+     * dot. FROM THE TAB'S WALK (`ref-rows.ts`), which the page beside the panel walked already to name its refs (scope
+     * 2026-10-24 A21), and not a read of its own; a caller handed a fetch of its own reads for itself.
      */
     async projects(rows: readonly LiveRun[]): Promise<Map<string, Project>> {
       const declared = Object.values(REGISTERS)
@@ -759,9 +761,10 @@ export function control(base: string, io?: Fetch) {
       const registers = [...new Set([...rows.map((r) => r.project?.split('#')[0] ?? null), ...declared].filter((x): x is string => !!x))];
       const out = new Map<string, Project>();
       for (const register of registers) {
-        const got = await c.list({ register, limit: 100 });
-        if (!got.ok) continue;
-        const listed = (got.value as { rows?: { seq: number | null; fields: Record<string, unknown>; state?: string | null }[] }).rows ?? [];
+        const listed: readonly { seq: number | null; fields: Record<string, unknown> }[] | null = io
+          ? await c.list({ register, limit: 100 }).then((got) => (got.ok ? ((got.value as { rows?: { seq: number | null; fields: Record<string, unknown> }[] }).rows ?? []) : null))
+          : await tabRows(c, base, register);
+        if (listed === null) continue;
         for (const row of listed) {
           if (row.seq === null || row.fields.draft === true) continue;
           const titled = REGISTERS[register]?.title;

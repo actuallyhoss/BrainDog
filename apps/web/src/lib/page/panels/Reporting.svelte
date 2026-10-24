@@ -22,8 +22,9 @@
   `BlockSlot.svelte` only, so nothing here reaches the entry chunk.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { getContext, untrack } from 'svelte';
   import { createClient, type ReportKeyRow } from '@braindog/client';
+  import { SHAPE_KEY, type ShapeBox } from '../shape-key.ts';
   import { apiBase } from '$lib/at.ts';
   import { rowsOf as tabRows } from '$lib/data/ref-rows.ts';
   import { since } from 'braindog-render';
@@ -48,6 +49,8 @@
   } from '$lib/record/reporting.ts';
 
   let { register, seq, title }: { register: string; seq: number; title: string } = $props();
+  /* THE PAGE'S OWN ANSWER OF ITS PROJECT, where this panel is under a project's page (`shape-key.ts`). */
+  const shapeBox = getContext<ShapeBox | undefined>(SHAPE_KEY);
 
   let from = $state<'reading' | 'absent' | 'ready'>('reading');
   let binding = $state<Binding | null>(null);
@@ -97,8 +100,11 @@
        LISTS reports for that organisation too, so its numbers are on the organisation's page; and HOW MANY READINGS NAME
        THIS ROW, and when the newest is dated: one row read, and its count. */
     const listsOrgs = register === 'things' && bound.field !== 'organisation';
+    /* THE ROW IS THE PAGE'S, where the page answered its project (scope 2026-10-24 A21): its id and the day it was made
+       came with the page, so it is asked for only on a page that did not carry it. */
+    const answered = (await shapeBox?.hold?.taken(spoken).catch(() => null)) ?? null;
     const [row, orgs, read, keyed] = await Promise.all([
-      client.get(register, seq),
+      answered !== null ? Promise.resolve({ ok: true as const, value: answered.row }) : client.get(register, seq),
       /* THE TAB'S WALK OF ORGANISATIONS (`ref-rows.ts`), which the page beside this walked already to name its refs (scope
          2026-10-24 A21), and not a read of its own. */
       listsOrgs ? tabRows(client, apiBase(), 'organisations') : Promise.resolve(null),
