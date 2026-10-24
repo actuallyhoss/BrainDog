@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { feedsOf } from './webhook-doors.ts';
+import { settle } from '../data/read.ts';
 
 const NOW = Date.UTC(2026, 9, 24, 19);
 const door = (id: string, name: string, lastArrival: string | null) => ({ id, name, lastArrival });
@@ -35,5 +36,7 @@ test('an empty list of scheduled fetches says nothing feeds the record only when
   assert.match(actions, /project === null && rows\.length === 0 && !others\}/u, 'Nothing feeds is said over the feeds');
   const ingest = readFileSync(new URL('../../routes/settings/[area]/areas/Ingest.svelte', import.meta.url), 'utf8');
   assert.match(ingest, /\{#each feeds as feed \(feed\.id\)\}/u, 'the feeds are not listed');
-  assert.match(ingest, /<Actions project=\{null\} others=\{feeds\.length > 0 \|\| !anOwner \|\| doors\.value === undefined\} \/>/u);
+  /* A DOORS READ REFUSED, as a reader without ADMIN is, holds `null`, which is what the screen asks: nothing is known. */
+  assert.equal(settle({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'no' } }).value, null);
+  assert.match(ingest, /<Actions project=\{null\} others=\{feeds\.length > 0 \|\| !anOwner \|\| doors\.value === null\} \/>/u);
 });

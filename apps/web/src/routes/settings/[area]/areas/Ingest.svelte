@@ -233,7 +233,7 @@
       </ul>
     {/if}
     {#if shell.live}
-      <Actions project={null} others={feeds.length > 0 || !anOwner || doors.value === undefined} />
+      <Actions project={null} others={feeds.length > 0 || !anOwner || doors.value === null} />
     {/if}
     <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
          shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
