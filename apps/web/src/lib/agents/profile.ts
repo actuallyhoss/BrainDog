@@ -47,8 +47,15 @@ export type ProfileView = Profile & {
   seats?: string[];
 };
 
-/** The kinds that always have a row, in this order, whether or not one was heard from yet. */
-export const SHOWN_KINDS = ['claude', 'codex', 'cursor', 'other'] as const;
+/**
+ * The order the usual kinds come in. A KIND HAS A ROW ONLY ONCE IT IS HEARD FROM OR GIVEN A ROW (audit C of 25 October,
+ * X15): four rows saying "Not heard from yet" on a new record read as four agents already set up.
+ */
+export const KIND_ORDER = ['claude', 'codex', 'cursor', 'other'] as const;
+
+/** What the list says while no agent has a row of its own: Defaults alone is not an agent. */
+export const noAgentYet = (rows: readonly Pick<AgentRow, 'key'>[]): string | null =>
+  rows.some((r) => r.key !== DEFAULT_PROFILE_ID) ? null : 'No agent connected yet';
 
 /** A kind of agent as he reads it. */
 export const KIND_NAMES: Readonly<Record<string, string>> = {
@@ -233,8 +240,8 @@ export const kindOfAgent = (agent: string): string => {
 };
 
 /**
- * Every row Settings › Agents draws: Claude Code, Codex, Cursor and Other apps always, any other kind he has a row for
- * or was heard from, the rows bound to one key or machine, then Defaults for new agents.
+ * Every row Settings › Agents draws: each kind he has a row for or was heard from, the usual four first, the rows
+ * bound to one key or machine, then Defaults for new agents.
  *
  * `keyScope` answers how far a kind's key reaches (`keyScopeOf` in `record/device.ts`), for an agent that follows it.
  */
@@ -260,12 +267,17 @@ export function agentRows(input: {
     return fromRuns !== null && fromRuns.at >= p.heard_at ? fromRuns : { at: p.heard_at, seq: null, scope: null };
   };
 
-  const kinds: string[] = [...SHOWN_KINDS];
+  const kinds: string[] = [];
   const add = (k: string) => {
     if ((PROFILE_KINDS as readonly string[]).includes(k) && !kinds.includes(k)) kinds.push(k);
   };
   for (const h of input.heard) add(kindOfAgent(h.agent));
-  for (const p of input.profiles) if (p.id !== DEFAULT_PROFILE_ID && onKind(p) !== null) add(onKind(p)!);
+  for (const p of input.profiles) if (p.id !== DEFAULT_PROFILE_ID && p.retired_at === null && onKind(p) !== null) add(onKind(p)!);
+  const order = (k: string): number => {
+    const at = (KIND_ORDER as readonly string[]).indexOf(k);
+    return at === -1 ? KIND_ORDER.length : at;
+  };
+  kinds.sort((a, b) => order(a) - order(b));
 
   const used = new Set<string>();
   const rows: AgentRow[] = kinds.map((kind) => {

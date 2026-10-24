@@ -39,7 +39,7 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { movable, placesIn, scopeFieldOf, type Place } from '$lib/record/scope-move.ts';
   import {
-    agentRows, argsOf, chipName, followers, groupRows, heardLine, keepersOf, keyDecides, LEVEL_LINES, LEVEL_WORDS, machinesLine, narrowed,
+    agentRows, argsOf, chipName, followers, groupRows, heardLine, keepersOf, keyDecides, LEVEL_LINES, LEVEL_WORDS, machinesLine, narrowed, noAgentYet,
     type AgentRow, type ProfileView,
   } from '$lib/agents/profile.ts';
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
@@ -581,6 +581,9 @@
         <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
       {:else}
         {@const nowMs = recordNow()}
+        <!-- NO AGENT IS LISTED UNTIL ONE IS HEARD FROM (`profile.ts`), so a new record says so once, above Defaults. -->
+        {@const none = noAgentYet(agents)}
+        {#if none}<Empty kind="no-data-yet" compact title={none} />{/if}
         <ul class="agents">
           {#each groups as g (g.row.key)}
             {@const a = g.row}

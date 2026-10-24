@@ -53,7 +53,7 @@ export const agents = {
   notUsedFor: (days: number) => `Not used for ${days} days`,
 
   /* THE CONSENT SCREEN (`routes/connect`). What it may do is always a sentence and never the bare word. */
-  consentTitle: 'Connect an app',
+  consentTitle: 'Connect an agent',
   consentNamed: (app: string) => `Connect ${app}`,
   consentNone: 'No app is asking to connect',
   consentNoneWhy: 'When you add BrainDog to an app, the app sends you to this page to allow it.',

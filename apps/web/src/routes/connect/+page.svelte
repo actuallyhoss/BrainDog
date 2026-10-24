@@ -1,5 +1,5 @@
 <!--
-  Connect an app: the page an MCP client's sign-in lands on.
+  Connect an agent: the page an MCP client's sign-in lands on.
 
   WHO IS ASKING, WHERE THE ANSWER GOES, WHAT IT MAY DO, ON WHICH RECORD, AND ONE ALLOW. The app's name and the host its
   code is sent back to come from the held request (`GET /oauth/request`); what it may do is a sentence, never the bare

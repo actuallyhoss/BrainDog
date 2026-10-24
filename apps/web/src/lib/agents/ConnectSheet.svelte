@@ -1,5 +1,5 @@
 <!--
-  CONNECT AN AGENT (AGT-A07): one sheet, opened from Settings, Agents, with the six ways in as six flat tiles, one open
+  CONNECT AN AGENT (AGT-A07): one sheet, opened from Settings, Agents, with the ways in as flat tiles, one open
   at a time. Each line has its own Copy. The open tile ends in a live row that asks the record every two seconds and
   turns from "Waiting for its first call" to "Connected: Claude Code on MacBook, called 3 seconds ago".
 
@@ -21,11 +21,10 @@
   import { LABEL_MAX, TOKEN_DAYS, headerLine, type ConnectLines } from '$lib/record/device.ts';
   import { mintAgent } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
-  import type { AgentKind } from '$lib/ui/agent-glyphs.ts';
+  import { markOf, type AppMark, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { CONNECT_TILES, connectWords, copyOf, heardOf, lineOf, liveRow, poll, type Heard, type KeyHeard, type TileId } from './connect.ts';
 
@@ -48,7 +47,16 @@
   } = $props();
 
   /* EACH WAY IN WEARS ITS APP'S MARK, as Connect your agent's segments do; the two with no maker wear a glyph. */
-  const MARKS: Record<TileId, AgentKind> = { 'claude-code': 'claude', 'claude-web': 'claude', codex: 'codex', cursor: 'cursor', other: 'other', script: 'other' };
+  const MARKS: Record<TileId, MarkedAgent | AppMark | null> = {
+    'claude-code': 'claude',
+    'claude-web': 'claude',
+    chatgpt: 'chatgpt',
+    vscode: 'vscode',
+    cursor: 'cursor',
+    codex: 'codex',
+    other: null,
+    script: null,
+  };
 
   /* ONE TILE OPEN AT A TIME, and when it opened, which is the moment its live row waits for a call after. */
   let openId = $state<TileId | null>(null);
@@ -152,7 +160,9 @@
         <h3 class="way-head">
           <button type="button" class="way-pick" aria-expanded={on} aria-controls={on ? `way-${t.id}` : undefined} onclick={() => pick(t.id)}
             ><span class="way-mark" aria-hidden="true"
-              >{#if t.id === 'script'}<Icon name="code" size="m" />{:else}<AgentMark kind={MARKS[t.id]} size="m" />{/if}</span
+              >{#if MARKS[t.id] !== null}{@const m = markOf(MARKS[t.id]!)}<svg class="mark" data-tone={m.tone} viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+                  ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule} /></svg
+                >{:else}<Icon name={t.id === 'script' ? 'code' : 'session'} size="m" />{/if}</span
             ><span class="way-title">{t.title}</span><span class="way-chev" aria-hidden="true"><Icon name="chevron" size="s" /></span></button
           >
         </h3>
@@ -273,6 +283,22 @@
   /* THE APP'S MARK IN A 28 WELL OF THE SHEET'S OWN SURFACE, then the name, then the chevron that turns as it opens. */
   .way-pick {
     gap: var(--sp-3);
+  }
+
+  .mark {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    fill: currentColor;
+  }
+
+  .mark[data-tone='claude'] {
+    fill: var(--agent-claude);
+  }
+
+  @media (forced-colors: active) {
+    .mark {
+      fill: CanvasText;
+    }
   }
 
   .way-mark {

@@ -6,20 +6,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { copy } from '../copy.ts';
 import { INSTALL_LINES } from '../device.ts';
 import { connectLines } from '../record/device.ts';
+import { appLines } from './first-connect.ts';
 import { CONNECT_TILES, POLL_MS, connectWords, copyOf, heardOf, lineOf, liveRow, machineOf, poll, type PollHost } from './connect.ts';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
 const ago = (ms: number): string => new Date(NOW - ms).toISOString();
 const run = (fields: Record<string, unknown>) => ({ seq: 47, fields });
 
-test('six ways in, in the order the sheet draws them', () => {
+test('the apps the first screen offers, in its order, then Codex, any other app and a script', () => {
   assert.deepEqual(
     CONNECT_TILES.map((t) => t.title),
-    ['Claude Code', 'Claude on the web', 'Codex', 'Cursor', 'Any other app', 'A script'],
+    ['Claude Code', 'Claude', 'ChatGPT', 'VS Code', 'Cursor', 'Codex', 'Any other app', 'A script'],
   );
-  assert.equal(new Set(CONNECT_TILES.map((t) => t.id)).size, 6);
+  /* THE SAME APPS AS CONNECT YOUR AGENT (`first-connect.ts`), so the two screens never offer different ones. */
+  const first = appLines(connectLines('https://brain.dog', 'acme')).map((a) => a.name);
+  assert.deepEqual(CONNECT_TILES.slice(0, first.length).map((t) => t.title), first);
+  assert.equal(new Set(CONNECT_TILES.map((t) => t.id)).size, CONNECT_TILES.length);
 });
 
 test('each tile hands over its own lines, and only the script holds the key form', () => {
@@ -29,11 +34,23 @@ test('each tile hands over its own lines, and only the script holds the key form
   assert.deepEqual(lines.codex, ['install', 'setup', 'codex']);
   assert.deepEqual(lines.cursor, ['install', 'setup', 'cursor']);
   assert.deepEqual(lines['claude-web'], ['web']);
+  assert.deepEqual(lines.chatgpt, ['chatgpt']);
+  assert.deepEqual(lines.vscode, ['vscode']);
   assert.deepEqual(lines.other, ['other']);
   assert.deepEqual(lines.script, []);
   assert.deepEqual(CONNECT_TILES.filter((t) => t.key).map((t) => t.id), ['script']);
   assert.equal(CONNECT_TILES.find((t) => t.id === 'script')?.hint, 'An app signs in. A key is for a script.');
   assert.match(CONNECT_TILES.find((t) => t.id === 'claude-web')?.hint ?? '', /Settings, Connectors, add a custom connector/u);
+  assert.match(CONNECT_TILES.find((t) => t.id === 'chatgpt')?.hint ?? '', /^In ChatGPT, open Settings, Connectors/u);
+});
+
+test('ChatGPT pastes the address and VS Code runs the line the first screen gives it', () => {
+  const lines = connectLines('https://brain.dog', 'acme');
+  const first = new Map(appLines(lines).map((a) => [a.id, a.line]));
+  assert.equal(lineOf('chatgpt', lines, 'unix'), first.get('chatgpt'));
+  assert.equal(lineOf('vscode', lines, 'unix'), first.get('vscode'));
+  assert.equal(copyOf('chatgpt'), connectWords.copyAddress);
+  assert.equal(copyOf('vscode'), connectWords.copyCommand);
 });
 
 test('a line is the installer for the computer chosen, or the record\'s own line, and never a key', () => {
@@ -80,6 +97,17 @@ test('each run is told to its way in, by the app it named or the kind of agent',
   assert.deepEqual(heard.map((h) => h.tile), ['claude-web', 'claude-code', 'cursor', 'other']);
   assert.deepEqual(heard.map((h) => h.app), ['Claude', 'Claude Code', 'Cursor', 'Zed']);
   assert.equal(heard[1]?.machine, 'iMac');
+});
+
+test('ChatGPT and VS Code are told to their own tiles, and Codex and Cursor stay theirs', () => {
+  const heard = heardOf([
+    run({ client: 'openai-mcp', last_seen: ago(5_000) }),
+    run({ client: 'Visual Studio Code', last_seen: ago(6_000) }),
+    run({ client: 'codex-mcp-client', agent: 'codex', last_seen: ago(7_000) }),
+    run({ client: 'cursor-vscode', agent: 'cursor', last_seen: ago(8_000) }),
+  ]);
+  assert.deepEqual(heard.map((h) => h.tile), ['chatgpt', 'vscode', 'codex', 'cursor']);
+  assert.equal(liveRow(heard, 'chatgpt', NOW, NOW - 60_000).state, 'connected');
 });
 
 test('the key just made is the script tile\'s, from its own last use or a run it opened', () => {
@@ -154,4 +182,9 @@ test('no sentence the sheet says carries an em dash', () => {
     connectWords.earlier('Codex', '2d ago'),
   ];
   for (const w of words) assert.doesNotMatch(w, /—/u, w);
+});
+
+test('the page an app sends you to says agent, as the button on it and the sheet do', () => {
+  assert.equal(copy.consentTitle, connectWords.open);
+  assert.equal(copy.consentConnectAgent, connectWords.open);
 });

@@ -1,5 +1,5 @@
 /**
- * The connect sheet (AGT-A07), what it decides with no runes: the six ways in, the lines each one hands over, and the
+ * The connect sheet (AGT-A07), what it decides with no runes: the ways in, the lines each one hands over, and the
  * live row under the open one that turns from "Waiting for its first call" to "Connected" when the app makes its call.
  *
  * PURE, SO `node --test` CAN IMPORT IT. The sheet (`ConnectSheet.svelte`) draws these and asks the record; the clock,
@@ -16,11 +16,11 @@ import { INSTALL_LINES, type Os } from '../device.ts';
 import type { ConnectLines } from '../record/device.ts';
 import { nameWords, runByName } from '../record/names.ts';
 
-/** The six ways in, by the app each is for. */
-export type TileId = 'claude-code' | 'claude-web' | 'codex' | 'cursor' | 'other' | 'script';
+/** The ways in, by the app each is for. */
+export type TileId = 'claude-code' | 'claude-web' | 'chatgpt' | 'vscode' | 'cursor' | 'codex' | 'other' | 'script';
 
 /** A line a tile hands over: the installer, the setup command, or one app's own line for doing it by hand. */
-export type LineId = 'install' | 'setup' | 'claude' | 'codex' | 'cursor' | 'web' | 'other';
+export type LineId = 'install' | 'setup' | 'claude' | 'codex' | 'cursor' | 'web' | 'chatgpt' | 'vscode' | 'other';
 
 export type ConnectTile = {
   id: TileId;
@@ -43,6 +43,8 @@ export const connectWords = {
   sheetSub: 'Choose the app. Its first call shows here.',
   setupHint: copy.doorSetupHint,
   webHint: 'In Claude, open Settings, Connectors, add a custom connector, and paste this address. Claude then sends you here to allow it.',
+  chatgptHint: 'In ChatGPT, open Settings, Connectors, add a connector, and paste this address. ChatGPT then sends you here to allow it.',
+  vscodeHint: 'Run this in a terminal. VS Code then sends you here to allow it.',
   otherHint: copy.doorAnyHint,
   scriptHint: 'An app signs in. A key is for a script.',
   step: {
@@ -52,6 +54,8 @@ export const connectWords = {
     codex: 'Or add it to Codex by hand',
     cursor: "Or add this to Cursor's MCP settings by hand",
     web: 'The address to paste',
+    chatgpt: 'The address to paste',
+    vscode: 'The command',
     other: 'The address',
   } satisfies Record<LineId, string>,
   copyCommand: copy.copyCommand,
@@ -66,22 +70,31 @@ export const connectWords = {
   aScript: 'Your script',
 } as const;
 
-/** THE SIX, IN THIS ORDER: the apps setup finds come together, then the address alone, then the key. */
+/**
+ * THE APPS CONNECT YOUR AGENT OFFERS, IN ITS ORDER (`first-connect.ts`, audit C of 25 October, X15), so the first screen
+ * and this sheet never offer different ones; then Codex, which setup also finds, the address alone, and the key.
+ */
 export const CONNECT_TILES: readonly ConnectTile[] = [
   { id: 'claude-code', title: 'Claude Code', hint: connectWords.setupHint, lines: ['install', 'setup', 'claude'], key: false },
-  { id: 'claude-web', title: 'Claude on the web', hint: connectWords.webHint, lines: ['web'], key: false },
-  { id: 'codex', title: 'Codex', hint: connectWords.setupHint, lines: ['install', 'setup', 'codex'], key: false },
+  { id: 'claude-web', title: 'Claude', hint: connectWords.webHint, lines: ['web'], key: false },
+  { id: 'chatgpt', title: 'ChatGPT', hint: connectWords.chatgptHint, lines: ['chatgpt'], key: false },
+  { id: 'vscode', title: 'VS Code', hint: connectWords.vscodeHint, lines: ['vscode'], key: false },
   { id: 'cursor', title: 'Cursor', hint: connectWords.setupHint, lines: ['install', 'setup', 'cursor'], key: false },
+  { id: 'codex', title: 'Codex', hint: connectWords.setupHint, lines: ['install', 'setup', 'codex'], key: false },
   { id: 'other', title: 'Any other app', hint: connectWords.otherHint, lines: ['other'], key: false },
   { id: 'script', title: 'A script', hint: connectWords.scriptHint, lines: [], key: true },
 ];
 
+/** VS Code's own command for an HTTP server, the line Connect your agent gives it. */
+const vscodeLine = (mcp: string): string => `code --add-mcp '${JSON.stringify({ name: 'braindog', type: 'http', url: mcp })}'`;
+
 /** A line's text: the installer for the computer chosen, else the record's own line for it. */
-export const lineOf = (id: LineId, lines: ConnectLines, os: Os): string => (id === 'install' ? INSTALL_LINES[os] : lines[id]);
+export const lineOf = (id: LineId, lines: ConnectLines, os: Os): string =>
+  id === 'install' ? INSTALL_LINES[os] : id === 'chatgpt' ? lines.mcp : id === 'vscode' ? vscodeLine(lines.mcp) : lines[id];
 
 /** What a line's Copy says: an address, Cursor's entry, or a command. */
 export const copyOf = (id: LineId): string =>
-  id === 'web' || id === 'other' ? connectWords.copyAddress : id === 'cursor' ? connectWords.copyEntry : connectWords.copyCommand;
+  id === 'web' || id === 'chatgpt' || id === 'other' ? connectWords.copyAddress : id === 'cursor' ? connectWords.copyEntry : connectWords.copyCommand;
 
 /** A call the record heard: the way in it came through, the app by name, the kind of machine, and when. */
 export type Heard = { tile: TileId; app: string; machine: string | null; at: string };
@@ -124,6 +137,8 @@ function tileOfRun(f: Record<string, unknown>): TileId {
   if (/^(?:claude|anthropic)/u.test(client)) return 'claude-web';
   if (/codex/u.test(client) || (client === '' && agent === 'codex')) return 'codex';
   if (/^cursor/u.test(client) || (client === '' && agent === 'cursor')) return 'cursor';
+  if (/^(?:openai|chatgpt)/u.test(client)) return 'chatgpt';
+  if (/^(?:visual[\s-]*studio[\s-]*code|vscode)/u.test(client)) return 'vscode';
   if (client === '' && agent === 'claude') return text(f.host) ? 'claude-code' : 'claude-web';
   return 'other';
 }

@@ -13,7 +13,7 @@ import { keyScopeOf, seatsHeard, type Run, type TokenRow } from '../record/devic
 import {
   BUDGET_WORDS,
   KIND_NAMES,
-  SHOWN_KINDS,
+  KIND_ORDER,
   TOOL_ROWS,
   agentRows,
   argsOf,
@@ -28,6 +28,7 @@ import {
   keepersOf,
   keyDecides,
   narrowed,
+  noAgentYet,
   plainSays,
   sameDraft,
   saysOf,
@@ -50,13 +51,17 @@ const STORED_DEFAULT = view({ id: 'default', effective: { says: '', applies: 'de
 const heard = (agent: string, seq: number, seen = '2026-10-21T09:00:00.000Z'): Heard => ({ agent, seq, seen, scope: null });
 const noKey = () => null;
 
-test('one row per agent, Claude Code, Codex, Cursor and other apps always, Defaults last', () => {
+test('a new record lists no agent it has not heard from: Defaults alone, and the list says none is connected', () => {
   const rows = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [], keyScope: noKey });
-  assert.deepEqual(
-    rows.map((r) => r.name),
-    ['Claude Code', 'Codex', 'Cursor', 'Other apps', 'Defaults for new agents'],
-  );
+  assert.deepEqual(rows.map((r) => r.name), ['Defaults for new agents']);
+  assert.equal(noAgentYet(rows), 'No agent connected yet');
+});
+
+test('one row per agent heard from, in the usual order, Defaults last', () => {
+  const rows = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [heard('agent:other', 3), heard('cursor', 2), heard('claude', 1)], keyScope: noKey });
+  assert.deepEqual(rows.map((r) => r.name), ['Claude Code', 'Cursor', 'Other apps', 'Defaults for new agents']);
   assert.equal(rows.at(-1)!.key, 'default');
+  assert.equal(noAgentYet(rows), null);
 });
 
 test('an agent heard from or given a row of its own gets a row; ids never name one', () => {
@@ -72,7 +77,7 @@ test('an agent heard from or given a row of its own gets a row; ids never name o
 });
 
 test('nothing stored: its key decides, and the row it would become starts at Write, which is what the key allows', () => {
-  const rows = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [], keyScope: (k) => (k === 'claude' ? 'write' : null) });
+  const rows = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [heard('claude', 2), heard('codex', 1)], keyScope: (k) => (k === 'claude' ? 'write' : null) });
   const claude = rows[0]!;
   assert.equal(claude.follows, 'key');
   assert.equal(claude.may, 'write');
@@ -105,7 +110,7 @@ test('the list groups by agent: profiles hang off their agent as chips, Defaults
 });
 
 test('Defaults saved: an agent with no row of its own follows it, at Suggest for a new agent', () => {
-  const rows = agentRows({ profiles: [STORED_DEFAULT], heard: [], keyScope: () => 'write' });
+  const rows = agentRows({ profiles: [STORED_DEFAULT], heard: [heard('claude', 2), heard('codex', 1)], keyScope: () => 'write' });
   assert.equal(rows[1]!.follows, 'defaults');
   assert.equal(rows[1]!.may, 'propose');
   assert.equal(rows[1]!.says, 'Suggests; every change waits for you.');
@@ -125,7 +130,7 @@ test('a stored row speaks for itself: his Claude at Write keeps Write', () => {
 test('the first save of Defaults keeps his current agents: heard and unset agents get rows of their own first', () => {
   const rows = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [heard('claude', 7), heard('codex', 6)], keyScope: noKey });
   assert.deepEqual(keepersOf(rows).map((r) => r.name), ['Claude Code', 'Codex']);
-  assert.deepEqual(followers(rows), ['Cursor', 'Other apps'], 'only agents never heard from take the Defaults');
+  assert.deepEqual(followers(rows), [], 'no agent heard from takes the Defaults: each is kept as it is');
   const kept = argsOf(keepersOf(rows)[0]!, keepersOf(rows)[0]!.draft);
   assert.equal(kept.ceiling, 'write');
   assert.deepEqual(kept.match, { kind: 'claude' });
@@ -143,7 +148,7 @@ test('what an agent may do, in plain words', () => {
 });
 
 test('a save sends the row it would write: by id when stored, by kind when not, Defaults by its id', () => {
-  const [claude, , , , dflt] = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [], keyScope: noKey });
+  const [claude, dflt] = agentRows({ profiles: [UNSTORED_DEFAULT], heard: [heard('claude', 1)], keyScope: noKey });
   const d = { ...claude!.draft, brief: '  Small commits.  ', model: '', tools: { create: false }, caps: { jobs_day: 5 } };
   const sent = argsOf(claude!, d);
   assert.equal(sent.id, undefined);
@@ -153,7 +158,7 @@ test('a save sends the row it would write: by id when stored, by kind when not, 
   assert.deepEqual(sent.tools, { create: false });
   assert.deepEqual(sent.caps, { jobs_day: 5 });
   assert.deepEqual(argsOf(dflt!, dflt!.draft).id, 'default');
-  const stored = agentRows({ profiles: [STORED_DEFAULT, view({ id: 'kind-codex', name: 'Codex', match: { kind: 'codex' } })], heard: [], keyScope: noKey })[1]!;
+  const stored = agentRows({ profiles: [STORED_DEFAULT, view({ id: 'kind-codex', name: 'Codex', match: { kind: 'codex' } })], heard: [], keyScope: noKey })[0]!;
   assert.equal(argsOf(stored, stored.draft).id, 'kind-codex');
   assert.equal(argsOf(stored, { ...stored.draft, notify: { on: 'long', minutes: 30, by: 'push' } }).notify && (argsOf(stored, { ...stored.draft, notify: { on: 'long', minutes: 30, by: 'push' } }).notify as { minutes: number }).minutes, 30);
 });
@@ -212,7 +217,7 @@ test('the key behind a kind’s newest run decides while nothing is stored', () 
 });
 
 test('the kinds and sizes are the kernel’s', () => {
-  for (const k of SHOWN_KINDS) assert.ok((PROFILE_KINDS as readonly string[]).includes(k));
+  for (const k of KIND_ORDER) assert.ok((PROFILE_KINDS as readonly string[]).includes(k));
   for (const k of PROFILE_KINDS) assert.ok(Object.hasOwn(KIND_NAMES, k), `${k} has no name`);
   assert.deepEqual(Object.keys(BUDGET_WORDS).map(Number), [...KERNEL_BUDGETS]);
 });
