@@ -204,20 +204,23 @@ test("a page's own keys are the record's, and an expanded page wears the colour 
   assert.deepEqual(out.page.page.identity, { register: 'projects', seq: 4 });
 });
 
-test('A PAGE ABOUT A ROW SAYS WHICH ROW TO WHOEVER ASKED (`about`), with its title, once its blocks are read', async () => {
-  const answered = { ...ANSWER, param: { register: 'projects', seq: 4, title: 'Kiln' } };
-  const { io } = host((method) => (method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
-  const told: unknown[] = [];
-  const out = await pageReader(BASE, io, () => AT).read('kiln', undefined, { about: (row) => told.push(row) });
+test("A PAGE IS ASKED WITH ITS PROJECT'S SHAPE (`shape`), and a shape the record answered is kept beside its blocks", async () => {
+  const shape = { register: 'projects', seq: 4, row: null, history: [], links: null, work: null, runs: null, kpis: null, figures: {} };
+  const answered = { ...ANSWER, param: { register: 'projects', seq: 4, title: 'Kiln' }, shape };
+  const asked: URL[] = [];
+  const { io } = host((method, url) => {
+    if (method === 'page') asked.push(url);
+    return method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.');
+  });
+  const out = await pageReader(BASE, io, () => AT).read('kiln');
   assert.equal(out.from, 'live');
-  assert.deepEqual(told, [{ register: 'projects', seq: 4, title: 'Kiln' }]);
-  /* A HOOK THAT THROWS COSTS THE PAGE NOTHING, and a page about no row tells nobody. */
-  const thrown = await pageReader(BASE, io, () => AT).read('kiln', undefined, { about: () => { throw new Error('no'); } });
-  assert.equal(thrown.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(asked[0]?.searchParams.get('shape'), '1', 'the page is asked to carry its shape');
+  assert.deepEqual(out.page.page.shape, shape);
+  /* A PAGE ABOUT NO PROJECT IS ANSWERED NONE, and carries none. */
   const { io: bare } = host((method) => (method === 'page' ? json(200, { ok: true, value: ANSWER }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
-  const none: unknown[] = [];
-  await pageReader(BASE, bare, () => AT).read('desk', undefined, { about: (row) => none.push(row) });
-  assert.deepEqual(none, []);
+  const plain = await pageReader(BASE, bare, () => AT).read('desk');
+  assert.ok(plain.from === 'live' && plain.page.page.shape === undefined);
 });
 
 test('a declaration the record never checked is narrowed before it reaches the renderer', async () => {

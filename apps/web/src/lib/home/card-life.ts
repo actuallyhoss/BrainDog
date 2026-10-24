@@ -5,7 +5,7 @@
  * named the projects they were in. A run is the newest sign of life a project has, so each card says who worked on it
  * last and when ("Claude worked on it 2 hours ago"), read from the runs themselves: one read of the list whose rows are
  * runs (`seq_prefix`) heard from (`last_seen`), newest first, each project taking its newest run. Found by what the list
- * declares, as the project page finds its runs (`shape-read.ts`), never by a name.
+ * declares, as the project page's own answer finds its runs (`packages/record/src/project-shape.ts`), never by a name.
  *
  * A RUN NAMES ITS PROJECT by a ref to the projects list, else by its `project`, which holds the project's spoken id
  * (`things#1`), its row id or its name; all three are read. A read that fails says nothing and the card says what it

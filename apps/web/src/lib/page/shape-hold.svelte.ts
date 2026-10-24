@@ -11,12 +11,13 @@
  * ONE CLOCK (SF3): open work and what is late are counted on the record's day (`recordNow`), as Work counts it. One read
  * of the work list that points here holds the hero's counts, the Work tile and the Path.
  *
- * LIVE (proj F9): read again when the record moves (`moved`), the old read kept on screen until the new one answers,
- * and each figure whose value changed washes in the neutral `--arrived` for a moment (`arrived`), as every other row does.
+ * LIVE (proj F9): the page is read again when the record moves, and its new answer is taken here, the old one kept on
+ * screen until it lands, and each figure whose value changed washes in the neutral `--arrived` for a moment (`arrived`),
+ * as every other row does.
  *
- * READ FOR THE ROW IT IS GIVEN (`shape-read.ts`), outside the page's own read: the page asks for it the moment it knows
- * the row, and the hold takes that read when it follows the row (`takeShape`). A row that is not a project's reads
- * nothing and has no parts.
+ * TAKEN FROM THE PAGE'S OWN ANSWER (scope 2026-10-24 A20, `shape-answer.ts`): the record answers what the parts draw
+ * beside the page's blocks, so the hold asks the record nothing. A page that carries no shape, a row that is not a
+ * project's, has no parts.
  */
 
 import { apiBase } from '$lib/at.ts';
@@ -28,7 +29,7 @@ import { symbolText } from '$lib/record/money.ts';
 import { rowScreen } from '$lib/record/row-href.ts';
 import { registerHref } from '$lib/record/where.ts';
 import { actor } from '$lib/record/names.ts';
-import { readShape, takeShape, type ShapeRead, type WorkRow } from './shape-read.ts';
+import { shapeFrom, type ShapeRead, type WorkRow } from './shape-answer.ts';
 import { lanesOf } from '$lib/shell/side.ts';
 import { blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
 import { HEALTH, daySaid, figureOf, hueOf } from '$lib/home/project-cards.ts';
@@ -58,51 +59,56 @@ export class ShapeHold {
   /** The line the model wrote for this project, kept while its tiles still say it, said in place of the rules' line. */
   modelLine = $state<string | null>(null);
 
-  #seen: number | null = null;
+  /** The page's answer last taken, so the same answer drawn again is not turned over again. */
+  #said: unknown = undefined;
+  #loading: Promise<void> = Promise.resolve();
   #clearing: ReturnType<typeof setTimeout> | undefined;
 
   get key(): string {
     return `${this.register}#${this.seq}`;
   }
 
-  /** Follow the row the page is about: a new row is read from nothing, the same row is left as it is. */
-  follow(register: string, seq: number): void {
-    if (register === this.register && seq === this.seq) return;
-    this.register = register;
-    this.seq = seq;
-    this.read = null;
-    this.here = 0;
-    this.#seen = null;
+  /**
+   * Follow the row the page is about, with what the page's answer said of its shape (`shape`, `null` for none): a new
+   * row is drawn from nothing, and a new answer for the same row is taken over the one on screen when it is turned (proj F9).
+   */
+  follow(register: string, seq: number, said: unknown = null): void {
+    if (register !== this.register || seq !== this.seq) {
+      this.register = register;
+      this.seq = seq;
+      this.read = null;
+      this.here = 0;
+      this.#said = undefined;
+    }
+    if (said === this.#said) return;
+    this.#said = said;
     const key = this.key;
-    if (register === '' || seq <= 0) {
+    if (register === '' || seq <= 0 || said === null) {
       this.settled = key;
       return;
     }
-    void this.#load(register, seq, key).finally(() => {
-      if (this.key === key) this.settled = key;
+    this.#loading = this.#load(said, key).finally(() => {
+      if (this.key === key && this.#said === said) this.settled = key;
     });
   }
 
-  /** The record moved: read again, keeping what is on screen until the new read answers (proj F9). */
-  moved(version: number | null): void {
-    if (this.#seen === null || version === null || version === this.#seen || this.read === null) {
-      this.#seen = version;
-      return;
-    }
-    this.#seen = version;
-    void this.#load(this.register, this.seq, this.key);
+  /**
+   * The shape of `key` once the answer being turned is, or `null`: what a panel under the page takes in place of a read
+   * of its own (scope 2026-10-24 A21), the row it is about among it.
+   */
+  async taken(key: string): Promise<ShapeRead | null> {
+    await this.#loading;
+    return this.read?.key === key ? this.read : null;
   }
 
   stop(): void {
     clearTimeout(this.#clearing);
   }
 
-  /* THE FIRST READ IS THE ONE THE PAGE ASKED AHEAD (`shape-read.ts`), where it did; every later one is the hold's own. */
-  async #load(r: string, n: number, key: string): Promise<void> {
+  async #load(said: unknown, key: string): Promise<void> {
     try {
-      const base = apiBase();
-      const next = await (takeShape(base, r, n) ?? readShape(base, r, n));
-      if (next === null || key !== this.key) return;
+      const next = await shapeFrom(apiBase(), said);
+      if (next === null || key !== this.key || said !== this.#said || next.key !== key) return;
       if (this.read && this.read.key === key) this.#mark(this.read, next);
       this.read = next;
     } catch {
@@ -128,7 +134,7 @@ export class ShapeHold {
   /** A figure in the record's home currency, its symbol where it has one. */
   said = (minor: number, currency: string): string => symbolText(moneyOf(minor, currency), homeCurrency(), true);
 
-  /* THE LIST'S DECLARATION, ASKED EACH TIME AND NEVER KEPT: it is learnt while the first read is out (`readShape`), and
+  /* THE LIST'S DECLARATION, ASKED EACH TIME AND NEVER KEPT: it is learnt while the answer is turned (`shapeFrom`), and
      a value kept from before that would say the row is no project's for good. */
   get decl() {
     return REGISTERS[this.register];

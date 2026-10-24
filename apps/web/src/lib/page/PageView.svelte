@@ -30,7 +30,6 @@
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';
   import { setContext, untrack } from 'svelte';
-  import { live as liveRecord } from '$lib/data/live.svelte.ts';
   import { SHAPE_KEY, type ShapeBox } from './shape-key.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
@@ -195,12 +194,15 @@
   /* ── the project's shape ───────────────────────────────────────────────────
      A PAGE ABOUT A ROW READS THE ROW'S PROJECT ONCE (`shape-hold.svelte.ts`), and every part of the shape the page
      declares (`{ kind: project, part }`, C28 and C29) is drawn from that one read in its own slot (`BlockSlot.svelte`,
-     through `shape-key.ts`). The hold's code is fetched only for a page about a row, so Today carries none of it. A row
-     that is not a project's reads nothing, and the hold says so at once. */
+     through `shape-key.ts`). The hold's code is fetched only for a page about a row, so Today carries none of it. WHAT
+     IT DRAWS IS IN THE PAGE'S OWN ANSWER (`shape`, scope 2026-10-24 A20), so it asks the record nothing, and each answer
+     of the page, read again when the record moves, is handed to it. A page that carries none has no parts. */
   const shapeBox = $state<ShapeBox>({ hold: null });
   setContext(SHAPE_KEY, shapeBox);
+  const shapeSaid = $derived(mode === 'page' ? ((live?.page.page as { shape?: unknown } | undefined)?.shape ?? null) : null);
   $effect(() => {
     const of = about;
+    const said = shapeSaid;
     const isOwner = shell?.me?.owner === true;
     const line = modelLine;
     untrack(() => {
@@ -209,20 +211,14 @@
         return;
       }
       void import('./shape-hold.svelte.ts').then(({ ShapeHold }) => {
-        if (about?.register !== of.register || about.seq !== of.seq) return;
+        if (about?.register !== of.register || about.seq !== of.seq || said !== shapeSaid) return;
         const hold = shapeBox.hold ?? new ShapeHold();
         hold.owner = isOwner;
         hold.modelLine = line;
-        hold.follow(of.register, of.seq);
+        hold.follow(of.register, of.seq, said);
         if (shapeBox.hold !== hold) shapeBox.hold = hold;
       });
     });
-  });
-  /* READ AGAIN WHEN THE RECORD MOVES, keeping what is on screen until the new read answers (proj F9). */
-  $effect(() => {
-    const v = liveRecord.version;
-    const hold = shapeBox.hold;
-    untrack(() => hold?.moved(v));
   });
   $effect(() => () => shapeBox.hold?.stop());
   /* What the project's shape draws on this page, once its reads are back. */

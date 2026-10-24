@@ -56,12 +56,12 @@ const SCREENS = [
   '../../routes/r/[register]/[seq]/+page.svelte',
   '../../routes/v/[view]/+page.svelte',
   '../../routes/usage/+page.svelte',
-  '../page/shape-read.ts',
+  '../page/shape-answer.ts',
 ];
 /* AND THE SCREENS HANDED THEIR DAY BY ONE THAT READS IT: the Path and Money of a project are drawn from the shape's read,
    on its day (`shape-hold.svelte.ts`), since the UI pass of 20 October (proj F3), and read no clock of their own, nor
-   do the parts drawn from it (`ProjectPart.svelte`, C28 and C29). The shape itself is read once (`shape-read.ts`),
-   which the page asks for ahead of it since round 3. */
+   do the parts drawn from it (`ProjectPart.svelte`, C28 and C29). The shape itself comes with the page's own answer
+   and is turned once (`shape-answer.ts`), on the record's day (scope 2026-10-24 A20). */
 const HANDED = ['../page/ProjectVisuals.svelte', '../page/ProjectPart.svelte', '../page/shape-hold.svelte.ts'];
 
 test('THE ROW PAGE, THE SAVED VIEW, USAGE AND A PROJECT READ THE RECORD’S CLOCK, never the browser’s', () => {

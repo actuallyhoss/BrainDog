@@ -263,7 +263,14 @@ type Answered = {
  * `declared_version` is the version the record holds the page at, which arranging it writes against. `filters` is
  * what the page may be narrowed by, as the record answered it; `filtersOf` (`$lib/page/filters.ts`) reads it.
  */
-export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number; filters?: unknown; look?: LiveLook };
+export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & {
+  requires?: readonly string[];
+  declared_version?: number;
+  filters?: unknown;
+  look?: LiveLook;
+  /** What a project's page draws of its shape, answered beside its blocks (`shape-answer.ts`); none on any other page. */
+  shape?: unknown;
+};
 
 /**
  * HOW THE ENGINE ARRANGED THE PAGE (`loop/contract-17.md`, the look overlay), as the record answers it beside the
@@ -2223,12 +2230,8 @@ export type PageReader = {
   kept(slug: string, filter?: Readonly<Record<string, string>>): Opened | null;
 };
 
-/**
- * WHAT A READ IS ASKED BESIDE THE PAGE: a length picked past the walk's reach (`walk`), and who to tell the row a page is
- * about, with the title the record expanded it under, once its blocks' reads are back (`about`), so a read of that row
- * of its own (a project's shape, `shape-read.ts`) goes out while the page is drawn and not after.
- */
-export type ReadOpts = { walk?: Walked; about?: (row: { register: string; seq: number; title: string }) => void };
+/** WHAT A READ IS ASKED BESIDE THE PAGE: a length picked past the walk's reach (`walk`). */
+export type ReadOpts = { walk?: Walked };
 
 /** A length a reader picked on a forecast's horizon knob: whole days, or `last`, to the last dated movement. */
 export type Walked = number | 'last';
@@ -2302,12 +2305,16 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
 
          AND A LENGTH PICKED PAST THE WALK'S REACH IS ASKED FOR BY NAME (`walk`), which the record hands the kernel and
          the kernel walks only where a block offers it. Through `call`, as the client's `page` takes no length yet; a
-         record that does not read `walk` keeps it as text it never looks at, and answers the walk it would have. */
+         record that does not read `walk` keeps it as text it never looks at, and answers the walk it would have.
+
+         AND A PROJECT'S SHAPE IS ASKED WITH IT (`shape`, scope 2026-10-24 A20): on a page about a project's row that draws
+         its parts, the record answers what they draw beside the blocks, and nothing is read for them after. Any other page
+         is answered as it was. */
       const walk = opts.walk ?? WALKS.get(slug);
       const out =
         walk === undefined
-          ? await client.page(slug, filter)
-          : await client.call<unknown>('page', { slug, ...(filter && Object.keys(filter).length ? { filter } : {}), walk });
+          ? await client.page(slug, filter, { shape: true })
+          : await client.call<unknown>('page', { slug, ...(filter && Object.keys(filter).length ? { filter } : {}), walk, shape: '1' });
       if (!out.ok) {
         if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed };
         if (out.refusal.code === 'PAGE_UNKNOWN') {
@@ -2414,17 +2421,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       );
       /* The walks, the bars' links, the runs and who is reading are all out at once, and the page waits for the slowest. */
       const [mapped, booted] = await Promise.all([mapping, booting, linking, naming]);
-      /* THE ROW IT IS ABOUT, said once the page's own reads are back and before it is drawn, so a read of that row goes out
-         while the page draws and never takes the page's place where the browser holds few connections to the record. A
-         hook that throws costs the page nothing. */
       const param = page.param;
-      if (opts.about && param && typeof param.register === 'string' && Number.isInteger(param.seq)) {
-        try {
-          opts.about({ register: param.register, seq: param.seq, title: typeof param.title === 'string' ? param.title : '' });
-        } catch {
-          /* The page is drawn as it would have been. */
-        }
-      }
       const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
       const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
       const refs = new Map<string, RefMap>();

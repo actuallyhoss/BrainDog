@@ -35,7 +35,14 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  */
 export type Linked = { from: 'live'; groups: Backlink[]; cursor: string | null } | { from: 'refused'; fix: string };
 
-export type LinkReader = { read(register: string, seq: number, cursor?: string): Promise<Linked> };
+export type LinkReader = {
+  read(register: string, seq: number, cursor?: string): Promise<Linked>;
+  /** What points at `register#seq`, from a `backlinks` answer the record already gave (a project page's shape). */
+  answered(value: BacklinksValue, seq: number): Promise<Linked>;
+};
+
+/** A `backlinks` answer, as much of it as the groups are drawn from. */
+export type BacklinksValue = { from: { register: string; field: string; rows: unknown[]; matched: number }[]; cursor: string | null };
 
 /** Enough to fill the sections a row's page draws, and a `cursor` when there is more. */
 export const LINKS_PAGE = 24;
@@ -80,44 +87,49 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
     return refs;
   }
 
+  /** The groups of a `backlinks` answer, each list's rows named by this record. */
+  async function answered(value: BacklinksValue, seq: number): Promise<Linked> {
+    const now = Date.now();
+    const groups: Backlink[] = [];
+    for (const g of value.from) {
+      /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR FIRST: a use case's own lists are declared by the record alone. */
+      await learn(client.schema, g.register, asked);
+      const r = REGISTERS[g.register];
+      const f = r?.fields.find((x) => x.id === g.field);
+      /* A LIST NEITHER THIS BUILD NOR THE RECORD WILL DECLARE IS LEFT OUT rather than drawn with its id
+         for a name: a heading reading `service_events` over columns nothing here can label is worse
+         than the section being absent. */
+      if (!r || !f) continue;
+      const refs = await refsFor(g.register);
+      const rows = (g.rows as RecordRow[]).map((row) => entryOf(g.register, row, refs));
+      /* The pointing field is dropped from the columns: every row in this list has the same value
+         for it, which is the row you are already looking at. */
+      const columns = columnsFor(g.register).filter((c) => c.field !== g.field).slice(0, 3);
+      groups.push({
+        register: g.register,
+        name: r.name,
+        label: labelOf(f),
+        icon: iconFor(r.icon, 'rows'),
+        total: g.matched,
+        /* NAMED BY THIS RECORD. A pointing row's own refs are drawn from the titles that walk
+           collected, never from the sample's rows of the same numbers. */
+        rows: toRows(g.register, rows, columns, now, namesOf(refs)),
+        columns,
+        href: `/r/${g.register}?f=${g.field}:is:${seq}`,
+        raw: (g.rows as RecordRow[]).map((row) => row.fields),
+      });
+    }
+    return { from: 'live', groups, cursor: value.cursor };
+  }
+
   return {
     async read(register, seq, cursor) {
       /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked, and nothing on the record can point at it. */
       if (!Number.isInteger(seq) || seq < 1) return { from: 'live', groups: [], cursor: null };
       const out = await client.backlinks({ register, seq, limit: LINKS_PAGE, ...(cursor === undefined ? {} : { cursor }) });
       if (!out.ok) return missed(out);
-
-      const now = Date.now();
-      const groups: Backlink[] = [];
-      for (const g of out.value.from) {
-        /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR FIRST: a use case's own lists are declared by the record alone. */
-        await learn(client.schema, g.register, asked);
-        const r = REGISTERS[g.register];
-        const f = r?.fields.find((x) => x.id === g.field);
-        /* A LIST NEITHER THIS BUILD NOR THE RECORD WILL DECLARE IS LEFT OUT rather than drawn with its id
-           for a name: a heading reading `service_events` over columns nothing here can label is worse
-           than the section being absent. */
-        if (!r || !f) continue;
-        const refs = await refsFor(g.register);
-        const rows = (g.rows as RecordRow[]).map((row) => entryOf(g.register, row, refs));
-        /* The pointing field is dropped from the columns: every row in this list has the same value
-           for it, which is the row you are already looking at. */
-        const columns = columnsFor(g.register).filter((c) => c.field !== g.field).slice(0, 3);
-        groups.push({
-          register: g.register,
-          name: r.name,
-          label: labelOf(f),
-          icon: iconFor(r.icon, 'rows'),
-          total: g.matched,
-          /* NAMED BY THIS RECORD. A pointing row's own refs are drawn from the titles that walk
-             collected, never from the sample's rows of the same numbers. */
-          rows: toRows(g.register, rows, columns, now, namesOf(refs)),
-          columns,
-          href: `/r/${g.register}?f=${g.field}:is:${seq}`,
-          raw: (g.rows as RecordRow[]).map((row) => row.fields),
-        });
-      }
-      return { from: 'live', groups, cursor: out.value.cursor };
+      return answered(out.value as BacklinksValue, seq);
     },
+    answered,
   };
 }
