@@ -41,7 +41,6 @@
  * Nothing is taken from the names of tools.
  */
 
-import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -285,6 +284,24 @@ function seenOf(f: Found): Record<string, unknown> {
 /** Whether any text of a found tool, as it would be sent, looks like a key. A server holding one is never sent. */
 const keyedSeen = (f: Found): boolean => [f.name, f.source, f.command ?? '', f.endpoint ?? '', ...f.args, ...f.entries.map(needName)].some(looksLikeKey);
 
+/**
+ * Every row of the tools list in every state, a hundred a read, for a dry run to match against what one context cuts;
+ * `null` when the record does not answer, and the dry run then says what it did before.
+ */
+async function wholeList(client: Client): Promise<Record<string, unknown>[] | null> {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    const out = await client.list({ register: 'tools', limit: 100, ...(cursor === null ? {} : { cursor }) });
+    const value = valueOf(out) as { rows?: unknown; cursor?: unknown } | null;
+    if (value === null || !Array.isArray(value.rows)) return null;
+    for (const r of value.rows) if (isObject(r) && isObject(r.fields)) rows.push(r.fields);
+    cursor = typeof value.cursor === 'string' ? value.cursor : null;
+    if (cursor === null) return rows;
+  }
+  return rows;
+}
+
 /** The record's reason a tool was skipped, as a line can carry it: its own words, or a fixed sentence. */
 function whyOf(why: unknown): string {
   if (typeof why !== 'string' || why.trim() === '' || looksLikeKey(why)) return 'the record did not say why.';
@@ -405,7 +422,9 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   const lockFile = join(s.home, '.braindog', 'tools-lock.json');
   const lock = toolsLock(lockFile);
   if (lock === null) return [`${lockFile} is not valid JSON, so tools were not scanned. Delete it and scan again.`];
-  const machine = s.machine ?? hostname();
+  /* ONE NAME FOR THIS MACHINE ON EVERY PATH, the one people read ("MacBook Pro"), never its network name: the old path
+     wrote "Maras-MacBook-Pro.local" beside the record's "MacBook Pro", so one Mac read as two on a tool's row. */
+  const machine = s.machine ?? (await (await import('./hooks.ts')).deviceName(process.env, s.once?.host ?? null));
   const now = (s.now ?? Date.now)();
 
   /* Found in precedence order, so a later one of the same scope and name replaces an earlier one. */
@@ -556,7 +575,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       lines.push(...said);
       return true;
     }
-    const device = s.machine ?? (await (await import('./hooks.ts')).deviceName(process.env, s.once?.host ?? null));
+    const device = machine;
     let handled = false;
     try {
       for (let at = 0; at < sending.length; at += SEEN_PER_CALL) {
@@ -605,6 +624,17 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   };
 
   const everywhere: { f: Found; key: string; shape: string; row: Record<string, unknown> }[] = [];
+  /* A DRY RUN OVER A LIST LONGER THAN ONE CONTEXT READS THE WHOLE LIST, every state, so it names only what the record
+     does not hold. It said "not recorded, because the record lists more tools than one context shows" of every server
+     on his Mac, nineteen lines a scan, after a real scan had matched them all. */
+  const every = s.dryRun && reg.truncated ? await wholeList(s.client) : null;
+  const held = (f: Found): boolean =>
+    every !== null &&
+    every.some(
+      (r) =>
+        (typeof r.name === 'string' && r.name.trim().toLowerCase() === f.name.trim().toLowerCase()) ||
+        ((f.command !== null || f.endpoint !== null) && startKey(startOf(r)) === startKey(f)),
+    );
   /* A dry run sends nothing, so it says what it would do from the context, as before. */
   if (s.dryRun || !(await viaSeen())) try {
     const projectServers = [...found.values()].filter((f) => f.scope === 'project');
@@ -626,6 +656,10 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       const row = listed.find((r) => r.scope === f.scope && r.name === f.name) ?? (waits || (f.kind === 'integration' && f.endpoint === null) ? undefined : await startsAs(f, key, start));
 
       if (row === undefined) {
+        if (every !== null) {
+          if (!held(f)) lines.push(`${toolSaid(f)} would be recorded.`);
+          continue;
+        }
         if (reg.truncated) {
           lines.push(`${toolSaid(f)} was not recorded, because the record lists more tools than one context shows.`);
           continue;

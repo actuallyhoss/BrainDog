@@ -189,6 +189,39 @@ test('A DRY RUN sends nothing to toolsSeen and says what it would record, as bef
   assert.deepEqual(h.sent, []);
 });
 
+test('A DRY RUN OVER A LIST ONE CONTEXT CUTS reads the whole list, every state, and names only what the record lacks', async (t) => {
+  const h = setup(t, { seen: seenAll });
+  h.global({ fenwick: stdio('fenwick'), larch: stdio('larch'), renamed: stdio('quill') });
+  const listed: Record<string, unknown>[] = [
+    { name: 'fenwick', state: 'active', command: 'npx', args: ['-y', '@example/fenwick-mcp'] },
+    { name: 'larch', state: 'retired', command: 'npx', args: ['-y', '@example/larch-mcp'] },
+    { name: 'quill', state: 'active', transport: 'stdio', command: 'npx', args: ['-y', '@example/quill-mcp'] },
+  ];
+  const pages: unknown[] = [];
+  (h.client as unknown as { list: (a: Record<string, unknown>) => Promise<unknown> }).list = async (a) => {
+    pages.push(a);
+    const at = a.cursor === undefined ? 0 : 2;
+    return { ok: true, value: { rows: listed.slice(at, at + 2).map((fields) => ({ fields })), matched: 3, cursor: at === 0 ? 'next' : null } };
+  };
+  const cut = { registers: [{ id: 'tools', name: 'Tools', rows: [], inherited: [], truncated: true }], project: null } as unknown as Context;
+  const said = await scanTools({ client: h.client, context: cut, top: h.top, cwd: h.top, home: h.home, dryRun: true, deposit: null, machine: MACHINES[0], now: () => NOW });
+  assert.deepEqual(said, [], 'a tool the record holds, live, retired or under another name, was said as new');
+  assert.equal(pages.length, 2, 'the whole list was not read');
+  h.global({ fenwick: stdio('fenwick'), ash: stdio('ash') });
+  const again = await scanTools({ client: h.client, context: cut, top: h.top, cwd: h.top, home: h.home, dryRun: true, deposit: null, machine: MACHINES[0], now: () => NOW });
+  assert.deepEqual(again, ['Tool ash in ~/.claude.json would be recorded.']);
+  assert.deepEqual(h.of('toolsSeen'), [], 'a dry run sent toolsSeen');
+});
+
+test('TWO SCANS IN A ROW MAKE NO ROW: what the record answered seen is not created on the second', async (t) => {
+  const h = setup(t, { seen: seenAll });
+  h.global({ fenwick: stdio('fenwick'), larch: stdio('larch') });
+  await h.scan();
+  await h.scan();
+  assert.equal(h.of('create').length, 0, 'a scan created a row');
+  assert.equal(h.of('toolsSeen').length, 2);
+});
+
 /* ── keys ──────────────────────────────────────────────────────────────── */
 
 test('A KEY NEVER REACHES THE CALL: a key-shaped argument keeps its server out, an env key goes by name, and is deposited into the row the answer names', async (t) => {
