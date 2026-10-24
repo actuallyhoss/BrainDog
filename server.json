@@ -5,10 +5,6 @@
   "description": "One record of your projects, money and people, shared by you and every AI agent you use.",
   "version": "0.1.0",
   "websiteUrl": "https://brain.dog",
-  "repository": {
-    "url": "https://github.com/actuallyhoss/braindog",
-    "source": "github"
-  },
   "remotes": [
     {
       "type": "streamable-http",
