@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 
 import { bodyOf, draftOf, faultsOf, proposalOf } from './flow.ts';
 import type { Body } from './flow.ts';
-import { answerWords, firedOf, lastSaid, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, withFired, type Fetch } from './source.ts';
+import { answerWords, editWords, rowsNote, firedOf, lastSaid, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, withFired, type Fetch } from './source.ts';
 import { copy } from '../copy.ts';
 
 /**
@@ -304,4 +304,22 @@ test('A ROW NAMES ITS LIST AS THE RAIL DOES, never by its id', () => {
   assert.equal(rowTrigger(row, said), 'When an item in Instalments is added or changed');
   assert.equal(rowTrigger({ ...row, body: { rule: 'part-due', register: 'installments', then: [{ tag: 'due' }] } }, said), 'When an item in Instalments is added or changed');
   assert.equal(rowTrigger(row), 'When an item in installments is added or changed', 'with no names to hand it is said as written');
+});
+
+/* A LIST THAT COULD NOT BE READ IS NOT AN EMPTY ONE (audit B of 25 October, Y14): "If it ran now" said "This list is empty"
+   over Bills and invoices, which held two, because a read that failed and a list with nothing in it were drawn alike. */
+test('the latest item says what it is, and an unread or a refused list says that, never that it is empty', () => {
+  const kiln = { id: 'e_1', label: 'Glaze order for the big kiln', at: null };
+  assert.equal(rowsNote([kiln], 'read'), 'Glaze order for the big kiln');
+  assert.equal(rowsNote([], 'read'), editWords.noRows);
+  assert.equal(rowsNote([], 'reading'), editWords.rowsReading);
+  assert.equal(rowsNote([], 'refused'), editWords.rowsUnread);
+  assert.doesNotMatch(editWords.rowsUnread, /empty/u);
+});
+
+/* THE THREE CHOICES FIT A PHONE ON ONE LINE (audit B of 25 October, Y14): "Something I paste" wrapped under the other two
+   and was cut at the edge at 390. Each is two words at most. */
+test('each way to try it is two words at most', () => {
+  for (const w of [editWords.fromLatest, editWords.fromRow, editWords.fromArrival, editWords.fromJson, editWords.fromAsIs, editWords.fromNow])
+    assert.ok(w.split(' ').length <= 2, w);
 });

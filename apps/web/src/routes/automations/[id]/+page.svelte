@@ -87,6 +87,7 @@
     type AutomationRow,
     type Pick,
     type Pickable,
+    type RowsRead,
     type RunRow,
     type Source,
     type Tried as TriedAnswer,
@@ -161,6 +162,8 @@
   /** What a try starts from, bound into the panel so the sticky bar's Try reads the same pick. */
   let pick = $state<Pick>({ from: 'latest', row: '', json: '' });
   let pickRows = $state<Pickable[]>([]);
+  /** How far the read of `pickRows` has got (`rowsNote`): a list not read yet, or refused, is not an empty one. */
+  let rowsRead = $state<RowsRead>('reading');
   let arrivals = $state<Pickable[]>([]);
   /** What a new draft looked like when it opened, so the page can tell a draft nobody has touched from one being drawn. */
   let startedAs = $state('');
@@ -362,12 +365,21 @@
     const s = source;
     if (s === null || list === null || list === '') {
       pickRows = [];
+      rowsRead = s === null ? 'reading' : 'read';
       return;
     }
+    rowsRead = 'reading';
     untrack(() => {
-      void s.rows(list, now).then((out) => {
-        if (register === list) pickRows = out.ok ? out.value : [];
-      });
+      void s
+        .rows(list, now)
+        .then((out) => {
+          if (register !== list) return;
+          pickRows = out.ok ? out.value : [];
+          rowsRead = out.ok ? 'read' : 'refused';
+        })
+        .catch(() => {
+          if (register === list) rowsRead = 'refused';
+        });
     });
   });
   $effect(() => {
@@ -773,8 +785,12 @@
               <p class="said">{copy.flowRunAfterSave}</p>
             {/if}
             <div class="foot-actions">
-              <Button disabled={!flow.canUndo} kbd={canvasWords.undoKey} onclick={undo}>{copy.undo}</Button>
-              <Button disabled={!flow.canRedo} kbd={canvasWords.redoKey} onclick={redo}>{copy.redo}</Button>
+              <!-- NOT DRAWN UNTIL THERE IS A STEP TO TAKE BACK (audit B of 25 October, Y14): greyed, the two read as presses
+                   under "Nothing has changed since it was opened". Each comes once the canvas holds a change for it. -->
+              {#if flow.canUndo || flow.canRedo}
+                <Button disabled={!flow.canUndo} kbd={canvasWords.undoKey} onclick={undo}>{copy.undo}</Button>
+                <Button disabled={!flow.canRedo} kbd={canvasWords.redoKey} onclick={redo}>{copy.redo}</Button>
+              {/if}
               {#if manual && row && row.enabled && !flow.dirty}
                 <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
               {/if}
@@ -791,7 +807,7 @@
         </div>
         <div class="column side">
           {#if flow.draft.steps.length > 0}
-            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
+            <Tried {kind} path={flow.path} {owner} rows={pickRows} {rowsRead} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
           {/if}
 
           <!-- RUN AGAIN OVER WHAT IS ALREADY THERE (SHL-D07): the owner's, for a saved inline rule that sets a field, and

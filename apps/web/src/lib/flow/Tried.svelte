@@ -25,7 +25,7 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { Stacked } from '$lib/viz/index.ts';
-  import { editWords, picksFor, type Answer, type Pick, type Pickable, type Tried, type TryRun, type TryState } from './source.ts';
+  import { editWords, picksFor, rowsNote, type Answer, type Pick, type Pickable, type RowsRead, type Tried, type TryRun, type TryState } from './source.ts';
   import { outText, testedOf } from './try-step.ts';
 
   let {
@@ -33,6 +33,7 @@
     path,
     owner,
     rows,
+    rowsRead = 'read',
     arrivals,
     pick = $bindable(),
     inline,
@@ -44,6 +45,8 @@
     path: 'inline' | 'run';
     owner: boolean;
     rows: readonly Pickable[];
+    /** How far the read of `rows` has got, so a list not read yet, or refused, is never said to be empty. */
+    rowsRead?: RowsRead;
     arrivals: readonly Pickable[];
     pick: Pick;
     /** The last dry run of an inline body, or `null`. */
@@ -119,12 +122,12 @@
       </Segmented>
 
       {#if pick.from === 'latest' && kind === 'written'}
-        <p class="tried-note">{rows[0]?.label ?? editWords.noRows}</p>
+        <p class="tried-note">{rowsNote(rows, rowsRead)}</p>
       {:else if pick.from === 'latest' && kind === 'arrival'}
         <p class="tried-note">{arrivals[0]?.label ?? editWords.noArrivals}</p>
       {:else if pick.from === 'row'}
         {#if rows.length === 0}
-          <p class="tried-note">{editWords.noRows}</p>
+          <p class="tried-note">{rowsNote(rows, rowsRead)}</p>
         {:else}
           <!-- A LIST OF PRESSABLE ROWS AND NOT A <select>, which would draw the phone's own picker over the page. -->
           <ul class="tried-choices" aria-label={editWords.pickRow}>

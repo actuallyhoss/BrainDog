@@ -400,16 +400,19 @@ export const editWords = {
   notHeld: 'It did not hold, so it took If not.',
   /* THE TRY PANEL. */
   tryFrom: 'Try it on',
-  fromLatest: 'The latest one',
-  fromRow: 'One I pick',
-  fromArrival: 'The last arrival',
-  fromJson: 'Something I paste',
+  /* TWO WORDS AT MOST, SINCE the audit of 25 October (Y14): "Something I paste" wrapped under the other two at 390. */
+  fromLatest: 'The latest',
+  fromRow: 'Pick one',
+  fromArrival: 'Last arrival',
+  fromJson: 'Paste one',
   fromNow: 'Now',
-  fromAsIs: 'As it would be decided',
+  fromAsIs: 'As decided',
   pickRow: 'Which one',
   pasteLabel: 'What to try it on',
   pasteHint: 'The fields of an item, what arrived, or a figure, written as JSON.',
   noRows: 'This list is empty, so paste the fields of an item.',
+  rowsReading: 'Reading the list.',
+  rowsUnread: 'The list could not be read just now, so paste the fields of an item.',
   noArrivals: 'Nothing has arrived yet, so paste what would.',
   notJson: 'That is not JSON. Write it as {"field": "value"}.',
   pickOne: 'Pick one to try it on.',
@@ -538,6 +541,20 @@ export function picksFor(kind: string, owner: boolean): Pick['from'][] {
  * starts from an empty sample; everything else is read off the picker, and pasted text is parsed as JSON, never as a
  * number by `Number()`.
  */
+/** How far the read of a try's list has got: not back yet, back, or refused. */
+export type RowsRead = 'reading' | 'read' | 'refused';
+
+/**
+ * The line under "The latest": the newest item's name, or why there is none.
+ *
+ * A LIST THAT COULD NOT BE READ IS NOT EMPTY (audit B of 25 October, Y14). The two were drawn alike, so "This list is
+ * empty" stood over Bills and invoices while it held two.
+ */
+export function rowsNote(rows: readonly Pickable[], read: RowsRead): string {
+  if (rows[0]) return rows[0].label;
+  return read === 'reading' ? editWords.rowsReading : read === 'refused' ? editWords.rowsUnread : editWords.noRows;
+}
+
 export function sampleOf(kind: string, pick: Pick, rows: readonly Pickable[], arrivals: readonly Pickable[]): Answer<Sample> {
   const fail = (fix: string): Answer<Sample> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix } });
   const choices = picksFor(kind, true);
