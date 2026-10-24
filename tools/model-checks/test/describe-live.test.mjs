@@ -129,6 +129,9 @@ test('with a stub host, seventeen are asked through the door, and a first ask is
   assert.equal(trunk.clean, 'first');
   assert.equal(trunk.parts.drew.length, 6, trunk.parts.missing.join(', '));
   assert.ok(['note', 'queue', 'cards', 'steps', 'capture', 'inputs'].every((k) => trunk.drew.includes(k)), trunk.drew.join(', '));
+  /* THREE PAGES FROM ONE ASK, KEPT AS ONE DRAFT (C37): the desk, a page for each part, and the price check. */
+  assert.equal(trunk.built.filter((k) => k === 'page').length, 3, trunk.built.join(', '));
+  assert.equal(trunk.kept, 1);
   /* A STUB IS NEVER A MEASUREMENT OF A MODEL, whatever it scored. */
   assert.equal(r.stub, true);
   assert.equal(r.outcome, lib.NONE);

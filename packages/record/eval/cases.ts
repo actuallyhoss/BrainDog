@@ -16,6 +16,8 @@
  *
  * THE SEVENTEENTH IS THE TRUNK BAR BY DESCRIBING IT (C36, DIRECTION §28): three sentences that ask for the six things a
  * person must be able to make, each read off the draft by its block (`TRUNK_PARTS`), and clean only with five of them.
+ * Its good answer is three pages in one draft (C37), the desk, a page for each part and the price check, and each page
+ * opens on its own sentence with a figure, which the record asks of every page it keeps.
  */
 
 type Decl = { id: string; kind: string; body: Record<string, unknown> };
@@ -372,17 +374,35 @@ export const CASES: readonly Case[] = [
           ]),
           figure('steps-left', 'Steps left', 'steps', { count: 'id' }, 'int', 'done is not true'),
           figure('priced', 'Price check filled in', 'prices', { count: 'id' }, 'int', 'price is set, cost is set'),
-          pageOf('launch', 'Launch', 'board', ['parts', 'steps', 'thoughts', 'prices'], [
+          /* THREE PAGES FROM ONE ASK (C37): the desk, a page for each part, and the price check, as the launch desk is. */
+          pageOf('launch', 'Launch', 'board', ['parts', 'steps', 'thoughts'], [
             { kind: 'note', lead: true, span: 12, body: '{{steps-left}} steps are left before the launch.' },
             { kind: 'queue', span: 12, heading: 'Calls waiting on you', source: 'governance.open', tiles: true, empty: 'No call is waiting on you.' },
             { kind: 'section', heading: 'The parts' },
             { kind: 'cards', span: 12, source: 'register.parts', columns: [{ field: 'name', as: 'title' }, { field: 'progress', as: 'ring' }, { field: 'what', as: 'next' }, { field: 'hue', as: 'hue' }, { field: 'picture', as: 'picture' }], empty: 'No parts yet.' },
             { kind: 'section', heading: 'The path' },
-            { kind: 'steps', span: 12, heading: 'The path', source: 'register.steps', columns: [{ field: 'what' }, { field: 'part' }], order: [{ field: 'rank', dir: 'asc' }], empty: 'No step yet.' },
+            { kind: 'steps', span: 12, heading: 'Next move', source: 'register.steps', first: 1, columns: [{ field: 'what' }, { field: 'part' }], order: [{ field: 'rank', dir: 'asc' }], empty: 'No step is open.' },
             { kind: 'section', heading: 'The pad' },
             { kind: 'capture', heading: 'A thought', register: 'thoughts', span: 4 },
             { kind: 'cards', span: 8, source: 'register.thoughts', columns: [{ field: 'text', as: 'title' }, { field: 'reply', as: 'reply' }], empty: 'Nothing on the pad yet.' },
-            { kind: 'section', heading: 'Does the price hold' },
+          ]),
+          {
+            id: 'page.part',
+            kind: 'page',
+            body: {
+              page: 'part',
+              title: '{{name}}',
+              for: { register: 'parts' },
+              requires: ['register.parts', 'register.steps'],
+              blocks: [
+                { kind: 'note', lead: true, span: 12, body: '{{steps-left}} steps are left across the launch, and these are this part’s.' },
+                { kind: 'note', body: '{{what}}' },
+                { kind: 'steps', span: 12, heading: 'The path', source: 'register.steps', where: 'part is {{name}}', columns: [{ field: 'what' }], order: [{ field: 'rank', dir: 'asc' }], empty: 'No step for this part yet.' },
+              ],
+            },
+          },
+          pageOf('price', 'Price check', 'money', ['prices'], [
+            { kind: 'note', lead: true, span: 12, body: 'The room over the cost is worked out as you type, over {{priced}} price checked.' },
             { kind: 'inputs', register: 'prices', heading: 'The price check', columns: [{ field: 'price' }, { field: 'cost' }, { field: 'room' }], row: 'prices#1' },
             /* THE VERDICT IS THE ROOM, worked out beside what is typed: a figure cannot add up a field worked out at read. */
             { kind: 'note', when: { metric: 'priced', is: 0 }, body: 'Type the price and what one costs to make, and the room over the cost is worked out beside them.' },
