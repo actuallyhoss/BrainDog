@@ -62,7 +62,7 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
-  import { cameFromOf, hintOf, opensOf, rowAction, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
+  import { cameFromOf, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
 
@@ -74,6 +74,12 @@
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
+  /* WHAT THE ADDRESS ASKED FOR (`?q=`, a service's page links here with its name), and the keys grouped by project and
+     then by who they are with (`groupsOf`), the asked-for ones alone while it asks. */
+  const asked = $derived(page.url.searchParams.get('q')?.trim() || null);
+  const shownKeys = $derived(keysFor(keys, asked));
+  const groups = $derived(groupsOf(shownKeys));
+  const severalGroups = $derived(groups.length > 1 || (groups[0]?.services.length ?? 0) > 1);
   /** Where each key came from, by its row id, for the rows that say so (`cameFromOf`). */
   let cameFrom = $state<ReadonlyMap<string, string>>(new Map());
   /** Whether the record holds keys past the ones read: a page refused part way, or a read that met its ceiling. */
@@ -714,8 +720,14 @@
       <!-- KEYS THAT LOOK LIKE THEY BELONG TO A PROJECT: one line and one button that puts the move on Decide. Loaded after
            the screen drew; nothing here at nought or on a refusal. -->
       {#if scope}<scope.Note found={scope.found} call={scope.call} />{/if}
+      {#if asked}<p class="said">{tileWords.searched(asked, shownKeys.length)} <a href={at('/vault')}>{tileWords.everyKey}</a></p>{/if}
+      {#each groups as g (g.name)}
+      <section class="key-group" aria-label={g.name}>
+      {#if severalGroups}<h3 class="group-head">{#if g.scope}<ScopeChip scope={g.scope} inline />{:else}{g.name}{/if}</h3>{/if}
+      {#each g.services as sv (sv.provider ?? '')}
+      {#if severalGroups && sv.provider}<h4 class="service-head">{sv.provider}</h4>{/if}
       <ul class="ledger ledger-lead whos keys">
-        {#each keys as k (k.id)}
+        {#each sv.keys as k (k.id)}
           <!--
             ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
             opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu always drawn at a desk, the "…" alone on a phone.
@@ -738,9 +750,11 @@
                 {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{k.label}</a>{:else}<span class="line-title key-name" data-own>{k.label}</span>{/if}
                 <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
                      projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
+                <!-- WHERE IT APPLIES IS THE GROUP'S HEAD once there are groups, so the line says what it opens, in words:
+                     a day as how long ago, a key named by its handle by its name (`opensInWords`). -->
                 <span class="line-detail key-meta">
-                  {#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}
-                  {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens" data-own>{k.opens}</span>{/if}
+                  {#if !severalGroups}{#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}{/if}
+                  {#if k.opens}{#if !severalGroups}<span class="sep" aria-hidden="true">{' · '}</span>{/if}<span class="key-opens" data-own>{opensInWords(k.opens, keys)}</span>{/if}
                   {#if hint}<span class="key-hint" data-own>{hint}</span>{/if}
                   {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
                 </span>
@@ -802,6 +816,9 @@
           </li>
         {/each}
       </ul>
+      {/each}
+      </section>
+      {/each}
     </div>
   </Tile>
 
@@ -994,6 +1011,27 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* THE GROUPS: a project's name over its keys, then who they are with, quieter, over each service's own. */
+  .key-group + .key-group {
+    margin-block-start: var(--sp-4);
+  }
+
+  .group-head {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .service-head {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 500;
     line-height: 18px;
   }
 

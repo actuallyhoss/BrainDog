@@ -13,7 +13,7 @@
  * PURE, SO `node --test` CAN IMPORT IT, as `said.ts` is.
  */
 
-import { since } from 'braindog-render';
+import { relativeWords, since, sinceWords } from 'braindog-render';
 
 import { words as vault, type KeyRow, type UsedByRun } from '../../lib/record/vault.ts';
 
@@ -45,6 +45,9 @@ export const words = {
   /* Where a key came from, as its row says it, in the row's menu. */
   cameFrom: 'Came from',
   cameFromSaid: (where: string) => `Came from ${where}`,
+  /* WHAT THE ADDRESS ASKED FOR (`?q=`), from a service's page, and the way back to every key. */
+  searched: (q: string, n: number) => `${n === 1 ? '1 key' : `${n} keys`} for “${q}”.`,
+  everyKey: 'Show every key',
   /* Over the keys, only when the read stopped before the record ran out of them. */
   moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. This record holds more.`,
 } as const;
@@ -186,3 +189,55 @@ export const rowPath = (k: KeyRow): string | null => {
   const m = k.spoken === null ? null : /^([a-z0-9_-]+)#([1-9][0-9]*)$/u.exec(k.spoken);
   return m ? `/r/${m[1]}/${m[2]}` : null;
 };
+
+/* ── grouped, and in words ────────────────────────────────────────────── */
+
+/** One project's keys, and inside it one group a service: who they are with, or `null` for the keys that say no one. */
+export type KeyGroup = { name: string; scope: KeyRow['scope']; services: { provider: string | null; keys: KeyRow[] }[] };
+
+/**
+ * THE VAULT BY PROJECT, THEN BY SERVICE (24 October, U-B23): one flat list of 176 read as a dump. Each project's keys
+ * under its name, the projects by name and the keys that apply everywhere last; inside each, a group a service by who
+ * the key is with, by name, and the keys that name nobody after them. Each key keeps the order it came in.
+ */
+export function groupsOf(keys: readonly KeyRow[]): KeyGroup[] {
+  const projects = new Map<string, KeyGroup>();
+  for (const k of keys) {
+    const name = k.scope?.name ?? k.project ?? words.allProjects;
+    const at = k.scope || k.project ? name : '';
+    let g = projects.get(at);
+    if (!g) projects.set(at, (g = { name, scope: k.scope, services: [] }));
+    const provider = k.provider ?? null;
+    let s = g.services.find((x) => x.provider === provider);
+    if (!s) g.services.push((s = { provider, keys: [] }));
+    s.keys.push(k);
+  }
+  const byName = (a: string, b: string): number => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  for (const g of projects.values()) g.services.sort((a, b) => (a.provider === b.provider ? 0 : a.provider === null ? 1 : b.provider === null ? -1 : byName(a.provider, b.provider)));
+  return [...projects.entries()].sort(([a], [b]) => (a === b ? 0 : a === '' ? 1 : b === '' ? -1 : byName(a, b))).map(([, g]) => g);
+}
+
+/** The keys the address asked for (`?q=`): a name, what it opens or who it is with holding the words, any case. */
+export function keysFor(keys: readonly KeyRow[], q: string | null): KeyRow[] {
+  const t = (q ?? '').trim().toLowerCase();
+  if (t === '') return [...keys];
+  return keys.filter((k) => [k.label, k.opens, k.provider ?? ''].some((v) => v.toLowerCase().includes(t)));
+}
+
+const DAY = /\b(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?(?![\d-])/gu;
+const HANDLE = /\b[a-z][a-z0-9_]*#[1-9]\d*\b/gu;
+
+/**
+ * WHAT A KEY OPENS, IN WORDS (24 October): the text is the record's, often an agent's, and it said "imported 2026-09-01"
+ * and "the index row is credentials#26". A day is said as how long ago ("3 weeks ago"), and a key named by its handle is
+ * said by its name; a handle this screen cannot name is left as it was written.
+ */
+export function opensInWords(text: string, keys: readonly KeyRow[], now: number = Date.now()): string {
+  const named = new Map(keys.flatMap((k) => (k.spoken ? [[k.spoken, k.label] as const] : [])));
+  return text
+    .replace(DAY, (whole: string, day: string) => {
+      if (!Number.isFinite(Date.parse(whole.length > 10 ? whole : day))) return whole;
+      return whole.length > 10 ? sinceWords(whole, now) : relativeWords(day, now);
+    })
+    .replace(HANDLE, (whole) => named.get(whole) ?? whole);
+}

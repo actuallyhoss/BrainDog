@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { KeyRow, UsedByRun } from '../../lib/record/vault.ts';
-import { BARS, cameFromOf, clip, hintOf, opensOf, readingOf, rowAction, rowPath, sentenceOf, stateOf, words } from './tiles.ts';
+import { BARS, cameFromOf, clip, groupsOf, hintOf, keysFor, opensInWords, opensOf, readingOf, rowAction, rowPath, sentenceOf, stateOf, words } from './tiles.ts';
 
 const NOW = Date.parse('2026-09-30T12:00:00Z');
 
@@ -150,4 +150,34 @@ test('EVERY KEY IS COUNTED, however many: 405 handed is 405 said, not the first 
 test('MORE KEYS THAN WERE READ IS SAID, and a read that got them all says nothing', () => {
   assert.equal(words.moreKeys(405), 'The first 405 keys are listed. This record holds more.');
   assert.ok(!words.moreKeys(1).includes('—'));
+});
+
+const scoped = (name: string) => ({ spoken: `things#${name.length}`, name, mark: null, hue: null });
+
+test('THE VAULT GROUPS BY PROJECT, THEN BY WHO A KEY IS WITH: projects by name, the keys for everywhere last', () => {
+  const keys = [
+    key({ id: '1', label: 'aws-access', provider: 'AWS', project: 'Bake', scope: scoped('Bake') }),
+    key({ id: '2', label: 'mongo', provider: 'Azure', project: 'Bake', scope: scoped('Bake') }),
+    key({ id: '3', label: 'notes' }),
+    key({ id: '4', label: 'stripe', provider: 'Stripe', project: 'Atlas', scope: scoped('Atlas') }),
+    key({ id: '5', label: 'loose', project: 'Bake', scope: scoped('Bake') }),
+  ];
+  const groups = groupsOf(keys);
+  assert.deepEqual(groups.map((g) => g.name), ['Atlas', 'Bake', words.allProjects]);
+  assert.deepEqual(groups[1]!.services.map((s) => s.provider), ['AWS', 'Azure', null], 'a key naming nobody comes after the services');
+  assert.deepEqual(groups[1]!.services.map((s) => s.keys.map((k) => k.id)), [['1'], ['2'], ['5']]);
+});
+
+test('A SERVICE PAGE OPENS THE VAULT ON ITS KEYS (`?q=`): a name, what it opens or who it is with', () => {
+  const keys = [key({ id: '1', label: 'Workers deploy', provider: 'Cloudflare' }), key({ id: '2', label: 'other', opens: 'the workers plan' }), key({ id: '3', label: 'x' })];
+  assert.deepEqual(keysFor(keys, 'workers').map((k) => k.id), ['1', '2']);
+  assert.deepEqual(keysFor(keys, 'cloudflare').map((k) => k.id), ['1']);
+  assert.equal(keysFor(keys, null).length, 3);
+});
+
+test('WHAT A KEY OPENS IS SAID IN WORDS: a day as how long ago, a key named by its handle by its name', () => {
+  const keys = [key({ id: '1', label: 'azure-index', spoken: 'credentials#26' })];
+  const said = opensInWords('Imported 2026-09-09 from the vault; the index row is credentials#26, see credentials#99', keys, NOW);
+  assert.equal(said, 'Imported 3 weeks ago from the vault; the index row is azure-index, see credentials#99');
+  assert.doesNotMatch(opensInWords('Rotated 2026-09-28T09:00:00Z', keys, NOW), /2026/u);
 });

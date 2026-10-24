@@ -289,6 +289,8 @@ export type KeyRow = {
   spoken: string | null;
   label: string;
   opens: string;
+  /** Who the key is with ("Azure", "Stripe"), as its row says, or `null`: the Vault groups a project's keys by it. */
+  provider?: string | null;
   project: string | null;
   /** Where the key applies, as the chip draws it: the project's spoken id, name, mark and hue, or `null` for
       a global key. Built from the same project row `project` names, never a second lookup. */
@@ -377,6 +379,7 @@ export function keysOf(
         grant: grant ? grant.id : null,
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
+        provider: typeof r.fields.provider === 'string' && r.fields.provider.trim() !== '' ? r.fields.provider.trim() : null,
         project,
         scope,
         sealed,
