@@ -14,7 +14,7 @@
  * answers with it, so the record is shown to draw that much clean from one ask; `mends` there leaves out what each table
  * says when it is empty on the first ask, as `stub.ts` does, so the repair is walked at this level too.
  *
- * THE SEVENTEENTH IS THE TRUNK BAR BY DESCRIBING IT (C36, DIRECTION §28): three sentences that ask for the six things a
+ * THE SEVENTEENTH IS THE LAUNCH BAR BY DESCRIBING IT (C36, DIRECTION §28): three sentences that ask for the six things a
  * person must be able to make, each read off the draft by its block (`TRUNK_PARTS`), and clean only with five of them.
  * Its good answer is three pages in one draft (C37), the desk, a page for each part and the price check, and each page
  * opens on its own sentence with a figure, which the record asks of every page it keeps.
@@ -62,7 +62,7 @@ const fitted = (lead: string, chart: Record<string, unknown>, form: Record<strin
   { kind: 'table', span: 12, limit: 20, ...table },
 ];
 
-/* ── the Trunk bar, by describing it (C36, DIRECTION §28) ─────────────── */
+/* ── the launch bar, by describing it (C36, DIRECTION §28) ─────────────── */
 
 const columnsAs = (b: Record<string, unknown>): string[] =>
   (Array.isArray(b['columns']) ? (b['columns'] as Record<string, unknown>[]) : []).map((c) => String(c['as'] ?? ''));
@@ -334,7 +334,7 @@ export const CASES: readonly Case[] = [
   },
   {
     n: 17,
-    name: 'launch trunk',
+    name: 'launch in parts',
     asked:
       'A desk for launching my perfume line in parts, the bottle, the box and the shop page, each part with its own colour, a picture, how far along it is and its next step, and the steps in order as a path. ' +
       'Open it on one sentence about how many steps are left, show the calls waiting on me with what each choice looks like, and keep a pad beside it where I write a thought and get a second opinion under it. ' +
