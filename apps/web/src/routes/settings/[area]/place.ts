@@ -103,13 +103,13 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
          sharing address opens it too (`MOVED`). */
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
-      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY (the audit of 22 October, U3): what it found wrong in its own pages
-         and notes, what went stale, what it matched and learned. Read only when it is opened. */
-      area('/settings/health', 'Health', 'heart-pulse', 'What the record found to tidy in itself'),
     ],
+    /* ONE HEALTH (audit 25 October, Y4): the record's vital signs, its Health page, with the count Today and the
+       sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
     outside: [
-      { label: 'Keys', href: '/vault', icon: 'vault', line: 'The keys your agents are handed', before: 'health' },
-      { label: 'Add-ons', href: '/packs', icon: 'packs', line: 'What is installed, and what to add', before: 'health' },
+      { label: 'Keys', href: '/vault', icon: 'vault', line: 'The keys your agents are handed' },
+      { label: 'Add-ons', href: '/packs', icon: 'packs', line: 'What is installed, and what to add' },
+      { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'What on this record needs a look' },
     ],
   },
   /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red (U-C9). It stood in a
@@ -119,6 +119,10 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'archive',
     span: 12,
     areas: [
+      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY (the audit of 22 October, U3): what it found wrong in its own pages
+         and notes, what went stale, what is here twice, what it matched and learned. Read only when it is opened. Called
+         Health until 25 October (Y4), beside a Health page that counted something else; `/settings/health` still lands. */
+      area('/settings/tidy', 'Tidy up', 'filter', 'What the record found to tidy in itself'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
@@ -138,7 +142,7 @@ export const OFF_INDEX: readonly Area[] = [];
 /**
  * ADDRESSES THAT MOVED, each to the area that holds it now: a link somebody shared, or a menu that still says the old
  * address, lands on the area it means. Identity, Recovery and Sessions are Signing in; Pages is Navigation; Sharing is
- * People & sharing.
+ * People & sharing; Health, the housekeeping, is Tidy up.
  */
 export const MOVED: ReadonlyMap<string, string> = new Map([
   ['identity', 'signing-in'],
@@ -147,6 +151,7 @@ export const MOVED: ReadonlyMap<string, string> = new Map([
   ['pages', 'navigation'],
   /* BY ITS ADDRESS, as every area here is (`area` above): the area's id is the address less `/settings/`. */
   ['sharing', '/settings/people'.slice(AREA_AT.length)],
+  ['health', 'tidy'],
 ]);
 
 /** The area an id names, a moved one by where it lives now. */

@@ -1,5 +1,5 @@
 <!--
-  Settings > Health: what the record found to tidy in itself.
+  Settings > Tidy up (Health until 25 October): what the record found to tidy in itself.
 
   THE RECORD'S HOUSEKEEPING LIVES HERE AND NOT ON TODAY (the audit of 22 October, U3). It stood under Today's More: what
   went stale, who the record matched, what it found wrong in its own pages and notes, what the answers taught, what may

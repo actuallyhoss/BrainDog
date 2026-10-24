@@ -515,7 +515,7 @@
       <Words {shell} {area} />
     {:else if area === 'backups'}
       <Backups {shell} {area} />
-    {:else if area === 'health'}
+    {:else if area === 'tidy'}
       <!-- BY `import()`: the record's housekeeping and its readers are a chunk only somebody opening Health waits for. -->
       {#await import('./areas/Health.svelte') then { default: Health }}<Health {shell} {area} />{/await}
     {:else if area === 'billing'}

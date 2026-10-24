@@ -54,7 +54,7 @@ test('SETTINGS › HEALTH ASKS THEM, each with its part when it is asked for, on
   }
   assert.match(health, /for \(const part of parts\) \{\s*await idle\(\);\s*if \(!here \|\| leaving\.signal\.aborted\) break;/u);
   /* AND SETTINGS FETCHES HEALTH ITSELF ONLY WHEN THAT AREA OPENS. */
-  assert.match(area, /\{:else if area === 'health'\}\s*\{#await import\('\.\/areas\/Health\.svelte'\) then \{ default: Health \}\}<Health \{shell\} \{area\} \/>\{\/await\}/u);
+  assert.match(area, /\{:else if area === 'tidy'\}\s*\{#await import\('\.\/areas\/Health\.svelte'\) then \{ default: Health \}\}<Health \{shell\} \{area\} \/>\{\/await\}/u);
 });
 
 test('NO MORE FOLD AT THE FOOT OF TODAY (frame A): the briefing is neither asked nor drawn, and the page is drawn once', () => {
