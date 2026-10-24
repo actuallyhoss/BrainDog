@@ -14,8 +14,9 @@
  */
 
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 export const AGENTS = ['claude', 'codex', 'cursor', 'other'] as const;
 export type Agent = (typeof AGENTS)[number];
@@ -57,21 +58,34 @@ export function repoOf(said: string | null, cwd: string): { top: string; repo: s
   return { top, repo: repo || basename(top), worktree: basename(top) };
 }
 
+/** Whether a `.git` stands in the folder or one above it, read without a process. */
+function underGit(cwd: string): boolean {
+  let dir = resolve(cwd);
+  for (;;) {
+    if (existsSync(join(dir, '.git'))) return true;
+    const up = dirname(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+}
+
 /** Never rejects: a machine without git, or a folder outside a work tree, is a position with nulls. */
 export async function positionOf(cwd: string): Promise<Position> {
-  const where = repoOf(await git(cwd, 'rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir'), cwd);
+  const whereOf = () => git(cwd, 'rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir');
+  const named = () => Promise.all([git(cwd, 'rev-parse', '--abbrev-ref', 'HEAD'), git(cwd, 'rev-parse', '--short', 'HEAD'), git(cwd, 'remote', 'get-url', 'origin')]);
+  const logs = () => Promise.all([git(cwd, 'log', '-n', '50', '--format=%an <%ae>'), git(cwd, 'log', '-n', '5', '--format=%h %s')]);
+  /*
+   * INSIDE A REPOSITORY, EVERY READ AT ONCE. They were asked in three waves, each waiting for the last, which
+   * held every start hook and every first call in a repository for three git processes in a row (45 ms on the start
+   * bench, more on a loaded machine). A `.git` in the folder or one above it says git will answer, so all six are asked
+   * together and each is used exactly as before; anywhere else git is asked once, as it was, and nothing more.
+   */
+  const together = underGit(cwd) ? Promise.all([whereOf(), named(), logs()]) : null;
+  const where = repoOf(await (together === null ? whereOf() : together.then(([w]) => w)), cwd);
   const top = where?.top ?? null;
-  const [branch, head, origin] =
-    top === null
-      ? [null, null, null]
-      : await Promise.all([
-          git(cwd, 'rev-parse', '--abbrev-ref', 'HEAD'),
-          git(cwd, 'rev-parse', '--short', 'HEAD'),
-          git(cwd, 'remote', 'get-url', 'origin'),
-        ]);
+  const [branch, head, origin] = top === null ? [null, null, null] : await (together === null ? named() : together.then(([, n]) => n));
   /* Only with a remote: the record meets these as people seen in that project's commits. */
-  const [log, subjects] =
-    top === null || origin === null ? [null, null] : await Promise.all([git(cwd, 'log', '-n', '50', '--format=%an <%ae>'), git(cwd, 'log', '-n', '5', '--format=%h %s')]);
+  const [log, subjects] = top === null || origin === null ? [null, null] : await (together === null ? logs() : together.then(([, , l]) => l));
   const authors = withCommits(authorsOf(log), subjects);
   return {
     cwd,
