@@ -124,6 +124,20 @@ test('EACH WAY IN STORES ITS OWN NOTE: the made page tells its owner the way, th
   assert.equal(noteIn((asked[1]!.args.body as { to: { body: unknown } }).to.body), pageWords.emptySuggested);
 });
 
+test("WITH every, THE SLUGS boot LEFT OUT ARE ASKED FIRST, so a page called like a person never takes the person's address", async () => {
+  const k = await record();
+  const { client, asked } = served(k);
+  /* A PERSON'S PAGE AT `wedding`, which `boot` no longer lists: it opens by its row. */
+  const listing: PageClient = { call: async (method, args) => (method === 'pages' ? { ok: true, value: [{ slug: 'wedding' }] } : client.call(method, args)) };
+  const out = await newPage('Wedding', { client: listing, pages: [], owner: true, every: true });
+  assert.equal(out.ok && out.slug, 'wedding-2');
+  assert.deepEqual(asked.map((a) => a.method), ['setDeclaration']);
+  /* AND A RECORD THAT DID NOT ANSWER THE LIST picks from `pages` alone. */
+  const silent: PageClient = { call: async (method, args) => (method === 'pages' ? { ok: false, refusal: { code: 'UNREACHABLE', fix: 'fetch failed' } } : client.call(method, args)) };
+  const alone = await newPage('Garden', { client: silent, pages: [], owner: true, every: true });
+  assert.equal(alone.ok && alone.slug, 'garden');
+});
+
 test('AN OWNER MAKES THE PAGE THROUGH setDeclaration, and the record then lists it', async () => {
   const k = await record();
   const { client, asked } = served(k);

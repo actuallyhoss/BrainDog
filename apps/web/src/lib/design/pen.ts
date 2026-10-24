@@ -74,7 +74,8 @@ export function penOf(said: unknown): PenItem[] {
     const to = isRecord(raw.change) ? raw.change.to : undefined;
     if (!isRecord(to) || !text(to.id) || !text(to.kind) || !isRecord(to.body)) return [];
     const lapses = dayOf(raw.lapses);
-    const draft = isRecord(raw.draft) && text(raw.draft.id) && text(raw.draft.kind) && isRecord(raw.draft.body) ? raw.draft : null;
+    /* `drafted: true` IS A DRAFT THAT IS `change.to` ITSELF, which `boot` sends once (`penSent` in the record). */
+    const draft = raw.drafted === true ? to : isRecord(raw.draft) && text(raw.draft.id) && text(raw.draft.kind) && isRecord(raw.draft.body) ? raw.draft : null;
     return [
       {
         id: raw.id,

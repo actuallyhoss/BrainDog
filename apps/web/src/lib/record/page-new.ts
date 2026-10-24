@@ -40,6 +40,12 @@ export type NewPageDeps = {
   pages: readonly string[];
   /** Whether the person owns the record. Anybody else suggests the page. */
   owner: boolean;
+  /**
+   * WHETHER TO ASK THE RECORD FOR EVERY PAGE'S SLUG FIRST (`pages`), as the palette and the rail do. `boot` lists the
+   * pages the rail draws and not a person's, a skill's or the projects past the rail's five, which open by their row, so
+   * a page called like a person would take that person's address. A read that fails picks from `pages` alone.
+   */
+  every?: boolean;
 };
 
 export type Refused = { ok: false; why: 'refused' | 'unreachable'; fix: string };
@@ -86,6 +92,13 @@ export function pageBody(slug: string, title: string, owner: boolean): Record<st
   };
 }
 
+/** Every page's slug the record lists to this reader (`pages`), or none when it did not answer. */
+async function slugsListed(client: PageClient): Promise<string[]> {
+  const out = await client.call('pages').catch(() => null);
+  if (out === null || !out.ok || !Array.isArray(out.value)) return [];
+  return out.value.flatMap((p: unknown) => (typeof p === 'object' && p !== null && typeof (p as { slug?: unknown }).slug === 'string' ? [(p as { slug: string }).slug] : []));
+}
+
 /** A write that answers no row: the record's sentence, or the calm one when nothing answered. */
 function refusedAs(out: Failed): Refused {
   if (!('refusal' in out)) return { ok: false, why: 'refused', fix: pageWords.raced };
@@ -103,7 +116,7 @@ export async function newPage(title: string, deps: NewPageDeps): Promise<MadePag
   if (named === '') return { ok: false, why: 'refused', fix: pageWords.blank };
   if ([...named].length > TITLE_MOST) return { ok: false, why: 'refused', fix: pageWords.long };
 
-  const slug = slugFor(named, deps.pages);
+  const slug = slugFor(named, deps.every === true ? [...deps.pages, ...(await slugsListed(deps.client))] : deps.pages);
   const id = `page.${slug}`;
   const body = pageBody(slug, named, deps.owner);
 

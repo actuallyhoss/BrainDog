@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, raiseFault, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, railRoom, raiseFault, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -1344,7 +1344,8 @@ export type Boot = {
    * reader held to some lists is not offered the rest. Empty too when the person turned `pen.suggest` off, and an item
    * whose id is in their `pen.dismissed` is never answered again.
    */
-  pen: PenItem[];
+  /* `drafted: true` IN PLACE OF `draft` IS A DRAFT THAT IS `change.to` ITSELF, sent once (`penSent`). */
+  pen: (PenItem & { drafted?: true })[];
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
   /**
@@ -6804,9 +6805,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const every = kernel.pages();
       rowAt.clear();
       slugAt.clear();
+      /* `slugAt` HOLDS EVERY ROW'S PAGE, a person's and a skill's as well as a run's, since `boot` lists none of a list
+         whose rows' pages have no place in the rail either (`pagesByRow`); `rowAt` stays with the rows that come and go. */
       for (const p of every)
-        if (p.fleeting && p.about !== null && p.about.seq !== null) {
-          rowAt.set(p.slug, { register: p.about.register, seq: p.about.seq });
+        if (p.about !== null && p.about.seq !== null) {
+          if (p.fleeting) rowAt.set(p.slug, { register: p.about.register, seq: p.about.seq });
           if (!slugAt.has(`${p.about.register}#${p.about.seq}`)) slugAt.set(`${p.about.register}#${p.about.seq}`, p.slug);
         }
       return every;
@@ -7500,9 +7503,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** How many lines `whatsNew` answers with: a screen's worth, `45 §5.3`. */
   const NEWS = 60;
   /** The most characters of a line's old or new value `boot` carries (`newsCut`). */
-  const NEWS_WORDS = 160;
+  const NEWS_WORDS = 80;
   /** The most items of a list inside a line's value `boot` carries (`newsCut`). */
   const NEWS_ITEMS = 3;
+  /** The keys of a line `boot` leaves out when they are `null` (`newsCut`), each put back as `null` by the client. */
+  const NEWS_SPARE = ['target', 'field', 'from', 'to', 'note', 'batch', 'register', 'seq', 'title'] as const;
+  /** The keys a line leaves out where the line before it about the same target said the same (`newsCut`). */
+  const NEWS_SAME = ['register', 'seq', 'title', 'actor'] as const;
 
   /**
    * The writes to a row that leave every older line as `lineOf` found it, which is what lets `versionFor` keep an answer
@@ -8268,13 +8275,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cut(x)]));
       return v;
     };
-    const line = (e: EventLine): EventLine => ({
-      ...e,
-      ...('from' in e ? { from: cut(e.from) as EventLine['from'] } : {}),
-      ...('to' in e ? { to: cut(e.to) as EventLine['to'] } : {}),
-      ...(e.steps ? { steps: e.steps.map(line) } : {}),
-    });
-    return { ...news, events: news.events.map(line) };
+    /* AND EACH LINE SAYS ONLY WHAT IT HOLDS (`NEWS_SPARE`): a key whose value is `null` is not sent, nor a `target_kind`
+       that is its target's own first word (`entry` of `entry:01M…`), nor the fields of a row a line says was added,
+       which is drawn as "Added" and its title; the client puts each back as it was (`bootFilled` in `@braindog/client`).
+       On a record his size these were a third of every line. */
+    /* AND A LINE ABOUT THE TARGET OF A LINE BEFORE IT (newer, above it in the list) LEAVES OUT WHAT THAT ONE SAID
+       (`NEWS_SAME`): a row's title, list, number and writer said once for the three lines one write to it makes. A key
+       it holds as `null` where the line before held a value is sent as `null`. */
+    const lines = (events: readonly EventLine[]): EventLine[] => {
+      const before = new Map<string, EventLine>();
+      return events.map((e) => {
+        const out: Record<string, unknown> = {
+          ...e,
+          ...('from' in e ? { from: cut(e.from) as EventLine['from'] } : {}),
+          ...('to' in e ? { to: cut(e.to) as EventLine['to'] } : {}),
+          ...(e.steps ? { steps: lines(e.steps) } : {}),
+        };
+        if (e.kind === 'create' && e.register !== null && typeof e.title === 'string' && e.title !== '') delete out.to;
+        if (e.target !== null && e.target_kind !== null && e.target.split(':', 1)[0] === e.target_kind) delete out.target_kind;
+        const prior = e.target === null ? undefined : before.get(e.target);
+        for (const k of NEWS_SPARE) if (out[k] === null && !(prior !== undefined && (NEWS_SAME as readonly string[]).includes(k) && prior[k as keyof EventLine] !== null)) delete out[k];
+        if (prior !== undefined) for (const k of NEWS_SAME) if (e[k] === prior[k]) delete out[k];
+        if (e.target !== null) before.set(e.target, e);
+        return out as EventLine;
+      });
+    };
+    return { ...news, events: lines(news.events) };
   };
 
   const newsFor = (ctx: CallContext, cursor?: number, everything = false): WhatsNew => {
@@ -8506,6 +8532,40 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      of the day's observation raised, not a row. One read over a table of a line a kind, a subject and a day. */
   const usedNow = (): unknown => sql.one('SELECT count(*) AS lines, total(n) AS uses FROM observation') ?? null;
 
+  /**
+   * AN OFFER AS `boot` SENDS IT: a draft that is the very declaration keeping it writes (`change.to`, as both kinds of
+   * page offer make it) is said as `drafted: true` and not a second time, which was a whole page's declaration twice an
+   * offer.
+   */
+  const penSent = (item: PenItem): Boot['pen'][number] => {
+    if (item.draft === undefined || JSON.stringify(item.draft) !== JSON.stringify(item.change.to)) return item;
+    const { draft: _same, ...rest } = item;
+    return { ...rest, drafted: true };
+  };
+
+  /**
+   * THE PAGES `boot` KEEPS: every one, less the pages of rows the rail would not draw. The rail draws a page out of a
+   * template while its list and heading have room (`railRoom`, `RAIL_PAGES`), spent on the rows touched last, and
+   * every page of a heading drawn as tabs (`layoutOf` in `apps/web/src/lib/record/boot-live.ts`, which this follows).
+   *
+   * MORE AND NEVER LESS THAN THE RAIL DRAWS. The rail leaves out a page that waits for its lists to fill, and its room
+   * goes to the next; that is worked out on the app's side, from who is reading. So a page spends room here only where
+   * it surely does not wait (its place is named, or a list it reads holds rows), and one that might is kept and spends
+   * none: whatever the app works out, every page it draws is here.
+   */
+  const railKept = (listed: Boot['pages'], count: (list: string) => number): Set<Boot['pages'][number]> => {
+    const tabbed = new Set(listed.flatMap((p) => (p.nav?.tabs === true ? [p.nav.section] : [])));
+    const room = railRoom();
+    const surely = (p: Boot['pages'][number]): boolean => typeof p.nav?.place === 'number' || (Array.isArray(p.lists) && p.lists.some((l) => count(l) > 0));
+    const newest = [...listed].sort((x, y) => (y.about?.updated_at ?? '').localeCompare(x.about?.updated_at ?? ''));
+    const kept = new Set<Boot['pages'][number]>();
+    for (const p of newest) {
+      const ofRow = p.about !== null && p.about.seq !== null && p.nav !== null;
+      if (!ofRow || tabbed.has(p.nav!.section) || !surely(p) || room({ register: p.about!.register, section: p.nav!.section })) kept.add(p);
+    }
+    return kept;
+  };
+
   const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
@@ -8532,10 +8592,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A PAGE OF A ROW THAT COMES AND GOES, WITH NO PLACE IN THE RAIL, IS NOT LISTED AT ALL (`pagesByRow`): sent whole, 908
        runs' pages were 207 KB of a 278 KB `boot`, and by address alone still 27 KB. A link to one opens it by the row's
        spoken id, which `page` answers; `boot` names the lists whose rows open so. */
-    const fleeting = (page: (typeof opens)[number]): boolean => page.fleeting === true && page.nav === null && page.about !== null && page.about.seq !== null;
-    const pagesByRow: NonNullable<Boot['pagesByRow']> = [...new Set(opens.filter(fleeting).map((page) => page.about!.register))];
+    /* AND NOR IS A ROW'S PAGE WHERE NO PAGE OF THAT LIST'S ROWS HAS A PLACE IN THE RAIL (scope 2026-10-24, boot under 30
+       KB): a person's, an organisation's, a skill's. On a record his size they were most of the 82 pages left and about
+       18 KB of every `boot`, drawn by nothing on the first screen: the rail and the palette list pages with a place, and
+       a link to one of them opens it by the row (`row-href.ts`). A list with a page in the rail (a project's) keeps
+       every one of its rows' pages listed, so a link to a row never opens a page other than the one it opened before. */
+    const ofRow = (page: (typeof opens)[number]): boolean => page.about !== null && page.about.seq !== null;
+    const railed = new Set(opens.filter((page) => ofRow(page) && page.nav !== null).map((page) => page.about!.register));
+    const fleeting = (page: (typeof opens)[number]): boolean => page.nav === null && ofRow(page) && (page.fleeting === true || !railed.has(page.about!.register));
     /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
-    const pages: Boot['pages'] = opens
+    const listed: Boot['pages'] = opens
       .filter((page) => !fleeting(page))
       /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
          A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
@@ -8559,6 +8625,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* THE LIST IT IS THE PAGE OF, held to what this caller reads as `list` is, so her `/r/<list>` opens on it. */
         ...(typeof page.opens === 'string' && !readable(ctx, page.opens) ? { opens: page.opens } : {}),
       }));
+    /* AND OF THE ROWS' PAGES WITH A PLACE IN THE RAIL, THE ONES THE RAIL DRAWS (`railKept`): his 27 projects' pages were
+       sent whole and the rail draws the five touched last. The rest open by the row, as above. */
+    const kept = railKept(listed, (list) => countNow(ctx, list));
+    const pages = listed.filter((page) => kept.has(page));
+    const pagesByRow: NonNullable<Boot['pagesByRow']> = [
+      ...new Set([...opens.filter(fleeting), ...listed.filter((page) => !kept.has(page))].map((page) => page.about!.register)),
+    ];
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -8615,7 +8688,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               use: { sql, nowMs: clock.now() },
               /* THE WORDS THE SPEAKING USE CASE GIVES A LIST, so the week offer says Jobs where the rail does (offer-labels-60). */
               labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
-            }))
+            })).map(penSent)
           : [],
       /* WITH EACH LINE'S LONG WORDS CUT (`newsCut`): a note's whole text was 26 KB of his `boot`'s 49 KB of news. */
       whatsNew: newsCut(newsFor(ctx)),

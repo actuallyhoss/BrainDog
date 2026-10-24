@@ -79,3 +79,10 @@ test('LAPSES IS READ AS A REAL DAY, and anything else is left off rather than dr
   assert.equal(dayOf('2027-02-29'), undefined);
   assert.equal(dayOf('+002026-10-27'), undefined);
 });
+
+test('AN OFFER boot SAYS IS drafted HAS ITS DECLARATION AS ITS DRAFT, sent once', () => {
+  const [one] = penOf([item('week:garden-beds', 'Garden beds this week', { drafted: true, list: 'garden-beds' })]);
+  assert.deepEqual(one?.draft, one?.change.to);
+  const [plain] = penOf([item('page:tool-shed', 'Tool shed')]);
+  assert.equal(plain?.draft, undefined);
+});

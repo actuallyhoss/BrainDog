@@ -298,6 +298,41 @@ export type Cursor = number | string;
 /** `whatsNew`: newest first, at most sixty. `upTo` is what `markRead` takes to mark all of them read. */
 export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean; byWho?: ByWho };
 
+/** The keys of a line `boot` leaves out when they are `null` (`newsCut` in `@braindog/record`). */
+const NEWS_SPARE = ['target', 'field', 'from', 'to', 'note', 'batch', 'register', 'seq', 'title'] as const;
+/** The keys a line of `boot`'s leaves out where the line before it about the same target said the same. */
+const NEWS_SAME = ['register', 'seq', 'title', 'actor'] as const;
+
+/**
+ * `boot`'s news as `whatsNew` would say it (`newsCut` in `@braindog/record`): a key a line leaves out takes the value
+ * the line before it about the same target holds (newer, above it in the list), and failing one is `null`; a
+ * `target_kind` left out is the target's own first word. A line that holds every key is answered as it came, so an older
+ * host's `boot` reads the same.
+ */
+export function linesFilled(lines: readonly EventLine[]): EventLine[] {
+  const before = new Map<string, EventLine>();
+  return lines.map((line) => {
+    const raw = line as Partial<EventLine> & Pick<EventLine, 'id'>;
+    const out: Record<string, unknown> = { ...raw };
+    const target = typeof raw.target === 'string' ? raw.target : null;
+    const prior = target === null ? undefined : before.get(target);
+    if (prior !== undefined) for (const k of NEWS_SAME) if (!(k in out)) out[k] = prior[k];
+    for (const k of NEWS_SPARE) if (!(k in out)) out[k] = null;
+    if (!('target_kind' in out)) out.target_kind = target === null ? null : target.split(':', 1)[0];
+    if (Array.isArray(raw.steps)) out.steps = linesFilled(raw.steps);
+    const filled = out as EventLine;
+    if (target !== null) before.set(target, filled);
+    return filled;
+  });
+}
+
+/** `boot` with its news filled (`linesFilled`), which is the shape every reader of it reads. */
+export function bootFilled(boot: Boot): Boot {
+  /* AN ANSWER THAT IS NOT A BOOT IS ANSWERED AS IT CAME, as `call` answers every other. */
+  const news = typeof boot === 'object' && boot !== null ? boot.whatsNew : undefined;
+  return news && Array.isArray(news.events) ? { ...boot, whatsNew: { ...news, events: linesFilled(news.events) } } : boot;
+}
+
 /** `recentHistory`: one page, newest first, and the cursor for the page below it. */
 export type HistoryPage = { events: EventLine[]; cursor: Cursor | null; byWho?: ByWho };
 
@@ -2287,7 +2322,10 @@ export function createClient(options: ClientOptions) {
         throw new NoSuchCall('setup', out.refusal);
       return out;
     },
-    boot: () => call<Boot>('boot'),
+    boot: async () => {
+      const out = await call<Boot>('boot');
+      return out.ok ? { ...out, value: bootFilled(out.value) } : out;
+    },
     version: async () => {
       const asked = Date.now();
       const heard = `${base} ${options.token ?? ''}`;

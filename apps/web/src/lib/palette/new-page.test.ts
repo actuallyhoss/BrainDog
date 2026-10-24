@@ -192,7 +192,8 @@ test('the owner\'s press is one setDeclaration beside the pages boot lists, and 
   assert.ok(out.ok && out.as === 'made');
   assert.equal(out.slug, 'our-wedding');
   assert.equal(out.said, pageWords.made('Our Wedding'));
-  assert.deepEqual(asked.map((a) => a.method), ['setDeclaration']);
+  /* THE SLUGS `boot` LEFT OUT ARE READ FIRST (`every` in `page-new.ts`), and the one write follows. */
+  assert.deepEqual(asked.map((a) => a.method), ['pages', 'setDeclaration']);
 
   const second = await maker('http://record.test', ['wedding'], true, io)('Wedding');
   assert.equal(second.ok && second.slug, 'wedding-2', 'a second Wedding was written over the first');
@@ -206,7 +207,7 @@ test('anybody else\'s press is one question and never a write, with nothing to t
   const { io, asked } = wire();
   const out = await maker('http://record.test', [], false, io)('Wedding');
   assert.deepEqual(out, { ok: true, slug: 'wedding', as: 'suggested', said: pageWords.suggested('Wedding') });
-  assert.deepEqual(asked.map((a) => a.method), ['propose']);
+  assert.deepEqual(asked.map((a) => a.method), ['pages', 'propose']);
 });
 
 test('a blank name is refused in a sentence before the record is asked', async () => {

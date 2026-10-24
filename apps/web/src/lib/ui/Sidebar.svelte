@@ -225,7 +225,7 @@
     const { dropPage, newPage, pageClient } = made;
     const client = pageClient(apiBase());
     const title = pageTitle.replace(/\s+/gu, ' ').trim();
-    const out = await newPage(pageTitle, { client, pages: shell.pages ?? [], owner: shell.me?.owner === true });
+    const out = await newPage(pageTitle, { client, pages: shell.pages ?? [], owner: shell.me?.owner === true, every: true });
     making = false;
     if (!out.ok) {
       toasts.push(out.fix, { intent: 'warn' });

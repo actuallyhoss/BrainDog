@@ -161,7 +161,7 @@ export function maker(base: string, pages: readonly string[], owner: boolean, io
   return async (title) => {
     const { newPage, dropPage, pageClient, pageWords } = await import('../record/page-new.ts');
     const client = pageClient(base, io);
-    const out = await newPage(title, { client, pages, owner });
+    const out = await newPage(title, { client, pages, owner, every: true });
     if (!out.ok) return { ok: false, fix: out.fix };
     const { slug, id, said } = out;
     if (out.as === 'suggested') return { ok: true, slug, as: 'suggested', said };
