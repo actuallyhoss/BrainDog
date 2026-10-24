@@ -75,7 +75,7 @@ test("the Tell screen's payment reads as Money reads it, in dollars, pounds and 
       const opts = { lists: LISTS, today: TODAY, currency: home, home, accounts: [{ seq: 1, name: 'Card wallet' }] };
       const row = tellRead(`Omar paid ${typed} by card`, opts).rows.find((r) => r.register === 'transactions');
       assert.deepEqual(row?.fields.amount, { amount: minor, currency }, `${typed} on ${home}`);
-      assert.equal(row?.said, `${asMoney(minor, currency, home)} in, by card`, `${typed} on ${home}`);
+      assert.equal(row?.said, `${asMoney(minor, currency, home)} from Omar, by card`, `${typed} on ${home}`);
     }
 });
 
