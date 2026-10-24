@@ -23,7 +23,7 @@
  * the run.
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -475,10 +475,63 @@ export function childRepos(top: string, depth = 2): string[] {
   return out;
 }
 
-/** Each child repository's HEAD, by its folder relative to `top`: what the start hook keeps and the end hook compares. */
+const FULL_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
+/**
+ * A repository's HEAD as git keeps it in its files, or `null` when they do not say it plainly and git is asked instead:
+ * `.git` (a folder, or a worktree's file naming one), its `HEAD`, the branch's own file, its common folder's, then
+ * `packed-refs`. A ref table, an unborn branch or anything else is `null`.
+ *
+ * NO PROCESS. The start hook read every child repository's HEAD with a `git rev-parse` of its own, and on the owner's
+ * `~/Developer` that was 37 processes started one after another before the attach left, 128 ms of the main thread on
+ * the start bench (`tools/agent-bench/start-hook.mjs`) and more on a loaded machine.
+ */
+export function headOnDisk(dir: string): string | null {
+  try {
+    let gitDir = join(dir, '.git');
+    if (statSync(gitDir).isFile()) {
+      const named = /^gitdir:\s*(.+)$/mu.exec(readFileSync(gitDir, 'utf8'))?.[1]?.trim();
+      if (!named) return null;
+      gitDir = resolve(dir, named);
+    }
+    const head = readFileSync(join(gitDir, 'HEAD'), 'utf8').trim();
+    if (FULL_SHA.test(head)) return head;
+    const ref = /^ref:\s*(refs\/\S+)$/u.exec(head)?.[1];
+    if (ref === undefined || ref.split('/').includes('..')) return null;
+    let common = gitDir;
+    try {
+      common = resolve(gitDir, readFileSync(join(gitDir, 'commondir'), 'utf8').trim());
+    } catch {
+      /* No commondir: the folder is its own. */
+    }
+    for (const base of gitDir === common ? [gitDir] : [gitDir, common])
+      try {
+        const sha = readFileSync(join(base, ref), 'utf8').trim();
+        if (FULL_SHA.test(sha)) return sha;
+      } catch {
+        /* Not a loose ref here. */
+      }
+    try {
+      for (const line of readFileSync(join(common, 'packed-refs'), 'utf8').split('\n')) {
+        const [sha, name] = line.trim().split(' ');
+        if (name === ref && sha !== undefined && FULL_SHA.test(sha)) return sha;
+      }
+    } catch {
+      /* No packed refs. */
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Each child repository's HEAD, by its folder relative to `top`: what the start hook keeps and the end hook compares.
+ * Read from git's files (`headOnDisk`), and from git itself only for a repository whose files do not say it.
+ */
 export async function childHeads(top: string): Promise<Record<string, string>> {
   const repos = childRepos(top);
-  const heads = await Promise.all(repos.map((rel) => git(join(top, rel), 'rev-parse', 'HEAD')));
+  const heads = await Promise.all(repos.map((rel) => headOnDisk(join(top, rel)) ?? git(join(top, rel), 'rev-parse', 'HEAD')));
   const out: Record<string, string> = {};
   repos.forEach((rel, i) => {
     const head = heads[i];
