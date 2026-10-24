@@ -590,6 +590,8 @@ const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
   toSettle: (n: number) => `${n} to settle`,
+  renew: (n: number) => `${n} renew`,
+  nextNamed: (title: string, when: string) => `next ${title} ${when}`,
   nothingOpen: 'Nothing is open',
   late: (n: number) => `${n} late`,
   noneLate: 'none late',
@@ -658,8 +660,13 @@ export function readingOf(
      Earning, Parked or Finished and declares none of them done, so every row read as open, and "30 open." stood over
      Parked and Finished rows. Such a list says how many it holds, in its own word. */
   const staged = Boolean(decl.done?.length);
+  /* A LIST OF RENEWALS RENEWS, IT IS NOT SETTLED (the audit of 25 October, Y23): Services' deadline is the day a domain or a
+     plan renews, so "34 to settle" over them was the bills' word. It says what renews and which comes next, by name. */
+  const renews = Boolean(dated && /^renew/iu.test(dated) && decl.done?.length);
   const lead =
-    decl.id === RUNS
+    renews
+      ? words.renew(open.length)
+      : decl.id === RUNS
       ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
       : decl.state && staged
         ? settles && dated
@@ -668,13 +675,23 @@ export function readingOf(
         : counted(decl, open.length);
   if (!dated) return plain(`${lead}.`);
   const late = open.filter((e) => isLate(decl, e, now)).length;
-  const next = open
-    .map((e) => e.fields[dated])
-    .filter((v): v is string => typeof v === 'string' && DAY_RE.test(v) && (Date.parse(`${v}T12:00:00Z`) - now) / DAY_MS >= 0)
-    .sort()[0];
-  const tail = next ? `, ${words.nextDue(dayWord(next, now))}.` : '.';
+  const coming = open
+    .map((e) => ({ e, v: e.fields[dated] }))
+    .filter((x): x is { e: Entry; v: string } => typeof x.v === 'string' && DAY_RE.test(x.v) && (Date.parse(`${x.v}T12:00:00Z`) - now) / DAY_MS >= 0)
+    .sort((a, b) => (a.v < b.v ? -1 : a.v > b.v ? 1 : 0));
+  const next = coming[0]?.v;
+  const nextTitle = decl.title && coming[0] ? String(coming[0].e.fields[decl.title] ?? '').trim() : '';
+  const tail = next ? `, ${renews && nextTitle ? words.nextNamed(nextTitle, dayWord(next, now)) : words.nextDue(dayWord(next, now))}.` : '.';
+  if (renews && late === 0) return plain(`${lead}${tail}`);
   return late > 0 ? { before: `${lead}, `, needs: words.late(late), after: tail } : plain(`${lead}, ${words.noneLate}${tail}`);
 }
+
+/**
+ * WHETHER A SIDE OF THE MONEY TILE DRAWS ITS BAR (Y23): the bar splits a side by state, so a side holding one state is
+ * a full bar whatever it holds, and two sides of two different sums drew two bars of one length. A side's late part and
+ * the rest are two parts, so it still draws.
+ */
+export const drawsBar = (lines: readonly { late: unknown }[]): boolean => lines.length + lines.filter((l) => l.late).length >= 2;
 
 /** One state's share of a list: the value, how many rows hold it, and whether it is a finished one. */
 export type StatePart = { value: string; count: number; done: boolean };

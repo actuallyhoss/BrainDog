@@ -20,6 +20,7 @@ import {
   isLate,
   lanesOf,
   lateFirst,
+  drawsBar,
   readingOf,
   stateReading,
   viewOf,
@@ -290,4 +291,34 @@ test('A LIST WITH A DEADLINE OPENS LATE FIRST: the longest overdue, then what is
   /* A list with no deadline keeps the order it came in. */
   const undated = [row({ name: 'Bo' }), row({ name: 'Ada' })];
   assert.deepEqual(lateFirst(people, undated, NOW), undated);
+});
+
+/* THE AUDIT OF 25 OCTOBER, Y23: Services said "34 to settle, none late" over domains and hosting, which are not settled,
+   they renew; and "Money: Out, In" drew a full bar for each side though each held one state. */
+test('a list of renewals says what renews and which is next, and a side with one part draws no bar', () => {
+  const services = {
+    id: 'services',
+    name: 'Services',
+    one: 'service',
+    title: 'name',
+    state: 'state',
+    done: ['cancelled'],
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'cost', type: 'money' },
+      { id: 'renews', type: 'day', deadline: true },
+      { id: 'state', type: 'enum', values: ['live', 'lapsing', 'cancelled'] },
+    ],
+  } as unknown as RegisterDecl;
+  const rows = [
+    row({ name: 'later.example', cost: gbp(100), renews: '2026-12-20', state: 'live' }),
+    row({ name: 'soon.example', cost: gbp(100), renews: '2026-11-25', state: 'live' }),
+    row({ name: 'old.example', cost: gbp(100), renews: '2026-08-01', state: 'cancelled' }),
+  ];
+  assert.deepEqual(readingOf(services, rows, NOW, WHOLE), { before: '2 renew, next soon.example on 25 Nov.', needs: '', after: '' });
+  const late = [...rows, row({ name: 'gone.example', cost: gbp(100), renews: '2026-09-01', state: 'lapsing' })];
+  assert.deepEqual(readingOf(services, late, NOW, WHOLE), { before: '3 renew, ', needs: '1 late', after: ', next soon.example on 25 Nov.' });
+  assert.equal(drawsBar([{ late: null }]), false);
+  assert.equal(drawsBar([{ late: null }, { late: null }]), true);
+  assert.equal(drawsBar([{ late: { count: 1 } }]), true, 'the late part and the rest are two parts');
 });

@@ -35,7 +35,7 @@
   import StateDot from '$lib/ui/StateDot.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { valueSaid } from '$lib/voice.ts';
-  import { byStateOf, dotOf, figureParts, figureSaid, figureSplit, isLate, stateReading, wholeMoney, type Figured } from './list.ts';
+  import { byStateOf, dotOf, drawsBar, figureParts, figureSaid, figureSplit, isLate, stateReading, wholeMoney, type Figured } from './list.ts';
 
   let {
     decl,
@@ -199,7 +199,7 @@
           {@const all = side.total ?? 0}
           <section class="cell" aria-label={side.label ?? undefined}>
             <p class="cell-head">{#if shortOf(side)}<span class="cell-name">{shortOf(side)}</span>{' '}{/if}<span class="cell-figure num">{said(fig, all)}</span></p>
-            {#if side.lines.length >= 1}
+            {#if drawsBar(side.lines)}
               <span class="stack" aria-hidden="true">
                 {#each side.lines as l (l.key)}
                   {#if l.late}<span class="stack-part" data-late style:inline-size="{l.late.share * 100}%"></span>{/if}
