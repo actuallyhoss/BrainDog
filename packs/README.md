@@ -156,7 +156,9 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 through `publishTo`, the door `braindog pack publish` uses, so the file is read the way a record reads it and its
 index line says what it reaches. From there:
 
-- **The app** lists it on Browse, and asks the owner on Decide to install it.
+- **The app** lists it on Browse only when `packs/listed.json` names its catalogue id. Listing is opt in and only
+  the owner adds an id there; a pack it does not name installs by id and is in no listing. The app asks the owner on
+  Decide to install it.
 - **The CLI** installs it by id, `braindog pack install project-brief`, from the host's catalogue, or from the file
   itself, `braindog pack install packs/project-brief/project-brief.pack.json`. `--dry-run` says what it would ask and
   sends nothing.

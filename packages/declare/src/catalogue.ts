@@ -24,8 +24,8 @@
  * WHAT A MARKETPLACE SHOWS IS WORKED OUT, NOT WRITTEN. An entry's categories come
  * from what its file declares (`categoriesOf`), its publisher from who the catalogue knows published it, a version's
  * notes from the file's own `changes`, and a preview of its pages from the record's own answer in a scratch record
- * (`tools/catalogue/from-packs.mjs`), never from an author's screenshot. A pack whose manifest says `unlisted: true`
- * stays in the index, so it installs by id and updates as any other, and is left out of every listing
+ * (`tools/catalogue/from-packs.mjs`), never from an author's screenshot. A pack whose manifest says `unlisted: true`,
+ * or that the owner's `packs/listed.json` does not name, stays in the index, so it installs by id and updates as any other, and is left out of every listing
  * (`listedEntries`).
  */
 
@@ -179,7 +179,10 @@ export type CatalogueEntry = {
   versions: CatalogueVersion[];
   categories?: Category[];
   publisher?: Publisher;
-  /** Its latest file says `unlisted: true`: installable by id and updated as any other, and left out of every listing. */
+  /**
+   * Its latest file says `unlisted: true`, or the owner's `packs/listed.json` does not name it (listing is opt in, E18):
+   * installable by id and updated as any other, and left out of every listing.
+   */
   unlisted?: true;
   /**
    * A use case's: the words its latest file says it is heard in, as the first run listens for them, and the modules it

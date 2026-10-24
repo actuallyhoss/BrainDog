@@ -1,0 +1,27 @@
+{
+  "note": "The add-ons the store lists, by catalogue id. Only the owner adds one here (call 12 of the 22 Oct audit): a pack not named here installs by id and is in no listing. tools/catalogue/from-packs.mjs reads it.",
+  "packs": [
+    "agent-notes",
+    "card-alerts",
+    "count-cash",
+    "fixed-dates",
+    "harbour-look",
+    "holdings",
+    "job-starter",
+    "launch-desk",
+    "mercury",
+    "money-watch",
+    "pad",
+    "pad-second-opinion",
+    "portfolio-bands",
+    "project-brief",
+    "reading-list",
+    "roadmap",
+    "slash-desk",
+    "standup",
+    "stripe",
+    "task-tiers",
+    "week-in-money",
+    "worked-numbers"
+  ]
+}

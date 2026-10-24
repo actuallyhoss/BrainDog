@@ -47,7 +47,13 @@
  *
  * EVERY ENTRY SAYS WHAT A MARKETPLACE SHOWS: BrainDog as its publisher, its
  * categories worked out from its latest file by `categoriesOf`, and `unlisted` when that file says so (a pack
- * named for one person or one bank stays in the index, so it installs by id, and out of every listing). The
+ * named for one person or one bank stays in the index, so it installs by id, and out of every listing).
+ *
+ * LISTING IS OPT IN (E18, call 12 of the 22 Oct audit): a pack is listed only when `packs/listed.json` (`LISTED_FILE`
+ * in the `--packs` folder) names its catalogue id, the flag only the owner sets. Every other pack, a new one first of
+ * all, is `unlisted`: in the index, installable by id, and in no listing. The flag is kept apart from the pack files so
+ * that writing or publishing a pack can never list it. An id there that is no pack in the index, or whose latest file
+ * says `unlisted: true`, stops the build by name. No file lists nothing. Use cases are not read against it. The
  * index is not hashed, only the files are, so an entry published before these fields existed is given them here without
  * a new version, and a new version's `changes` becomes its `notes` through `publishTo`.
  *
@@ -87,6 +93,8 @@ import { builtInFile } from '../../packages/seed/src/usecases/share.ts';
 import { makePreview } from './previews.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** The owner's list of the packs the store lists, in the packs folder. */
+const LISTED_FILE = 'listed.json';
 const TEST = /\.test\.(?:ts|mjs|js)$/u;
 /* `test(` on its own, not a method of that name: `/x/.test('shelf.pack.json')` holds no test. */
 const CALLS_TEST = /(?<![.\w$])test\(/u;
@@ -214,6 +222,24 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
 /* EVERY ENTRY DESCRIBED FROM ITS LATEST FILE, the ones published before these fields existed included. A latest file
    that no longer reads through its door keeps the entry as it was, and the run says so rather than stopping the build
    over a version already published. */
+/* THE PACKS HE MARKED LISTED, read before any entry is described, and held to ids the index has. */
+const listedPath = join(packsDir, LISTED_FILE);
+const marked = new Set();
+if (existsSync(listedPath)) {
+  let doc;
+  try {
+    doc = JSON.parse(readFileSync(listedPath, 'utf8'));
+  } catch {
+    fail(`packs/${LISTED_FILE} does not read as JSON.`);
+  }
+  if (!Array.isArray(doc?.packs) || !doc.packs.every((id) => typeof id === 'string' && id !== '')) fail(`packs/${LISTED_FILE} says { "packs": [<catalogue id>, ...] }.`);
+  for (const id of doc.packs) {
+    if (marked.has(id)) fail(`packs/${LISTED_FILE} names ${id} twice.`);
+    if (!index.entries.some((e) => e.kind === 'pack' && e.id === id)) fail(`packs/${LISTED_FILE} names ${id}, which is not a pack in the index.`);
+    marked.add(id);
+  }
+}
+
 const described = [];
 for (const entry of index.entries) {
   const path = catalogueFile(entry.id, entry.latest, entry.kind);
@@ -225,7 +251,9 @@ for (const entry of index.entries) {
     continue;
   }
   const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, ...rest } = entry;
-  const unlisted = entry.kind === 'pack' && JSON.parse(text).unlisted === true;
+  const says = entry.kind === 'pack' && JSON.parse(text).unlisted === true;
+  if (says && marked.has(entry.id)) fail(`packs/${LISTED_FILE} names ${entry.id}, whose latest file says unlisted: true. Take one of the two out.`);
+  const unlisted = entry.kind === 'pack' && (says || !marked.has(entry.id));
   /* A USE CASE PUBLISHED BEFORE ITS ENTRY SAID ITS WORDS is given them here, from the same latest file, as categories were. */
   const u = file.value.kind === 'usecase' ? file.value.shared.usecase : null;
   const heard = { ...(u && u.signals.length > 0 ? { signals: [...u.signals] } : {}), ...(u && u.modules.length > 0 ? { modules: [...u.modules] } : {}) };

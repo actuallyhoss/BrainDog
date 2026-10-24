@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readCatalogue } from '../../packages/declare/src/catalogue.ts';
+import { listedEntries, readCatalogue } from '../../packages/declare/src/catalogue.ts';
 import { readShared } from '../../packages/declare/src/shared.ts';
 import { normaliseUseCase } from '../../packages/declare/src/usecase.ts';
 import { USE_CASES } from '../../packages/seed/src/usecases/index.ts';
@@ -182,4 +182,31 @@ test('the three fronts publish as usecase entries with their signals', () => {
     for (const w of words) assert.ok(entry.signals.includes(w));
     assert.ok(entry.modules.includes(id));
   }
+});
+
+test('LISTING IS OPT IN: a new pack is in the index and in no listing until packs/listed.json names it (E18)', () => {
+  const packs = packsFolder();
+  const to = scratch();
+  const first = run(packs, to);
+  assert.equal(first.status, 0, first.stderr);
+  const shelf = () => indexOf(to).entries.find((e) => e.kind === 'pack' && e.id === 'shelf');
+  assert.equal(shelf()?.unlisted, true, 'a pack nobody marked is unlisted');
+  assert.ok(!listedEntries(indexOf(to)).some((e) => e.id === 'shelf'), 'and out of every listing');
+  assert.ok(listedEntries(indexOf(to)).some((e) => e.kind === 'usecase' && e.id === 'rent-book'), 'a use case is not read against the list');
+  write(join(packs, 'listed.json'), { packs: ['shelf'] });
+  const marked = run(packs, to);
+  assert.equal(marked.status, 0, marked.stderr);
+  assert.equal(shelf()?.unlisted, undefined, 'marked, it is listed');
+  assert.ok(listedEntries(indexOf(to)).some((e) => e.id === 'shelf'));
+  write(join(packs, 'listed.json'), { packs: ['shelf', 'nowhere'] });
+  const unknown = run(packs, to);
+  assert.equal(unknown.status, 1);
+  assert.match(unknown.stderr, /names nowhere, which is not a pack in the index/u);
+});
+
+test('THE STORE LISTS WHAT packs/listed.json NAMES, and nothing else', () => {
+  const index = readCatalogue(JSON.parse(readFileSync(join(ROOT, 'apps', 'web', 'static', 'catalogue', 'index.json'), 'utf8')));
+  assert.ok(index.ok);
+  const named = new Set(JSON.parse(readFileSync(join(ROOT, 'packs', 'listed.json'), 'utf8')).packs);
+  for (const e of listedEntries(index.value).filter((x) => x.kind === 'pack')) assert.ok(named.has(e.id), `${e.id} is listed and packs/listed.json does not name it`);
 });
