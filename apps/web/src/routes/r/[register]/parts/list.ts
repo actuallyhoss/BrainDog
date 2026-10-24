@@ -653,10 +653,14 @@ export function readingOf(
   /* "TO SETTLE" ON A LIST OF AMOUNTS (money F16): "28 open" read against a board's "Open 22", which counts one state; a
      bill part paid is still to settle, and the words say what the number counts. */
   const settles = decl.fields.some((f) => f.type === 'money') && Boolean(decl.done?.length);
+  /* A STATE WITH NO FINISHED VALUE IS A KIND, NOT A STAGE (the audit of 25 October, Z32): Projects' lane is Building,
+     Earning, Parked or Finished and declares none of them done, so every row read as open, and "30 open." stood over
+     Parked and Finished rows. Such a list says how many it holds, in its own word. */
+  const staged = Boolean(decl.done?.length);
   const lead =
     decl.id === RUNS
       ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
-      : decl.state
+      : decl.state && staged
         ? settles && dated
           ? words.toSettle(open.length)
           : words.open(open.length)

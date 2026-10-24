@@ -86,6 +86,25 @@ test('a list with neither state nor deadline says how many and how new', () => {
   assert.equal(readingOf(people, rows.slice(0, 1), NOW, WHOLE)?.before, '1 person, newest 3d ago.');
 });
 
+test('a list whose state is a kind and never finished says how many it holds, not how many are open (Z32)', () => {
+  /* Projects' lane: Building, Earning, Parked and Finished, none declared finished. "30 open." stood over Parked and
+     Finished rows on his record (`things-390-light.png`). */
+  const things = {
+    id: 'things',
+    name: 'Projects',
+    one: 'project',
+    title: 'name',
+    mobile: ['name', 'lane'],
+    state: 'lane',
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'lane', type: 'enum', values: ['building', 'earning', 'parked', 'finished'] },
+    ],
+  } as unknown as RegisterDecl;
+  const rows = [row({ name: 'Kiln', lane: 'building' }), row({ name: 'Portage', lane: 'parked' }), row({ name: 'Tallyard', lane: 'finished' })];
+  assert.equal(readingOf(things, rows, NOW, WHOLE)?.before, '3 projects.');
+});
+
 test('filtered, it says how many match; paging, it says nothing', () => {
   assert.equal(readingOf(bills, [], NOW, { whole: false, filtered: true, matched: 3, total: 38 })?.before, '3 of 38 match.');
   assert.equal(readingOf(bills, [], NOW, { whole: true, filtered: true, matched: 1, total: 38 })?.before, '1 of 38 matches.');
