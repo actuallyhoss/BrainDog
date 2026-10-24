@@ -1,9 +1,9 @@
 {
   "pack": "estate",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "Each service has a page of its own: what it costs, who it is with, what it points at and when it renews, with its keys one press away in the Vault. Services still goes in where there are no projects yet.",
+  "changes": "Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -141,12 +141,16 @@
           "when": { "metric": "points-nowhere", "gt": 0 }
         },
         {
-          "kind": "stat",
-          "heading": "At a glance",
-          "icon": "gauge",
+          "kind": "table",
+          "heading": "Lapsing",
+          "icon": "circle-alert",
           "span": 12,
-          "when": { "metric": "services-held", "gt": 0 },
-          "cells": [ { "metric": "renews-30d", "label": "Renews in 30 days" }, { "metric": "lapsing", "label": "Lapsing" } ]
+          "source": "register.services",
+          "where": "state is lapsing",
+          "columns": [ { "field": "name" }, { "field": "provider" }, { "field": "renews" } ],
+          "order": [ { "field": "renews", "dir": "asc" } ],
+          "limit": 6,
+          "when": { "metric": "lapsing", "gt": 0 }
         },
         {
           "kind": "queue",

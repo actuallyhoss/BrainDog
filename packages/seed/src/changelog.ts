@@ -245,6 +245,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.4.0', notes: 'Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.' },
     {
       version: '2.3.0',
       notes: 'Each service has a page of its own: what it costs, who it is with, what it points at and when it renews, with its keys one press away in the Vault.',

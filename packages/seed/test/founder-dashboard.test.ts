@@ -171,6 +171,20 @@ test('LAPSING IS WHAT LAPSES WITHIN THIRTY DAYS OF TODAY, and not a name somebod
   assert.equal(counted.value.value, 2, 'what the block is drawn on counts what it lists');
 });
 
+test('SERVICES NAMES WHAT IS LAPSING, where it said only how many (the audit of 25 October, Z40)', async () => {
+  const k = await founder();
+  const day = (n: number) => new Date(NOW + n * DAY).toISOString().slice(0, 10);
+  const blocksNow = () => value<{ blocks: Drawn[] }>(k.page('estate')).blocks;
+  value(k.create('services', { name: 'kept.example', provider: 'Cove Domains', kind: 'domain', renews: day(40), cycle: 'yearly', state: 'live' }, OWNER));
+  assert.equal(blocksNow().find((b) => b.heading === 'Lapsing')?.drawn, false, 'a Lapsing tile is drawn over nothing lapsing');
+  for (const [name, renews] of [['lapsed.example', day(-6)], ['long-gone.example', day(-40)]] as const)
+    value(k.create('services', { name, provider: 'Cove Domains', kind: 'domain', renews, cycle: 'yearly', state: 'lapsing' }, OWNER));
+  const lapsing = blocksNow().find((b) => b.heading === 'Lapsing')!;
+  assert.deepEqual(lapsing.refusals ?? [], []);
+  assert.deepEqual(lapsing.rows?.map((r) => r.fields.name), ['long-gone.example', 'lapsed.example'], 'each lapsing one by name, the longest gone first');
+  assert.equal(blocksNow().some((b) => b.heading === 'At a glance'), false, 'the count with no names is still drawn');
+});
+
 test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is open, its money, the numbers it reports and where it sends them', async () => {
   const k = await founder();
   assert.ok(held(k).includes('services'), 'a founder keeps services since Estate joined Solo founder');

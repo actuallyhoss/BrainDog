@@ -911,6 +911,23 @@ const DECLARED: Record<string, Version> = {
       'Estate 2.3.0 (things, not rows, 24 October): `page.service` is declared, a page for each service, a template with no nav and fleeting, drawing its own row by `seq is {{seq}}` and a line to its keys in the Vault; the project it is for stays on the row screen -> a750322603e54cc6',
     ],
   },
+  /* SERVICES NAMES WHAT IS LAPSING (the audit of 25 October, Z40). 2.3.0 is master's, so a version of its own. One block
+     for another and no id added or taken away. */
+  'estate@2.4.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+      page.service
+    `,
+    declares: '5b92d466b63000d2',
+    history: [
+      "Estate 2.4.0 (the audit of 25 October, Z40): `page.estate`'s At a glance, Renews in 30 days and Lapsing as two numbers, gives way to Lapsing, a table of each service that is lapsing by its name, who it is with and the day it was due, drawn only while `lapsing` holds one; one block for another, no id added or taken away -> 5b92d466b63000d2",
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `

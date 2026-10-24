@@ -428,17 +428,20 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'points-nowhere', gt: 0 },
       },
       {
-        /* TWO FIGURES AND NOT THREE, SINCE estate 2.1.0: Cost per year was the line's month said again at twelve times
-           its size. */
-        kind: 'stat',
-        heading: 'At a glance',
-        icon: 'gauge',
+        /* WHICH ONES ARE LAPSING, BY NAME, IN PLACE OF AT A GLANCE, SINCE estate 2.4.0 (the audit of 25 October, Z40): At a
+           glance said "Lapsing 2" and nothing on the page said which two, and its "Renews in 30 days 0" sat over "Next
+           ninety days 3", which lists the same renewals by day. Each lapsing one by its name, who it is with and the day
+           it was due to renew, the longest gone first, and only while one is. Renews in 30 days is still Home's figure. */
+        kind: 'table',
+        heading: 'Lapsing',
+        icon: 'circle-alert',
         span: 12,
-        when: { metric: 'services-held', gt: 0 },
-        cells: [
-          { metric: 'renews-30d', label: 'Renews in 30 days' },
-          { metric: 'lapsing', label: 'Lapsing' },
-        ],
+        source: 'register.services',
+        where: 'state is lapsing',
+        columns: [{ field: 'name' }, { field: 'provider' }, { field: 'renews' }],
+        order: [{ field: 'renews', dir: 'asc' }],
+        limit: 6,
+        when: { metric: 'lapsing', gt: 0 },
       },
       {
         /* WHAT `renew-soon` HAS ASKED ABOUT SERVICES, answered where it is shown, three at a time, and the rest are in
