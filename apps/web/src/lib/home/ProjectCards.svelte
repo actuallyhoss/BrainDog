@@ -125,11 +125,13 @@
 </script>
 
 {#if shown.length > 0}
-  <section class="projects" aria-labelledby="desk-projects">
+  <!-- NOT A LANDMARK OF ITS OWN: the block it is drawn in is the region, named by the same heading, and two regions
+       called "Projects" on one page say nothing about where each goes. -->
+  <div class="projects">
     <header class="p-head">
       <span class="p-title-row">
         <IconWell name="grid" />
-        <h2 id="desk-projects" class="p-title">{name}</h2>
+        <h2 class="p-title">{name}</h2>
         <span class="p-count num">{shown.length + more}</span>
       </span>
       {#if lanes.length > 2}
@@ -172,7 +174,7 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </div>
 {/if}
 
 <style>
