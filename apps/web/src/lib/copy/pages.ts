@@ -189,14 +189,6 @@ export const pages = {
   pollQuestion: (host: string, every: string, title: string, names: string) => `Poll ${host} ${every.toLowerCase()} for ${title}’s numbers: ${names}?`,
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
-  /* A THREAD'S TWO EMPTY STATES, AND BOTH SAID `track`. The register was renamed to Threads and the
-     rename reached the head and the kicker of this screen, which read it from the declaration; the
-     three sentences below them were typed into the route, so they went on saying the word the rest
-     of the product had stopped using. They are here so the next rename reaches them. */
-  /* POSTING ONE. The button's own word was typed into the route, so
-     the one control in the product that writes an update kept its words where no review of the
-     copy could see them, which is the whole reason the copy is kept in one place. */
-  post: 'Post',
   /* `blockNeedsOneCurrency` WAS HERE AND IS DELETED RATHER THAN EXCUSED. It was one of two headings the
      browser chose between by running `/currenc/` over the record's refusal text, which is the habit that put
      *This block's filter was not understood, so it matched nothing* over a filter that was understood and
