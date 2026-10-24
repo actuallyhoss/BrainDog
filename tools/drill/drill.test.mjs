@@ -9,6 +9,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { OPERATOR, startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { HOST } from '../../apps/worker/test/cloud-harness.ts';
@@ -16,6 +20,10 @@ import { planFor, stranger } from '../canary/lane.d/60-stranger.mjs';
 import { close, erase, fileDelete, soleOwnerFix, sweep } from './ends.mjs';
 import { argsOf, ORDER, runDrill } from './run.mjs';
 import { capturedMail, drill, NOTE } from './steps.mjs';
+import { countsWorking, drill as leakDrill, hiddenAmounts, KNOWN } from './leak-on-copy.mjs';
+import { build as leakRecord } from '../../packages/record/test/leak/fixture.ts';
+import { openSqlite } from '../../packages/kernel/test/sqlite.ts';
+import { SHARE_TEMPLATES } from '../../packages/kernel/src/share-templates.ts';
 
 const SUPPORT = `help@${HOST}`;
 const ADDRESS = 'drill-ceramics@example.test';
@@ -257,4 +265,81 @@ test('CLOSE HOLDS THE SOLE-OWNER RULE: refused with the door’s sentence while 
   assert.match(closed.said, new RegExp(`^while it alone owned its record, a close was refused \\(“Delete ${SLUG}, or make somebody else its owner, first\\.”\\); then the account closed`, 'u'));
   const wrong = await close(Object.assign(fakeDrill(after.send), { deleted: true, soleOwner: { status: 200, fix: null, refused: false, closed: false } }));
   assert.equal(wrong.pass, false);
+});
+
+/* ── the leak drill on a copy (sharing plan §4.5) ───────────────────────── */
+
+/** The leak matrix's record, kept as a `.brain` file the leak drill opens a copy of, with no grants of its own. */
+async function leakFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'leak-drill-test-'));
+  const file = join(dir, 'studio.brain');
+  (await leakRecord({ file, shapes: [] })).sql.close();
+  return { dir, file };
+}
+
+const leakCli = (file) => spawnSync(process.execPath, [new URL('./leak-on-copy.mjs', import.meta.url).pathname, file], { encoding: 'utf8' });
+
+test('THE LEAK DRILL MAKES EVERY TEMPLATE A REAL SHARE AND FINDS NOTHING on the leak matrix\'s record, with no gap tolerated', async () => {
+  const { dir, file } = await leakFile();
+  try {
+    assert.deepEqual(KNOWN, {});
+    const report = await leakDrill(file);
+    assert.deepEqual(report.skipped, []);
+    assert.deepEqual(report.grants.map((g) => g.template).sort(), [...SHARE_TEMPLATES.map((t) => t.id), 'project-no-amounts'].sort());
+    for (const g of report.grants) assert.deepEqual(g.leaks, [], g.template);
+    /* DENIES AND HIDES ARE MADE AS THE TEMPLATES SAY THEM, and the guest held to them sees some rows and not all. */
+    assert.ok(report.grants.some((g) => g.rows.some((r) => r.effect === 'deny')));
+    const hidden = report.grants.find((g) => g.template === 'project-no-amounts');
+    assert.ok(hidden.amounts > 0 && hidden.sees > 0 && hidden.hidden > 0, JSON.stringify(hidden));
+    const run = leakCli(file);
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.match(run.stdout, /6 share\(s\), 0 leak\(s\)/u);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A PLANTED LEAK FAILS THE LEAK DRILL: a guest the record answers more than its share is caught by the ids', async () => {
+  const { dir, file } = await leakFile();
+  try {
+    /* THE RECORD IS PLANTED WITH MORE THAN THE SHARES SAY: an Admin's row for the one-row guest, and a whole-record read
+       for the guest amounts are hidden from, before the drill makes either share. (The record still masks her amounts,
+       a member row and all, so the amounts are proved by `hiddenAmounts` below.) */
+    const sql = openSqlite(file);
+    for (const [person, level] of [['p_leak_one_row', 'decide'], ['p_leak_project_no_amounts', 'read']]) {
+      sql.exec('INSERT INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)', person, `${person}@leak-drill.invalid`, person);
+      sql.exec("INSERT INTO member (person_id, register, level) VALUES (?, '*', ?)", person, level);
+    }
+    sql.close();
+    const report = await leakDrill(file);
+    const of = (id) => report.grants.find((g) => g.template === id)?.leaks.join('\n') ?? report.skipped.join(' / ');
+    assert.match(of('one-row'), /id\(s\) out of sight/u);
+    assert.match(of('project-no-amounts'), /id\(s\) out of sight/u);
+    assert.equal(of('accountant'), '');
+    const run = leakCli(file);
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.match(run.stdout, /LEAK: /u);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('THE LEAK DRILL FAILS A BOOT THAT COUNTS AN AGENT WORKING for a guest who may not open the runs, and not one who may', () => {
+  const booted = (working, listed = []) => ({ ok: true, value: { waits: { working }, working: listed } });
+  assert.equal(countsWorking(booted(0), { grant: { agents: false } }), null);
+  assert.match(countsWorking(booted(1), { grant: { agents: false } }), /^boot: counts 1 agent\(s\) working/u);
+  assert.match(countsWorking(booted(0, [{}]), {}), /^boot: counts 1 agent/u);
+  assert.equal(countsWorking(booted(2), { grant: { agents: true } }), null);
+  assert.equal(countsWorking({ ok: false }, {}), null);
+});
+
+test('THE LEAK DRILL HOLDS EVERY AMOUNT ON A ROW IN SIGHT against a guest amounts are hidden from, a field\'s and one in text', () => {
+  const registers = new Map([['money', { fields: [{ id: 'payee', type: 'text' }, { id: 'amount', type: 'money' }, { id: 'old', type: 'money', retired: true }] }]]);
+  const row = { register: 'money', fields: { payee: 'Paid £923.47 and $5 for clay', amount: { amount: 92347, currency: 'GBP' }, old: { amount: 55555, currency: 'GBP' } } };
+  const said = hiddenAmounts([row, { register: 'money', fields: { amount: { amount: 42, currency: 'GBP' } } }], registers);
+  assert.deepEqual(said.sort(), ['"amount":92347', '$5', '£923.47'].sort());
+  /* AND A MASKED ANSWER CARRIES NONE OF THEM. */
+  const masked = JSON.stringify({ fields: { payee: 'Paid £… and $… for clay', amount: { currency: 'GBP' } } });
+  assert.deepEqual(said.filter((a) => masked.includes(a)), []);
+  assert.deepEqual(said.filter((a) => JSON.stringify(row).includes(a)).sort(), said.sort());
 });

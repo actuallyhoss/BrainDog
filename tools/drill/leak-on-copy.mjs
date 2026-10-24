@@ -1,21 +1,26 @@
 /**
- * The leak matrix on a real record (sharing plan §4.5), run on a copy and never on the file itself.
+ * The leak matrix on a real record (sharing plan §4.5, §6 step 4), run on a copy and never on the file itself.
  *
  *   node tools/drill/leak-on-copy.mjs <record.brain>
  *
  * 1. Copies the file (and its `-wal` beside it) into a fresh temporary folder and opens the copy in process.
- * 2. For each share template (`packages/kernel/src/share-templates.ts`) adds a throwaway grant for a fake person. Until
- *    Slice 5 wires shares, a grant is today's member rows: a level per list, a ceiling, and a row rule (`row_where`),
- *    made through `kernel.invite` exactly as the People screen makes them.
- * 3. Runs every READ+ and DATA route that changes nothing, through the host's own handler table, as each fake person.
- * 4. Asserts that no answer carries the id of a row out of that person's sight, and times `boot` and `list`.
+ * 2. For each share template (`packages/kernel/src/share-templates.ts`) makes a real share for a fake guest, through the
+ *    record's own `share` as the owner makes one on the Share sheet: the template's rows, its allows and its denies, with
+ *    the `$` words filled from this record's own lists, and lasting the template's days. And one more, a project shared
+ *    with its amounts hidden, as the Share sheet shares one with anybody outside his team.
+ * 3. Runs every READ+ and DATA route that changes nothing, through the host's own handler table, as each guest, a page
+ *    with the feed of what happened and the questions waiting among them.
+ * 4. Asserts that no answer carries the id of a row out of that guest's sight, that `boot` counts no agent working for
+ *    a guest who may not open the runs, and that a guest amounts are hidden from is never answered an amount: neither a
+ *    money field's nor one written in the text of a row in sight. And it times `boot` and `list`.
  *
- * SIGHT IS WORKED OUT HERE, NOT ASKED OF THE RECORD: a row is in sight when its list is granted, the template's rule
- * admits it (read in plain code off the row's fields), it is not deleted, and nobody else kept it private. An id a
- * visible row's own fields hold is in sight with it.
+ * SIGHT IS WORKED OUT HERE, NOT ASKED OF THE RECORD: a row is in sight when an allow of the guest's reaches it and no
+ * deny does, each read in plain code off the row's list and fields (`reaches`), it is not deleted, its list is not the
+ * owner's own (personal, owner-only, the kernel's, Keys and People, which no broad share reaches), and nobody kept it
+ * private. An id a visible row's own fields hold is in sight with it.
  *
- * NOTHING IS WRITTEN BACK. The copy is deleted on the way out, whatever happened. A leak on a route a known gap holds
- * open (`KNOWN`) is listed and does not fail the run; any other leak does, with exit 1.
+ * NOTHING IS WRITTEN BACK. The copy is deleted on the way out, whatever happened. Every leak fails the run, with exit 1:
+ * `KNOWN` lists the routes a known gap holds open, and the matrix closed every one (`leak-matrix.test.ts`).
  */
 
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -25,60 +30,160 @@ import { basename, join, resolve } from 'node:path';
 import { createRecordApi } from '../../packages/record/src/index.ts';
 import { ROUTES, handlersFor } from '../../packages/host/src/index.ts';
 import { sessionContext } from '../../packages/host/src/auth.ts';
+import { SHARE_TEMPLATES } from '../../packages/kernel/src/share-templates.ts';
 import { openSqlite } from '../../packages/kernel/test/sqlite.ts';
 
-/** The routes a known gap holds open (`packages/record/test/leak-matrix.test.ts`), and the gap. */
-export const KNOWN = { backlinks: 'G3', context: 'G2', metric: 'G4' };
+/** The routes a known gap holds open, and the gap. None: the matrix closed G1 to G8. */
+export const KNOWN = {};
 
 const ULID = /[0-9A-HJKMNP-TV-Z]{26}/gu;
 const KEYS = 'credentials';
 const SAMPLE = 6;
+const DAY_MS = 86_400_000;
 
-/** A list's declared fields. */
-const fieldsOf = (decl) => (Array.isArray(decl?.fields) ? decl.fields : []);
-const hasMoney = (decl) => fieldsOf(decl).some((f) => f.type === 'money' || f.of === 'money');
+/** An amount written in text, symbol first, as "Paid £923.47" holds one. */
+const WRITTEN = /[£€$] ?\d[\d.,]*\d|[£€$] ?\d/gu;
+
+/** The feed of what happened and the questions waiting, as Activity and Decide draw them. */
+export const FEED_PROBE = {
+  body: {
+    page: 'probe-leak-drill',
+    title: 'Probe',
+    blocks: [
+      { kind: 'feed', key: 'feed', heading: 'What happened', source: 'activity', empty: 'Nothing yet.' },
+      { kind: 'queue', key: 'open', heading: 'Needs you', source: 'governance.open', empty: 'Nothing waits.' },
+    ],
+  },
+};
+
+/** A list's declared fields, the retired ones left out. */
+const fieldsOf = (decl) => (Array.isArray(decl?.fields) ? decl.fields.filter((f) => f.retired !== true) : []);
+const hasMoney = (decl) => fieldsOf(decl).some((f) => f.type === 'money');
+const moneyFields = (decl) => fieldsOf(decl).filter((f) => f.type === 'money').map((f) => f.id);
+const scopeField = (decl) => fieldsOf(decl).find((f) => f.scope !== undefined);
 
 /**
- * Today's member rows for each template, read off this record's own lists, with the rule that admits a row in plain
- * code beside the `where` the record is handed. A template this record cannot fill (no project, no list with an enum)
- * is left out and said so.
+ * The record's lists as sight reads them, from the declarations: the owner's own lists (personal, owner-only, the
+ * kernel's, Keys and the People list `meet` writes), and the lists whose rows are projects.
  */
-export function templates(sql, registers) {
-  const lists = [...registers].filter(([id]) => !id.startsWith('_'));
+export function listsOf(sql, registers) {
+  const kernel = new Set(sql.all("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0").map((r) => String(r.id).replace(/^register\./u, '')));
+  const all = [...registers];
+  const declaring = all.filter(([, d]) => d.meets !== undefined);
+  const people = declaring.length === 1 ? declaring[0][0] : declaring.length === 0 && registers.has('people') ? 'people' : null;
+  const gated = new Set(all.filter(([id, d]) => d.personal === true || d.owner_only === true || kernel.has(id) || id === KEYS || id === people).map(([id]) => id));
+  const personal = new Set(all.filter(([, d]) => d.personal === true).map(([id]) => id));
+  const projects = new Set(all.filter(([, d]) => d.scopes !== undefined).map(([id]) => id));
+  return { registers, gated, personal, projects, people };
+}
+
+/** Whether one target of a share reaches one row, in plain code off the row's list and fields. */
+export function reaches(what, row, lists) {
+  const decl = lists.registers.get(row.register);
+  if (!decl || lists.personal.has(row.register)) return false;
+  const gated = lists.gated.has(row.register);
+  if (what.record === true) return !gated;
+  if (what.project !== undefined) {
+    if (lists.projects.has(row.register)) return row.id === what.project;
+    if (what.lists ? !what.lists.includes(row.register) : gated) return false;
+    const sf = scopeField(decl);
+    if (!sf) return false;
+    const v = row.fields?.[sf.id];
+    return sf.scope?.links === true ? Array.isArray(v) && v.includes(what.project) : v === what.project;
+  }
+  if (what.lists !== undefined) {
+    if (Array.isArray(what.lists)) return what.lists.includes(row.register);
+    if (what.lists.has === 'money') return hasMoney(decl) && !gated;
+    return what.lists.role === 'keys' ? row.register === KEYS : what.lists.role === 'meets' ? row.register === lists.people : false;
+  }
+  if (what.list !== row.register) return false;
+  if (Array.isArray(what.rows)) return what.rows.includes(row.id);
+  const w = what.where;
+  if (w && typeof w.field === 'string' && 'is' in w) return (w.field === 'seq' ? row.seq : row.fields?.[w.field]) === w.is;
+  /* A CONDITION THIS DRILL CANNOT READ IN PLAIN CODE IS NOT IN SIGHT, so anything it answers counts against it. */
+  return false;
+}
+
+/**
+ * What a guest amounts are hidden from must never be answered, on the rows in their sight: each money field's amount as
+ * an answer carries one (`"amount":92347`), and each amount written in a text field ("£923.47"). An amount under 100 in
+ * minor units is left out, as a number too short to tell from any other.
+ */
+export function hiddenAmounts(visible, registers) {
+  return [
+    ...new Set(
+      visible.flatMap((r) => [
+        ...moneyFields(registers.get(r.register))
+          .map((f) => r.fields?.[f]?.amount)
+          .filter((a) => Number.isInteger(a) && Math.abs(a) >= 100)
+          .map((a) => `"amount":${a}`),
+        ...Object.values(r.fields ?? {})
+          .filter((v) => typeof v === 'string')
+          .flatMap((v) => v.match(WRITTEN) ?? []),
+      ]),
+    ),
+  ];
+}
+
+/**
+ * The line `boot` fails with when it counts an agent working for a guest who may not open the runs (LENS-3: the bar's
+ * Agents count reads `waits.working`), or `null`.
+ */
+export function countsWorking(booted, held) {
+  if (!booted?.ok || held?.grant?.agents === true) return null;
+  const n = Number(booted.value?.waits?.working ?? 0);
+  const listed = Array.isArray(booted.value?.working) ? booted.value.working.length : 0;
+  return n > 0 || listed > 0 ? `boot: counts ${Math.max(n, listed)} agent(s) working for a guest who may not open the runs` : null;
+}
+
+/** Fill a template's `$` words. */
+const filled = (what, words) => JSON.parse(JSON.stringify(what), (_k, v) => (typeof v === 'string' && v.startsWith('$') && v in words ? words[v] : v));
+
+/**
+ * The grants to make: each template's rows with its `$` words filled from this record, and the Share sheet's project
+ * with amounts hidden. A template this record cannot fill (no project, no list with an enum, no row) is left out and
+ * said so.
+ */
+export function templates(sql, lists) {
+  const own = [...lists.registers].filter(([id]) => !lists.gated.has(id));
   const rowsOf = (list) => sql.all('SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND seq IS NOT NULL ORDER BY seq', list);
-  const sized = lists.map(([id, decl]) => ({ id, decl, n: sql.one('SELECT COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', id)?.n ?? 0 })).sort((a, b) => b.n - a.n);
+  const sized = own
+    .map(([id, decl]) => ({ id, decl, n: sql.one('SELECT COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND seq IS NOT NULL', id)?.n ?? 0 }))
+    .sort((a, b) => b.n - a.n);
+  const home = [...lists.projects].find((id) => !lists.gated.has(id));
+  const project = home ? rowsOf(home)[0] : undefined;
+  const graded = sized.find(({ decl, n }) => n > 0 && fieldsOf(decl).some((f) => f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0));
+  const enumOf = graded ? fieldsOf(graded.decl).find((f) => f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0) : undefined;
+  /* THE VALUE MOST ROWS HOLD, so the reviewer sees some rows and not all. */
+  const value = enumOf
+    ? (sql.one(`SELECT json_extract(fields, '$.' || ?) AS v, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.' || ?) IS NOT NULL GROUP BY v ORDER BY n DESC LIMIT 1`, enumOf.id, graded.id, enumOf.id)?.v ?? enumOf.values[0])
+    : undefined;
+  const biggest = sized.find(({ n }) => n > 0);
+  const first = biggest ? rowsOf(biggest.id)[0] : undefined;
+
   const out = [];
   const why = [];
-
-  const money = lists.filter(([id, d]) => id !== KEYS && hasMoney(d)).map(([id]) => id);
-  if (money.length) out.push({ id: 'accountant', registers: Object.fromEntries(money.map((l) => [l, 'read'])), admits: () => true });
-  else why.push('accountant: no list holds money');
-
-  const plain = lists.filter(([id, d]) => id !== KEYS && !hasMoney(d) && d.owner_only !== true).map(([id]) => id);
-  if (plain.length) out.push({ id: 'assistant', registers: Object.fromEntries(plain.map((l) => [l, 'write'])), admits: () => true });
-
-  /* THE CONTRACTOR: the biggest list with a scoped ref to the projects list, held to its first project. */
-  const home = lists.find(([, d]) => d.scopes !== undefined)?.[0];
-  const project = home ? rowsOf(home)[0] : undefined;
-  const scoped = sized.find(({ decl }) => fieldsOf(decl).some((f) => f.type === 'ref' && f.to === home && f.scope !== undefined));
-  if (project && scoped) {
-    const field = fieldsOf(scoped.decl).find((f) => f.type === 'ref' && f.to === home && f.scope !== undefined).id;
-    out.push({ id: 'contractor', registers: { [scoped.id]: 'write' }, wheres: { [scoped.id]: { field, is: project.id } }, admits: (list, row) => list !== scoped.id || row.fields[field] === project.id });
-  } else why.push('contractor: no project, or no list on a project');
-
-  /* THE REVIEWER: the biggest list with an enum, held to its first value. */
-  const graded = sized.find(({ id, decl }) => id !== KEYS && fieldsOf(decl).some((f) => f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0) && sized.length > 0);
-  if (graded) {
-    const f = fieldsOf(graded.decl).find((x) => x.type === 'enum' && Array.isArray(x.values) && x.values.length > 0);
-    const value = f.values[0];
-    out.push({ id: 'reviewer', registers: { [graded.id]: 'read' }, wheres: { [graded.id]: { field: f.id, is: value } }, admits: (list, row) => list !== graded.id || row.fields[f.id] === value });
-  } else why.push('reviewer: no list with an enum');
-
-  /* ONE ROW: the biggest list's first row. */
-  const biggest = sized.find(({ id, n }) => id !== KEYS && n > 0);
-  const first = biggest ? rowsOf(biggest.id)[0] : undefined;
-  if (first) out.push({ id: 'one-row', registers: { [biggest.id]: 'read' }, wheres: { [biggest.id]: { field: 'seq', is: first.seq } }, admits: (list, row) => list !== biggest.id || row.seq === first.seq });
-  else why.push('one-row: no row');
+  for (const t of SHARE_TEMPLATES) {
+    const words = {};
+    const missing = [];
+    for (const ask of t.asks) {
+      if (ask === 'project') project ? (words.$project = project.id) : missing.push('no project');
+      if (ask === 'list') {
+        const list = t.asks.includes('row') ? biggest?.id : graded?.id;
+        list ? (words.$list = list) : missing.push(t.asks.includes('row') ? 'no row' : 'no list with an enum');
+      }
+      if (ask === 'where') graded ? (words.$where = { field: enumOf.id, is: value }) : missing.push('no list with an enum');
+      if (ask === 'row') first ? (words.$row = first.id) : missing.push('no row');
+    }
+    if (missing.length) {
+      why.push(`${t.id}: ${[...new Set(missing)].join(', ')}`);
+      continue;
+    }
+    out.push({ id: t.id, days: t.days, rows: t.rows.map((r) => ({ effect: r.effect, what: filled(r.what, words), can: r.can, ...(r.caps ? { caps: r.caps } : {}) })) });
+  }
+  /* THE SHARE SHEET'S DEFAULT FOR ANYBODY OUTSIDE HIS TEAM: a project, every amount hidden. */
+  if (project) out.push({ id: 'project-no-amounts', days: 30, hidesMoney: true, rows: [{ effect: 'allow', what: { project: project.id }, can: 'view', hide: { types: ['money'] } }] });
+  else why.push('project-no-amounts: no project');
   return { out, why };
 }
 
@@ -108,7 +213,7 @@ function argsFor(route, lists, sample, words, pages, figures) {
     case 'whatsNew':
       return [{}, { everything: true }];
     case 'previewPage':
-      return [];
+      return [FEED_PROBE];
     default:
       return takes.includes('register') ? [{}, ...lists.map((register) => ({ register }))] : [{}];
   }
@@ -126,42 +231,74 @@ export async function drill(file) {
   try {
     const api = await createRecordApi({ sql, clock: { now: () => Date.now() }, invitations: () => null });
     const owner = sql.one("SELECT person_id AS id FROM member m JOIN person p ON p.id = m.person_id WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL LIMIT 1")?.id;
-    if (!owner) throw new Error('This record has no owner on it, so no grant can be made on it.');
+    if (!owner) throw new Error('This record has no owner on it, so no share can be made on it.');
     const ownerCtx = { principal: { kind: 'person', id: owner, level: 'owner' }, credentialed: true };
     const registers = api.kernel.registers();
-    const { out: grants, why } = templates(sql, registers);
+    const lists = listsOf(sql, registers);
+    const { out: grants, why } = templates(sql, lists);
     const handlers = handlersFor(api);
     const read = ROUTES.filter((r) => (r.group === 'READ+' || r.group === 'DATA') && !r.writes);
-    const pages = (((await api.pages(ownerCtx))?.value ?? [])).map((p) => p.slug ?? p.page).filter(Boolean).slice(0, 8);
-    const figures = (((await api.figures(ownerCtx))?.value ?? [])).map((m) => m.id).filter(Boolean).slice(0, 8);
+    const pages = ((await api.pages(ownerCtx))?.value ?? []).map((p) => p.slug ?? p.page).filter(Boolean).slice(0, 8);
+    const figures = ((await api.figures(ownerCtx))?.value ?? []).map((m) => m.id).filter(Boolean).slice(0, 8);
     const privateRows = new Map(sql.all('SELECT entry_id, person_id FROM entry_private').map((r) => [r.entry_id, r.person_id]));
     const every = sql.all('SELECT id, register, seq, fields, deleted_at FROM entry').map((r) => ({ ...r, fields: safeJson(r.fields) }));
 
     const report = { file: source, grants: [], skipped: why };
     for (const grant of grants) {
       const person = `p_leak_${grant.id.replace(/-/gu, '_')}`;
-      const made = api.kernel.invite(owner, { person, name: `Leak drill ${grant.id}`, registers: grant.registers, ...(grant.wheres ? { wheres: grant.wheres } : {}) });
-      if (!made.ok) {
-        report.skipped.push(`${grant.id}: ${made.refusal?.fix ?? 'refused'}`);
+      /* A GUEST WITH NOTHING ELSE ON THE RECORD, as a share by email binds one. */
+      sql.exec('INSERT OR IGNORE INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)', person, `${person}@leak-drill.invalid`, `Leak drill ${grant.id}`);
+      const until = grant.days === null ? undefined : new Date(Date.now() + grant.days * DAY_MS).toISOString();
+      let refused = null;
+      for (const row of grant.rows) {
+        const made = await api.share({ share: { ...row, who: { kind: 'person', id: person }, ...(until ? { when: { until } } : {}) }, template: grant.id.startsWith('project-') ? undefined : grant.id }, ownerCtx);
+        if (!made.ok) refused = made.refusal?.fix ?? 'refused';
+      }
+      if (refused) {
+        report.skipped.push(`${grant.id}: ${refused}`);
         continue;
       }
-      const ctx = sessionContext({ person, provedAt: Date.now() }, api.kernel.access(person));
-      const granted = Object.keys(grant.registers);
-      const sees = (r) => granted.includes(r.register) && r.deleted_at === null && (!privateRows.has(r.id) || privateRows.get(r.id) === person) && grant.admits(r.register, r);
+      api.kernel.accessChanged?.();
+      const held = api.kernel.access(person);
+      if (!held) {
+        report.skipped.push(`${grant.id}: the record holds nothing for the guest`);
+        continue;
+      }
+      const ctx = sessionContext({ person, provedAt: Date.now() }, held);
+      const allows = grant.rows.filter((r) => r.effect === 'allow');
+      const denies = grant.rows.filter((r) => r.effect === 'deny');
+      const sees = (r) =>
+        r.deleted_at === null &&
+        (!privateRows.has(r.id) || privateRows.get(r.id) === person) &&
+        allows.some((a) => reaches(a.what, r, lists)) &&
+        !denies.some((d) => reaches(d.what, r, lists));
       const visible = every.filter(sees);
       const inSight = new Set([...visible.map((r) => r.id), ...visible.flatMap((r) => JSON.stringify(r.fields).match(ULID) ?? [])]);
       const out = new Set(every.filter((r) => !inSight.has(r.id)).map((r) => r.id));
-      /* A SAMPLE OF ROWS IN AND OUT OF SIGHT, per granted list, and one list not granted. */
-      const lists = [...granted, ...[...registers.keys()].filter((l) => !granted.includes(l)).slice(0, 1)];
-      const sample = lists.flatMap((l) => [...every.filter((r) => r.register === l && r.seq !== null && sees(r)).slice(0, SAMPLE), ...every.filter((r) => r.register === l && r.seq !== null && !sees(r)).slice(0, SAMPLE)]);
-      const words = [...new Set(every.filter((r) => out.has(r.id)).slice(0, SAMPLE * 2).flatMap((r) => Object.values(r.fields ?? {}).filter((v) => typeof v === 'string' && v.length > 4 && !ULID.test(v)).map((v) => v.split(/\s+/u)[0])).filter((w) => w && w.length > 3))].slice(0, SAMPLE * 2);
-      ULID.lastIndex = 0;
+      const granted = [...new Set(visible.map((r) => r.register))];
+      /* WHAT A GUEST AMOUNTS ARE HIDDEN FROM MUST NEVER BE ANSWERED: each money field's amount, and each written in text. */
+      const amounts = grant.hidesMoney ? hiddenAmounts(visible, registers) : [];
+      /* A SAMPLE OF ROWS IN AND OUT OF SIGHT, per list in sight, and one list not in sight. */
+      const asked_lists = [...granted, ...[...registers.keys()].filter((l) => !granted.includes(l)).slice(0, 1)];
+      const sample = asked_lists.flatMap((l) => [
+        ...every.filter((r) => r.register === l && r.seq !== null && sees(r)).slice(0, SAMPLE),
+        ...every.filter((r) => r.register === l && r.seq !== null && !sees(r)).slice(0, SAMPLE),
+      ]);
+      const words = [
+        ...new Set(
+          every
+            .filter((r) => out.has(r.id))
+            .slice(0, SAMPLE * 2)
+            .flatMap((r) => Object.values(r.fields ?? {}).filter((v) => typeof v === 'string' && v.length > 4 && !/[0-9A-HJKMNP-TV-Z]{26}/u.test(v)).map((v) => v.split(/\s+/u)[0]))
+            .filter((w) => w && w.length > 3),
+        ),
+      ].slice(0, SAMPLE * 2);
 
       const found = [];
       const known = [];
       let asked = 0;
       for (const route of read)
-        for (const args of argsFor(route, lists, sample, words, pages, figures)) {
+        for (const args of argsFor(route, asked_lists, sample, words, pages, figures)) {
           asked += 1;
           let answer;
           try {
@@ -169,11 +306,17 @@ export async function drill(file) {
           } catch (cause) {
             answer = { threw: String(cause?.message ?? cause) };
           }
-          const ids = [...new Set(JSON.stringify(answer ?? null).match(ULID) ?? [])].filter((id) => out.has(id));
-          if (ids.length === 0) continue;
-          const line = `${route.name} ${JSON.stringify(args).slice(0, 80)}: ${ids.length} id(s) out of sight, such as ${ids[0]}`;
-          (KNOWN[route.name] ? known : found).push(KNOWN[route.name] ? `${KNOWN[route.name]} ${line}` : line);
+          const text = JSON.stringify(answer ?? null);
+          const ids = [...new Set(text.match(ULID) ?? [])].filter((id) => out.has(id));
+          const said = amounts.filter((a) => text.includes(a));
+          const lines = [];
+          if (ids.length) lines.push(`${route.name} ${JSON.stringify(args).slice(0, 80)}: ${ids.length} id(s) out of sight, such as ${ids[0]}`);
+          if (said.length) lines.push(`${route.name} ${JSON.stringify(args).slice(0, 80)}: ${said.length} hidden amount(s), such as ${said[0]}`);
+          for (const line of lines) (KNOWN[route.name] ? known : found).push(KNOWN[route.name] ? `${KNOWN[route.name]} ${line}` : line);
         }
+      /* NOBODY WHO MAY NOT OPEN THE RUNS IS COUNTED ONE (LENS-3): a guest's bar says no agent is working. */
+      const counted = countsWorking(await handlers.boot({}, ctx), held);
+      if (counted) found.push(counted);
       const timed = async (name, args) => {
         const t = performance.now();
         await handlers[name](args, ctx);
@@ -182,12 +325,13 @@ export async function drill(file) {
       report.grants.push({
         template: grant.id,
         lists: granted,
-        rule: grant.wheres ?? null,
+        rows: grant.rows,
         sees: visible.length,
         hidden: out.size,
+        amounts: amounts.length,
         asked,
         boot_ms: await timed('boot', {}),
-        list_ms: await timed('list', { register: granted[0] }),
+        list_ms: await timed('list', { register: granted[0] ?? [...registers.keys()][0] }),
         leaks: found,
         known,
       });
@@ -217,12 +361,13 @@ if (import.meta.main) {
     console.log(`  leak-on-copy: ${report.file}, read on a copy that is gone again`);
     for (const why of report.skipped) console.log(`  skipped ${why}`);
     for (const g of report.grants) {
-      console.log(`  ${g.template}: ${g.lists.join(', ')}${g.rule ? ` held by ${JSON.stringify(g.rule)}` : ''}; sees ${g.sees} row(s), ${g.hidden} out of sight; ${g.asked} call(s); boot ${g.boot_ms} ms, list ${g.list_ms} ms`);
+      const said = g.rows.map((r) => `${r.effect} ${JSON.stringify(r.what)}${r.hide ? ` hiding ${JSON.stringify(r.hide)}` : ''}`).join('; ');
+      console.log(`  ${g.template} (${said}): sees ${g.sees} row(s) on ${g.lists.join(', ') || 'no list'}, ${g.hidden} out of sight${g.amounts ? `, ${g.amounts} amount(s) hidden` : ''}; ${g.asked} call(s); boot ${g.boot_ms} ms, list ${g.list_ms} ms`);
       for (const l of g.known) console.log(`    known: ${l}`);
       for (const l of g.leaks) console.log(`    LEAK: ${l}`);
     }
     const leaks = report.grants.reduce((n, g) => n + g.leaks.length, 0);
-    console.log(`  leak-on-copy: ${report.grants.length} template(s), ${leaks} leak(s) outside the known gaps`);
-    if (leaks > 0) process.exitCode = 1;
+    console.log(`  leak-on-copy: ${report.grants.length} share(s), ${leaks} leak(s)`);
+    if (leaks > 0 || report.grants.length === 0) process.exitCode = 1;
   }
 }
