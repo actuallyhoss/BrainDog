@@ -1817,12 +1817,13 @@ const DECLARED: Record<string, Version> = {
       metric.projects-retired metric.projects-with-agent metric.projects-with-health
       page.all-numbers page.portfolio
       register.datapoints register.kpis register.stages register.things
-      rule.project-past-aim
-      script.kpi_backfill
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
     `,
-    declares: 'b81f3e2271681c18',
+    declares: 'c269d3aa29ad7555',
     history: [
       "Portfolio 1.25.0 (E26): `page.all-numbers`, Numbers' own page (`list: datapoints`): each kind of number once under its project, with its newest value, unit and age, and the two that moved most this year as lines; one page added -> b81f3e2271681c18",
+      "Portfolio 1.25.0 on top of 1.24.0: holds 1.24.0's `rule.kind-offers-kpis` and `script.kind_drafts` too -> c269d3aa29ad7555",
     ],
   },
   /* A PROJECT'S PLAN IS DRAWN, NOT LISTED (the thinking scope of 24 October, C18 and C19). 1.22.0 IS MASTER'S (the
