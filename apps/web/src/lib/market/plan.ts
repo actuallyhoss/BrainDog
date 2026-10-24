@@ -41,6 +41,8 @@ export const words = {
   notNow: 'Not now',
   stops: "What stops this install",
   adds: 'Adds',
+  /* THE NUMBERS A PLAN ADDS, AS ONE ROW (audit C, X10): seventeen of them named one under another buried its lists. */
+  addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
   handed: 'already here, under another add-on',
   changes: 'Changes',
   retires: 'Takes away',
@@ -115,7 +117,8 @@ export type SectionKey =
   | 'interrupts'
   | 'worth';
 
-export type Section = { key: SectionKey; title: string; rows: Row[] };
+/** `n` is how many things the section holds when that is more than its rows, as Adds is with its numbers folded. */
+export type Section = { key: SectionKey; title: string; rows: Row[]; n?: number };
 
 /**
  * One call out and whether it is new to this record. `line` is the kernel's own sentence for it, the one Decide says
@@ -181,6 +184,12 @@ function namer(nameOf: (id: string) => string): (id: string) => string {
 }
 
 const section = (key: SectionKey, title: string, rows: Row[]): Section[] => (rows.length === 0 ? [] : [{ key, title, rows }]);
+
+/** What a plan adds: each list, page and rule by name, then its numbers as one row, and the count of every one. */
+function addsSection(named: Row[], figures: number): Section[] {
+  const rows = figures === 0 ? named : [...named, row(words.addsNumbers(figures))];
+  return rows.length === 0 ? [] : [{ key: 'adds', title: words.adds, rows, n: named.length + figures }];
+}
 const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
 
 /* THE PREDICATE NAMES ITS OWN SHAPE, AND NOT PLAIN `Body`: two guards that both narrow to the same wide type leave the
@@ -250,7 +259,10 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     title,
     move: installed && installed !== version ? words.updateAvailable : '',
     sections: [
-      ...section('adds', words.adds, list(d.adds).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : text(a.summary) || null))),
+      ...addsSection(
+        list(d.adds).filter((a) => !text(a.id).startsWith('metric.')).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : text(a.summary) || null)),
+        list(d.adds).filter((a) => text(a.id).startsWith('metric.')).length,
+      ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
       ...section('retires', words.retires, retires.filter((r) => typeof r.to !== 'string').map((r) => row(name(text(r.id)), words.keepsRows(count(r.rows))))),
       ...section('moves', words.moves, retires.filter((r) => typeof r.to === 'string').map((r) => row(name(text(r.id)), words.movesTo(name(text(r.to)))))),
@@ -292,14 +304,14 @@ function sharedParts(plan: Body, name: (id: string) => string): { parts: Part[];
     stops.push(...strings(p.conflicts));
     const version = text(p.version);
     const installed = typeof p.installedVersion === 'string' ? p.installedVersion : null;
-    const named = (items: unknown): Row[] => list(items).map((a) => row(text(a.name)));
+    const named = (items: unknown): Row[] => list(items).filter((a) => a.kind !== 'figure').map((a) => row(text(a.name)));
     const examples = count(p.examples);
     return {
       key: text(p.id),
       title: text(p.title) || name(text(p.id)),
       move: installed && installed !== version ? words.updateAvailable : '',
       sections: [
-        ...section('adds', words.adds, named(p.adds)),
+        ...addsSection(named(p.adds), list(p.adds).filter((a) => a.kind === 'figure').length),
         ...section('changes', words.changes, strings(p.changes).map((c) => row(c))),
         ...section('retires', words.retires, strings(p.retires).map((c) => row(c))),
         ...section('moves', words.moves, list(p.hands).map((h) => row(text(h.name), words.movesTo(text(h.to))))),

@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs';
 
 import type { SharedPlan } from '../../sharing.ts';
 import { sheetOf } from '../../../../lib/market/plan.ts';
-import { afterOthers, diffOf, installInTurn, sheetWords, turnWords, waitsOf, type Offered, type Planned } from './offer.ts';
+import { afterOthers, diffOf, firstPageOf, installInTurn, sheetWords, turnWords, waitsOf, type Offered, type Planned } from './offer.ts';
+import { words } from '../../../../lib/market/words.ts';
 
 const planned = (diff: Record<string, unknown>, planHash = 'h'): Planned => ({ kind: 'pack', doc: {}, diff, planHash, approve: [] });
 
@@ -206,4 +207,20 @@ test('a refusal before any holder went in names none, and two that went in are b
 test('the listing hands its plan what else waits, so the wait is read where the update is pressed', () => {
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /planFor\(client, listing, file, held, copy\.writeRaced, \(\) => waitingOf\(fetch, kennel, held\)\)/u);
+});
+
+/* AFTER INSTALL, ONE PRESS LANDS ON WHAT IT BROUGHT (audit C of 25 October, X9): its first page that opens on its own. */
+
+test('the page Installed opens is the first that needs no row chosen, by its title', () => {
+  const pages = [
+    { id: 'firing', title: '{{name}}' },
+    { id: 'kiln', title: 'Kiln' },
+    { id: 'glazes', title: 'Glazes' },
+  ];
+  const declared = [{ page: 'firing', for: { register: 'firings' } }, { page: 'kiln' }, { page: 'glazes' }];
+  assert.deepEqual(firstPageOf(pages, declared), { id: 'kiln', title: 'Kiln' });
+  assert.equal(words.open('Kiln'), 'Open Kiln');
+  assert.equal(firstPageOf([{ id: 'firing', title: '{{name}}' }], declared), null, 'only a page for each row: nothing to open on its own');
+  assert.equal(firstPageOf([{ id: 'studio', title: '{{config:studio_name}}' }], []), null, 'a title still waiting on a setting is not a name to press');
+  assert.equal(firstPageOf([], []), null);
 });

@@ -106,7 +106,8 @@ export type SharedPack = {
   version: string;
   installedVersion: string | null;
   direction: 'install' | 'upgrade' | 'downgrade' | 'reinstall';
-  adds: { kind: 'list' | 'page' | 'other'; name: string }[];
+  /** `figure` for a number it tracks, so the plan sheet folds them into one row; `other` for a rule. */
+  adds: { kind: 'list' | 'page' | 'figure' | 'other'; name: string }[];
   changes: string[];
   retires: string[];
   /**
@@ -151,7 +152,7 @@ export const oneOf = (list: string): string => {
 export const moduleTitle = (id: string): string => moduleOf(id)?.name ?? moduleName(id);
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
-function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
+function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'figure' | 'other'; name: string } {
   const declsOf = (d: Body): Body[] => (Array.isArray(d.declarations) ? (d.declarations as Body[]) : []);
   const decls = declsOf(doc);
   /* A LIST ANOTHER PACK IN THE SAME PLAN DECLARES, such as Projects for a page on each of Portfolio's rows. */
@@ -186,7 +187,7 @@ function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kin
        first-party one is said by the name this build gives it: "Chase late payments", not `invoice-late`. */
     const d = decls.find((x) => x[kind ?? ''] === bare);
     const own = typeof d?.name === 'string' ? filled(d.name) : kind === 'rule' ? ruleName(bare) : null;
-    return { kind: 'other', name: own ?? (bare || id) };
+    return { kind: kind === 'metric' ? 'figure' : 'other', name: own ?? (bare || id) };
   };
 }
 

@@ -16,6 +16,8 @@ import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type Catalogue
 
 import {
   askForVersion,
+  byBrainDog,
+  callSaid,
   catalogueText,
   catalogueTitles,
   changesSince,
@@ -25,6 +27,7 @@ import {
   readHostCatalogue,
   STORE_UNREACHED,
   signedWords,
+  signedLine,
   standingOf,
   trustFor,
   trustLine,
@@ -256,7 +259,7 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
   /* THREE SECTIONS SINCE the screens scope of 24 October (E20), and never where a thing came from. */
   assert.deepEqual(Object.values(market.sections), ['Ready-made setups', 'Add-ons', 'Looks']);
   assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
-  assert.match(copy.browseAll, /use cases/iu);
+  assert.match(copy.browseAll, /setups/iu);
   assert.match(copy.browseAll, /add-ons/iu);
   assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
   assert.match(at('./[id]/+page.svelte'), /\{copy\.browseAll\}/u);
@@ -582,4 +585,26 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
   assert.match(detail, /trustThisKey\(/u);
   assert.match(detail, /Trust this key/u);
   assert.doesNotMatch(detail, /trustForEntry\(browserStore\(\)/u);
+});
+
+/* A STORE PAGE SAYS WHAT AN ADD-ON CALLS IN A PERSON'S WORDS, never the kernel's line (audit C of 25 October, X12). */
+
+test('what an add-on calls out to is a sentence: the host, how often, and the key by its name', () => {
+  assert.equal(callSaid({ host: 'api.kiln.example', key: 'kiln', line: 'CALLS OUT api.kiln.example · every 1h · key "kiln" to the host its vault entry opens' }), 'Calls api.kiln.example every hour with your Kiln key');
+  assert.equal(callSaid({ host: 'api.kiln.example', key: null, line: 'CALLS OUT api.kiln.example · every 6h · no key' }), 'Calls api.kiln.example every 6 hours');
+  assert.equal(
+    callSaid({ host: 'glaze.example', key: 'glaze', line: 'CALLS OUT glaze.example · when a rule runs it, at most 100 a day · grant "glaze"' }),
+    'Calls glaze.example when a rule runs it, at most 100 a day, with your Glaze key',
+  );
+  assert.equal(callSaid({ host: null, key: null, line: 'CALLS OUT no host declared · daily · no key' }), 'Calls a service it does not name daily');
+  for (const s of [callSaid({ host: 'a.example', key: 'k', line: 'CALLS OUT a.example · every 1h · grant "k"' })]) assert.doesNotMatch(s, /CALLS OUT|grant|·/u);
+});
+
+test('BrainDog’s own add-ons say no signature line: By BrainDog is the whole of who made it', () => {
+  assert.equal(byBrainDog({ source: 'kennel', author: 'BrainDog', publisher: null }), true);
+  assert.equal(byBrainDog({ source: 'kennel', author: 'Mara', publisher: null }), false);
+  assert.equal(byBrainDog({ source: 'bundled', author: 'Mara', publisher: null }), true);
+  assert.equal(signedLine(null, true), null, 'no "Not checked" under each of its versions');
+  assert.equal(signedLine(null, false), signedWords(null));
+  assert.equal(signedLine({ key_id: 'k1' } as never, true), signedWords({ key_id: 'k1' } as never));
 });

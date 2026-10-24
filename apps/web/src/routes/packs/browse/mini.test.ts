@@ -7,6 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { USE_CASES } from '@braindog/seed/usecases';
 import { isGlyph } from '../../../lib/ui/icons.ts';
+import { copy } from '../../../lib/copy.ts';
+import { words } from '../../../lib/market/words.ts';
 import { miniOf, shapeOf } from './mini.ts';
 
 test('every use case draws one to four tiles, each named, with a glyph the app draws', () => {
@@ -37,4 +39,13 @@ test('a figure is a chart, a board is columns, and anything with rows is a list'
   assert.equal(shapeOf('calendar'), 'calendar');
   assert.equal(shapeOf('table'), 'list');
   assert.equal(shapeOf(undefined), 'list');
+});
+
+test('ONE WORD FOR A SETUP EVERYWHERE, and the menu is never "Rail" (audit C of 25 October, X10)', () => {
+  assert.equal(words.kinds.usecase, 'Ready-made setup');
+  assert.equal(words.sections.setups, 'Ready-made setups');
+  assert.equal(words.categories['ways-of-working'], 'Ready-made setups');
+  assert.equal(copy.browseAll, 'All setups and add-ons');
+  assert.equal(copy.browseRail, 'Menu');
+  for (const w of [copy.browseAll, copy.browseRail, copy.browseNoRail, words.kinds.usecase]) assert.doesNotMatch(w, /use case|rail/iu, w);
 });

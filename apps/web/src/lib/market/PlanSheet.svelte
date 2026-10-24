@@ -99,7 +99,7 @@
           {/if}
           {#each part.sections as s (s.key)}
             <div class="plan-group">
-              <h4 class="plan-h"><IconWell name={glyphOf(s.key)} /><span class="plan-title">{s.title}</span><span class="plan-count num">{s.rows.length}</span></h4>
+              <h4 class="plan-h"><IconWell name={glyphOf(s.key)} /><span class="plan-title">{s.title}</span><span class="plan-count num">{s.n ?? s.rows.length}</span></h4>
               <ul class="plan-rows">
                 {#each s.rows as r, i (i)}
                   <li class="plan-row">

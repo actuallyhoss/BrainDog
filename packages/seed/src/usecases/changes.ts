@@ -16,7 +16,7 @@ export type UseCaseChange = { version: string; notes: string };
 
 /** The notes a person reads on settings that name each list, said once for the four use cases that took it. */
 const NAMED = (list: string): string =>
-  `Settings say which list each name belongs to, such as "Name of the ${list} list", and the names of your lists come first.`;
+  `Each setting now names the list it is for, such as the ${list} list, and your own lists come first.`;
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [

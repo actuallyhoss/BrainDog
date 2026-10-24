@@ -18,7 +18,7 @@ export const words = {
   categoriesLabel: 'Categories',
   categories: {
     'made-by-braindog': 'Made by BrainDog',
-    'ways-of-working': 'Use cases',
+    'ways-of-working': 'Ready-made setups',
     modules: 'Built in',
     templates: 'Templates',
     connectors: 'Connectors',
@@ -29,7 +29,7 @@ export const words = {
   } satisfies Record<Category, string>,
   orderLabel: 'Order',
   orders: { 'for-you': 'For you', installed: 'Most used', newest: 'Newest' },
-  kinds: { module: 'Built in', usecase: 'Use case', pack: 'Add-on' },
+  kinds: { module: 'Built in', usecase: 'Ready-made setup', pack: 'Add-on' },
   nothingFound: 'Nothing matches that search',
   nothingFoundBody: 'Try fewer words, or pick All.',
   installs: (n: number): string => `On ${n}+ BrainDogs`,
@@ -88,6 +88,7 @@ export const words = {
      role will do, so it is said in plain words and never as one list's name. */
   waitsOn: { rates: 'exchange rates', meets: 'a list of people', org: 'a list of organisations' } as Readonly<Record<string, string>>,
   versions: 'Versions',
+  earlier: (n: number): string => (n === 1 ? 'The version before' : `The ${n} versions before`),
   requiresNothing: 'Nothing else',
   licence: 'Licence',
   pages: 'Its pages',
@@ -98,6 +99,8 @@ export const words = {
   update: (to: string): string => `Update to ${to}`,
   turnOn: (title: string): string => `Turn on ${title}`,
   installed: 'Installed',
+  /* AFTER INSTALL, THE ONE PRESS: its first page, by name. */
+  open: (title: string): string => `Open ${title}`,
   turnedOn: (title: string): string => `${title} is on.`,
   planning: 'Reading the plan…',
   asked: 'Asked in Needs you.',

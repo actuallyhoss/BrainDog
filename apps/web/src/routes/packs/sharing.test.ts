@@ -397,6 +397,14 @@ test('WITH THREE USE CASES ON, ADDING ONE BESIDE NEVER CHANGES WHO SPEAKS, and e
     }
 });
 
+test('A NUMBER A PLAN ADDS IS A FIGURE, told apart from a rule, so the sheet can fold its numbers', () => {
+  const plan = sharedPlanOf({
+    usecase: { usecase: 'kiln', title: 'Kiln studio', version: '1.0.0' },
+    packs: [{ id: 'usecase-kiln', role: 'usecase', version: '1.0.0', doc: { declarations: [{ metric: 'firings-late', name: 'Firings late' }] }, adds: ['metric.firings-late'] }],
+  });
+  assert.deepEqual(plan?.packs[0]?.adds, [{ kind: 'figure', name: 'Firings late' }]);
+});
+
 test('A MONEY RULE WITH NO NAME IS SAID BY THE NAME THIS BUILD GIVES IT, and a module by its own', () => {
   const plan = sharedPlanOf({
     usecase: { usecase: 'personal', title: 'Personal', version: '1.0.0' },

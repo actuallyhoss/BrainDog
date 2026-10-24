@@ -301,3 +301,18 @@ export async function askOnDecide(client: OfferClient, entry: CatalogueEntry, fr
   const out = await askForVersion(fetch, (name, args) => client.call(name, args), entry, version, from);
   return out.ok ? { ok: true, id: out.id } : out;
 }
+
+/**
+ * THE PAGE ONE PRESS OPENS ONCE IT IS IN (audit C of 25 October, X9): the first page it adds that opens on its own, by
+ * the title it is drawn with, or `null`. A page for each row needs a row chosen, and a title still reading a setting
+ * (`{{config:…}}`) is no name to put on a button. Installed with nothing to open said only a grey "Installed".
+ */
+export function firstPageOf(pages: readonly { id: string; title: string }[], declared: readonly Record<string, unknown>[]): { id: string; title: string } | null {
+  for (const p of pages) {
+    const d = declared.find((x) => x.page === p.id);
+    if (d !== undefined && typeof d.for === 'object' && d.for !== null) continue;
+    if (p.title.includes('{{') || p.title.trim() === '') continue;
+    return { id: p.id, title: p.title };
+  }
+  return null;
+}

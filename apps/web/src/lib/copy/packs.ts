@@ -58,7 +58,7 @@ export const packs = {
 
   /* USE CASES, SHARED AND INSTALLED. A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */
-  browseAll: 'All use cases and add-ons',
+  browseAll: 'All setups and add-ons',
   chooseFile: 'Choose a file',
   shareAddressNotOne: 'That is not a web address. Paste the whole https address of the file.',
   shareAddressHttps: 'A use case is read only from an https address.',
@@ -74,10 +74,10 @@ export const packs = {
   voiceAsk: 'Voice and Home',
   voiceKeep: (now: string, adding: string) => `Keep ${now}'s voice and Home, and add ${adding} beside it`,
   voiceTake: (now: string, adding: string) => `Speak as ${adding}, with its own Home. ${now}'s lists stay`,
-  browseRail: 'Rail',
+  browseRail: 'Menu',
   browseHome: 'Home',
   browseLists: 'Lists',
-  browseNoRail: 'Nothing added to the rail',
+  browseNoRail: 'Nothing added to the menu',
   shareNoUseCase: 'No setup is on here, so the file carries the add-ons that are on and the pages you placed.',
   shareTitle: 'Title',
   shareVersion: 'Version',

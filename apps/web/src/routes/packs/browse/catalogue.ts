@@ -159,6 +159,34 @@ export { browserStore, KNOWN_KEYS, type KeySource, type KeyStore } from './known
 /** A version's signature said plainly: the key that signed it, or that nothing did. */
 export const signedWords = (signature: Signature | null | undefined): string => (signature ? copy.catalogueSigned(signature.key_id) : copy.catalogueUnsigned);
 
+/** Whether BrainDog made a listing: built in, or published by BrainDog to the store. */
+export const byBrainDog = (l: { source: string; author: string; publisher?: { kind?: string; name?: string } | null | undefined }): boolean =>
+  l.source === 'bundled' || l.publisher?.kind === 'braindog' || (l.publisher?.name ?? l.author).trim().toLowerCase() === 'braindog';
+
+/**
+ * A version's signature line, or `null` where there is nothing to say: BrainDog's own add-ons are not signed, and "Not
+ * checked" under every one of their versions read as a warning about BrainDog's own work (audit C, X12).
+ */
+export const signedLine = (signature: Signature | null | undefined, ours: boolean): string | null => (!signature && ours ? null : signedWords(signature));
+
+/**
+ * What one call out is, as a person says it: "Calls api.stripe.com every hour with your Stripe key". The kernel's line
+ * (`CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its vault entry opens`) is read for its cadence and
+ * anything else it says, and the key is said by its name.
+ */
+export function callSaid(call: { host: string | null; line: string; key: string | null }): string {
+  const m = /^CALLS OUT (.+?) · (.*)$/u.exec(call.line);
+  const host = call.host ?? (m && m[1] !== 'no host declared' ? m[1]! : copy.arrangeCallNoHost.toLowerCase());
+  const parts = (m?.[2] ?? '').split(' · ').flatMap((part): string[] => {
+    if (part === '' || part === 'no key' || part.startsWith('grant "') || part.startsWith('key "')) return [];
+    return [part.replace(/^every (\d+)([mhdw])\b/u, (_, n: string, unit: string) => copy.arrangeCallEvery(Number.parseInt(n, 10), unit as 'm' | 'h' | 'd' | 'w'))];
+  });
+  const key = call.key ?? /(?:grant|key) "([^"]+)"/u.exec(call.line)?.[1] ?? null;
+  const how = parts.join(', ');
+  const named = key && key !== 'none' ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : null;
+  return `Calls ${host}${how ? ` ${how}` : ''}${named ? `${how.includes(',') ? ',' : ''} with your ${named} key` : ''}`;
+}
+
 /** The keys this browser has seen, or none when storage is out of reach or holds something else. */
 export const loadKnownKeys = (store: KeyStore | null): Promise<KnownKeys> => readLocal(store);
 
@@ -229,6 +257,10 @@ export function trustLine(trust: Trust, publisher: string): { text: string; loud
       return { text: 'Nobody signed this version', loud: false };
   }
 }
+
+/** The trust line a listing page draws, or `null`: BrainDog's own unsigned add-ons say who made them and no more. */
+export const trustSaid = (trust: Trust, publisher: string, ours: boolean): { text: string; loud: boolean } | null =>
+  ours && trust.kind === 'unsigned' ? null : trustLine(trust, publisher);
 
 /**
  * Whether nothing a version's key signed is offered to install: a revoked key, a signature lost, or a key other than the

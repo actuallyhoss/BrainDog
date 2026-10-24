@@ -30,7 +30,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import type { CatalogueIndex, Reach, Trust } from '@braindog/declare/catalogue';
+  import type { CatalogueIndex, CatalogueVersion, Reach, Trust } from '@braindog/declare/catalogue';
   import { useCase } from '@braindog/seed/usecases';
   import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
   import { titleOf } from '$lib/title.ts';
@@ -64,10 +64,10 @@
   import { glyphOf as placeGlyph } from '../../glyph.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
-  import { catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustLine, trustThisKey } from '../catalogue.ts';
+  import { byBrainDog, callSaid, catalogueText, keepFirstKey, readHostCatalogue, signedLine, trustForEntry, trustSaid, trustThisKey } from '../catalogue.ts';
   import { recordKeys } from '../known-keys.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
-  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
+  import { askOnDecide, diffOf, firstPageOf, install, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
   const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
@@ -124,7 +124,9 @@
   /* THE KEYS SEEN ARE THE RECORD'S, read through the client the page already makes, with this browser behind it on an
      older record. The client may not be made yet when the file is verified, so one is made for the read. */
   const keys = recordKeys((name, args) => (client ?? createClient({ base: apiBase() })).call(name, args));
-  const said = $derived(trust && listing ? trustLine(trust, listing.publisher?.name ?? listing.author) : null);
+  /* BRAINDOG'S OWN SAYS BY BRAINDOG AND NO SIGNATURE LINE (audit C, X12): "Nobody signed this version" read as a warning. */
+  const ours = $derived(listing ? byBrainDog(listing) : false);
+  const said = $derived(trust && listing ? trustSaid(trust, listing.publisher?.name ?? listing.author, ours) : null);
   /* WITHHELD, as `catalogue.ts` `withheld` says: a revoked key, a lost signature, or a different key until pressed. */
   const untrusted = $derived(trust?.kind === 'revoked' || trust?.kind === 'stripped' || trust?.kind === 'changed');
   /**
@@ -424,8 +426,10 @@
             ? words.installed
             : words.install(listing?.title ?? ''),
   );
+  /* ONCE IT IS IN, ITS FIRST PAGE, so one press lands on what it brought (`offer.ts` `firstPageOf`). */
+  const opens = $derived(adds ? firstPageOf(adds.pages, declared) : null);
   /* SOMETHING TO PRESS: the phone's bar is drawn only then (S5), and never to say "Installed" over the last tile. */
-  const doable = $derived(listing !== null && listing !== undefined && filed === null && action?.kind !== 'installed' && (trust?.kind === 'changed' || !untrusted));
+  const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null) && (trust?.kind === 'changed' || !untrusted));
 
   const publisherWords = $derived(
     !listing
@@ -444,9 +448,22 @@
      page's, where a bare button above the lead sat off it. -->
 <PageHead icon={glyph} kicker={copy.packs} back="/packs/browse" title={listing?.title ?? copy.packs} />
 
+<!-- ONE VERSION ON THE VERSIONS TILE: the newest, and each earlier one under the fold. -->
+{#snippet versionRow(v: CatalogueVersion)}
+  <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
+    <!-- THE VERSION AND ITS TAG ON ONE LINE: "1.13.0  New · Published 2 Sep". -->
+    <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{[v.bump ? words.bump[v.bump] : words.first, v.published_at ? words.published(v.published_at) : ''].filter(Boolean).join(' · ')}</span></span>
+    {#if v.notes}<span class="notes">{v.notes}</span>{/if}
+    {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
+    {#if listing?.source === 'kennel' && signedLine(v.signature, ours)}<span class="quiet">{signedLine(v.signature, ours)}</span>{/if}
+  </li>
+{/snippet}
+
 {#snippet act()}
   {#if filed !== null}
     <p class="said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>
+  {:else if action?.kind === 'installed' && opens}
+    <Button weight="primary" href={at(`/p/${opens.id}`)}>{words.open(opens.title)}</Button>
   {:else if action?.kind === 'installed'}
     <Button weight="primary" disabled>{label}</Button>
   {:else if trust?.kind === 'changed'}
@@ -477,7 +494,7 @@
         <Tile lead icon={glyph} title={copy.useCaseFor} meta={words.kinds[listing.kind]} aria-label={copy.useCaseFor}>
           <p class="summary">{listing.summary}</p>
           <p class="byline with-icon">
-            <Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}
+            <Icon name={ours || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}
             {#if words.held(listing.count, listing.source)}<span class="num quiet-part">{words.held(listing.count, listing.source)}</span>{/if}
           </p>
           {#if said && trustTone}
@@ -528,7 +545,9 @@
       <!-- WHAT IT ADDS, BEFORE ANYTHING CHANGES (the site's board): each kind beside its glyph and its count, and what each
            is called; then every host it calls, or that it calls none. Read from the file, never written for the page. -->
       <div class="adds-cell">
-        <Tile icon="plus" title={words.adds} count={addsTotal ?? undefined}>
+        <!-- NO COUNT OVER NOTHING: "What it adds 0" over the hosts it calls read as a mistake. -->
+        <Tile icon="plus" title={words.adds} count={addsTotal || undefined}>
+          {#if addsTotal === 0}<p class="quiet">{words.addsNothing}</p>{/if}
           {#if planRows.length > 0}
             <ul class="plan">
               {#each planRows as r (r.key)}
@@ -569,7 +588,7 @@
         <div class="third-cell calls-cell">
           <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
             <ul class="log">
-              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{call.line}</li>{/each}
+              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{callSaid(call)}</li>{/each}
             </ul>
           </Tile>
         </div>
@@ -577,17 +596,19 @@
 
       <div class="third-cell versions-cell">
         <Tile icon="history" title={words.versions} count={listing.versions.length}>
+          <!-- THE NEWEST VERSION AND WHAT IT CHANGED, then the earlier ones folded (audit C, X12): six versions of notes
+               were a wall on a phone, and an old note says what a person no longer needs to read. -->
           <ol class="log versions">
-            {#each listing.versions as v (v.version)}
-              <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
-                <!-- THE VERSION AND ITS TAG ON ONE LINE: "1.13.0  New · Published 2 Sep". -->
-                <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{[v.bump ? words.bump[v.bump] : words.first, v.published_at ? words.published(v.published_at) : ''].filter(Boolean).join(' · ')}</span></span>
-                {#if v.notes}<span class="notes">{v.notes}</span>{/if}
-                {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
-                {#if listing.source === 'kennel'}<span class="quiet">{signedWords(v.signature)}</span>{/if}
-              </li>
-            {/each}
+            {#each listing.versions.slice(0, 1) as v (v.version)}{@render versionRow(v)}{/each}
           </ol>
+          {#if listing.versions.length > 1}
+            <details class="earlier">
+              <summary class="tap">{words.earlier(listing.versions.length - 1)}</summary>
+              <ol class="log versions">
+                {#each listing.versions.slice(1) as v (v.version)}{@render versionRow(v)}{/each}
+              </ol>
+            </details>
+          {/if}
         </Tile>
       </div>
 
@@ -597,9 +618,9 @@
             {#if latest}<dt>{words.version}</dt><dd class="num">{latest.version}</dd>{/if}
             <dt>{words.licence}</dt>
             <dd>{listing.license}</dd>
-            {#if listing.source === 'kennel'}
+            {#if listing.source === 'kennel' && signedLine(latest?.signature, ours)}
               <dt>{words.signature}</dt>
-              <dd class="with-icon"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</dd>
+              <dd class="with-icon"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedLine(latest?.signature, ours)}</dd>
             {/if}
             <dt>{words.addsModules}</dt>
             <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
@@ -891,6 +912,16 @@
     font-weight: 600;
   }
 
+  .earlier > summary {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+
+  .earlier[open] > summary {
+    margin-block-end: var(--sp-2);
+  }
+
   .notes {
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -979,21 +1010,25 @@
       display: none;
     }
 
-    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the tab bar and the home indicator (`--tabbar`), on a bar of
-       the board's colour with one hairline over it (S5), and only while there is something to press. The page ends a
-       bar's height plus the tab bar further down, so no tile ends underneath it. */
+    /* THE BUTTON SITS ON THE TAB BAR, fixed to the window as the list's bulk bar is, on a bar of the board's colour with
+       one hairline over it (S5), and only while there is something to press. Sticky, it stood a tab bar's height above
+       the tab bar with the page showing through the gap (audit C, X13). The page ends the bar's height further down, so
+       no tile ends underneath it. */
     .narrow-only {
-      position: sticky;
+      position: fixed;
+      inset-inline: 0;
       inset-block-end: var(--tabbar, env(safe-area-inset-bottom));
+      z-index: var(--z-raise);
       display: flex;
-      margin-inline: calc(-1 * var(--gutter));
+      min-block-size: 68px;
+      align-items: center;
       padding: var(--sp-3) var(--gutter);
       background: var(--board);
       box-shadow: inset 0 1px 0 var(--rule);
     }
 
     .page[data-bar] {
-      padding-block-end: var(--sp-4);
+      padding-block-end: calc(68px + var(--sp-4));
     }
 
     .narrow-only > :global(*) {

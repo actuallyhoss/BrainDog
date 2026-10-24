@@ -110,3 +110,53 @@ test('the skills an add-on gives the agents are named before it installs, by nam
   );
   assert.equal(sheetOf(plain, pack)?.parts[0]?.sections.some((s) => s.key === 'teaches'), false);
 });
+
+/* THE INSTALL SHEET NAMES EACH THING ONCE (audit C of 25 October, X10): its lists and pages by name, and its numbers as
+   one row, so a list and a number of the same name are not two "Kiln firings" one under the other. */
+
+test('an add-on’s plan names its lists and pages and folds its numbers into one row, counted whole', () => {
+  const sheet = sheetOf(
+    {
+      pack: { id: 'kiln', version: '1.0.0', summary: '' },
+      planHash: 'h',
+      direction: 'install',
+      adds: [
+        { id: 'register.firings', summary: '6 fields' },
+        { id: 'page.kiln', summary: '4 blocks' },
+        { id: 'metric.firings', summary: '' },
+        { id: 'metric.firings-late', summary: '' },
+      ],
+    },
+    (id) => ({ 'register.firings': 'Firings', 'page.kiln': 'Kiln', 'metric.firings': 'Firings', 'metric.firings-late': 'Firings still to fire' })[id] ?? id,
+  );
+  const adds = sheet?.parts[0]?.sections.find((s) => s.key === 'adds');
+  assert.deepEqual(adds?.rows.map((r) => r.text), ['Firings', 'Kiln', 'and 2 numbers']);
+  assert.equal(adds?.n, 4);
+});
+
+test('a ready-made setup’s plan folds its numbers too, and keeps its rules by name', () => {
+  const sheet = sheetOf(
+    {
+      usecase: { id: 'kiln', title: 'Kiln studio', version: '1.0.0', summary: '' },
+      packs: [
+        {
+          id: 'usecase-kiln',
+          title: 'Kiln studio',
+          version: '1.0.0',
+          adds: [
+            { kind: 'list', name: 'Firings' },
+            { kind: 'page', name: 'Kiln' },
+            { kind: 'figure', name: 'Firings' },
+            { kind: 'figure', name: 'Firings done' },
+            { kind: 'figure', name: 'Firings late' },
+            { kind: 'other', name: 'Mark a firing done' },
+          ],
+        },
+      ],
+    },
+    (id) => id,
+  );
+  const adds = sheet?.parts[0]?.sections.find((s) => s.key === 'adds');
+  assert.deepEqual(adds?.rows.map((r) => r.text), ['Firings', 'Kiln', 'Mark a firing done', 'and 3 numbers']);
+  assert.equal(adds?.n, 6);
+});
