@@ -217,13 +217,22 @@ async function put(key: string, res: Response, now: number): Promise<void> {
   await (await sw.caches.open(COPY)).put(key, new Response(body, { status: res.status, statusText: res.statusText, headers }));
 }
 
-/** The answer kept under `key` and when, or nothing when there is none younger than a week. An older one is deleted. */
+/**
+ * The answer kept under `key` and when, or nothing when there is none younger than a week. An older one is deleted.
+ *
+ * READ WHOLE BEFORE IT ANSWERS, AND NEVER HANDED ON AS THE COPY'S OWN RESPONSE (scope 2026-10-24 A31). Chromium, given a
+ * script answered with the response `match` returns, which streams out of Cache Storage, sometimes cancels the page's
+ * module loads (`ERR_ABORTED`) a few tens of milliseconds into a busy load, and the page dies on "Failed to fetch
+ * dynamically imported module". Measured on 424 loads of every route in four tabs under load: 8 to 17 pages lost a
+ * module with the copy's response, none with the same bytes read into a new one, and none with the worker blocked. A
+ * kept answer is a few kilobytes, so reading it whole costs nothing a person sees.
+ */
 async function kept(key: string, now: number): Promise<{ res: Response; at: number } | null> {
   const box = await sw.caches.open(COPY);
   const res = await box.match(key, { ignoreVary: true });
   if (!res) return null;
   const at = Number(res.headers.get(KEPT));
-  if (fresh(at, now)) return { res, at };
+  if (fresh(at, now)) return { res: new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers }), at };
   await box.delete(key);
   return null;
 }

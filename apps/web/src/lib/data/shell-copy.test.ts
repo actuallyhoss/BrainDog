@@ -22,9 +22,15 @@ async function worker(answer: (url: string) => Response) {
   const box = new Map<string, Response>();
   const told: unknown[] = [];
   const asked: string[] = [];
+  /** Every response `match` handed out, so a test can tell the copy's own from one read out of it. */
+  const matched: Response[] = [];
   const cache = {
     put: async (key: string | Request, res: Response) => void box.set(typeof key === 'string' ? key : key.url, res),
-    match: async (key: string | { url: string }) => box.get(typeof key === 'string' ? key : key.url)?.clone(),
+    match: async (key: string | { url: string }) => {
+      const res = box.get(typeof key === 'string' ? key : key.url)?.clone();
+      if (res) matched.push(res);
+      return res;
+    },
     keys: async () => [...box.keys()].map((url) => ({ url })),
     delete: async (key: string | { url: string }) => box.delete(typeof key === 'string' ? key : key.url),
   };
@@ -41,11 +47,11 @@ async function worker(answer: (url: string) => Response) {
     return answer(url);
   };
   await import(`../../service-worker.ts?${Math.random()}`);
-  const open = async (url: string) => {
+  const open = async (url: string, mode = 'navigate') => {
     const waited: Promise<unknown>[] = [];
     const held: { res: Promise<Response> | null } = { res: null };
     /* A NAVIGATION, which `new Request` cannot make outside a browser: the four facts the worker reads. */
-    const request = { url, method: 'GET', mode: 'navigate', headers: new Headers() };
+    const request = { url, method: 'GET', mode, headers: new Headers() };
     on.get('fetch')?.({ request, clientId: '', resultingClientId: 'tab-1', waitUntil: (p: Promise<unknown>) => void waited.push(p), respondWith: (r: Promise<Response>) => void (held.res = r) });
     const out = await held.res;
     await Promise.all(waited);
@@ -57,7 +63,7 @@ async function worker(answer: (url: string) => Response) {
     await Promise.all(waited);
   };
   const keepShell = (body: string, at = Date.now()) => box.set(SCOPE, new Response(body, { headers: { 'content-type': 'text/html', [KEPT]: String(at) } }));
-  return { box, told, asked, open, install, keepShell };
+  return { box, told, asked, matched, open, install, keepShell };
 }
 
 test('THE KEPT SHELL ANSWERS FIRST, and the same shell from the network is kept again without a word to the page', async () => {
@@ -120,4 +126,17 @@ test('THE WORKER KEEPS THE SHELL WHEN IT INSTALLS, so the open after the one tha
   await w.install();
   assert.deepEqual(w.asked, [SCOPE]);
   assert.equal(await w.box.get(SCOPE)!.clone().text(), '<p>build A</p>');
+});
+
+test("AN ANSWER FROM THE COPY IS READ WHOLE INTO A RESPONSE OF ITS OWN, never the copy's streamed one (A31)", async () => {
+  const w = await worker(() => html('<p>build A</p>'));
+  const file = `${SCOPE}_app/immutable/chunks/a1b2c3.js`;
+  w.box.set(file, new Response('export const a = 1;', { headers: { 'content-type': 'text/javascript', [KEPT]: String(Date.now()) } }));
+  w.keepShell('<p>build A</p>');
+  for (const [url, mode, body] of [[file, 'cors', 'export const a = 1;'], [`${SCOPE}the-studio/p/money`, 'navigate', '<p>build A</p>']] as const) {
+    const res = await w.open(url, mode);
+    assert.equal(await res.clone().text(), body);
+    assert.ok(!w.matched.includes(res), `${mode}: the page was handed the copy's own response`);
+  }
+  assert.deepEqual(w.asked, [`${SCOPE}the-studio/p/money`], 'a hashed file from the copy asks the network nothing');
 });
