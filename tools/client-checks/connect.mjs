@@ -39,7 +39,9 @@ export function command(env = process.env) {
 export function childEnv(base, key, config) {
   const env = {};
   for (const [name, value] of Object.entries(process.env)) if (!name.startsWith('BRAINDOG_') && !name.startsWith('CLAUDE')) env[name] = value;
-  return { ...env, XDG_CONFIG_HOME: config, BRAINDOG_HOST: base, BRAINDOG_TOKEN: key };
+  /* A home of its own beside the config: `~/.braindog/started.json` is read from HOME, and the check filled his real one. */
+  const home = join(dirname(config), 'home');
+  return { ...env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: config, BRAINDOG_HOST: base, BRAINDOG_TOKEN: key };
 }
 
 const INFO = { name: 'braindog-client-checks', version: '1.0.0' };
