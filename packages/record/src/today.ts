@@ -37,6 +37,7 @@ type Decl = {
   scopes?: unknown;
   seq_prefix?: string;
   hand?: unknown;
+  title?: string;
 };
 
 /** The most late rows of one list read: more than any record holds late (`card-late.ts` `LATE_READ`). */
@@ -98,6 +99,8 @@ export type TodayCards = {
   runs: { list: string; field: string; rows: unknown[] } | null;
   /** The key numbers the cards lead with, as the `kpis` block `for: cards` answers them; `null` where it was refused. */
   leads: unknown[] | null;
+  /** The day each project's row last changed, by its number: what a card with no other sign of life is quiet since. */
+  moved: Record<string, string>;
 };
 
 /** What `today` answers: the page as `previewPage` draws it, and each tile's part, or `null` where that part was refused. */
@@ -132,9 +135,14 @@ async function cardsOf(asks: TodayAsks, projects: string, decls: readonly Decl[]
       if (typeof v === 'string' && v !== '') links.push(v);
     }
   }
+  /* THE PROJECTS THEMSELVES, read once by their name alone (`fields`): a row keeps its number and its days, which the late
+     work is counted by and a quiet card says, and his projects' notes were most of 466 KB. */
+  const title = decls.find((d) => d.id === projects)?.title ?? 'name';
+  const all = await asking(asks.list, { register: projects, limit: TODAY_PROJECTS_READ, fields: [title] }, ctx);
+  const rows = all !== null && all.ok ? (all.value as { rows: { id?: unknown; seq?: unknown; updated_at?: unknown }[] }).rows : [];
+  const moved: Record<string, string> = {};
+  for (const r of rows) if (typeof r.seq === 'number' && typeof r.updated_at === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(r.updated_at)) moved[String(r.seq)] = r.updated_at.slice(0, 10);
   if (links.length > 0) {
-    const all = await asking(asks.list, { register: projects, limit: TODAY_PROJECTS_READ }, ctx);
-    const rows = all !== null && all.ok ? (all.value as { rows: { id?: unknown; seq?: unknown }[] }).rows : [];
     const seqOf = new Map(rows.flatMap((r) => (typeof r.id === 'string' && typeof r.seq === 'number' ? [[r.id, r.seq] as const] : [])));
     const spoken = new RegExp(`^${projects}#(\\d+)$`, 'u');
     for (const link of links) {
@@ -154,5 +162,5 @@ async function cardsOf(asks: TodayAsks, projects: string, decls: readonly Decl[]
   const kpis = await asking(asks.previewPage, { body: { page: 'key-numbers', title: 'Key numbers', blocks: [{ kind: KPIS_KIND, source: KPIS_KIND, for: 'cards', limit: TODAY_LEADS_MOST }] } }, ctx);
   const block = kpis !== null && kpis.ok ? ((kpis.value as { blocks?: { kpis?: unknown }[] }).blocks?.[0] ?? null) : null;
   const leads = block !== null && Array.isArray(block.kpis) ? (block.kpis as unknown[]) : null;
-  return { register: projects, lates, runs, leads };
+  return { register: projects, lates, runs, leads, moved };
 }

@@ -29,7 +29,7 @@
   import { untrack } from 'svelte';
   import { live } from '$lib/data/live.svelte.ts';
   import { latesOf } from './card-late.ts';
-  import { readLastRuns, type LastRun } from './card-life.ts';
+  import { readLastRuns, readMoved, type LastRun } from './card-life.ts';
 
   let {
     cards,
@@ -86,14 +86,20 @@
   });
   /* WHO WORKED ON EACH LAST, from the runs (`card-life.ts`), for each card's live line, again when the record moves. */
   let lasts = $state.raw<ReadonlyMap<number, LastRun>>(new Map());
+  /* AND THE DAY EACH ROW LAST CHANGED, which the desk's rows do not carry: what a card nobody worked on says it is quiet
+     since. On his record seven of fourteen cards had no run naming them and drew a name and a lane, nothing else. */
+  let moved = $state.raw<ReadonlyMap<number, string>>(new Map());
   $effect(() => {
     const said = seqs;
     void live.version;
     if (said === '') return;
     untrack(() => {
-      void readLastRuns(apiBase(), list, cards.filter((c) => !c.draft))
-        .then((got) => {
-          if (said === seqs) lasts = got;
+      const base = apiBase();
+      void Promise.all([readLastRuns(base, list, cards.filter((c) => !c.draft)), readMoved(base, list).catch(() => new Map<number, string>())])
+        .then(([got, days]) => {
+          if (said !== seqs) return;
+          lasts = got;
+          moved = days;
         })
         .catch(() => {});
     });
@@ -169,7 +175,7 @@
               {#if failed}<span class="d-fail" role="alert">{failed}</span>{/if}
             </div>
           {:else}
-            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late, last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? c.last ?? null) }} label={label(c)} agents={agentsOn(c.name, working)} />
+            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late, last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? c.last ?? null), moved: c.moved ?? moved.get(c.seq) ?? null }} label={label(c)} agents={agentsOn(c.name, working)} />
           {/if}
         </li>
       {/each}

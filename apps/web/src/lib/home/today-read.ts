@@ -34,6 +34,8 @@ export type TodayCards = {
   runs: { list: string; field: string; rows: unknown[] } | null;
   /** The key numbers the cards lead with; `null` where they were refused. */
   leads: unknown[] | null;
+  /** The day each project's row last changed, by its number; left out by a host built before it. */
+  moved?: Readonly<Record<string, string>>;
 };
 
 /** What `today` answers: the body as `previewPage` draws it, and each tile's part, `null` where it was refused. */

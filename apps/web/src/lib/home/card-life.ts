@@ -76,8 +76,12 @@ export function lastRunsOf(
  * such day): what a card with no other sign of life is quiet since. One read of the projects list.
  */
 export async function readMoved(base: string, projects: string): Promise<Map<number, string>> {
+  /* READ BY THE RECORD IN TODAY'S ONE READ, where it is held at this version (`today-read.ts`). */
+  const held = (await cardsHeld(base, projects).catch(() => null))?.moved;
+  if (held) return new Map(Object.entries(held).map(([seq, day]) => [Number(seq), day]));
+  /* BY THE NAME ALONE (`fields`): the row keeps its days, and his projects' notes were most of 466 KB. */
   const got = await createClient({ base })
-    .list({ register: projects, limit: RUNS_READ })
+    .list({ register: projects, limit: RUNS_READ, fields: [REGISTERS[projects]?.title ?? 'name'] })
     .catch(() => null);
   const out = new Map<number, string>();
   if (!got?.ok) return out;

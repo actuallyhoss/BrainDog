@@ -56,6 +56,10 @@ test('ONE CALL ANSWERS EVERY TILE: the page, what was handled, what is shared, a
   /* THE KEY NUMBERS, as the cards' own body draws them. */
   const kpis = value<{ blocks: { kpis?: unknown[] }[] }>(await api.previewPage({ body: { page: 'key-numbers', title: 'Key numbers', blocks: [{ kind: 'kpis', source: 'kpis', for: 'cards', limit: 200 }] } }, owner));
   assert.deepEqual(got.cards.leads, kpis.blocks[0]!.kpis);
+  /* AND THE DAY EACH PROJECT'S ROW LAST CHANGED, what a card with no run on it is quiet since. */
+  const projects = value<{ rows: { seq: number; updated_at: string }[] }>(await api.list({ register: 'things', limit: 500 } as never, owner)).rows;
+  assert.ok(projects.length > 0);
+  assert.deepEqual(got.cards.moved, Object.fromEntries(projects.map((r) => [String(r.seq), r.updated_at.slice(0, 10)])));
   sql.close();
 });
 
