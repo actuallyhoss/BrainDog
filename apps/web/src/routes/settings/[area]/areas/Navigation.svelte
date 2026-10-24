@@ -12,7 +12,6 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { said as voiceSaid } from '$lib/voice.svelte.ts';
-  import type { NavShape } from '$lib/design/nav-shape.ts';
   import { glyphOf, iconOf, penCount, waiting, type Offer, type PenItem } from '$lib/design/pen.ts';
   import { cardWords, todayOf } from '$lib/decide/card.ts';
   import { shortDay } from 'braindog-render';
@@ -48,8 +47,6 @@
     else if (done !== undefined) toasts.push(done);
   };
 
-  const navShapeLabel = (s: NavShape): string => (s === 'rail' ? copy.navShapeRail : s === 'bar' ? copy.navShapeBar : copy.navShapeMenu);
-
   /* THE SWITCH. Off empties the pen and stops it refilling; the record's own offers come back with the next `boot`, so it
      is read again once the switch is kept. */
   async function flipSuggest() {
@@ -61,8 +58,8 @@
     }
   }
 
-  /* THE SHAPE IS NO LONGER OFFERED (U-C8): the frame is one, so the pen holds only what the record offers. */
-  const shapeRow = null;
+  /* NO SHAPE IS OFFERED (C11): one sidebar and one bar are drawn for everyone since nav A, so the pen holds the record's
+     offers alone. */
 
   /* KEPT IN THIS VISIT, each with the one call that puts it back. The record stops offering a kept item on the next
      `boot`, so without this the row and its Put back would vanish together. */
@@ -73,38 +70,30 @@
 
   /* ONE COUNT (ENG-B14): the list and its number read the same three inputs, so they cannot say two things. */
   const gone = (id: string): boolean => navPrefs.isDismissed(id) || kept.some((k) => k.item.id === id);
-  const offers = $derived(navPrefs.suggest ? waiting(shapeRow, shell.pen, gone) : []);
-  const waitingCount = $derived(navPrefs.suggest ? penCount(shell.pen, shapeRow, gone) : 0);
-  const idOf = (o: Offer): string => (o.from === 'shape' ? o.id : o.item.id);
-  const titleOf = (o: Offer): string => (o.from === 'shape' ? o.title : o.item.title);
-  const whyOf = (o: Offer): string => (o.from === 'shape' ? `${navShapeLabel(o.shape)}. ${o.why}` : o.item.why);
+  const offers = $derived(navPrefs.suggest ? waiting(shell.pen, gone) : []);
+  const waitingCount = $derived(navPrefs.suggest ? penCount(shell.pen, gone) : 0);
+  const idOf = (o: Offer): string => o.item.id;
+  const titleOf = (o: Offer): string => o.item.title;
+  const whyOf = (o: Offer): string => o.item.why;
   /**
    * THE DAY AN OFFER STOPS WAITING, in Decide's own words ("Waits until 27 Oct", `card.ts`), on the reader's own calendar:
-   * a day already come is said as today. The browser's shape, and an offer from a host older than `lapses`, say nothing.
+   * a day already come is said as today. An offer from a host older than `lapses` says nothing.
    */
   const lapseOf = (o: Offer): string | null => {
-    const last = o.from === 'change' ? o.item.lapses : undefined;
+    const last = o.item.lapses;
     if (last === undefined) return null;
     const today = todayOf(Date.now());
     return last <= today ? cardWords.lapsesToday : cardWords.lapses(shortDay(last, today));
   };
 
   /**
-   * "Keep it": the offer's whole declaration, written by the owner (`keep.ts`), or for the shape, `nav.shape` set.
+   * "Keep it": the offer's whole declaration, written by the owner (`keep.ts`).
    *
    * NOTHING IS SAID UNTIL IT HAPPENED. The toast is the record's answer, and the shell reads `boot` again so a page kept
    * into the nav is in the rail before the toast has gone.
    */
   async function keep(o: Offer) {
     if (keeping !== null) return;
-    if (o.from === 'shape') {
-      /* WHAT WAS CHOSEN BEFORE, nothing included, so the Undo puts a record that never chose back to no choice. */
-      const before = navPrefs.chosen;
-      const saved = await navPrefs.setShape(o.shape);
-      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
-      else toasts.push(penWords.kept(navShapeLabel(o.shape)), { undo: () => void navPrefs.setShape(before).then((s) => said(s)) });
-      return;
-    }
     const item = o.item;
     keeping = item.id;
     const at = opened();
@@ -246,11 +235,9 @@
               </span>
               <span class="line-amount"></span>
               <span class="line-when pen-acts">
-                {#if o.from === 'change'}
-                  <Button weight="quiet" onclick={() => void show(o.item)}>{penWords.show}</Button>
-                {/if}
+                <Button weight="quiet" onclick={() => void show(o.item)}>{penWords.show}</Button>
                 <Button weight="quiet" disabled={keeping !== null} onclick={() => void keep(o)}>
-                  {o.from === 'shape' ? copy.navShapeRecommendAccept(navShapeLabel(o.shape)) : keeping === o.item.id ? penWords.keeping : penWords.keep}
+                  {keeping === o.item.id ? penWords.keeping : penWords.keep}
                 </Button>
                 <Button weight="bare" onclick={() => dismissOffer(o)}>{penWords.dismiss}</Button>
               </span>

@@ -2,7 +2,7 @@
  * ENG-B14 job 2: one recommender and one queue (`loop/scope/area-engine-b.md`, decision 5).
  *
  * WHAT THE OWNER'S RECORD SHOWED: "4 suggested" in the rail, seven on the Slash page, two of them for things that already
- * had a page, and offers unanswered for five days. These hold the four rules that end it: the shape is weighed first, a
+ * had a page, and offers unanswered for five days. These hold the rules that end it: no navigation shape is offered (C11), a
  * thing with a page as drawn is never offered one, three arrangement offers wait at most and each says the day it lapses,
  * and an offer turned down stays down until what it rested on moves.
  */
@@ -24,32 +24,23 @@ const FIVE = [grew('walks', 'Walks', 6), grew('meals', 'Meals', 9), grew('reads'
 const base = (over: Partial<DesignSignals> = {}): DesignSignals => ({ nowMs: NOW, pages: [], ...over });
 const oneSentence = (why: string): boolean => /^[A-Z][^.!?]*\.$/u.test(why) && !why.includes('\u2014');
 
-test('with one page placed, the first offer is the navigation shape with one sentence of why', () => {
+test('NO NAVIGATION SHAPE IS OFFERED: one sidebar and one bar for everyone, so the first offer is a page', () => {
   const offers = recommend(
     base({
-      nav: { entries: 1, sections: 1, arranged: false },
       pages: [{ slug: 'home-notes', title: 'Home notes', lists: [] }],
       lists: FIVE,
     }),
   );
+  assert.ok(!offers.some((o) => o.key.startsWith('shape:') || (o.change.kind as string) === 'shape'));
   const first = offers[0]!;
-  assert.equal(first.key, 'shape:menu');
+  assert.equal(first.key, 'page:trips');
   assert.equal(first.class, 'arrange');
-  assert.deepEqual(first.change, { kind: 'shape', shape: 'menu' });
   assert.ok(oneSentence(first.why), first.why);
   assert.equal(first.lapses, LAPSES);
   for (const o of offers) assert.ok(oneSentence(o.why), o.why);
-});
-
-test('the shape already chosen, or the rail nobody chose against, is not offered', () => {
-  assert.equal(recommend(base({ nav: { entries: 1, sections: 1, arranged: false, chosen: 'menu' } })).length, 0);
-  assert.equal(recommend(base({ nav: { entries: 7, sections: 2, arranged: false } })).length, 0);
-  /* The top bar is somebody's choice to make, never an offer to a record on the default rail. */
-  assert.equal(recommend(base({ nav: { entries: 3, sections: 1, arranged: false } })).length, 0);
-  /* An order set by hand keeps the rail, which always shows it. */
-  assert.equal(recommend(base({ nav: { entries: 1, sections: 1, arranged: true } })).length, 0);
-  const back = recommend(base({ nav: { entries: 7, sections: 2, arranged: false, chosen: 'bar' } }));
-  assert.equal(back[0]?.key, 'shape:rail');
+  /* A caller still handing the old navigation signals is offered no shape for them. */
+  const old = recommend({ ...base({ lists: FIVE }), nav: { entries: 1, sections: 1, arranged: false } } as DesignSignals);
+  assert.ok(!old.some((o) => o.key.startsWith('shape:')));
 });
 
 test('a thing that has a page as drawn, a page made from a template included, is never offered one', () => {
@@ -155,12 +146,11 @@ test('a dismissed key does not return until its basis moves', () => {
   assert.equal(basisMoved('one-page', 'nothing-placed'), true);
 });
 
-test('offers come in the order shape, pages, blocks and columns, then icons', () => {
+test('offers come in the order pages, blocks and columns, then icons', () => {
   const walks = { slug: 'walks', title: 'Walks', lists: ['walks'], placed: true };
   const offers = recommend(
     base({
       glyphs: ['walk', 'home', 'meal'],
-      nav: { entries: 1, sections: 1, arranged: false },
       pages: [walks],
       earned: [
         { kind: 'column', page: 'log', pageTitle: 'Log', list: 'walks', listName: 'Walks', what: 'miles', at: 0, label: 'Miles', rows: 900, filled: 880 },
@@ -174,15 +164,15 @@ test('offers come in the order shape, pages, blocks and columns, then icons', ()
       lists: [grew('meals', 'Meals', 400)],
     }),
   );
-  assert.deepEqual(offers.map((o) => o.key), ['shape:menu', 'page:meals', 'page:ventures#6', 'block:walks:calendar:walks', 'column:log:0:miles', 'icon:walks']);
+  assert.deepEqual(offers.map((o) => o.key), ['page:meals', 'page:ventures#6', 'block:walks:calendar:walks', 'column:log:0:miles', 'icon:walks']);
   assert.deepEqual([...offers].sort((a, b) => b.rank - a.rank), offers);
-  assert.equal(offers[3]!.key, signatureOf('block', 'walks:calendar:walks'));
-  assert.equal(offers[4]!.key, signatureOf('column', 'log:0:miles'));
-  assert.equal(offers[4]!.why, 'Miles is filled on 97% of the 900 entries in Walks, and the table on Log does not show it.');
-  assert.deepEqual(offers[5]!.change, { kind: 'icon', page: 'walks', glyph: 'walk' });
+  assert.equal(offers[2]!.key, signatureOf('block', 'walks:calendar:walks'));
+  assert.equal(offers[3]!.key, signatureOf('column', 'log:0:miles'));
+  assert.equal(offers[3]!.why, 'Miles is filled on 97% of the 900 entries in Walks, and the table on Log does not show it.');
+  assert.deepEqual(offers[4]!.change, { kind: 'icon', page: 'walks', glyph: 'walk' });
   for (const o of offers) assert.ok(oneSentence(o.why), o.why);
   /* The queue keeps that order, and the three it keeps are the first three. */
-  assert.deepEqual(queueOf(offers, [], [], NOW).waiting.map((o) => o.key), ['shape:menu', 'page:meals', 'page:ventures#6']);
+  assert.deepEqual(queueOf(offers, [], [], NOW).waiting.map((o) => o.key), ['page:meals', 'page:ventures#6', 'block:walks:calendar:walks']);
   /* No glyph names handed, no icon offered. */
   assert.ok(!recommend(base({ pages: [walks] })).some((o) => o.key.startsWith('icon:')));
 });
@@ -212,7 +202,7 @@ test('an open offer for a thing that has since got a page is named, with why', (
 });
 
 test('it reads what it is handed: the same signals answer the same offers, and nothing is changed', () => {
-  const signals = base({ nav: { entries: 1, sections: 1, arranged: false }, lists: FIVE });
+  const signals = base({ lists: FIVE });
   const frozen = JSON.stringify(signals);
   assert.deepEqual(recommend(signals), recommend(signals));
   assert.equal(JSON.stringify(signals), frozen);

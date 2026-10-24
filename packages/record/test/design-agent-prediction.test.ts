@@ -32,10 +32,9 @@ test('A PAGE OFFERED OVER A GROWING LIST CARRIES A PREDICTION on that same count
   assert.ok(!offer!.prediction!.claim.includes('—'), 'no em dash in a claim a person reads');
 });
 
-test('AN OFFER OVER NOTHING THE KERNEL COUNTS CARRIES NONE: somebody met, a block, a column, the shape, an icon', () => {
+test('AN OFFER OVER NOTHING THE KERNEL COUNTS CARRIES NONE: somebody met, a block, a column, an icon', () => {
   const offers = recommend(
     base({
-      nav: { entries: 1, sections: 1, arranged: false },
       pages: [{ slug: 'trips', title: 'Trips', lists: ['trips'], placed: true }],
       named: [{ list: 'people', listName: 'People', seq: 4, name: 'Marta Quill', met: 7, linked: 0 }],
       earned: [
@@ -45,7 +44,7 @@ test('AN OFFER OVER NOTHING THE KERNEL COUNTS CARRIES NONE: somebody met, a bloc
       glyphs: ['trip'],
     }),
   );
-  assert.deepEqual(offers.map((o) => o.change.kind).sort(), ['block', 'icon', 'page', 'shape']);
+  assert.deepEqual(offers.map((o) => o.change.kind).sort(), ['block', 'icon', 'page']);
   for (const o of offers) assert.equal(o.prediction, undefined, `${o.key} rests on nothing to grade`);
 });
 

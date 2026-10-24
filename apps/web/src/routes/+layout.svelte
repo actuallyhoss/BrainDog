@@ -392,7 +392,7 @@
     extras: { label: 'Tools', icon: 'packs' },
   };
   /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT (USE-B03): an update that adds a page lands hidden. */
-  const penWaits = $derived(penCount(data.pen, null, (id) => navPrefs.isDismissed(id)));
+  const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
   const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation' } : null);
 
   /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the bar's five places, and Settings (2.A.15). */

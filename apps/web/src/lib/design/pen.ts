@@ -5,9 +5,10 @@
  * dismiss, and a dismissal is terminal on every device. The record sends its own offers on `boot` as `pen`, each carrying
  * the whole declaration keeping it writes (`packages/record/src/emergent.ts`), already held to "max 3 waiting" (HD.224).
  *
- * ONE COUNT (ENG-B14). The record is the one recommender, icons included, so the browser makes no offer of its own but
- * the navigation shape, and only when the record sent none: the shape reads the screen (`nav-shape.ts`, nothing under
- * `SHAPE_MIN_WIDTH`), which the record cannot. `penCount` is the figure the rail, the Slash page and Settings say.
+ * ONE COUNT (ENG-B14). The record is the one recommender, icons included, so the browser makes no offer of its own.
+ * THE NAVIGATION SHAPE IS NOT OFFERED (C11, 24 Oct): one sidebar and one bar are drawn for everyone since nav A, so a
+ * shape offer would change nothing anyone sees, and one a host still sends is left out. `penCount` is the figure the
+ * rail, the Slash page and Settings say.
  *
  * GENERIC BY KIND. A kind the record adds later arrives with its title, its why and its whole declaration, and is drawn,
  * shown, kept and dismissed by the same code as a page, so a new kind of offer needs no change here.
@@ -16,7 +17,6 @@
  */
 
 import { isGlyph, type IconName } from '../ui/icons.ts';
-import type { NavShape, NavShapeRecommendation } from './nav-shape.ts';
 
 /** One declaration, whole, as `setDeclaration` and `previewChange` take it. */
 export type Decl = { id: string; kind: string; body: Record<string, unknown> };
@@ -45,11 +45,8 @@ export type PenItem = {
   lapses?: string | undefined;
 };
 
-/** The navigation shape as one more offer, which carries its own `id` and never a `PenItem`. */
-export type ShapeOffer = { from: 'shape'; id: string; title: string; why: string; shape: NavShape };
-
-/** What one row of the pen is: an offer with a declaration behind it, or the navigation shape, which has none. */
-export type Offer = { from: 'change'; item: PenItem } | ShapeOffer;
+/** What one row of the pen is: an offer with a declaration behind it. */
+export type Offer = { from: 'change'; item: PenItem };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v !== '';
@@ -94,19 +91,6 @@ export function penOf(said: unknown): PenItem[] {
   });
 }
 
-/**
- * The navigation shape's recommendation, as one more offer. Its id is `shape:<shape>:<reason>`, the signature the old
- * device store kept, so the exact recommendation dismissed is the one that stays gone and a record that changes enough
- * to earn a different one may say so again.
- */
-export const shapeOffer = (rec: NavShapeRecommendation, title: string): ShapeOffer => ({
-  from: 'shape',
-  id: `shape:${rec.shape}:${rec.reason}`,
-  title,
-  why: rec.reason,
-  shape: rec.shape,
-});
-
 /** The icon an offer would set, when it is an icon offer, for the row's glyph and the sheet that shows it. */
 export function iconOf(item: PenItem): IconName | null {
   const icon = item.kind === 'icon' ? item.change.to.body.icon : undefined;
@@ -115,29 +99,24 @@ export function iconOf(item: PenItem): IconName | null {
 
 /** The glyph a row of the pen leads with: the icon itself for an icon offer, and a glyph for what kind of thing it adds. */
 export function glyphOf(offer: Offer): IconName {
-  if (offer.from === 'shape' || isShapeItem(offer.item)) return 'learning';
   const icon = iconOf(offer.item);
   if (icon !== null) return icon;
   return offer.item.kind === 'page' ? 'doc' : offer.item.kind === 'column' ? 'rows' : 'grid';
 }
 
-/** Whether an offer the record sent is its own navigation shape, which stands in for the browser's. */
+/** Whether an offer a host sent is a navigation shape, which the pen no longer draws (C11). */
 export const isShapeItem = (item: PenItem): boolean => item.kind === 'shape' || item.id.startsWith('shape:');
 
 /**
- * Every offer still waiting, in the order the pen draws them: the shape first, since it changes the thing the others are
- * placed in, then the record's, strongest first as it sent them. A dismissed offer is gone here as well as on the record,
- * so a dismissal holds before `boot` is read again.
- *
- * THE BROWSER'S SHAPE ONLY WHEN THE RECORD SENT NONE, so one shape is offered, never two that disagree. The browser makes
- * no other offer: icons and every other kind are the record's to make (ENG-B14).
+ * Every offer still waiting, in the order the pen draws them: the record's, strongest first as it sent them. A dismissed
+ * offer is gone here as well as on the record, so a dismissal holds before `boot` is read again. A navigation shape a
+ * host still sends is left out (C11), and the browser makes no offer of its own (ENG-B14).
  */
-export function waiting(shape: ShapeOffer | null, record: readonly PenItem[], gone: (id: string) => boolean): Offer[] {
+export function waiting(record: readonly PenItem[], gone: (id: string) => boolean): Offer[] {
   const out: Offer[] = [];
-  if (shape !== null && !gone(shape.id) && !record.some(isShapeItem)) out.push(shape);
   const seen = new Set<string>();
   for (const item of record) {
-    if (gone(item.id) || seen.has(item.id)) continue;
+    if (isShapeItem(item) || gone(item.id) || seen.has(item.id)) continue;
     seen.add(item.id);
     out.push({ from: 'change', item });
   }
@@ -148,12 +127,10 @@ export function waiting(shape: ShapeOffer | null, record: readonly PenItem[], go
 export const suggested = (n: number): string => `${n} suggested`;
 
 /**
- * THE ONE COUNT the rail, the Slash page and Settings say: the record's offers still waiting, plus the browser's shape
- * when the record has none of its own. It is `waiting`'s own length, so the number and the list beside it never differ,
- * and it is never more than the record's items and one.
+ * THE ONE COUNT the rail, the Slash page and Settings say: the record's offers still waiting. It is `waiting`'s own
+ * length, so the number and the list beside it never differ, and it is never more than the record sent.
  */
-export const penCount = (record: readonly PenItem[], shape: ShapeOffer | null, gone: (id: string) => boolean): number =>
-  waiting(shape, record, gone).length;
+export const penCount = (record: readonly PenItem[], gone: (id: string) => boolean): number => waiting(record, gone).length;
 
 /* ── the offer on a list's own screen (USE-B03: an offer is shown where the person is) ─────────────────────────────── */
 

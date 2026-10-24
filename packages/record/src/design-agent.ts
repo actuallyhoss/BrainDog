@@ -11,16 +11,14 @@
  * and filing a question are the caller's. Nothing here opens a table, asks a model or knows what day it is: the caller
  * says `nowMs`.
  *
- * THE ORDER IS SET: the navigation shape first, "before any page"; then pages, for a thing with no page as
- * drawn and for a list that grows; then the blocks and columns a list has earned; then icons, only when the host has
- * handed the glyph names. A tier is never outranked by one below it, so the order offers come in is their rank.
+ * THE ORDER IS SET: pages first, for a thing with no page as drawn and for a list that grows; then the blocks and
+ * columns a list has earned; then icons, only when the host has handed the glyph names. A tier is never outranked by
+ * one below it, so the order offers come in is their rank. THE NAVIGATION SHAPE IS NO LONGER WEIGHED (C11, 24 Oct): one
+ * sidebar and one bar are drawn for everyone since nav A, so a shape offer would change nothing anyone sees.
  *
  * A THING THAT HAS A PAGE IS NEVER OFFERED ONE, and "has a page" is read off the pages as drawn: a page made for a row
  * from a template is that row's page (`DrawnPage.row`), whatever its template is titled.
  */
-
-/** The shapes the navigation takes, as the shell draws them. */
-export type NavShape = 'rail' | 'bar' | 'menu';
 
 /** The two classes of question Slash files, each with its own `WAITING_MOST`: an arrangement, and who is who. */
 export type OfferClass = 'arrange' | 'who';
@@ -30,7 +28,6 @@ export type Draft = { id: string; kind: string; body: Record<string, unknown> };
 
 /** What accepting an offer writes, said as what it is; `draft` is the declaration when the caller handed one. */
 export type OfferChange =
-  | { kind: 'shape'; shape: NavShape }
   | { kind: 'page'; list: string; seq?: number; draft?: Draft }
   | { kind: 'block'; page: string; list: string; block: string; draft?: Draft }
   | { kind: 'column'; page: string; list: string; field: string; draft?: Draft }
@@ -131,18 +128,6 @@ export type Earned = {
 
 export type DesignSignals = {
   nowMs: number;
-  /** The navigation as it stands. Absent, no shape is weighed. */
-  nav?: {
-    /** Pages and lists placed in the navigation, not counting the native spine. */
-    entries: number;
-    sections: number;
-    /** Whether the person set the order by hand. */
-    arranged: boolean;
-    /** The shape somebody chose. Absent while nobody has, which is the rail. */
-    chosen?: NavShape;
-    /** How many of the entries were opened in sixty days. Absent, use is not weighed. */
-    opened60?: number;
-  };
   pages: readonly DrawnPage[];
   named?: readonly NamedThing[];
   lists?: readonly GrowingList[];
@@ -163,12 +148,10 @@ export const NAMED_PAGE = { met: 5, linked: 3 } as const;
 export const GROWS = { rows: 5, days: 3 } as const;
 /** A column is offered when its field is filled on this share of at least this many entries. */
 export const COLUMN = { rows: 20, filled: 0.8 } as const;
-/** The top bar's fixed slots before it hides the rest behind More (`TopBar.svelte`). */
-const BAR_SLOTS = 4;
 
 const DAY_MS = 86_400_000;
 /** Where each kind of offer ranks: a tier's base, and up to 999 above it by its strength (`within`). */
-export const TIER = { shape: 5000, page: 4000, block: 3000, column: 2000, icon: 1000 } as const;
+export const TIER = { page: 4000, block: 3000, column: 2000, icon: 1000 } as const;
 /** The most strength lifts an offer within its tier. */
 export const WITHIN_MOST = 999;
 const within = (strength: number): number => Math.max(0, Math.min(WITHIN_MOST, Math.floor(strength)));
@@ -198,54 +181,6 @@ export function namedHasPage(pages: readonly DrawnPage[], thing: Pick<NamedThing
 
 /** Whether a page draws `list` whole. A page made for one row is that row's page, and not the list's. */
 export const listHasPage = (pages: readonly DrawnPage[], list: string): boolean => pages.some((p) => p.row === undefined && p.lists.includes(list));
-
-/* ── the navigation shape ───────────────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * The shape that suits the navigation, its one sentence and the fact it rests on, or `null` when the shape drawn suits.
- *
- * THE WINDOW IS NOT READ HERE. The record recommends, and the browser's one job is to not show a shape offer under 900
- * pixels, where the tab bar is drawn whatever is chosen.
- *
- * NOBODY IS TALKED OFF THE DEFAULT RAIL INTO THE TOP BAR: the bar is a choice in Settings, and is offered only back to
- * somebody who chose a shape.
- */
-function shapeFor(nav: NonNullable<DesignSignals['nav']>): { shape: NavShape; why: string; basis: string } | null {
-  const { entries, sections, arranged, chosen, opened60 } = nav;
-  const drawn: NavShape = chosen ?? 'rail';
-  let best: { shape: NavShape; why: string; basis: string };
-  if (entries <= 1) {
-    best =
-      entries <= 0
-        ? { shape: 'menu', basis: 'nothing-placed', why: 'Nothing is placed in your navigation yet, so a menu takes the least room until there is something to show.' }
-        : { shape: 'menu', basis: 'one-page', why: 'Only one page is placed in your navigation, so a menu takes less room than a rail around it.' };
-    /* AN ORDER SET BY HAND is somebody caring how it reads, and a menu shows it only after a press. */
-    if (arranged) best = { shape: 'rail', basis: 'arranged', why: 'You set the order of your navigation by hand, so a rail keeps that order in view where a menu would hide it.' };
-  } else if (entries <= BAR_SLOTS) {
-    best = { shape: 'bar', basis: 'fits-bar', why: `You have ${entries} pages in your navigation, few enough for a top bar to show all of them with nothing behind More.` };
-  } else if (!arranged && opened60 !== undefined && opened60 >= 2 && opened60 <= BAR_SLOTS) {
-    best = {
-      shape: 'bar',
-      basis: 'few-opened',
-      why: `You opened ${opened60} of your ${entries} pages in the last sixty days, few enough for a top bar to show the ones you use.`,
-    };
-  } else {
-    const hidden = entries - BAR_SLOTS;
-    best = {
-      shape: 'rail',
-      basis: 'past-bar',
-      why:
-        sections > 1
-          ? `You have ${entries} pages in ${sections} sections, and a top bar shows four of them with the other ${hidden} behind More.`
-          : `You have ${entries} pages in your navigation, and a top bar shows four of them with the other ${hidden} behind More.`,
-    };
-  }
-  if (best.shape === drawn) return null;
-  if (chosen === undefined && best.shape === 'bar') return null;
-  return best;
-}
-
-const SHAPE_TITLE: Record<NavShape, string> = { rail: 'A rail for your pages', bar: 'A top bar for your pages', menu: 'A menu for your pages' };
 
 /** The window an offer's prediction is read over: the thirty days its basis was counted in. */
 export const PREDICTION_WINDOW = '30d';
@@ -277,7 +212,7 @@ export const lapsesFrom = (nowMs: number): string => dayOf(nowMs + LAPSE_DAYS * 
 /* ── the offers ─────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Every offer the signals earn, strongest first: the shape, pages, blocks and columns, icons. NOT CUT TO THREE, which is
+ * Every offer the signals earn, strongest first: pages, blocks and columns, icons. NOT CUT TO THREE, which is
  * `queueOf`'s, so the caller can see what waits behind the three.
  */
 export function recommend(signals: DesignSignals): Offer[] {
@@ -287,11 +222,8 @@ export function recommend(signals: DesignSignals): Offer[] {
   const offer = (o: Omit<Offer, 'class' | 'lapses'>): void => void out.push({ ...o, class: 'arrange', lapses });
   const drafted = (draft: Draft | undefined): { draft?: Draft } => (draft === undefined ? {} : { draft });
   /* A PREDICTION ONLY WHERE THE OFFER RESTS ON A FIGURE THE KERNEL READS AGAIN: a growing list's count. Somebody met in
-     dated lines, a block or column a list earned, the shape and an icon rest on nothing it can grade, so carry none. */
+     dated lines, a block or column a list earned and an icon rest on nothing it can grade, so carry none. */
   const predicted = (p: OfferPrediction | null): { prediction?: OfferPrediction } => (p === null ? {} : { prediction: p });
-
-  const shape = signals.nav ? shapeFor(signals.nav) : null;
-  if (shape) offer({ key: `shape:${shape.shape}`, rank: TIER.shape, basis: shape.basis, title: SHAPE_TITLE[shape.shape], why: shape.why, change: { kind: 'shape', shape: shape.shape } });
 
   /* A LIST THAT GROWS and no page draws whole. */
   for (const l of signals.lists ?? []) {
@@ -475,8 +407,11 @@ export function answeredAlready(open: readonly Pick<Held, 'key'>[], signals: Pic
 
 /** The most rank a filed arrangement may say: the kernel's scale (`kernel/src/govern.ts` `RANK_MOST`), not the tiers'. */
 export const FILED_RANK_MOST = 1000;
-/** The kernel's scale cut into one band a tier, the lowest band for a rank under every tier (an ask no rule weighed). */
-const BAND = Math.floor(FILED_RANK_MOST / (Object.keys(TIER).length + 1));
+/**
+ * The kernel's scale cut into one band a tier, the lowest band for a rank under every tier (an ask no rule weighed).
+ * SIX BANDS STILL, the shape's top one left empty since it went (C11), so a rank filed before reads on the same scale.
+ */
+const BAND = Math.floor(FILED_RANK_MOST / 6);
 
 /**
  * A rank as a filed arrangement says it, on the kernel's scale, in the same order, so the kernel's "outranks"
@@ -486,7 +421,7 @@ const BAND = Math.floor(FILED_RANK_MOST / (Object.keys(TIER).length + 1));
 export const filedRank = (rank: number): number => {
   /* A TIER IS ITS BASE AND UP TO `WITHIN_MOST` ABOVE IT, so the tiers sit `WITHIN_MOST + 1` apart. */
   const step = WITHIN_MOST + 1;
-  const r = Math.max(0, Math.min(TIER.shape + WITHIN_MOST, Math.floor(rank)));
+  const r = Math.max(0, Math.min(TIER.page + WITHIN_MOST, Math.floor(rank)));
   return Math.floor(r / step) * BAND + Math.floor(((r % step) * (BAND - 1)) / WITHIN_MOST);
 };
 

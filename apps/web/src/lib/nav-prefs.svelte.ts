@@ -256,8 +256,8 @@ export class NavPrefs {
   /** The pages the person put on the phone bar after Today; empty is the rail's first four. */
   tabs = $state<string[]>([]);
   /**
-   * The shape somebody chose, on a record or on this device, or `undefined` while nobody has. The design agent's
-   * recommendation reads this one (`design/nav-shape.ts`), so it can tell a rail somebody picked from the default.
+   * The shape somebody chose, on a record or on this device, or `undefined` while nobody has, so a rail somebody picked
+   * reads apart from the default.
    */
   chosen = $state<NavShape | undefined>(undefined);
   /**
