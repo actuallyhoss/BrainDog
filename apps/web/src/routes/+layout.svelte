@@ -93,6 +93,7 @@
   import { tick, untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { noteOpened } from '$lib/palette/opened.ts';
+  import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { PRODUCT } from '$lib/title.ts';
   import { navigating, page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
@@ -702,7 +703,9 @@
           const now = document.activeElement;
           if (h1 && (now === null || now === document.body)) {
             if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
-            h1.focus({ preventScroll: true });
+            /* QUIET UNLESS THE LAST THING WAS A KEY (`quiet-focus.ts`): script focus with no press before it counts as
+               `:focus-visible`, so a cold open drew a ring round the name (Z26). */
+            quietFocus(h1);
           }
           return false;
         }, 1500),
@@ -1168,7 +1171,7 @@
 </script>
 
 <svelte:window {onkeydown} />
-<svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} />
+<svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} onkeydowncapture={heard} onpointerdowncapture={heard} />
 
 <a class="skip" href="#main">Skip to content</a>
 
@@ -1635,6 +1638,12 @@
   /* A page's name given focus by script after a move shows no ring to a pointer (`afterNavigate` above). */
   :global(main h1[tabindex='-1']:focus:not(:focus-visible)) {
     /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
+    outline: none;
+  }
+
+  /* NOR ON A COLD OPEN, which the browser counts as `:focus-visible` (`quiet-focus.ts`, Z26). */
+  :global(main h1[data-quiet]:focus) {
+    /* focus-ok: marked only while the reader's last act was not a key; Tab takes the mark off and the ring shows. */
     outline: none;
   }
 
