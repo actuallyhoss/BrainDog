@@ -39,7 +39,7 @@
   const words = {
     exactly: (name: string) => `Type ${name} exactly.`,
     notIt: (name: string) => `That is not ${name}.`,
-    exportFirst: 'Export a copy first',
+    exportFirst: 'Download a copy first',
   } as const;
 
   const matches = $derived(typed.trim().toLocaleLowerCase() === RECORD.trim().toLocaleLowerCase());

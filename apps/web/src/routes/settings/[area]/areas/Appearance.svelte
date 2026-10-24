@@ -160,6 +160,15 @@
      beside House there is no choice to draw. */
   const choices = $derived(choicesOf(booted, false).filter((c) => c.id !== CONTRAST));
 
+  /* THE DENSITY PREVIEW DRAWS HIS OWN ROWS (U-C7): the first three questions waiting on him, as Today leads with them,
+     else the names of three of his lists. A made-up studio stood there before. Nothing until the record answers. */
+  const previewRows = $derived.by((): string[] => {
+    const b = booted as { waiting?: { question?: unknown }[]; registers?: { name?: unknown; kernel?: boolean }[] } | null;
+    const asked = (b?.waiting ?? []).map((w) => (typeof w.question === 'string' ? w.question.trim() : '')).filter((q) => q !== '');
+    if (asked.length > 0) return asked.slice(0, 3);
+    return (b?.registers ?? []).filter((r) => r.kernel !== true && typeof r.name === 'string').map((r) => String(r.name)).slice(0, 3);
+  });
+
   const recordBoot = async (): Promise<unknown> => {
     const [{ createClient }, { apiBase }] = await Promise.all([import('@braindog/client'), import('$lib/at.ts')]);
     const out = await createClient({ base: apiBase() })
@@ -450,11 +459,11 @@
             </div>
             <p class="pv-said">{words.said} <span class="pv-needs">{words.needs}</span></p>
             <ul class="ledger ledger-lead pv-rows">
-              {#each copy.densityPreviewRows as row, i (row)}
+              {#each previewRows as row, i (i)}
                 <li>
                   <div class="line">
                     <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
-                    <span class="line-main"><span class="line-title pv-row">{row}</span></span>
+                    <span class="line-main"><span class="line-title pv-row" data-own>{row}</span></span>
                     <span class="line-amount"></span>
                     <span class="line-when"></span>
                   </div>

@@ -20,7 +20,6 @@ export const account = {
 
   sourcesAdd: 'A new source comes with an add-on, or is set up by an agent you connect.',
   sourcesAddGo: 'Browse add-ons',
-  densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
 
   /**
    * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
@@ -41,7 +40,7 @@ export const account = {
     read: 'Can read, cannot change',
   } as Record<string, string>,
   auditHolds: 'Every change to this record shows up here, with who made it and when.',
-  export: 'Export a copy',
+  export: 'Download a copy',
   /* The two questions an audit log exists to answer, as the labels of the two controls. */
   auditWho: 'Who',
   auditWhat: 'What kind of change',

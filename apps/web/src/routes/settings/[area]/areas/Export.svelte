@@ -125,7 +125,7 @@
 <!-- THE ONE ACTION EACH ROW OFFERS, declared here so a row whose action is the owner's is handed
      none at all for a colleague, rather than an empty slot at the end of the row. -->
 {#snippet exportWhole()}
-  <Button disabled={exporting !== null} aria-busy={exporting === 'record'} onclick={() => takeCopy('record')}>{copy.export}</Button>
+  <Button weight="primary" disabled={exporting !== null} aria-busy={exporting === 'record'} onclick={() => takeCopy('record')}>{copy.export}</Button>
 {/snippet}
 {#snippet exportPack()}
   <Button disabled={exporting !== null} aria-busy={exporting === 'pack'} onclick={() => takeCopy('pack')}>{copy.exportPack}</Button>

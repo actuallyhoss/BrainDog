@@ -38,7 +38,7 @@
   const words = {
     /* THE REWRITES OF THE UI PASS OF 20 OCTOBER (agents F27): what a person can do, not what a deployment lacks. */
     notHereYet: 'No backups here yet',
-    exportInstead: 'Export a copy instead; it works anywhere.',
+    exportInstead: 'Download a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
     askForIt: 'Going back to a copy',
     missedLine: 'It is waiting for you in Decide: run it now, or let tonight try again.',
@@ -139,7 +139,8 @@
    * whose `boot` says it is a self-host is not asked at all, so its console carries no 404 for a door it never had.
    */
   let drill = $state<DrillFacts | null>(null);
-  const drillSaid = $derived(drill ? drillLine(drill, Date.now()) : null);
+  /* NO RESTORE TEST IS SAID BEFORE THERE IS A COPY (U-C7): "Never tested" over a record with no copy yet read as a fault. */
+  const drillSaid = $derived(drill && facts?.last_copy_at ? drillLine(drill, Date.now()) : null);
   $effect(() => {
     if (shell.host === 'self-host') return;
     untrack(() => void readDrill(fetch).then((d) => (drill = d)));
