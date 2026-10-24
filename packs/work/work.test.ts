@@ -310,7 +310,7 @@ test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and i
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-four parts wait, each on one of the two', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-two parts wait, each on one of the two', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
@@ -329,8 +329,7 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-four pa
     /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
     { at: '"Work", "With no project"', holds: [PROJECTS] },
     { at: '"Board", "board", "owner"', holds: [PEOPLE] },
-    { at: '"Board", "Everything open", "Project"', holds: [PROJECTS] },
-    { at: '"Board", "Everything open", "Owner"', holds: [PEOPLE] },
+    /* NO EVERYTHING OPEN UNDER THE BOARD, SINCE the audit of 25 October (Y8), so its Project and Owner wait no more. */
     ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day', 'Done, by week'].map(
       (name) => ({ at: `"${name}"`, holds: [PROJECTS] }),
     ),

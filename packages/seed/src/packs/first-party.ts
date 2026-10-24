@@ -538,7 +538,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   unreleased step): one block added to a page that is there, nothing taken away. And Work declares a head, its open
  *   count, Add and a search word, and lists open work with no project under a fold of its own, over a new figure
  *   `tasks-no-project` (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14, batch 101, inside the unreleased step):
- *   one figure and two blocks added, nothing taken away.
+ *   one figure and two blocks added, nothing taken away. And the Board reads every task in play before any done one,
+ *   its line says what is kept for later, and Everything open goes from under it (audit B of 25 October, Y8, inside
+ *   the unreleased step): one block taken from a page that is there, no id added or taken away.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
  *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from

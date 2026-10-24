@@ -468,3 +468,31 @@ test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN TH
   for (const b of agents.value.blocks.filter((x) => x.kind === 'todo' && x.source === 'register.tasks'))
     assert.ok(b.rows.every((r) => typeof r.fields.agent === 'string' && r.fields.agent !== ''), `${String(b.heading)} draws work no agent holds under Agents`);
 });
+
+/**
+ * THE BOARD'S LINE ADDS UP TO ITS COLUMNS, AND THE BOARD IS ITS ONE LIST (audit B of 25 October, Y8). The board read its
+ * rows by tier and day with done work among them, fifty at most, so on a record with many urgent tasks finished the
+ * read ran out inside Open: the line said 36 open while the columns held 34 of them. And the page drew every open task
+ * a second time under the board, as Everything open.
+ */
+test('THE BOARD HOLDS EVERY TASK IN PLAY BEFORE ANY DONE ONE, its line counts Later too, and no list repeats it', async () => {
+  const k = await seeded();
+  const person = { actor: 'p_1' };
+  /* SIXTY URGENT TASKS FINISHED, INVENTED: each would be read before an open task of a lower tier. */
+  for (let n = 1; n <= 60; n++) assert.ok(k.create('tasks', { what: `Glaze test tile ${n}`, state: 'done', priority: 'urgent', done_on: TODAY }, person).ok);
+  for (let n = 1; n <= 12; n++) assert.ok(k.create('tasks', { what: `Sand the kiln shelf ${n}`, state: 'open', priority: 'low' }, person).ok);
+  const read = (id: string) => {
+    const out = k.metric(METRICS[id] as never);
+    assert.ok(out.ok, sayOf(out));
+    return Number(out.value.value);
+  };
+  const page = opened(k, 'work-board');
+  const board = boardOf(page);
+  const inPlay = board.rows.filter((r) => r.fields.state !== 'done').length;
+  assert.equal(inPlay, read('open-tasks') + read('tasks-later'), 'a task in play is missing from the board');
+  assert.ok(board.rows.some((r) => r.fields.state === 'done'), 'the board keeps a Done column to drop a card on');
+  /* THE LINE NAMES WHAT IS KEPT FOR LATER, so open and later add up to the columns that are not Done. */
+  const line = page.blocks.map((b) => String((b as { body?: string }).body ?? '')).find((b) => b.includes('{{open-tasks}}'));
+  assert.match(line ?? '', /\{\{tasks-later\}\} for later/u);
+  assert.ok(!page.blocks.some((b) => b.kind === 'table'), 'the board page lists its tasks a second time');
+});

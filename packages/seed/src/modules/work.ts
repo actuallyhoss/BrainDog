@@ -1149,6 +1149,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    *
    * NO HEADING OVER THE BOARD, SINCE work 1.16.0 (the second design review's fix 2). It read "By status" under a page
    * called Board whose every column is headed by its status, so the tile said what it was three times.
+   *
+   * AND NO LIST UNDER IT, SINCE the audit of 25 October (Y8): Everything open drew every open task a second time, with
+   * a count of its own beside the line's, and on a phone it ran on under a board already fifteen thousand pixels long.
    */
   'work-board': {
     page: 'work-board',
@@ -1168,11 +1171,13 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         body: 'Nothing is open right now',
       },
       {
-        /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. */
+        /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. WHAT IS
+           KEPT FOR LATER IS SAID TOO, SINCE the audit of 25 October (Y8): Later is a column of this board, and the line
+           counted only Open, so the columns that are not Done added up to more than it said. */
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
+        body: '{{open-tasks}} open task(s), {{tasks-later}} for later, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
       },
       {
         /* ADD IN PLACE, SINCE work 1.19.0: the same line as Work's, first after the sentence and before the board, so a
@@ -1188,39 +1193,24 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'board',
         span: 12,
         /* A CARD SAYS WHEN IT IS DUE AND WHO HOLDS IT, SINCE work 1.17.0, where it named its project: a board is read
-           for what is next and whose it is, and the project is a column of the list under it. The day comes before the
+           for what is next and whose it is, and the project is on the task's own page. The day comes before the
            holder, because who holds a task is a link that goes on a record without People (`LINKS` in
            `packs/first-party.ts`), and the day must not move when it does. */
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'by' }, { field: 'owner' }],
         source: 'register.tasks',
         where: 'state is not dropped',
         /* EACH COLUMN BY TIER, THEN BY DUE DAY. A board keeps its rows in the order they are read within each column
-           (`render/src/board.ts`), so the order the record reads them in is the order a column draws. */
-        order: TIER_THEN_DUE,
+           (`render/src/board.ts`), so the order the record reads them in is the order a column draws. BY STATE FIRST,
+           SINCE the audit of 25 October (Y8): read by tier alone, finished urgent work came before open work of a lower
+           tier, the read stopped at fifty inside Open, and the line said 36 open over columns holding 34. The record
+           sorts an enum by its declared order, so every task in play is read before any done one, and Done takes what
+           room is left. */
+        order: [{ field: 'state', dir: 'asc' }, ...TIER_THEN_DUE],
+        limit: 100,
         /* AND WHICH CARDS AN AGENT IS ON RIGHT NOW. This is the page that answers "what are my agents
            doing", and until now it answered it only in a strip beside the board: a card being worked
            on looked exactly like one nobody had opened in a week. */
         working: true,
-      },
-      {
-        kind: 'table',
-        heading: 'Everything open',
-        icon: 'rows',
-        span: 12,
-        source: 'register.tasks',
-        /* WHAT OPEN COUNTS: work kept for later has its own column on the board above. */
-        where: OPEN,
-        columns: [
-          DESCRIPTION,
-          { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
-          { field: 'owner', label: 'Owner', width: 'minmax(8ch,14ch)' },
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'by', dir: 'asc' }],
-        when: { metric: 'open-tasks', gt: 0 },
-        limit: 50,
       },
     ],
   },

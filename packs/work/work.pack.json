@@ -375,7 +375,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent"
+          "body": "{{open-tasks}} open task(s), {{tasks-later}} for later, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent"
         },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {
@@ -389,27 +389,9 @@
           ],
           "source": "register.tasks",
           "where": "state is not dropped",
-          "order": [ { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
+          "order": [ { "field": "state", "dir": "asc" }, { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
+          "limit": 100,
           "working": true
-        },
-        {
-          "kind": "table",
-          "heading": "Everything open",
-          "icon": "rows",
-          "span": 12,
-          "source": "register.tasks",
-          "where": "state is not backlog or done or dropped",
-          "columns": [
-            { "field": "what", "width": "minmax(20ch,1fr)" },
-            { "field": "thing", "label": "Project", "width": "minmax(10ch,16ch)", "when": { "holds": [ "things" ] } },
-            { "field": "owner", "label": "Owner", "width": "minmax(8ch,14ch)", "when": { "holds": [ "people" ] } },
-            { "field": "agent", "label": "Agent", "width": "10ch" },
-            { "field": "state", "label": "Status", "width": "12ch" },
-            { "field": "by", "label": "Due", "width": "13ch", "align": "end" }
-          ],
-          "order": [ { "field": "by", "dir": "asc" } ],
-          "when": { "metric": "open-tasks", "gt": 0 },
-          "limit": 50
         }
       ]
     },

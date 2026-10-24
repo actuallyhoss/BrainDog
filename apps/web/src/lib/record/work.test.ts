@@ -163,12 +163,13 @@ test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were fini
 
 test('A TASK COLUMN IS HEADED BY WHAT ONE ROW IS CALLED, in both engines, and a team whose tasks are Tickets reads Ticket', async () => {
   const k = await kernel;
-  /* THE BOARD'S PAGE, whose Everything open is the tasks table: Work draws its tasks as lists since it went calm. */
-  const record = k.page('work-board');
+  /* WORK'S PAGE, whose Not moved in three months is a tasks table: the Board draws no table since the audit of 25
+     October (Y8), where Everything open listed its tasks a second time. */
+  const record = k.page('work');
   assert.ok(record.ok);
   const heads = () => ({
     record: record.value.blocks.filter((b) => b.kind === 'table').map((b) => columnHeading('tasks', (b as { columns: { field: string; label?: string }[] }).columns[0]!)),
-    demo: page('work-board')!.blocks.filter((b) => b.kind === 'table').map((b) => b.columns[0]!.label),
+    demo: page('work')!.blocks.filter((b) => b.kind === 'table').map((b) => b.columns[0]!.label),
   });
   const plain = heads();
   assert.deepEqual(plain.record, plain.demo);

@@ -2065,7 +2065,7 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: '7b2625ccfea7fed8',
+    declares: 'cce7e1d53c029ee7',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
@@ -2079,6 +2079,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.19.0 (the UI pass of 20 October): Not this week, Needs a project and Done lately are the page's width again, since a section is a heading across the page and is drawn at twelve whatever it declares, in `page.work` -> 723aa988723465e4",
       "Inside the unreleased 1.19.0 (the screens scope of 24 October, E24): `page.work` draws Late and This week as two bands, in the order Late, Waiting on you, This week, With an agent, half the row each, and its head counts a new figure `metric.tasks-in-play`, every task not done or dropped, which is what the project chips count; one figure and one block added, nothing taken away -> 65b382ee2c8f38ab",
       "Inside the unreleased 1.19.0 (the thinking scope of 24 October, C32, the old Work screen retired): `page.work` filters by whose work it is, Yours where no agent holds a task and Agents where one does, beside its strip of projects, and folds the open work not written in 90 days under Not moved in three months, a table and not a list that ticks; no id added or taken away -> 7b2625ccfea7fed8",
+      "Inside the unreleased 1.19.0 (audit B of 25 October, Y8): `page.work-board`'s board reads by state, then tier, then due day, a hundred at most, so every task in play is read before any done one, its line says how many are kept for later, and its table Everything open is taken away; a block taken away, no id added or taken away -> cce7e1d53c029ee7",
     ],
   },
 };
