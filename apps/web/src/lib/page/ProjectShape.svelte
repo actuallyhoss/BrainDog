@@ -36,6 +36,7 @@
   import { actor } from '$lib/record/names.ts';
   import { midnightOf, type SessionRow } from '$lib/record/today-live.ts';
   import { readShape, takeShape, type ShapeRead, type WorkRow } from './shape-read.ts';
+  import { lanesOf } from '$lib/shell/side.ts';
   import VisualStrip from '../visual/VisualStrip.svelte';
   import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
   import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
@@ -164,16 +165,21 @@
   const RING_FROM = 5;
   const ringSays = (f: { key: string; total?: number }): boolean => f.key !== 'open' || (doneCount > 0 && doneCount + (f.total ?? 0) >= RING_FROM);
   const figs = $derived<Shown[]>(hero ? (kpiLead ? [{ key: 'kpi' as const, kpi: kpiLead }, ...hero.figures.filter((f) => f.key !== 'money')] : hero.figures).filter(ringSays) : []);
-  /* WHERE IT STANDS: its lane, how it is going with its dot, and since when, in the list's own words. */
+  /* WHERE IT STANDS: its lane, how it is going with its dot, and since when, in the list's own words.
+     A PARKED OR FINISHED PROJECT SAYS SO QUIETLY, AND SINCE WHEN IT MOVED THERE ("Parked since Sep 2026"), read off its
+     history (`stateSince`), where the day it started is the `since` it keeps; its page is drawn quieter (`data-quiet`). */
   const status = $derived.by(() => {
-    if (!read || !decl) return { lane: '', health: null as { word: string; tone: string } | null, since: '' };
+    if (!read || !decl) return { lane: '', health: null as { word: string; tone: string } | null, since: '', quiet: false };
     const fd = decl.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
     const v = decl.state ? read.fields[decl.state] : undefined;
     const lane = fd && typeof v === 'string' && v !== '' ? valueSaid(fd as Parameters<typeof valueSaid>[0], v) : '';
-    const h = typeof read.fields.health === 'string' ? (HEALTH[read.fields.health] ?? null) : null;
-    const s = read.fields.since;
+    const values = (fd as { values?: readonly string[] } | undefined)?.values ?? [];
+    const lanes = lanesOf(decl as { done?: readonly string[] }, values);
+    const quiet = typeof v === 'string' && (lanes.parked.has(v) || lanes.finished.has(v));
+    const h = quiet ? null : typeof read.fields.health === 'string' ? (HEALTH[read.fields.health] ?? null) : null;
+    const s = quiet && read.stateSince ? read.stateSince : read.fields.since;
     const since = typeof s === 'string' && /^\d{4}-\d{2}/u.test(s) ? `${monthShort(+s.slice(5, 7) - 1)} ${s.slice(0, 4)}` : '';
-    return { lane, health: h, since };
+    return { lane, health: h, since, quiet };
   });
   const name = $derived(read && decl ? String(read.fields[decl.title] ?? '').trim() : '');
   const mark_ = $derived(read && decl?.identity ? String(read.fields[decl.identity.mark] ?? '') : '');
@@ -292,13 +298,13 @@
 </script>
 
 {#if drawsHero && hero && read}
-  <section class="hero" aria-label={name} style={slotStyle(hue)} id="part-overview" data-part="Overview" data-part-icon="eye">
+  <section class="hero" aria-label={name} style={slotStyle(hue)} data-quiet={status.quiet || undefined} id="part-overview" data-part="Overview" data-part-icon="eye">
     <span class="h-well"><ProjectWell mark={mark_} {name} {hue} size="xl" /></span>
     <div class="h-name">
       <h1 class="h-title" dir="auto">{name}</h1>
       {#if status.lane || status.health || status.since}
         <p class="h-status">
-          {status.lane}{#if status.health}{#if status.lane}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}{#if status.since}{#if status.lane || status.health}{' · '}{/if}since {status.since}{/if}
+          {status.lane}{#if status.health}{#if status.lane}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}{#if status.since}{#if status.health}{' · '}{:else if status.lane}{' '}{/if}since {status.since}{/if}
         </p>
       {/if}
     </div>
@@ -534,6 +540,16 @@
     padding: 16px;
     border-radius: var(--r-tile, 16px);
     background: color-mix(in oklab, var(--ph) var(--h-wash), var(--tile));
+  }
+
+  /* A PARKED OR FINISHED PROJECT IS DRAWN QUIET: no wash of its colour, and its well greyed, so it reads as resting. */
+  .hero[data-quiet] {
+    --h-wash: 0%;
+  }
+
+  .hero[data-quiet] .h-well {
+    filter: grayscale(1);
+    opacity: 0.7;
   }
 
   .h-well {

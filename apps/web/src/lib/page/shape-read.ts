@@ -54,6 +54,8 @@ export type ShapeRead = {
   noun: string;
   /** The runs on this project heard from today. */
   sessions: SessionRow[];
+  /** The day the row last moved into the state it is in now, read off its history, or `null` where no line says so. */
+  stateSince: string | null;
   /** Who worked on it last and how long ago in words, from its newest run on any day: the hero's news. */
   last: { name: string; said: string } | null;
   /** The key number its card leads with, as the `kpis` source answered it, where it keeps one. */
@@ -70,6 +72,17 @@ export function lastOf(runs: readonly { fields?: Readonly<Record<string, unknown
     return { name: actor(agent).name, said: sinceWords(at, now) };
   }
   return null;
+}
+
+/**
+ * THE DAY A ROW MOVED INTO THE STATE IT IS IN, from its history (newest first): the newest line that set the state field
+ * to what it holds now. `null` where the list declares no state or no line says so, and the page then says no day.
+ */
+export function stateSinceOf(lines: readonly { at: string; field?: string; to?: unknown }[], state: string | undefined, fields: Readonly<Record<string, unknown>>): string | null {
+  if (!state) return null;
+  const now = fields[state];
+  const moved = lines.find((l) => l.field === state && l.to === now && Number.isFinite(Date.parse(l.at)));
+  return moved ? moved.at : null;
 }
 
 /* A read that fails is a read that said nothing: the blocks it feeds go without it and the others still draw. */
@@ -131,6 +144,7 @@ export async function readShape(base: string, r: string, n: number, title = ''):
   const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], name: g.name, rows: g.rows })) : [];
   /* AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
   const history = (told?.from === 'live' ? told.lines : []).map((l) => ({ note: l.note, by: /^p_/u.test(l.by) ? '' : l.by, at: l.at }));
+  const stateSince = told?.from === 'live' ? stateSinceOf(told.lines, decl.state, row.entry.fields) : null;
   const now = recordNow();
   const today = localDay(now);
   const [[i, o, w, inByMonth, outByMonth], [listed, runRows], kpi] = await Promise.all([early !== null && said === name ? early : moneyOf(name), listing, leading] as const);
@@ -143,6 +157,7 @@ export async function readShape(base: string, r: string, n: number, title = ''):
     fields: row.entry.fields,
     incoming,
     history,
+    stateSince,
     money: { in: (i as Figure | null) ?? null, out: (o as Figure | null) ?? null, owed: (w as Figure | null) ?? null },
     inByMonth: (inByMonth as Months | null) ?? null,
     outByMonth: (outByMonth as Months | null) ?? null,

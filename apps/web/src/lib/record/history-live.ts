@@ -29,7 +29,8 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  * it ("Slash suggested · Mara accepted"), on a line an answered suggestion of Slash's made, where `linesOf` was handed
  * the names to say it with, and "Slash did this without asking" on one Slash's rung let land (`slashDidSaid`).
  */
-export type Line = { by: string; note: string; at: string; settled?: string };
+/** `field` and `to` say which field a line changed and what to, where it changed one: "parked since" is read off them. */
+export type Line = { by: string; note: string; at: string; settled?: string; field?: string; to?: unknown };
 
 /** `now` is the clock `since` reads against: the reader's, since every line is the record's. */
 export type Told = { from: 'live'; lines: Line[]; now: number } | { from: 'refused'; fix: string };
@@ -295,7 +296,7 @@ export const linesOf = (register: string, events: readonly (Event & Suggested)[]
     .map((e) => {
       /* WHAT SLASH DID ALONE FIRST, so a change the ladder let land is never "Slash suggested · Ladder accepted". */
       const settled = say === undefined ? null : (slashDidBy(e, say) ?? settledBy(e, say));
-      return { by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts, ...(settled === null ? {} : { settled }) };
+      return { by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts, ...(settled === null ? {} : { settled }), ...(e.field ? { field: e.field, to: e.to } : {}) };
     })
     .reverse();
 
