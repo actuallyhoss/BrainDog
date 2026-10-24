@@ -400,6 +400,9 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
   const tonight = nightOf(nowMs);
   const addOns = installedAddOns(deps.sql);
   const names = new Map(addOns.map((p) => [p.id, addOnName(p.id, p.title)]));
+  /* THE MANIFEST'S OWN TITLE, where it has one. An add-on without one is named by the catalogue's title, as Add-ons
+     names it, and never by its id said as words ("Bank hsbc eg" beside "HSBC Egypt alerts", audit 25 October, Y5). */
+  const titled = new Map(addOns.flatMap((p) => (typeof p.title === 'string' && p.title.trim() !== '' ? [[p.id, addOnName(p.id, p.title)] as const] : [])));
   /* Each red thing: its line, and what it is called in the sentence that counts them. */
   const red = new Map<string, { line: string; who: string }>();
   const notes: string[] = [];
@@ -432,7 +435,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
         const before = kept[o.id]?.since;
         const since = typeof before === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(before) && before <= tonight ? before : tonight;
         behind[o.id] = { to: o.to, since };
-        const name = names.get(o.id) ?? addOnName(o.id, o.title);
+        const name = titled.get(o.id) ?? addOnName(o.id, o.title);
         if (nightsBetween(since, tonight) >= ARRIVED_NIGHTS) {
           if (!red.has(o.id)) red.set(o.id, { line: `${name} has had version ${o.to} waiting since ${daySaid(since)}. Updating it on Add-ons turns it on.`, who: name });
         } else {
