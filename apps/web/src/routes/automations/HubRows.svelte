@@ -182,8 +182,12 @@
 
   /* THE NAME WRAPS TO A SECOND LINE BEFORE IT IS CUT: "File what an account holds in the account's book" lost its end
      on a phone, and the end is the part that says which. */
+  /* AND IT IS CUT AT THE SECOND LINE, NEVER DRAWN OVER WHAT IS UNDER IT (the scope of 24 October, E34): a clamp with the
+     overflow left visible still painted the third line of "Import the next ready-made skin bundle" over "A clock · Ran
+     once" at 390, because under 640 the shared rows let a title's overflow show (`rows.css`). */
   .name {
     display: -webkit-box;
+    overflow: hidden;
     white-space: normal;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
