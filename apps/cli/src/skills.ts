@@ -175,8 +175,19 @@ export const spokenOf = (value: unknown): string | null =>
 
 export const SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-/** One lock entry. `proposed_sha` is the file hash already acted on: proposed, found unmanaged, or reported. */
-export type LockEntry = { spoken: string | null; version: number; sha256: string; proposed_sha?: string };
+/**
+ * One lock entry. `proposed_sha` is the file hash already acted on: proposed, found unmanaged, or reported. `host` is
+ * the record it names a row of, by the host's key; an entry with none is from before hosts were kept, and is read as
+ * the syncing host's.
+ */
+export type LockEntry = { spoken: string | null; version: number; sha256: string; proposed_sha?: string; host?: string };
+
+/**
+ * Whether a lock path is one this system could hold: a drive-letter path off Windows, or a rooted path on Windows that
+ * names no drive, is another machine's (the lock came with the move from the Windows PC: 24 `C:\Users\Sam\…` entries).
+ */
+export const foreignLockPath = (path: string, platform: string = process.platform): boolean =>
+  platform === 'win32' ? path.startsWith('/') : /^[A-Za-z]:[\\/]/u.test(path) || path.startsWith('\\\\');
 
 type Kind = 'skill' | 'command';
 
@@ -378,10 +389,20 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   const lockFile = join(s.home, '.braindog', 'skills-lock.json');
   const held = readLock(lockFile);
   if (held === null) return [`${lockFile} is not valid JSON, so skills were not synced. Delete it and sync again.`];
+  /* ONE LOCK FILE, MANY RECORDS: a sync against another host (a seed host a check started, a copy of the record) wrote
+     its own row numbers into the same file, so on his Mac 44 entries named skills#39 to #82, which his record never had,
+     and every sync said "the lock pointed at another row" of each. An entry now says its host: another host's is kept
+     as it is and never read here, and one for a path this system cannot hold is dropped. */
+  const host = s.to?.key ?? null;
   const lock: Record<string, LockEntry> = {};
-  for (const [path, e] of Object.entries(held))
-    if (isObject(e) && (typeof e.spoken === 'string' || e.spoken === null) && typeof e.version === 'number' && typeof e.sha256 === 'string')
-      lock[path] = { spoken: e.spoken, version: e.version, sha256: e.sha256, ...(typeof e.proposed_sha === 'string' ? { proposed_sha: e.proposed_sha } : {}) };
+  const others: Record<string, LockEntry> = {};
+  for (const [path, e] of Object.entries(held)) {
+    if (!isObject(e) || !(typeof e.spoken === 'string' || e.spoken === null) || typeof e.version !== 'number' || typeof e.sha256 !== 'string') continue;
+    if (foreignLockPath(path)) continue;
+    const entry: LockEntry = { spoken: e.spoken, version: e.version, sha256: e.sha256, ...(typeof e.proposed_sha === 'string' ? { proposed_sha: e.proposed_sha } : {}), ...(typeof e.host === 'string' ? { host: e.host } : {}) };
+    if (host !== null && entry.host !== undefined && entry.host !== host) others[path] = entry;
+    else lock[path] = entry;
+  }
 
   const lines: string[] = [];
   const machine = s.machine ?? hostname();
@@ -748,7 +769,9 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         } catch {
           /* The exclude file could not be written; the skills are in place either way. */
         }
-      writeLock(lockFile, lock);
+      /* THIS HOST'S ENTRIES SAY SO, and another host's go back as they were, unless this sync now holds the path. */
+      const mine = Object.fromEntries(Object.entries(lock).map(([path, e]) => [path, host === null ? e : { ...e, host }]));
+      writeLock(lockFile, { ...Object.fromEntries(Object.entries(others).filter(([path]) => !(path in mine))), ...mine });
     }
   }
   return lines;

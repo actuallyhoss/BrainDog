@@ -148,7 +148,7 @@ export async function startWork(
   if (wants('skills'))
     /* The list read stops at half the step's time, on the hook's clock, so what was read is still acted on inside it. */
     await step('skills sync', (client, _signal, ms) =>
-      syncSkills({ client, context, home, configDir, top, dryRun: false, until: Date.now() + ms / 2 }),
+      syncSkills({ client, context, home, configDir, top, dryRun: false, until: Date.now() + ms / 2, to }),
     );
   if (wants('tools'))
     await step('tools scan', (client, signal) =>

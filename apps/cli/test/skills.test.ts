@@ -677,6 +677,43 @@ test('THE START HOOK SYNCS SKILLS on startup, after its card, and not on a compa
   printed.push(...written);
 });
 
+test("THE LOCK IS EACH HOST'S: another host's row is never read here, another system's paths go, and two dry runs say nothing", async (t) => {
+  const h = await setup(t);
+  h.add(RELEASE);
+  const path = h.global('kiln-release');
+  const elsewhere = join(h.dir, 'other-profile', 'skills', 'ponytail', 'SKILL.md');
+  const windows = 'C:\\Users\\Ada\\.claude\\skills\\kiln-release\\SKILL.md';
+  const other = 'http://127.0.0.1:8790';
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, render('skill', RELEASE.name, RELEASE.trigger, RELEASE.body));
+  mkdirSync(dirname(h.lockFile), { recursive: true });
+  writeFileSync(
+    h.lockFile,
+    JSON.stringify({
+      /* A SEED HOST'S SYNC numbered this file skills#60, which this record never had. */
+      [path]: { spoken: 'skills#60', version: 1, sha256: sha(readFileSync(path, 'utf8')), host: other },
+      [elsewhere]: { spoken: 'skills#61', version: 1, sha256: 'b'.repeat(64), host: other },
+      [windows]: { spoken: 'skills#5', version: 1, sha256: 'a'.repeat(64) },
+    }),
+  );
+  const run = async (dryRun: boolean) => {
+    const at = await connect(undefined, h.io);
+    if (typeof at === 'number') throw new Error(`connect ended with ${String(at)}`);
+    const lines = await syncSkills({ client: at.client, context: at.context, home: h.home, configDir: h.configDir, top: null, dryRun, machine: 'test-machine', to: { key: h.base } });
+    printed.push(...lines);
+    return lines;
+  };
+  assert.deepEqual(await run(true), [], `a dry run read another host's lock entry`);
+  assert.deepEqual(await run(false), [], `a sync read another host's lock entry`);
+  const lock = h.lock();
+  assert.equal(lock[windows], undefined, "another system's path stayed in the lock");
+  assert.deepEqual(lock[elsewhere], { spoken: 'skills#61', version: 1, sha256: 'b'.repeat(64), host: other }, "another host's entry was changed");
+  assert.deepEqual(lock[path], { spoken: 'skills#1', version: 1, sha256: sha(readFileSync(path, 'utf8')), host: h.base }, 'the file is not locked to this host\'s row');
+  assert.deepEqual(await run(true), [], 'a dry run after a sync had something to say');
+  assert.deepEqual(await run(true), [], 'a second dry run had something to say');
+  assert.equal(h.rows.length, 1, 'a skill was registered twice');
+});
+
 test('THE TOKEN WAS NEVER PRINTED by any sync, command or hook above', () => {
   assert.ok(printed.length > 10, 'the tests above printed nothing, so this proves nothing');
   assert.equal(printed.join('\n').includes('stub-bearer-for-tests-only'), false);
