@@ -243,7 +243,7 @@ import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
-import { drawsShape, shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
+import { shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -11226,11 +11226,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               'SELECT created_at AS at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
               `look.${typeof look.look === 'string' ? look.look : args.slug}`,
             )?.at;
-      /* A PROJECT'S SHAPE, ASKED WITH `shape`, on a page about a project's row that draws a part of it (`project-shape.ts`):
-         what its parts draw, each its own method's answer to this caller, so the host reads none of it for itself. */
+      /* A PROJECT'S SHAPE, ASKED WITH `shape`, on a page about a project's row (`project-shape.ts`): what its parts draw,
+         each its own method's answer to this caller, so the host reads none of it for itself. WHETHER OR NOT THE PAGE
+         DECLARES THE PARTS: a page of a use case older than founder 3.3.0 or team 2.25.0 declares none, and the host
+         draws them in their places all the same (the audit of 25 October, Z1). */
       const param = (out.value as { param?: { register?: unknown; seq?: unknown } }).param;
       const shape =
-        (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && drawsShape(blocks) && typeof param?.register === 'string' && typeof param.seq === 'number'
+        (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && typeof param?.register === 'string' && typeof param.seq === 'number'
           ? await shapeAnswerOf(shapeAsks, param.register, param.seq, [...kernel.registers()].map(([, decl]) => decl as never), ctx)
           : null;
       /* THE ROWS A BLOCK SHE IS SHOWN DRAWS COME LESS THE FIELDS HIDDEN FROM HER (`sight.mask`). The shape's parts were

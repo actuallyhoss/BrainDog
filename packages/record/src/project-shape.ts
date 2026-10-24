@@ -89,10 +89,6 @@ export function workListOf(decls: readonly Decl[], projects: string): { list: st
   return null;
 }
 
-/** Whether a page's blocks draw any part of a project's shape. */
-export const drawsShape = (blocks: readonly unknown[]): boolean =>
-  blocks.some((b) => typeof b === 'object' && b !== null && (b as { kind?: unknown }).kind === 'project');
-
 /**
  * Every part of the project `register#seq`'s shape, asked of the record one after another in this one call, or `null`
  * where the row is not a project's. `decls` are the record's lists (the caller's ceiling is each part's own method's).

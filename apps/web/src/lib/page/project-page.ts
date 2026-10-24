@@ -44,6 +44,24 @@ export function modelLineOf(blocks: readonly { kind: string; lead?: unknown; dra
   return lead?.modelLine === true && typeof lead.body === 'string' && lead.body.trim() !== '' ? lead.body : null;
 }
 
+/**
+ * THE PROJECT'S SHAPE WHERE ITS PAGE DECLARES NONE (the audit of 25 October, Z1). The shape's parts became blocks of the
+ * project's page in founder 3.3.0 and team 2.25.0 (C28, C29), and a record still on an older version, whose page declares
+ * no `project` block, drew a project's page with no name, no hero and nothing of its work: blank on a phone. Such a page
+ * is drawn with the two blocks those versions declare, in their order, so it looks as it did before the shape was
+ * declared. AFTER THE DECLARED BLOCKS, so every index a write finds a block by is the block's own; the shape's parts are
+ * drawn over both columns before the rest wherever they are (`PageBody.svelte` `shapeParts`).
+ */
+export const SHAPE_DEFAULT = [
+  { kind: 'project', parts: ['hero', 'path', 'money'], heading: 'Overview', icon: 'eye', span: 12, key: 'shape-first' },
+  { kind: 'project', parts: ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'], heading: 'Work, people and agents', icon: 'task', span: 12, key: 'shape-second' },
+] as const;
+
+/** A project page's blocks with the shape's two blocks after them where it declares no part of the shape, else as they are. */
+export function withShape<T extends { kind: string }>(blocks: readonly T[], make: (raw: (typeof SHAPE_DEFAULT)[number]) => T): T[] {
+  return blocks.some((b) => b.kind === 'project') ? [...blocks] : [...blocks, ...SHAPE_DEFAULT.map(make)];
+}
+
 const isRuns = (register: string | undefined): boolean => !!register && (REGISTERS[register] as { seq_prefix?: unknown } | undefined)?.seq_prefix !== undefined;
 const said = <T extends Block>(b: T): T => (b.drawn === false ? b : ({ ...b, drawn: false, why: 'empty' } as T));
 const main = (b: Block): boolean => b.area !== 'rail';

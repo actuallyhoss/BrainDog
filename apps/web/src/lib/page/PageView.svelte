@@ -39,7 +39,7 @@
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { hueOf, iconFor } from '$lib/record/api.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
-  import { askWalk, forgetWalks, walkAsked, type LiveBlock, type Opened, type Walked } from '$lib/record/page-live.ts';
+  import { askWalk, blockOf, forgetWalks, walkAsked, type LiveBlock, type Opened, type Walked } from '$lib/record/page-live.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -59,7 +59,7 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import { rowScreen } from '$lib/record/row-href.ts';
   import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
-  import { onProject, moreSaid, modelLineOf } from './project-page.ts';
+  import { onProject, moreSaid, modelLineOf, withShape } from './project-page.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -580,7 +580,10 @@
     /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
     /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
        Not while the page is arranged, which moves the blocks as they are declared. */
-    const shaped = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange ? onProject(drawn, about?.register ?? '') : drawn;
+    const reading = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange;
+    /* A PAGE OF AN OLDER USE CASE DECLARES NO PART OF THE SHAPE, and is drawn with the two its newer versions declare (`withShape`, Z1). */
+    const parted = reading ? withShape(drawn, (raw) => blockOf({ ...raw, parts: [...raw.parts], rows: [], matched: 0, refusals: [] } as never, new Map(), live?.now ?? 0)) : drawn;
+    const shaped = reading ? onProject(parted, about?.register ?? '') : drawn;
     const repeats = about && !shapeKnown ? withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null) : about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
     /* EACH PART OF THE PROJECT'S SHAPE IS DRAWN WHERE IT HAS SOMETHING, at its width (`project-parts.ts`), and none on a
        page about no project. */
