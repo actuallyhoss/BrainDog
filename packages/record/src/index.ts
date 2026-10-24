@@ -17,7 +17,7 @@
 
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
-import { lintRound, pagesCleanReading, unworded } from './page-lint.ts';
+import { keptRound, lintRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, unworded } from './page-lint.ts';
 import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
@@ -295,7 +295,7 @@ export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps 
 export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, type UpdatePass } from './update-pass.ts';
 export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
-export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
+export { keptRoundIn, lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_HOLDER, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type KeptFinding, type KeptRound, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_ASKS_DAY,
@@ -10903,6 +10903,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         keysOf: lintKeysOf,
         now: () => Date.now(),
       });
+      /* THE WHOLE ROUND IS KEPT BESIDE THE SIGN (C39): its reading carries six facts, and Settings › Health lists every
+         finding from this, each with its page's address by its title. */
+      const slugs = new Map(kernel.pages().map((p) => [p.title, p.slug] as const));
+      kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, clock.now(), (title) => slugs.get(title) ?? null));
       /* THE PAGES CENSUS BESIDE THE LINT (PGS-A01 step 5): every page, read as the system, and the suggested pages waiting
          in the holding pen, so the sign also says which pages show a refused block or print a path that named nothing. */
       const census = await censusMethods(methodDeps()).pagesCensus(undefined, { principal: { kind: 'system', id: 'signs' } });

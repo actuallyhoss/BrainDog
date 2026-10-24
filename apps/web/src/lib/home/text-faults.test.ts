@@ -19,7 +19,11 @@ import {
   loadTextFaults,
   more,
   notChecked,
+  anyFound,
   placeOf,
+  printedLeft,
+  printedLine,
+  printedRows,
   readTextFaults,
   textFaultsOf,
   textFaultsOnce,
@@ -243,7 +247,7 @@ test('SETTINGS › HEALTH REACHES THE PART BY A DYNAMIC IMPORT ONLY, draws it on
   }
   assert.match(health, /import\('\$lib\/home\/text-faults\.ts'\)/u);
   assert.match(health, /import\('\$lib\/home\/TextFaults\.svelte'\)/u);
-  assert.match(health, /const found = await m\.textFaultsOnce\(base, io\);\s*if \(!here\) return;\s*unchecked = m\.notChecked\(found\);\s*faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(health, /const found = await m\.textFaultsOnce\(base, io\);\s*if \(!here\) return;\s*unchecked = m\.notChecked\(found\);\s*faults = found && m\.anyFound\(found\) \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(health.split('<faults.Part').length - 1, 1, 'the part is drawn once');
   assert.match(health, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{shell\.lists\} \/>\{\/if\}/u);
 });
@@ -275,3 +279,30 @@ test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB
   assert.doesNotMatch(bare(part), /\u2014/u);
 });
 
+test('EVERY THING THE PAGES PRINT RAW IS LISTED, never six: twenty findings on fourteen pages are twenty rows', () => {
+  const findings = Array.from({ length: 20 }, (_, i) => ({
+    page: `Desk ${(i % 14) + 1}`,
+    part: i === 0 ? `Desk 1` : 'Lead',
+    said: `Prints a raw time, number ${i + 1}.`,
+    slug: i % 14 === 0 ? 'desk-1' : null,
+  }));
+  const found = textFaultsOf({ ok: true, value: { count: 0, line: '', faults: [], truncated: false, computedAt: '2026-10-24T03:00:00.000Z', printed: { at: '2026-10-24T03:00:00.000Z', pages: 14, unread: 2, findings, cut: [] } } });
+  const rows = printedRows(found);
+  assert.equal(rows.length, 20);
+  assert.equal(printedLine(found), '20 things on 14 pages print raw');
+  /* THE PART IS NAMED WHERE IT IS NOT THE PAGE, and a page the record sent an address for opens. */
+  assert.deepEqual(rows[0], { title: 'Desk 1', said: 'Prints a raw time, number 1.', fix: '', href: '/p/desk-1' });
+  assert.deepEqual(rows[1], { title: 'Desk 2', said: 'Lead: Prints a raw time, number 2.', fix: '', href: null });
+  assert.deepEqual(printedLeft(found), ['2 more pages were not reached last night.']);
+  /* THE WORDS' OWN FAULTS ARE NOUGHT, SO THEIR TILE STAYS EMPTY while this one lists. */
+  assert.equal(faultLine(found), null);
+  assert.equal(anyFound(found), true, 'Health draws the part for these alone');
+});
+
+test('NO ROUND, OR A ROUND THAT FOUND NOTHING, DRAWS NO RAW LIST', () => {
+  assert.deepEqual(printedRows(textFaultsOf(answer([NOTE]))), []);
+  assert.equal(printedLine(textFaultsOf(answer([NOTE]))), null);
+  const clean = textFaultsOf({ ok: true, value: { count: 0, line: '', faults: [], truncated: false, printed: { at: '2026-10-24T03:00:00.000Z', pages: 3, unread: 0, findings: [], cut: [] } } });
+  assert.equal(printedLine(clean), null);
+  assert.deepEqual(printedLeft(clean), []);
+});

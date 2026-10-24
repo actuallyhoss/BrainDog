@@ -14,6 +14,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'textFaults', group: 'READ+', writes: false, what: 'Every fault in the words of your pages and documents, as the record found them at its last nightly check, and when that was: a path that names nothing, a value that does not parse, a block shown as written. Each with its place and its fix. It changes nothing.',
+  { name: 'textFaults', group: 'READ+', writes: false, what: 'Every fault in the words of your pages and documents, as the record found them at its last nightly check, and when that was: a path that names nothing, a value that does not parse, a block shown as written. Each with its place and its fix. A reader of the whole record is also told everything the nightly page check found the pages print raw. It changes nothing.',
     takes: {} },
 ];

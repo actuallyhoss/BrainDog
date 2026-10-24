@@ -31,14 +31,21 @@ import { viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageRe
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
-import { ROUND_PAGES, pagesToLint } from '../page-lint.ts';
+import { ROUND_HOLDER, ROUND_KEPT, ROUND_PAGES, keptRoundIn, pagesToLint, type KeptFinding } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
 /** What `textFaults` answers: how many faults, the one sentence, the first `FAULTS_MOST` of them, and when they were found. */
-export type TextFaultsRead = { count: number; pages: number; line: string; faults: TextFault[]; truncated: boolean; computedAt: string | null };
+export type TextFaultsRead = { count: number; pages: number; line: string; faults: TextFault[]; truncated: boolean; computedAt: string | null; printed?: Printed };
+
+/**
+ * WHAT THE PAGES PRINT RAW, EVERY FINDING OF THE NIGHT'S PAGE LINT (C39): the sign `pages-clean` carries six of them, and
+ * this is the whole round (`keptRound` in `page-lint.ts`), handed only to a reader of the whole record, with when it ran,
+ * how many pages it read and how many it did not reach. Absent before the first round.
+ */
+export type Printed = { at: string; pages: number; unread: number; findings: KeptFinding[]; cut: string[] };
 
 /** The most faults one answer carries. The count and the sentence are over all of them. */
 export const FAULTS_MOST = 100;
@@ -309,8 +316,14 @@ function walker(deps: RecordDeps) {
 /** The night's walk, kept (see the header). */
 export const keepTextFaults = (deps: RecordDeps): TextFaultsRead => walker(deps).keep();
 
-/** The kept answer put away, so the next night pass finds nothing kept and walks again (an erasure names rows it held). */
-export const dropTextFaults = (deps: Pick<RecordDeps, 'kernel'>): void => deps.kernel.setPref(HOLDER, KEPT, null);
+/**
+ * The kept answer put away, so the next night pass finds nothing kept and walks again (an erasure names rows it held).
+ * The page lint's kept round goes with it: a page a template made for a row is titled by that row.
+ */
+export const dropTextFaults = (deps: Pick<RecordDeps, 'kernel'>): void => {
+  deps.kernel.setPref(HOLDER, KEPT, null);
+  deps.kernel.setPref(ROUND_HOLDER, ROUND_KEPT, null);
+};
 
 export function methods(deps: RecordDeps) {
   const { scoped, kernel, clock, no } = deps;
@@ -345,7 +358,11 @@ export function methods(deps: RecordDeps) {
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing.`, { at: extra, allowed: [] });
       if (read.shared(ctx)) {
         const night = read.night();
-        return { ok: true, value: night === null ? NOT_YET : toRead(night) };
+        const value = night === null ? NOT_YET : toRead(night);
+        const round = keptRoundIn(kernel.prefsOf(ROUND_HOLDER)[ROUND_KEPT]);
+        if (round === null) return { ok: true, value };
+        const { at, ...rest } = round;
+        return { ok: true, value: { ...value, printed: { at: new Date(at).toISOString(), ...rest } } };
       }
       const start = clock.now();
       const who = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null]);

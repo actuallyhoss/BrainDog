@@ -432,6 +432,52 @@ function lintReading(round: PageLintRound): PagesCleanReading {
   return { state: 'red', value: round.findings.length, said: fit(`${head}${unread}`, SAID_MOST), facts: [...found, ...cut].slice(0, FACTS_MOST) };
 }
 
+/* ── the whole round, kept for Health ───────────────────────────────────── */
+
+/**
+ * ONE FINDING AS HEALTH LISTS IT: the page and the part by their names and the sentence, as the sign's facts say them,
+ * and the page's address beside them so a press opens it. The address is never printed (see the header).
+ */
+export type KeptFinding = { page: string; slug: string | null; part: string; said: string };
+
+/**
+ * THE NIGHT'S WHOLE ROUND, KEPT (C39, "never hide a fault"). The sign carries six facts, because a reading is a few
+ * lines (`FACTS_MOST`, the kernel's own limit), so a round of twenty findings showed six and said nothing of the rest.
+ * The round is kept whole beside it, and Settings › Health lists every finding from it (`textFaults`' `printed`).
+ */
+export type KeptRound = { at: number; pages: number; unread: number; findings: KeptFinding[]; cut: string[] };
+
+/** Where the round is kept: a pref of its own, so the reads of the signs' pref never parse it. */
+export const ROUND_HOLDER = 'braindog:page-lint';
+export const ROUND_KEPT = 'round';
+
+/** The most findings kept, far past any record's pages: a round reads `ROUND_PAGES` at most. */
+export const KEPT_FINDINGS_MOST = 500;
+
+/** A round as it is kept, each finding with its page's address where the record lists one by that title. */
+export function keptRound(round: PageLintRound, at: number, slugOf: (title: string) => string | null): KeptRound {
+  return {
+    at,
+    pages: round.pages,
+    unread: round.unread,
+    findings: round.findings.slice(0, KEPT_FINDINGS_MOST).map((f) => ({ page: f.page, slug: slugOf(f.page), part: f.part, said: fit(f.said, FACT_MOST) })),
+    cut: round.cut.map((c) => fit(`${c.part === c.page ? c.page : `${c.page}, ${c.part}`}: only the first ${integer(c.read)} of ${integer(c.held)} were read.`, FACT_MOST)),
+  };
+}
+
+const text = (v: unknown): v is string => typeof v === 'string';
+
+/** A kept round read back, or `null` for nothing kept or a value of another shape. */
+export function keptRoundIn(stored: unknown): KeptRound | null {
+  const k = stored as Partial<KeptRound> | null | undefined;
+  if (k === null || typeof k !== 'object' || typeof k.at !== 'number' || !Number.isFinite(k.at)) return null;
+  if (typeof k.pages !== 'number' || typeof k.unread !== 'number' || !Array.isArray(k.findings) || !Array.isArray(k.cut)) return null;
+  const findings = k.findings.filter(
+    (f): f is KeptFinding => f !== null && typeof f === 'object' && text(f.page) && text(f.part) && text(f.said) && (f.slug === null || text(f.slug)),
+  );
+  return { at: k.at, pages: k.pages, unread: k.unread, findings, cut: k.cut.filter(text) };
+}
+
 /* ── the census on the sign ─────────────────────────────────────────────── */
 
 /** How many sentences of facts the census may take when the lint has facts of its own, so neither crowds the other out. */

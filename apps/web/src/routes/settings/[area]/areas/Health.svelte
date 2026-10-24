@@ -69,13 +69,14 @@
     addEventListener('beforeunload', leave);
     const io: Fetch = (url, init) => fetch(url, { ...init, signal: leaving.signal });
     const parts: (() => Promise<unknown>)[] = [
-      /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES: the long walk, kept for the tab (`textFaultsOnce`). */
+      /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES: the long walk, kept for the tab (`textFaultsOnce`), and every
+         thing the night's page lint found the pages print raw (`printed`). */
       () =>
         Promise.all([import('$lib/home/text-faults.ts'), import('$lib/home/TextFaults.svelte')]).then(async ([m, part]) => {
           const found = await m.textFaultsOnce(base, io);
           if (!here) return;
           unchecked = m.notChecked(found);
-          faults = found && found.count > 0 ? { found, Part: part.default } : null;
+          faults = found && m.anyFound(found) ? { found, Part: part.default } : null;
         }),
       /* WHAT WENT STALE, AND WHERE EACH IS CLEARED. */
       () =>

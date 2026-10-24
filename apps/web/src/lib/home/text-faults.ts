@@ -44,7 +44,16 @@ export type TextFault = { kind: string; where: FaultWhere; said: string; fix: st
  * never clean: its count of nought says nothing of the words. Absent, the host walked as it was asked (a build before
  * the night pass kept the walk).
  */
-export type TextFaults = { count: number; line: string; faults: TextFault[]; truncated: boolean; computedAt?: string | null };
+export type TextFaults = { count: number; line: string; faults: TextFault[]; truncated: boolean; computedAt?: string | null; printed?: Printed };
+
+/**
+ * ONE THING A PAGE PRINTS RAW, from the record's nightly page lint (`printed`): the page by its title, the part, the
+ * sentence, and the page's address where the record sent one. The sign `pages-clean` carries six; this is every one.
+ */
+export type PrintedFinding = { page: string; part: string; said: string; slug: string | null };
+
+/** The night's whole page lint as the record keeps it: when, how many pages read and not reached, every finding. */
+export type Printed = { at: string; pages: number; unread: number; findings: PrintedFinding[]; cut: string[] };
 
 /** One fault as it is drawn: the place's own name, what is wrong, the fix, and where it opens (`null`: words alone). */
 export type FaultRow = { title: string; said: string; fix: string; href: string | null };
@@ -132,6 +141,25 @@ function faultOf(v: unknown): TextFault | null {
   return { kind: plain(f.kind), where, said, fix: plain(f.fix), ...(at ? { at } : {}) };
 }
 
+/** The record's `printed`, or nothing for an answer without it or of another shape. A finding with no page or sentence is dropped. */
+function printedOf(v: unknown): Printed | null {
+  if (typeof v !== 'object' || v === null) return null;
+  const p = v as Record<string, unknown>;
+  if (typeof p.at !== 'string' || typeof p.pages !== 'number' || !Array.isArray(p.findings)) return null;
+  const findings: PrintedFinding[] = [];
+  for (const f of p.findings) {
+    if (typeof f !== 'object' || f === null) continue;
+    const r = f as Record<string, unknown>;
+    const page = plain(r.page);
+    const said = plain(r.said);
+    if (page === '' || said === '' || ULID.test(page)) continue;
+    const slug = handle(r.slug);
+    findings.push({ page, part: plain(r.part), said, slug: slug === '' ? null : slug });
+  }
+  const cut = Array.isArray(p.cut) ? p.cut.map(plain).filter((c) => c !== '') : [];
+  return { at: p.at, pages: p.pages, unread: typeof p.unread === 'number' ? p.unread : 0, findings, cut };
+}
+
 /**
  * The place's own name: the page's title, else the entry's (a note is the entry it is written on), else the part's. A
  * name that is a raw id is no name, and a fault with none is dropped.
@@ -152,6 +180,8 @@ export function textFaultsOf(answer: unknown): TextFaults | null {
   if (typeof v.count !== 'number' || !Number.isInteger(v.count) || v.count < 0) return null;
   const faults = Array.isArray(v.faults) ? v.faults.map(faultOf).filter((f): f is TextFault => f !== null) : [];
   const found: TextFaults = { count: v.count, line: plain(v.line), faults, truncated: v.truncated === true };
+  const printed = printedOf((v as { printed?: unknown }).printed);
+  if (printed) found.printed = printed;
   /* WHEN THE NIGHT PASS WALKED, as the record says it; `null` is not checked yet, and kept as `null`. */
   if (v.computedAt === null) found.computedAt = null;
   else if (typeof v.computedAt === 'string' && v.computedAt !== '') found.computedAt = v.computedAt;
@@ -232,4 +262,42 @@ export function faultLine(found: TextFaults | null): string | null {
   if (!found || found.count <= 0) return null;
   if (found.line !== '') return found.line;
   return found.count === 1 ? 'One thing on your pages needs a fix' : `${String(found.count)} things on your pages need a fix`;
+}
+
+/* ── what the pages print raw: every finding, never six ───────────────── */
+
+/**
+ * EVERY THING THE PAGES PRINT RAW, one row each (C39, "never hide a fault"): the page's title, the part and what it
+ * prints, and a press to the page. The sign beside it carries six, so this list is where the rest are read, and it is
+ * never cut: a round reads a few dozen pages, so it is a list a person can read through.
+ */
+export function printedRows(found: TextFaults | null): FaultRow[] {
+  const printed = found?.printed;
+  if (!printed) return [];
+  return printed.findings.map((f) => ({
+    title: f.page,
+    said: f.part === '' || same(f.part, f.page) ? f.said : `${f.part}: ${f.said}`,
+    fix: '',
+    href: f.slug === null ? null : `/p/${encodeURIComponent(f.slug)}`,
+  }));
+}
+
+/** The heading over them: "20 things on 14 pages print raw", and `null` at none, which draws nothing. */
+export function printedLine(found: TextFaults | null): string | null {
+  const findings = found?.printed?.findings ?? [];
+  if (findings.length === 0) return null;
+  const pages = new Set(findings.map((f) => f.page.toLowerCase())).size;
+  const things = findings.length === 1 ? 'One thing' : `${String(findings.length)} things`;
+  return `${things} on ${pages === 1 ? 'one page' : `${String(pages)} pages`} ${findings.length === 1 ? 'prints' : 'print'} raw`;
+}
+
+/** Whether there is anything to list: a fault in the words, or a thing a page prints raw. */
+export const anyFound = (found: TextFaults | null): boolean => found !== null && (found.count > 0 || (found.printed?.findings.length ?? 0) > 0);
+
+/** What the round did not read, said under the list: pages not reached, and blocks read only in part. */
+export function printedLeft(found: TextFaults | null): string[] {
+  const printed = found?.printed;
+  if (!printed || printed.findings.length === 0) return [];
+  const unread = printed.unread > 0 ? [`${printed.unread === 1 ? 'One more page was' : `${String(printed.unread)} more pages were`} not reached last night.`] : [];
+  return [...unread, ...printed.cut];
 }

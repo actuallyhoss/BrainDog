@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { DAY, HOLDER, NIGHT, type TextFaultsRead } from '../src/methods/text-faults.ts';
+import { keptRound, ROUND_HOLDER, ROUND_KEPT, type PageLintRound } from '../src/page-lint.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 const T0 = Date.UTC(2026, 9, 14, 3);
@@ -44,10 +45,12 @@ async function record(pages = 2) {
   return { sql, api, later: (ms: number) => void (at += ms) };
 }
 
+/* THE WORDS' WALK ALONE: the page lint's round (`printed`) is kept by the same night pass on its own day, and its tests are below. */
 const read = async (api: Awaited<ReturnType<typeof record>>['api'], ctx: CallContext = owner): Promise<TextFaultsRead> => {
   const out = await api.textFaults({}, ctx);
   assert.ok(out.ok, JSON.stringify(out));
-  return out.value;
+  const { printed: _printed, ...words } = out.value;
+  return words;
 };
 
 const keptPref = (api: Awaited<ReturnType<typeof record>>['api']) => api.kernel.prefsOf(HOLDER)['kept'] as { at: number } | undefined;
@@ -151,5 +154,51 @@ test('AN ERASURE PUTS THE KEPT FAULTS AWAY, because they name rows, and the next
   const after = await read(api);
   assert.ok(after.computedAt !== null);
   assert.ok(!JSON.stringify(after).includes('Mara Quill'));
+  sql.close();
+});
+
+/* ── the page lint's whole round (C39) ──────────────────────────────────── */
+
+const printedOf = async (api: Awaited<ReturnType<typeof record>>['api'], ctx: CallContext = owner) => {
+  const out = await api.textFaults({}, ctx);
+  assert.ok(out.ok, JSON.stringify(out));
+  return out.value.printed;
+};
+
+test('HEALTH IS HANDED EVERY FINDING OF THE NIGHT\'S PAGE LINT, not the sign\'s six', async () => {
+  const { sql, api } = await record();
+  assert.equal(await printedOf(api), undefined, 'nothing before the first round');
+  await api.lintTick();
+  const first = await printedOf(api);
+  assert.ok(first, 'the night pass keeps its round');
+  assert.equal(first.at, new Date(T0).toISOString());
+  assert.equal(first.pages, 2);
+  /* TWENTY FINDINGS ON FOURTEEN PAGES, as on his record: every one is handed back, each page with its address. */
+  const round: PageLintRound = {
+    findings: Array.from({ length: 20 }, (_, i) => ({ page: `Desk ${(i % 14) + 1}`, part: 'Lead', rule: 'no-reading' as const, said: `Shows a figure with no answer, number ${i + 1}.` })),
+    pages: 14,
+    unread: 0,
+    withFindings: [],
+    cells: 0,
+    cut: [],
+  };
+  api.kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, T0, (title) => (title === 'Desk 1' ? 'desk-1' : null)));
+  const all = await printedOf(api);
+  assert.equal(all?.findings.length, 20);
+  assert.equal(all?.findings[0]?.slug, 'desk-1');
+  assert.equal(all?.findings[1]?.slug, null);
+  assert.equal(all?.findings[19]?.said, 'Shows a figure with no answer, number 20.');
+  /* A READER HELD TO SOME LISTS IS NOT HANDED THE ROUND: it was read as the system, over every page. */
+  assert.equal(await printedOf(api, narrow), undefined);
+  sql.close();
+});
+
+test('AN ERASURE PUTS THE KEPT ROUND AWAY TOO, since a page made for a row is titled by it', async () => {
+  const { sql, api } = await record(0);
+  await api.lintTick();
+  assert.ok(await printedOf(api));
+  const erased = (await api.erase({ subjects: ['Nobody Here'], basis: 'Article 17 request' }, owner)) as { ok: boolean };
+  assert.ok(erased.ok, JSON.stringify(erased));
+  assert.equal(await printedOf(api), undefined);
   sql.close();
 });

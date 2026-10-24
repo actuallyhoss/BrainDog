@@ -15,12 +15,15 @@
   THE MARK AND THE WORD GO TOGETHER: the heading's well carries the alert mark in the deeper red, and the sentence
   beside it says what is wrong, so the red is never the only sign. The rows stay in ink, the fix in the quieter colour.
   A link is 44 tall under a thumb.
+
+  AND WHAT THE PAGES PRINT RAW, EVERY ONE (C39): the night's page lint, which the sign `pages-clean` carries six of, as a
+  second part under the first, a line a finding and none held back (`printedRows`).
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { faultLine, faultRows, knownOf, more, type TextFaults } from './text-faults.ts';
+  import { faultLine, faultRows, knownOf, more, printedLeft, printedLine, printedRows, type FaultRow, type TextFaults } from './text-faults.ts';
 
   /* `lists` IS THE SHELL'S, by id and name, so a fault the record says by a list's name opens that list. */
   let { found, lists = [] }: { found: TextFaults; lists?: readonly { id: string; name: string }[] } = $props();
@@ -28,7 +31,37 @@
   const line = $derived(faultLine(found));
   const rows = $derived(faultRows(found, knownOf(lists)));
   const rest = $derived(more(found));
+  const rawLine = $derived(printedLine(found));
+  const raw = $derived(printedRows(found));
+  const rawLeft = $derived(printedLeft(found));
 </script>
+
+{#snippet faultList(rows: FaultRow[])}
+  <ul class="f-list">
+    {#each rows as row, i (i)}
+      <li>
+        {#if row.href}
+          <a class="f-line" href={at(row.href)}>
+            <span class="f-text">
+              <span class="f-title" dir="auto">{row.title}</span>
+              <span class="f-what" dir="auto">{row.said}</span>
+              {#if row.fix}<span class="f-fix" dir="auto">{row.fix}</span>{/if}
+            </span>
+            <span class="f-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
+          </a>
+        {:else}
+          <p class="f-line">
+            <span class="f-text">
+              <span class="f-title" dir="auto">{row.title}</span>
+              <span class="f-what" dir="auto">{row.said}</span>
+              {#if row.fix}<span class="f-fix" dir="auto">{row.fix}</span>{/if}
+            </span>
+          </p>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
 
 {#if line}
   <section class="faults" aria-labelledby="faults-h" data-text-faults>
@@ -36,33 +69,19 @@
       <IconWell name="alert" tone="danger" />
       <h2 class="f-said" id="faults-h" dir="auto">{line}</h2>
     </div>
-    {#if rows.length > 0}
-      <ul class="f-list">
-        {#each rows as row, i (i)}
-          <li>
-            {#if row.href}
-              <a class="f-line" href={at(row.href)}>
-                <span class="f-text">
-                  <span class="f-title" dir="auto">{row.title}</span>
-                  <span class="f-what" dir="auto">{row.said}</span>
-                  {#if row.fix}<span class="f-fix" dir="auto">{row.fix}</span>{/if}
-                </span>
-                <span class="f-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
-              </a>
-            {:else}
-              <p class="f-line">
-                <span class="f-text">
-                  <span class="f-title" dir="auto">{row.title}</span>
-                  <span class="f-what" dir="auto">{row.said}</span>
-                  {#if row.fix}<span class="f-fix" dir="auto">{row.fix}</span>{/if}
-                </span>
-              </p>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    {#if rows.length > 0}{@render faultList(rows)}{/if}
     {#if rest}<p class="f-more">{rest[0]!.toUpperCase() + rest.slice(1)}.</p>{/if}
+  </section>
+{/if}
+
+{#if rawLine}
+  <section class="faults" aria-labelledby="printed-h" data-printed-raw>
+    <div class="f-head">
+      <IconWell name="alert" tone="danger" />
+      <h2 class="f-said" id="printed-h" dir="auto">{rawLine}</h2>
+    </div>
+    {@render faultList(raw)}
+    {#each rawLeft as left, i (i)}<p class="f-more" dir="auto">{left}</p>{/each}
   </section>
 {/if}
 
