@@ -26,6 +26,7 @@ import { allowedPrograms, owedCommands, readAllowed, sentOf, usedTools, type Sen
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
+import { mark } from './hook-trace.ts';
 import { seedInbox, toldAtStart } from './inbox-file.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
@@ -545,11 +546,13 @@ export async function hookStart(io: Io): Promise<void> {
   const soon =
     event.source === 'resume' && before !== null && event.client_id !== undefined && before.client_id === event.client_id && began - heardAt(before) < QUIET_MS;
   const to = reach(io.env);
+  mark('auth');
   if (typeof to === 'string') return soon ? undefined : io.write(to);
 
   const ms = hookBudget(io.env);
   const signal = AbortSignal.timeout(ms);
   const [at, device] = await Promise.all([positionOf(event.cwd), io.device ?? deviceName(io.env, to.key)]);
+  mark('position');
   /* A FOLDER THAT IS NOT A REPOSITORY: the HEAD of each one under it, read beside the attach, so the end hook reads the
      commits of every one that moved. 28 of the 32 runs in the owner's ~/Developer started there. */
   const heads = at.repo === null ? childHeads(event.cwd).catch(() => ({})) : Promise.resolve({});
@@ -570,6 +573,7 @@ export async function hookStart(io: Io): Promise<void> {
     ...(at.branch === null ? {} : { branch: at.branch }),
     ...(at.head === null ? {} : { head: at.head }),
   });
+  mark('attach');
   if (!out.ok) {
     if (soon) return;
     if (signal.aborted || (refused(out) && out.refusal.code === 'UNREACHABLE')) return io.write(unreachable(ms));
@@ -623,6 +627,7 @@ export async function hookStart(io: Io): Promise<void> {
       clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env, parent, ahead: moved }), AbortSignal.timeout(left())).context(),
     );
     const shown = told === undefined || told === run.context ? run : { ...run, context: told };
+    mark('ahead');
     /* THE STOP, THEN EVERY OPEN INSTRUCTION, NEVER CUT, each in his voice (`toldAtStart`), and the ids they name. */
     const heard = toldAtStart(run.context);
     const ids = [...heard.told.map((t) => t.id), ...(heard.stop === null ? [] : [heard.stop.id || heard.stop.kind])];
@@ -652,6 +657,7 @@ export async function hookStart(io: Io): Promise<void> {
     });
     seed(ids);
     io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}`);
+    mark('card');
     /*
      * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR (audit of 22 Oct, E2). The skills sync and the tools scan held
      * every card for up to six seconds, and the card reads neither. Only a session that begins syncs: a compaction or a
@@ -660,6 +666,7 @@ export async function hookStart(io: Io): Promise<void> {
      */
     if (run.context !== undefined && (event.source === 'startup' || event.source === 'resume') && startOwed(io, to, at, run.context, await topOf(at)))
       (io.work ?? spawnWork(io.env))({ host: to.key, at, context: run.context, run: named });
+    mark('owed');
   } finally {
     /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
        beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */
@@ -671,6 +678,7 @@ export async function hookStart(io: Io): Promise<void> {
         /* The same folder as above: the sign loses one time, and nothing else. */
       }
     await marking;
+    mark('marked');
   }
 }
 

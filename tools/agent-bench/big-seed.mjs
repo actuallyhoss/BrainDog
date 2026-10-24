@@ -33,7 +33,7 @@ function clone(fields, n, nameKey) {
   return out;
 }
 
-const NAME = { things: 'name', skills: 'name', tools: 'name', credentials: 'label', tasks: 'what' };
+const NAME = { things: 'name', people: 'name', skills: 'name', tools: 'name', credentials: 'label', tasks: 'what' };
 
 /**
  * Write one clone. A field the record computes comes back on a read but is refused on a write (`FIELD_UNKNOWN` at it),
@@ -54,13 +54,20 @@ function write(kernel, register, fields, opts, at) {
 export function growSeed(kernel, shape = HIS, { actor = 'p_seed', now = Date.now() } = {}) {
   const reached = {};
   const things = kernel.count('things');
-  for (const register of ['things', 'skills', 'tools', 'credentials', 'tasks', 'transactions', 'datapoints']) {
+  for (const register of ['things', 'people', 'skills', 'tools', 'credentials', 'tasks', 'transactions', 'datapoints']) {
     const want = shape[register] ?? 0;
     const from = templates(kernel, register);
     if (from.length === 0) continue;
     for (let n = kernel.count(register); n < want; n++) {
       const fields = clone(from[n % from.length], n, register === 'things' ? 'name' : NAME[register]);
       if (register === 'things') fields.name = `Project ${n + 1}`;
+      /* A PERSON'S EMAIL IS ONE PERSON'S, so each clone has its own and the seed's handles stay the seed's. */
+      if (register === 'people') {
+        fields.email = `person-${n + 1}@grown.example`;
+        fields.keys = [`email:${fields.email}`];
+        delete fields.handles;
+        delete fields.aliases;
+      }
       if (register === 'tasks') fields.what = `Task ${n + 1}: ${String(from[n % from.length].what ?? 'work')}`.slice(0, 120);
       /* SPREAD OVER EVERY PROJECT, as his are, so a read per project walks thirty. */
       for (const key of ['project', 'thing']) if (typeof fields[key] === 'string' && fields[key].startsWith('things#')) fields[key] = `things#${1 + (n % Math.max(things, shape.things ?? things))}`;
@@ -93,8 +100,8 @@ export function growSeed(kernel, shape = HIS, { actor = 'p_seed', now = Date.now
       big
         ? { question: `Add the ledger backfill ${n + 1}, 200 rows?`, body_kind: 'rowset', body: { register: 'transactions', rows: backfill(n) } }
         : rowset
-        ? { question: `Add task ${n + 1} for project ${1 + (n % 30)} to Tasks?`, body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: `Grown task ${n + 1}: follow up on the project`, state: 'open', thing: `things#${1 + (n % 30)}`, note: 'Built, not live. Done when it is live and checked.' }] } }
-        : { question: `Which way for project ${1 + (n % 30)}, option A or B (${n + 1})?`, body_kind: 'options', body: { options: [{ id: 'a', label: 'Option A', because: 'It is the smaller change.' }, { id: 'b', label: 'Option B', because: 'It keeps the old path.' }] } },
+        ? { question: `Add task ${n + 1} for project ${1 + (n % (shape.things ?? 30))} to Tasks?`, body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: `Grown task ${n + 1}: follow up on the project`, state: 'open', thing: `things#${1 + (n % (shape.things ?? 30))}`, note: 'Built, not live. Done when it is live and checked.' }] } }
+        : { question: `Which way for project ${1 + (n % (shape.things ?? 30))}, option A or B (${n + 1})?`, body_kind: 'options', body: { options: [{ id: 'a', label: 'Option A', because: 'It is the smaller change.' }, { id: 'b', label: 'Option B', because: 'It keeps the old path.' }] } },
       run,
     );
     if (!filed.ok) throw new Error(`grow questions: ${filed.refusal?.code} ${filed.refusal?.fix}`);

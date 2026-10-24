@@ -33,6 +33,7 @@ import { automations, scripts } from './automations.ts';
 import { behindLine, doctorLine, installedBuild } from './behind.ts';
 import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
+import { mark } from './hook-trace.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
 import { codexSession, INBOX_ENTRY, notifyHook, runHook, watchHook } from './inbox-file.ts';
@@ -801,6 +802,7 @@ async function statuslineCommand(args: string[]): Promise<void> {
 
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
+  if (which === 'start') mark('loaded');
   /*
    * THE PROMPT, TOOL AND STOP HOOKS (`inbox-file.ts`) READ ONE FILE AND SAY AT MOST ONE JSON LINE: no host, no git, no
    * budget to wait out, and nothing above it, because Claude Code reads that line as JSON. The watcher waits on the
@@ -891,13 +893,16 @@ async function hook(args: string[]): Promise<void> {
     /* The error could quote anything, so the start hook says only that it failed. */
     if (which === 'start') write('BrainDog: the start hook failed, so this session works without shared context.');
   }
+  mark('returned');
   if (held !== null) {
     const behind = await behindAsked;
+    mark('behind');
     flush([which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind, doctored].filter((line): line is string => line !== null).join('\n') || null);
   }
   /* SETUP SYNC'S PUSH, IN THE BACKGROUND, after the hook's own work and never waited for (`startPush`): when a session
      ends, and on the day's first start, on a machine that has joined. It reads one file and starts one process. */
   if (which === 'end' || which === 'start') startPush({ home: homedir(), env: process.env, cli: fileURLToPath(import.meta.url), when: which === 'end' ? 'end' : 'day' });
+  if (which === 'start') mark('push');
   /* LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive socket to the host holds it
      open. `process.exit` straight after more than one request aborted Node 24 on Windows with a libuv
      assertion, a non-zero exit, which is the one thing a hook must never do. */
