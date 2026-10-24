@@ -498,20 +498,21 @@ function rulesFor(c: Context): Rules<Brief> {
 }
 
 /**
- * Learned: the one learning that applies here, the shortest of the record's rules and the standing lessons `context`
- * sent (they are already this project's first), cut to a line. Nothing when there is none.
+ * Learned: the one learning that applies here, cut to a line. The record's rules lead, this project's first and then
+ * the newest; then the standing lessons by `learnedFirst` (a method before a fact, this project's before everywhere,
+ * then the newest). Nothing when there is none.
+ *
+ * THE FIRST, NOT THE SHORTEST: picking the shortest put one short lesson from the Sam Brain days ("On a 409 from PUT
+ * /api/db…") on every card for a month, however many newer and nearer ones the record held.
  */
 function learnedBrief(c: Context, at: CardAt): string | null {
   const rules = rulesFor(c);
   const isRule = new Set(rules.rows.map((row) => row.spoken));
-  /* SORTED BY `learnedFirst`, so of two the same length the method, this project's, the newest comes first. */
   const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active').sort(learnedFirst);
-  const all = [...rules.rows, ...lessons.filter((row) => row.kind !== RULE && !isRule.has(row.spoken))]
+  const first = [...[...rules.rows].sort(learnedFirst), ...lessons.filter((row) => row.kind !== RULE && !isRule.has(row.spoken))]
     .map((row) => words(tidy(plainly(wordsOf(row, 'lesson'), c, true, at)), 400))
-    .filter(Boolean);
-  if (all.length === 0) return null;
-  const shortest = all.reduce((a, z) => ([...z].length < [...a].length ? z : a));
-  return words(shortest, ROOM);
+    .find(Boolean);
+  return first === undefined ? null : words(first, ROOM);
 }
 
 /* ── an older command ──────────────────────────────────────────────────── */

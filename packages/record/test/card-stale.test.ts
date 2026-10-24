@@ -100,7 +100,7 @@ test('A METHOD OUTRANKS A FACT, however new the fact: one from last month leads 
   const method = lesson('learnings#1', 'Read the firing log before changing a schedule.', 'method', DAY('2026-09-09'));
   assert.ok(learnedFirst(method, fact) < 0);
   assert.ok(learnedFirst(fact, method) > 0);
-  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [fact, method])] })), 'Learned'), 'The kiln room is on the second floor.');
+  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [fact, method])] })), 'Learned'), 'Read the firing log before changing a schedule.');
 });
 
 test("AMONG TWO METHODS THE PROJECT'S WINS over the one that applies everywhere, however new that one is", () => {
@@ -112,7 +112,7 @@ test("AMONG TWO METHODS THE PROJECT'S WINS over the one that applies everywhere,
   const hereFact = lesson('learnings#4', 'The glaze room has no scale.', 'fact', DAY('2026-10-09'));
   assert.ok(learnedFirst(everywhere, hereFact) < 0);
   const drawn = draw(ctx({ registers: [reg('learnings', [hereFact], [everywhere])] }));
-  assert.equal(slot(drawn, 'Learned'), 'The glaze room has no scale.');
+  assert.equal(slot(drawn, 'Learned'), 'Money is minor units plus a currency.');
   assert.equal(slot(draw(ctx({ registers: [reg('learnings', [hereFact, here], [everywhere])] })), 'Learned'), 'Weigh glaze dry, never wet.');
 });
 

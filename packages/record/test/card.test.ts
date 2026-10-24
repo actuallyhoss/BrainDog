@@ -141,12 +141,12 @@ test('WAITING IS A COUNT AND THE TOP ONE IN PLAIN WORDS: questions that read the
   assert.match(both, /^1 here of 8 on the owner, first: /u);
 });
 
-test('LEARNED IS THE ONE SHORTEST LEARNING, and More is the one call for the rest, naming no key and no skill', () => {
+test('LEARNED IS THE FIRST LEARNING, not the shortest, and More is the one call for the rest, naming no key and no skill', () => {
   const lesson = (n: number, said: string) => row(`learnings#${String(n)}`, { lesson: said });
   const keys = reg('credentials', [row('credentials#1', { label: 'Deploy key' }), row('credentials#2', { label: 'Mail key' })]);
   const learnings = reg('learnings', [lesson(9, 'Lesson nine is long enough to be the longer one.'), lesson(4, 'Lesson four is short.'), lesson(2, 'Lesson two is a middle one.')]);
   const slots = shaped(draw(ctx({ session: run, registers: [learnings, keys] })));
-  assert.equal(slots.get('Learned'), 'Lesson four is short.');
+  assert.equal(slots.get('Learned'), 'Lesson nine is long enough to be the longer one.');
   assert.equal(slots.get('More'), MORE);
   assert.doesNotMatch(draw(ctx({ session: run, registers: [keys] })), /Deploy key/u, 'a key was listed by name');
   assert.ok(!shaped(draw(ctx({ session: run }))).has('Learned'), 'a record with no learning drew the line');

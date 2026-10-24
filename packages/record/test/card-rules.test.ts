@@ -39,21 +39,24 @@ const draw = (c: Context, at: Parameters<typeof card>[1] = {}) => card(c, at, NO
 
 const rule = (n: number, lesson: string, scope: Brief['scope'] = 'global'): Brief => row(`learnings#${String(n)}`, { lesson, kind: 'rule', created_at: `2026-10-0${String(n)}` }, scope);
 
-test('LEARNED IS THE ONE SHORTEST OF THE RULES context found and the lessons that stand, cut to a line', () => {
+test('LEARNED IS THE NEWEST OF THE RULES context found, ahead of the lessons that stand, cut to a line', () => {
   const long = rule(1, 'Every estimate a person gives is divided by four before it goes on a plan.');
   const short = rule(2, 'Art is drawn at sixteen pixels and doubled.');
   const fact = row('learnings#9', { lesson: 'The kiln room is on the second floor.', kind: 'fact', created_at: '2026-10-09' });
   const said = slot(draw(ctx({ registers: [reg('learnings', [fact])], rules: { rows: [long, short], more: 2 } })), 'Learned');
-  assert.equal(said, 'The kiln room is on the second floor.');
+  assert.equal(said, 'Art is drawn at sixteen pixels and doubled.');
   assert.ok([...said!].length <= 91, said!);
+  /* NEWEST, NOT SHORTEST: a longer rule made later leads. */
+  const newer = rule(3, 'Every estimate a person gives is divided by four before it goes on any plan at all.');
+  assert.equal(slot(draw(ctx({ rules: { rows: [short, newer], more: 0 } })), 'Learned'), newer.lesson);
 });
 
-test('WITHOUT A RULES ANSWER the card finds the rules among the learnings it was sent, and says the shortest', () => {
+test("WITHOUT A RULES ANSWER the card finds the rules among the learnings it was sent, and says this project's first", () => {
   const everywhere = rule(3, 'Money is minor units plus a currency.');
   const here = rule(1, 'Weigh glaze dry, never wet.', 'project');
   const method = row('learnings#5', { lesson: 'Log every cone.', kind: 'method', created_at: '2026-10-08' });
   const said = slot(draw(ctx({ registers: [reg('learnings', [here, method], [everywhere])] })), 'Learned');
-  assert.equal(said, 'Log every cone.');
+  assert.equal(said, 'Weigh glaze dry, never wet.');
 });
 
 test('A RULE IS NEVER SAID TWICE, once as a rule and again as a lesson', () => {
