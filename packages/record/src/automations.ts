@@ -431,8 +431,16 @@ export type AutomationRow = {
   id: string;
   /** The bare id, as `automationRun` and `braindog:automation/<id>` take it. */
   rule: string;
-  /** What its card says: `name`, or the id when it has none. */
+  /**
+   * What its card says: `name`, else the title of the one script it starts, else the id.
+   *
+   * THE SCRIPT'S TITLE BEFORE THE ID (audit B of 25 October, Y11): a rule whose one step starts a script is that script
+   * to a person, and Automations listed it as "Close follow ups" while Scripts called it "Close the follow-ups of a
+   * finished task". A name the rule gives itself still comes first, since several rules may start one script.
+   */
   name: string;
+  /** The script its one step starts, by id and title, or `null` for a rule that does anything else. */
+  script: { id: string; title: string } | null;
   version: number;
   trigger: string;
   path: 'inline' | 'run';
@@ -618,9 +626,26 @@ const writesOf = (sql: Sql, bare: string, since = ''): number =>
     since,
   )?.n ?? 0;
 
+/** The script a body's one step starts, with its title (the id where it has none), or `null`. */
+function scriptOf(sql: Sql, body: Body): { id: string; title: string } | null {
+  const steps = Array.isArray(body.steps) ? body.steps : [];
+  const only = steps.length === 1 && isObject(steps[0]) && isObject(steps[0].script) ? steps[0].script : null;
+  const id = only && typeof only.id === 'string' && only.id !== '' ? only.id : null;
+  if (id === null) return null;
+  let title: unknown;
+  try {
+    const d = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'script' AND superseded_at IS NULL AND retired = 0", `script.${id}`);
+    title = d ? (JSON.parse(d.body) as Body).title : undefined;
+  } catch {
+    title = undefined;
+  }
+  return { id, title: typeof title === 'string' && title.trim() !== '' ? title.trim() : id };
+}
+
 function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: Body } {
   const body = JSON.parse(d.body) as Body;
   const bare = d.id.slice('rule.'.length);
+  const script = scriptOf(sql, body);
   /* THE CLOCK ROW `flow.ts` KEYS `flow.every:<id>`, which the install arms one interval out. `firing` counts as armed:
      the drain holds a row there while it takes the turn, and the next due time is written back when it lets go. */
   const next = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'rule' AND key = ? AND state IN ('pending', 'firing')", `flow.every:${bare}`);
@@ -671,7 +696,8 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
     row: {
       id: d.id,
       rule: bare,
-      name: typeof body.name === 'string' && body.name.trim() !== '' ? body.name : bare,
+      name: typeof body.name === 'string' && body.name.trim() !== '' ? body.name : script && script.title !== script.id ? script.title : bare,
+      script,
       version: d.version,
       trigger: triggerOf(body),
       path: pathOf(body),
