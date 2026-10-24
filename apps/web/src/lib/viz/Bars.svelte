@@ -10,8 +10,9 @@
 
   THE SCALE IS SHARED WHEN YOU SAY SO: pass `max` to put several charts on one scale.
 
-  The label column takes the longest label up to two fifths of the width, so at phone width a long
-  label narrows the bars rather than the other way round. Text keeps its size at any width.
+  The label column takes the longest label up to two fifths of the width. A label longer than that
+  puts every label over its bar instead, with the value at the end of the label's line, so at phone
+  width no bar is drawn over its words. Text keeps its size at any width.
 -->
 <script lang="ts">
   import './viz.css';
@@ -60,7 +61,7 @@
         <rect class="viz-fill viz-grow-x" data-tone="g4" x={row.pair.x} y={row.pair.y} width={row.pair.w} height={row.pair.h} rx={row.pair.rx} />
       {/if}
       {#if items[i]?.note}
-        <text class="viz-value" x={row.noteX} y={row.textY}>{items[i]?.note}</text>
+        <text class="viz-value" x={row.noteX} y={row.noteY ?? row.textY}>{items[i]?.note}</text>
       {/if}
       <text class="viz-value" x={g.valueX} y={row.textY} text-anchor="end">{row.value}</text>
     {/each}

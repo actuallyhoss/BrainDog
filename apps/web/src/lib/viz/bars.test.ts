@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { barRect, bars, describeBars, ROW_ALONE, ROW_PAIRED } from './bars.ts';
+import { barRect, bars, describeBars, ROW_ALONE, ROW_PAIRED, ROW_STACKED } from './bars.ts';
+import { textWidth } from './shared.ts';
 
 const SPEND = [
   { label: 'Household', value: 9800 },
@@ -46,9 +47,26 @@ test('rows sit a pitch apart and the values are anchored at the right edge', () 
   assert.equal(g.rows[0]?.value, '9,800');
 });
 
-test('the label column is never more than two fifths of a narrow chart', () => {
-  const g = bars([{ label: 'A label far too long for a phone to give it its whole width', value: 1 }], { width: 320 });
-  assert.equal(g.rows[0]?.bar.x, 128);
+/* THE AUDIT OF 25 OCTOBER, Z29 (`automations-390-light.png`, Runs this month): held to two fifths, "File a Ledger entry
+   in its account's book" ran on under its bar and the bar was drawn over it. A label that does not fit two fifths puts
+   every label over its bar, so no bar starts before its label ends. */
+test('A LABEL TOO LONG FOR TWO FIFTHS GOES OVER ITS BAR, so no bar is drawn over its words', () => {
+  const RUNS = [
+    { label: 'Know who each payment was with', value: 14 },
+    { label: 'Close follow ups', value: 8 },
+    { label: "File a Ledger entry in its account's book", value: 5, note: '3 failed' },
+    { label: 'Find what a payment paid', value: 5, note: '1 failed' },
+  ];
+  const g = bars(RUNS, { width: 300 });
+  assert.equal(g.stacked, true);
+  for (const [i, r] of g.rows.entries()) {
+    assert.ok(r.bar.y >= r.textY + 4, `${RUNS[i]!.label}: its bar is on its label's line`);
+    assert.ok(textWidth(r.label, 13) <= 300 - (textWidth('14', 13) + 12), `${r.label} runs into its value`);
+    if (RUNS[i]!.note) assert.ok((r.noteY ?? 0) > r.textY, 'the note is on the label\'s line, not the bar\'s');
+  }
+  assert.equal(g.rows[1]!.textY - g.rows[0]!.textY, ROW_STACKED);
+  /* SHORT LABELS KEEP THEIR COLUMN. */
+  assert.equal(bars(SPEND, { width: 400 }).stacked, false);
 });
 
 test('a bar above zero is at least 2px, zero is nothing, and the radius never passes half', () => {

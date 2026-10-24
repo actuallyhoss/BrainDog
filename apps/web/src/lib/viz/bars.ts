@@ -30,6 +30,8 @@ export interface BarRow {
   value: string;
   /** Where the note starts, just past the longer of the two bars. */
   noteX: number;
+  /** The note's baseline where the label is over its bar, on the bar's line; else the label's (`textY`). */
+  noteY?: number;
 }
 
 export interface BarsGeometry {
@@ -39,6 +41,8 @@ export interface BarsGeometry {
   /** The x the values are anchored to (their end). */
   valueX: number;
   height: number;
+  /** Each label is over its bar, since one would not fit two fifths of the width. */
+  stacked: boolean;
 }
 
 export interface BarsInput {
@@ -56,6 +60,9 @@ export interface BarsOptions {
 
 export const ROW_ALONE = 22;
 export const ROW_PAIRED = 20;
+/** A row whose label sits over its bar: the label's line, then the bar (or the two) under it. */
+export const ROW_STACKED = 34;
+export const ROW_STACKED_PAIRED = 40;
 const GAP = 12;
 /** The size a bar's label, value and note are drawn at (`viz.css`, `--fs-meta`). */
 const LABEL = 13;
@@ -74,26 +81,35 @@ export function bars(items: readonly BarsInput[], o: BarsOptions): BarsGeometry 
 
   /* The label column is the longest label, and never more than two fifths of the chart. */
   /* AT 13, the size the labels are drawn at (P29): at 12 a bar's name was the smallest words on its page. */
-  const gutter = Math.min(Math.max(0, ...items.map((it) => textWidth(it.label, LABEL))) + GAP, Math.round(o.width * 0.4));
+  const longest = Math.max(0, ...items.map((it) => textWidth(it.label, LABEL))) + GAP;
   const valueCol = Math.max(0, ...values.map((v) => textWidth(v, LABEL))) + GAP;
   const noteCol = Math.max(0, ...items.map((it) => (it.note ? textWidth(it.note, LABEL) + 8 : 0)));
-  const space = Math.max(0, o.width - gutter - valueCol - noteCol);
+
+  /* A LABEL WIDER THAN TWO FIFTHS GOES OVER ITS BAR (the audit of 25 October, Z29): held to the column, "File a Ledger
+     entry in its account's book" ran on under its own bar at 390 and the bar was drawn over the words. Over the bar it
+     has the width but the value's, and is cut with an ellipsis only past that. */
+  const stacked = longest > Math.round(o.width * 0.4);
+  const gutter = stacked ? 0 : longest;
+  const space = Math.max(0, o.width - gutter - (stacked ? 0 : valueCol) - noteCol);
 
   const all = [...items.map((it) => it.value), ...(o.paired ?? [])].filter(Number.isFinite);
   const max = o.max !== undefined && o.max > 0 ? o.max : Math.max(0, ...all);
 
-  const pitch = paired ? ROW_PAIRED : ROW_ALONE;
+  const pitch = stacked ? (paired ? ROW_STACKED_PAIRED : ROW_STACKED) : paired ? ROW_PAIRED : ROW_ALONE;
+  /* Under its label a bar starts a line down: 20 alone, 18 and 27 paired. */
+  const drop = stacked ? 17 : 0;
   const rows = items.map((it, i): BarRow => {
     const y = i * pitch;
-    const bar = paired ? barRect(gutter, y + 1, it.value, max, space, 7) : barRect(gutter, y + 6, it.value, max, space, 8);
-    const pair = paired ? barRect(gutter, y + 10, o.paired?.[i] ?? 0, max, space, 7) : null;
+    const bar = paired ? barRect(gutter, y + drop + 1, it.value, max, space, 7) : barRect(gutter, y + (stacked ? 20 : 6), it.value, max, space, 8);
+    const pair = paired ? barRect(gutter, y + drop + 10, o.paired?.[i] ?? 0, max, space, 7) : null;
     return {
-      label: it.label,
+      label: stacked ? fitted(it.label, o.width - valueCol) : it.label,
       textY: y + 13,
       bar,
       pair,
       value: values[i] ?? '',
       noteX: r2(gutter + Math.max(bar.w, pair?.w ?? 0) + 6),
+      ...(stacked ? { noteY: y + (paired ? 31 : 29) } : {}),
     };
   });
 
@@ -101,8 +117,17 @@ export function bars(items: readonly BarsInput[], o: BarsOptions): BarsGeometry 
     rows,
     track: paired ? null : { x: gutter, w: r2(space) },
     valueX: o.width,
-    height: Math.max(0, items.length * pitch - (pitch - 17)),
+    height: Math.max(0, items.length * pitch - (pitch - (stacked ? pitch - 2 : 17))),
+    stacked,
   };
+}
+
+/** A label cut to `room` px with an ellipsis, by the same measure the columns are made with. */
+function fitted(label: string, room: number): string {
+  if (textWidth(label, LABEL) <= room) return label;
+  const chars = [...label];
+  while (chars.length > 1 && textWidth(`${chars.join('').trimEnd()}…`, LABEL) > room) chars.pop();
+  return `${chars.join('').trimEnd()}…`;
 }
 
 /**
