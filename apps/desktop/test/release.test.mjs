@@ -2,14 +2,14 @@
  * The Mac app's release pieces that read no keychain and build nothing (E50, E51): which identity signs, what
  * `signing.env` says, the update feed, and the public key written into the config.
  *
- *   node --test tools/desktop/release.test.mjs
+ *   pnpm --filter @braindog/desktop test
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { developerId, envFile, feedOf } from './release.mjs';
-import { CONF, configPubkey, withPubkey } from './updater-key.mjs';
+import { developerId, envFile, feedOf } from '../../../tools/desktop/release.mjs';
+import { CONF, configPubkey, withPubkey } from '../../../tools/desktop/updater-key.mjs';
 
 test('ONLY A DEVELOPER ID SIGNS FOR OTHER MACS: an Apple Development identity is not one', () => {
   assert.equal(developerId('  1) ABC "Apple Development: Created via API (V52SF93K2D)"\n     1 valid identities found'), null);
