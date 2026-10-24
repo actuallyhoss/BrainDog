@@ -115,8 +115,17 @@ function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
  * alone), and a list no walk reads keeps every row that is not finished.
  */
 function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps: PageDeps, kit: SourceKit): Predicate[] {
+  /* A LEG HELD BY A HOLE IS ONE PAGE'S PART OF A WALK, NOT THE RECORD'S (the audit of 25 October, Z15): a book's page walks
+     Money's legs held to that book, `book is {{name}}`, filled only on that page. Read here the hole names no book, and
+     that one leg left the bill and its repeating line both due, one premium twice on Today. The walk it narrows is
+     among the legs already. */
   const over = legs.filter(
-    (l): l is Leg => l !== null && typeof l === 'object' && (l as { register?: unknown }).register === schema.register && (l as { on?: unknown }).on === field,
+    (l): l is Leg =>
+      l !== null &&
+      typeof l === 'object' &&
+      (l as { register?: unknown }).register === schema.register &&
+      (l as { on?: unknown }).on === field &&
+      !(typeof (l as { where?: unknown }).where === 'string' && (l as { where: string }).where.includes('{{')),
   );
   if (over.length === 0) return [];
   const each: Predicate[] = [];
