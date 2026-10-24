@@ -184,7 +184,7 @@ export type LockEntry = { spoken: string | null; version: number; sha256: string
 
 /**
  * Whether a lock path is one this system could hold: a drive-letter path off Windows, or a rooted path on Windows that
- * names no drive, is another machine's (the lock came with the move from the Windows PC: 24 `C:\Users\Sam\…` entries).
+ * names no drive, is another machine's (a lock carried over from a Windows PC held 24 `C:\Users\…` entries).
  */
 export const foreignLockPath = (path: string, platform: string = process.platform): boolean =>
   platform === 'win32' ? path.startsWith('/') : /^[A-Za-z]:[\\/]/u.test(path) || path.startsWith('\\\\');

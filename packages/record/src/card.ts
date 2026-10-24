@@ -502,7 +502,7 @@ function rulesFor(c: Context): Rules<Brief> {
  * the newest; then the standing lessons by `learnedFirst` (a method before a fact, this project's before everywhere,
  * then the newest). Nothing when there is none.
  *
- * THE FIRST, NOT THE SHORTEST: picking the shortest put one short lesson from the Sam Brain days ("On a 409 from PUT
+ * THE FIRST, NOT THE SHORTEST: picking the shortest put one short lesson from an older system ("On a 409 from PUT
  * /api/db…") on every card for a month, however many newer and nearer ones the record held.
  */
 function learnedBrief(c: Context, at: CardAt): string | null {

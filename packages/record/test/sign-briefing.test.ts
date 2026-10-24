@@ -16,7 +16,8 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
 const MIN = 60_000;
-const DAY = 24 * 60 * MIN;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
 const OPTIONS = { options: [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'It is not' }] };
 
 const owner = (repo: string): CallContext => ({ principal: { kind: 'person', id: 'p_1', level: 'owner' }, session: { repo } });
@@ -152,10 +153,10 @@ test('A REPOSITORY IS SAID BY ITS NAME', () => {
 test('A RUN IS SAID BY WHAT IT DID, with no path, address or key in it', async () => {
   const { left, clock, deps } = await record();
   await left('kiln', 'Fix /Users/ada/kiln/src/glyphs.ts for ada@kiln.example', 'Kern the lowercase pairs');
-  clock.advance(2 * DAY);
+  clock.advance(2 * HOUR);
   const real = (await deps.briefing('kiln'))!;
   const none = await readBriefingSign({ sql: deps.sql, briefing: () => ({ ...real, handoff: null, live: { same_repo: [], elsewhere: [] } }) }, clock.now());
-  assert.match(none.said, /though "Fix for someone at kiln\.example" left one 2 days ago/u);
+  assert.match(none.said, /though "Fix for someone at kiln\.example" left one 2 hours ago/u);
   assert.doesNotMatch(none.said, /\/Users|glyphs\.ts|ada@/u);
 });
 

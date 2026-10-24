@@ -123,7 +123,8 @@ test('THE CARD ON THE OLD IDS READS AS BEFORE, and the same lists under other id
   const before = card(ctx(agentsIn(OLD, false)), at, NOW).card;
   const lines = before.split('\n');
   assert.ok(lines.includes(BEFORE_MORE) && lines.includes(BEFORE_NEXT), before);
-  assert.match(before, /Learned  Proofs are read on paper, never on screen\./u);
+  /* The first lesson in the record's order leads Learned, not the shortest (the shortest is LN2's). */
+  assert.ok(before.includes(`Learned  Tag the ${PROJECTS[0]} release before the deploy starts.`), before);
   assert.ok(!/Deploy key|SK1|KY1/u.test(before), 'a key and a skill handed to the agent are not work it is handed');
   assert.equal(card(ctx(agentsIn(NEW, true)), at, NOW).card, before, 'by role, under other ids');
   assert.equal(card(ctx(agentsIn(OLD, true)), at, NOW).card, before, 'the old ids declaring their roles');

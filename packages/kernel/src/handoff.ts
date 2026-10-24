@@ -85,6 +85,8 @@ export type OpenHandoff = {
   age_s: number;
   /** `next`: the one a new session is handed. `earlier`: older than a day, or passed over since. */
   mark: 'next' | 'earlier';
+  /** A later run in its place has worked since it was left. */
+  passed?: boolean;
 };
 
 /**
@@ -183,6 +185,7 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
       left_at: row.left_at,
       age_s: Math.floor(age / 1000),
       mark: age < EARLIER_MS && row.passed === 0 ? 'next' : 'earlier',
+      passed: row.passed !== 0,
     };
   });
 }

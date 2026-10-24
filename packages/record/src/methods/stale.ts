@@ -68,6 +68,8 @@ const SESSION = (sessionDeclaration().body as unknown as { id: string }).id;
 const DAY_MS = 86_400_000;
 /** An agent's own question is worth taking back or leaving once it has waited this long. */
 export const OWN_QUESTION_MS = 7 * DAY_MS;
+/** A step nobody took in a week, in seconds as `age_s` counts. */
+const STEP_STALE_S = (7 * DAY_MS) / 1000;
 /** A question is old for the person who answers it once it has waited this long, which is the tidy's own count. */
 export const OLD_QUESTION_MS = 14 * DAY_MS;
 
@@ -133,6 +135,9 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   const token = ctx.principal.kind === 'token' ? ctx.principal.id : null;
   const lines: StaleLine[] = [];
 
+  /* A STEP IS STALE ONCE A WEEK OLD, or once a later run here passed it by. The card stops handing a step over after a
+     day (`EARLIER_MS`), but a step left yesterday is still one somebody may take, so it is not yet one to clear. */
+  const leftWaiting = (step: OpenHandoff): boolean => step.mark === 'earlier' && (step.passed === true || step.age_s >= STEP_STALE_S);
   /* THE STEPS LEFT EARLIER, in the place the caller stands: an agent's repository, or for a person every place a run
      waits. Each run is read under the caller's own grant, so a run they may not read leaves no step here. */
   const runsOpen = readable(ctx, SESSION) === null;
@@ -149,7 +154,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
       places.set(JSON.stringify([place.project, place.repo]), place);
     }
     const left = new Map<string, OpenHandoff>();
-    for (const place of places.values()) for (const step of openHandoffs(sql, place, null, nowMs)) if (step.mark === 'earlier' && runs.has(step.id)) left.set(step.id, step);
+    for (const place of places.values()) for (const step of openHandoffs(sql, place, null, nowMs)) if (leftWaiting(step) && runs.has(step.id)) left.set(step.id, step);
     /* Oldest first: the one said out loud is the one that has waited longest. */
     const steps = [...left.values()].sort((a, b) => b.age_s - a.age_s || (a.spoken < b.spoken ? -1 : 1));
     const oldest = steps[0];

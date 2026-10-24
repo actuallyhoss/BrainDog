@@ -423,7 +423,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   const lock = toolsLock(lockFile);
   if (lock === null) return [`${lockFile} is not valid JSON, so tools were not scanned. Delete it and scan again.`];
   /* ONE NAME FOR THIS MACHINE ON EVERY PATH, the one people read ("MacBook Pro"), never its network name: the old path
-     wrote "Maras-MacBook-Pro.local" beside the record's "MacBook Pro", so one Mac read as two on a tool's row. */
+     wrote "Someones-MacBook-Pro.local" beside the record's "MacBook Pro", so one Mac read as two on a tool's row. */
   const machine = s.machine ?? (await (await import('./hooks.ts')).deviceName(process.env, s.once?.host ?? null));
   const now = (s.now ?? Date.now)();
 
