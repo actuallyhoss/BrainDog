@@ -9,6 +9,8 @@
   the shape's read both draw this, so the second loader under the first is the same picture, never a blank between.
 
   AT ONCE, NOT AFTER 300ms as `Waiting`'s bars come: it carries the project's own name, so it is no flash of shapes.
+  THE NAME IS THE PAGE'S `h1` from the first paint (a headless head draws none, and the hero's own `h1` waits on the
+  read), so a page caught while it waits still has its heading.
   `role="status"` with the hidden word and `aria-busy`, as `Waiting` says it, so the screen is not called drawn.
 -->
 <script lang="ts">
@@ -29,13 +31,13 @@
 
 <div class="pw" data-shape-waiting role="status" aria-busy="true">
   <span class="said">{copy.waiting}</span>
-  <section class="pw-hero" style={slotStyle(project.hue)} aria-hidden="true">
-    <span class="pw-well"><ProjectWell mark={project.mark} name={project.name} hue={project.hue} size="xl" /></span>
+  <section class="pw-hero" style={slotStyle(project.hue)}>
+    <span class="pw-well" aria-hidden="true"><ProjectWell mark={project.mark} name={project.name} hue={project.hue} size="xl" /></span>
     <div class="pw-name">
-      <p class="pw-title" dir="auto">{project.name}</p>
+      <h1 class="pw-title" dir="auto">{project.name}</h1>
       {#if project.lane}<p class="pw-status">{project.lane.charAt(0).toUpperCase() + project.lane.slice(1)}</p>{:else}<span class="bar status"></span>{/if}
     </div>
-    <span class="bar news"></span>
+    <span class="bar news" aria-hidden="true"></span>
   </section>
   {#each { length: tiles } as _, i}
     <div class="pw-tile" aria-hidden="true">
