@@ -379,7 +379,7 @@
 
   /* ── the board: Money, Quick and Handled ──────────────────────────────── */
 
-  /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: cards (one a family) and the lines BrainDog handled. */
+  /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: the questions, as the head's sentence counts them (audit Z3), and the lines BrainDog handled. */
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
   const counts = $derived<Record<Column, number>>({ money: shaped?.groups.money ?? 0, quick: shaped?.groups.quick ?? 0, handled: handledCount });
   /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */

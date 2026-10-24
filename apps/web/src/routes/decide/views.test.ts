@@ -181,9 +181,35 @@ test('the head says how many questions and, when alike ones fold, how many cards
   const qs = [ran('r1'), ran('r2'), ran('r3'), ran('r4'), question('q1')];
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK);
   assert.equal(shaped.sentence.text, '5 need you, as 2 cards, all quick ones.');
-  assert.equal(shaped.groups.quick, 2);
+  /* THE SWITCH COUNTS QUESTIONS, as the sentence does (audit Z3), and the cards are said in the sentence. */
+  assert.equal(shaped.groups.quick, 5);
   /* A QUEUE THAT DREW SOME OF THEM says no cards, since a fold of some is not one of all. */
   assert.equal(decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 9, true), queueBlock(qs, 9)], CLOCK).sentence.text, '9 need you, all quick ones.');
+});
+
+/* AUDIT Z3 (decide-390-light.png, decide-1512-light.png): "35 need you: 2 about money, ... and 33 quick ones" sat over
+   "Quick 18" on the laptop and "Quick 5" on the phone. The record holds 35, the queue drew 20 (its ceiling), and 14 of
+   them fold into one card. One count everywhere: the sentence's. */
+test('the sentence, the switch and each column\'s head say one count of what waits (audit Z3)', () => {
+  const paying = (id: string): QueueQuestion => ({ ...question(id), money: [{ amount: 480000, currency: 'GBP' }] });
+  const tidy = (id: string): QueueQuestion => ({ ...question(id), kind: 'rowset', body_kind: 'rowset', options: [], run: { id: 'S904', name: 'Tidy projects' } }) as QueueQuestion;
+  const qs = [paying('m1'), paying('m2'), ...Array.from({ length: 14 }, (_, n) => tidy(`t${n}`)), ...['a', 'b', 'c', 'd'].map((id) => question(id))];
+  const waits = { questions: 35, late: 0, hard: 0, inbox: null };
+  const shaped = decideDrawn([noteBlock(), queueBlock(qs, 35), queueBlock(qs, 35)], CLOCK, () => '', waits);
+  assert.match(shaped.sentence.text, /^35 need you: 2 about money, .* and 33 quick ones\.$/u);
+  assert.deepEqual(shaped.groups, { money: 2, quick: 33 });
+  const head = (b: LiveBlock | undefined): unknown => (b as { counted?: unknown } | undefined)?.counted;
+  assert.equal(head(shaped.blocks[1]), 2);
+  assert.equal(head(shaped.blocks[2]), 33);
+});
+
+/* AUDIT Z4 (decide-390-light-full.png): "EGP 930,191 in all" over cards that said "Moves EGP 74,092.16 and $9,074.01"
+   and "Records EGP 2,155,589". The sum is what the cards say, every value of each, in their currencies. */
+test('the sentence\'s sum is the sum of what the money cards say, in their currencies (audit Z4)', () => {
+  const tidy = { ...question('m1'), money: [{ amount: 5000000, currency: 'EGP' }, { amount: 907401, currency: 'USD' }, { amount: 2409216, currency: 'EGP' }] } as QueueQuestion;
+  const parts = { ...question('m2'), money: [{ amount: 100000000, currency: 'EGP' }, { amount: 115558900, currency: 'EGP' }] } as QueueQuestion;
+  const shaped = decideDrawn([noteBlock(), queueBlock([tidy, parts, question('q1')], 3), queueBlock([tidy, parts, question('q1')], 3)], CLOCK);
+  assert.match(shaped.sentence.text, /^3 need you: 2 about money, EGP\s2,229,681 and \$9,074\s?USD in all, and 1 quick one\.$/u);
 });
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);

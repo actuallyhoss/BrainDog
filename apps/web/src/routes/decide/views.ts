@@ -31,6 +31,7 @@ import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
 import { alikeOf } from '../../lib/page/alike.ts';
 import { copy } from '../../lib/copy.ts';
+import { movesOf as cardMoves } from '../../lib/decide/card.ts';
 import { ageDays, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 import { othersLine, WORDS as DECIDER_WORDS, type Decided } from './[id]/decider.ts';
@@ -285,7 +286,7 @@ export type DecideDrawn = {
   open: number;
   /** Whether the page draws anything at all under its head. */
   drawsAny: boolean;
-  /** How many cards each group draws, questions of one family counted once: what the phone's switch says. */
+  /** How many questions wait in each group, as the head's sentence counts them: what the phone's switch and each column's head say. */
   groups: Record<Group, number>;
 };
 
@@ -315,16 +316,21 @@ function shortDay(iso: string): string {
   return Number.isFinite(d.getTime()) ? `${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]}` : '';
 }
 
-/** The amount a money question's sentence names, as the record stored it ("GBP 4,800.00"), in minor units, or `null`. */
-function amountIn(q: QueueQuestion): { minor: number; currency: string } | null {
-  const held = Array.isArray(q.money) ? q.money[0] : undefined;
-  if (held && Number.isSafeInteger(held.amount)) return { minor: Math.abs(held.amount), currency: held.currency };
+/**
+ * THE AMOUNTS A MONEY QUESTION'S CARD SAYS, one a currency, in minor units, or `null`. What accepting writes is read as
+ * the card reads it (`card.ts` `movesOf`, every value and not the first), so "in all" is the sum of what the cards say
+ * (audit Z4: "EGP 930,191 in all" over cards of EGP 74,092.16 and $9,074.01, and EGP 2,155,589). A question that writes
+ * none is read off its sentence ("GBP 4,800.00").
+ */
+function amountsIn(q: QueueQuestion): { minor: number; currency: string }[] | null {
+  const moves = cardMoves((q as unknown as { money?: unknown }).money);
+  if (moves.length > 0) return moves.map((m) => ({ minor: Math.abs(m.amount), currency: m.currency }));
   const m = /\b([A-Z]{3})\s?([\d,]+(?:\.(\d+))?)\b/u.exec(q.question);
   if (!m) return null;
   const exp = exponentOf(m[1]!);
   const [whole = '0', frac = ''] = m[2]!.replace(/,/gu, '').split('.');
   const minor = Number(whole) * 10 ** exp + Number((frac + '000').slice(0, exp) || 0);
-  return Number.isSafeInteger(minor) ? { minor, currency: m[1]! } : null;
+  return Number.isSafeInteger(minor) ? [{ minor, currency: m[1]! }] : null;
 }
 
 /**
@@ -343,9 +349,9 @@ export function groupSentence(money: readonly QueueQuestion[], quick: readonly Q
   const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you${folded}`;
   let sum = '';
   if (money.length > 0) {
-    const amounts = money.map(amountIn);
+    const amounts = money.map(amountsIn);
     const sums = new Map<string, number>();
-    if (amounts.every((a) => a !== null)) for (const a of amounts) sums.set(a!.currency, (sums.get(a!.currency) ?? 0) + a!.minor);
+    if (amounts.every((a) => a !== null)) for (const a of amounts.flat()) sums.set(a!.currency, (sums.get(a!.currency) ?? 0) + a!.minor);
     const said = [...sums.entries()].map(([currency, minor]) => {
       const exp = exponentOf(currency);
       return writeAmount({ minor: Math.round(minor / 10 ** exp) * 10 ** exp, currency }, homeCurrency(), 'read')?.text ?? '';
@@ -402,7 +408,12 @@ export function decideDrawn(
      question is drawn once. A page with one open queue draws every question in it, as it always did. */
   const money = pool.filter(aboutMoney);
   const quick = pool.filter((q) => !aboutMoney(q));
-  const groups = { money: alikeOf(money).length, quick: alikeOf(quick).length };
+  /* ONE COUNT OF WHAT WAITS (audit Z3): "35 need you: 2 about money and 33 quick ones" sat over "Quick 18" on the laptop
+     (the questions drawn) and "Quick 5" on the phone (the cards). Each group is counted in questions, the record's
+     count where it says more than the queue held, as the sentence, the badge and Today count them. */
+  if (waits) open = waits.questions;
+  const quickCount = Math.max(quick.length, open - money.length);
+  const groups = { money: money.length, quick: quickCount };
   const groupOf = (n: number): Group | 'all' | null => {
     if (openAt.length < 2) return n === openAt[0] ? 'all' : null;
     return n === openAt[0] ? 'money' : n === openAt[1] ? 'quick' : null;
@@ -431,18 +442,18 @@ export function decideDrawn(
       queue: qs,
       shown: qs.length,
       total: qs.length,
+      counted: groups[group],
       most: NEEDS_SHOWN,
       ...(qs.length === 0 ? { drawn: false } : {}),
     } as LiveBlock;
   });
   /* THE LINE SAYS HOW MANY, THEN THE TWO GROUPS (today F12, U-A7): "8 need you: 3 about money, £7,239 in all, and 5
      quick ones." The red is on how many. */
-  if (waits) open = waits.questions;
   /* THE QUICK ONES ARE EVERY OPEN QUESTION THAT IS NOT ABOUT MONEY, by the record's count where it says more than the
-     queue held. */
+     queue held (`quickCount`). */
   /* THE CARDS ARE COUNTED ONLY WHEN EVERY QUESTION WAITING WAS DRAWN, so a fold of some is never said of all. */
-  const cards = pool.length >= open ? groups.money + groups.quick : undefined;
-  const waiting = pool.length > 0 ? groupSentence(money, quick, Math.max(quick.length, open - money.length), cards) : null;
+  const cards = pool.length >= open ? alikeOf(money).length + alikeOf(quick).length : undefined;
+  const waiting = pool.length > 0 ? groupSentence(money, quick, quickCount, cards) : null;
   /* WHAT WAS PUT OFF, BY HOW MANY AND THE SOONEST BACK, said on its fold's own line. */
   const laterAt = blocks.findIndex((b) => b.kind === 'queue' && b.source === 'governance.later');
   if (laterAt > 0 && blocks[laterAt - 1]?.kind === 'section') {
