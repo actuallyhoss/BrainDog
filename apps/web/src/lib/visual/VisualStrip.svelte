@@ -8,6 +8,9 @@
   `cardsFor`), so a page of questions asks the record once for each it scrolls to. A thing that holds none draws
   nothing at all, not an empty heading.
 
+  A CARD WITH A DRAFT WAITING carries its mark and its three presses under it (`DraftBar.svelte`): Keep, Try again and
+  Throw away, so a draft is settled where it shows without opening it. Pressed open, the viewer shows the draft first.
+
   `on` names the thing as the record takes it: `tasks#3` for a row, `SG12` for a question, `D4` for a decision.
   `tile` wraps it in its own tile with a heading, for a page of tiles; elsewhere it is a heading and a row of cards
   inside what holds it.
@@ -18,6 +21,7 @@
   import { actor } from '$lib/record/names.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import DraftBar from './DraftBar.svelte';
   import { cardsFor, forgetCards, madeLine, pictureAt, visualWords as words, type Card } from './held.ts';
 
   let { on, tile = false, compact = false }: { on: string; tile?: boolean | undefined; compact?: boolean | undefined } = $props();
@@ -70,7 +74,7 @@
 {#snippet strip()}
   <ul class="vs-cards" data-compact={compact ? '' : undefined}>
     {#each cards as card (card.id)}
-      <li>
+      <li class="vs-one" data-draft={card.draft ? '' : undefined}>
         <button type="button" class="vs-card tap" data-still={card.still && !compact ? '' : undefined} aria-label={words.open(card.title)} onclick={() => press(card)}>
           <span class="vs-still" aria-hidden="true">
             {#if card.still}
@@ -84,6 +88,11 @@
             <span class="vs-made">{madeLine(actor(card.by, me, names).name, card.at, now)}{#if card.versions > 1}{' · '}{words.versions(card.versions)}{/if}</span>
           </span>
         </button>
+        {#if card.draft}
+          {#key `${card.id} ${card.draft.version}`}
+            <div class="vs-draft"><DraftBar id={card.id} version={card.draft.version} by={card.draft.by} title={card.title} onsettled={changed} /></div>
+          {/key}
+        {/if}
       </li>
     {/each}
   </ul>
@@ -143,6 +152,24 @@
 
   .vs-cards[data-compact] {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* A CARD WITH A DRAFT: the card, then its mark and its three presses, on the same well. */
+  .vs-one[data-draft] {
+    display: grid;
+    align-content: start;
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+  }
+
+  .vs-one[data-draft] .vs-card {
+    block-size: auto;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  .vs-draft {
+    padding: 4px 8px 8px;
   }
 
   /* A QUIET CARD: a small well, its title and who made it, on one line. */

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { KEEP_MS, cardsFor, cardsOf, forgetCards, openedOf, readCards, readOpened, readPictures, tagOf, undoAsks, undoOf, visualWords, type Version } from './held.ts';
+import { KEEP_MS, cardsFor, cardsOf, forgetCards, mayAskAgain, openedOf, readCards, readOpened, readPictures, settle, stepOf, tagOf, undoAsks, undoOf, visualWords, type Version } from './held.ts';
 
 const SHA = 'a'.repeat(64);
 const SHA2 = 'b'.repeat(64);
@@ -85,6 +85,47 @@ test('THE LIST SAYS WHICH IS NEWEST, and which it stands at once the newest was 
   ];
   assert.deepEqual([3, 2, 1].map((v) => tagOf(v, versions, 3)), ['Newest', null, null]);
   assert.deepEqual([3, 2, 1].map((v) => tagOf(v, versions, 2)), ['Newest', 'Current', null]);
+});
+
+test('A DRAFT IS MARKED: its card says which version waits and who drew it, and open it shows first beside the kept one', () => {
+  const [card] = cardsOf({ visuals: [{ id: 'v', title: 'Plan', version: 1, versions: 2, kept: true, draft: { version: 2, by: 'S4', at: '' } }] });
+  assert.deepEqual(card!.draft, { version: 2, by: 'S4' });
+  assert.equal(cardsOf({ visuals: [{ id: 'v', title: 'Plan', version: 1 }] })[0]!.draft, null);
+  const opened = openedOf({
+    id: 'v',
+    title: 'Plan',
+    version: 3,
+    kept: 1,
+    draft: 3,
+    page: '<h1>Three</h1>',
+    versions: [
+      { version: 1, by: 'S4', batch: 'B1' },
+      { version: 2, by: 'S4', batch: 'B2', draft: true },
+      { version: 3, by: 'S4', batch: 'B3', draft: true },
+    ],
+  })!;
+  assert.deepEqual([opened.kept, opened.draft], [1, 3]);
+  assert.deepEqual([3, 2, 1].map((v) => tagOf(v, opened.versions, opened.kept, opened.draft)), ['Draft', 'Thrown away', 'Current']);
+  assert.equal(undoOf(opened.versions, opened.kept, 3), null, 'a draft is settled by its three presses, not Undo');
+  /* A RECORD FROM BEFORE DRAFTS stands at the version it answered. */
+  assert.deepEqual(((o) => [o.kept, o.draft])(openedOf({ id: 'v', version: 2, page: '' })!), [2, null]);
+});
+
+test('THE ARROWS STEP THE VERSIONS, and Try again is offered only on a version a run drew', () => {
+  const versions: Version[] = [3, 2, 1].map((version) => ({ version, title: 'P', by: 'a', at: '', batch: null }));
+  assert.deepEqual([stepOf(versions, 3, true), stepOf(versions, 3, false), stepOf(versions, 1, true), stepOf(versions, 2, false), stepOf(versions, 9, true)], [2, null, null, 3, null]);
+  assert.equal(mayAskAgain('S12'), true);
+  assert.equal(mayAskAgain('p_owner'), false);
+  assert.equal(mayAskAgain('S0'), false);
+});
+
+test('A PRESS ON A DRAFT IS settleVisual, answered in the record\'s own sentence', async () => {
+  const h = host({ ok: true, value: { visual: 'v', kept: 2, batch: 'B', said: 'Kept version 2 of "Plan".' } });
+  assert.deepEqual(await settle('https://b.example', 'v', 2, 'keep', h.io), { ok: true, value: { said: 'Kept version 2 of "Plan".', kept: 2 } });
+  assert.equal(new URL(h.asked[0]!.url).pathname, '/api/settleVisual');
+  assert.deepEqual(h.asked[0]!.body, { id: 'v', version: 2, as: 'keep' });
+  const no = host({ ok: false, refusal: { code: 'TRANSITION_ILLEGAL', fix: 'Version 2 of "Plan" is not a draft waiting now, so there is nothing to keep.' } }, 409);
+  assert.deepEqual(await settle('https://b.example', 'v', 2, 'keep', no.io), { ok: false, fix: 'Version 2 of "Plan" is not a draft waiting now, so there is nothing to keep.' });
 });
 
 test('UNDO SAYS FIRST WHAT ELSE IT TAKES BACK only when the write did more than this visual', () => {

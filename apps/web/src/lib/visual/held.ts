@@ -8,10 +8,12 @@
  *
  * OPEN, IT IS ITS PAGE IN THE SANDBOX FRAME (`VisualViewer.svelte`, loaded by `import()` on the first press): its
  * pictures read here and handed in as `data:` addresses, since the frame has no network, and its versions newest first,
- * with Undo on the newest through the record's own undo of the write that made it.
+ * with arrows to step them and Undo on the newest through the record's own undo of the write that made it.
  *
- * NO DRAFT YET. The record keeps no draft mark on a version (Keep, Try again and Throw away wait for one), so every
- * version here is a kept one.
+ * A DRAFT IS MARKED, AND SETTLED WHERE IT SHOWS (DIRECTION §45). A version handed in as a draft waits beside the one the
+ * visual stands at and never replaces it. The strip marks its card and the viewer opens on it, each with Keep, Try
+ * again and Throw away (`settle`, the record's `settleVisual`). Try again throws it away and tells the run that drew it
+ * to draw it again, so it is offered only on a version a run drew.
  *
  * PURE AND RELATIVE-IMPORTED, the reads with their fetch handed in, so `held.test.ts` drives every branch without a socket.
  */
@@ -22,14 +24,37 @@ import { pictureData, since } from 'braindog-render';
 /** A picture a version names: the name its page uses, and the hash its bytes are kept under. */
 export type Picture = { name: string; sha256: string; mime: string };
 
-/** One visual as a strip shows it, closed. `still` is its first picture's hash, or `null` for a quiet card. */
-export type Card = { id: string; title: string; version: number; versions: number; by: string; at: string; still: string | null };
+/**
+ * One visual as a strip shows it, closed. `still` is its first picture's hash, or `null` for a quiet card. `draft` is
+ * the version waiting to be kept or thrown away, with who drew it, or `null` when none waits.
+ */
+export type Card = { id: string; title: string; version: number; versions: number; by: string; at: string; still: string | null; draft: { version: number; by: string } | null };
 
-/** One version as the viewer lists it. `batch` is the write that made it, which Undo takes back. */
-export type Version = { version: number; title: string; by: string; at: string; batch: string | null };
+/**
+ * One version as the viewer lists it. `batch` is the write that made it, which Undo takes back. `draft` is there for one
+ * handed in as a draft and never kept: the one waiting, or one thrown away.
+ */
+export type Version = { version: number; title: string; by: string; at: string; batch: string | null; draft?: true };
 
-/** One visual open: the version shown, its page and pictures, and every version, newest first. */
-export type Opened = { id: string; title: string; version: number; by: string; at: string; page: string; pictures: Picture[]; versions: Version[] };
+/**
+ * One visual open: the version shown, its page and pictures, and every version, newest first. `kept` is the version it
+ * stands at and `draft` the one waiting, each `null` for none.
+ */
+export type Opened = {
+  id: string;
+  title: string;
+  version: number;
+  kept: number | null;
+  draft: number | null;
+  by: string;
+  at: string;
+  page: string;
+  pictures: Picture[];
+  versions: Version[];
+};
+
+/** The three presses on a draft, as the record takes them. */
+export type Press = 'keep' | 'throw' | 'again';
 
 /** What a read came to: the record's own sentence when it did not answer. */
 export type Read<T> = { ok: true; value: T } | { ok: false; fix: string };
@@ -54,6 +79,15 @@ export const visualWords = {
   undoMore: (n: number) => (n === 1 ? 'This also puts back 1 other change made with it.' : `This also puts back ${n} other changes made with it.`),
   undoYes: 'Put it back',
   keep: 'Keep it',
+  /** The mark on a version waiting to be kept or thrown away, and on one that was. */
+  draft: 'Draft',
+  thrown: 'Thrown away',
+  keepDraft: 'Keep',
+  again: 'Try again',
+  throwAway: 'Throw away',
+  settling: 'One moment.',
+  older: 'Older version',
+  newer: 'Newer version',
   reading: 'Opening the visual.',
   gone: 'This visual was taken away.',
   noFrame: 'This visual could not be drawn here.',
@@ -87,7 +121,8 @@ export function cardsOf(answer: unknown): Card[] {
     const title = text(v.title);
     const version = whole(v.version);
     if (id === null || title === null || version === null) return [];
-    return [{ id, title, version, versions: whole(v.versions) ?? version, by: text(v.by) ?? '', at: text(v.at) ?? '', still: picturesOf(v.pictures)[0]?.sha256 ?? null }];
+    const waits = isRow(v.draft) && whole(v.draft.version) !== null ? { version: whole(v.draft.version)!, by: text(v.draft.by) ?? '' } : null;
+    return [{ id, title, version, versions: whole(v.versions) ?? version, by: text(v.by) ?? '', at: text(v.at) ?? '', still: picturesOf(v.pictures)[0]?.sha256 ?? null, draft: waits }];
   });
   return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
@@ -100,10 +135,13 @@ export function openedOf(answer: unknown): Opened | null {
   if (id === null || version === null || typeof answer.page !== 'string') return null;
   const versions = (Array.isArray(answer.versions) ? answer.versions : []).flatMap((v): Version[] => {
     if (!isRow(v) || whole(v.version) === null) return [];
-    return [{ version: whole(v.version)!, title: text(v.title) ?? '', by: text(v.by) ?? '', at: text(v.at) ?? '', batch: text(v.batch) }];
+    return [{ version: whole(v.version)!, title: text(v.title) ?? '', by: text(v.by) ?? '', at: text(v.at) ?? '', batch: text(v.batch), ...(v.draft === true ? { draft: true as const } : {}) }];
   });
   versions.sort((a, b) => b.version - a.version);
-  return { id, title: text(answer.title) ?? '', version, by: text(answer.by) ?? '', at: text(answer.at) ?? '', page: answer.page, pictures: picturesOf(answer.pictures), versions };
+  /* A RECORD FROM BEFORE DRAFTS SAYS NEITHER, and stands at the version it answered. */
+  const kept = 'kept' in answer ? whole(answer.kept) : version;
+  const draft = whole(answer.draft);
+  return { id, title: text(answer.title) ?? '', version, kept, draft, by: text(answer.by) ?? '', at: text(answer.at) ?? '', page: answer.page, pictures: picturesOf(answer.pictures), versions };
 }
 
 /**
@@ -117,12 +155,27 @@ export function undoOf(versions: readonly Version[], standing: number | null, sh
   return newest && standing === newest.version && shown === newest.version ? newest.batch : null;
 }
 
-/** The word beside a version in the list: the one it stands at once that is not the newest, else the newest. */
-export function tagOf(version: number, versions: readonly Version[], standing: number | null): string | null {
+/**
+ * The word beside a version in the list: Draft on the one waiting, Thrown away on a draft never kept, the one it stands
+ * at once that is not the newest, else the newest.
+ */
+export function tagOf(version: number, versions: readonly Version[], standing: number | null, draft: number | null = null): string | null {
+  if (draft !== null && version === draft) return visualWords.draft;
+  if (versions.find((v) => v.version === version)?.draft === true) return visualWords.thrown;
   const newest = versions[0]?.version ?? null;
   if (standing !== null && standing !== newest && version === standing) return visualWords.current;
   return version === newest ? visualWords.newest : null;
 }
+
+/** The version the arrows step to from the one shown: `older` down the list, else up it; `null` past either end. */
+export function stepOf(versions: readonly Version[], shown: number, older: boolean): number | null {
+  const at = versions.findIndex((v) => v.version === shown);
+  if (at < 0) return null;
+  return versions[older ? at + 1 : at - 1]?.version ?? null;
+}
+
+/** Whether Try again is offered: only on a version a run drew (`S12`), since it asks that run to draw it again. */
+export const mayAskAgain = (by: string): boolean => /^S[1-9][0-9]*$/u.test(by);
 
 /** Whether Undo goes at once or says first what else it takes back: a write that touched more than this visual asks. */
 export const undoAsks = (steps: number): boolean => steps > 1;
@@ -180,6 +233,17 @@ export async function readPictures(base: string, pictures: readonly Picture[], i
     }),
   );
   return { inline, missing };
+}
+
+/**
+ * A press on a draft: Keep, Throw away, or Try again. Answers the record's sentence either way, so the press says what
+ * happened in its words.
+ */
+export async function settle(base: string, id: string, version: number, as: Press, io?: Fetch): Promise<Read<{ said: string; kept: number | null }>> {
+  const out = (await createClient({ base, ...(io ? { fetch: io } : {}) }).call('settleVisual', { id, version, as })) as Wire;
+  if (!out.ok) return refusedOf(out);
+  const v = isRow(out.value) ? out.value : {};
+  return { ok: true, value: { said: text(v.said) ?? '', kept: whole(v.kept) } };
 }
 
 /* ── kept for the tab ───────────────────────────────────────────────────── */

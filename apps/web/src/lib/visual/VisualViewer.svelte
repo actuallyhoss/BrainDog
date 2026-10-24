@@ -1,6 +1,10 @@
 <!--
   One visual open over its thing (DIRECTION §45, "Shown where it lives"): its page in the sandbox frame the whole width of
-  the window, its versions to step between, newest first with who made each and when, and Undo on the newest.
+  the window, its versions to step between with the arrows or the list, newest first with who made each and when, and
+  Undo on the newest.
+
+  A DRAFT OPENS FIRST, MARKED, with Keep, Try again and Throw away over its page (`DraftBar.svelte`). The version it
+  stands at is a step away, tagged Current, and a draft never kept is tagged Thrown away in the list.
 
   LOADED BY `import()` ON THE FIRST PRESS (`VisualStrip.svelte`), so no page that only holds a visual carries this or the
   renderer's frame document in its first load.
@@ -28,7 +32,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { scrims, settled } from '$lib/ui/panel.ts';
   import { drawnTheme, visualDocument, type DrawnTheme } from 'braindog-render';
-  import { forgetCards, madeLine, readOpened, readPictures, tagOf, undoAsks, undoOf, visualWords as words, type Opened } from './held.ts';
+  import DraftBar from './DraftBar.svelte';
+  import { forgetCards, madeLine, readOpened, readPictures, stepOf, tagOf, undoAsks, undoOf, visualWords as words, type Opened } from './held.ts';
 
   let {
     open = $bindable(false),
@@ -44,7 +49,7 @@
     on: string;
     /** Its title as the strip said it, the dialog's name until the read lands. */
     title: string;
-    /** Said after an Undo changed what the thing holds. */
+    /** Said after an Undo or a press on a draft changed what the thing holds. */
     onchanged?: (() => void) | undefined;
   } = $props();
 
@@ -56,9 +61,10 @@
   let held = false;
   let lift: (() => void) | null = null;
 
-  /** The version shown, and the one the visual stands at now (what a read with no version answers). */
+  /** The version shown, the one the visual stands at now, and the draft waiting beside it, as the last read said. */
   let shown = $state.raw<Opened | null>(null);
   let standing = $state<number | null>(null);
+  let draft = $state<number | null>(null);
   let doc = $state<string | null>(null);
   let fix = $state('');
   let missing = $state(0);
@@ -74,6 +80,8 @@
   const who = (by: string): string => actor(by, me, names).name;
   const now = $derived(Date.now());
   const undoBatch = $derived(shown ? undoOf(shown.versions, standing, shown.version) : null);
+  const older = $derived(shown ? stepOf(shown.versions, shown.version, true) : null);
+  const newer = $derived(shown ? stepOf(shown.versions, shown.version, false) : null);
 
   /** Light or dark as the page is drawn now, and its colours: the drawn block's reading of them. */
   function themeNow(): DrawnTheme {
@@ -84,7 +92,7 @@
     return drawnTheme(dark ? 'dark' : 'light', (name) => css.getPropertyValue(name));
   }
 
-  /** Read one version, or the one it stands at, with its pictures, and draw it. */
+  /** Read one version, or the draft waiting, else the one it stands at, with its pictures, and draw it. */
   async function show(version?: number) {
     fix = '';
     const base = apiBase();
@@ -94,7 +102,8 @@
       return;
     }
     const pictures = await readPictures(base, got.value.pictures);
-    if (version === undefined) standing = got.value.version;
+    standing = got.value.kept;
+    draft = got.value.draft;
     shown = got.value;
     missing = pictures.missing;
     doc = visualDocument(got.value.page, pictures.inline, themeNow());
@@ -164,7 +173,7 @@
   $effect(() => {
     if (!open) return;
     const again = () => {
-      if (shown) void show(shown.version === standing ? undefined : shown.version);
+      if (shown) void show(shown.version);
     };
     const media = matchMedia('(prefers-color-scheme: dark)');
     media.addEventListener('change', again);
@@ -175,6 +184,15 @@
       watch.disconnect();
     };
   });
+
+  /* ── a draft settled: what the record said, and the thing read again ── */
+
+  async function settled_(line: string) {
+    said = line;
+    forgetCards(apiBase(), on);
+    onchanged?.();
+    await show();
+  }
 
   /* ── Undo ── */
 
@@ -232,6 +250,16 @@
         </p>
       {/if}
     </div>
+    {#if shown && shown.versions.length > 1}
+      <div class="v-step">
+        <button type="button" class="v-arrow tap" disabled={older === null} onclick={() => older !== null && void show(older)} aria-label={words.older} title={words.older}>
+          <Icon name="back" size="m" />
+        </button>
+        <button type="button" class="v-arrow tap" disabled={newer === null} onclick={() => newer !== null && void show(newer)} aria-label={words.newer} title={words.newer}>
+          <Icon name="arrow" size="m" />
+        </button>
+      </div>
+    {/if}
     {#if undoBatch !== null}
       <Button size="sm" disabled={busy} onclick={() => void undo()}>{words.undo}</Button>
     {/if}
@@ -248,6 +276,11 @@
         <Button size="sm" weight="primary" disabled={busy} onclick={() => asking && void putBack(asking)}>{words.undoYes}</Button>
       </div>
     </div>
+  {/if}
+  {#if shown && draft !== null && shown.version === draft}
+    {#key `${shown.id} ${draft}`}
+      <div class="v-draft"><DraftBar id={shown.id} version={draft} by={shown.by} title={shown.title} onsettled={(line) => void settled_(line)} /></div>
+    {/key}
   {/if}
   {#if said}<p class="v-said" role="status">{said}</p>{/if}
 
@@ -269,9 +302,9 @@
       <nav class="v-versions" aria-label={words.versions(shown.versions.length)}>
         <ol>
           {#each shown.versions as v (v.version)}
-            {@const tag = tagOf(v.version, shown.versions, standing)}
+            {@const tag = tagOf(v.version, shown.versions, standing, draft)}
             <li>
-              <button type="button" class="v-version tap" aria-current={v.version === shown.version ? 'true' : undefined} onclick={() => void show(v.version === standing ? undefined : v.version)}>
+              <button type="button" class="v-version tap" aria-current={v.version === shown.version ? 'true' : undefined} onclick={() => void show(v.version)}>
                 <span class="v-version-n">{words.version(v.version)}{#if tag}<span class="v-tag">{tag}</span>{/if}</span>
                 <span class="v-version-by">{madeLine(who(v.by), v.at, now)}</span>
               </button>
@@ -356,6 +389,41 @@
 
   .v-close:hover {
     color: var(--ink);
+  }
+
+  .v-step {
+    flex: none;
+    display: flex;
+    gap: 4px;
+  }
+
+  .v-arrow {
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .v-arrow:hover:not(:disabled) {
+    background: var(--tile-2);
+    color: var(--ink);
+  }
+
+  .v-arrow:disabled {
+    color: var(--ink-3);
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .v-draft {
+    padding: 10px 20px;
+    border-block-end: 1px solid var(--rule);
   }
 
   .v-ask,
@@ -523,9 +591,15 @@
 
     .v-ask,
     .v-said,
+    .v-draft,
     .v-note,
     .v-missing {
       padding-inline: 16px;
+    }
+
+    .v-arrow {
+      inline-size: 44px;
+      block-size: 44px;
     }
   }
 </style>
