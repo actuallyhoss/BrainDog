@@ -1,7 +1,7 @@
 /**
  * HOW MUCH OF EACH PROJECT'S WORK IS LATE, for its card's red flag (proj section 4, Row A: "1 late").
  *
- * Counted as the project's own page counts it (`ProjectShape.svelte`): the open rows of the work list that points at the
+ * Counted as the project's own page counts it (`shape-hold.svelte.ts`): the open rows of the work list that points at the
  * projects list (the one that says who holds its rows), past their day on the record's clock ("before today", SF3), so
  * a card, its page's hero and Work say one number. One read of the late rows for every card at once (`rowLates`); a read
  * that fails says nothing, and a card with nothing late draws no flag.

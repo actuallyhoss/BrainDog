@@ -80,6 +80,9 @@
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
+  import { getContext } from 'svelte';
+  import { SHAPE_KEY, type ShapeBox } from './shape-key.ts';
+  import { partsOf } from './kinds/project.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { drawnOf } from './kinds/drawn.ts';
   import { goto } from '$app/navigation';
@@ -545,6 +548,12 @@
      line, who is working, and the projects' row of cards, each the desk's component over the block's own answer. The
      block's bar is kept for a screen reader, as a lead question's is, since the tile says its own name. */
   const desk = $derived((block as { desk?: Desk }).desk ?? null);
+  /* ── a row of a project's shape ──────────────────────────────────────────
+     A `project` BLOCK IS A ROW OF THE PROJECT'S OWN SHAPE (C28, C29, `ProjectPart.svelte`): its hero, path, money, work,
+     people, what it runs on or its agents, drawn from the one read of the project the page holds (`shape-key.ts`). Its
+     bar is kept for a screen reader, as the desk's is, since each part's tile says its own name. */
+  const parts = $derived(partsOf(block));
+  const shapeBox = getContext<ShapeBox | undefined>(SHAPE_KEY);
   /* A PHONE SHOWS THREE LATE LINES AT REST, a desk four. */
   const phone = new MediaQuery('(width < 600px)', false);
 
@@ -685,7 +694,7 @@
   <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
        ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
        heading list. While arranging it shows, since that is the label a block is moved by. -->
-  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) || (desk && !arranging) ? '' : undefined}>
+  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) || (desk && !arranging) || (parts !== null && !arranging) ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
@@ -726,7 +735,13 @@
 <!-- Never hidden and never centred: the page's shape is information, and a page that silently shrinks teaches that
      blocks come and go (19 §6). ONE surface for every kind, so "nothing matched" and "this block is broken" are told
      apart. -->
-{#if desk && !arranging && !block.refusals.length}
+{#if parts !== null && !arranging && !block.refusals.length}
+  <!-- THE ROW, its component fetched as the row is drawn, so a page that is no project's carries none of it. -->
+  {#if shapeBox?.hold}
+    {@const hold = shapeBox.hold}
+    {#await import('./ProjectPart.svelte') then { default: ProjectPart }}<ProjectPart {hold} {parts} />{/await}
+  {/if}
+{:else if desk && !arranging && !block.refusals.length}
   <!-- THE DESK'S OWN TILE, its component fetched as the tile is drawn, so a page that is not Today carries none of it. -->
   <div class="desk-part" data-desk={desk.kind}>
     {#if desk.kind === 'late'}
@@ -1184,6 +1199,17 @@
   }
 
   /* THE DESK'S OWN TILE IS ITS OWN TILE: the slot draws no fill round it, and the tile fills the slot's height. */
+  /* A ROW OF A PROJECT'S SHAPE IS ITS PARTS' OWN TILES: the slot draws no fill round them, and a row with nothing to
+     show (the agents' runs read unseen) takes no room on the board. */
+  :global(.block-slot.block-slot:has(> .shape-row)) {
+    padding: 0;
+    background: none;
+  }
+
+  :global(.block-slot.block-slot:has(> .shape-row[data-empty])) {
+    display: none;
+  }
+
   :global(.block-slot.block-slot:has(> .desk-part)) {
     padding: 0;
     background: none;

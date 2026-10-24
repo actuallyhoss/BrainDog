@@ -131,7 +131,7 @@
   const backName = $derived(((route.data as unknown as Shell).nav ?? []).find((n) => `/p/${n.id}` === backTo)?.title);
   /* ITS SHAPE'S CODE IS ASKED AS IT OPENS, so the page landing does not wait on the chunk with nothing drawn. */
   $effect(() => {
-    if (known) void import('$lib/page/ProjectShape.svelte');
+    if (known) void Promise.all([import('$lib/page/shape-hold.svelte.ts'), import('$lib/page/ProjectPart.svelte')]);
   });
 
   /**

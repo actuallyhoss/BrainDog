@@ -261,8 +261,18 @@
   type Laid = { slot: Slot; block: LiveBlock; at: number };
   const pairs = $derived<Laid[]>(laid.map((x, at) => ({ ...x, at })));
 
+  /**
+   * THE PROJECT'S SHAPE, ITS PARTS AS THE PAGE DECLARES THEM (`{ kind: project, part }`, C28 and C29): the hero, Path and
+   * Money, Work and Who is on it, Runs on and the agents on it, over both columns and before them, in the order they are
+   * declared, as the shape stood over the page when it was drawn by hand. Each row lays its own parts
+   * (`ProjectPart.svelte`). On a page at its own address and not while arranging, where each is a block of its column.
+   */
+  const shapeParts = $derived(mode === 'page' && !arranging ? pairs.filter((x) => x.block.kind === 'project').sort((a, b) => a.slot.i - b.slot.i) : []);
+  /** Every pair the columns lay out: all of them, less the shape's parts. */
+  const rest = $derived(shapeParts.length === 0 ? pairs : pairs.filter((x) => !shapeParts.includes(x)));
+
   /** Each area's pairs, in declared order. The slot says where a block is, because a move to the rail is a slot's. */
-  const split = $derived(splitAreas(pairs, layout, (x) => x.slot.area));
+  const split = $derived(splitAreas(rest, layout, (x) => x.slot.area));
 
   /**
    * THE HEADLINE, LIFTED: the page's sentence, drawn as the header's line under the page's name and not as a tile
@@ -295,7 +305,7 @@
    */
   const sectioned = $derived.by(() => {
     const out = new Map<number, LiveBlock>();
-    for (const list of layout ? [mainRest, railRest] : [pairs]) {
+    for (const list of layout ? [mainRest, railRest] : [rest]) {
       let open: { at: number; block: LiveBlock; under: Toned[] } | null = null;
       const close = () => {
         if (open && open.under.length > 0) out.set(open.at, { ...open.block, heads: open.under } as Headed<LiveBlock>);
@@ -344,8 +354,8 @@
    * can see, and `j` on a page that opens with three of them pressed three times before anything moved.
    */
   const reading = $derived.by(() => {
-    if (!layout) return pairs.filter((x) => x.block.drawn);
-    const top = lifted ? [lifted] : [];
+    if (!layout) return [...shapeParts, ...rest].filter((x) => x.block.drawn);
+    const top = [...(lifted ? [lifted] : []), ...shapeParts];
     const first = leadFirst ? [leadFirst] : [];
     /* AT A DESK WITH THE COLUMN CLOSED, the board under both columns comes after the rail, where the eye meets it. */
     const desk = [...top, ...flowSplit.beside, ...railRest, ...flowSplit.after];
@@ -482,7 +492,7 @@
     /* THE MAIN COLUMN BESIDE THE RAIL AND THE BOARD UNDER IT ARE TWO FLOWS (`flowSplit`), and the one under it pairs its
        whole rows as a page with no rail does, since it has the board's whole width. */
     const after = flowSplit.after;
-    const flows = layout ? [flowSplit.beside, after] : [pairs];
+    const flows = layout ? [flowSplit.beside, after] : [rest];
     for (const run of flows.flatMap((list) => runsOf(list).map((r) => ({ ...r, wide: list === after })))) {
       let got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
       if (twoUp || (run.wide && workWidth !== null && workWidth >= PAIR_FROM)) {
@@ -1146,7 +1156,7 @@
   <!-- `rail` is whether the block is drawn in the rail; `pos` and `count` are its place in its own column, which is what
        Move up and Move down step through. -->
   {@const rail = layout !== null && slot.area === 'rail'}
-  {@const peers = rail ? split.rail : layout ? split.main : pairs}
+  {@const peers = rail ? split.rail : layout ? split.main : rest}
   {@const pos = peers.findIndex((x) => x.at === at)}
   {@const count = peers.length}
   {@const stacked = rail || slot.span >= COLUMNS}
@@ -1371,6 +1381,12 @@
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
   {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
   {#if opens && opensAt < 0}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
+  <!-- THE PROJECT'S SHAPE OVER BOTH COLUMNS, where the screen's own opening stood, its parts in one flow of their own (`shapeParts`). -->
+  {#if shapeParts.some((x) => x.block.drawn)}
+    <div class="area" data-area="shape">
+      {#each shapeParts as x (keys[x.slot.i])}{@render slotted(x)}{/each}
+    </div>
+  {/if}
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
   {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
@@ -1398,7 +1414,7 @@
       {@render afterArea(flowSplit.after)}
     {/if}
   {:else}
-    {@render column(pairs)}
+    {@render column(rest)}
   {/if}
   <!-- WHAT WAS CHANGED FOR THE READER THIS WEEK, one line at the foot of the board; the list opens in the panel. -->
   {#if host && mode === 'page' && !arranging}<Changed {host} />{/if}
@@ -1481,6 +1497,17 @@
   }
 
   .area[data-area='rail'] .block-slot {
+    grid-column: auto;
+  }
+
+  /* THE PROJECT'S SHAPE, OVER BOTH COLUMNS (`shapeParts`): one row of it under the other, each the whole width, and each
+     laying its own parts side by side (`ProjectPart.svelte`). */
+  .area[data-area='shape'] {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .area[data-area='shape'] > .block-slot {
     grid-column: auto;
   }
 

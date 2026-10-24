@@ -29,7 +29,9 @@
   import '@braindog/skin/blocks-charts.css';
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';
-  import { untrack } from 'svelte';
+  import { setContext, untrack } from 'svelte';
+  import { live as liveRecord } from '$lib/data/live.svelte.ts';
+  import { SHAPE_KEY, type ShapeBox } from './shape-key.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -104,7 +106,7 @@
     waiting,
   }: {
     /**
-     * What a project's page draws while its shape's code is on its way, the project in its own shape (`ProjectWaiting`,
+     * What a project's page draws while its shape's code is on its way (`shape-hold.svelte.ts`), the project in its own shape (`ProjectWaiting`,
      * handed in by the route so this file's chunk does not carry it). Left out, nothing is drawn there, as before.
      */
     waiting?: Snippet | undefined;
@@ -188,14 +190,47 @@
      counts them first (`panels.ts`): ONE READ A PAGE, for the row it is drawn for, and only where a section waits on
      it. `null` until the read is back, and for good where nothing asks or the record refused. Read again for another
      row, never for the same page read again after a write. */
-  /* What the project's shape draws on this page, said by `ProjectShape` once its reads are back. */
-  let shapeDrew = $state.raw<readonly Block[]>([]);
-  let shapeRow = $state.raw<Readonly<Record<string, unknown>> | null>(null);
-  /* Whether the shape's reads are back. Until they are, what it runs on is taken as the shape's, so a declared Runs on
-     does not stand empty and then go when the shape lands (the audit of 20 October, on a project page). */
-  let shapeKnown = $state(false);
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
+  /* ── the project's shape ───────────────────────────────────────────────────
+     A PAGE ABOUT A ROW READS THE ROW'S PROJECT ONCE (`shape-hold.svelte.ts`), and every part of the shape the page
+     declares (`{ kind: project, part }`, C28 and C29) is drawn from that one read in its own slot (`BlockSlot.svelte`,
+     through `shape-key.ts`). The hold's code is fetched only for a page about a row, so Today carries none of it. A row
+     that is not a project's reads nothing, and the hold says so at once. */
+  const shapeBox = $state<ShapeBox>({ hold: null });
+  setContext(SHAPE_KEY, shapeBox);
+  $effect(() => {
+    const of = about;
+    const isOwner = shell?.me?.owner === true;
+    const line = modelLine;
+    untrack(() => {
+      if (!of) {
+        shapeBox.hold = null;
+        return;
+      }
+      void import('./shape-hold.svelte.ts').then(({ ShapeHold }) => {
+        if (about?.register !== of.register || about.seq !== of.seq) return;
+        const hold = shapeBox.hold ?? new ShapeHold();
+        hold.owner = isOwner;
+        hold.modelLine = line;
+        hold.follow(of.register, of.seq);
+        if (shapeBox.hold !== hold) shapeBox.hold = hold;
+      });
+    });
+  });
+  /* READ AGAIN WHEN THE RECORD MOVES, keeping what is on screen until the new read answers (proj F9). */
+  $effect(() => {
+    const v = liveRecord.version;
+    const hold = shapeBox.hold;
+    untrack(() => hold?.moved(v));
+  });
+  $effect(() => () => shapeBox.hold?.stop());
+  /* What the project's shape draws on this page, once its reads are back. */
+  const shapeDrew = $derived<readonly Block[]>(shapeBox.hold?.blocks ?? []);
+  const shapeRow = $derived<Readonly<Record<string, unknown>> | null>(shapeBox.hold?.shape && shapeBox.hold.read ? shapeBox.hold.read.fields : null);
+  /* Whether the shape's reads are back. Until they are, what it runs on is taken as the shape's, so a declared Runs on
+     does not stand empty and then go when the shape lands (the audit of 20 October, on a project page). */
+  const shapeKnown = $derived(shapeBox.hold?.known ?? false);
   /* A PAGE ABOUT A PROJECT'S ROW (proj section 4): its hero holds the name, so the head is the way back and the actions. */
   const projectPage = $derived(about !== null && isProject(REGISTERS[about.register]));
   /* THE ROW'S OWN FIELDS UNDER A PAGE ABOUT IT (things, not rows): the page speaks first, and "Show the data" opens the
@@ -405,7 +440,7 @@
   /**
    * AND THEN THE SENTENCE IS THE LEAD TILE (the Bento boards, 22 October): the page's name, count and buttons on the
    * tile's first row and the sentence under them at 40, in place of a 28px name over a 17px line floating on the board.
-   * Not on a project's page, whose hero already holds its name and its line (`ProjectShape`).
+   * Not on a project's page, whose hero already holds its name and its line (`ProjectPart`).
    */
   const tiled = $derived(led && !projectPage);
 
@@ -550,8 +585,11 @@
     /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
        Not while the page is arranged, which moves the blocks as they are declared. */
     const shaped = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange ? onProject(drawn, about?.register ?? '') : drawn;
-    if (about && !shapeKnown) return withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null);
-    return about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
+    const repeats = about && !shapeKnown ? withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null) : about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
+    /* EACH PART OF THE PROJECT'S SHAPE IS DRAWN WHERE IT HAS SOMETHING, at its width (`project-parts.ts`), and none on a
+       page about no project. */
+    const hold = shapeBox.hold;
+    return hold && about ? hold.laid(repeats) : repeats.map((b) => (b.kind === 'project' && b.drawn ? ({ ...b, drawn: false, why: 'empty' } as LiveBlock) : b));
   });
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. This is what Arrange moves. */
@@ -878,16 +916,16 @@
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
     {#await import('./SourceView.svelte') then { default: SourceView }}<SourceView {slug} title={live.page.page.title} />{/await}
   {:else}
-    <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
-    <!-- THE SHAPE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a project's shape, so its
-         first load does not carry one. The page waits on the shape's reads either way (`shapeWaits`). -->
-    {#snippet shapeAt()}{#await import('./ProjectShape.svelte')}{@render waiting?.()}{:then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} {modelLine} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
+    <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, the parts its page declares (C28, C29); its other
+         blocks follow. THE SHAPE'S CODE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a
+         project's shape, so its first load does not carry one. While it is on its way the project waits in its own shape
+         (`waiting`), and the page's other blocks wait on the shape's reads (`shapeWaits`). -->
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"
-      opens={about ? shapeAt : null}
+      opens={about && !shapeBox.hold ? (waiting ?? null) : null}
       page={bodyPage ?? live.page.page}
-      blocks={shapeWaits ? [] : all}
+      blocks={shapeWaits ? all.map((b) => (b.kind === 'project' || !b.drawn ? b : ({ ...b, drawn: false } as LiveBlock))) : all}
       held={counted}
       now={live.now}
       {writes}

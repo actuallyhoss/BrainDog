@@ -7,7 +7,7 @@
   sheet (`KpiSheet.svelte`) on that number, wherever it is drawn. Its menu says the two ways it is not on Today and
   "Lead the card with this" (`block-menu.ts` `kpiActionsFor`), each one press through the app's row writer at the
   version each row was read at, with a line over Undo. On a project's page the foot adds one, and no number is drawn
-  large: the hero says the one the card leads with (`ProjectShape.svelte`), so here it is the first tile, marked.
+  large: the hero says the one the card leads with (`ProjectPart.svelte`), so here it is the first tile, marked.
 
   WHAT WAS SUGGESTED AND NOT KEPT is on the project's page only, under its numbers: each by name with Keep and Not this.
   Every form of the block leaves drafts out (`sources/kpis.ts`), so this is the one place they are seen; Keep is the

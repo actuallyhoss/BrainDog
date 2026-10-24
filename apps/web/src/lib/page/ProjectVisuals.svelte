@@ -12,6 +12,9 @@
   months with two of them above nought; otherwise the total is a line. Bars in the project's colour, the period before at
   45% of it over the tile so it holds in dark.
 
+  ONE AT A TIME ON A PROJECT'S PAGE (C28, 24 October): Path and Money are each a block of the page (`only`), laid side by
+  side by the page's own flow (`project-parts.ts`); with no `only` both are drawn in one row, as before.
+
   EACH TILE IS AS TALL AS ITS CONTENT (`align-self: start`), so neither stretches to the other. "Show the data" waits for
   the pointer on a wide screen with a fine pointer (SF10), and is always there on a phone.
 -->
@@ -22,6 +25,7 @@
   import { at } from '$lib/at.ts';
   import { monthsDrawn, type Months, type Path, type Trend } from '$lib/record/visuals.ts';
   import type { DataRow, MoneyLine } from '$lib/record/project.ts';
+  import { moneyShown } from './project-parts.ts';
 
   let {
     path = null,
@@ -35,6 +39,7 @@
     money = [],
     moneyRows = [],
     arrived = new Set<string>(),
+    only = null,
   }: {
     path?: Path | null;
     /** The whole work list narrowed to the project, for "All 17". */
@@ -54,6 +59,8 @@
     moneyRows?: readonly DataRow[];
     /** Which figures changed in the read just landed (`data-arrived`, proj F9). */
     arrived?: ReadonlySet<string>;
+    /** The one tile to draw, where the page lays each as a block of its own (C28). */
+    only?: 'path' | 'money' | null;
   } = $props();
 
   const uid = $props.id();
@@ -99,7 +106,8 @@
     return null;
   });
   const peak = (m: Months): number => Math.max(...m.months.map((x) => x.value), 1);
-  const hasMoney = $derived(lead !== null || since !== null || months !== null);
+  /* WHETHER MONEY SAYS ANYTHING, by the rule the page lays its part by (`moneyShown`), so the two never disagree. */
+  const hasMoney = $derived(moneyShown(money, trend, inByMonth, outByMonth));
   const monthRows = $derived<DataRow[]>(months ? months.m.months.map((x) => ({ key: `m#${x.key}`, title: monthLong(x.key), detail: format(x.value, months.m.currency), href: null })) : []);
   const trendRows = $derived<DataRow[]>(
     trend
@@ -116,9 +124,9 @@
   const doneCount = $derived(path ? path.stops.filter((s) => s.kind === 'done').length : 0);
 </script>
 
-{#if path || hasMoney}
-  <div class="row2" data-alone={path && hasMoney ? undefined : ''}>
-    {#if path}
+{#if (path && only !== 'money') || (hasMoney && only !== 'path')}
+  <div class="row2" data-alone={path && hasMoney && only === null ? undefined : ''}>
+    {#if path && only !== 'money'}
       <div class="vis path">
         <Tile icon="observe" title="Path" href={pathHref ?? undefined} hrefLabel={pathHref ? `All ${path.total}` : undefined} id="part-path" data-part="Path" data-part-icon="observe">
           <ol class="steps" aria-label="Path" style:--stops={path.stops.length} style:--done={doneCount} data-many={path.stops.length > 5 ? '' : undefined}>
@@ -136,7 +144,7 @@
         </Tile>
       </div>
     {/if}
-    {#if hasMoney}
+    {#if hasMoney && only !== 'path'}
       <div class="vis money">
         <Tile icon="money" title="Money" id="part-money" data-part="Money" data-part-icon="money">
           <div class="mb">

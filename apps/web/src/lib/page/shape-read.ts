@@ -1,12 +1,12 @@
 /**
- * A project's shape, read (`ProjectShape.svelte` draws it): its row, what was said of it, what points at it, the work
+ * A project's shape, read (`shape-hold.svelte.ts` holds it, and each part of the page draws from it, `ProjectPart.svelte`): its row, what was said of it, what points at it, the work
  * and the runs on it, its key number and its money, on the record's clock.
  *
  * ASKED AHEAD OF THE SHAPE (`shapeAhead`): a page about a project's row says which row the moment its answer is in, and
  * the shape mounted only once the page's blocks had walked every list their rows name, so it was read a round trip or
  * three after the page was drawn and the page's blocks were pushed down when it landed (CLS 0.15 on a project's first
  * open, `loop/perf/r3-diag.mjs`). The page now asks for it as soon as it knows the row and the shape takes that read when
- * it mounts (`takeShape`), so it lands sooner; what follows it on the page waits for it (`shapeWaits` in `PageView`).
+ * it follows the row (`takeShape`), so it lands sooner; what follows it on the page waits for it (`shapeWaits` in `PageView`).
  *
  * ONE ROUND TRIP AND NOT THREE: what needs only the row's number (what was said of it, what points at it, its key
  * number) is asked beside the row, the work and the runs as soon as the lists' declarations are learnt, and the money,

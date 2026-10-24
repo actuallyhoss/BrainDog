@@ -64,12 +64,13 @@ test('THE PAGE ASKS AHEAD ONLY WHERE NOTHING OF IT IS DRAWN, and the shape takes
   const route = readFileSync(new URL('../../routes/p/[slug]/+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /if \(got === null && \(route\.params\.slug \?\? ''\) === asked\) void shapeAhead\(apiBase\(\), row\.register, row\.seq, row\.title\);/u);
   assert.match(route, /reader\.read\(asked, filtered, \{ about \}\)/u);
-  const shape = readFileSync(new URL('./ProjectShape.svelte', import.meta.url), 'utf8');
+  const shape = readFileSync(new URL('./shape-hold.svelte.ts', import.meta.url), 'utf8');
   assert.match(shape, /await \(takeShape\(base, r, n\) \?\? readShape\(base, r, n\)\)/u);
 });
 
 test('WHAT FOLLOWS A PROJECT’S SHAPE WAITS FOR IT, and is drawn with it', () => {
   const view = readFileSync(new URL('./PageView.svelte', import.meta.url), 'utf8');
   assert.match(view, /const shapeWaits = \$derived\(projectPage && about !== null && !shapeKnown && !arranging && arrangement\.slots === null\);/u);
-  assert.match(view, /blocks=\{shapeWaits \? \[\] : all\}/u);
+  /* THE SHAPE'S OWN PARTS ARE DRAWN WHILE IT WAITS (C28, C29): the hero holds the screen, and every other block waits. */
+  assert.match(view, /blocks=\{shapeWaits \? all\.map\(\(b\) => \(b\.kind === 'project' \|\| !b\.drawn \? b : \(\{ \.\.\.b, drawn: false \} as LiveBlock\)\)\) : all\}/u);
 });

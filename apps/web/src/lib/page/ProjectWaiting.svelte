@@ -51,7 +51,7 @@
     gap: var(--tile-gap);
   }
 
-  /* THE HERO'S OWN GEOMETRY (`ProjectShape`'s `.hero`): the well, the name at the page's size in the display face, where
+  /* THE HERO'S OWN GEOMETRY (`ProjectPart`'s `.hero`): the well, the name at the page's size in the display face, where
      it stands under it, and the line of news across, over the project's colour at its low tint. */
   .pw-hero {
     --ph: var(--ink);
