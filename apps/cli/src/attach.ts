@@ -1,6 +1,7 @@
 /**
  * `braindog attach <file.html> [pictures...] --on "<thing>"`: pictures first through the file door, then the page in one
- * call, so no call carries more than one of them. `--undo <batch>` takes it back as the receipt says.
+ * call, so no call carries more than one of them. `--draft` hands the version in as a draft, which waits for a person to
+ * keep or throw away in BrainDog. `--undo <batch>` takes it back as the receipt says.
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -14,7 +15,7 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { isObject, type AgentIo } from './skills.ts';
 
-const USAGE = 'braindog attach takes a page and its pictures, as in braindog attach audit.html img/before.png --on "Fix the login" [--title <title>] [--host <host>], or --undo <batch>.';
+const USAGE = 'braindog attach takes a page and its pictures, as in braindog attach audit.html img/before.png --on "Fix the login" [--title <title>] [--visual <id>] [--draft] [--host <host>], or --undo <batch>.';
 
 /** The most a page may be, as the record holds it (`VISUAL_PAGE_MOST`), asked here so a long one never leaves the machine. */
 export const PAGE_MOST = 512 * 1024;
@@ -59,14 +60,14 @@ type Attached = { visual?: unknown; version?: unknown; batch?: unknown; said?: u
 
 /** `braindog attach`, and its exit code: 0 kept, 1 refused, 3 unreachable. */
 export async function attachCommand(args: string[], io: AgentIo): Promise<number> {
-  let values: { on?: string | undefined; title?: string | undefined; visual?: string | undefined; undo?: string | undefined; host?: string | undefined };
+  let values: { on?: string | undefined; title?: string | undefined; visual?: string | undefined; draft?: boolean | undefined; undo?: string | undefined; host?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
       args,
       strict: true,
       allowPositionals: true,
-      options: { on: { type: 'string' }, title: { type: 'string' }, visual: { type: 'string' }, undo: { type: 'string' }, host: { type: 'string' } },
+      options: { on: { type: 'string' }, title: { type: 'string' }, visual: { type: 'string' }, draft: { type: 'boolean' }, undo: { type: 'string' }, host: { type: 'string' } },
     }));
   } catch {
     io.say(USAGE);
@@ -85,7 +86,7 @@ export async function attachCommand(args: string[], io: AgentIo): Promise<number
 
   /* ── taking one back, by the batch its receipt named ── */
   if (values.undo !== undefined) {
-    if (positionals.length > 0 || values.on !== undefined) {
+    if (positionals.length > 0 || values.on !== undefined || values.draft === true) {
       io.say(USAGE);
       return 1;
     }
@@ -147,6 +148,7 @@ export async function attachCommand(args: string[], io: AgentIo): Promise<number
     pictures,
     ...(values.title === undefined ? {} : { title: values.title }),
     ...(values.visual === undefined ? {} : { visual: values.visual }),
+    ...(values.draft === true ? { draft: true } : {}),
   });
   if (!done.ok) {
     if (refused(done) && (done.refusal.code === 'ROUTE_UNKNOWN' || done.refusal.code === 'NOT_IN_THIS_BUILD'))

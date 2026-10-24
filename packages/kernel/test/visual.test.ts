@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { visualPage, visualSaid, visualStanding, type VisualLine } from '../src/visual.ts';
+import { visualPage, visualSaid, visualStanding, visualState, type VisualLine } from '../src/visual.ts';
 
 const fault = (html: string, names: string[] = []): string => {
   const out = visualPage(html, new Set(names));
@@ -46,4 +46,23 @@ test('A VISUAL STANDS AT ITS NEWEST VERSION, a step back names the version, and 
   assert.equal(visualStanding([v1, line('g', JSON.stringify({ gone: true }), 3)]), null);
   assert.equal(visualStanding([]), null);
   assert.equal(visualSaid('--erased--'), null, 'an erased line says nothing a visual can be');
+});
+
+test('A DRAFT WAITS BESIDE THE KEPT VERSION and never moves where it stands; a keep moves it, a throw away clears it', () => {
+  const body = (page: string, draft = false) => JSON.stringify({ title: 'T', page: page.repeat(64), bytes: 1, pictures: [], ...(draft ? { draft: true } : {}) });
+  const line = (id: string, to: string, rowid: number): VisualLine => ({ rowid, id, ts: '', actor: 'p', target: 'entry:x', field: 'visual:v1', to_v: to, batch: null });
+  const v1 = line('v1', body('a'), 1);
+  const d2 = line('d2', body('b', true), 2);
+  const drop = line('t', JSON.stringify({ drop: 'd2' }), 3);
+  assert.deepEqual(visualState([v1, d2]), { standing: 'v1', draft: 'd2' });
+  assert.equal(visualStanding([v1, d2]), 'v1', 'a draft never replaces the kept one');
+  assert.deepEqual(visualState([v1, d2, line('k', JSON.stringify({ keep: 'd2' }), 3)]), { standing: 'd2', draft: null });
+  assert.deepEqual(visualState([v1, d2, drop]), { standing: 'v1', draft: null });
+  /* A KEEP OF A DRAFT NO LONGER WAITING MOVES NOTHING, and a kept version after a draft leaves none waiting. */
+  assert.deepEqual(visualState([v1, d2, drop, line('k', JSON.stringify({ keep: 'd2' }), 4)]), { standing: 'v1', draft: null });
+  assert.deepEqual(visualState([v1, d2, line('v3', body('c'), 3)]), { standing: 'v3', draft: null });
+  /* A FIRST VERSION AS A DRAFT stands nowhere yet, and an undo's step back may put a draft back to wait. */
+  assert.deepEqual(visualState([d2]), { standing: null, draft: 'd2' });
+  assert.deepEqual(visualState([v1, d2, drop, line('u', JSON.stringify({ back: 'v1', draft: 'd2' }), 4)]), { standing: 'v1', draft: 'd2' });
+  assert.deepEqual(visualSaid(body('a', true)), { title: 'T', page: 'a'.repeat(64), bytes: 1, pictures: [], draft: true });
 });

@@ -269,7 +269,7 @@ export type { PenItem } from './emergent.ts';
    mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
 export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type SealedStore } from './methods/sealed.ts';
-export type { AttachVisualArgs, PictureNamed, VisualAttached, VisualListed, VisualRead, VisualStore } from './methods/visuals.ts';
+export type { AttachVisualArgs, PictureNamed, SettleVisualArgs, VisualAttached, VisualListed, VisualRead, VisualSettled, VisualStore } from './methods/visuals.ts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';

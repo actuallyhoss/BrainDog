@@ -61,7 +61,7 @@ import { reopenedTail } from './ingest.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { attempt } from './tx.ts';
-import { VISUAL_FIELD, isVersion, visualLines, visualSaid, visualStanding, type VisualLine } from './visual.ts';
+import { VISUAL_FIELD, isVersion, visualLines, visualSaid, visualState, type VisualLine } from './visual.ts';
 
 /* ── what is asked and what is answered ──────────────────────────────────── */
 
@@ -912,7 +912,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       ...(only.value === null ? {} : { only: only.value }),
       /* ONLY WHEN THERE IS ONE, so a plan with none has the hash it always had. */
       ...(declares.length === 0 ? {} : { declares: declares.map((d) => [d.id, d.installed, d.prior]) }),
-      ...(visuals.length === 0 ? {} : { visuals: visuals.map((v) => [v.field, v.head, v.back]) }),
+      ...(visuals.length === 0 ? {} : { visuals: visuals.map((v) => (v.draft === null ? [v.field, v.head, v.back] : [v.field, v.head, v.back, v.draft])) }),
     } as unknown as Json),
   );
   return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, visuals, keys, lines, every, decisions });
@@ -923,8 +923,11 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
 /** Whether a line is one of a visual's (`visual.ts`), which the plan puts back as a visual and never counts as a note. */
 const isVisualLine = (l: Line): boolean => l.kind === 'note' && typeof l.field === 'string' && l.field.startsWith(VISUAL_FIELD);
 
-/** One visual the scope drew on, and the version it goes back to: `back` is a version line, `null` takes it away. */
-type Pictured = { target: string; field: string; head: number; back: string | null; keys: string[]; step: UndoStep };
+/**
+ * One visual the scope drew on, and where it goes back to: `back` is a version line, `null` takes it away, and `draft`
+ * is the draft that waits again, or `null` for none.
+ */
+type Pictured = { target: string; field: string; head: number; back: string | null; draft: string | null; keys: string[]; step: UndoStep };
 
 /**
  * The visuals the scope drew, each back to where it stood before. One somebody changed since is left with who; one an
@@ -951,23 +954,34 @@ function picturedIn(sql: Sql, lines: readonly Line[], keys: readonly string[], o
     const last = mine[mine.length - 1]!.rowid;
     const since = all.filter((l) => l.rowid > last);
     const title = [...all].reverse().map((l) => visualSaid(l.to_v)).find(isVersion)?.title ?? 'a visual';
-    /* LINES SINCE THAT LEFT IT WHERE THE SCOPE LEFT IT change nothing it would put back: a version drawn and undone. */
-    const now = visualStanding(all);
-    if (since.length > 0 && now !== visualStanding(all.filter((l) => l.rowid <= last))) {
+    /* LINES SINCE THAT LEFT IT WHERE THE SCOPE LEFT IT change nothing it would put back: a version drawn and undone. A
+       visual is where it stands and the draft waiting beside it, so a draft handed in, kept or thrown away is put back too. */
+    const same = (a: { standing: string | null; draft: string | null }, b: typeof a): boolean => a.standing === b.standing && a.draft === b.draft;
+    const now = visualState(all);
+    if (since.length > 0 && !same(now, visualState(all.filter((l) => l.rowid <= last)))) {
       if (since.every((l) => l.batch !== null && undoneBy.has(l.batch))) continue;
       skip(title, `${whoIn(sql, since[since.length - 1]!.actor)} has changed it since`);
       continue;
     }
-    const back = visualStanding(all.filter((l) => l.rowid < first));
-    if (back === now) continue;
-    const line = back === null ? `Takes the visual ${named(title)} away.` : `Puts the earlier version of the visual ${named(title)} back.`;
+    const before = visualState(all.filter((l) => l.rowid < first));
+    if (same(before, now)) continue;
+    const back = before.standing;
+    const line =
+      back === now.standing
+        ? before.draft === null
+          ? `Throws the draft of the visual ${named(title)} away.`
+          : `Puts the draft of the visual ${named(title)} back.`
+        : back === null && before.draft === null
+          ? `Takes the visual ${named(title)} away.`
+          : `Puts the earlier version of the visual ${named(title)} back.`;
     out.push({
       target,
       field,
       head: all[all.length - 1]!.rowid,
       back,
+      draft: before.draft,
       keys: [...new Set(mine.map(keyOf))],
-      step: { do: back === null ? 'remove' : 'set', title, label: 'visual', line },
+      step: { do: back === null && before.draft === null ? 'remove' : 'set', title, label: 'visual', line },
     });
   }
   return out;
@@ -1374,7 +1388,7 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
         v.target,
         v.target.slice(0, v.target.indexOf(':')),
         v.field,
-        jcs((v.back === null ? { gone: true } : { back: v.back }) as Json),
+        jcs({ ...(v.back === null ? { gone: true } : { back: v.back }), ...(v.draft === null ? {} : { draft: v.draft }) } as Json),
         PUT_BACK,
         batch,
       );

@@ -70,6 +70,14 @@ test('A PAGE AND ITS PICTURE GO UP, HANG ON THE THING BY ITS NAME, AND THE RECEI
   assert.ok(after.ok);
   assert.deepEqual(after.value.visuals, []);
 
+  /* --draft HANDS IT IN AS A DRAFT, and the receipt says so. */
+  out.length = 0;
+  assert.equal(await attachCommand(['audit/page.html', '--on', 'Kiln', '--draft'], io), 0, said.join('\n'));
+  assert.match(out[0] ?? '', /^Version 1 of "Kiln audit" waits on "Kiln" in Things as a draft/u);
+  const drafted = await running.api.visuals({ on: 'Kiln' }, owner);
+  assert.ok(drafted.ok);
+  assert.deepEqual(drafted.value.visuals.map((v) => [v.kept, v.draft?.version]), [[false, 1]]);
+
   /* A THING NOTHING IS CALLED IS REFUSED IN THE RECORD'S WORDS, exit 1. */
   said.length = 0;
   assert.equal(await attachCommand(['audit/page.html', '--on', 'Nothing called this'], io), 1);

@@ -38,11 +38,17 @@ export const PICTURE_NAME = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$/;
 
 export type VisualPicture = { name: string; sha256: string; mime: string; bytes: number };
 
-/** What a version line holds in `to_v`. */
-export type VisualBody = { title: string; page: string; bytes: number; pictures: VisualPicture[] };
+/**
+ * What a version line holds in `to_v`. `draft` marks one handed in to be kept or thrown away (DIRECTION §45): it waits
+ * beside the version the visual stands at and never replaces it until a person keeps it.
+ */
+export type VisualBody = { title: string; page: string; bytes: number; pictures: VisualPicture[]; draft?: true };
 
-/** What any visual line holds in `to_v`: a version, a step back to one, or the visual taken away. */
-export type VisualSaid = VisualBody | { back: string } | { gone: true };
+/**
+ * What any visual line holds in `to_v`: a version; a step back to one, or the visual taken away, each with the draft
+ * that waits again when an undo puts one back; a draft kept, so the visual stands at it; or a draft thrown away.
+ */
+export type VisualSaid = VisualBody | { back: string; draft?: string } | { gone: true; draft?: string } | { keep: string } | { drop: string };
 
 /** One line of a visual as the log holds it. */
 export type VisualLine = { rowid: number; id: string; ts: string; actor: string; target: string; field: string; to_v: string | null; batch: string | null };
@@ -128,8 +134,11 @@ export function visualSaid(to: string | null): VisualSaid | null {
   }
   if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
-  if (o.gone === true) return { gone: true };
-  if (typeof o.back === 'string') return { back: o.back };
+  const waits = typeof o.draft === 'string' ? { draft: o.draft } : {};
+  if (o.gone === true) return { gone: true, ...waits };
+  if (typeof o.back === 'string') return { back: o.back, ...waits };
+  if (typeof o.keep === 'string') return { keep: o.keep };
+  if (typeof o.drop === 'string') return { drop: o.drop };
   if (typeof o.page !== 'string' || !SHA.test(o.page) || typeof o.title !== 'string' || typeof o.bytes !== 'number' || !Array.isArray(o.pictures)) return null;
   const pictures = o.pictures.flatMap((p): VisualPicture[] => {
     if (p === null || typeof p !== 'object') return [];
@@ -138,7 +147,7 @@ export function visualSaid(to: string | null): VisualSaid | null {
       ? [{ name: q.name, sha256: q.sha256, mime: q.mime, bytes: q.bytes }]
       : [];
   });
-  return { title: o.title, page: o.page, bytes: o.bytes, pictures };
+  return { title: o.title, page: o.page, bytes: o.bytes, pictures, ...(o.draft === true ? { draft: true as const } : {}) };
 }
 
 export const isVersion = (s: VisualSaid | null): s is VisualBody => s !== null && 'page' in s;
@@ -153,13 +162,31 @@ export function visualLines(sql: Sql, target: string, field: string): VisualLine
 }
 
 /**
- * The version a visual stood at once `lines` were written, as the id of the version line, or `null` when it was gone or
- * not there. A `back` names a version line itself, so nothing is followed twice.
+ * Where a visual was once `lines` were written: the version line it stood at (`null` when it was gone or not there yet)
+ * and the draft line waiting beside it (`null` when none waits). Each is the id of a version line itself, so nothing is
+ * followed twice.
+ *
+ * A DRAFT NEVER MOVES WHERE IT STANDS. A version handed in as a draft waits; a kept version after it, a step back or a
+ * taking away leaves none waiting; and only a keep naming the draft that waits makes the visual stand at it. A line
+ * this build cannot read (erased) moves nothing.
  */
-export function visualStanding(lines: readonly VisualLine[]): string | null {
-  const last = lines[lines.length - 1];
-  if (last === undefined) return null;
-  const said = visualSaid(last.to_v);
-  if (said === null || 'gone' in said) return null;
-  return 'back' in said ? said.back : last.id;
+export function visualState(lines: readonly VisualLine[]): { standing: string | null; draft: string | null } {
+  let standing: string | null = null;
+  let draft: string | null = null;
+  for (const l of lines) {
+    const said = visualSaid(l.to_v);
+    if (said === null) continue;
+    if (isVersion(said)) {
+      if (said.draft === true) draft = l.id;
+      else [standing, draft] = [l.id, null];
+    } else if ('gone' in said) [standing, draft] = [null, said.draft ?? null];
+    else if ('back' in said) [standing, draft] = [said.back, said.draft ?? null];
+    else if ('keep' in said) {
+      if (said.keep === draft) [standing, draft] = [draft, null];
+    } else if (said.drop === draft) draft = null;
+  }
+  return { standing, draft };
 }
+
+/** The version line a visual stood at once `lines` were written, or `null` when it was gone or not there (`visualState`). */
+export const visualStanding = (lines: readonly VisualLine[]): string | null => visualState(lines).standing;

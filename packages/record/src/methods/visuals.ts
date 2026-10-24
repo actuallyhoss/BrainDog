@@ -1,12 +1,18 @@
 /**
- * Visuals: `attachVisual`, `visuals` and `visual`, a page with its pictures hung on a task, a project, a question or a
- * decision (DIRECTION §45). Asked as a note is asked, since it changes no value; the bytes stay in the host's store.
+ * Visuals: `attachVisual`, `visuals`, `visual` and `settleVisual`, a page with its pictures hung on a task, a project, a
+ * question or a decision (DIRECTION §45). Asked as a note is asked, since it changes no value; the bytes stay in the
+ * host's store.
+ *
+ * A VERSION MAY COME AS A DRAFT (`draft: true`), which waits beside the version the visual stands at and never replaces
+ * it. A person settles it in BrainDog with `settleVisual`: Keep, so the visual stands at it; Throw away; or Try again,
+ * which throws it away and tells the run that drew it to draw it again, as a draft.
  */
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import {
   PICTURE_NAME,
+  PROFILE_KINDS,
   VISUAL_PAGE_MOST,
   VISUAL_PICTURE_TYPES,
   VISUAL_PICTURES_BYTES_MOST,
@@ -41,7 +47,7 @@ export type VisualStore = {
 export type PictureNamed = { name: string; sha256: string };
 
 /** What `attachVisual` takes. */
-export type AttachVisualArgs = { on: string; page: string; title?: string; pictures?: PictureNamed[]; visual?: string };
+export type AttachVisualArgs = { on: string; page: string; title?: string; pictures?: PictureNamed[]; visual?: string; draft?: boolean };
 
 /** What `attachVisual` answers: the receipt. `batch` is what an undo takes back. */
 export type VisualAttached = {
@@ -53,13 +59,20 @@ export type VisualAttached = {
   batch: string | null;
   said: string;
   unchanged?: true;
+  /** Present when the version came as a draft: it waits to be kept or thrown away. */
+  draft?: true;
 };
 
-/** One visual as `visuals` lists it: where it stands, and what its page and pictures are by hash. */
+/**
+ * One visual as `visuals` lists it: where it stands, and what its page and pictures are by hash. `draft` is the version
+ * waiting beside it, or `null`; `kept` is false for a visual whose only versions are drafts, listed by its draft.
+ */
 export type VisualListed = {
   id: string;
   title: string;
   version: number;
+  kept: boolean;
+  draft: { version: number; by: string; at: string } | null;
   versions: number;
   by: string;
   at: string;
@@ -76,12 +89,28 @@ export type VisualRead = {
   on: string;
   title: string;
   version: number;
+  /** The version the visual stands at, and the draft waiting beside it: each a number, or `null` for none. */
+  kept: number | null;
+  draft: number | null;
   by: string;
   at: string;
   page: string;
   pictures: VisualPicture[];
-  versions: { version: number; title: string; by: string; at: string; bytes: number; pictures: number; batch: string | null }[];
+  /** Every version; `draft` is true for one handed in as a draft and never kept. */
+  versions: { version: number; title: string; by: string; at: string; bytes: number; pictures: number; batch: string | null; draft: boolean }[];
 };
+
+/** The three presses a draft offers (DIRECTION §45). */
+export const SETTLE_AS = ['keep', 'throw', 'again'] as const;
+
+/** What `settleVisual` takes: the visual, the version pressed on, and the press. */
+export type SettleVisualArgs = { id: string; version: number; as: (typeof SETTLE_AS)[number] };
+
+/**
+ * What `settleVisual` answers: the version the visual stands at now, in one sentence, the write an undo takes back, and
+ * for Try again the instruction it filed.
+ */
+export type VisualSettled = { visual: string; kept: number | null; batch: string | null; said: string; told?: string };
 
 const SHA = /^[0-9a-f]{64}$/;
 const BYTES = new TextEncoder();
@@ -193,12 +222,24 @@ export function methods(deps: RecordDeps) {
     id: v.id,
     title: v.title,
     version: v.now.n,
+    kept: v.kept,
+    draft: v.draft === null ? null : { version: v.draft.n, by: v.draft.by, at: v.draft.at },
     versions: v.versions,
     by: v.now.by,
     at: v.now.at,
     page: { sha256: v.now.page, bytes: v.now.bytes },
     pictures: v.now.pictures,
   });
+
+  /** A thing as `thingOf` answers it, from where the log keys it, or `null` for one this caller may not see. */
+  const onOf = (ctx: CallContext, target: string): On | null => {
+    if (sightOf(ctx, target) === null) return null;
+    if (target.startsWith('entry:')) {
+      const row = kernel.get(target.slice('entry:'.length));
+      return row === null ? null : { target, list: row.register, id: row.id, words: wordsOf(ctx, target) };
+    }
+    return { target, list: null, id: target.slice(target.indexOf(':') + 1), words: wordsOf(ctx, target) };
+  };
 
   const sameBody = (a: VisualBody, b: VisualVersion | null): boolean =>
     b !== null && a.page === b.page && a.title === b.title && JSON.stringify(a.pictures) === JSON.stringify(b.pictures);
@@ -259,7 +300,9 @@ export function methods(deps: RecordDeps) {
 
       const bytes = BYTES.encode(checked.page);
       const page = hex(await crypto.subtle.digest('SHA-256', bytes));
-      const body: VisualBody = { title, page, bytes: bytes.byteLength, pictures };
+      if (a.draft !== undefined && typeof a.draft !== 'boolean') return no('VALUE_MALFORMED', 'draft is true for a version to be kept or thrown away, or left out.', { at: 'draft' });
+      const draft = a.draft === true;
+      const body: VisualBody = { title, page, bytes: bytes.byteLength, pictures, ...(draft ? { draft: true as const } : {}) };
 
       /* WHICH VISUAL: the one named, or the one this thing carries under this title, or a new one. */
       const on = kernel.visualsOn(at.target);
@@ -268,9 +311,22 @@ export function methods(deps: RecordDeps) {
         if (typeof a.visual !== 'string' || kernel.visualOn(a.visual) !== at.target) return no('REF_UNKNOWN', 'There is no such visual on this to give a new version.', { at: 'visual' });
         id = a.visual;
       } else id = on.find((v) => words(v.title) === words(title))?.id;
-      const now = id === undefined ? null : (kernel.visualOf(id)?.now ?? null);
-      if (id !== undefined && now !== null && sameBody(body, now))
-        return ok({ visual: id, version: now.n, title, on: at.words, pictures: pictures.length, batch: null, said: `${title} on ${at.words} is already this version.`, unchanged: true });
+      const whole = id === undefined ? null : kernel.visualOf(id);
+      const now = whole?.now ?? null;
+      /* THE SAME PAGE AGAIN WRITES NOTHING: as the version it stands at, or as the draft already waiting. */
+      const same = [whole?.draft ?? null, now].find((v) => v !== null && sameBody(body, v)) ?? null;
+      if (id !== undefined && same !== null)
+        return ok({
+          visual: id,
+          version: same.n,
+          title,
+          on: at.words,
+          pictures: pictures.length,
+          batch: null,
+          said: same === now ? `${title} on ${at.words} is already this version.` : `${title} on ${at.words} already waits as this draft.`,
+          unchanged: true,
+          ...(same === now ? {} : { draft: true as const }),
+        });
 
       /* ONLY NEW BYTES WEIGH: a picture or a page the visual already had costs the record nothing again. */
       const had = new Set(now === null ? [] : [now.page, ...now.pictures.map((p) => p.sha256)]);
@@ -283,15 +339,17 @@ export function methods(deps: RecordDeps) {
         ...(id === undefined ? {} : { id }),
         said: { body },
         weight,
-        note: fresh ? `Added the visual "${clip(title, 80)}".` : `A new version of the visual "${clip(title, 80)}".`,
+        note: draft ? `Drew a draft of the visual "${clip(title, 80)}".` : fresh ? `Added the visual "${clip(title, 80)}".` : `A new version of the visual "${clip(title, 80)}".`,
         w: { ...writerOf(ctx), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) },
       });
       if (!wrote.ok) return wrote as Result<never>;
       const n = wrote.value.n ?? 1;
-      const said = fresh
-        ? `Put "${clip(title, 80)}" on ${at.words}${pictures.length > 0 ? `, with ${pictures.length === 1 ? 'one picture' : `${pictures.length} pictures`}` : ''}.`
-        : `Version ${n} of "${clip(title, 80)}" is on ${at.words}.`;
-      return tail(ok({ visual: wrote.value.id, version: n, title, on: at.words, pictures: pictures.length, batch: wrote.value.batch, said }));
+      const said = draft
+        ? `Version ${n} of "${clip(title, 80)}" waits on ${at.words} as a draft, to be kept or thrown away in BrainDog.`
+        : fresh
+          ? `Put "${clip(title, 80)}" on ${at.words}${pictures.length > 0 ? `, with ${pictures.length === 1 ? 'one picture' : `${pictures.length} pictures`}` : ''}.`
+          : `Version ${n} of "${clip(title, 80)}" is on ${at.words}.`;
+      return tail(ok({ visual: wrote.value.id, version: n, title, on: at.words, pictures: pictures.length, batch: wrote.value.batch, said, ...(draft ? { draft: true as const } : {}) }));
     },
 
     /** Every visual a thing carries now, oldest first, each by its hashes and without its page. READ+. */
@@ -304,8 +362,8 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * One visual: the version asked (its newest when none is), its page's text and its pictures by hash, and every
-     * version by who made it and when. READ+. A visual taken away is read by naming a version.
+     * One visual: the version asked (the draft waiting when none is, else the one it stands at), its page's text and its
+     * pictures by hash, and every version by who made it and when. READ+. A visual taken away is read by naming a version.
      */
     async visual(args: { id: string; version?: number }, ctx: CallContext): Promise<Result<VisualRead>> {
       const stop = scoped(ctx, 'read');
@@ -316,7 +374,7 @@ export function methods(deps: RecordDeps) {
       const asked = args.version;
       if (asked !== undefined && (typeof asked !== 'number' || !Number.isSafeInteger(asked) || asked < 1 || asked > whole.versions.length))
         return no('OUT_OF_BOUNDS', `This visual has versions 1 to ${whole.versions.length}.`, { at: 'version' });
-      const one = asked === undefined ? whole.now : whole.versions[asked - 1]!;
+      const one = asked === undefined ? (whole.draft ?? whole.now) : whole.versions[asked - 1]!;
       if (one === null) return no('REF_UNKNOWN', `This visual was taken away. Name a version, 1 to ${whole.versions.length}, to read one.`, { at: 'version' });
       const store = deps.visuals;
       if (store === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog keeps no visuals: it has no file store.', { at: 'host' });
@@ -327,12 +385,81 @@ export function methods(deps: RecordDeps) {
         on: wordsOf(ctx, whole.target),
         title: one.title,
         version: one.n,
+        kept: whole.now?.n ?? null,
+        draft: whole.draft?.n ?? null,
         by: one.by,
         at: one.at,
         page: TEXT.decode(bytes),
         pictures: one.pictures,
-        versions: whole.versions.map((v) => ({ version: v.n, title: v.title, by: v.by, at: v.at, bytes: v.bytes, pictures: v.pictures.length, batch: v.batch })),
+        versions: whole.versions.map((v) => ({ version: v.n, title: v.title, by: v.by, at: v.at, bytes: v.bytes, pictures: v.pictures.length, batch: v.batch, draft: v.draft })),
       });
+    },
+
+    /**
+     * A person settles a version in BrainDog (DIRECTION §45). DATA, a person's alone: an agent suggests, and the person
+     * decides. `keep` makes the visual stand at the draft that waits; `throw` throws that draft away; `again` throws it
+     * away when it waits and tells the run that drew the version to draw it again, as a draft. Each names the version
+     * pressed on, so a press on a screen a newer version has passed is refused rather than settling the wrong one.
+     */
+    async settleVisual(args: SettleVisualArgs, ctx: CallContext): Promise<Result<VisualSettled>> {
+      if (ctx.principal.kind === 'token')
+        return no('NEEDS_BROWSER_SESSION', 'A person keeps or throws away a draft, in BrainDog. Hand the next version in as a draft.', { at: 'principal' });
+      const stop = scoped(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      const a = (args ?? {}) as Partial<Record<keyof SettleVisualArgs, unknown>>;
+      if (!(SETTLE_AS as readonly unknown[]).includes(a.as)) return no('ENUM_VALUE_UNKNOWN', `as is one of ${SETTLE_AS.join(', ')}.`, { at: 'as', allowed: SETTLE_AS });
+      const id = typeof a.id === 'string' ? a.id.trim() : '';
+      const whole = id === '' ? null : kernel.visualOf(id);
+      if (whole === null || sightOf(ctx, whole.target) === null) return no('REF_UNKNOWN', 'There is no visual by that id you can see.', { at: 'id' });
+      const version = a.version;
+      if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1 || version > whole.versions.length)
+        return no('OUT_OF_BOUNDS', `This visual has versions 1 to ${whole.versions.length}.`, { at: 'version' });
+      const at = onOf(ctx, whole.target);
+      if (at === null) return no('REF_UNKNOWN', 'There is no visual by that id you can see.', { at: 'id' });
+      const held = mayDraw(ctx, at);
+      if (held) return { ok: false, refusal: held };
+      const one = whole.versions[version - 1]!;
+      const waits = whole.draft?.n === version;
+      const title = clip(one.title, 80);
+      if (a.as !== 'again' && !waits)
+        return no('TRANSITION_ILLEGAL', `Version ${version} of "${title}" is not a draft waiting now, so there is nothing to ${a.as === 'keep' ? 'keep' : 'throw away'}.`, { at: 'version' });
+
+      /* TRY AGAIN ASKS WHO DREW IT: the run itself while it is open, else the next run of its kind. */
+      let told: string | undefined;
+      if (a.as === 'again') {
+        const row = /^S[1-9][0-9]*$/u.test(one.by) ? kernel.get(one.by) : null;
+        const run = row !== null && row.register === 'session' ? row : null;
+        if (run === null) return no('TRANSITION_ILLEGAL', `Version ${version} of "${title}" was not drawn by an agent, so there is nobody to ask to draw it again.`, { at: 'version' });
+        const agent = typeof run.fields.agent === 'string' && (PROFILE_KINDS as readonly string[]).includes(run.fields.agent) ? run.fields.agent : null;
+        const open = run.state === 'active' || run.state === 'idle';
+        const said = `Draw "${title}" again: version ${version} on ${at.words} was not it. Hand the new one in as a draft, with braindog attach --draft --visual ${whole.id}, or log with page and draft: true.`;
+        const to = open || agent === null ? { to_run: one.by } : { to: 'agent' as const, to_agent: agent };
+        const task = at.list === null ? null : kernel.nameOf(at.id);
+        const asked = kernel.instruct(writerOf(ctx), { said, ...to, ...(task === null ? {} : { task }) });
+        if (!asked.ok) return asked as Result<never>;
+        told = asked.value.id;
+      }
+      let batch: string | null = null;
+      if (waits) {
+        const wrote = kernel.writeVisual({
+          target: whole.target,
+          id: whole.id,
+          said: a.as === 'keep' ? { keep: one.line } : { drop: one.line },
+          weight: 0,
+          note: a.as === 'keep' ? `Kept the draft of the visual "${title}".` : `Threw away the draft of the visual "${title}".`,
+          w: { ...writerOf(ctx), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) },
+        });
+        if (!wrote.ok) return wrote as Result<never>;
+        batch = wrote.value.batch;
+      }
+      const kept = kernel.visualOf(whole.id)?.now?.n ?? null;
+      const said =
+        a.as === 'keep'
+          ? `Kept version ${version} of "${title}".`
+          : a.as === 'throw'
+            ? `Threw away version ${version} of "${title}"${kept === null ? '' : `. It stands at version ${kept}`}.`
+            : `Asked ${one.by} to draw "${title}" again. The new version comes as a draft.`;
+      return tail(ok({ visual: whole.id, kept, batch, said, ...(told === undefined ? {} : { told }) }));
     },
   };
 }

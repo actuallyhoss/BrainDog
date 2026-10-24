@@ -50,4 +50,13 @@ test('A PAGE ON log HANGS ON THE TASK, ITS RECEIPT NAMES IT, AND undo TAKES IT B
   const left = await api.visuals({ on: 'Draw the payroll calendar' }, me);
   assert.ok(left.ok);
   assert.deepEqual(left.value.visuals, []);
+
+  /* draft: true HANDS IT IN AS A DRAFT, which waits for the person to keep or throw away. */
+  const drafted = await call('log', { spoken: 'Draw the payroll calendar', note: 'Payroll calendar', page: '<h1>Payroll, again</h1>', draft: true });
+  assert.ok(!drafted.error, drafted.text);
+  assert.match(drafted.text, /^Version 1 of "Payroll calendar" waits on .* as a draft/u);
+  const waits = await api.visuals({ on: 'Draw the payroll calendar' }, me);
+  assert.ok(waits.ok);
+  assert.deepEqual(waits.value.visuals.map((v) => [v.kept, v.draft?.version]), [[false, 1]]);
+  assert.ok((await call('log', { spoken: 'Draw the payroll calendar', note: 'x', page: '<h1>x</h1>', draft: 'yes' })).error);
 });

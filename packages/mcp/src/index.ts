@@ -198,7 +198,7 @@ export type McpSurface<C> = {
   /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
   undoOwn?(args: { batch: string; dry?: boolean }, ctx: C): Answer;
   /** Hang a page on a thing, or give one it carries a new version (`methods/visuals.ts`). Optional like `undoOwn`. */
-  attachVisual?(args: { on: string; page: string; title?: string }, ctx: C): Answer;
+  attachVisual?(args: { on: string; page: string; title?: string; draft?: boolean }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
   /**
    * The record's whole log, newest first, a page at a time, held to what the caller may see. READ+.
@@ -706,8 +706,9 @@ export const TOOLS: readonly Tool[] = [
       { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' } },
       ['note'],
     ),
-    /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. */
-    quiet: ['page'],
+    /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. So
+       is `draft: true`, a page handed in to be kept or thrown away, which Try again's instruction names to the run. */
+    quiet: ['page', 'draft'],
     writes: true,
   },
   {
@@ -2415,7 +2416,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Say in spoken what the page is on: a task, a project, or a question as SG5.', at: 'spoken' } } };
     if (typeof args.page !== 'string') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'page is the HTML itself, with its style and script.', at: 'page' } } };
     const title = typeof args.note === 'string' && args.note.trim() !== '' ? { title: args.note.trim() } : {};
-    const out = await surface.attachVisual({ on: args.spoken.trim(), page: args.page, ...title }, ctx);
+    if (args.draft !== undefined && typeof args.draft !== 'boolean') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'draft is true for a page to be kept or thrown away, or left out.', at: 'draft' } } };
+    const out = await surface.attachVisual({ on: args.spoken.trim(), page: args.page, ...title, ...(args.draft === true ? { draft: true } : {}) }, ctx);
     if (!out.ok) return { result: await failed(out, ctx, turn) };
     turn.batch = batchIn(out.value);
     const said = isObject(out.value) && typeof out.value.said === 'string' ? out.value.said : 'Drawn.';
