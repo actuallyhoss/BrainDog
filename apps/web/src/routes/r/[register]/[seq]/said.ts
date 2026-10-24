@@ -79,12 +79,18 @@ export function sentenceOf(p: {
   due: { label: string; day: string } | null;
   /** `addedSaid`'s words. */
   added: string;
+  /**
+   * A reading said whole, "16.4% on 28 Sep" (`readingSaid`, Y17), which leads the sentence and says when in place of
+   * the day it was added.
+   */
+  reading?: string | null;
 }): Piece[] {
   const clauses: Piece[][] = [];
+  if (p.reading) clauses.push([{ kind: 'words', text: p.reading }]);
   if (p.state) clauses.push(p.finished ? [{ kind: 'state' }, { kind: 'words', text: ` ${p.finished}` }] : [{ kind: 'state' }]);
   if (p.late) clauses.push([{ kind: 'late', text: p.late.text, tone: p.late.tone }]);
   else if (p.due) clauses.push([{ kind: 'words', text: `${p.due.label.toLowerCase()} ${p.due.day}` }]);
-  clauses.push([{ kind: 'words', text: p.added }]);
+  if (!p.reading) clauses.push([{ kind: 'words', text: p.added }]);
 
   const out: Piece[] = p.archived ? [{ kind: 'words', text: `${rowWords.archived} ` }] : [];
   clauses.forEach((clause, i) => {

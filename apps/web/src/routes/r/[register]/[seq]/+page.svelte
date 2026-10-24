@@ -109,6 +109,7 @@
   import Timeline from './Timeline.svelte';
   import NoteText from './NoteText.svelte';
   import { isMemo } from './note-text.ts';
+  import { readingOf, readingSaid } from '$lib/record/reading.ts';
   import VisualStrip from '$lib/visual/VisualStrip.svelte';
   import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
@@ -739,9 +740,13 @@
   const scopeField = $derived.by(() => (void got, scopeFieldOf(id)));
   /* THE FIELDS THE HEAD SAYS: the figure the tile leads with, the finished day the sentence says after the state, and
      where the row applies, which is the toolbar's chip. */
+  /* A READING SAID WHOLE IN THE HEAD (Y17), "16.4% on 28 Sep", so its number, unit and moment are not facts as well. */
+  const readings = $derived.by(() => (void got, readingOf(decl)));
+  const readingLine = $derived(readings && row ? readingSaid(row.fields, readings, row.created, clock) : null);
   const leadIds = $derived(
     new Set(
       [
+        ...(readingLine !== null && readings ? [readings.value, readings.unit, readings.at] : []),
         figure !== null ? figureField?.id : undefined,
         paidPart?.field,
         finishedOn ? decl?.finished : undefined,
@@ -966,6 +971,7 @@
               ? { label: labelOf(dueField), day: dueField.type === 'day' ? daySaid(String(due), clock) : String(display(id, dueField.id, due, clock, names) ?? '') }
               : null,
           added: addedSaid(row.created, clock),
+          reading: readingLine,
         })
       : [],
   );

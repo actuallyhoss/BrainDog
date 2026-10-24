@@ -101,6 +101,7 @@
   import ListCards from './parts/ListCards.svelte';
   import ListPeople from './parts/ListPeople.svelte';
   import { orgFieldOf } from './people.ts';
+  import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import ListBoard from './parts/ListBoard.svelte';
   import ListSummary from './parts/ListSummary.svelte';
   import ViewSwitch from './parts/ViewSwitch.svelte';
@@ -1451,7 +1452,18 @@
   });
   /* NAMED BY THE RECORD THAT DREW THEM. `result.names` is the record's own title for every row a
      ref on this list points at, and `null` only before the first answer has landed. */
-  const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined));
+  /* AND A READING'S VALUE CARRIES ITS UNIT (Y17): "16.4%", where the "%" sat in a field no column drew. */
+  const readings = $derived(readingsOf(decl));
+  const rows = $derived.by(() => {
+    const shown = result.entries.slice(0, DOM_CAP);
+    const drawn = toRows(id, shown, columns, now, result.names ?? undefined);
+    const at = readings ? columns.findIndex((c) => c.field === readings.value) : -1;
+    if (!readings || at < 0) return drawn;
+    return drawn.map((r, n) => {
+      const said = shown[n] ? valueSaid(shown[n].fields, readings) : null;
+      return said === null ? r : { ...r, cells: r.cells.map((c, i) => (i === at ? said : c)) };
+    });
+  });
 
   /**
    * WHAT A READER CAN ORDER THE LIST BY. What each direction is called is `wayOf` (`parts/list.ts`).
