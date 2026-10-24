@@ -36,15 +36,27 @@
     lock,
     client,
     keys = 1,
+    onask,
     onturn,
   }: {
     lock: Lock;
     client: Locker | null;
     /** How many keys the vault holds: with none there is nothing to lock yet. */
     keys?: number;
+    /** Ask the record where the vault is, once, when the switch is pressed before anything said (X24). */
+    onask?: (() => Promise<Lock>) | undefined;
     /** The vault after a change, or after a refusal that said where it is. */
     onturn: (lock: Lock) => void;
   } = $props();
+
+  /* NOT ASKED YET: the page asks nothing on open, so until the switch is pressed or a key door says, the row offers to
+     set a passphrase and claims neither on nor off. */
+  let asking = $state(false);
+  const unasked = $derived(lock.state === 'reading' && !asking && onask !== undefined);
+  const local = {
+    unasked: 'Put a passphrase on, and only you can open your keys.',
+    set: 'Set a passphrase',
+  } as const;
 
   const on = $derived(lock.state === 'on');
   /* ONLY A KNOWN STATE CAN BE CHANGED: a switch pressed while the record would not say which way it is would be a guess. */
@@ -54,6 +66,8 @@
   const line = $derived(
     keys === 0
       ? words.lockNoKeys
+      : unasked
+        ? local.unasked
       : lock.state === 'on'
         ? words.lockOn
         : lock.state === 'off'
@@ -71,6 +85,21 @@
   let busy = $state(false);
   let said = $state('');
   const matches = $derived(confirmed(first, again));
+
+  /* THE FIRST PRESS ASKS WHERE THE VAULT IS, then opens the sheet that changes it from there: off opens Put it on, on
+     moves the switch and waits for the next press, and a vault that cannot have one says so on the row. */
+  async function ask() {
+    if (!onask || asking) return;
+    asking = true;
+    const now = await onask();
+    asking = false;
+    if (now.state === 'off' && client !== null) {
+      first = '';
+      again = '';
+      said = '';
+      sheet = 'on';
+    }
+  }
 
   function press() {
     if (!can) return;
@@ -123,7 +152,9 @@
       <span class="lock-title" id="lock-title">{words.lockSwitch}</span>
       <span class="lock-line" id="lock-line" role="status" data-on={on ? '' : undefined}>{line}</span>
     </span>
-    {#if keys > 0 && can}
+    {#if keys > 0 && (unasked || asking)}
+      <Button weight="quiet" disabled={asking} aria-busy={asking} onclick={() => void ask()}>{local.set}</Button>
+    {:else if keys > 0 && can}
       <button
         type="button"
         class="switch"

@@ -120,7 +120,7 @@ test('YOU, THIS BRAINDOG AND DATA (U-C9): six rows beside six, Data the whole wi
   assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'This BrainDog', 'Data']);
   const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
   assert.deepEqual(rows[0], ['Appearance', 'Navigation', 'Words and money', 'Notifications', 'Keyboard', 'Signing in']);
-  assert.deepEqual(rows[1], ['Agents', 'People & sharing', 'What comes in', 'Keys', 'Add-ons', 'Health']);
+  assert.deepEqual(rows[1], ['Agents', 'People & sharing', 'What comes in', 'Vault', 'Add-ons', 'Health']);
   assert.deepEqual(rows[2], ['Tidy up', 'Backups', 'Usage', 'Billing', 'Export', 'Delete this record']);
   assert.equal(rows[0]!.length, rows[1]!.length, 'the two columns side by side end together');
   assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 12]);

@@ -66,7 +66,7 @@ async function vault() {
         "SELECT actor, field, from_v, to_v FROM event WHERE kind = 'grant.rotate' AND target = 'vault_key:record' ORDER BY rowid",
       )
       .map((r) => ({ actor: r.actor, field: r.field, from_v: r.from_v, to_v: r.to_v }));
-  return { x: extension(parts), clock, rows, rotations };
+  return { x: extension(parts), clock, rows, rotations, sql };
 }
 
 /** A host's step putting the key behind a passphrase: new bytes and a salt, with what it was handed kept. */
@@ -216,4 +216,17 @@ test('A SLOW CHANGE MADE AGAINST A PASSPHRASE SINCE REPLACED IS A CONFLICT, AND 
     rotations().map((r) => `${r.from_v}>${r.to_v}`),
     ['kek>passphrase', 'passphrase>kek', 'kek>passphrase'],
   );
+});
+
+test('A RECORD WITH NO KEY OF ITS OWN SAYS LOCKING IS NOT ON THIS BRAINDOG, never that its keys hold no value', async () => {
+  /* AUDIT 25 OCTOBER, X24: the vault drew "6 keys. 3 have no value yet." over "Keys here have no stored value yet, so
+     there is nothing to lock", a sentence about the record's own key said as a fact about his. */
+  const { x, sql } = await vault();
+  sql.exec("DELETE FROM vault_key WHERE purpose = 'record'");
+  const out = await x.changeVaultWrapping('passphrase', toPassphrase([]), 'p_1');
+  assert.equal(out.ok, false);
+  const refusal = !out.ok && 'refusal' in out ? out.refusal : null;
+  assert.equal(refusal?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(refusal?.fix, 'Locking keys with a passphrase isn’t on this BrainDog yet.');
+  assert.doesNotMatch(refusal?.fix ?? '', /no stored value/u);
 });

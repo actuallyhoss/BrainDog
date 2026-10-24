@@ -37,7 +37,7 @@ export type Area = {
 };
 
 /**
- * A row of the index that opens a page outside Settings (Keys is the vault, Add-ons the store, Usage its own page): its
+ * A row of the index that opens a page outside Settings (Vault, Add-ons the store, Usage its own page): its
  * name, its address, its line and its glyph, and the area it stands before, or the group's end.
  */
 export type Outside = { readonly label: string; readonly href: string; readonly icon: IconName; readonly line: string; readonly before?: string };
@@ -107,7 +107,8 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     /* ONE HEALTH (audit 25 October, Y4): the record's vital signs, its Health page, with the count Today and the
        sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
     outside: [
-      { label: 'Keys', href: '/vault', icon: 'vault', line: 'The keys your agents are handed' },
+      /* ONE NAME FOR IT (audit 25 October, X24): the page is Vault, and this row said Keys. */
+      { label: 'Vault', href: '/vault', icon: 'vault', line: 'The keys your agents are handed' },
       { label: 'Add-ons', href: '/packs', icon: 'packs', line: 'What is installed, and what to add' },
       { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'What on this record needs a look' },
     ],

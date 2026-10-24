@@ -37,7 +37,7 @@ test('the probe asks with no passphrase and reads each answer the record gives a
   assert.deepEqual(await lockOf(stub(refused('REQUIRED_MISSING', 'Type the vault’s passphrase to take it off.', 'passphrase'))), { state: 'on' });
   assert.deepEqual(await lockOf(stub(refused('RATE_LIMITED', 'Too many wrong passphrases. Wait a while, then try again.', 'passphrase'))), { state: 'on' });
 
-  const none = 'Keys here have no stored value yet, so there is nothing to lock.';
+  const none = 'Locking keys with a passphrase isn’t on this BrainDog yet.';
   assert.deepEqual(await lockOf(stub(refused('NOT_IN_THIS_BUILD', none, 'passphrase'))), { state: 'none', fix: none });
 
   const stale = 'Sign in again to change the vault.';

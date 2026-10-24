@@ -207,9 +207,9 @@
       void twinsRead();
       from = 'live';
       void scopeNote();
-      /* THE PASSPHRASE IS ASKED ABOUT ONLY FOR A PERSON WHO MAY ACT HERE: its two methods are the vault gate's, as the
-         machines read is, so anyone that read refused would be refused this too, and it would say nothing new. */
-      if (mayAct(devices)) void probe();
+      /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN (audit 25 October, X24): the only question that says is a write,
+         `clearVaultPassphrase` with none, and opening a page writes nothing. A key door that wants one says so
+         (`wantsPassphrase`), and the switch asks when it is pressed (`Passphrase.svelte`, `onask`). */
       reconnect();
       /* The screen has an answer if either half answered; a screen refused both halves is a refused screen. */
       return devices.kind === 'held' || index.kind === 'held';
@@ -245,13 +245,14 @@
 
   /**
    * WHETHER THE VAULT IS BEHIND A PASSPHRASE, which decides whether opening or putting a key asks for it. `lockOf` says
-   * how it is found out; a key door that answers "type the passphrase" also moves it to on, so a vault turned on from
-   * another tab since this one read it asks at the next press rather than failing twice.
+   * how it is found out, and is asked only when the switch is pressed; a key door that answers "type the passphrase"
+   * moves it to on, so a vault behind one asks at the next press rather than failing twice. `reading` until either.
    */
   let lock = $state<Lock>({ state: 'reading' });
-  async function probe() {
-    if (!client) return;
+  async function probe(): Promise<Lock> {
+    if (!client) return lock;
     lock = await lockOf(client);
+    return lock;
   }
 
   /* ── the code ── */
@@ -904,7 +905,7 @@
   <!-- THE PASSPHRASE IS ONE ROW AT THE FOOT, for a person who may act here: the keys come first, since they are what a
        person opens the vault for, and how the passphrase works is a fold under it. -->
   {#if acts}
-    <Passphrase {lock} {client} keys={keys.length} onturn={(next) => (lock = next)} />
+    <Passphrase {lock} {client} keys={keys.length} onask={probe} onturn={(next) => (lock = next)} />
   {/if}
 
   <Sheet open={sheet !== null} title={sheetTitle} subtitle={sheetHint} onclose={shut}>
@@ -1058,6 +1059,17 @@
     font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
+  }
+
+  /* FOLDED PROJECTS SIT AS ONE LIST (audit 25 October, X24): rows a hairline apart, not islands 60px apart with nothing
+     between them. An open one keeps its room above and below. */
+  details.key-group:not([open]) + details.key-group {
+    margin-block-start: 0;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  details.key-group:not([open]) summary.group-head {
+    margin-block-end: 0;
   }
 
   /* A FOLDED PROJECT IS A LINE A THUMB OPENS: its name and how many keys, the whole line the target. */

@@ -60,7 +60,9 @@ export function extension(parts: KernelParts) {
     async changeVaultWrapping(to: 'passphrase' | 'kek', rewrap: PassphraseRewrap, actor: string): Promise<Result<VaultPassphrase>> {
       const held = recordWrapping(sql);
       if (held === null)
-        return no('NOT_IN_THIS_BUILD', 'Keys here have no stored value yet, so there is nothing to lock.', { at: 'passphrase' });
+        /* NOT ON THIS BRAINDOG, said as that (audit 25 October, X24): a record with no key of its own has nothing a
+           passphrase could be put on, and "keys here have no stored value" stood under a vault whose keys had values. */
+        return no('NOT_IN_THIS_BUILD', 'Locking keys with a passphrase isn’t on this BrainDog yet.', { at: 'passphrase' });
       if (to === 'passphrase' && held.wrapped_by === 'passphrase')
         return no('ALREADY_KNOWN', 'This vault already has a passphrase. Take it off with that passphrase, then set the new one.', { at: 'passphrase' });
       if (to === 'kek' && held.wrapped_by === 'kek')
