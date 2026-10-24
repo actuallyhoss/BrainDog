@@ -1716,6 +1716,44 @@
     }
   }
 
+  /* A NOTE WHOSE LINE IS A ROW OF LINKS IS A FOOT OF DOORS, the Agents page's ("How the brain changed · Learnings ·
+     Skills"): only links among its tags. It is drawn on the page's ground and not as a tile, quiet, in the second ink, so
+     it reads as the page's foot and not as one more card; under a thumb each door is a 44 by 44 target, centred, the
+     dots between them where they were. */
+  /* `:has()` NESTS NO `:has()`, so the tile is read off two links side by side, which a sentence with one link never has. */
+  .block-slot:not([data-arranging]):has(:global(.block[data-kind='note'] p > a + a)) {
+    padding-block: 0;
+    background: transparent;
+  }
+
+  .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a)))) {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a))) > a) {
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a))) > a:hover) {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a))) > a) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: var(--tap);
+      min-inline-size: var(--tap);
+    }
+  }
+
   /* And the same note inside its fold (`fold.ts`), one step down. */
   @media (pointer: coarse) {
     .block-slot > .fold > :global(.block[data-kind='note'] p > a:only-child) {

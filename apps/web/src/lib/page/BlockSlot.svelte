@@ -862,7 +862,9 @@
   <!-- A PANEL ABOUT THE RECORD (`panels/index.ts`), on any page: the screen part as its own screen mounts it, handed
        whether the reader owns the record. The registry and the panel are both reached by `import()`, so neither is in
        the entry chunk. -->
-  {#await import('./panels/index.ts').then((m) => m.PANEL_LOADERS[hosted]()) then { default: Hosted }}<Hosted owner={owns} />{/await}
+  <!-- WHILE ITS CODE ARRIVES THE SLOT SAYS IT IS STILL READING (`aria-busy`), so nobody, a look included, takes the
+       empty tile for the panel. -->
+  {#await import('./panels/index.ts').then((m) => m.PANEL_LOADERS[hosted]())}<span hidden aria-busy="true"></span>{:then { default: Hosted }}<Hosted owner={owns} />{/await}
 {/if}
 
 <!--
