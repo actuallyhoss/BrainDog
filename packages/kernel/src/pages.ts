@@ -1485,8 +1485,14 @@ export { RAIL_PAGES, railRoom };
 export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
   /* A RUN IS READ ONCE FOR THE PAGE (`runsOnce`), whichever of its blocks names it first. */
   const deps = runsOnce(host);
-  const every = host.resolved?.() ?? resolvePages(deps);
-  const found = every.find((p) => p.slug === slug);
+  /* A PAGE SOMEBODY WROTE IS FOUND AMONG THE WRITTEN ONES ALONE (scope 2026-10-24 A9). They claim their addresses before
+     any template does (`resolvePages`), so which address each holds never turns on a template's rows, and resolving every
+     page to find one filled a page for every row of every template: on his record a read of the Agents page filled one
+     for each of 908 runs, 1,410 ms of the record's time. A slug none of them holds is looked for among them all. */
+  const written = host.resolved === undefined ? resolvePages({ ...deps, pages: () => deps.pages().filter((d) => !d.for) }) : null;
+  const mine = written?.find((p) => p.slug === slug && !p.refusal);
+  const every = mine !== undefined ? written! : (host.resolved?.() ?? resolvePages(deps));
+  const found = mine ?? every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
      named after the row's title, so listing those slugs listed every row title of every templated list, and this
      function cannot tell who is asking. Measured: a member invited to Obligations alone asked for `nope` and was handed
