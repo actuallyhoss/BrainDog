@@ -701,14 +701,14 @@
         {:else if declared !== null}<span class="line-title">{declared}</span>
         {:else}<span class="line-title"
             >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
-                  >{said.quoted ? '“' : ''}<bdi class="target-name">{thing.text}</bdi>{said.quoted ? '”' : ''}</a
-                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name">{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}</span
+                  >{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}</a
+                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}</span
           >{/if}
         <span class="line-detail">
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
+            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note}>{' · '}<span data-own>{note}</span></span>{/if}{#if thing?.list}<span class="where-inline"
                 >{' · '}{thing.list}</span
               >{/if}</span
           >

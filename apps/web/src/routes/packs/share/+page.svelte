@@ -407,8 +407,8 @@
                     onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
                   />
                   <span class="pick-text">
-                    <span>{skill.title}</span>
-                    {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
+                    <span data-own>{skill.title}</span>
+                    {#if skill.trigger}<span class="pick-detail" data-own>{skill.trigger}</span>{/if}
                   </span>
                 </label>
               {:else}

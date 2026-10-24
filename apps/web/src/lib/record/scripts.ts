@@ -189,7 +189,7 @@ export const words = {
   noneWhy: 'A script is a short program an agent writes and you accept. It runs on a clock, when something arrives, or when an automation starts it, and it may only read, write and fetch what it declares.',
   resume: 'Resume',
   resumeOne: (title: string) => `Resume ${title}`,
-  resumed: (title: string) => `${title} runs again now. Three more refused runs in a row pause it again.`,
+  resumed: (title: string) => `${title} runs again now. Three more refused runs one after another pause it again.`,
   /* What starts it. */
   /* `15m`, `1h`, `1d` AS A PERSON SAYS THEM: "every 15 minutes", "every hour", "every day" (`often`). */
   every: (every: string) => often(every),
@@ -198,7 +198,7 @@ export const words = {
   runs: (parts: string[]) => `Runs ${parts.join(' and ')}.`,
   never: 'Runs only when started by hand.',
   /* Where it stands. */
-  paused: (n: number) => `Paused after ${n} refused runs in a row. It runs again when you resume it.`,
+  paused: (n: number) => `Paused after ${n} refused runs one after another. It runs again when you resume it.`,
   notRun: (next: string | null) => (next === null ? 'Not run yet.' : next === DUE ? 'Not run yet. Due to run.' : `Not run yet. First run ${next}.`),
   ranOk: (last: string, next: string | null) => (next === null ? `Last ran ${last}.` : next === DUE ? `Last ran ${last}. Due to run again.` : `Last ran ${last}. Next run ${next}.`),
   /* THE ROW'S SHORT WORD on the list: where it stands, with no sentence round it. */
@@ -222,7 +222,7 @@ export const words = {
   fetches: 'Fetches from',
   keys: 'Opens the keys',
   nothing: 'Nothing',
-  inARowLabel: 'Refused in a row',
+  inARowLabel: 'Refused one after another',
   monthLabel: 'This month',
   /* Runs, logs and versions. */
   recent: 'Recent runs',

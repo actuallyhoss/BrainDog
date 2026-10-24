@@ -332,7 +332,7 @@
                what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a
                list of people, the person's face, in a slot every card keeps when any card in the list has
                one, so the titles share an edge. The tone and the mark both led it once, two dots before a word. -->
-          <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined}>
+          <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined} data-own={title === null ? undefined : ''}>
             {#if faced}
               <!-- `aria-hidden` inside `Face`, because the name it is drawn from is the title beside it. -->
               <span class="card-face"><Face name={title ?? ''} kind="person" size="s" /></span>

@@ -40,6 +40,7 @@
   import { ofPeople } from '$lib/ui/RowCards.svelte';
   import StateDot from '$lib/ui/StateDot.svelte';
   import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
+  import { OWN_TYPES } from '$lib/ui/own.ts';
   import { boxOf, deadlineOf, dotOf, dueOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
 
   let {
@@ -127,6 +128,10 @@
     archive?: ((seq: number) => void) | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
   } = $props();
+
+  /* THE PERSON'S OWN WORDS, AS WRITTEN (`data-own`, `lib/ui/own.ts`): a text field holds what somebody typed, which the
+     look's words check forgives, while a date, an amount or a choice is drawn by the app and is still read. */
+  const ownWords = (field: string): boolean => OWN_TYPES.has(fieldOf(field)?.type ?? '');
 
   /**
    * WHAT A DOT MEANS, AT 1440.
@@ -547,7 +552,7 @@
           control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
           sheet has advertised since the grid was written.
         -->
-        <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}<button
+        <span class="cell-said" data-own={ownWords(column.field) ? '' : undefined}>{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}<button
             type="button"
             class="cell-pen"
             tabindex="-1"

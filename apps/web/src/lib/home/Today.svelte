@@ -849,7 +849,7 @@
       {/if}
     </span>
     <span class="line-main">
-      <a class="line-title tap" href={at(href)} dir="auto">{task.what}</a>
+      <a class="line-title tap" href={at(href)} dir="auto" data-own>{task.what}</a>
       <span class="line-detail">
         {#if task.project}<span class="proj" style:--hue={hue} aria-hidden="true"></span><span dir="auto">{task.project}</span>{#if taskMeta(task).length}{' · '}{/if}{/if}{taskMeta(task).join(' · ')}
       </span>
@@ -882,7 +882,7 @@
   <div class="line line-tall">
     <span class="line-mark"><IconWell name={bill.out ? 'obligation' : 'money'} size="l" /></span>
     <span class="line-main">
-      <a class="line-title tap" href={at(href)} dir="auto">{bill.what}</a>
+      <a class="line-title tap" href={at(href)} dir="auto" data-own>{bill.what}</a>
       <span class="line-detail">{words.money} · {bill.out ? words.toPay : words.toCome}{#if !need && bill.due}{' · '}{daySaid(bill.due)}{/if}</span>
     </span>
     {#if need && bill.late && bill.due}

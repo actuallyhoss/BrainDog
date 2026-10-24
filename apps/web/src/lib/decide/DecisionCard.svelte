@@ -664,7 +664,7 @@
        (polish 8, VERIFY P7): the late word carries the red, once. -->
   <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl}>
     <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" /></span>
-    <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}>{row.title}</a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
+    <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)} data-own>{row.title}</a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
     <span class="dr-amount num">{row.amount}</span>
     <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
     {#if drawn}
@@ -711,7 +711,7 @@
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
       <h3 class="queue-question" dir="auto">
-        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+        {#if link || compact}<a class="dc-open tap" href={at(card.href)} data-own>{card.question}</a>{:else}<span data-own>{card.question}</span>{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>

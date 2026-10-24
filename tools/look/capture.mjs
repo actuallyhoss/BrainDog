@@ -258,6 +258,18 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     .evaluate(() => ({
       overflow: document.documentElement.scrollWidth - window.innerWidth,
       text: (document.querySelector('main') ?? document.body).innerText,
+      /* THE WORDS READ ARE THE APP'S: text the page marks as the person's own (`data-own`, `lib/ui/own.ts`), what they or
+         their agent typed, drawn as written, is lifted out before the words check reads the screen. */
+      words: (() => {
+        const m = document.querySelector('main') ?? document.body;
+        let t = m.innerText;
+        for (const el of m.querySelectorAll('[data-own]')) {
+          if (el.parentElement?.closest('[data-own]')) continue;
+          const own = el.innerText.trim();
+          if (own !== '') t = t.replace(own, ' ');
+        }
+        return t;
+      })(),
       marked: [...document.querySelectorAll('[data-count]')].map((el) => ({
         of: el.getAttribute('aria-label') ?? el.closest('[aria-label]')?.getAttribute('aria-label') ?? null,
         n: el.getAttribute('data-count'),
@@ -308,7 +320,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     writesBlocked: blocked.writes ?? 0,
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),
-    raw: rawIn([facts.text, frame, pressed.text].join('\n'), { all: true, slugs: known.slugs }),
+    raw: rawIn([facts.words ?? facts.text, frame, pressed.text].join('\n'), { all: true, slugs: known.slugs }),
     frameRaw: rawIn(frame, { all: true, slugs: known.slugs }),
     pressed: { palette: pressed.open, ...(pressed.open ? { image: `${base}-palette.png`, raw: rawIn(pressed.text, { all: true, slugs: known.slugs }) } : {}) },
     counts: countsIn(facts.text, seen),

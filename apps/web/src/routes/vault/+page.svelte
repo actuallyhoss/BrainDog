@@ -627,7 +627,7 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="session" size="l" /></span>
               <span class="line-main">
-                <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
+                <span class="line-title who-name" data-own={d.label ? '' : undefined}>{d.label ?? copy.unnamedMachine}</span>
                 <span class="line-detail who-detail"
                   ><span class="state"><span class="dot" data-tone="warn" role="img" aria-label={TONES.warn.label}></span>{tileWords.waiting}</span
                   ><span class="sep" aria-hidden="true">{' · '}</span>{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{words.days(
@@ -735,13 +735,13 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
-                {#if href}<a class="line-title key-name tap" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
+                {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{k.label}</a>{:else}<span class="line-title key-name" data-own>{k.label}</span>{/if}
                 <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
                      projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
                 <span class="line-detail key-meta">
                   {#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}
-                  {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens">{k.opens}</span>{/if}
-                  {#if hint}<span class="key-hint">{hint}</span>{/if}
+                  {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens" data-own>{k.opens}</span>{/if}
+                  {#if hint}<span class="key-hint" data-own>{hint}</span>{/if}
                   {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
                 </span>
               </span>
@@ -821,7 +821,7 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="session" size="l" /></span>
               <span class="line-main">
-                <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
+                <span class="line-title who-name" data-own={d.label ? '' : undefined}>{d.label ?? copy.unnamedMachine}</span>
                 <span class="line-detail who-detail"
                   >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{d.last_used
                     ? copy.usedWhen(since(d.last_used, Date.now()))

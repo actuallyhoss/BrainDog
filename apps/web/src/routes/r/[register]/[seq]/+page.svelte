@@ -119,6 +119,7 @@
   import { may } from '$lib/record/may.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
+  import { OWN_TYPES } from '$lib/ui/own.ts';
   import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
 
   const id = $derived(page.params.register ?? '');
@@ -1219,7 +1220,7 @@
     {@const value = row.fields[f.id]}
     <div class="fact">
       <dt class="fact-label">{labelOf(f)}</dt>
-      <dd class="fact-value" data-type={f.type} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)}>
+      <dd class="fact-value" data-type={f.type} data-own={OWN_TYPES.has(f.type) ? '' : undefined} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)}>
         {#if editing === f.id}
           {@render fieldEditor(f, value)}
         {:else}
@@ -1342,7 +1343,7 @@
             {#if handoff.project || handoff.next}
               <div class="facts-box"><dl class="facts">
                 {#if handoff.project}<div class="fact"><dt class="fact-label">{faceWords.project}</dt><dd class="fact-value">{handoff.project}</dd></div>{/if}
-                {#if handoff.next}<div class="fact"><dt class="fact-label">{faceWords.next}</dt><dd class="fact-value">{handoff.next}</dd></div>{/if}
+                {#if handoff.next}<div class="fact"><dt class="fact-label">{faceWords.next}</dt><dd class="fact-value" data-own>{handoff.next}</dd></div>{/if}
               </dl></div>
             {/if}
             {#if handoff.tried.length}
@@ -1397,7 +1398,7 @@
                   {#each g.lines as k, i (i)}
                     <div class="fact">
                       <dt class="fact-label">{k.label}</dt>
-                      <dd class="fact-value" dir="auto">{k.value}</dd>
+                      <dd class="fact-value" dir="auto" data-own>{k.value}</dd>
                       {#if i === 0 && changes && editable(g.field, id)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
                     </div>
                   {/each}
