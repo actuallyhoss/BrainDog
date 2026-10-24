@@ -261,6 +261,17 @@ export function onDeskOf(rows: readonly LiveRun[]): LiveRun[] {
   return [...atWorkOf(rows), ...waiting];
 }
 
+/**
+ * THE SAME RUNS IN TWO PARTS, as the Agents page draws them (the audit of 25 October, Z6): the ones working now, which
+ * the page's line counts, and the ones open and quiet. Three quiet runs drawn as one list under At work read as three
+ * at work beside "Nobody working right now."
+ */
+export function deskSplit(rows: readonly LiveRun[]): { working: LiveRun[]; quiet: LiveRun[] } {
+  const working = atWorkOf(rows);
+  const at = new Set(working.map((r) => r.run));
+  return { working, quiet: onDeskOf(rows).filter((r) => !at.has(r.run)) };
+}
+
 const escaped = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 /**

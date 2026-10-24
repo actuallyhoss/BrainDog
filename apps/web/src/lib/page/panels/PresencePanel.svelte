@@ -8,9 +8,10 @@
 
   ON THE AGENTS PAGE, ONE LINE A RUN (the Agents page of 23 October): what the run is doing in plain words leads the row
   (`doingSaid`, never "Claude run" or the agent's name twice), then its project as a chip, how long it has run and how
-  it stands (`standsSaid`: working now, or quiet for 40 min). The runs at work come first, then the ones waiting on him
-  that called inside three hours (`onDeskOf`); a run quiet longer is left to Recent runs, so a session open and silent
-  for two days is not at work. Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each
+  it stands (`standsSaid`: working now, or quiet for 40 min). The runs at work come first, then, under Quiet, the
+  ones waiting on him that called inside three hours (`deskSplit`); a run quiet longer is left to Recent runs, so a
+  session open and silent for two days is not at work. THE QUIET ONES ARE A PART OF THEIR OWN SINCE THE AUDIT OF 25
+  OCTOBER (Z6): drawn among the runs at work, three quiet runs sat under "Nobody working right now." Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each
   reaches is said in the ask before it is sent. The machines they are on are one quiet line at the foot, and under two
   or more machines each heads its own runs. With nothing at work the tile says so in one line.
 
@@ -38,7 +39,7 @@
     byMachine,
     control,
     doingSaid,
-    onDeskOf,
+    deskSplit,
     presenceOf,
     scopedLeads,
     spanSaid,
@@ -76,7 +77,9 @@
     stop: 'Stop',
     resume: 'Resume',
     open: 'Open its page',
-    none: 'No agent is at work right now.',
+    none: 'No agent has a run open.',
+    working: 'Working now',
+    quiet: 'Quiet',
     on: (said: string) => `On ${said}`,
     idle: (names: string) => `nothing open on ${names}`,
   } as const;
@@ -128,10 +131,23 @@
   const lineOf = (r: LiveRun): PresenceView => ({ ...viewOf(r), doing: doingSaid(r), time: spanSaid(r.for_s * 1000), stands: standsSaid(r) });
 
   /* WHO IS AT WORK, AND WHO WAITS ON HIM BUT CALLED LATELY: the rail's count first, never the runs merely open. */
-  const desk = $derived(line ? onDeskOf(rows) : []);
+  const split = $derived(line ? deskSplit(rows) : { working: [], quiet: [] });
+  const desk = $derived([...split.working, ...split.quiet]);
+  const quietRuns = $derived(new Set(split.quiet.map((r) => r.run)));
+  /* A PART IS HEADED WHERE QUIET RUNS ARE DRAWN, so a run open and quiet never reads as one at work. */
+  const headed = $derived(split.quiet.length > 0);
   /* A MACHINE IS SAID AS A PERSON SAYS IT (`machineSaid`), its own name kept for the hover. */
   const machineNames = $derived([...new Set(rows.map((r) => r.machine).filter((m): m is string => m !== null))]);
-  const groups = $derived(byMachine(desk).map((g) => ({ ...g, said: words.machine(g.machine, machineNames), views: g.rows.map(lineOf) })));
+  const groups = $derived(
+    byMachine(desk).map((g) => ({
+      ...g,
+      said: words.machine(g.machine, machineNames),
+      parts: [
+        { key: 'working', head: words.working, views: g.rows.filter((r) => !quietRuns.has(r.run)).map(lineOf) },
+        { key: 'quiet', head: words.quiet, views: g.rows.filter((r) => quietRuns.has(r.run)).map(lineOf) },
+      ].filter((p) => p.views.length > 0),
+    })),
+  );
   /* THE MACHINES IN ONE QUIET LINE, where one machine holds them all: "On MacBook Pro, as work". */
   const foot = $derived.by((): string | null => {
     if (!line || groups.length > 1) return null;
@@ -200,7 +216,10 @@
           {#if groups.length > 1}
             <h3 class="machine-head"><Icon name="monitor" size="s" /><span class="machine-name" title={g.machine ?? undefined}>{g.said}</span><span class="machine-n num">{words.atWork(g.rows.length)}</span></h3>
           {/if}
-          {@render list(g.machine ?? '', g.views)}
+          {#each g.parts as p (p.key)}
+            {#if headed}<svelte:element this={groups.length > 1 ? 'h4' : 'h3'} class="part-head" data-part={p.key}>{p.head}<span class="machine-n num">{p.views.length.toLocaleString('en')}</span></svelte:element>{/if}
+            {@render list(`${g.machine ?? ''}:${p.key}`, p.views)}
+          {/each}
         </section>
       {/each}
       {#if foot}<p class="at-work-foot">{foot}</p>{/if}
@@ -256,6 +275,22 @@
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
+  }
+
+  /* WORKING NOW AND QUIET, each over its runs, quieter than a machine's name. */
+  .part-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+  }
+
+  .part-head:first-of-type {
+    margin-block-start: 0;
   }
 
   .machine-name {

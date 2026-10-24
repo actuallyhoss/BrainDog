@@ -51,27 +51,36 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.19.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.20.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.19.0');
+  assert.equal(pack.manifest.version, '1.20.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.19.0, and it says Nobody working right now', () => {
+test('THE NEWEST CHANGE NOTE IS 1.20.0, and it says the runs open now are headed Open now', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.19.0');
+  assert.equal(newest.version, '1.20.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
+  assert.match(newest.notes, /Open now/);
+  assert.match(newest.notes, /Quiet/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
+});
+
+test('THE 1.19.0 NOTE says Nobody working right now', () => {
+  const newest = MODULE_CHANGES.agents[1]!;
+  assert.equal(newest.version, '1.19.0');
   assert.match(newest.notes, /Nobody working right now/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
 
 test('THE 1.18.0 NOTE says a key in the vault says Locked value', () => {
-  const newest = MODULE_CHANGES.agents[1]!;
+  const newest = MODULE_CHANGES.agents[2]!;
   assert.equal(newest.version, '1.18.0');
   assert.match(newest.notes, /Locked value/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -79,7 +88,7 @@ test('THE 1.18.0 NOTE says a key in the vault says Locked value', () => {
 });
 
 test('THE 1.17.0 NOTE says the page reads like a list of runs', () => {
-  const newest = MODULE_CHANGES.agents[2]!;
+  const newest = MODULE_CHANGES.agents[3]!;
   assert.equal(newest.version, '1.17.0');
   assert.match(newest.notes, /At work, Up next and Recent runs/);
   assert.match(newest.notes, /Needs you only/);
@@ -88,7 +97,7 @@ test('THE 1.17.0 NOTE says the page reads like a list of runs', () => {
 });
 
 test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
-  const newest = MODULE_CHANGES.agents[3]!;
+  const newest = MODULE_CHANGES.agents[4]!;
   assert.equal(newest.version, '1.16.0');
   assert.match(newest.notes, /who is at work and on what/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -96,7 +105,7 @@ test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
 });
 
 test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
-  const newest = MODULE_CHANGES.agents[4]!;
+  const newest = MODULE_CHANGES.agents[5]!;
   assert.equal(newest.version, '1.15.0');
   assert.match(newest.notes, /Your agents asked/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -104,7 +113,7 @@ test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
 });
 
 test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () => {
-  const newest = MODULE_CHANGES.agents[5]!;
+  const newest = MODULE_CHANGES.agents[6]!;
   assert.equal(newest.version, '1.14.0');
   assert.match(newest.notes, /how many are at work, on how many machines and how many wait on you/);
   assert.match(newest.notes, /At work/);
@@ -119,22 +128,22 @@ test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () 
    1.13.0's as they were written too. */
 test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 11), ['1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 12), ['1.20.0', '1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
-    MODULE_CHANGES.agents[6]!.notes,
+    MODULE_CHANGES.agents[7]!.notes,
     'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[7]!.notes,
+    MODULE_CHANGES.agents[8]!.notes,
     'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[8]!.notes,
+    MODULE_CHANGES.agents[9]!.notes,
     'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[9]!.notes,
+    MODULE_CHANGES.agents[10]!.notes,
     'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
   );
 });
@@ -178,7 +187,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.19.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.20.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -349,7 +358,7 @@ test('/p/agents: a runs console, the line, Tell an agent, At work, Up next and R
     sections.map((b) => [b.heading, b.panel, b.span]),
     [
       ['Tell an agent', 'instruct', 12],
-      ['At work', 'presence', 12],
+      ['Open now', 'presence', 12],
       ['Up next', 'left-steps', 12],
       ['Recent runs', 'run-list', 12],
     ],
@@ -420,7 +429,7 @@ test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` 
   assert.deepEqual(Object.keys(AGENTS_MODULE).filter((name) => /WORKING/u.test(name)), [], 'the pack still exports its own clause for working');
   assert.equal(JSON.stringify(agentsPackDocument()).includes('agents-working'), false, 'the pack still declares or reads its own working figure');
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; when?: { metric?: string }; lead?: boolean; body?: string }[];
-  const working = blocks.find((b) => b.heading === 'At work') as { kind: string; panel?: string; source?: string; where?: unknown; when?: unknown } | undefined;
+  const working = blocks.find((b) => b.heading === 'Open now') as { kind: string; panel?: string; source?: string; where?: unknown; when?: unknown } | undefined;
   assert.deepEqual([working?.kind, working?.panel, working?.source], ['section', 'presence', undefined], 'At work is not the runs open now');
   assert.equal(working?.where, undefined, 'the working source takes no clause');
   assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
@@ -467,7 +476,7 @@ test('UP NEXT IS THE HOST’S over the steps nobody has taken, the whole row und
   const at = blocks.findIndex((b) => b.heading === 'Up next');
   assert.ok(at > 0, 'no block is headed Up next');
   assert.deepEqual(blocks[at], STEPS_17);
-  assert.deepEqual([blocks[at - 1]!.heading, blocks[at - 1]!.span], ['At work', 12], 'the steps are not right under At work, the whole row');
+  assert.deepEqual([blocks[at - 1]!.heading, blocks[at - 1]!.span], ['Open now', 12], 'the steps are not right under Open now, the whole row');
   assert.deepEqual([blocks[at + 1]!.kind, blocks[at + 1]!.heading], ['section', 'Recent runs'], 'the steps are not right over the runs');
   /* THE PANEL READS THE STEPS ITSELF, so no declared block reads them a second time. */
   assert.equal(blocks.filter((b) => b.source === 'handoffs.open').length, 0);
@@ -577,7 +586,7 @@ test('A RUN IS SAID BY WHAT IT DID: the page draws no card of one, a finished ru
   /* NO CARD OF A RUN ON THE PAGE SINCE 1.17.0: At work is the host's live part (`panel: presence`) and the runs that
      stopped are the host's rows under Recent runs (`panel: run-list`), which title a run by what it did as these cards did. */
   assert.equal(page.filter((b) => b.kind === 'cards').length, 0, 'the page still draws cards of runs');
-  assert.equal((page.find((b) => b.heading === 'At work') as Card & { panel?: string }).panel, 'presence');
+  assert.equal((page.find((b) => b.heading === 'Open now') as Card & { panel?: string }).panel, 'presence');
 
   /* THE FIGURE STILL COUNTS THE RUN THAT ENDED TODAY AND WROTE, not the one that wrote nothing, nor the helper, nor a working run. */
   assert.equal(reading(k, 'runs-today'), 1, 'the figure of the runs that stopped today counts other runs');
@@ -786,8 +795,15 @@ const LINES_15: Loose[] = [
 ];
 /** AND 1.18.0 AS IT WAS CUT, under every older version: the line with nobody working says Nobody at work, where 1.19.0 says Nobody working right now. */
 const NOBODY_18 = 'Nobody at work. {{handoffs-open}} step(s) up next';
-const doc18 = (): { version: string; declarations: Record<string, unknown>[] } => {
+/** AND 1.19.0 AS IT WAS CUT, under every older version: the runs open now headed At work, where 1.20.0 heads them Open now. */
+const OPEN_NOW = '"heading":"Open now"';
+const doc19 = (): { version: string; declarations: Record<string, unknown>[] } => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(JSON.stringify(doc.declarations).split(OPEN_NOW).length, 2, 'doc19 was handed a document that is not 1.20.0');
+  return { ...doc, version: '1.19.0', declarations: JSON.parse(JSON.stringify(doc.declarations).replace(OPEN_NOW, '"heading":"At work"')) };
+};
+const doc18 = (): { version: string; declarations: Record<string, unknown>[] } => {
+  const doc = doc19();
   assert.ok(JSON.stringify(doc.declarations).includes(JSON.stringify(LINES[1])), 'doc18 was handed a document that is not 1.19.0');
   return { ...doc, version: '1.18.0', declarations: JSON.parse(JSON.stringify(doc.declarations).replace(JSON.stringify(LINES[1]), JSON.stringify(NOBODY_18))) };
 };
@@ -1015,12 +1031,27 @@ test('AGENTS 1.18.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and changed one headin
 /* WHAT 1.19.0 DECLARES, AS ONE MARK: 1.18.0 with the line with nobody working in its new words (`doc18` puts them back). */
 const MARK_19 = '03bffb36eb12f3ae';
 test('AGENTS 1.19.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and changed the Agents page only', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc19();
   assert.equal(doc.version, '1.19.0', 'a new version takes a mark of its own beside this one');
   assert.equal(mark(doc.declarations), MARK_19, 'the Agents add-on changed what it declares with no new version');
   const was = doc18().declarations;
   assert.equal(was.length, doc.declarations.length, '1.19.0 put in or took out a declaration');
   assert.deepEqual(doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page), ['agents'], '1.19.0 changed more than the Agents page');
+});
+
+/* WHAT 1.20.0 DECLARES, AS ONE MARK: 1.19.0 with the runs open now headed Open now (`doc19` puts At work back). The
+   audit of 25 October (Z6, `agents-390-light.png`): "Nobody working right now." over a tile called At work holding
+   three quiet runs. */
+const MARK_20 = 'cdd44094356440d8';
+test('AGENTS 1.20.0 HEADS THE RUNS OPEN NOW OPEN NOW, and changed that heading only', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.20.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_20, 'the Agents add-on changed what it declares with no new version');
+  const blocks = AGENTS_PAGES.agents!.blocks as { heading?: string; panel?: string }[];
+  assert.deepEqual(blocks.filter((b) => b.panel === 'presence').map((b) => b.heading), ['Open now'], 'the runs open and quiet are under a tile called At work');
+  const was = doc19().declarations;
+  assert.equal(was.length, doc.declarations.length, '1.20.0 put in or took out a declaration');
+  assert.deepEqual(doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page), ['agents'], '1.20.0 changed more than the Agents page');
 });
 
 /* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a

@@ -12,6 +12,7 @@ import {
   answersSaid,
   agoSaid,
   composerOf,
+  deskSplit,
   doingSaid,
   instructArgs,
   leadsOf,
@@ -290,6 +291,20 @@ test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones q
   const silent = run({ run: 'S5', state: 'waiting', quiet_s: 42 * 3600 });
   const unsaid = run({ run: 'S6', state: 'waiting' });
   assert.deepEqual(onDeskOf([...ROWS, quiet, silent, unsaid]).map((r) => r.run), ['S1', 'S2', 'S4']);
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z6 (`agents-390-light.png`): "Nobody working right now." over a list called At work holding
+   three quiet runs. The quiet ones are their own part, so nothing quiet stands among the runs at work. */
+test('THREE QUIET RUNS ARE OPEN AND QUIET, NONE AT WORK, and a working one is the only one at work', () => {
+  const tidy = run({ run: 'S904', state: 'waiting', quiet_s: 19 * 60 });
+  const bot = run({ run: 'S900', state: 'waiting', quiet_s: 75 * 60 });
+  const unsaid = run({ run: 'S901', state: 'waiting', quiet_s: 80 * 60 });
+  const quiet = deskSplit([tidy, bot, unsaid]);
+  assert.deepEqual(quiet.working, []);
+  assert.deepEqual(quiet.quiet.map((r) => r.run), ['S904', 'S900', 'S901']);
+  const one = deskSplit([{ ...tidy, state: 'working' }, bot, unsaid]);
+  assert.deepEqual(one.working.map((r) => r.run), ['S904']);
+  assert.deepEqual(one.quiet.map((r) => r.run), ['S900', 'S901']);
 });
 
 /* ── an order that names questions (D8) ─────────────────────────────────── */

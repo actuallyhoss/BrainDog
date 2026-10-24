@@ -483,10 +483,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
          NO `when:`, because the panel says the quiet case itself, and the source takes no `where:` and no `order:`, so
          no page can count working its own way again. It was seven twelfths beside Left for the next run, which wrapped
-         each step to six lines and left a hole under the runs. */
+         each step to six lines and left a hole under the runs.
+
+         HEADED OPEN NOW SINCE 1.20.0 (the audit of 25 October, Z6): it holds the runs at work and, under Quiet, the ones
+         open and quiet, so "Nobody working right now." sat over a tile called At work with three runs in it. The panel
+         draws the two parts apart, each with its count. */
       {
         kind: 'section',
-        heading: 'At work',
+        heading: 'Open now',
         icon: 'session',
         span: 12,
         panel: 'presence',
@@ -789,8 +793,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      it said Sealed value. No list, field or figure goes.
      1.19.0 IS WORDS, SO IT IS MINOR (the agents scope of 24 October, H26): with nobody working the line says Nobody
      working right now, where it said Nobody at work over a tile called At work holding quiet runs. No list, field or
-     figure goes. */
-  manifest: { id: 'agents', version: '1.19.0', requires: ['register.things'] },
+     figure goes.
+     1.20.0 IS WORDS, SO IT IS MINOR (the audit of 25 October, Z6): the runs open now are headed Open now, where they
+     were headed At work over runs open and quiet. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.20.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
