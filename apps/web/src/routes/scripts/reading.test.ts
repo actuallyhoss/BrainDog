@@ -6,10 +6,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { Run, Script } from '../../lib/record/scripts.ts';
-import { plain, recentOf, sentenceOf, toneOf } from './reading.ts';
+import type { Run } from '../../lib/record/scripts.ts';
+import { plain, recentOf, sentenceOf, toneOf, type SaidRow } from './reading.ts';
 
-type Row = Pick<Script, 'title' | 'status' | 'last' | 'month'>;
+type Row = SaidRow;
 const row = (over: Partial<Row>): Row => ({
   title: 'FX rate',
   status: 'on',
