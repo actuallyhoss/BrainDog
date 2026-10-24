@@ -41,7 +41,10 @@
     exportInstead: 'Download a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
     askForIt: 'Going back to a copy',
-    missedLine: 'It is waiting for you in Decide: run it now, or let tonight try again.',
+    /* NEEDS YOU, AS THE BAR CALLS IT (audit 25 October, X20): the page said Decide, a name nothing else on screen uses. */
+    missedLine: 'Run it now from Needs you, or let tonight try again.',
+    /* UNDER A NIGHT THAT DID NOT RUN, the export is the way to a copy, said without "No backups here yet" again. */
+    copyAnyway: 'Download a copy',
     answer: 'Answer it',
   };
 
@@ -128,6 +131,8 @@
    */
   let facts = $state<CopyFacts | null>(null);
   const lastCopy = $derived(facts ? copyLine(facts, Date.now()) : null);
+  /* NO COPY KEPT YET: "First copy tonight" is then the empty state's title, and not a line over "No backup yet" (X20). */
+  const firstTonight = $derived(facts !== null && facts.last_copy_at === null);
   $effect(() => {
     untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
   });
@@ -340,7 +345,7 @@
       {@render missedRow()}
       {@render drillLineOf()}
       <div role="status">
-        <StateRow icon="archive" title={words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
+        <StateRow icon="archive" title={failedNight || missed ? words.copyAnyway : words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
       </div>
     </div>
   </Tile>
@@ -354,8 +359,8 @@
   <Tile icon="history" class="section" data-surface="tile" title={copy.kept} actions={backUpButton}>
     <div class="section-body">
       {@render missedRow()}
-      {@render lastCopyLine()}
-      <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
+      {#if firstTonight}{@render drillLineOf()}{:else}{@render lastCopyLine()}{/if}
+      <Empty kind="no-data-yet" title={firstTonight ? copy.copiesFirst : copy.noSnapshots} body={copy.noSnapshotsWhy} />
     </div>
   </Tile>
 {:else}
@@ -451,10 +456,12 @@
     <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
          two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
          build thought it was on, drawn for as long as the read took and for the sample always. -->
+    <!-- EACH GOING BACK SAYS HOW (audit 25 October, X20): on the Cloud by writing to us, on a self-host by the command on
+         its machine, and over a list with no copy yet, what Restore this will do once there is one. -->
     {#if copiesFrom === 'refused'}
-      <StateRow icon="history" title={words.askForIt} line={copy.restoreNotHere} />
+      <StateRow icon="history" title={words.askForIt} line={shell.host === 'cloud' ? copy.restoreNotHere : copy.restoreSelfHost} />
     {:else if copiesFrom === 'live'}
-      <p class="hint">{copy.restoreLive}</p>
+      <p class="hint">{copyLines.length > 0 ? copy.restoreLive : copy.restoreFirst}</p>
     {/if}
     {#if restoring}
       <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND: a destructive verb is its words in ink asking to

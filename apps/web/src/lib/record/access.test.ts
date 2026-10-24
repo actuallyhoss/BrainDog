@@ -363,7 +363,9 @@ test('and the two areas that report rather than offer say which deployment this 
   /* SAID PLAINLY SINCE THE UI PASS OF 20 OCTOBER (agents F27): where the key is, and to keep a copy elsewhere. */
   assert.match(key, /keep a copy somewhere else/i);
   assert.match(key, /cannot show it to you/i);
-  assert.match(copy.theKeyWhere, /the file you made at set-up/i, 'the screen no longer says where the key is');
+  /* AND THE FILE BY ITS NAME, ON A SELF-HOST (audit 25 October, X20): "If you run BrainDog yourself" was said to the one
+     person who does. */
+  assert.match(copy.theKeyWhere, /the file named kek/i, 'the screen no longer says where the key is');
   /**
    * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
    *

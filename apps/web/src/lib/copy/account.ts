@@ -12,6 +12,8 @@
  * Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports only relative `.ts` files.
  */
 
+import { SUPPORT_EMAIL } from './shell.ts';
+
 export const account = {
   shownInNav: (title: string) => `${title} is back in your nav.`,
   showAgain: 'Show again',
@@ -482,7 +484,9 @@ export const account = {
    */
   theKeyIs:
     'These copies are locked with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
-  theKeyWhere: 'If you run BrainDog yourself, the key is the file you made at set-up. Keep a copy somewhere else.',
+  /* NAMED BY ITS FILE ON A SELF-HOST (audit 25 October, X20): it began "If you run BrainDog yourself", said only to the
+     person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
+  theKeyWhere: "The key is the file named kek in BrainDog's data folder, made at set-up. Keep a copy somewhere else, or these copies cannot be opened.",
   restore: 'Going back',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
@@ -497,8 +501,9 @@ export const account = {
    * What it adds is the part the refusal leaves out: a copy is being kept, it is kept out of this
    * app's reach (`53 §5.4`), and going back to one is a thing to ask for.
    */
-  restoreNotHere:
-    'Nothing on this screen can put this record back to how it was. What is kept of it is kept where this app cannot reach it, so going back to a copy is asked for rather than pressed.',
+  restoreNotHere: `Going back to an earlier copy is asked for rather than pressed: write to ${SUPPORT_EMAIL} and say which day.`,
+  /* AND ON A SELF-HOST, HOW (X20): the copy and the going back are two commands on the machine it runs on. */
+  restoreSelfHost: 'On the machine BrainDog runs on, braindog backup <folder> keeps a copy of all of it, and braindog restore <folder> puts that copy back.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
   billing: 'Billing',
@@ -642,6 +647,8 @@ export const account = {
   sizeOnDisk: (size: string) => `${size} on disk`,
   restoreThis: 'Restore this copy',
   restoreLive: 'Put the record back to one of the copies above. What it holds now is kept as a copy first.',
+  /* NO COPY ABOVE YET (X20): "one of the copies above" over none. */
+  restoreFirst: 'Once a copy is kept, Restore this beside it puts the record back to that day.',
   restoreConfirm: (id: string) => `Put the record back to ${id}? Everything written since then is replaced.`,
   keepAsIs: 'Keep it as it is',
   restoredTo: (id: string, kept: string) => `The record is back to ${id}. What it held before is kept as ${kept}.`,
