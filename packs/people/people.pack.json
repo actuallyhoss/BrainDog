@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "Health is said in plain words: how many checks have not run yet, Needs a look, All good and Not checked yet, and how many days every check has passed.",
+  "changes": "People shows everyone with a face, what they are to you, who they are with and when you last spoke, and you are no longer in your own list. The count of contacts is the people it shows.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -155,16 +155,17 @@
           "body": "{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1)."
         },
         {
-          "kind": "table",
+          "kind": "cards",
           "heading": "Everyone",
           "icon": "people",
           "span": 6,
           "source": "register.people",
-          "where": "merged_into is empty",
+          "where": "merged_into is empty, self is not true",
           "columns": [
-            { "field": "name", "label": "Name", "width": "minmax(14ch,2fr)" },
-            { "field": "role", "label": "Role", "width": "12ch" },
-            { "field": "in_touch", "label": "Last spoke", "width": "14ch", "align": "end" }
+            { "field": "name", "label": "Name", "as": "who" },
+            { "field": "role", "label": "Role", "as": "fact" },
+            { "field": "org", "label": "With", "as": "fact" },
+            { "field": "in_touch", "label": "Last spoke", "as": "when" }
           ],
           "order": [ { "field": "in_touch", "dir": "desc" }, { "field": "seq", "dir": "desc" } ],
           "limit": 50,
@@ -512,6 +513,7 @@
       "metric": "people-count",
       "name": "People",
       "source": "register.people",
+      "where": "merged_into is empty, self is not true",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },

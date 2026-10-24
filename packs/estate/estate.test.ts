@@ -173,14 +173,15 @@ function waits(doc: File): { at: string; holds: unknown }[] {
   return out;
 }
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, a page and ten figures over that list, four rules', () => {
+test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, two pages and ten figures over that list, four rules', () => {
   const doc = file();
   assert.equal(doc.pack, 'estate');
   const kinds = doc.declarations.map((d) => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else');
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 1, page: 1, metric: 10, rule: 4 },
-    'one list, one page, ten figures and four rules',
+    /* TWO PAGES SINCE 2.3.0 (things, not rows): Renewals, and one for each service. */
+    { register: 1, page: 2, metric: 10, rule: 4 },
+    'one list, two pages, ten figures and four rules',
   );
   assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
   assert.doesNotMatch(JSON.stringify(doc.declarations), /"script"|"source":"(?!register\.|metric\.|governance\.|activity")|"egress"|"keys"/u, 'a step that runs a script or reaches out');
@@ -334,16 +335,17 @@ function project(api: Api, name: string): string {
 
 const SERVICE = { name: 'kiln.example', provider: 'Nordhaven Registry', kind: 'domain', cycle: 'yearly', state: 'live', cost: { amount: 1_400, currency: 'GBP' }, renews: '2026-03-22' };
 
-test('INSTALLED FROM THE FILE OR FROM THE MODULE, a record with Projects stores the same sixteen parts, word for word', async () => {
+test('INSTALLED FROM THE FILE OR FROM THE MODULE, a record with Projects stores the same seventeen parts, word for word', async () => {
   const built = await record([PROJECTS]);
   const filed = await record([PROJECTS]);
   said(await put(built.api, firstPartyDocument('estate', { holds: [PROJECTS, 'services'], seeds: [] })));
   said(await put(filed.api, file()));
   const mine = stored(filed.api);
   const theirs = stored(built.api);
-  const ids = [...theirs.keys()].filter((id) => !id.endsWith(`.${PROJECTS}`) && (id.startsWith('register.services') || id.startsWith('page.estate') || id.startsWith('metric.') || id.startsWith('rule.')));
+  const ids = [...theirs.keys()].filter((id) => !id.endsWith(`.${PROJECTS}`) && (id.startsWith('register.services') || id.startsWith('page.estate') || id.startsWith('page.service') || id.startsWith('metric.') || id.startsWith('rule.')));
   const estate = (await read(file())).declarations.map((d) => d.id);
-  assert.equal(estate.length, 16);
+  /* SEVENTEEN SINCE 2.3.0: a service's own page is the seventeenth. */
+  assert.equal(estate.length, 17);
   for (const id of estate) {
     assert.ok(ids.includes(id), `${id} is in the file and the module did not store it`);
     const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

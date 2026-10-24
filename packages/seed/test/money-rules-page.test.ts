@@ -102,7 +102,7 @@ function leadOf(blocks: Block[]): Block {
 /** A figure read through the kernel as a page reads it. */
 const figure = (k: Kernel, id: string): Reading => value<Reading>(k.metric(FILING_FIGURES[id] as never));
 
-test('the page is under Money, after a plan, needs the two lists, and is last of Money pages', () => {
+test('the page is under Money, after a plan, needs the two lists, and is last of the pages on the rail', () => {
   assert.equal(MONEY_RULES_PAGE.page, 'money-rules');
   assert.equal(MONEY_RULES_PAGE.title, 'Filing rules');
   assert.equal(MONEY_RULES_PAGE.pack, 'money-core');
@@ -111,7 +111,9 @@ test('the page is under Money, after a plan, needs the two lists, and is last of
   const requires = MONEY_RULES_PAGE.requires as string[];
   assert.ok(requires.includes('register.filing_rules'));
   assert.ok(requires.includes('register.transactions'));
-  assert.equal(Object.keys(MONEY_PAGES).at(-1), 'money-rules');
+  /* AFTER IT, SINCE money-core 3.19.0, ONLY THE PAGES OF ONE ACCOUNT AND ONE BILL, which are on no rail. */
+  const railed = Object.entries(MONEY_PAGES).filter(([, page]) => (page as { nav?: unknown }).nav !== undefined);
+  assert.equal(railed.at(-1)?.[0], 'money-rules');
 });
 
 test('every figure of the page is a count, unjudged, and named to money-core', () => {

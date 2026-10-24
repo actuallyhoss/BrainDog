@@ -1609,6 +1609,31 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 3.0.0 (the KPI plan of 21 October, K3-C): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> e844999b8bf97975",
     ],
   },
+  /** A VERSION AND NOT A RESET: founder@3.0.0 is on `origin/master`. */
+  'founder@3.1.0': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d metric.projects-earning-silent
+      metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'ad57bae127218aa1',
+    history: [
+      'Founder 3.1.0 (things, not rows, 24 October): `page.project` is a template over every project, its `for:` no longer narrowed to those building or earning; no id added or taken away -> ad57bae127218aa1',
+    ],
+  },
   'team@2.19.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
@@ -1707,6 +1732,30 @@ const DECLARED: Record<string, Version> = {
     declares: 'd08d7e5234994c4b',
     history: [
       "`page.home-team`'s Bring the team in says only that a team of agents works on any record, where it added that a team of people needs Cloud; no id added or taken away -> d08d7e5234994c4b",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: team@2.22.0 is on `origin/master`. */
+  'team@2.23.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+      rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day
+      script.plan_follows_ticket
+    `,
+    declares: '651e2ac8ad07331a',
+    history: [
+      'Team 2.23.0 (things, not rows, 24 October): `page.project` is a template over every project, its `for:` no longer narrowed to those building or earning; no id added or taken away -> 651e2ac8ad07331a',
     ],
   },
   'business@1.6.0': {

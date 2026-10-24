@@ -85,14 +85,11 @@ test('A TEMPLATE IS ONE DECLARATION AND ONE PAGE PER ROW, slugged by the row it 
      is a URL somebody can type and one that survives the row being renumbered. */
   const { k, sql } = await seeded();
   const slugs = k.pages().map((p) => p.slug);
-  /* The template's own predicate decides which rows get a page: `lane is building or earning`, so a
-     parked project has none. A template that expanded over every row would be a rail full of things
-     nobody is working on. */
-  const live = THINGS.filter((t) => t.lane === 'building' || t.lane === 'earning');
-  assert.ok(live.length >= 3 && live.length < THINGS.length, 'the seed needs both kinds for this to bite');
-  for (const thing of live) assert.ok(slugs.includes(slugify(String(thing.name))), `no page for ${String(thing.name)}`);
-  for (const thing of THINGS.filter((t) => !live.includes(t)))
-    assert.ok(!slugs.includes(slugify(String(thing.name))), `${String(thing.name)} is parked and has a page`);
+  /* EVERY PROJECT HAS A PAGE, A PARKED ONE TOO, SINCE 24 October (things, not rows): a parked project's row opened its
+     fields. The rail is the sidebar's own list now, which keeps the parked apart, so a page each crowds nothing. */
+  const parked = THINGS.filter((t) => t.lane !== 'building' && t.lane !== 'earning');
+  assert.ok(parked.length > 0, 'the seed needs a parked project for this to bite');
+  for (const thing of THINGS) assert.ok(slugs.includes(slugify(String(thing.name))), `no page for ${String(thing.name)}`);
 
   const kiln = page(k, 'kiln');
   assert.match(kiln.title as string, /Kiln/, 'the title still carries its placeholder');

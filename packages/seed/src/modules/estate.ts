@@ -547,6 +547,52 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
       },
     ],
   },
+
+  /**
+   * ONE PAGE A SERVICE, SINCE estate 2.3.0 (things, not rows, 24 October): a service from Renewals opened its row's
+   * fields. Now it opens on what it costs, who it is with, what it points at and the day it renews, then where its keys
+   * are (the project it is for waits for Projects, so it is on the row's own screen); its fields are "Show the data", one press under the page.
+   *
+   * A TEMPLATE WITH NO `nav`, as a person's page is, and FLEETING (`for.fleeting`): a service called what a project is
+   * called never moves the project's page to a numbered address. ITS OWN ROW BY NUMBER (`seq is {{seq}}`), since two
+   * services may share a name.
+   *
+   * THE KEYS ARE THE VAULT'S, AND A LINK THERE. They are kept on the agents' list of keys, which Services does not hold,
+   * and a block over it would refuse Services on a record without that list; the Vault opens on the provider's keys.
+   */
+  service: {
+    page: 'service',
+    title: '{{name}}',
+    for: { register: 'services', fleeting: true },
+    icon: 'service',
+    requires: ['register.services'],
+    pack: 'estate',
+    blocks: [
+      {
+        kind: 'cards',
+        lead: true,
+        span: 12,
+        source: 'register.services',
+        where: 'seq is {{seq}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'cost', as: 'figure' },
+          { field: 'provider', label: 'With', as: 'fact' },
+          { field: 'points_at', label: 'Points at', as: 'fact' },
+          { field: 'renews', label: 'Renews', as: 'when' },
+        ],
+        limit: 1,
+      },
+      {
+        /* BY ITS NAME, WHICH EVERY SERVICE HAS: a hole for a provider nobody wrote would be drawn as it is spelt. */
+        kind: 'note',
+        heading: 'Keys',
+        icon: 'key',
+        span: 12,
+        body: 'Keys for {{name}} are kept in the [Vault](/vault?q={{name}}).',
+      },
+    ],
+  },
 };
 
 /**

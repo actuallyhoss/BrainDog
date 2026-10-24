@@ -1,9 +1,9 @@
 {
   "pack": "estate",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "Services goes in where there are no projects yet. Which project a service is for, and what one project costs a year to keep running, wait until Projects is there. Nothing else changed.",
+  "changes": "Each service has a page of its own: what it costs, who it is with, what it points at and when it renews, with its keys one press away in the Vault. Services still goes in where there are no projects yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -229,6 +229,32 @@
           "where": "list is services",
           "first": 3
         }
+      ]
+    },
+    {
+      "page": "service",
+      "title": "{{name}}",
+      "for": { "register": "services", "fleeting": true },
+      "icon": "service",
+      "requires": [ "register.services" ],
+      "pack": "estate",
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.services",
+          "where": "seq is {{seq}}",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "cost", "as": "figure" },
+            { "field": "provider", "label": "With", "as": "fact" },
+            { "field": "points_at", "label": "Points at", "as": "fact" },
+            { "field": "renews", "label": "Renews", "as": "when" }
+          ],
+          "limit": 1
+        },
+        { "kind": "note", "heading": "Keys", "icon": "key", "span": 12, "body": "Keys for {{name}} are kept in the [Vault](/vault?q={{name}})." }
       ]
     },
     {

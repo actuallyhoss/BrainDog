@@ -216,7 +216,8 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   /* NOT A STEP ABOVE, AS ESTATE'S IS: People 3.4.0 is still unreleased (commit 63423720 holds 3.3.0), so the file takes
      the version the module is at and nothing a record already holds is changed in place. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.people);
-  assert.equal(doc.version, '3.5.0');
+  /* 3.6.0 SINCE 24 October (things, not rows): Everyone as faces, the owner left off. 3.5.0 is released. */
+  assert.equal(doc.version, '3.6.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

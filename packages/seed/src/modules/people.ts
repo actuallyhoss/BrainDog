@@ -379,6 +379,9 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'people-count',
     name: 'People',
     source: 'register.people',
+    /* THE PEOPLE EVERYONE DRAWS, SINCE People 3.6.0: never the owner and never somebody folded into another, so the
+       page's "6 contacts" is the number of cards under it. */
+    where: 'merged_into is empty, self is not true',
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -575,7 +578,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            NOT THE `met` LINES, which the card drew whole: "2026-08-27 · commit 8b1e4d0 in portage" is where an
            agent was when it met them, in the agent's words, and a card is read by a person. The lines stay on
            the row, where the history of a person is read. */
-        kind: 'table',
+        kind: 'cards',
         heading: 'Everyone',
         icon: 'people',
         /* HALF, WITH THE ORGANISATIONS BESIDE IT (the UI pass of 20 October, money F13): two lists a page wide left a
@@ -583,17 +586,23 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            in apps/web), so two thirds and a third drew the organisations under it. On a phone each takes the width. */
         span: 6,
         source: 'register.people',
-        /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one line, not two. */
-        where: 'merged_into is empty',
-        /* PEOPLE AS LINES, SINCE People 3.5.0: each person one line, their name, what they are, who they are with and
+        /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one line, not two. AND NEVER THE
+           OWNER, SINCE People 3.6.0 (the look of 24 October found him in his own list): the row marked as you is who the
+           record is for, not somebody you know. */
+        where: 'merged_into is empty, self is not true',
+        /* FACES AGAIN, SINCE People 3.6.0 (things, not rows): each person a card with their initial, what they are to you
+           and when you last spoke, where a table of three columns read as a directory. The name is the card's `who`, so
+           it leads with a face. Who they are with is the card's second fact.
+           PEOPLE AS LINES, SINCE People 3.5.0: each person one line, their name, what they are, who they are with and
            when you last spoke, where each was a little form of labelled facts. */
         /* NAME, ROLE AND WHEN YOU LAST SPOKE, and not who they are with (money F13): a phone's line holds two values
            after the name, and "With" took the place of Last spoke there, so the one fact a person scans People for was
            dropped on a phone. Who they are with is on their own page, first line. */
         columns: [
-          { field: 'name', label: 'Name', width: 'minmax(14ch,2fr)' },
-          { field: 'role', label: 'Role', width: '12ch' },
-          { field: 'in_touch', label: 'Last spoke', width: '14ch', align: 'end' },
+          { field: 'name', label: 'Name', as: 'who' },
+          { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'org', label: 'With', as: 'fact' },
+          { field: 'in_touch', label: 'Last spoke', as: 'when' },
         ],
         order: [
           { field: 'in_touch', dir: 'desc' },

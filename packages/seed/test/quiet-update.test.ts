@@ -22,6 +22,7 @@ import { AGENTS_PACK, FIRST_PARTY_VERSIONS, NOW, agentsPackDocument, firstPartyD
 import { keptLists, modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
+import { thingsUndone, useCaseThingsUndone } from './things-before.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
 import { QUEUE } from '../src/modules/money/pages/parts/queue.ts';
@@ -1126,7 +1127,7 @@ const unplaced = (doc: Body): Body => ({
 });
 
 /** A document as the version before this build's declared it, for a module this build moved on, else as it is. */
-const latestUndone = (id: string, doc: Body): Body => LATEST[id]?.undo(doc) ?? doc;
+const latestUndone = (id: string, doc: Body): Body => LATEST[id]?.undo(thingsUndone(id, doc)) ?? thingsUndone(id, doc);
 
 /**
  * EACH MODULE AS THE VERSION BEFORE DECLARED IT, made from this build's document by undoing the one change its new
@@ -1202,7 +1203,7 @@ test('THE VERSIONS BEFORE THE SECOND DESIGN REVIEW, REBUILT, ARE THE ONES RELEAS
   for (const [id, was] of [...Object.entries(BEFORE), ...Object.entries(LATEST)]) {
     const now = firstPartyDocument(id as never, { seeds: [] }) as unknown as Body;
     assert.notEqual(FIRST_PARTY_VERSIONS[id as 'work'], was.version, `${id} has not moved on from ${was.version}`);
-    assert.equal(fingerprintOf(was.undo(unplaced(now))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.equal(fingerprintOf(was.undo(unplaced(thingsUndone(id, now)))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
     assert.notEqual(fingerprintOf(now), was.released, `${id}: this build declares what ${was.version} did under a new version`);
   }
 });
@@ -1243,8 +1244,9 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* PEOPLE DRAWS NO DOTS, AND SINCE 3.2.0 NO LIST OVER ITS CARDS EITHER, and keeps the figures the chart and the list drew on. */
   const people = blocks('people');
   assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');
-  /* THE ONLY TABLES ARE THE LINES OF EVERYONE AND THE ORGANISATIONS, SINCE BATCH 6, which are the people and not a list over their cards. */
-  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Everyone', 'Organisations']);
+  /* THE ONLY TABLE IS THE ORGANISATIONS, AND EVERYONE THE FACES, SINCE People 3.6.0, the people and not a list over their cards. */
+  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Organisations']);
+  assert.deepEqual(people.filter((b) => b.kind === 'cards').map((b) => b.heading), ['Everyone']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
   /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS, SINCE the UI pass of 20 October (proj F5): what each earns alone, and
      the parked a lane of the cards. */
@@ -1444,7 +1446,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const u = useCase(id)!;
     const was = USECASE_BEFORE[id]!;
     assert.notEqual(u.version, was.version);
-    assert.equal(fingerprintOf(oneBefore(projectBefore(useCaseDocument(id, TODAY) as Body, id))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.equal(fingerprintOf(oneBefore(projectBefore(useCaseThingsUndone(useCaseDocument(id, TODAY) as Body), id))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
 
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
@@ -1486,7 +1488,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const doc = documentFor(k, m)!;
     const was = LATEST[m];
-    await put(k, sql, was ? { ...withoutCashStale(was.undo(doc)), version: was.version } : doc);
+    await put(k, sql, was ? { ...withoutCashStale(was.undo(thingsUndone(m, doc))), version: was.version } : doc);
   }
   const port = portOf(k, sql);
 
@@ -1506,7 +1508,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   type Held = { kind: string; heading?: string; source?: string; columns?: { field: string }[] };
   const blocks = (slug: string): Held[] => value<{ blocks: Held[] }>(k.page(slug)).blocks;
   assert.deepEqual(blocks('work-board').find((b) => b.kind === 'board')!.columns!.map((c) => c.field), ['state', 'what', 'by', 'owner']);
-  assert.deepEqual(blocks('people').filter((b) => b.source === 'register.people').map((b) => [b.kind, b.heading]), [['table', 'Everyone']]);
+  assert.deepEqual(blocks('people').filter((b) => b.source === 'register.people').map((b) => [b.kind, b.heading]), [['cards', 'Everyone']]);
   assert.ok(k.packClaims('people').includes('metric.people-in-touch-90d'), 'the figure the list drew on was taken off the record');
 
   assert.deepEqual(await updateFirstParty(port), []);
@@ -1638,7 +1640,7 @@ test('TAKING CASH STALE AWAY IS ASKED: a record on money-core 3.13.0 that holds 
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const doc = documentFor(k, m)!;
     const was = LATEST[m];
-    await put(k, sql, was ? { ...was.undo(doc), version: was.version } : doc);
+    await put(k, sql, was ? { ...was.undo(thingsUndone(m, doc)), version: was.version } : doc);
   }
   const steps = await updateFirstParty(portOf(k, sql));
   assert.deepEqual(

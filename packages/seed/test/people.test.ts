@@ -111,11 +111,12 @@ test('PEOPLE SHOWS EACH PERSON ONCE, as a line with the day they last spoke, the
   /* AND NEITHER LIST OVER THE CARDS: one block reads the people, and it is Everyone. */
   for (const heading of ['Gone quiet', 'Last in touch']) assert.ok(!page.blocks.some((b) => b.heading === heading), `People lists its people under ${heading} as well as on their cards`);
   const over = page.blocks.filter((b) => (b as { source?: unknown }).source === 'register.people');
-  assert.deepEqual(over.map((b) => [b.kind, b.heading]), [['table', 'Everyone']]);
+  assert.deepEqual(over.map((b) => [b.kind, b.heading]), [['cards', 'Everyone']]);
 
   const cards = over[0]!;
-  /* THE LINE CARRIES THE DAY, which is why it is the one that stays, as a line since batch 6 and not a little form. */
-  assert.deepEqual(cards.columns?.find((c) => c.field === 'in_touch'), { field: 'in_touch', label: 'Last spoke', width: '14ch', align: 'end' });
+  /* THE CARD CARRIES THE DAY, which is why it is the one that stays, and a face since People 3.6.0. */
+  assert.deepEqual(cards.columns?.find((c) => c.field === 'in_touch'), { field: 'in_touch', label: 'Last spoke', as: 'when' });
+  assert.deepEqual(cards.columns?.find((c) => c.field === 'name'), { field: 'name', label: 'Name', as: 'who' });
   const names = cards.rows.map((r) => r.fields.name);
   assert.equal(new Set(names).size, names.length, 'somebody is on Everyone twice');
   const latest = cards.rows.map((r) => r.fields.in_touch).filter((d): d is string => typeof d === 'string');
@@ -319,13 +320,13 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   const held = relation(['people', 'organisations', 'things', 'transactions']);
   assert.deepEqual(held.blocks.map((b) => b.source).filter((s) => s === 'register.things' || s === 'register.transactions'), ['register.things', 'register.transactions']);
 
-  /* THE PEOPLE PAGE LISTS EVERYONE AS LINES, SINCE BATCH 6: the name, what they are and the day they last spoke, one line
-     each, where each was a little form of labelled facts grouped by organisation. Who they are with left the line in the
-     UI pass of 20 October (money F13), since on a phone it took the place of the day they last spoke. */
-  const everyone = (PAGES.people!.blocks as { kind?: string; heading?: string; group?: string; columns?: { field: string }[] }[]).find((b) => b.heading === 'Everyone');
-  assert.equal(everyone?.kind, 'table');
+  /* THE PEOPLE PAGE DRAWS EVERYONE AS FACES, SINCE People 3.6.0: the name with its initial, what they are, who they are
+     with and the day they last spoke, one card each and never grouped; the owner is not among them. */
+  const everyone = (PAGES.people!.blocks as { kind?: string; heading?: string; group?: string; where?: string; columns?: { field: string }[] }[]).find((b) => b.heading === 'Everyone');
+  assert.equal(everyone?.kind, 'cards');
   assert.equal(everyone?.group, undefined);
-  assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'role', 'in_touch']);
+  assert.match(String(everyone?.where), /self is not true/u);
+  assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'role', 'org', 'in_touch']);
 
   /* THE PEOPLE PAGE LISTS THE ORGANISATIONS BESIDE EVERYONE. */
   const list = opened(k, 'people').blocks.find((b) => b.heading === 'Organisations');

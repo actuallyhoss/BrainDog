@@ -107,7 +107,8 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
   assert.deepEqual(m.requires, []);
   for (const id of ['register.datapoints', 'register.kpis', 'metric.kpis-held', 'metric.kpi-stale']) assert.ok(m.provides.includes(id), id);
   const doc = useCaseDocument('founder', TODAY) as { version: string; declarations: Body[]; hands: Record<string, string>; seeds?: Body[] };
-  assert.equal(doc.version, '3.0.0');
+  /* 3.1.0 SINCE 24 October (things, not rows): its project page is drawn for every project; Numbers is handed as 3.0.0 did. */
+  assert.equal(doc.version, '3.1.0');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');
   assert.ok(!(doc.seeds ?? []).some((s) => s.register === 'datapoints'), 'and seeds no list it does not own');

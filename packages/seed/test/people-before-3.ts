@@ -14,11 +14,22 @@ type Body = Record<string, unknown>;
 
 const LATER = new Set(['org', 'keys', 'aliases', 'self']);
 
+/** A declaration with its `where` set, or with none where nothing is left of it. */
+const withWhere = (d: Body, where: unknown): Body => {
+  const { where: _was, ...rest } = d;
+  return where === undefined ? rest : { ...rest, where };
+};
+
 /** The rules People 3.0.0 added, each meeting an organisation, which a People with no list of them could not. */
 const LATER_RULES = new Set(['meet-sender-organisations', 'meet-payees']);
 
+/** A `where` without the clause about who is you, which a People with no `self` cannot read (People 3.6.0 added it). */
+const unselfed = (where: unknown): unknown =>
+  typeof where === 'string' ? where.split(',').map((c) => c.trim()).filter((c) => c !== '' && !/^self\b/u.test(c)).join(', ') || undefined : where;
+
 export function peopleBefore3(doc: Body): Body {
   const declarations = (doc.declarations as Body[])
+    .map((d) => (typeof d.metric === 'string' && typeof d.where === 'string' && /\bself\b/u.test(d.where) ? withWhere(d, unselfed(d.where)) : d))
     .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && d.metric !== 'organisations-count' && !LATER_RULES.has(String(d.rule)))
     .map((d) => {
       if (d.register === 'people')
@@ -34,7 +45,8 @@ export function peopleBefore3(doc: Body): Body {
           blocks: (d.blocks as Body[])
             .filter((b) => b.heading !== 'Organisations' && b.heading !== 'Known by')
             .map((b) => {
-              const { group: _group, fold: _fold, ...rest } = b;
+              const { group: _group, fold: _fold, ...kept } = b;
+              const rest = typeof b.where === 'string' && /\bself\b/u.test(b.where) ? withWhere(kept, unselfed(b.where)) : kept;
               return Array.isArray(b.columns) ? { ...rest, columns: (b.columns as Body[]).filter((c) => c.field !== 'org') } : rest;
             }),
         };

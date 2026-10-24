@@ -895,6 +895,22 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 2.2.0 (services-people-five-parts-101, PGS-C18; batch 101; commit 63423720, the deployed build, holds 2.1.0): `page.estate` gains What agents did under its fold, an agents block over the log narrowed to services, first three a run; a block added, nothing taken away, no id added or taken away -> c1fcbf2f04e75a76",
     ],
   },
+  /** A VERSION AND NOT A RESET: estate 2.2.0 is on `origin/master`. */
+  'estate@2.3.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+      page.service
+    `,
+    declares: 'a750322603e54cc6',
+    history: [
+      'Estate 2.3.0 (things, not rows, 24 October): `page.service` is declared, a page for each service, a template with no nav and fleeting, drawing its own row by `seq is {{seq}}` and a line to its keys in the Vault; the project it is for stays on the row screen -> a750322603e54cc6',
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `
@@ -1555,6 +1571,47 @@ const DECLARED: Record<string, Version> = {
       "Money 3.18.0 (the audit of 22 October, U4): `installments-late` is declared, the parts still open past their day going out, and `page.money` names its first row after the money in the line, says `cash-now` in the line for two books, and says the part first in Heads up's line of bills late -> 0f876e822683705b",
     ],
   },
+  /** A VERSION AND NOT A RESET: money-core 3.18.0 is on `origin/master`. */
+  'money-core@3.19.0': {
+    holds: `
+      metric.account-ages metric.arriving-30d metric.balances-stale metric.bills-in-no-book metric.book-cash metric.book-in-by-month
+      metric.book-in-month metric.book-lasts-until metric.book-net-by-month metric.book-net-month metric.book-out-by-month
+      metric.book-out-month metric.book-owed-by metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on
+      metric.budgets-set metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check
+      metric.cash-now metric.categories-against-direction metric.chasing metric.currencies-held metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.filed-by-rule-30d
+      metric.filed-for-you-30d metric.filed-today metric.in-30d metric.in-by-month metric.in-due-by-month
+      metric.installments-after-next-by-plan metric.installments-due-30d metric.installments-late metric.installments-left
+      metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
+      metric.installments-total-by-plan metric.instalments-in-no-book metric.lasts-no-income metric.late-in metric.leaving-30d
+      metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.net-by-month metric.nights-missed-30d
+      metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you
+      metric.plan-last-due metric.plan-left metric.plan-next-due metric.plan-paid metric.plan-parts metric.plan-parts-open
+      metric.plan-parts-paid metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.repeating-in-no-book
+      metric.repeating-overdue metric.rule-filed metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days
+      metric.settled-in-7d metric.spent-30d metric.spent-by-category-last-month metric.spent-by-category-month
+      metric.spent-by-category-to-date-last-month metric.spent-last-month metric.spent-vs-last-month metric.statement-oldest-days
+      metric.txn-uncategorised metric.uncategorised-share-30d
+      page.money page.money-book page.money-plan page.money-rules
+      register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
+      register.obligations register.plans register.recurring register.snapshots register.transactions
+      rule.bill-takes-book rule.category-taught rule.category-teaches rule.entry-takes-book rule.installment-due-soon
+      rule.instalment-settles rule.invoice-chased rule.invoice-late rule.part-counts-plan rule.part-takes-book rule.payment-matches
+      rule.payment-settles rule.payment-unsettles rule.plan-links-parts rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.recurring-went-through rule.repeat-takes-book rule.rule-files-back rule.txn-categorise
+      script.book_from_account script.file_back script.last_day script.learn_category script.match_payment script.plans_from_names
+      script.settle script.settle_matched_line script.unsettle
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
+      page.money-account page.money-bill
+    `,
+    declares: '4e14ca35e97a9289',
+    history: [
+      'Money 3.19.0 (things, not rows, 24 October): `page.money-account` and `page.money-bill` are declared, a page for each account and each bill or invoice, templates with no nav and fleeting, each drawing its own row by `seq is {{seq}}` -> 4e14ca35e97a9289',
+    ],
+  },
   'work@1.17.0': {
     holds: `
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
@@ -1637,6 +1694,20 @@ const DECLARED: Record<string, Version> = {
     declares: '24ab659bc74c166a',
     history: [
       "`page.health` is said in plain words: its lines count checks that have not run yet where they counted signs not read, nought red reads 'Nothing on this record needs a look.', its groups are All good and Not checked yet where they were Alive and Not read yet, and the run of good days says every check passed; no id added or taken away -> 24ab659bc74c166a",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: people 3.5.0 is on `origin/master`. */
+  'people@3.6.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.activity page.calendar page.health page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: 'bee224943d7fab5c',
+    history: [
+      "People 3.6.0 (things, not rows, 24 October): `page.people`'s Everyone is cards with a face, role, organisation and Last spoke, never the owner (`self is not true`), and `people-count` counts the people Everyone draws; no id added or taken away -> bee224943d7fab5c",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */

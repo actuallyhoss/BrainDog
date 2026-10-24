@@ -96,6 +96,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '3.6.0',
+      notes: 'People shows everyone with a face, what they are to you, who they are with and when you last spoke, and you are no longer in your own list. The count of contacts is the people it shows.',
+    },
     { version: '3.5.0', notes: 'Health is said in plain words: how many checks have not run yet, Needs a look, All good and Not checked yet, and how many days every check has passed.' },
     { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it. What is asked about somebody here waits on the People page to be answered, and its first line says how many. People shows how many you were in touch with in the last 30 days, with a line of the month, and what agents did to the people and organisations here. Activity can be narrowed by who, what kind of change and which list.' },
     { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
@@ -133,6 +137,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.19.0',
+      notes: 'Each account and each bill or invoice has a page of its own. An account opens on what it holds, when that was last confirmed and the last things that moved through it; a bill on what it is for, how much, who and when, what is still to pay and the parts paid.',
+    },
     {
       version: '3.18.0',
       notes: 'A part of something paid in parts is late once its day has gone. Money\'s first line says how much you have, then names the part that is late longest, what it is and how long ago it was due. With more than one book it says the money there is, where it said only how many books and accounts. On Heads up, a late part comes first, with the bills that are late after it.',
@@ -214,6 +222,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    {
+      version: '2.3.0',
+      notes: 'Each service has a page of its own: what it costs, who it is with, what it points at and when it renews, with its keys one press away in the Vault.',
+    },
     { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are. A project page no longer says Costs a year 0 when nothing it runs on has a cost recorded; the figure is left out until one is. Services shows what is asked about a service and says how many in its first line, and Virtual machine, Edge network and Object storage are types with names. Services shows what agents did to your services, under everything you keep.' },
     {
       version: '2.1.0',

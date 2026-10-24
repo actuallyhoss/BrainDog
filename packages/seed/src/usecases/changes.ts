@@ -27,6 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
+    { version: '3.1.0', notes: 'Every project has its page now, parked and finished ones too, and a parked one says quietly since when it has been parked.' },
     {
       version: '3.0.0',
       notes: 'Numbers, the readings your projects report, moves to Projects, which keeps them from now on along with each project\'s key numbers. Every number you hold stays where it is, and the Dashboard, Today and each project page draw them as before. A new founder record no longer starts with an example number.',
@@ -51,6 +52,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.23.0', notes: 'Every project has its page now, parked and finished ones too, and a parked one says quietly since when it has been parked.' },
     {
       version: '2.22.0',
       notes: 'Bring the team in says that a team of agents works on any record, and no longer that a team of people needs Cloud.',

@@ -675,12 +675,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   project its key numbers from what Numbers holds, once a day and once a project, as questions on Decide. It was
  *   written and tested and declared nowhere, so a record with readings held no key number. One script added and
  *   nothing taken away, so a minor step; it asks and writes nothing itself.
+ * - money-core 3.19.0, people 3.6.0 and estate 2.3.0 (things, not rows, 24 October): an account, a bill or invoice and a
+ *   service each have a page of their own, a template over their list (`page.money-account`, `page.money-bill`,
+ *   `page.service`), with no `nav` and `fleeting`, so none takes an address from a steadier page. People's Everyone is
+ *   faces, the owner left off (`self is not true`), and `people-count` counts the people it draws. Three pages added and
+ *   two declarations changed, nothing taken away, so minor steps. 3.18.0, 3.5.0 and 2.2.0 ARE RELEASED (origin/master).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.22.0',
-  people: '3.5.0',
-  'money-core': '3.18.0',
-  estate: '2.2.0',
+  people: '3.6.0',
+  'money-core': '3.19.0',
+  estate: '2.3.0',
   work: '1.19.0',
 };
 

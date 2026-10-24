@@ -687,7 +687,7 @@ const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
  * what is coming up and the feed of what agents did are gone, each said once elsewhere on the page or in History.
  */
 test('MONEY IS ONE PAGE, and every block on it answers on the sample without a refusal', async () => {
-  assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book', 'money-plan', 'money-rules'], 'money-core declares a page besides Money, one a book, one a plan and one of its filing rules');
+  assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book', 'money-plan', 'money-rules', 'money-account', 'money-bill'], 'money-core declares a page besides Money, one a book, one a plan, one of its filing rules, one an account and one a bill');
   const page = MONEY_PAGES.money!;
   assert.equal(page.title, 'Money');
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
@@ -890,7 +890,8 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
        it, straight after it. */
     /* A PLAN'S PAGE WALKS NO CASH (`money-plan`, money-core 3.17.0): it has no headline row to hold to. */
     if (walk < 0) {
-      assert.ok(slug === 'money-plan' || slug === 'money-rules', `${slug}: the page draws no Cash ahead`);
+      /* NOR AN ACCOUNT'S OR A BILL'S (money-core 3.19.0): each is one thing, said first, and not a walk of the money. */
+      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill'].includes(slug), `${slug}: the page draws no Cash ahead`);
     } else if ((page as { layout?: unknown }).layout !== undefined) {
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);
@@ -913,7 +914,9 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     /* WHAT A PERSON READS, AND ONLY THAT: a `where:` is the record's grammar, and `direction is owed to me` is an id. */
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
     /* A PLAN'S PAGE READS TEN SINCE ITS LEAD BECAME ONE SENTENCE (plan-lead-sentence-70), where four figures had a label each. */
-    assert.ok(read.length >= (slug === 'money-rules' ? 8 : 10), `${slug}: the sweep read almost nothing, so it proves nothing`);
+    /* AN ACCOUNT'S AND A BILL'S PAGE READ TWO AND THREE (money-core 3.19.0): one card, and a heading or two under it. */
+    const least = slug === 'money-rules' ? 8 : slug === 'money-account' ? 2 : slug === 'money-bill' ? 2 : 10;
+    assert.ok(read.length >= least, `${slug}: the sweep read almost nothing, so it proves nothing`);
     for (const t of read) assert.doesNotMatch(t, /\bowe[ds]?\b|\byou owe\b|\bowing\b/iu, `${slug} says "${t}"`);
   }
 

@@ -224,8 +224,10 @@ export const TEAM = {
      the whole width under Waiting on you. A block added, nothing taken away.
      2.22.0: Bring the team in says only that a team of agents works on any record, and no longer that a team of people
      needs Cloud, which brain.dog does not sell and where inviting people is held (the audit of 22 October, U-C4). One
-     line's words, so a patch would do; a minor step, since 2.21.0 is live on brain.dog. */
-  version: '2.22.0',
+     line's words, so a patch would do; a minor step, since 2.21.0 is live on brain.dog.
+     2.23.0 (things, not rows, 24 October): the project page it embeds is drawn for every project, parked and finished
+     ones too, so a parked project's row opens its page. One `for:` widened; a minor step, since 2.22.0 is released. */
+  version: '2.23.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

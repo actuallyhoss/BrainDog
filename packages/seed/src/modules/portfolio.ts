@@ -1261,7 +1261,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
   project: {
     page: 'project',
     title: '{{name}}',
-    for: { register: 'things', where: 'lane is building or earning' },
+    /* EVERY PROJECT, PARKED AND FINISHED ONES TOO (things, not rows, 24 October): it was the ones building or earning,
+       so a parked project's row opened on its fields. Its hero says it is parked, and since when, quietly. */
+    for: { register: 'things' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
     layout: { rail: 4 },

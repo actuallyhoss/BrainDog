@@ -73,7 +73,8 @@ export function unresolved(doc: { declarations: Decl[] }): string[] {
     /* `for: { register: 'books' }`, the list the page is made once a row of. */
     const over = (page.for as { register?: unknown } | undefined)?.register;
     const each = typeof over === 'string' ? lists.get(over) : undefined;
-    const rowHoles = new Set(['spoken', ...((each?.fields as Field[] | undefined) ?? []).map((f) => f.id)]);
+    /* `{{seq}}` IS THE ROW'S OWN NUMBER, filled as `{{spoken}}` is (`fill` in the kernel), since money-core 3.19.0. */
+    const rowHoles = new Set(['spoken', 'seq', ...((each?.fields as Field[] | undefined) ?? []).map((f) => f.id)]);
     for (const [at, text] of strings(page, `page.${String(page.page)}`)) {
       const said = SAID.some((re) => re.test(at));
       for (const m of text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}]*)\}\}/g)) {

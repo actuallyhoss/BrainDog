@@ -435,8 +435,12 @@ export const FOUNDER = {
      here still reads it, and a founder's readings stay where they are. A list this pack declared is taken away, so the
      step is a major one, as 2.0.0 was when organisations went to People; 2.7.0 is published and frozen. Still unreleased,
      it takes K3-C's block with no version of its own: the project page it embeds draws Key numbers, the project's own
-     key numbers (`kpis`, `for: project`), the whole width under Waiting on you. A block added, nothing taken away. */
-  version: '3.0.0',
+     key numbers (`kpis`, `for: project`), the whole width under Waiting on you. A block added, nothing taken away.
+
+     3.1.0, THINGS, NOT ROWS (24 October): the project page it embeds is drawn for every project, parked and finished ones
+     too, where it was drawn for those building or earning, so a parked project's row opens its page. One declaration's
+     `for:` widened, nothing added or taken away; a minor step, since 3.0.0 is on origin/master. */
+  version: '3.1.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

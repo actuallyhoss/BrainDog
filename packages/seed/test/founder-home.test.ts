@@ -23,6 +23,7 @@ import { DUE_THIS_WEEK } from '../src/modules/money.ts';
 import { MODULE_ORDER, modulesFor, signalsIn, standsOn, useCase, useCaseDocument, type UseCase } from '../src/usecases/index.ts';
 import { carriedDocument, claimedBy, dayOf, fitted, moduleDocument } from '../src/usecases/install.ts';
 import { DOMAINS, PROJECTS } from '../../../fixtures/names.ts';
+import { useCaseThingsUndone } from './things-before.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -250,7 +251,8 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   type Page = { page?: string; blocks?: { kind?: string }[] };
   const project = (next.declarations as Page[]).find((d) => d.page === 'project')!;
   assert.deepEqual(project.blocks!.filter((b) => b.kind === 'kpis'), [{ kind: 'kpis', heading: 'Key numbers', icon: 'chart-line', span: 12, key: 'kpis', source: 'kpis', for: 'project' }]);
-  const less = (next.declarations as Page[]).map((d) => (d.page === 'project' ? { ...d, blocks: d.blocks!.filter((b) => b.kind !== 'kpis') } : d));
+  /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */
+  const less = (useCaseThingsUndone(next as never).declarations as Page[]).map((d) => (d.page === 'project' ? { ...d, blocks: d.blocks!.filter((b) => b.kind !== 'kpis') } : d));
   assert.deepEqual(less, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
   assert.equal(next.hands['register.datapoints'], 'portfolio');
   const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;

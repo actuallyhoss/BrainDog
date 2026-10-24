@@ -183,12 +183,14 @@ test('AND EVERY `where:` RESOLVES AGAINST THE REGISTER IT NAMES', async () => {
         return (Array.isArray(raw) ? raw : [raw]).flatMap((n) => (typeof n === 'number' ? [k.get(`${field.to}#${n}`)?.id ?? ''] : [])).join(' or ');
       };
       const said = first && template
-        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) => (key === 'spoken' ? `${template.register}#1` : holeOf(key)))
+        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) => (key === 'spoken' ? `${template.register}#1` : key === 'seq' ? '1' : holeOf(key)))
         : block.where;
 
       const out = parseWhere(said, schemaOf(k, register), {
         nowMs: NOW,
         refByTitle: (to, title) => {
+          /* A ROW BY ITS SPOKEN ID, `accounts#1`, as a page about it names it (`{{spoken}}`), and the record reads it. */
+          if (title === `${to}#1`) return k.get(title)?.id ?? null;
           const seq = (ROWS[to] ?? []).findIndex((r) => r[REGISTERS[to]!.title] === title);
           return seq < 0 ? null : (k.get(`${to}#${seq + 1}`)?.id ?? null);
         },
