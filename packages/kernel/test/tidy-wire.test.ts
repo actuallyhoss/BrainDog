@@ -77,21 +77,21 @@ test('a record never swept holds no line, and the first sweep keeps one a finder
 test('a step passed over for thirty-one days: the sweep closes it and the steps line says so, and a second sweep inside the hour adds none', async () => {
   const { k, sql } = await record();
   run(sql, 'handoff', 31 * DAY, { next: 'Ship it', next_at: ago(31 * DAY), project: 'PRJ3' });
-  /* A step two days old that a later run in the same place passed over: still stale after the sweep, which leaves it. */
+  /* A step two days old that a later run in the same place passed over: the sweep closes it too (scope D11). */
   run(sql, 'handoff', 2 * DAY, { next: 'Write it up', next_at: ago(2 * DAY), project: 'PRJ1' });
   run(sql, 'done', DAY, { project: 'PRJ1', wrote: 2, started: ago(DAY + 3_600_000), last_seen: ago(DAY) });
   k.purge();
   const first = kept(sql);
   const steps = first.find((l) => l.finder === 'steps-old');
   assert.ok(steps, 'no line for the steps finder');
-  /* The tidy runs after the sweep's own cleaning, so the old step reads as cleared and not as still stale. */
-  assert.deepEqual([steps.stale, steps.did, steps.low, steps.day], [1, 1, 1, '2026-10-13']);
+  /* The tidy runs after the sweep's own cleaning, so both steps read as cleared and not as still stale. */
+  assert.deepEqual([steps.stale, steps.did, steps.low, steps.day], [0, 2, 0, '2026-10-13']);
   /* AND THE TWO NUMBERS A FIGURE READS agree with the lines: what every finder still counts, and one cleared this week.
      The step the sweep closed is now a run that ended long ago and wrote nothing, so the empty runs count it too. */
   assert.equal(first.find((l) => l.finder === 'runs-empty')?.stale, 1);
-  assert.equal(staleNow(sql, NOW), 2);
+  assert.equal(staleNow(sql, NOW), 1);
   assert.equal(staleNow(sql, NOW), first.reduce((n, l) => n + l.stale, 0));
-  assert.equal(tidied(sql, NOW, 7), 1);
+  assert.equal(tidied(sql, NOW, 7), 2);
   k.purge();
   assert.deepEqual(kept(sql), first);
   assert.equal(Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM tidy_line')!.n), first.length);

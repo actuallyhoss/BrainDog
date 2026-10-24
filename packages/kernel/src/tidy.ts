@@ -23,7 +23,7 @@ import type { Sql } from '@braindog/ports';
 
 import { RECHECK_BOUND, causeFault, moot } from './cause.ts';
 import { openFaults } from './fault.ts';
-import { EXPIRE_MS, passedSql } from './handoff.ts';
+import { EXPIRE_MS, PASSED_HEAD, passedSql } from './handoff.ts';
 import { ABANDON_MS, unheardRuns } from './presence.ts';
 import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
@@ -162,7 +162,8 @@ const runsEmpty: Finder = {
 /**
  * `steps-old`: steps passed over, and steps expired. Stale: an open step that a later run in the same place passed
  * over (`openHandoffs`' own test: it began after the step was left, wrote, ended, and works for no other run), or one
- * left over thirty days ago that `expire` has not reached yet. Did: the steps that expired in the last day.
+ * left over thirty days ago that `expire` has not reached yet. Did: the steps that expired or the sweep closed as passed
+ * over in the last day.
  *
  * THE SAME PLACE, with no caller to stand in: the step's own project, or with none on either run its repository.
  */
@@ -185,9 +186,13 @@ const stepsOld: Finder = {
     const did = count(
       sql,
       `SELECT COUNT(*) AS n FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL
-         AND json_extract(e.fields, '$.closed_as') = 'expired'
+         AND (json_extract(e.fields, '$.closed_as') = 'expired'
+           OR (json_extract(e.fields, '$.closed_as') = 'dropped' AND EXISTS (SELECT 1 FROM event v WHERE v.target = 'entry:' || e.id
+             AND v.kind = 'state' AND v.actor = 'system' AND v.note LIKE ?)))
          AND julianday(json_extract(e.fields, '$.closed_at')) > julianday(?) AND julianday(json_extract(e.fields, '$.closed_at')) <= julianday(?)`,
       SESSION,
+      /* AND THE ONES THE SWEEP CLOSED AS PASSED OVER (`closePassed`), told from a person's drop by the sweep's own note. */
+      `${PASSED_HEAD}%`,
       iso(nowMs - DID_MS),
       iso(nowMs),
     );

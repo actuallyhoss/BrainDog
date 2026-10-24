@@ -47,7 +47,8 @@ export const EXPIRED_NOTE = 'Nobody took this step in thirty days.';
 export const PASSED_ACTIVE_MS = 12 * 3_600_000;
 
 /** The note on a passed-over step the sweep closes, naming the run that worked past it. */
-export const passedNote = (by: string): string => `Passed over: ${by} worked here after this step was left.`;
+export const PASSED_HEAD = 'Passed over:';
+export const passedNote = (by: string): string => `${PASSED_HEAD} ${by} worked here after this step was left.`;
 
 /**
  * Whether run `l` passed over the step on run `h`, as SQL: it works for no other run, wrote, began its stretch once the
