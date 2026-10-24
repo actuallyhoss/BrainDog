@@ -11126,7 +11126,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * THE RECORD OPENS SUGGESTIONS FROM THREE PLACES and until this existed nothing could read one.
      * A proposal nobody can see is a proposal that was never made.
      */
-    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string; order?: 'wait'; review?: 'only' } = {}) =>
+    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string; order?: 'wait'; review?: 'only'; weigh?: false } = {}) =>
       listGovernance({ sql, nowMs: clock.now() }, register, opts),
 
     /** How many rows a governance register holds, all of them. */

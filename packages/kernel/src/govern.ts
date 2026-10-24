@@ -247,6 +247,8 @@ export function listGovernance(
     order?: 'wait' | undefined;
     /** `only`: just the doubtful arrivals waiting in To review. Left out, an open list leaves them out (they are not Needs you). */
     review?: 'only' | undefined;
+    /** `false`: the rows without what each costs to get wrong, for a reader that reads no cost (the briefing's places). */
+    weigh?: false | undefined;
   } = {},
 ): Result<Record<string, unknown>[]> {
   if (!(GOVERNANCE as readonly string[]).includes(register))
@@ -304,6 +306,8 @@ export function listGovernance(
   );
   const out = rows.map((r) => hydrate(register, r));
   if (register !== 'suggestion') return ok(out);
+  /* UNWEIGHED, the rows as they are with how long each waits: weighing one is most of what a queue costs to read. */
+  if (opts.weigh === false) return ok(out.map(({ waits, ...r }) => ({ ...r, ...(typeof waits === 'string' ? { waits } : {}) })));
 
   /* WHAT EACH QUESTION COSTS TO GET WRONG, said by the record and never left to the reader. A body alone cannot say
      which fields a list's history withholds, so a browser weighing the raw row called a patch of a hidden field a row

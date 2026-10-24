@@ -7132,8 +7132,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * questions lead and are counted. Held as `waitingFor` holds them; the places are never sent.
    */
   const placedWaiting = (ctx: CallContext): ({ id: string; question: string; waits?: string } & Placed)[] => {
-    const rows = heldFor(waitHeld, '', () => kernel.governance('suggestion', { status: 'open', every: true, order: 'wait' }));
+    /* UNWEIGHED (`weigh: false`): a place reads no cost, and weighing every open question was most of this read. */
+    const rows = heldFor(waitHeld, '', () => kernel.governance('suggestion', { status: 'open', every: true, order: 'wait', weigh: false }));
     if (!rows.ok) return [];
+    const at = placesOnce();
     return rows.value
       .filter((row) => !heldBack(ctx, row))
       .flatMap((row) => {
@@ -7141,7 +7143,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (id === null) return [];
         const raw = row.body;
         const body = (typeof raw === 'string' ? (() => { try { return JSON.parse(raw) as unknown; } catch { return null; } })() : raw) as Record<string, unknown> | null;
-        return [{ id, question: kernel.question(String(row.id)) ?? '', ...(typeof row.waits === 'string' ? { waits: row.waits } : {}), ...placedBy(row.opened_by, body) }];
+        return [{ id, question: kernel.question(String(row.id)) ?? '', ...(typeof row.waits === 'string' ? { waits: row.waits } : {}), ...placedBy(row.opened_by, body, at) }];
       });
   };
 
@@ -7159,9 +7161,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** Where a question stands (`Placed`): the run that asked it, and the rows its body names (`about`, `at`, `target`, `rows[].at`). */
-  const placedBy = (openedBy: unknown, body: Record<string, unknown> | null): Placed => {
+  /* `at` IS `placeOf`, OR ONE THAT ASKS EACH ROW ONCE (`placesOnce`) for a read placing many questions at one moment. */
+  const placedBy = (openedBy: unknown, body: Record<string, unknown> | null, at: (ref: unknown) => string | null = placeOf): Placed => {
     const named = [body?.about, body?.at, body?.target, ...(Array.isArray(body?.rows) ? (body.rows as unknown[]).map((r) => (r !== null && typeof r === 'object' ? (r as { at?: unknown }).at : undefined)) : [])];
-    return { project: placeOf(openedBy), projects: [...new Set(named.map(placeOf).filter((p): p is string => p !== null))] };
+    return { project: at(openedBy), projects: [...new Set(named.map(at).filter((p): p is string => p !== null))] };
+  };
+
+  /**
+   * `placeOf`, each row read once for the read it is made for: the questions a queue places were mostly filed by a few
+   * runs, and every one read its run's row again. Made fresh for each read, inside its one moment, so nothing written
+   * after it is answered from it.
+   */
+  const placesOnce = (): ((ref: unknown) => string | null) => {
+    const placed = new Map<string, string | null>();
+    return (ref) => {
+      if (typeof ref !== 'string') return placeOf(ref);
+      if (placed.has(ref)) return placed.get(ref)!;
+      const at = placeOf(ref);
+      placed.set(ref, at);
+      return at;
+    };
   };
 
   /** The most closed questions `placedDecided` reads, newest first, before it places them. */
@@ -7198,11 +7217,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return null;
       }
     };
+    const at = placesOnce();
     return rows.flatMap((row) => {
       const body = parsed(row.body) as Record<string, unknown> | null;
       if (holds(ctx, { ...row, body })) return [];
       const choice = choiceOf(row.asked ?? '', { resolved_as: row.resolved_as, body, decided: parsed(row.decided) as { answer?: unknown; rows?: unknown } | null });
-      return choice === null ? [] : [{ choice, decided_at: row.ts, ...placedBy(row.opened_by, body) }];
+      return choice === null ? [] : [{ choice, decided_at: row.ts, ...placedBy(row.opened_by, body, at) }];
     });
   };
 
