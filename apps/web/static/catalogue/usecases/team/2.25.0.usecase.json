@@ -841,10 +841,10 @@
           {
             "kind": "project",
             "parts": [
-              "work",
-              "people",
+              "what-is-open",
+              "who-is-on-it",
               "runs-on",
-              "agents"
+              "agents-here"
             ],
             "heading": "Work, people and agents",
             "icon": "task",
