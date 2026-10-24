@@ -5,6 +5,8 @@
  *   node tools/agent-bench/run.mjs                       the seed, in process (the default)
  *   node tools/agent-bench/run.mjs --host <url>          a host, through the CLI bridge; reads only
  *   node tools/agent-bench/run.mjs --runs 30 --json      more samples; the table as JSON
+ *   node tools/agent-bench/run.mjs --big                 the seed grown to his record's size (`big-seed.mjs`)
+ *   node tools/agent-bench/local-host.mjs                a host on this machine with that seed, through this tree's CLI
  *   node tools/agent-bench/run.mjs --profile <file>      a restored COPY of a record (see README; needs his approval)
  *
  * It never fails: a miss against targets.json is printed, and the exit code is 0 either way.
@@ -22,7 +24,7 @@ export const READS = [
   { label: 'context', name: 'context', args: () => ({}) },
   { label: 'context since', name: 'context', args: (s) => ({ since: s.stamp ?? 'v0' }) },
   { label: 'instructions', name: 'instructions', args: () => ({}) },
-  { label: 'get', name: 'get', args: () => ({ spoken: 'tasks#1' }) },
+  { label: 'get', name: 'get', args: (s) => ({ spoken: s.row ?? 'tasks#1' }) },
   { label: 'list', name: 'list', args: () => ({ register: 'tasks', where: { field: 'state', is: 'open' }, limit: 10 }) },
   { label: 'search', name: 'search', args: () => ({ q: 'kiln' }) },
   { label: 'schema', name: 'schema', args: () => ({ register: 'tasks' }) },
@@ -55,10 +57,24 @@ export async function sample(rpc, method, params, n) {
 /** The stamp the answer carries, for the `since` read. */
 const stampOf = (result) => result?._meta?.braindog?.stamp ?? null;
 
+/**
+ * A task the record holds, by its spoken id, for the `get` read, or `null` when the list named none.
+ *
+ * ASKED, NEVER ASSUMED. The bench read `tasks#1`, which his record deleted long ago: `get` was refused 30 times of 30
+ * (24 Oct, H1) and its time was a refusal's. The newest task the list answers is one that is there.
+ */
+export function rowOf(result) {
+  const rows = result?.structuredContent?.rows;
+  if (Array.isArray(rows)) for (const r of rows) if (typeof r?.spoken === 'string' && /^tasks#\d+$/u.test(r.spoken)) return r.spoken;
+  const text = (result?.content ?? []).map((c) => c?.text ?? '').join('\n');
+  return text.match(/\btasks#\d+\b/u)?.[0] ?? null;
+}
+
 export async function bench(rpc, { runs = 10 } = {}) {
   const rows = [];
   const first = await rpc('tools/call', { name: 'context', arguments: {} });
-  const state = { stamp: stampOf(first.result) };
+  const listed = await rpc('tools/call', { name: 'list', arguments: { register: 'tasks', limit: 1 } });
+  const state = { stamp: stampOf(first.result), row: rowOf(listed.result) };
   for (const m of LISTS) rows.push({ label: m, ...(await sample(rpc, m, {}, runs)) });
   for (const r of READS) rows.push({ label: r.label, ...(await sample(rpc, 'tools/call', { name: r.name, arguments: r.args(state) }, runs)) });
   return rows;
@@ -124,6 +140,7 @@ function flags(argv) {
     const a = argv[i];
     if (a === '--json') o.json = true;
     else if (a === '--approved') o.approved = true;
+    else if (a === '--big') o.big = true;
     else if (['--host', '--runs', '--cli', '--agent', '--profile'].includes(a)) o[a.slice(2)] = argv[++i];
     else { console.error(`agent-bench: no such option ${a}`); process.exit(0); }
   }
@@ -171,10 +188,10 @@ async function main() {
     where = `host ${o.host} through ${cli}`;
   } else {
     const { openBench } = await import('./seed.mjs');
-    const { rpc, close } = await openBench();
+    const { rpc, close } = await openBench({ big: o.big === true });
     rows = await bench(rpc, o);
     close();
-    where = 'the seed, in process';
+    where = o.big ? 'the seed grown to his size, in process' : 'the seed, in process';
   }
   const miss = misses(rows, targets);
   if (o.json) console.log(JSON.stringify({ where, runs: o.runs, rows, misses: miss }, null, 1));

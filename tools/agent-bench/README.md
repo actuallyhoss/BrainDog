@@ -7,6 +7,8 @@ bytes, and says where a call misses `targets.json`. It never fails CI: a miss is
 node tools/agent-bench/run.mjs                      # the seed, in process
 node tools/agent-bench/run.mjs --host <url>         # a host, through the CLI bridge
 node tools/agent-bench/run.mjs --runs 30 --json     # more samples, JSON out
+node tools/agent-bench/run.mjs --big                # the seed grown to his record's size
+node tools/agent-bench/local-host.mjs               # a host on this machine with that seed, through this tree's CLI
 ```
 
 ## Against the seed
@@ -19,13 +21,22 @@ still a read. The seed has no open run, so `context since` has no stamp to ask f
 
 `--host <url>` starts `braindog mcp --host <url>` and talks to it as a client does. Reads only: `tools/list`,
 `resources/list`, `context`, `context {since}`, `instructions`, `get`, `list`, `search`, `schema`, `record_index` and
-`governance`. Nothing writes, so a run leaves no session note behind.
+`governance`. Nothing writes, so a run leaves no session note behind. `get` reads the newest task one `list` names,
+never a number assumed to be there: `tasks#1` was refused 30 times of 30 on his record, which has no such task.
 
 - `--cli <file>` picks the CLI (default `~/.braindog/bin/braindog.mjs`, or `$CLI`).
 - `--agent <kind>` picks the agent kind the bridge says it is (default `claude`).
 - You need to be signed in to the host already. The bench signs nothing in.
 
 The numbers include the network from this machine, which is what the plan's targets (section 4.1) are measured on.
+
+## His size, on this machine
+
+`--big` grows the seed to his record's shape on 24 Oct 2026 (`big-seed.mjs`: 30 projects, 910 runs, 38 skills, 48
+tools, 176 keys, 2,527 numbers, 35 questions waiting), still nobody's rows. `local-host.mjs` starts the self-host in
+memory with that seed, makes one agent key, and runs this bench through `apps/cli/dist/braindog.mjs` (build it first
+with `pnpm --filter braindog-cli build`), so a host's costs show without the network and without his record.
+`--small` there keeps the plain seed.
 
 ## `--profile <file>`
 

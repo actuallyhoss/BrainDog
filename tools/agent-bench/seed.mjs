@@ -6,14 +6,17 @@ import { handle } from '../../packages/mcp/src/rpc.ts';
 import { createRecordApi } from '../../packages/record/src/index.ts';
 import { installSeed } from '../../packages/seed/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
+import { growSeed } from './big-seed.mjs';
 
 const SESSION = { client_id: 'bench-1', cwd: '/Users/studio/Code/kiln-type', repo: 'kiln-type', host: 'bench.local', agent: 'claude', client: 'claude-code' };
 
 /** A record, seeded or opened from a file (a restored copy), and a caller on it. */
-export async function openBench({ file, seed = true, scope = 'propose' } = {}) {
+export async function openBench({ file, seed = true, big = false, scope = 'propose' } = {}) {
   const sql = openSqlite(file ?? ':memory:');
   const api = await createRecordApi({ sql, clock: fixedClock(Date.now()) });
   if (seed) await installSeed(api.kernel);
+  /* `--big`: the seed grown to his record's size (`big-seed.mjs`), still nobody's. */
+  if (seed && big) growSeed(api.kernel);
   const who = { principal: { kind: 'token', id: 't_bench', scope, person: 'p_seed', level: 'owner' }, session: SESSION };
   let id = 0;
   const rpc = async (method, params) => {

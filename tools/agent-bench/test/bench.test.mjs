@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { misses, percentile, profile, READS, sample, table } from '../run.mjs';
+import { misses, percentile, profile, READS, rowOf, sample, table } from '../run.mjs';
 
 const dir = fileURLToPath(new URL('..', import.meta.url));
 const targets = JSON.parse(readFileSync(`${dir}targets.json`, 'utf8')).targets;
@@ -56,4 +56,12 @@ test('the seed run prints a table and exits 0', () => {
 test('a bad option or a dead host never fails the run', () => {
   const r = spawnSync(process.execPath, [`${dir}run.mjs`, '--nope'], { encoding: 'utf8' });
   assert.equal(r.status, 0);
+});
+
+test('get reads a task the list named, and never one assumed to be there', () => {
+  assert.equal(rowOf({ structuredContent: { rows: [{ spoken: 'tasks#396' }] } }), 'tasks#396');
+  assert.equal(rowOf({ content: [{ type: 'text', text: 'Tasks · 1 of 59\nSend the refund (tasks#396) · done' }] }), 'tasks#396');
+  assert.equal(rowOf({ content: [{ type: 'text', text: 'No tasks.' }] }), null);
+  const get = READS.find((r) => r.label === 'get');
+  assert.deepEqual(get.args({ row: 'tasks#396' }), { spoken: 'tasks#396' });
 });

@@ -47,9 +47,9 @@ const HOP = new Set(['host', 'connection', 'keep-alive', 'transfer-encoding', 'u
 /**
  * Start one: the record, named and seeded, behind a front that answers `/cli/` and forwards the rest. Answers
  * `{ base, record, key, close }`, `base` as `http://localhost:<port>` and `key` its server key, for the caller's
- * memory alone.
+ * memory alone. `grow`, when given, is handed the seeded kernel to add rows before the first request.
  */
-export async function startSeedHost({ port = 0 } = {}) {
+export async function startSeedHost({ port = 0, grow } = {}) {
   const key = randomBytes(32).toString('base64url');
   const running = await start({
     token: key,
@@ -68,6 +68,8 @@ export async function startSeedHost({ port = 0 } = {}) {
     if (!named.ok) throw new Error(`the seed host could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
     const seeded = await installSeed(running.api.kernel);
     if (!seeded.ok) throw new Error(`the seed host could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
+    /* `grow`, A FUNCTION OVER THE KERNEL, MAKES IT BIGGER, as the agent bench's `big-seed.mjs` does to his size. */
+    if (typeof grow === 'function') await grow(running.api.kernel);
   } catch (e) {
     await running.close().catch(() => {});
     throw e;
