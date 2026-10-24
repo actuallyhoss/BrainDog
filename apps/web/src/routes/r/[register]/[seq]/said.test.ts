@@ -7,6 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { since, sinceWords } from 'braindog-render';
 
 import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, importKeysOnly, sentenceOf } from './said.ts';
 
@@ -50,7 +51,7 @@ test('A DAY INSIDE THE YEAR DROPS ITS YEAR, and one outside keeps it', () => {
 });
 
 test('THE AGE CARRIES ITS LABEL, so it is never read as the date beside it', () => {
-  assert.equal(addedSaid('2026-07-31T10:00:00.000Z', MORNING), 'added 7 weeks ago');
+  assert.equal(addedSaid('2026-07-31T10:00:00.000Z', MORNING), 'added 8 weeks ago');
   assert.equal(addedSaid('2026-09-25T07:59:40.000Z', MORNING), 'added just now');
 });
 
@@ -62,6 +63,17 @@ test('THE AGE SAYS ITS UNIT IN WORDS, never "7w" or "12h"', () => {
   assert.equal(agoSaid('2026-05-25T08:00:00.000Z', MORNING), '4 months ago');
   assert.equal(agoSaid('2024-09-25T08:00:00.000Z', MORNING), '2 years ago');
   assert.equal(agoSaid('not a time', MORNING), '');
+});
+
+test('ONE DAY READS ONE AGE EVERYWHERE: Added, Activity and the list say 28 Sep from 24 Oct as the fields do (Z25)', () => {
+  const NOW = Date.UTC(2026, 9, 24, 19);
+  const at = '2026-09-28T10:00:00.000Z';
+  /* The fields and the list read the record's ladder: "4w ago" in a cell, "4 weeks ago" in words. */
+  assert.equal(since(at, NOW, 'UTC'), '4w ago');
+  assert.equal(sinceWords(at, NOW, 'UTC'), '4 weeks ago');
+  /* It said "Added 3 weeks ago" and "3 weeks ago" in Activity, counting its own floored weeks. */
+  assert.equal(addedSaid(at, NOW), 'added 4 weeks ago');
+  assert.equal(agoSaid(at, NOW), sinceWords(at, NOW, 'UTC'));
 });
 
 test('THE TITLE ROW SAYS WHERE THE ROW STANDS, WHEN IT IS DUE AND HOW OLD IT IS, in one sentence', () => {

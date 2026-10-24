@@ -12,7 +12,7 @@
  * days as `relative()` counts them. Out of the component so `node --test` can run it, as `lead.ts` beside it is.
  */
 
-import { day, shortDay } from 'braindog-render';
+import { day, shortDay, sinceWords } from 'braindog-render';
 
 /**
  * WHETHER A LIST OF TAGS IS ONLY THE KEYS AN IMPORT LEFT, which say where a row came from to the importer and nothing to
@@ -171,24 +171,20 @@ export function daySaid(iso: string, now: number): string {
 }
 
 /**
- * HOW LONG AGO, IN WORDS: "just now", "5 minutes ago", "12 hours ago", "yesterday", "3 days ago", "7 weeks ago",
- * "4 months ago", "2 years ago". The short form ("7w") is a list cell's; a sentence and a history line say the unit.
+ * HOW LONG AGO, IN WORDS: "just now", "5 minutes ago", "12 hours ago", "yesterday", "3 days ago", "4 weeks ago",
+ * "4 months ago", "2 years ago". The short form ("4w") is a list cell's; a sentence and a history line say the unit.
  * A moment that does not read comes back as nothing said, never as a guess.
+ *
+ * ON THE ONE LADDER, `since()`'s in `braindog-render`, with its unit in words (`sinceWords`). This counted its own
+ * floored weeks, so one day, 28 Sep read from 24 Oct, was "Added 3 weeks ago" and "3 weeks ago" in Activity over "When
+ * 4w ago" in the fields and "4 weeks ago" on the list (the audit of 25 October, Z25). Only its first day is its own:
+ * "yesterday", where the ladder says "1 day ago".
  */
 export function agoSaid(at: string, now: number): string {
-  const t = Date.parse(at);
-  if (!Number.isFinite(t)) return '';
-  const s = Math.max(0, Math.floor((now - t) / 1000));
-  const unit = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'} ago`;
-  if (s < 60) return 'just now';
-  if (s < 3600) return unit(Math.floor(s / 60), 'minute');
-  if (s < 86_400) return unit(Math.floor(s / 3600), 'hour');
-  const days = Math.floor(s / 86_400);
-  if (days === 1) return 'yesterday';
-  if (days < 7) return unit(days, 'day');
-  if (days < 56) return unit(Math.floor(days / 7), 'week');
-  if (days < 365) return unit(Math.max(2, Math.floor(days / 30)), 'month');
-  return unit(Math.floor(days / 365), 'year');
+  if (!Number.isFinite(Date.parse(at))) return '';
+  if (Date.parse(at) >= now) return 'just now';
+  const said = sinceWords(at, now);
+  return said === '1 day ago' ? 'yesterday' : said;
 }
 
 /** The row's age with its label, so it is never read as the date beside it. */
