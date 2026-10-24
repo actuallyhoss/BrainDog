@@ -125,6 +125,62 @@
       "why": "Names, never ids, in anything a person reads. The page lint's raw-id rule holds the same on a drawn page."
     },
     {
+      "name": "palette",
+      "shape": "\\bpalettes?\\b",
+      "say": "the search, or the box you type in",
+      "page": false,
+      "why": "The command palette is a developer's name for the box that opens on a key (U-C7)."
+    },
+    {
+      "name": "gate",
+      "shape": "\\bgates?\\b",
+      "say": "what it checks, or a rule",
+      "page": false,
+      "why": "A gate is how the build is checked, not something a person keeps (U-C7)."
+    },
+    {
+      "name": "host",
+      "shape": "\\bhosts?\\b",
+      "say": "this BrainDog, or the server's name",
+      "page": false,
+      "why": "The machine a BrainDog runs on is not a thing a person names (U-C7)."
+    },
+    {
+      "name": "kernel",
+      "shape": "\\bkernel\\b",
+      "say": "BrainDog",
+      "page": false,
+      "why": "The kernel is how BrainDog is built inside (U-C7)."
+    },
+    {
+      "name": "bytes",
+      "shape": "\\bbytes\\b",
+      "say": "a size in KB or MB",
+      "page": false,
+      "why": "A size reads in the units a phone shows (U-C7)."
+    },
+    {
+      "name": "sealed",
+      "shape": "\\bsealed\\b",
+      "say": "locked, or kept",
+      "page": false,
+      "why": "Sealed is the word for how a key is stored, not for what the person can do with it (U-C7)."
+    },
+    {
+      "name": "vital signs",
+      "shape": "\\bvital signs\\b",
+      "say": "how BrainDog is doing",
+      "page": false,
+      "why": "A medical metaphor for health checks (U-C7)."
+    },
+    {
+      "name": "house look",
+      "shape": "\\bhouse looks?\\b",
+      "say": "BrainDog's look, or the usual look",
+      "page": false,
+      "why": "The house look is the builders' name for the default theme (U-C7)."
+    },
+    {
       "name": "the long dash",
       "shape": "\u2014",
       "unless": "^[\\s\u2014]*$",

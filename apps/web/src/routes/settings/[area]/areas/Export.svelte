@@ -102,7 +102,7 @@
     rowsLine: (things: string) => `Everything you have written in ${things}, without the pages around it.`,
     setupTitle: 'A setup somebody else can install',
     setupLine: 'Published as an add-on, with what you wrote left out.',
-    notHereYet: 'Not on this host yet',
+    notHereYet: 'Not here yet',
     /** What the record keeps, when it keeps nothing it can name yet. */
     yourThings: 'your things',
     /** The rest past the names said, "and 4 more". */

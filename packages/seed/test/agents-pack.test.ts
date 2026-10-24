@@ -51,20 +51,28 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.17.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.18.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.17.0');
+  assert.equal(pack.manifest.version, '1.18.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.17.0, and it says the page reads like a list of runs', () => {
+test('THE NEWEST CHANGE NOTE IS 1.18.0, and it says a key in the vault says Locked value', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.17.0');
+  assert.equal(newest.version, '1.18.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
+  assert.match(newest.notes, /Locked value/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
+});
+
+test('THE 1.17.0 NOTE says the page reads like a list of runs', () => {
+  const newest = MODULE_CHANGES.agents[1]!;
+  assert.equal(newest.version, '1.17.0');
   assert.match(newest.notes, /At work, Up next and Recent runs/);
   assert.match(newest.notes, /Needs you only/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -72,7 +80,7 @@ test('THE NEWEST CHANGE NOTE IS 1.17.0, and it says the page reads like a list o
 });
 
 test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
-  const newest = MODULE_CHANGES.agents[1]!;
+  const newest = MODULE_CHANGES.agents[2]!;
   assert.equal(newest.version, '1.16.0');
   assert.match(newest.notes, /who is at work and on what/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -80,7 +88,7 @@ test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
 });
 
 test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
-  const newest = MODULE_CHANGES.agents[2]!;
+  const newest = MODULE_CHANGES.agents[3]!;
   assert.equal(newest.version, '1.15.0');
   assert.match(newest.notes, /Your agents asked/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -88,7 +96,7 @@ test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
 });
 
 test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () => {
-  const newest = MODULE_CHANGES.agents[3]!;
+  const newest = MODULE_CHANGES.agents[4]!;
   assert.equal(newest.version, '1.14.0');
   assert.match(newest.notes, /how many are at work, on how many machines and how many wait on you/);
   assert.match(newest.notes, /At work/);
@@ -103,22 +111,22 @@ test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () 
    1.13.0's as they were written too. */
 test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 9), ['1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 10), ['1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
-    MODULE_CHANGES.agents[4]!.notes,
+    MODULE_CHANGES.agents[5]!.notes,
     'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[5]!.notes,
+    MODULE_CHANGES.agents[6]!.notes,
     'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[6]!.notes,
+    MODULE_CHANGES.agents[7]!.notes,
     'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[7]!.notes,
+    MODULE_CHANGES.agents[8]!.notes,
     'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
   );
 });
@@ -162,7 +170,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.17.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.18.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -768,6 +776,12 @@ const LINES_15: Loose[] = [
   { kind: 'note', lead: true, span: 12, when: { metric: 'machines-working', is: 1 }, body: '{{runs-working}} at work on one machine, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run' },
   { kind: 'note', lead: true, span: 12, when: { metric: 'machines-working', is: 0 }, body: 'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run' },
 ];
+/** AND 1.17.0 AS IT WAS CUT, under every older version: a key's value headed Sealed value, where 1.18.0 says Locked value. */
+const doc17 = (): { version: string; declarations: Record<string, unknown>[] } => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.ok(JSON.stringify(doc.declarations).includes('"label":"Locked value"'), 'doc17 was handed a document that is not 1.18.0');
+  return { ...doc, version: '1.17.0', declarations: JSON.parse(JSON.stringify(doc.declarations).replace('"label":"Locked value"', '"label":"Sealed value"')) };
+};
 /**
  * AND 1.16.0 AS IT WAS CUT, put back first of all: 1.17.0 took most of the page's blocks away and renamed two more, so the
  * page is put back whole from the file it was written to (`BLOCKS_16`), and only the page: no list, field or figure moved.
@@ -821,7 +835,7 @@ const before13 = (declarations: Record<string, unknown>[]): Record<string, unkno
 
 test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figures put back, the add-on declares what 1.11.0 did, to the letter', () => {
   type Block = { kind: string; heading?: string };
-  const doc = { declarations: before13((agentsPackDocument() as { declarations: Record<string, unknown>[] }).declarations) };
+  const doc = { declarations: before13((doc17() as { declarations: Record<string, unknown>[] }).declarations) };
   let swapped = 0;
   const back = doc.declarations.map((d) => {
     if (typeof d.metric === 'string' && FIGURES_11[d.metric]) return swapped++, FIGURES_11[d.metric];
@@ -859,7 +873,7 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
   assert.equal(mark(kept), '7f805aacdb423834', 'a block 1.10.0 drew is changed');
   assert.equal(mark(rest), 'e3c40dd0030b3e3c', 'the page is named, placed or held to other lists');
   assert.equal(mark(Object.entries(AGENTS_PAGES).filter(([slug]) => slug !== 'agents' && slug !== 'brain')), 'c0ba8121ad6e909f', 'a skill’s page or a run’s is changed');
-  assert.equal(mark(listsBefore13(AGENTS_REGISTERS)), 'dd24d88e551ccf5d', 'a list or a field is changed');
+  assert.equal(mark(listsBefore13(JSON.parse(JSON.stringify(AGENTS_REGISTERS).replace('"label":"Locked value"', '"label":"Sealed value"')))), 'dd24d88e551ccf5d', 'a list or a field is changed');
   /* WITHOUT 1.13.0'S FOUR, which came last of the figures this add-on writes itself and before the door's. */
   const figures12 = Object.fromEntries(
     Object.entries(AGENTS_MODULE.AGENTS_METRICS)
@@ -926,7 +940,7 @@ test('NOTHING IS FOLDED SINCE 1.17.0, and the foot is one line of doors, How the
    runs list (it was e051523f0cd521af): Today’s runs holding every run with Undo as the host's `panel: run-list`, which
    `runsListBack` puts back. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(mark(as13(doc.declarations)), '6d4c197a9e3586aa', 'something 1.13.0 declared is changed beside what 1.14.0 moved');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
@@ -937,7 +951,7 @@ test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is
    is released sets the mark again and says what moved; one after it is a version with a mark of its own. */
 const MARK_14 = '44814963f8550841';
 test('AGENTS 1.14.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(mark(as14(doc.declarations)), MARK_14, 'something 1.14.0 declared is changed beside what 1.15.0 moved');
   assert.equal(as13(doc.declarations).length, doc.declarations.length, '1.14.0 put in or took out a declaration');
   for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as13(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
@@ -946,7 +960,7 @@ test('AGENTS 1.14.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, fie
 /* WHAT 1.15.0 DECLARES, AS ONE MARK: 1.14.0 with the queue of what runs asked headed Your agents asked (`back15`). */
 const MARK_15 = '2b5602af7bd88e59';
 test('AGENTS 1.15.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(mark(as15(doc.declarations)), MARK_15, 'something 1.15.0 declared is changed beside what 1.16.0 moved');
   assert.equal(as14(doc.declarations).length, doc.declarations.length, '1.15.0 put in or took out a declaration');
 });
@@ -955,7 +969,7 @@ test('AGENTS 1.15.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, fie
    1.17.0 took apart put back (`back17`). */
 const MARK_16 = 'ba20285de8c8400c';
 test('AGENTS 1.16.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(mark(as16(doc.declarations)), MARK_16, 'something 1.16.0 declared is changed beside what 1.17.0 moved');
   assert.equal(as15(doc.declarations).length, doc.declarations.length, '1.16.0 put in or took out a declaration');
   for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as15(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
@@ -965,11 +979,22 @@ test('AGENTS 1.16.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, fie
    released sets the mark again and says what moved; one after it is a version with a mark of its own. */
 const MARK_17 = 'aee177d1b677edf3';
 test('AGENTS 1.17.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.17.0', 'a new version takes a mark of its own beside this one');
   assert.equal(mark(doc.declarations), MARK_17, 'the Agents add-on changed what it declares with no new version');
   assert.equal(as16(doc.declarations).length, doc.declarations.length, '1.17.0 put in or took out a declaration');
   for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as16(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
+});
+
+/* WHAT 1.18.0 DECLARES, AS ONE MARK: 1.17.0 with a key's value headed Locked value (`doc17` puts Sealed value back). */
+const MARK_18 = 'd39b5d923b195fd1';
+test('AGENTS 1.18.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and changed one heading only', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.18.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_18, 'the Agents add-on changed what it declares with no new version');
+  const was = doc17().declarations;
+  assert.equal(was.length, doc.declarations.length, '1.18.0 put in or took out a declaration');
+  assert.equal(doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).length, 1, '1.18.0 changed more than the list of keys');
 });
 
 /* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a

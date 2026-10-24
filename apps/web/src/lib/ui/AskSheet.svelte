@@ -41,7 +41,7 @@
 
   const words = {
     title: 'Note a choice to make',
-    subtitle: 'It waits in Needs you until you answer it with a reason.',
+    subtitle: 'It waits in Needs you until you answer it with a reason',
     question: 'The question',
     questionHint: 'Which lining for the autumn coat?',
     why: 'Why it is asked',
@@ -58,7 +58,7 @@
     figure: 'The figure',
     figureHint: '4 weeks',
     file: 'The file',
-    fileHelp: 'The row that holds it, then its field.',
+    fileHelp: 'The thing that holds it, then its field.',
     remove: (n: number) => `Remove option ${n}`,
     add: 'Add an option',
     suggest: 'Which do you suggest?',

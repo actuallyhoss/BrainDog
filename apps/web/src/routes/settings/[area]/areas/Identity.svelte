@@ -38,7 +38,7 @@
   /* THE TWO SIGN-IN STATES THAT ARE NOT A SESSION, said in the row where "Signed in as" stands when there is one. */
   const identityWords = {
     here: 'This browser',
-    openHost: 'Let in without signing in, as this host’s one person',
+    openHost: 'Let in without signing in, as this BrainDog’s one person',
     notSignedIn: 'Not signed in',
   };
   const signedInEmail = $derived(s.hostAuth?.me?.email ?? null);

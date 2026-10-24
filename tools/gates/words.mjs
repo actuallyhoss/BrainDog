@@ -15,6 +15,11 @@
  * a module's address, a value compared with `===` or matched by `case`, a type's union of literals, an index, and the
  * argument of a method call (`.join(', ')`, `.toLocaleString('en-GB')`). A template is read with each `${…}` as `{}`.
  *
+ * AND THE WORDS A SVELTE FILE KEEPS INLINE (U14): a `.svelte` under `apps/web/src` that holds its copy in its own script,
+ * as `const words = { … }` or `const <name>Words = { … }`, is read there, that object and nothing else of the file, by the
+ * same lexer, so copy kept in a component rather than in `lib/copy` is still judged. And the `label` of each key the
+ * keyboard sheet lists (`lib/a11y/bindings.ts`), whose other values are ids.
+ *
  * AND WHAT A DECLARED PAGE PRINTS (EXP-B07 job 2): the `title`, `heading`, `label`, `body` and `empty` of every page the
  * seed declares (`packages/seed/src`) and every add-on in `packs/` (its `*.pack.json`), read by the same lexer. Only
  * those five keys are read there, since a declaration's other strings are its ids and sources; and inside them a
@@ -274,6 +279,88 @@ export function copyFiles(root) {
   return files.sort();
 }
 
+/** Files whose `label` values a screen prints beside their code: the keyboard sheet's list of keys (U-C7). */
+const LABEL_FILES = ['apps/web/src/lib/a11y/bindings.ts'];
+
+/** Where a `const words = {` or `const <name>Words = {` opens, in a Svelte source's scripts. */
+const WORDS_OBJECT = /\bconst\s+(?:words|[A-Za-z_$][\w$]*Words)\s*(?::[^=]+)?=\s*\{/g;
+
+/**
+ * The text of the object whose `{` is at `start`, to its matching `}`: strings, templates and their `${…}`, and both
+ * comment forms are stepped over, so a brace inside a string never ends it. `null` when it never closes.
+ */
+function objectAt(source, start) {
+  const n = source.length;
+  const stack = [];
+  let i = start;
+  while (i < n) {
+    const c = source[i];
+    if (stack.at(-1) === '`') {
+      if (c === '\\') i += PAIR;
+      else if (c === '`') stack.pop(), i++;
+      else if (c === '$' && source[i + 1] === '{') stack.push('${'), (i += PAIR);
+      else i++;
+      continue;
+    }
+    if (c === '/' && source[i + 1] === '/') {
+      const e = source.indexOf('\n', i);
+      i = e === -1 ? n : e;
+    } else if (c === '/' && source[i + 1] === '*') {
+      const e = source.indexOf('*/', i + PAIR);
+      i = e === -1 ? n : e + PAIR;
+    } else if (c === "'" || c === '"') {
+      i++;
+      while (i < n && source[i] !== c && source[i] !== '\n') i += source[i] === '\\' ? PAIR : 1;
+      i++;
+    } else if (c === '`') stack.push('`'), i++;
+    else if (c === '{') stack.push('{'), i++;
+    else if (c === '}') {
+      stack.pop();
+      i++;
+      if (stack.length === 0) return source.slice(start, i);
+    } else i++;
+  }
+  return null;
+}
+
+/**
+ * The strings of every inline words object in a Svelte source, each with its line in the whole file. Only the scripts
+ * are read, and in them only those objects: the markup and the rest of the script are code, or draw from them.
+ */
+export function svelteStrings(source) {
+  const out = [];
+  for (const m of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
+    const body = m[1];
+    const bodyAt = m.index + m[0].indexOf('>') + 1;
+    for (const w of body.matchAll(WORDS_OBJECT)) {
+      const open = w.index + w[0].length - 1;
+      const obj = objectAt(body, open);
+      if (obj === null) continue;
+      const before = source.slice(0, bodyAt + open).split('\n').length - 1;
+      for (const lit of literalsOf(`const words = ${obj};`)) out.push({ ...lit, line: lit.line + before });
+    }
+  }
+  return out;
+}
+
+/** The Svelte files under `root` that keep words inline, repository-relative. */
+export function svelteFiles(root) {
+  const files = [];
+  const walk = (rel) => {
+    let entries;
+    try {
+      entries = readdirSync(join(root, rel), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries)
+      if (e.isDirectory()) walk(`${rel}/${e.name}`);
+      else if (/\.svelte$/.test(e.name) && svelteStrings(readFileSync(join(root, rel, e.name), 'utf8')).length) files.push(`${rel}/${e.name}`);
+  };
+  walk('apps/web/src');
+  return files.sort();
+}
+
 /** The keys whose values a declared page prints: a page's or a block's title, heading, label, body and empty text. */
 const PAGE_KEYS = new Set(['title', 'heading', 'label', 'body', 'empty']);
 
@@ -320,10 +407,13 @@ const notCode = (s) => {
  * as `{}`, and a link's address, a span in backticks and a type's angle brackets are dropped, since each is code inside
  * the copy (`{{bills.rows}}`, `[Bills](/r/bills)`, `` `rows` ``, `Promise<Row>`).
  */
-export const pageStrings = (source) =>
-  literalsOf(source)
-    .filter((l) => PAGE_KEYS.has(l.key))
+export const pageStrings = (source) => {
+  /* A list's `title` names the field its things are titled by (`"title": "host"`): a field's id, code, not words. */
+  const ids = new Set([...source.matchAll(/["']?\bid["']?\s*:\s*["']([a-z][a-z0-9_]*)["']/g)].map((m) => m[1]));
+  return literalsOf(source)
+    .filter((l) => PAGE_KEYS.has(l.key) && !(l.key === 'title' && ids.has(l.text)))
     .map((l) => ({ ...l, text: notCode(l.text.replace(/\{\{[^{}]*\}\}/g, '{}').replace(/\]\([^)\s]*\)/g, ']')) }));
+};
 
 /**
  * Which files are red and which held counts can come down, from each file's count of findings. A file above its held
@@ -347,8 +437,10 @@ export default async function wordsGate(root = process.env.BRAINDOG_GATE_ROOT ??
   const list = readList(listAt);
   const files = copyFiles(ROOT);
   const pages = pageFiles(ROOT);
+  const svelte = svelteFiles(ROOT);
+  const labels = LABEL_FILES.filter((rel) => existsSync(join(ROOT, rel)));
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run". */
-  if (files.length + pages.length === 0) {
+  if (files.length + pages.length + svelte.length + labels.length === 0) {
     console.log(`  words: no copy file (apps/web/src/lib/copy, lib/first-run.ts, routes/*/words.ts) and no declared page (packages/seed/src, packs/*/*.pack.json) under ${ROOT}, so nothing was read`);
     return 3;
   }
@@ -366,6 +458,8 @@ export default async function wordsGate(root = process.env.BRAINDOG_GATE_ROOT ??
   };
   for (const rel of files) read(rel, literalsOf(readFileSync(join(ROOT, rel), 'utf8')));
   for (const rel of pages) read(rel, pageStrings(readFileSync(join(ROOT, rel), 'utf8')));
+  for (const rel of svelte) read(rel, svelteStrings(readFileSync(join(ROOT, rel), 'utf8')));
+  for (const rel of labels) read(rel, literalsOf(readFileSync(join(ROOT, rel), 'utf8')).filter((l) => l.key === 'label'));
 
   /* THE PAGE LINT SAYS THE SAME: its plain-words and system-word lists are this list's page entries, and its one-word
      buttons this list's buttons, word for word. */
@@ -384,7 +478,7 @@ export default async function wordsGate(root = process.env.BRAINDOG_GATE_ROOT ??
     for (const d of down) console.log(`  ${d.rel}: held ${d.held}, now ${d.now}`);
   }
   const many = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
-  const said = `${many(files.length, 'copy file')} and ${many(pages.length, 'file')} of declared pages, ${many(strings, 'string')}, ${heldNow} held in ${many(Object.keys(held).length, 'file')}`;
+  const said = `${many(files.length + svelte.length + labels.length, 'copy file')} and ${many(pages.length, 'file')} of declared pages, ${many(strings, 'string')}, ${heldNow} held in ${many(Object.keys(held).length, 'file')}`;
   if (red.length === 0 && !drift) {
     console.log(`  words: 0 words a person must never read, over ${said}`);
   } else {

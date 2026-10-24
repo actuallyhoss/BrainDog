@@ -2944,12 +2944,41 @@
       "kind": "pack",
       "id": "setup-sync",
       "title": "Setup sync",
-      "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, sealed on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
+      "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "913a0ece2e54d095fb6734b1ddfc2803ace5e5d473e4c7de11bca210df1f4cb4",
+          "bytes": 15051,
+          "published_at": "2026-10-24T07:32:44.792Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Says locked for what each machine locks with your sync key, and gives a bundle's size as Size. Nothing it keeps changed."
+        },
         {
           "version": "1.0.1",
           "checksum": "2bac7b433fd9a02d7a4976a9d1928c6dae172b83b1355ec9d87988cc2198090c",

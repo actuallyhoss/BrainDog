@@ -43,7 +43,7 @@
     tooBig: 'This file is bigger than 2 MB. Choose a smaller one.',
     preview: (field: string) => `Preview of ${field.toLowerCase()}`,
     size: (bytes: number) =>
-      bytes < 1024 ? `${bytes} bytes` : bytes < 1_048_576 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`,
+      bytes < 1024 ? 'Under 1 KB' : bytes < 1_048_576 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`,
   } as const;
 
   /** The most one file may be, the stores' own ceiling (`apps/worker/src/files.ts` `FILE_MOST`), said before it is sent. */

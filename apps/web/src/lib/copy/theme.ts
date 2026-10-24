@@ -21,11 +21,11 @@ export const theme = {
   lookHint:
     'Every colour this record is drawn in, in light and in dark, for everybody who opens it.',
   lookOwn: 'This record has a look of its own.',
-  lookHouseNow: 'This record is in the house look.',
+  lookHouseNow: 'This record is in the usual look.',
   lookEdit: 'Edit the look',
   lookClose: 'Close the editor',
-  lookHouse: 'Use the house look',
-  lookHouseBack: 'The record is back in the house look.',
+  lookHouse: 'Use the usual look',
+  lookHouseBack: 'The record is back in the usual look.',
   lookMember: 'Your look goes to the owner in Needs you, and the record takes it when they accept.',
   /** The title the editor wears when a theme refused at install opened it with its fixes staged. */
   lookFixAndInstall: 'Fix and install',

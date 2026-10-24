@@ -110,7 +110,7 @@ export const decide = {
      owner's order, all four ways `startScript` stops a run included. What `as:` keeps, the id of the queued run, is
      said by the canvas's sentence before it. */
   proposalScriptGoesOn:
-    'The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.',
+    'The run goes on without waiting for it: what the script writes lands when BrainDog runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.',
   proposalCallsOut: 'Calls out',
   proposalCallsNothing: 'Nothing outside this record',
   proposalMaySend: 'May send',
@@ -168,7 +168,7 @@ export const decide = {
   arrangeNeedPerson: (label: string) =>
     `A key called “${label}” is held, but only for you. A scheduled run cannot open it, so put it in again here.`,
   arrangeNeedField: 'Paste the key',
-  arrangeNeedHint: 'Sent once and sealed. It is never shown again.',
+  arrangeNeedHint: 'Sent once and locked away. It is never shown again.',
   arrangeNeedSave: 'Keep this key',
   arrangeNeedSaving: 'Keeping it',
   arrangeNeedKept: (label: string) => `Kept “${label}” for scheduled runs`,

@@ -89,7 +89,7 @@ export const account = {
      what it actually takes is the help sheet, the palette shortcut and every goto. The sentence a
      person needs before pressing Off is what stops working and what does not. */
   characterKeysHint:
-    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
+    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the search and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
 
   /* the record's own colour */
 
@@ -507,7 +507,7 @@ export const account = {
    * purpose, so the fix is not to reveal it here; it is to say where it lives.
    */
   theKeyIs:
-    'These copies are sealed with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
+    'These copies are locked with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
   theKeyWhere: 'If you run BrainDog yourself, the key is the file you made at set-up. Keep a copy somewhere else.',
   restore: 'Going back',
   /**
@@ -743,8 +743,8 @@ export const account = {
   billingManage: 'Manage payment',
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',
-  billingNotOpen: 'This host is not taking payments at the moment, so nothing here can be paid or changed.',
-  billingNoneOwned: 'Billing belongs to a record’s owner, and you own no record on this host.',
+  billingNotOpen: 'This BrainDog is not taking payments at the moment, so nothing here can be paid or changed.',
+  billingNoneOwned: 'Billing belongs to a record’s owner, and you own no record on this BrainDog.',
   billingUnread: 'What this record costs could not be read just now. Try again in a minute.',
   /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must
      say the same thing about the same record. */
@@ -770,8 +770,8 @@ export const account = {
   passkeyLost: 'If you lose a passkey',
   passkeyLostHow: (magic: boolean) =>
     magic
-      ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this host can let you back in.'
-      : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this host can let you back in.',
+      ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this BrainDog can let you back in.'
+      : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this BrainDog can let you back in.',
 
   /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',
@@ -869,12 +869,12 @@ export const account = {
 
   /* SETTINGS > BACKUPS: THIS HOST'S LAST RESTORE TEST (LCH-C04), drawn by `areas/copies.ts` `drillLine`. The host's,
      never the record's: only the operator holds the key that opens the copies, so every record reads the same line. */
-  drillPassed: (when: string) => `This host's last restore test: passed ${when}`,
-  drillFailed: (when: string) => `This host's last restore test: failed ${when}`,
+  drillPassed: (when: string) => `This BrainDog's last restore test: passed ${when}`,
+  drillFailed: (when: string) => `This BrainDog's last restore test: failed ${when}`,
   /* A test that opened the Directory's copy and tried no record's copy has proven no restore, so it never reads "passed". */
-  drillNoRecord: (when: string) => `This host's last restore test, ${when}: the Directory's copy opened; no record's copy was tried`,
+  drillNoRecord: (when: string) => `This BrainDog's last restore test, ${when}: the Directory's copy opened; no record's copy was tried`,
   drillUnproven: 'Not proven',
   drillNever: 'Never tested',
-  drillNeverSaid: 'No copy on this host has been restored as a test yet',
+  drillNeverSaid: 'No copy on this BrainDog has been restored as a test yet',
   drillOverdue: 'Overdue',
 } as const;

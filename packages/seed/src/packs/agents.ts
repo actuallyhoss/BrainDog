@@ -147,7 +147,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
       /* The kinds the vault seals (`packages/kernel/src/vault.ts`). */
       { id: 'kind', label: 'Kind', type: 'enum', values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'], required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
-      { id: 'value', label: 'Sealed value', type: 'secret' },
+      { id: 'value', label: 'Locked value', type: 'secret' },
       /* For a key that is not in the vault: where a person finds it. */
       { id: 'where', label: 'Kept at', type: 'text', max: 280 },
       { id: 'origin', label: 'Came from', type: 'text', max: 280 },
@@ -779,8 +779,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      many at work and how many steps up next; At work, Up next (Left for the next run until now) and Recent runs (Today's
      runs) are each the whole row; Your agents asked, Needs a look's heading and its three tidying lines, Earlier and its
      cards, What the brain learned and its log, and Machines and profiles go; a foot line holds the doors. No list, field
-     or figure goes. */
-  manifest: { id: 'agents', version: '1.17.0', requires: ['register.things'] },
+     or figure goes.
+     1.18.0 IS WORDS, SO IT IS MINOR (the screens scope of 24 October, U-C7): a key's value is headed Locked value, where
+     it said Sealed value. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.18.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

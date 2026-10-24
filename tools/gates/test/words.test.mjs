@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { breaks, judge, literalsOf, pageFiles, pageStrings, pageWords, readList } from '../words.mjs';
+import { breaks, judge, literalsOf, pageFiles, pageStrings, pageWords, readList, svelteStrings } from '../words.mjs';
 import { BUTTON_WORDS, PAGE_WORDS } from '../../../packages/render/src/lint.ts';
 import { GUIDE, guide, readRaw } from '../words-guide.mjs';
 
@@ -86,6 +86,14 @@ const RED = {
   Submit: 'Submit',
   OK: 'OK',
   "isn't code": "BrainDog isn't code",
+  palette: 'Open the palette',
+  gate: 'At the gate',
+  host: 'Not on this host yet',
+  kernel: 'The kernel refused it',
+  bytes: '200 bytes',
+  sealed: 'Sent once and sealed',
+  'vital signs': 'Your vital signs',
+  'house look': 'Use the house look',
   'an id in a sentence': 'Filed as tools#8',
   'the long dash': `Rent ${DASH} due Friday`,
 };
@@ -150,6 +158,24 @@ test('the declared pages are the seed\'s sources and each add-on\'s pack file, t
   assert.ok(files.includes('packs/live-feed/live-feed.pack.json'), 'a pack file');
   assert.ok(files.some((f) => f.startsWith('packages/seed/src/modules/')), 'a seed module');
   assert.ok(!files.some((f) => /\.test\.ts$/.test(f)), 'no test');
+});
+
+test('A SVELTE FILE IS READ BY ITS INLINE WORDS OBJECTS AND NOTHING ELSE, each string at its line in the file', () => {
+  const src = [
+    '<script lang="ts">',
+    "  const id = 'a row';",
+    '  const words = {',
+    "    open: 'Open it',",
+    '    said: (n: string) => `${{ a: n }.a} rows`,',
+    '  };',
+    '  const listWords = { empty: "Nothing yet" };',
+    '</script>',
+    '<p>A row in the markup</p>',
+  ].join('\n');
+  assert.deepEqual(svelteStrings(src).map((l) => [l.text, l.line, l.key]), [['Open it', 4, 'open'], ['{} rows', 5, 'said'], ['Nothing yet', 7, 'empty']]);
+  const r = run({ 'apps/web/src/lib/ui/Look.svelte': "<script>\n  const words = { back: 'Use the house look' };\n</script>\n" });
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.out.includes('Look.svelte:2'), r.out);
 });
 
 test('a planted tree is judged whole, by every kind of copy file, and an empty root is a skip', () => {

@@ -1,9 +1,9 @@
 {
   "pack": "setup-sync",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "title": "Setup sync",
-  "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, sealed on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
+  "changes": "Says locked for what each machine locks with your sync key, and gives a bundle's size as Size. Nothing it keeps changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",
@@ -65,7 +65,7 @@
       "name": "Bundles",
       "one": "bundle",
       "icon": "archive",
-      "holds": "what each machine sealed and sent, written by that machine: when, what each thing held, and the sealed files by hash",
+      "holds": "what each machine locked and sent, written by that machine: when, what each thing held, and the locked files by hash",
       "title": "host",
       "personal": true,
       "state": "state",
@@ -78,8 +78,8 @@
         { "id": "heard", "label": "Last checked", "type": "instant", "index": true },
         { "id": "rows", "label": "What it sent", "type": "list", "of": "text" },
         { "id": "files", "label": "Files", "type": "int" },
-        { "id": "size", "label": "Size in bytes", "type": "int" },
-        { "id": "sealed", "label": "Sealed files", "type": "list", "of": "text" },
+        { "id": "size", "label": "Size", "type": "int" },
+        { "id": "sealed", "label": "Locked files", "type": "list", "of": "text" },
         {
           "id": "kept",
           "label": "Result",
@@ -192,7 +192,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Each machine seals what it carries with your sync key before it leaves. BrainDog keeps only sealed files it cannot open, and a new machine joins with your sync passphrase."
+          "body": "Each machine locks what it carries with your sync key before it leaves. BrainDog keeps only locked files it cannot open, and a new machine joins with your sync passphrase."
         },
         {
           "kind": "stat",
@@ -273,7 +273,7 @@
           "heading": "What the sync passphrase changes",
           "icon": "lock",
           "span": 12,
-          "body": "BrainDog can open what is sealed: no, only your machines can. If you forget the passphrase, the machines that joined keep working, and one of them puts a new copy of the key back with braindog sync join."
+          "body": "BrainDog can open what is locked: no, only your machines can. If you forget the passphrase, the machines that joined keep working, and one of them puts a new copy of the key back with braindog sync join."
         },
         {
           "kind": "note",
@@ -281,7 +281,7 @@
           "heading": "If you lose the passphrase and every machine",
           "icon": "circle-alert",
           "span": 12,
-          "body": "Nothing sealed can be opened again, by you or by anybody, and nobody can reset it. Keep the passphrase somewhere other than these machines."
+          "body": "Nothing locked can be opened again, by you or by anybody, and nobody can reset it. Keep the passphrase somewhere other than these machines."
         },
         {
           "kind": "note",

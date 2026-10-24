@@ -122,7 +122,7 @@ export const TRACKS: Fields[] = [
    `stamp` counts HOURS, so a figure in days is written as days times 24 rather than left looking
    like a date and behaving like an afternoon. */
 export const UPDATES: Fields[] = [
-  { body: 'Three instances signed off. Mastering pass is the gate on the other six.', health: 'on_track', track: 1, by: 'you', at: stamp(-20 * 24) },
+  { body: 'Three instances signed off. The other six wait on the mastering pass.', health: 'on_track', track: 1, by: 'you', at: stamp(-20 * 24) },
   { body: 'Mastering pass done. Six instances queued, claude is working through them.', health: 'on_track', track: 1, by: 'claude', at: stamp(-3 * 24) },
   { body: 'Notice window opens on the 12th and closes 60 days later. Nothing to do until then.', health: 'on_track', track: 2, by: 'you', at: stamp(-30 * 24) },
   { body: 'Missed the window last year by four days. Diarised this time, but the renewal auto-charges before the notice lands.', health: 'at_risk', track: 2, by: 'you', at: stamp(-2 * 24) },

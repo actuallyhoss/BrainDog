@@ -74,8 +74,8 @@ export const NEVER_BIND = [
 export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 
 export const BINDINGS: Binding[] = [
-  { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the palette', bare: false },
-  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Open the palette, caret in the query', bare: true },
+  { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the search', bare: false },
+  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Open the search, caret in the query', bare: true },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
      it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
      thing under the launcher"* — which was true while the palette was the only search, and which
@@ -200,7 +200,7 @@ export const BINDINGS: Binding[] = [
   { id: 'inbox-move', scope: 'inbox', key: 'j  k', label: 'The next or the previous email', bare: true },
   { id: 'inbox-open', scope: 'inbox', key: '↵', label: 'Open it or close it', bare: false },
   { id: 'inbox-file', scope: 'inbox', key: 'e', label: 'File it where you chose', bare: true },
-  { id: 'inbox-archive', scope: 'inbox', key: 'Delete', label: 'Archive it, with its bytes kept', bare: false },
+  { id: 'inbox-archive', scope: 'inbox', key: 'Delete', label: 'Archive it, keeping the whole email', bare: false },
   { id: 'inbox-select', scope: 'inbox', key: 'x', label: 'Select it, to file or archive several', bare: true },
   { id: 'inbox-clear', scope: 'inbox', key: 'Esc', label: 'Clear the selection', bare: false },
 

@@ -66,7 +66,7 @@ export const words = {
   /* INSTALL FROM. */
   fromBlurb: 'A use case or an add-on somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
   address: 'An https address, or a file in a GitHub repository',
-  addressHint: 'The host reads it, so a site that blocks browsers still works.',
+  addressHint: 'BrainDog reads it, so a site that blocks browsers still works.',
   read: 'Read it',
   reading: 'Reading',
   paste: 'Or paste the text of the file',

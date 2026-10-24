@@ -91,20 +91,20 @@ test('a passed test reads its age, and is no fault', async () => {
   const drill = await readDrill(io);
   assert.deepEqual(asked, ['/account/drill']);
   assert.deepEqual(drill, { at: back(12 * D), pass: true, records: 3 });
-  assert.deepEqual(drillLine(drill!, NOW), { text: "This host's last restore test: passed 12 days ago", fault: false, mark: null });
+  assert.deepEqual(drillLine(drill!, NOW), { text: "This BrainDog's last restore test: passed 12 days ago", fault: false, mark: null });
 });
 
 test('a failed test is a fault, and the word failed says so beside the red', async () => {
   const { io } = door(200, { ok: true, value: { at: back(3 * D), pass: false, record_copies: 0 } });
   const line = drillLine((await readDrill(io))!, NOW);
-  assert.deepEqual(line, { text: "This host's last restore test: failed 3 days ago", fault: true, mark: null });
+  assert.deepEqual(line, { text: "This BrainDog's last restore test: failed 3 days ago", fault: true, mark: null });
 });
 
 test('a test that tried no record reads what it did, never "passed", and is a fault with its word', async () => {
   const { io } = door(200, { ok: true, value: { at: back(12 * D), pass: true, record_copies: 0 } });
   const line = drillLine((await readDrill(io))!, NOW);
   assert.deepEqual(line, {
-    text: "This host's last restore test, 12 days ago: the Directory's copy opened; no record's copy was tried",
+    text: "This BrainDog's last restore test, 12 days ago: the Directory's copy opened; no record's copy was tried",
     fault: true,
     mark: 'Not proven',
   });
@@ -134,7 +134,7 @@ test('a host never tested reads "Never tested" as a fault, and stays red until t
   const line = drillLine(drill!, NOW);
   assert.equal(line.fault, true);
   assert.equal(line.mark, 'Never tested');
-  assert.equal(line.text, 'No copy on this host has been restored as a test yet');
+  assert.equal(line.text, 'No copy on this BrainDog has been restored as a test yet');
 });
 
 test("a self-host has no such door: its 404 draws no line, nor does a 401 or a host that cannot be reached", async () => {
@@ -153,7 +153,7 @@ test("a self-host has no such door: its 404 draws no line, nor does a 401 or a h
 test('a pass past 35 days is overdue, marked with the word, and at 35 days it is not yet', () => {
   assert.equal(drillLine({ at: back(DRILL_DUE_MS), pass: true, records: 1 }, NOW).fault, false);
   const late = drillLine({ at: back(DRILL_DUE_MS + 60_000), pass: true, records: 1 }, NOW);
-  assert.deepEqual(late, { text: "This host's last restore test: passed 35 days ago", fault: true, mark: 'Overdue' });
+  assert.deepEqual(late, { text: "This BrainDog's last restore test: passed 35 days ago", fault: true, mark: 'Overdue' });
 });
 
 test('no drill line carries an em dash, an id or a path', () => {
@@ -169,5 +169,5 @@ test('no drill line carries an em dash, an id or a path', () => {
 });
 
 test('a drill reported a moment ago reads "just now", as the operator sees it after the first report', () => {
-  assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This host's last restore test: passed just now");
+  assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This BrainDog's last restore test: passed just now");
 });

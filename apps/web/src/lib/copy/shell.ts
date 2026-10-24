@@ -278,7 +278,7 @@ export const shell = {
         ? 'two of the four meanings, good and wrong, would look the same to somebody who does not see red and green apart'
         : codes.includes('THEME_LADDER_ORDER')
           ? 'its surfaces would not stack in order, so a card would not read as sitting on the page'
-          : 'a full palette cannot be solved from it';
+          : 'a full set of colours cannot be made from it';
     return `${name} cannot be this record's colour: ${why}. The other colours are unaffected.`;
   },
   /* WHAT THIS DEPLOYMENT IS, IN A WORD, AND NOT ONLY IN A COLOUR. `13 §5.1`: meaning may not live
@@ -413,10 +413,10 @@ export const shell = {
   scopeGrid: 'In a table',
   scopeBoard: 'On a board',
   scopePage: 'On a page',
-  scopeGate: 'At the gate',
+  scopeGate: 'On a question',
   scopeDecide: 'In Needs you',
   scopeInbox: 'In the inbox',
-  scopePalette: 'In the palette',
+  scopePalette: 'In the search',
   scopeNav: 'In the sidebar',
 
   /** `33 §4`'s own row is headed *Sign in*, so that is the word rather than a new one. */

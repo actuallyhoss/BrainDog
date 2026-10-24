@@ -28,6 +28,14 @@ declares; the page lint reads what a page prints on a real record, and Health sh
 | OK | Done, or a verb and its object | A button says what it does to what (RQ-EXP-408). | the source only |
 | isn't code | not just code | The product's words are "not just code" (RQ-EXP-417). | `system-word` |
 | an id in a sentence | the thing's name; a run's handle only beside its name | Names, never ids, in anything a person reads. The page lint's raw-id rule holds the same on a drawn page. | the source only |
+| palette | the search, or the box you type in | The command palette is a developer's name for the box that opens on a key (U-C7). | the source only |
+| gate | what it checks, or a rule | A gate is how the build is checked, not something a person keeps (U-C7). | the source only |
+| host | this BrainDog, or the server's name | The machine a BrainDog runs on is not a thing a person names (U-C7). | the source only |
+| kernel | BrainDog | The kernel is how BrainDog is built inside (U-C7). | the source only |
+| bytes | a size in KB or MB | A size reads in the units a phone shows (U-C7). | the source only |
+| sealed | locked, or kept | Sealed is the word for how a key is stored, not for what the person can do with it (U-C7). | the source only |
+| vital signs | how BrainDog is doing | A medical metaphor for health checks (U-C7). | the source only |
+| house look | BrainDog's look, or the usual look | The house look is the builders' name for the default theme (U-C7). | the source only |
 | the long dash | a comma, a colon or a new sentence | No em dashes in copy a person reads. A dash alone is the drawn mark for no value and is forgiven. The page lint's em-dash rule holds the same on a drawn page. | the source only |
 
 ## Titles, headings, labels and buttons

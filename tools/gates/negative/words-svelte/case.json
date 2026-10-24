@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "a builder's word kept inline in a Svelte file's own words",
+  "expect": "house look: .*say BrainDog's look, or the usual look",
+  "findings": 1,
+  "total": 1,
+  "why": "A SVELTE FILE'S INLINE WORDS ARE READ, AND ONLY THEM. The finding is the house look in the file's const words object, inside a template whose ${} holds a brace, so the reader has to find the object's real end. The decoys say house look where a screen never reads it from the object: a comment in the script, a plain variable outside the words object, and the markup. A reader that took any of them would count two or more."
+}
