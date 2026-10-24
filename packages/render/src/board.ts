@@ -115,3 +115,23 @@ export function dropTarget(columns: readonly string[], from: string, to: string)
   if (to === from) return null;
   return to;
 }
+
+/**
+ * The lane a narrow board shows, where it draws one lane at a time behind a switch of their names.
+ *
+ * STACKED ON A PHONE, A BOARD WAS ONE LIST 15,000 PX LONG (audit B of 25 October, Y8): every lane's cards one under
+ * another, so the lane you wanted was a long scroll past the ones you did not. One lane at a time is the board read the
+ * way a phone reads it, and the switch above says how many each lane holds, which is what comparing heights told you.
+ *
+ * THE LANE ONCE CHOSEN STAYS, so a card moved out of it does not take the reader with it. Until one is chosen, or once
+ * the board no longer has it, the board opens on the BUSIEST LANE BEFORE THE LAST, the first of a tie: where the work
+ * is. Never the last while another holds a card, since the last of a sequence of states is where work ends up, and a
+ * board opening on forty finished cards answers a question nobody asked. `null` only for a board with no lanes.
+ */
+export function laneShown(drawn: readonly Lane[], chosen: string | null): string | null {
+  if (chosen !== null && drawn.some((lane) => lane.name === chosen)) return chosen;
+  const before = drawn.slice(0, -1);
+  let best: Lane | undefined;
+  for (const lane of before) if (lane.cards.length > (best?.cards.length ?? 0)) best = lane;
+  return (best ?? drawn.at(-1))?.name ?? null;
+}

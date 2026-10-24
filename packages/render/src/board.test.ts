@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { columnAt, columnOf, columnsOf, dropTarget, lanes, moveTarget, type Moves } from './board.ts';
+import { columnAt, columnOf, columnsOf, dropTarget, lanes, laneShown, moveTarget, type Moves } from './board.ts';
 import type { Component } from 'svelte';
 import type { Block as BlockSegment, Row } from './parse.ts';
 
@@ -116,6 +116,28 @@ test('a drop carrying a column this board does not have is refused', () => {
   assert.equal(dropTarget(COLUMNS, 'Todo', ''), null);
 });
 
+/* ── the lane a phone shows ───────────────────────────────────────────────── */
+
+/* ON A PHONE THE BOARD IS ONE LANE AT A TIME (audit B of 25 October, Y8): stacked, the lanes were one list 15,000 px
+   long. The lane it opens on is where the work is, so the busiest one, and never the last, where work ends up. */
+test('a phone opens on the busiest lane before the last, the first of a tie', () => {
+  assert.equal(laneShown(lanes(WORK), null), 'Todo');
+  const tied = [row('Later', 'Glaze the test tiles'), row('Open', 'Sand the kiln shelf'), row('Done', 'Fire the first batch'), row('Done', 'Sweep the studio'), row('Done', 'Order more clay')];
+  assert.equal(laneShown(lanes(tied), null), 'Later', 'Done holds the most and is never the lane a board opens on');
+});
+
+test('a lane once chosen stays shown, until the board no longer has it', () => {
+  assert.equal(laneShown(lanes(WORK), 'Blocked'), 'Blocked');
+  assert.equal(laneShown(lanes(WORK), 'Archived'), 'Todo');
+});
+
+test('a board of one lane shows it, and a board of none shows nothing', () => {
+  assert.equal(laneShown(lanes([row('Done', 'Fire the first batch')]), null), 'Done');
+  assert.equal(laneShown(lanes([]), null), null);
+  /* EVERY LANE BEFORE THE LAST LEFT EMPTY BY A MOVE: the board opens on the last, which is where the cards are. */
+  assert.equal(laneShown(lanes([row('Open', 'Sand the kiln shelf'), row('Done', 'Fire the first batch')], { 0: 'Done' }), null), 'Done');
+});
+
 /* ── a card's two verbs, drawn ────────────────────────────────────────────── */
 
 /* The arithmetic above needs no DOM. What a card DRAWS does, and `parity.test.ts` shows the way: Node's module hooks
@@ -165,7 +187,40 @@ test('WITH NO CALLBACK A CARD IS WHAT IT WAS: no button on it, and a title that 
   assert.doesNotMatch(bare, /<button/u);
   assert.match(bare, /<a [^>]*href="\/r\/tasks\/4"[^>]*>Fix login<\/a>/u);
   // Moving a card brings its lane control and neither of the two verbs.
-  assert.doesNotMatch(draw({ onmove: () => {} }), /<button/u);
+  assert.doesNotMatch(draw({ onmove: () => {} }), /class="(item-open|card-more)/u);
+});
+
+const switches = (html: string): string[] => [...html.matchAll(/<button [^>]*class="board-lane"[^>]*>.*?<\/button>/gsu)].map((m) => m[0]);
+const shown = (html: string): string[] => [...html.matchAll(/<div [^>]*class="board-col"[^>]*>/gu)].filter((m) => m[0].includes('data-shown')).map((m) => m[0]);
+
+test('A HOSTED BOARD DRAWS A SWITCH OF ITS LANES, one pressed, and marks the one lane a phone shows', () => {
+  for (const props of [{ onmove: () => {} }, { onopen: () => {} }, { onmenu: () => {} }]) {
+    const drawn = draw(props);
+    const lanesDrawn = switches(drawn);
+    assert.equal(lanesDrawn.length, 2, 'one a lane');
+    for (const b of lanesDrawn) assert.match(b, /type="button"/u);
+    assert.deepEqual(lanesDrawn.map((b) => /aria-pressed="([^"]*)"/u.exec(b)?.[1]), ['true', 'false'], 'Doing holds two and opens; Done is last');
+    assert.match(lanesDrawn[0]!, />Doing<span class="board-count num">2<\/span>/u);
+    assert.match(drawn, /<div [^>]*role="group"[^>]*aria-label="Columns"|<div [^>]*aria-label="Columns"[^>]*role="group"/u);
+    assert.equal(shown(drawn).length, 1, 'one lane shown on a phone');
+    assert.match(drawn, /<div [^>]*class="grid"[^>]*data-lanes/u);
+  }
+});
+
+test('A STATIC BOARD DRAWS NO SWITCH: it has nothing to turn it with, and the mirror stacks its lanes', () => {
+  const bare = draw();
+  assert.equal(switches(bare).length, 0);
+  assert.equal(shown(bare).length, 0);
+  assert.doesNotMatch(bare, /data-lanes/u);
+});
+
+test("WHERE A CARD HAS A MENU, ITS LANE CONTROL IS NOT DRAWN UNDER IT: the menu's Move to does that", () => {
+  assert.match(draw({ onmove: () => {}, onmenu: () => {} }), /<div [^>]*class="grid"[^>]*data-menu/u);
+  assert.doesNotMatch(draw({ onmove: () => {} }), /data-menu/u, 'with no menu the select is the only way to move a card on a phone');
+  const css = readFileSync(new URL('../../skin/kinds/board.css', import.meta.url), 'utf8');
+  assert.match(css, /\.grid\[data-menu\] \.board-move:not\(:focus-visible\)/u, 'the select under every card is still drawn');
+  assert.match(css, /\.grid\[data-lanes\] \.board-col:not\(\[data-shown\]\)\s*\{\s*display: none;/u, 'a phone still stacks every lane');
+  assert.match(css, /\.board-lanes\s*\{[^}]*display: none;/u, 'the switch is drawn where the lanes stand side by side');
 });
 
 test("A CARD'S TITLE IS A BUTTON only where the host opens a card, and it is drawn as its words", () => {

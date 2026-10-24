@@ -190,6 +190,28 @@
     }
   }
 
+  /* AND WHERE A CARD HAS A MENU, UNDER A FINGER TOO (audit B of 25 October, Y8): the menu's Move to is the touch path
+     there, so a select under every card was a second menu on each, said in the lane's own name. Kept in the tree as
+     above, for the tab stop and a screen reader. */
+  .grid[data-menu] .board-move:not(:focus-visible) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* THE SWITCH OF LANES (`p/Grid.svelte`), drawn only where the lanes stack, below. Side by side, the lanes are their
+     own switch. */
+  .board-lanes {
+    display: none;
+  }
+
   /**
    * A BOARD IN A NARROW SLOT IS A GROUPED LIST: each lane's heading with its count, then its cards as
    * rows with a hairline between them, and no box round any of them.
@@ -216,6 +238,49 @@
     .block[data-kind='board'] .grid {
       grid-template-columns: minmax(0, 1fr);
       row-gap: var(--sp-5);
+    }
+
+    /* ONE LANE AT A TIME, WHERE THE BOARD HAS A SWITCH (audit B of 25 October, Y8): every lane stacked was one list of
+       15,000 px on his phone. The switch is a row of the lanes' names and counts that scrolls sideways inside itself
+       when they outrun the width, each a 44px press; the pressed one wears the control's fill. */
+    .block[data-kind='board'] .board-lanes {
+      display: flex;
+      gap: var(--sp-1);
+      margin-block-end: var(--sp-3);
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scrollbar-width: none;
+    }
+
+    .block[data-kind='board'] .board-lane {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      gap: var(--sp-1);
+      min-block-size: var(--tap);
+      padding-inline: var(--sp-3);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: var(--r-xs);
+      color: var(--ink-2);
+      font: inherit;
+      font-size: var(--fs-meta);
+      font-weight: 500;
+    }
+
+    .block[data-kind='board'] .board-lane[aria-pressed='true'] {
+      background: var(--tile-2);
+      border-color: transparent;
+      color: var(--ink);
+    }
+
+    .block[data-kind='board'] .grid[data-lanes] .board-col:not([data-shown]) {
+      display: none;
+    }
+
+    /* THE SHOWN LANE'S HEAD SAYS WHAT THE PRESSED SWITCH SAYS, so it is not drawn twice. */
+    .block[data-kind='board'] .grid[data-lanes] .board-head {
+      display: none;
     }
 
     .block[data-kind='board'] .board-col {

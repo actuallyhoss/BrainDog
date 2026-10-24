@@ -14,7 +14,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { figureChars, headlineFigure, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
-  import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
+  import { columnAt, columnsOf, dropTarget, lanes, laneShown, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import { valueWord } from '../../src/format.ts';
@@ -65,6 +65,8 @@
   const MORE = 'More for';
   /** What a card with no title is called there. */
   const CARD = 'this card';
+  /** The name of the switch a narrow board shows one lane at a time with. */
+  const LANES = 'Columns';
 
   const live = $derived(Boolean(onmove));
   const columns = $derived(columnsOf(block.rows));
@@ -72,6 +74,18 @@
   /** Moves made since this block was drawn, by row index. Nothing has been written yet. */
   let moved = $state<Moves>({});
   const board = $derived(lanes(block.rows, moved));
+
+  /**
+   * ONE LANE AT A TIME ON A PHONE, behind a switch of their names and counts (audit B of 25 October, Y8): stacked, the
+   * lanes were one list 15,000 px long. Drawn only on a board a host draws, which is a board in the app: the static
+   * mirror has nothing to turn a switch with, so it stacks as it always did, and the two stay one tree there. The
+   * switch is in the markup at every width and `kinds/board.css` shows it, and hides the other lanes, only where the
+   * lanes are stacked. Which lane opens is `laneShown`'s to say.
+   */
+  const hosted = $derived(live || Boolean(onopen) || Boolean(onmenu));
+  const switched = $derived(hosted && board.length > 1);
+  let chosen = $state<string | null>(null);
+  const shownLane = $derived(switched ? laneShown(board, chosen) : null);
 
   /**
    * ROVING TABINDEX: exactly one card is reachable by Tab and every other is -1, held as the row's
@@ -143,6 +157,8 @@
     const card = cards[Math.max(0, Math.min(rank, cards.length - 1))];
     if (!card) return;
     focus = card.at;
+    /* A KEY THAT WALKS INTO ANOTHER LANE SHOWS IT, so on a phone the caret never lands on a card that is not drawn. */
+    chosen = board[col]?.name ?? chosen;
     cardAt(card.at)?.focus();
   }
 
@@ -350,10 +366,23 @@
     or a roving 0 on the one cell that holds the tab stop, which is what the APG grid pattern asks
     for. `Table` carries the same suppression, for the same wrapper, for the same reason.
   -->
+  {#if switched}
+    <!-- THE LANES' SWITCH, each a toggle with its count, as a lane's head says it. Outside the grid, so its buttons are
+         tab stops of their own and the board's arrows never reach them. -->
+    <div class="board-lanes" role="group" aria-label={LANES}>
+      {#each board as lane (lane.name)}
+        <button type="button" class="board-lane" aria-pressed={lane.name === shownLane} onclick={() => (chosen = lane.name)}
+          >{valueWord(lane.name, true)}<span class="board-count num">{lane.cards.length}</span></button
+        >
+      {/each}
+    </div>
+  {/if}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div
     class="grid"
     style="--cells:{columns.length}"
+    data-lanes={switched ? '' : undefined}
+    data-menu={live && onmenu ? '' : undefined}
     bind:this={root}
     role={live ? 'grid' : undefined}
     aria-label={live ? (block.heading ?? BOARD) : undefined}
@@ -375,6 +404,7 @@
       <div
         class="board-col"
         role={live ? 'row' : undefined}
+        data-shown={shownLane === lane.name ? '' : undefined}
         data-drop={dropping === lane.name ? '' : undefined}
         ondragover={live
           ? (e) => {
@@ -447,6 +477,7 @@
                 walking the board meets it there and nowhere else, and a pointer that can drag still can.
 
                 NOT DRAWN WHERE A POINTER CAN DRAG (`kinds/board.css`): it said the lane's name again under every card.
+                Nor where the card has a menu (`data-menu`), whose Move to is the touch path there.
                 It stays in the tree for that, never `hidden`, so the tab stop and a screen reader still have it and it
                 shows itself when a keyboard lands on it.
               -->
