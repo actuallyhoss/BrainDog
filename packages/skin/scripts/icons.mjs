@@ -1,5 +1,6 @@
 /**
- * The two PNG icons Android asks an installed web app for, 192 and 512 pixels square, drawn from `MARK`.
+ * The two PNG icons Android asks an installed web app for, 192 and 512 pixels square, drawn from `MARK`, and the tab's
+ * 16 and 32 with `favicon.ico` made of them.
  *
  * AN IMAGE TOOL IS NOT A DEPENDENCY THIS REPOSITORY HAS, and the mark is two filled paths, so this draws them itself.
  * The path data is read into outlines, each curve is cut into short straight edges, and each pixel is covered by
@@ -153,10 +154,10 @@ function outlines(d) {
   return shapes;
 }
 
-/** How much of each pixel the mark covers, from 0 to 1, row by row, on a square of `size`. */
-function coverage(shapes, size) {
+/** How much of each pixel the mark covers, from 0 to 1, row by row, on a square of `size`, the mark `fill` of its width. */
+function coverage(shapes, size, fill = FILL) {
   const [, , w, h] = MARK.viewBox.split(' ').map(Number);
-  const scale = (size * FILL) / w;
+  const scale = (size * fill) / w;
   const dx = (size - w * scale) / 2;
   const dy = (size - h * scale) / 2;
   const edges = [];
@@ -258,14 +259,70 @@ function png(size, alpha, ground, ink) {
  * EACH PATH IS COVERED ON ITS OWN AND LAID OVER THE ONE BEFORE, as SVG paints two paths in one group. Wound together,
  * a path drawn the other way round inside another would cancel it and leave a hole the favicon does not have.
  */
-function layered(size) {
+function layered(size, fill = FILL) {
   const out = new Float64Array(size * size);
   for (const d of MARK.paths) {
-    const cover = coverage(outlines(d), size);
+    const cover = coverage(outlines(d), size, fill);
     for (let p = 0; p < out.length; p++) out[p] = out[p] + Math.min(1, cover[p]) * (1 - out[p]);
   }
   return out;
 }
+
+/**
+ * AN 8-BIT RGBA PNG OF THE MARK ON NOTHING, for a browser tab: a tab draws its own ground, light or dark, and a square
+ * of the house ground on a dark tab bar read as a hole (the scope of 24 October, E46).
+ */
+function pngClear(size, alpha, ink) {
+  const stride = size * 4 + 1;
+  const raw = Buffer.alloc(size * stride);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const at = y * stride + 1 + x * 4;
+      raw[at] = ink[0];
+      raw[at + 1] = ink[1];
+      raw[at + 2] = ink[2];
+      raw[at + 3] = Math.round(Math.min(1, alpha[y * size + x]) * 255);
+    }
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header[8] = 8;
+  header[9] = 6;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * `favicon.ico`, THE ONE ADDRESS EVERY BROWSER AND CRAWLER ASKS WHATEVER THE PAGE SAYS, and it was a 404 on brain.dog.
+ * The format is a directory of images, and each one may be a PNG whole, which every browser that reads an icon reads.
+ */
+function ico(images) {
+  const head = Buffer.alloc(6 + 16 * images.length);
+  head.writeUInt16LE(0, 0);
+  head.writeUInt16LE(1, 2);
+  head.writeUInt16LE(images.length, 4);
+  let offset = head.length;
+  images.forEach(({ size, file }, i) => {
+    const at = 6 + 16 * i;
+    head[at] = size >= 256 ? 0 : size;
+    head[at + 1] = size >= 256 ? 0 : size;
+    head.writeUInt16LE(1, at + 4);
+    head.writeUInt16LE(32, at + 6);
+    head.writeUInt32LE(file.length, at + 8);
+    head.writeUInt32LE(offset, at + 12);
+    offset += file.length;
+  });
+  return Buffer.concat([head, ...images.map((m) => m.file)]);
+}
+
+/** The tab's sizes, and the mark across the whole width of each: at 16 pixels every one of them is needed. */
+const TAB = [16, 32];
+const TAB_FILL = 1;
 
 const ground = bytes(HOUSE.schemes.light.bg);
 const ink = bytes(HOUSE.schemes.light.accent);
@@ -274,4 +331,18 @@ for (const size of SIZES) {
   const file = png(size, layered(size), ground, ink);
   await writeFile(path, file);
   console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
+}
+
+/* THE TAB'S OWN, IN THE FAVICON'S RED (`theme.mjs` writes `mark.svg` in the same), into both apps' static folders: the
+   site answers brain.dog/favicon.ico and the app its own path. */
+const red = bytes(HOUSE.frame.light['red-fill']);
+const tab = TAB.map((size) => ({ size, file: pngClear(size, layered(size, TAB_FILL), red) }));
+for (const { size, file } of tab) {
+  await writeFile(join(root, 'apps', 'web', 'static', `icon-${size}.png`), file);
+  console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
+}
+const icon = ico(tab);
+for (const app of ['web', 'site']) {
+  await writeFile(join(root, 'apps', app, 'static', 'favicon.ico'), icon);
+  console.log(`  wrote apps/${app}/static/favicon.ico, ${icon.length} bytes`);
 }
