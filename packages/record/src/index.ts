@@ -731,6 +731,15 @@ RETURNING n, until`;
 
 /** How long a fact a read is written from is held while the record's version stands (`heldFor`): 30 s, plan §4.1. */
 const HELD_MS = 30_000;
+/** The most field names one `list` may ask for (`fields`). */
+const LIST_FIELDS_MOST = 64;
+
+/** One row with only the fields asked for; its other columns stay. */
+function onlyFields(row: Entry, fields: readonly string[]): Entry {
+  const kept: Record<string, JsonValue> = {};
+  for (const f of fields) if (Object.hasOwn(row.fields, f)) kept[f] = row.fields[f] as JsonValue;
+  return { ...row, fields: kept };
+}
 /** The most log lines `version` reads to say which lists moved; past it, it says it cannot (`movedSince`). */
 const MOVED_LINES_MOST = 200;
 /** What a line may be about and move no list: a question, a decision, an arrival. */
@@ -10069,6 +10078,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            it to the kernel's deleted rows on afb3b1b2 (`host/test/list-include-deleted.test.ts`, whose
            POST case passed before this line existed while its GET case failed). */
         includeDeleted?: boolean;
+        /* SOME FIELDS ONLY (scope 2026-10-24 A10): a walk that wants each row's name read every note whole, and his things
+           list was 466 KB, 457 KB of it notes. Absent is every field, as before; each row keeps its other columns. */
+        fields?: string[];
       },
       ctx: CallContext,
     ): Promise<Result<Page<Entry>>> {
@@ -10082,6 +10094,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          for the import is a row he deleted planned again as new. */
       if (args.includeDeleted !== undefined && args.includeDeleted !== null && typeof args.includeDeleted !== 'boolean')
         return no('VALUE_MALFORMED', `includeDeleted is true or false, and ${JSON.stringify(args.includeDeleted) ?? String(args.includeDeleted)} is neither.`, { at: 'includeDeleted' });
+      const picked = args.fields;
+      if (picked !== undefined && picked !== null && (!Array.isArray(picked) || picked.length === 0 || picked.length > LIST_FIELDS_MOST || !picked.every((f) => typeof f === 'string')))
+        return no('VALUE_MALFORMED', `fields is a list of 1 to ${LIST_FIELDS_MOST} field names, like ["name"].`, { at: 'fields' });
       /* A LIMIT BELOW ONE IS REFUSED, NOT READ AS FIFTY OR AS ONE. The kernel coerces what a query
          string cannot parse, and `limit: 0` came back as fifty rows while `limit: -3` came back as
          one. A number that parses and is out of range is a question with an answer, which is
@@ -10132,7 +10147,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          register called tasks", which sends a person looking for a list that is only asleep. */
       /* HER OWN FILTER AND ORDER ARE READ WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), so naming one is a
          field the list does not have, and the rows come back without them (`sight.mask`). */
-      return offRegister(
+      const { fields: _picked, ...asked } = args;
+      const read = offRegister(
         args.register,
         sight.mask(
           ctx,
@@ -10140,7 +10156,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             ctx,
             marked(kernel.list(
               {
-                ...args,
+                ...asked,
                 reads: (register) => readable(ctx, register) === null,
                 /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole,
                    and one with a field hidden from her could be filtered by it. */
@@ -10152,6 +10168,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ),
         ),
       );
+      return Array.isArray(picked) && read.ok ? { ...read, value: { ...read.value, rows: read.value.rows.map((r) => onlyFields(r, picked)) } } : read;
     },
 
     /**

@@ -2382,6 +2382,8 @@ export function createClient(options: ClientOptions) {
        * live rows and nothing said. The host's table now decodes it, so it goes in the address like any other read.
        */
       includeDeleted?: boolean;
+      /** Only these fields of each row, its other columns kept: a walk for names need not carry every note. */
+      fields?: string[];
     }) => call<Page<unknown>>('list', args as Record<string, unknown>),
     /**
      * How many entries of one list hold each value of one field, in one read. `counts` is the most common values; `more`

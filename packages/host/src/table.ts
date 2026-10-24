@@ -110,7 +110,7 @@ const CORE_ROUTES: readonly Route[] = [
        answered the live rows alone, 200, nothing said, while the same read as a POST answered the deleted ones too.
        The CLI's import sent that POST by hand for want of this line. Decoded, `true` is `true`; a value that is not
        true or false is the record's to refuse (`record.list`), because read as false it is the same silent answer. */
-    takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json', includeDeleted: 'json' } },
+    takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json', includeDeleted: 'json', fields: 'json' } },
   /* ONE READ FOR EVERY PILL OF A FIELD: the list screen asked `list` once a value, a dozen requests before it settled. */
   { name: 'countBy', group: 'DATA', writes: false, what: 'How many entries of one list hold each value of one field.',
     takes: { register: 'text', by: 'text', where: 'json' } },
