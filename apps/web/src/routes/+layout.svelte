@@ -1254,7 +1254,7 @@
               working={workingOn}
               version={live.version}
               projects={projectsPlace?.href ?? null}
-              places={sidePlaces}
+              places={sidePlaces} workList={workCounted ? TASKS : null}
               owned={listsShown}
               views={sideViews}
               {tools}
@@ -1280,7 +1280,7 @@
               working={workingOn}
               version={live.version}
               projects={projectsPlace?.href ?? null}
-              places={sidePlaces}
+              places={sidePlaces} workList={workCounted ? TASKS : null}
               owned={listsShown}
               views={sideViews}
               {tools}
@@ -1332,7 +1332,7 @@
       {/if}
       {#if phoneProjects}
         <!-- ON A PHONE THE PROJECTS TAB IS THE SIDEBAR AS A PAGE: the projects, one fact each, then the lists. -->
-        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} places={sidePlaces} owned={listsShown} views={sideViews} {tools} heads={sideHeads} pen={sidePen} />{/if}
+        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} places={sidePlaces} workList={workCounted ? TASKS : null} owned={listsShown} views={sideViews} {tools} heads={sideHeads} pen={sidePen} />{/if}
       {:else}
         {@render children()}
       {/if}

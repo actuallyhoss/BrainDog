@@ -145,17 +145,25 @@ export async function readWeek(base: string, list: string, play: readonly SideRo
   );
 }
 
-/** The record's count of open work: what Work's head and its project chips say (`modules/work.ts`). */
-export const OPEN_WORK = 'tasks-in-play';
-
 /**
- * HOW MANY TASKS ARE OPEN, the record's own figure, for Work's row in the sidebar (`side.ts` `withOpenWork`). `null`
- * where the record has no such figure or the read did not land, and the row then says no number.
+ * HOW MANY ROWS OF A LIST ARE OPEN, for Work's row in the sidebar (`side.ts` `withOpenWork`): every row whose state is
+ * not one the list declares done, as Work's head and its project chips count them. Read off the declaration (its
+ * `state` and `done`) with one `countBy`, never by a figure's name. `null` where the list declares no state, the count
+ * was capped, or the read did not land, and the row then says no number.
  */
-export async function readOpenWork(base: string): Promise<number | null> {
+export async function readOpenWork(base: string, list: string): Promise<number | null> {
+  const d = REGISTERS[list] as { state?: string; done?: readonly string[] } | undefined;
+  if (!d?.state) return null;
   const out = await createClient({ base })
-    .metric(OPEN_WORK)
+    .countBy({ register: list, by: d.state })
     .catch(() => null);
-  const v = out?.ok ? (out.value as { value?: unknown } | null)?.value : undefined;
-  return typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (!out?.ok) return null;
+  return openOf(out.value, d.done ?? []);
+}
+
+/** The open rows of a `countBy` over a list's state: every one matched, less those in a done state. */
+export function openOf(counted: { counts: readonly { value: unknown; n: number }[]; matched: number; capped?: true }, done: readonly string[]): number | null {
+  if (counted.capped || !Number.isSafeInteger(counted.matched)) return null;
+  const closed = counted.counts.filter((c) => typeof c.value === 'string' && done.includes(c.value)).reduce((a, c) => a + c.n, 0);
+  return Math.max(0, counted.matched - closed);
 }

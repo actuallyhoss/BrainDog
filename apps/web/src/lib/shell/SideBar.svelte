@@ -39,6 +39,7 @@
     width = 248,
     phone = false,
     places = [],
+    workList = null,
     owned = [],
     views = [],
     tools = [],
@@ -61,6 +62,8 @@
     phone?: boolean;
     /** The places the bar leaves out (Work, People), each a row under Lists. */
     places?: readonly SideLink[];
+    /** The list Work counts, whose open rows its row says (audit Z8); `null` and the row says no number. */
+    workList?: string | null;
     /** The record's lists that hold something, the kernel's own marked; money's is read from each declaration. */
     owned?: readonly Omit<SideList, 'money'>[];
     /** The places' own views (Board under Work), drawn with the saved views. */
@@ -105,7 +108,7 @@
   /** The outline's rows, by how far each bar reaches. */
   const OUTLINE = ['62%', '48%', '56%'] as const;
   let week = $state.raw<Week>(new Map());
-  /* HOW MANY TASKS ARE OPEN, the record's figure, for Work's row (audit Z8): never the count of every row ever filed. */
+  /* HOW MANY TASKS ARE OPEN, for Work's row (audit Z8): never the count of every row ever filed. */
   let openWork = $state<number | null>(null);
   let asked = 0;
   $effect(() => {
@@ -127,14 +130,14 @@
           answered = true;
           /* WORK'S OPEN COUNT ASKED WITH THE WEEK'S FIGURES, so it goes in their wave and not as a read of its own. */
           if (got === null) {
-            const o = await readOpenWork(b);
+            const o = workList ? await readOpenWork(b, workList) : null;
             if (n === asked) openWork = o;
             return;
           }
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
           knowProjects(b, got.rows, projects);
           const play = splitOf(got.rows, got.lanes).play;
-          const [w, o] = await Promise.all([readWeek(b, got.list, play), readOpenWork(b)]);
+          const [w, o] = await Promise.all([readWeek(b, got.list, play), workList ? readOpenWork(b, workList) : null]);
           if (n !== asked) return;
           week = w;
           openWork = o;
