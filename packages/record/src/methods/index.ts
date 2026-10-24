@@ -167,6 +167,11 @@ export type RecordDeps = {
    */
   readsEveryList?: (ctx: CallContext) => boolean;
   /**
+   * Every installed page as `kernel.pages()` answers, held while the record's version stands (`pagesNow` in `index.ts`).
+   * Absent, the kernel is asked.
+   */
+  pagesNow?: () => ReturnType<Kernel['pages']>;
+  /**
    * Whether the caller reads every list a grant can reach, all of each (`readsAcross` in `index.ts`): `readsEveryList`
    * less the personal lists, which a read that can leave a list's lines out asks instead. Absent, `readsEveryList`.
    */

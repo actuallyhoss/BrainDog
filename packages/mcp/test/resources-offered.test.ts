@@ -143,16 +143,18 @@ test('ONE CALL TO offered, AND NO READ OF ANY RESOURCE: nothing drawn, no figure
 });
 
 test('AN ADDRESS THE RECORD DOES NOT DECIDE IS STILL READ BEFORE IT IS LISTED, and that is all that is read', async () => {
-  const { surface, calls } = offering();
+  /* THE BRIEFING, WHAT STOPPED, WHAT WENT STALE AND THE LEARNINGS ARE THE RECORD'S TO DECIDE NOW (bench 24 Oct, H1): each
+     was read whole to learn it answers. A stand-in that does not offer `stale` has it left out, and none of the four is read. */
+  const { surface, calls } = offering({ ...OFFER, fixed: OFFER.fixed.filter((a) => a !== 'stale') });
   const asked = (method: string) => async (_a: unknown, ctx: Ctx): Promise<Result<unknown>> => {
     calls.push({ method, args: undefined, ctx });
-    return method === 'stale' ? { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Not yours.' } } : { ok: true, value: {} };
+    return { ok: true, value: {} };
   };
   const more: McpSurface<Ctx> = { ...surface, briefing: asked('briefing'), exceptions: asked('exceptions'), stale: asked('stale'), learnings: asked('learnings'), about: asked('about') };
   const listed = (await tools(more).resources({ who: 'agent' })).map((r) => r.uri);
-  assert.deepEqual(calls.map((c) => c.method).sort(), ['briefing', 'exceptions', 'learnings', 'offered', 'stale', 'version'].sort());
+  assert.deepEqual(calls.map((c) => c.method).sort(), ['offered', 'version']);
   assert.ok(listed.includes('braindog:briefing') && listed.includes('braindog:learnings') && listed.includes('braindog:about'));
-  assert.equal(listed.includes('braindog:stale'), false, 'an address its reader refused is listed');
+  assert.equal(listed.includes('braindog:stale'), false, 'an address the record did not offer is listed');
 });
 
 test('A SURFACE WITHOUT offered, OR ONE THAT REFUSES IT OR ANSWERS NO SHAPE, IS LISTED THE OLD WAY', async () => {

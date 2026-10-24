@@ -1301,7 +1301,7 @@ const FIXED: readonly Resource[] = [
  * here is read before it is listed, as it always was: who may read it is still the record's to say, and it draws no page.
  */
 export const OFFERED_DECIDES: ReadonlySet<string> = new Set([
-  'whoami', 'boot', 'context', 'understand', 'handoffs', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
+  'whoami', 'boot', 'context', 'understand', 'handoffs', 'briefing', 'exceptions', 'stale', 'learnings', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
   'actions', 'automations', 'arrangement', 'grammar/page', 'grammar/register', 'grammar/metric', 'grammar/proposals',
   'grammar/ingest', 'grammar/kinds', 'grammar/script', 'grammar/automations',
 ]);
@@ -1315,6 +1315,10 @@ const SERVED_BY: Readonly<Record<string, keyof McpSurface<unknown>>> = {
   context: 'context',
   understand: 'understandPlan',
   handoffs: 'previewPage',
+  briefing: 'briefing',
+  exceptions: 'exceptions',
+  stale: 'stale',
+  learnings: 'learnings',
   'sessions/live': 'sessionsLive',
   inbox: 'inbox',
   'inbox/patterns': 'inboxPatterns',

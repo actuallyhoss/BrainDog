@@ -57,7 +57,8 @@ type Asks = 'record' | 'any' | 'every' | 'runs' | 'inbox';
  * - `record`: `guard(ctx, 'read')`. `whoami`, `actions`, `arrangement` and its grammars, and `version`, which the door
  *   asks before it answers the two grammars it keeps as its own text.
  * - `any`: `scoped(ctx, 'read')`, a read that filters its own answer. `boot`, `context`, `digestToday`, `governance`,
- *   `automations`, and `previewPage`, which draws `handoffs`.
+ *   `automations`, `briefing`, `exceptions`, `stale`, `learnings`, and `previewPage`, which draws `handoffs`. The four
+ *   before it were each read whole to learn that they answer, about half of `resources/list` on a record his size.
  * - `every`: `understandPlan`, for somebody who reads every list, on a record that can walk what it holds.
  * - `runs`: `sessionsLive`, a read of the list of runs by name.
  * - `inbox`: `inbox` and `inboxPatterns`.
@@ -68,6 +69,10 @@ const FIXED: readonly (readonly [string, Asks])[] = [
   ['context', 'any'],
   ['understand', 'every'],
   ['handoffs', 'any'],
+  ['briefing', 'any'],
+  ['exceptions', 'any'],
+  ['stale', 'any'],
+  ['learnings', 'any'],
   ['sessions/live', 'runs'],
   ['digest/today', 'any'],
   ['decisions', 'any'],
@@ -130,7 +135,8 @@ export function methods(deps: RecordDeps) {
     /* HELD FROM NO BLOCK, as `pages` asks it: every list read, and a level that reads. Her pages are not drawn to ask. */
     const everyList = deps.readsEveryList?.(ctx) === true && guard(ctx, 'read') === null;
     const out: OfferedPage[] = [];
-    for (const p of kernel.pages()) {
+    /* HELD WHILE THE VERSION STANDS when the record hands them so (`pagesNow`): resolving every page is most of this read. */
+    for (const p of deps.pagesNow?.() ?? kernel.pages()) {
       /* `seesPage`: any list the page draws from is one she reads, or it draws from none, and never a page about a row
          in a list she cannot read, whose title is that row's. */
       if (p.registers.length > 0 && p.registers.every((id) => readable(ctx, id) !== null)) continue;
