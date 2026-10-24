@@ -27,6 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
+    { version: '3.6.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
       version: '3.5.0',
       notes: 'The Dashboard draws the two numbers that moved most and lists the rest, as Numbers does, so both pages count the same. Its Organisations table leaves out the ones you put away.',
@@ -68,6 +69,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.27.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
       version: '2.26.0',
       notes: "A project page says when it was last worked on from its tasks and its agents' runs together, the time Projects and Today say.",

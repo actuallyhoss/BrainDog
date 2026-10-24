@@ -725,9 +725,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
  *   nothing taken away, so a minor step.
+ * - portfolio 1.27.0 (audit C of 25 October, X7): `page.portfolio` opens on an Add a project capture while nothing is
+ *   in play, under a line of its own where the record holds no project at all; the line saying none is in play draws
+ *   only while one is parked, and the one saying nothing needs a push only while one is in play, so a new record's
+ *   Projects is one line and one box. 1.26.0 is master's (Z7). Blocks added and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.26.0',
+  portfolio: '1.27.0',
   people: '3.8.0',
   'money-core': '3.22.0',
   estate: '2.4.0',

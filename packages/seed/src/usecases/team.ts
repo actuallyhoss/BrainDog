@@ -241,8 +241,12 @@ export const TEAM = {
 
      2.26.0, THE AUDIT OF 25 OCTOBER (Z7): the project page's Where it stands says Last worked from the record's own
      `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads. No id added or
-     taken away, and 2.25.0 is master's, so a minor step of its own. */
-  version: '2.26.0',
+     taken away, and 2.25.0 is master's, so a minor step of its own.
+
+     2.27.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
+     a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 2.26.0 is master's, so a minor
+     step of its own. */
+  version: '2.27.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

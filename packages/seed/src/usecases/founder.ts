@@ -502,8 +502,12 @@ export const FOUNDER = {
      3.5.0, THE AUDIT OF 25 OCTOBER (Y16 and Y2): the Dashboard's numbers draw the two that moved most and list up to forty,
      as Numbers' own page does, where they drew twelve charts, so the two pages count the same; and its Organisations table
      leaves out one People retired (`retired_on`, People 3.8.0). Two blocks reworded in their shape and none added or taken
-     away, and 3.4.0 is master's, so a minor step of its own. */
-  version: '3.5.0',
+     away, and 3.4.0 is master's, so a minor step of its own.
+
+     3.6.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
+     a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 3.5.0 is master's, so a minor
+     step of its own. */
+  version: '3.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

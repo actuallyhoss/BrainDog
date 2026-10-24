@@ -288,6 +288,36 @@ test("MARIAM'S RECORD TAKES SHOP WITH SMALL BUSINESS BESIDE IT, and the two inst
   sql.close();
 });
 
+test('A NEW SHOP\'S PROJECTS HAS NO LINE AND ONE BOX TO ADD A PROJECT, and a project in play brings one line back', async () => {
+  /* Audit C of 25 October: "No project is in play. Add one, or set a parked one building." in headline type with nothing
+     to press, and "Nothing needs a push." under it outside any card. */
+  const { k, sql } = await made(['shop', 'business'], false);
+  /* PROJECTS AS SIGN-UP ADDS IT BESIDE A SHOP, with no project in it. */
+  const holds = new Set([...held(k), ...firstPartyManifest('portfolio').provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
+  await put(k, moduleDocument(useCase('shop')!, 'portfolio', { today: TODAY, holds, examples: false }));
+  assert.equal(k.count('things'), 0);
+  const blocks = value<{ blocks: Drawn[] }>(k.page('portfolio')).blocks;
+  for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  const drawn = blocks.filter((b) => b.drawn !== false);
+  assert.deepEqual(
+    drawn.map((b) => b.body ?? `${b.kind} ${b.heading ?? ''}`),
+    ['No project yet. Add the first one below.', 'capture Add a project'],
+  );
+  /* ONE PARKED: the line says how to start and the box is still there. */
+  value(k.create('things', { name: 'Glaze trials', lane: 'parked' }, { actor: 'p_owner' }));
+  const parked = value<{ blocks: (Drawn & { lead?: boolean })[] }>(k.page('portfolio')).blocks.filter((b) => b.drawn !== false && b.kind !== 'cards');
+  assert.deepEqual(
+    parked.map((b) => b.body ?? b.heading),
+    ['No project is in play. Add one, or set a parked one building.', 'Add a project'],
+  );
+  /* ONE IN PLAY: one line, and no box. */
+  value(k.create('things', { name: 'Kiln room', lane: 'building' }, { actor: 'p_owner' }));
+  const live = value<{ blocks: (Drawn & { lead?: boolean })[] }>(k.page('portfolio')).blocks.filter((b) => b.drawn !== false);
+  assert.equal(live.filter((b) => b.kind === 'note' && b.lead === true).length, 1);
+  assert.ok(!live.some((b) => b.kind === 'capture'), 'the Add box stays once a project is in play');
+  sql.close();
+});
+
 /* NO SHOP WORD, NO SHOP: these are other use cases' sentences, and Shop is neither proposed nor put beside them. */
 const NOT_A_SHOP = [
   'I run a few companies and the agents on them',

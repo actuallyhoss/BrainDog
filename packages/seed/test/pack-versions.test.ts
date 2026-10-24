@@ -1936,6 +1936,26 @@ const DECLARED: Record<string, Version> = {
   /* NUMBERS HAS A PAGE OF ITS OWN (E26). 1.23.0 is master's and 1.24.0 another lane's, so a version of its own. One page
      added and nothing taken away. */
   /* THE AUDIT OF 25 OCTOBER (Z7): 1.25.0 IS MASTER'S, so a version of its own. One column changed, no id added. */
+  /* AUDIT C OF 25 OCTOBER (X7): 1.26.0 IS MASTER'S, so a version of its own. A block added, no id added. */
+  'portfolio@1.27.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: 'ecc0db684fe9dcc8',
+    history: [
+      "Portfolio 1.27.0 (audit C of 25 October, X7): `page.portfolio` opens on an Add a project capture over `register.things` while nothing is in play, its line saying none is in play draws only while one is parked, and the one saying nothing needs a push only while one is in play; no id added or taken away -> 02439153f3a25f54",
+      "Inside the unreleased 1.27.0 (audit C, X7): `page.portfolio` says one line of its own where the record holds no project at all, over the Add a project box -> ecc0db684fe9dcc8",
+    ],
+  },
   'portfolio@1.26.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

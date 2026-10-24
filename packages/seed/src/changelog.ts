@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.27.0',
+      notes: 'A record with no project in play opens Projects on a box to add one, under one line, and says how to set a parked one building only when one is parked.',
+    },
+    {
       version: '1.26.0',
       notes: "A project's card on Projects says when it was last worked on from its tasks and its agents' runs together, the same time its card on Today says.",
     },

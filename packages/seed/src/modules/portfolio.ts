@@ -1119,6 +1119,16 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          speaks when nothing is in play, and the one saying nothing needs you then has no clause left to say, so a page
          still reads one line. */
       {
+        /* A RECORD WITH NO PROJECT AT ALL, SINCE portfolio 1.27.0 (audit C of 25 October, X7): a new record's Projects
+           said "No project is in play. Add one, or set a parked one building." over nothing to press, and nothing was
+           parked. One line, and the Add a project box under it says how. No figure, so no line is asked of it. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { all: [{ metric: 'projects-live', is: 0 }, { metric: 'projects-parked', is: 0 }, { metric: 'projects-retired', is: 0 }] },
+        body: 'No project yet. Add the first one below.',
+      },
+      {
         /* THE ONE THING TO DO ON A PAGE WITH NOTHING IN PLAY, SINCE portfolio 1.13.0, which was In play's own empty line:
            a line is the one place a page says it is empty. FIRST OF THE THREE, because the record draws the one saying
            nothing needs you too over none in play, and the nightly line is written for the first line a page draws
@@ -1127,7 +1137,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'projects-live', is: 0 },
+        /* ONLY WHILE ONE IS PARKED, SINCE portfolio 1.27.0 (audit C of 25 October): a new record has none to set
+           building, so it said a step it could not take. The record with no project at all has the line before this. */
+        when: { all: [{ metric: 'projects-live', is: 0 }, { metric: 'projects-parked', gt: 0 }] },
         body: 'No project is in play. Add one, or set a parked one building.',
       },
       {
@@ -1150,12 +1162,25 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'projects-need-you', is: 0 },
+        /* AND ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.27.0 (audit C of 25 October): "Nothing needs a push." stood
+           under the line saying none is in play, a second line outside any card on a new record's Projects. */
+        when: { all: [{ metric: 'projects-need-you', is: 0 }, { metric: 'projects-live', gt: 0 }] },
         /* A PUSH AND NOT YOU, AND THE QUESTIONS SECOND, SINCE portfolio 1.17.0: "Nothing needs you" read false beside two
            questions waiting, and first they would put "Nothing" mid-line, since the writer never mends a capital.
            AND NO COUNT OF THE PROJECTS IN PLAY, inside the same 1.17.0 (PGS-C17): the strip under the line says it, with
            how it moved, and a figure is said once on a page. */
         body: 'Nothing needs a push, {{questions-open-in:things}} question(s) for you',
+      },
+      {
+        /* ONE BOX TO ADD A PROJECT WHILE NONE IS IN PLAY, SINCE portfolio 1.27.0 (audit C of 25 October): the page said
+           "Add one" with nothing to press. Under the line, as Work's box is under its own, and a project added here is
+           Building, the first of its lanes. */
+        kind: 'capture',
+        heading: 'Add a project',
+        icon: 'plus',
+        span: 12,
+        register: 'things',
+        when: { metric: 'projects-live', is: 0 },
       },
       /* NO IN PLAY AND EARNING STRIP, SINCE portfolio 1.18.0: a full-width tile saying "In play 3, Earning 2", which the line
          above already says. */

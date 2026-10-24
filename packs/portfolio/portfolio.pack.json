@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A project's card on Projects says when it was last worked on from its tasks and its agents' runs together, the same time its card on Today says.",
+  "changes": "A record with no project in play opens Projects on a box to add one, under one line, and says how to set a parked one building only when one is parked.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -216,7 +216,14 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "when": { "metric": "projects-live", "is": 0 },
+          "when": { "all": [ { "metric": "projects-live", "is": 0 }, { "metric": "projects-parked", "is": 0 }, { "metric": "projects-retired", "is": 0 } ] },
+          "body": "No project yet. Add the first one below."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "all": [ { "metric": "projects-live", "is": 0 }, { "metric": "projects-parked", "gt": 0 } ] },
           "body": "No project is in play. Add one, or set a parked one building."
         },
         {
@@ -230,8 +237,16 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "when": { "metric": "projects-need-you", "is": 0 },
+          "when": { "all": [ { "metric": "projects-need-you", "is": 0 }, { "metric": "projects-live", "gt": 0 } ] },
           "body": "Nothing needs a push, {{questions-open-in:things}} question(s) for you"
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a project",
+          "icon": "plus",
+          "span": 12,
+          "register": "things",
+          "when": { "metric": "projects-live", "is": 0 }
         },
         {
           "kind": "split",

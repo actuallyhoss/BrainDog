@@ -182,13 +182,21 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and the parked are
   for (const [n, t] of THINGS.entries()) if (inPlay(t)) assert.ok(k.update('things', `things#${n + 1}`, { lane: 'parked' }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'portfolio');
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true) as { body?: string; drawn?: boolean }[];
-  assert.equal(leads[0]!.drawn !== false, true, 'a page with nothing in play does not say so');
-  assert.equal(leads[0]!.body, 'No project is in play. Add one, or set a parked one building.');
-  /* THE ONE SAYING NOTHING NEEDS YOU IS SAID OF THE PROJECTS IN PLAY ALONE, so the writer leaves its one clause out over
-     none. The record still draws it, so it comes after the line with no figure: the nightly line is written for the
-     first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`), and asked of "across 0 projects" the
-     model's line would be drawn over this one saying the same. */
-  assert.equal(leads[2]!.body, 'Nothing needs a push, {{questions-open-in:things}} question(s) for you', 'the quiet line is not the one that leaves In play to the strip');
+  /* THE FIRST IS THE RECORD WITH NO PROJECT AT ALL, SINCE portfolio 1.27.0 (audit C, X7), which this is not. */
+  assert.equal(leads[0]!.drawn, false, 'a record with parked projects says it has none');
+  assert.equal(leads[1]!.drawn !== false, true, 'a page with nothing in play does not say so');
+  assert.equal(leads[1]!.body, 'No project is in play. Add one, or set a parked one building.');
+  /* THE ONE SAYING NOTHING NEEDS YOU IS SAID OF THE PROJECTS IN PLAY ALONE, and SINCE portfolio 1.27.0 (audit C, X7) it
+     draws only while one is in play: "Nothing needs a push." stood as a second line under this one. It still comes
+     after the line with no figure: the nightly line is written for the first line a page draws (`leadBlockOf` in
+     `packages/record/src/headlines.ts`), and asked of "across 0 projects" the model's line would be drawn over this one
+     saying the same. */
+  assert.equal(leads[3]!.body, 'Nothing needs a push, {{questions-open-in:things}} question(s) for you', 'the quiet line is not the one that leaves In play to the strip');
+  assert.deepEqual(
+    leads.filter((b) => b.drawn !== false).map((b) => b.body),
+    ['No project is in play. Add one, or set a parked one building.'],
+    'a page with nothing in play says two lines',
+  );
   const first = leads.find((b) => b.drawn !== false);
   assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
   /* THE PARKED ARE THE CARDS UNDER THE LANE BAR'S PARKED, SINCE the UI pass of 20 October (proj F5), so a page with
@@ -296,11 +304,12 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
   const overview = opened(k, 'portfolio');
 
   /* EXACTLY ONE OPENING SENTENCE DRAWS, the one its figure says: two projects on the sample are at risk or off track.
-     THE FIRST, SINCE portfolio 1.13.0, is the page with nothing in play, which the sample is not. */
+     THE FIRST, SINCE portfolio 1.27.0 (audit C, X7), is the record with no project at all, and the second, since 1.13.0,
+     the page with nothing in play; the sample is neither. */
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
-  assert.equal(leads.length, 3, 'the Overview declares its three opening sentences');
-  assert.deepEqual(leads.map((b) => b.drawn !== false), [false, true, false], 'one sentence and not two, or none');
-  assert.match(String((leads[1] as { body?: string }).body), /^\{\{questions-open-in:things\}\} question\(s\) for you, \{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
+  assert.equal(leads.length, 4, 'the Overview declares its four opening sentences');
+  assert.deepEqual(leads.map((b) => b.drawn !== false), [false, false, true, false], 'one sentence and not two, or none');
+  assert.match(String((leads[2] as { body?: string }).body), /^\{\{questions-open-in:things\}\} question\(s\) for you, \{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */
@@ -342,7 +351,8 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   assert.equal(JSON.stringify(row[1]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
   /* NO STRIP UNDER THE LINE SINCE BATCH 6: "In play 3, Earning 2" was a whole row for what the line says. */
   assert.ok(!blocks.some((b) => b.heading === 'In play and earning'), 'the strip is drawn again');
-  assert.equal(blocks.find((b) => !b.lead)?.heading, 'Where they are', 'the lanes are not the first under the line');
+  /* THE ADD A PROJECT BOX COMES BEFORE THEM, SINCE portfolio 1.27.0 (audit C, X7), drawn only while none is in play. */
+  assert.equal(blocks.find((b) => !b.lead && b.kind !== 'capture')?.heading, 'Where they are', 'the lanes are not the first under the line');
 
   const k = await seeded();
   const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;
