@@ -62,7 +62,7 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
-  import { cameFromOf, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
+  import { cameFromOf, foldsOpen, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, sharedState, stateOf, twinsOf, words as tileWords, type KeyGroup } from './tiles.ts';
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
 
@@ -77,9 +77,18 @@
   /* WHAT THE ADDRESS ASKED FOR (`?q=`, a service's page links here with its name), and the keys grouped by project and
      then by who they are with (`groupsOf`), the asked-for ones alone while it asks. */
   const asked = $derived(page.url.searchParams.get('q')?.trim() || null);
-  const shownKeys = $derived(keysFor(keys, asked));
+  /* AND WHAT IS TYPED IN THE BOX (Y26): 176 keys in one list were found by scrolling 22,900 px on a phone. */
+  let findText = $state('');
+  const finding = $derived(findText.trim() || asked || '');
+  const shownKeys = $derived(keysFor(keys, finding));
   const groups = $derived(groupsOf(shownKeys));
   const severalGroups = $derived(groups.length > 1 || (groups[0]?.services.length ?? 0) > 1);
+  /* EACH PROJECT FOLDS UNDER ITS NAME AND COUNT, and opens while a search is typed (`foldsOpen`). */
+  const unfolded = $derived(foldsOpen(groups, finding));
+  /* THE WORD EVERY KEY WITHOUT A VALUE HERE SHARES, said once over the list rather than under every row. */
+  const shared = $derived(sharedState(shownKeys));
+  /* THE KEYS THE RECORD HOLDS TWICE, by its own `heldTwice`, marked on their rows as Health counts them. */
+  let twins = $state<ReadonlySet<string>>(new Set());
   /** Where each key came from, by its row id, for the rows that say so (`cameFromOf`). */
   let cameFrom = $state<ReadonlyMap<string, string>>(new Map());
   /** Whether the record holds keys past the ones read: a page refused part way, or a read that met its ceiling. */
@@ -195,6 +204,7 @@
       moreKeys = credentials.more && credentials.rows.length > 0;
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
       void whoOpened();
+      void twinsRead();
       from = 'live';
       void scopeNote();
       /* THE PASSPHRASE IS ASKED ABOUT ONLY FOR A PERSON WHO MAY ACT HERE: its two methods are the vault gate's, as the
@@ -352,6 +362,14 @@
   async function whoOpened() {
     if (!client) return;
     lastBy = await lastUsers(client, keys);
+  }
+
+  /* THE TWINS, ASKED ONCE AFTER THE KEYS DREW: a refusal or a record that keeps no twins marks none. */
+  async function twinsRead() {
+    if (!client) return;
+    const out = await client.call('heldTwice', { register: 'credentials' }).catch(() => null);
+    const seqs = out?.ok ? (out.value as { seqs?: unknown } | null)?.seqs : null;
+    twins = twinsOf(keys, Array.isArray(seqs) ? seqs.filter((n): n is number => typeof n === 'number') : []);
   }
 
   /* ── putting a key in, and reading one back ── */
@@ -721,9 +739,26 @@
            the screen drew; nothing here at nought or on a refusal. -->
       {#if scope}<scope.Note found={scope.found} call={scope.call} />{/if}
       {#if asked}<p class="said">{tileWords.searched(asked, shownKeys.length)} <a href={at('/vault')}>{tileWords.everyKey}</a></p>{/if}
+      <!-- THE BOX THAT FINDS A KEY AS IT IS TYPED: its name, what it opens or who it is with. -->
+      {#if keys.length > 1}
+        <div class="find"><label class="vh" for="key-find">{tileWords.find}</label><input class="field-input find-input" id="key-find" type="search" autocomplete="off" placeholder={tileWords.find} bind:value={findText} /></div>
+      {/if}
+      {#if findText.trim() !== '' && shownKeys.length === 0}<p class="said">{tileWords.searched(findText.trim(), 0)}</p>{/if}
+      {#if shared}<p class="said">{tileWords.sharedSaid(shared)}</p>{/if}
       {#each groups as g (g.name)}
-      <section class="key-group" aria-label={g.name}>
-      {#if severalGroups}<h3 class="group-head">{#if g.scope}<ScopeChip scope={g.scope} inline />{:else}{g.name}{/if}</h3>{/if}
+      {#if severalGroups}
+        <details class="key-group" open={unfolded} aria-label={g.name}>
+          <summary class="group-head">{#if g.scope}<ScopeChip scope={g.scope} inline />{:else}{g.name}{/if} <span class="group-count">{tileWords.keysIn(g.services.reduce((n, sv) => n + sv.keys.length, 0))}</span></summary>
+          {@render groupKeys(g)}
+        </details>
+      {:else}
+        <section class="key-group" aria-label={g.name}>{@render groupKeys(g)}</section>
+      {/if}
+      {/each}
+    </div>
+  </Tile>
+
+  {#snippet groupKeys(g: KeyGroup)}
       {#each g.services as sv (sv.provider ?? '')}
       {#if severalGroups && sv.provider}<h4 class="service-head">{sv.provider}</h4>{/if}
       <ul class="ledger ledger-lead whos keys">
@@ -756,7 +791,8 @@
                   {#if !severalGroups}{#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}{/if}
                   {#if k.opens}{#if !severalGroups}<span class="sep" aria-hidden="true">{' · '}</span>{/if}<span class="key-opens" data-own>{opensInWords(k.opens, keys)}</span>{/if}
                   {#if hint}<span class="key-hint" data-own>{hint}</span>{/if}
-                  {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
+                  {#if !state.sealed && state.word !== shared}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
+                  {#if twins.has(k.id)}<span class="sep" aria-hidden="true">{' · '}</span><span class="twice">{tileWords.twice}</span>{/if}
                 </span>
               </span>
               <span class="key-count">
@@ -817,10 +853,7 @@
         {/each}
       </ul>
       {/each}
-      </section>
-      {/each}
-    </div>
-  </Tile>
+  {/snippet}
 
   <Tile icon="monitor" class="section" data-surface="tile" title={words.mayOpen} count={holding.length || undefined}>
     <div class="section-body">
@@ -1025,6 +1058,35 @@
     font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
+  }
+
+  /* A FOLDED PROJECT IS A LINE A THUMB OPENS: its name and how many keys, the whole line the target. */
+  summary.group-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
+    cursor: pointer;
+  }
+
+  .group-count {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+  }
+
+  .find {
+    margin: 0 0 var(--sp-3);
+  }
+
+  .find-input {
+    inline-size: 100%;
+  }
+
+  /* A KEY HELD TWICE, said in words beside what it opens. */
+  .twice {
+    color: var(--ink-2);
+    font-weight: 500;
   }
 
   .service-head {

@@ -50,6 +50,14 @@ export const words = {
   everyKey: 'Show every key',
   /* Over the keys, only when the read stopped before the record ran out of them. */
   moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. This record holds more.`,
+  /* THE BOX THAT FINDS A KEY AS IT IS TYPED (Y26), and how many keys each project's fold holds. */
+  find: 'Find a key',
+  keysIn: (n: number) => (n === 1 ? '1 key' : `${n} keys`),
+  /* A KEY THE RECORD HOLDS TWICE, as Health counts them. */
+  twice: 'Here twice',
+  /* A WORD EVERY KEY WITHOUT A VALUE HERE SHARES, said once over the list and not under every row. */
+  sharedSaid: (word: string) =>
+    word === 'Kept elsewhere' ? 'Keys with no value here are kept elsewhere.' : word === 'Out of service' ? 'Keys with no value here are out of service.' : `${word}.`,
 } as const;
 
 /** How many bars the tile draws; the rest of the keys are the list under it. */
@@ -240,4 +248,30 @@ export function opensInWords(text: string, keys: readonly KeyRow[], now: number 
       return whole.length > 10 ? sinceWords(whole, now) : relativeWords(day, now);
     })
     .replace(HANDLE, (whole) => named.get(whole) ?? whole);
+}
+
+/* ── found, folded and marked (Y26) ───────────────────────────────────── */
+
+/**
+ * WHETHER THE PROJECTS OPEN UNFOLDED: while a search is typed, so what it found shows, and where there is only one
+ * project, which has nothing to fold. Otherwise each project is its name and its count, and opens on a press.
+ */
+export const foldsOpen = (groups: readonly KeyGroup[], typed: string): boolean => typed.trim() !== '' || groups.length <= 1;
+
+/** The ids of the keys the record holds twice, from the numbers its `heldTwice` answered for the Keys list. */
+export function twinsOf(keys: readonly KeyRow[], seqs: readonly number[]): Set<string> {
+  const held = new Set(seqs.map((n) => `credentials#${n}`));
+  return new Set(keys.filter((k) => k.spoken !== null && held.has(k.spoken)).map((k) => k.id));
+}
+
+/**
+ * THE WORD EVERY KEY WITHOUT A VALUE HERE SHARES, when two or more do and they all say the same calm thing: "Kept
+ * elsewhere" under each of 176 rows said one fact 176 times. `null` where they differ, where one key alone says it, and
+ * for "No value yet", which keeps its ring and its words on each row since each one is a thing to see to.
+ */
+export function sharedState(keys: readonly KeyRow[]): string | null {
+  const states = keys.map(stateOf).filter((st) => !st.sealed);
+  if (states.length < 2 || states.some((st) => st.warn)) return null;
+  const word = states[0]!.word;
+  return states.every((st) => st.word === word) ? word : null;
 }
