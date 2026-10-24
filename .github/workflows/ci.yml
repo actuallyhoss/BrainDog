@@ -219,6 +219,9 @@ jobs:
       # `apps/web/build` is absent, which is every `test` leg, so only a job that builds first can
       # run it on every push.
       - run: node --test apps/web/test/csp.test.ts
+      # AND THE SHELL DRAWN FROM THE SERVICE WORKER'S COPY, in a browser over that build (scope 2026-10-24 A17),
+      # which skips without `apps/web/build` in every `test` leg for the same reason.
+      - run: node --test apps/web/test/shell-copy.browser.test.mjs
       # AND THE SELF-HOST SERVING THAT BUILD UNDER ITS APP PATH, which skips without `apps/web/build` in
       # every `test` leg for the same reason.
       - run: node --test apps/selfhost/test/app-path.test.ts
