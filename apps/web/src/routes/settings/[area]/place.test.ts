@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { AREAS, AREA_AT, DEFAULT_GROUPS, areaOf, ONLY_WIDE, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, indexBody, labelIn, type IndexBlock } from './place.ts';
+import { AREAS, AREA_AT, DEFAULT_GROUPS, areaOf, ONLY_WIDE, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, indexBody, labelIn, rowsOf, type IndexBlock } from './place.ts';
 
 const ids = (groups: ReturnType<typeof groupsOf>) => groups.map((g) => [g.title, g.areas.map((a) => a.id)]);
 const link = (heading: string, rows: string[][], more: Partial<IndexBlock> = {}): IndexBlock => ({
@@ -23,11 +23,10 @@ test('the house index is a page of link tiles, one for each group, each area onc
     SETTINGS_INDEX.blocks.map((b) => [b.kind, b.heading, typeof b.icon]),
     DEFAULT_GROUPS.map((g) => ['link', g.title, 'string']),
   );
-  const rows = SETTINGS_INDEX.blocks.flatMap((b) => b.authored ?? []);
+  const rows = SETTINGS_INDEX.blocks.flatMap((b) => b.authored ?? []).filter((r) => r.cells[1]!.startsWith(AREA_AT));
   assert.equal(rows.length, DEFAULT_GROUPS.flatMap((g) => g.areas).length);
   for (const r of rows) {
     assert.equal(r.cells.length, 4);
-    assert.ok(r.cells[1]!.startsWith(AREA_AT), `${r.cells[1]} is not a settings address`);
     assert.ok(AREAS.has(r.cells[1]!.slice(AREA_AT.length)));
     /* THE AREA'S OWN GLYPH RIDES WITH ITS ROW, so the index draws the well the chooser draws. */
     assert.equal(r.cells[3], AREAS.get(r.cells[1]!.slice(AREA_AT.length))!.icon);
@@ -40,6 +39,7 @@ test('the house body read back is the house groups, so the chooser and the index
 
 test('the one irreversible act is the last row of the last group', () => {
   assert.equal(DEFAULT_GROUPS.at(-1)?.areas.at(-1)?.id, 'delete');
+  assert.equal(rowsOf(DEFAULT_GROUPS.at(-1)!).at(-1)?.id, 'delete');
 });
 
 test('a person reorders, moves, renames and leaves out areas, and the chooser follows', () => {
@@ -116,11 +116,16 @@ test('every area this build declares has an arm in the page that draws it', () =
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });
 
-test('FIVE AREAS STAND ON TOP, EIGHT UNDER MORE AND DELETE ALONE LAST, and the design book is on no index but still opens at /design', () => {
-  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'More', 'Cannot be undone']);
-  assert.deepEqual(DEFAULT_GROUPS[0]!.areas.map((a) => a.id), ['appearance', 'navigation', 'words', 'notifications', 'agents']);
-  assert.deepEqual(DEFAULT_GROUPS[1]!.areas.map((a) => a.id), ['signing-in', 'people', 'ingest', 'keyboard', 'backups', 'health', 'billing', 'export']);
-  assert.deepEqual(DEFAULT_GROUPS[2]!.areas.map((a) => a.id), ['delete']);
+test('YOU, THIS BRAINDOG AND DATA (U-C9): six rows beside six, Data the whole width under them, Keys, Add-ons and Usage listed, Delete last', () => {
+  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'This BrainDog', 'Data']);
+  const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
+  assert.deepEqual(rows[0], ['Appearance', 'Navigation', 'Words and money', 'Notifications', 'Keyboard', 'Signing in']);
+  assert.deepEqual(rows[1], ['Agents', 'People & sharing', 'What comes in', 'Keys', 'Add-ons', 'Health']);
+  assert.deepEqual(rows[2], ['Backups', 'Usage', 'Billing', 'Export', 'Delete this record']);
+  assert.equal(rows[0]!.length, rows[1]!.length, 'the two columns side by side end together');
+  assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 12]);
+  const hrefs = SETTINGS_INDEX.blocks.flatMap((b) => (b.authored ?? []).map((r) => r.cells[1]));
+  for (const at of ['/vault', '/packs', '/usage']) assert.ok(hrefs.includes(at), at);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /param === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');

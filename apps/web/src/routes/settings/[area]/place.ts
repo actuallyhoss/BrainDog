@@ -36,8 +36,32 @@ export type Area = {
   readonly line: string;
 };
 
-/** One group of the index: its heading, its icon, and its areas in the order drawn. */
-export type AreaGroup = { readonly title: string; readonly icon: IconName; readonly areas: readonly Area[] };
+/**
+ * A row of the index that opens a page outside Settings (Keys is the vault, Add-ons the store, Usage its own page): its
+ * name, its address, its line and its glyph, and the area it stands before, or the group's end.
+ */
+export type Outside = { readonly label: string; readonly href: string; readonly icon: IconName; readonly line: string; readonly before?: string };
+
+/**
+ * One group of the index: its heading, its icon, its areas in the order drawn, the rows that open a page elsewhere, and
+ * how much of the page's width it takes (half, unless it says the whole).
+ */
+export type AreaGroup = { readonly title: string; readonly icon: IconName; readonly areas: readonly Area[]; readonly outside?: readonly Outside[]; readonly span?: number };
+
+/** One drawn row of a group: an area, at its address, or an outside row, at its own. */
+export type IndexRow = { readonly label: string; readonly href: string; readonly icon: IconName; readonly line: string; readonly id?: string };
+
+/** A group's rows in the order drawn: its areas, each outside row placed before the area it names or at the end. */
+export function rowsOf(g: AreaGroup): IndexRow[] {
+  const out: IndexRow[] = [];
+  const placed = new Set<Outside>();
+  for (const a of g.areas) {
+    for (const o of g.outside ?? []) if (o.before === a.id) (out.push(o), placed.add(o));
+    out.push({ label: a.label, href: `${AREA_AT}${a.id}`, icon: a.icon, line: a.line, id: a.id });
+  }
+  for (const o of g.outside ?? []) if (!placed.has(o)) out.push(o);
+  return out;
+}
 
 const area = (address: string, label: string, icon: IconName, line: string): Area => ({ id: address.slice(AREA_AT.length), label, icon, line });
 
@@ -52,52 +76,56 @@ const area = (address: string, label: string, icon: IconName, line: string): Are
  * scheme.
  */
 export const DEFAULT_GROUPS: readonly AreaGroup[] = [
-  /* FIVE ON TOP, SINCE BATCH 6 (call 6): what a person changes for themselves and reaches for. Appearance holds the theme,
-     the density and the accent; Navigation the phone bar and the order; Words what the lists are called; Notifications
-     when BrainDog interrupts; Agents the machines that work here. Sixteen areas stood in four groups before, against the
-     five agreed. */
+  /* THREE GROUPS SINCE 24 OCTOBER (U-C9): You, This BrainDog and Data. You and This BrainDog stand side by side, six
+     rows each, so both columns end together and no hole is left under the shorter; Data runs the whole width under them,
+     with Delete its last row. Keys, Add-ons and Usage, pages of their own, are listed here too, where they were in no
+     group at all. */
   {
     title: 'You',
     icon: 'sliders-horizontal',
     areas: [
       area('/settings/appearance', 'Appearance', 'sun', 'Theme, text size, density and accent'),
-      area('/settings/navigation', 'Navigation', 'rows', 'The phone bar, its order and hidden pages'),
+      area('/settings/navigation', 'Navigation', 'rows', 'What is in the sidebar and the bar'),
       area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
       area('/settings/notifications', 'Notifications', 'bell', 'When BrainDog interrupts you'),
-      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts, and the keys that are one letter'),
+      area('/settings/signing-in', 'Signing in', 'key', 'You, your passkeys and where you are signed in'),
     ],
   },
-  /* THE REST UNDER MORE, SEVEN SINCE THE UI PASS OF 20 OCTOBER (agents F14) less Delete: signing in (who you are, passkeys, where you
-     are signed in and the records you can open, which were three half-empty areas), sharing, what comes in, the keys, and what
-     the record keeps and costs. Pages is Navigation's now: the phone bar, the order and every page. Eight since Health
-     came off Today (23 October). */
+  /* WHAT THIS BRAINDOG HOLDS AND WHO WORKS IN IT: the agents, the people it is shared with, what comes in, the keys and
+     add-ons, and the record's own housekeeping (Health came off Today on 23 October). */
   {
-    title: 'More',
-    icon: 'archive',
+    title: 'This BrainDog',
+    icon: 'settings',
     areas: [
-      area('/settings/signing-in', 'Signing in', 'key', 'You, your passkeys and where you are signed in'),
+      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
       /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them (sharing plan §3.2). The
          sharing address opens it too (`MOVED`). */
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
-      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
-      /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
-      area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY (the audit of 22 October, U3): what it found wrong in its own pages
          and notes, what went stale, what it matched and learned. Read only when it is opened. */
       area('/settings/health', 'Health', 'heart-pulse', 'What the record found to tidy in itself'),
-      area('/settings/billing', 'Billing', 'money', 'What this record costs'),
-      area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
+    ],
+    outside: [
+      { label: 'Keys', href: '/vault', icon: 'vault', line: 'The keys your agents are handed', before: 'health' },
+      { label: 'Add-ons', href: '/packs', icon: 'packs', line: 'What is installed, and what to add', before: 'health' },
     ],
   },
-  /* THE ONE IRREVERSIBLE ACT IN A GROUP OF ITS OWN, LAST (UI audit of 22 October, 18). It was the last row of More, one
-     hairline under Export and Billing, and read as one more thing to look at. Its heading says what sets it apart. It
-     was the last section of `Export` before that: a destructive act reached by somebody looking for a backup is reached
-     by the person least expecting it. */
+  /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red (U-C9). It stood in a
+     group of its own, one row under a heading, and left a hole beside it the height of a tile. */
   {
-    title: 'Cannot be undone',
-    icon: 'alert',
-    areas: [area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good')],
+    title: 'Data',
+    icon: 'archive',
+    span: 12,
+    areas: [
+      /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
+      area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
+      area('/settings/billing', 'Billing', 'money', 'What this record costs'),
+      area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
+      area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good'),
+    ],
+    outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'What this record used this month', before: 'billing' }],
   },
 ];
 
@@ -151,9 +179,10 @@ export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexB
       kind: 'link',
       heading: g.title,
       icon: g.icon,
-      /* HALF THE PAGE EACH (agents F28): You and More side by side where the page is wide, one under another on a phone. */
-      span: 6,
-      authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line, a.icon] })),
+      /* HALF THE PAGE EACH (agents F28): You and This BrainDog side by side where the page is wide, one under another on
+         a phone; Data the whole width under them. */
+      span: g.span ?? 6,
+      authored: rowsOf(g).map((r) => ({ cells: [r.label, r.href, r.line, r.icon] })),
     })),
   };
 }

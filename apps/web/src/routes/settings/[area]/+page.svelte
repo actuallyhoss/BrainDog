@@ -660,13 +660,10 @@
     pointer-events: none;
   }
 
-  /* THE ONE IRREVERSIBLE ACT STANDS A STEP APART, 16 under the row before it, with no rule over it. */
-  .settings-index :global(.list[data-kind='link'] > .item:has(> a[href$='/settings/delete'])) {
-    margin-block-start: var(--sp-4);
-  }
-
-  .settings-index :global(.list[data-kind='link'] > .item:has(> a[href$='/settings/delete'])::before) {
-    display: none;
+  /* THE ONE IRREVERSIBLE ACT IS DATA'S LAST ROW, ITS NAME IN RED (U-C9), at the rows' own rhythm: the 16 it stood apart
+     by left a hole under a group of one. */
+  .settings-index :global(.list[data-kind='link'] > .item > a[href$='/settings/delete']) {
+    color: var(--red);
   }
 
   /* THE FALLBACK LIST BRINGS ITS OWN GUTTER (`.settings-place`), so the index does not add a second one round it. */
