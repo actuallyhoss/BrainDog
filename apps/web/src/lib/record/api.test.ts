@@ -1340,7 +1340,8 @@ test('and the projects past the cap are pages, still reachable, not pages that s
 test('the cap takes nothing off the rail at the size the record is today', () => {
   const now = boot().nav.map((n) => n.href);
   for (const p of Object.values(pages())) if (p.nav && p.placed !== false) assert.ok(now.includes(`/p/${p.page}`), `/p/${p.page} fell out of the rail`);
-  assert.equal(railRows('things').length, (ROWS.things ?? []).filter((t) => t.fields.lane === 'building' || t.fields.lane === 'earning').length);
+  /* EVERY PROJECT, A PARKED ONE TOO, SINCE 24 October (things, not rows): each has its page, so each is on the rail. */
+  assert.equal(railRows('things').length, (ROWS.things ?? []).length);
 });
 
 test('a page somebody wrote is never capped away by the rows of a register', async () => {

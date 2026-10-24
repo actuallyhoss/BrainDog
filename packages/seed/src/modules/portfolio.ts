@@ -1546,7 +1546,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'table',
         heading: 'Bills and invoices',
         icon: 'receipt',
-        span: 6,
+        /* THE WHOLE WIDTH SINCE 24 October (things, not rows), and so is Keeping it alive: a parked project's page, which
+           the look orders by what it has, put a half alone in a row of its own, beside a hole. */
+        span: 12,
         source: 'register.obligations',
         where: 'thing is {{name}}',
         /* THE AMOUNT CARRIES ITS OWN SIGN, because this block holds money in and money out, and a column of unsigned
@@ -1568,7 +1570,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Keeping it alive',
         icon: 'server',
-        span: 6,
+        span: 12,
         source: 'register.services',
         where: 'thing is {{name}}',
         columns: [

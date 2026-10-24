@@ -1629,9 +1629,10 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
-    declares: 'ad57bae127218aa1',
+    declares: 'e577287f526b4a1c',
     history: [
       'Founder 3.1.0 (things, not rows, 24 October): `page.project` is a template over every project, its `for:` no longer narrowed to those building or earning; no id added or taken away -> ad57bae127218aa1',
+      'Inside the unreleased 3.1.0: `page.project` draws Bills and invoices and Keeping it alive the whole width, where each was a half a parked project left beside a hole; no id added or taken away -> e577287f526b4a1c',
     ],
   },
   'team@2.19.0': {

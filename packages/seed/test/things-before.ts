@@ -20,9 +20,14 @@ const PAGES_ADDED: Readonly<Record<string, ReadonlySet<string>>> = {
 };
 
 /** A page over every project as a use case declared it before 24 October: only those building or earning had one. */
+const HALVES = new Set(['Bills and invoices', 'Keeping it alive']);
+
 const inPlay = (d: Body): Body => {
   const f = d.for as Body | undefined;
-  return f && f.register === 'things' && f.where === undefined ? { ...d, for: { register: 'things', where: 'lane is building or earning' } } : d;
+  if (!f || f.register !== 'things' || f.where !== undefined) return d;
+  /* AND ITS BILLS AND WHAT KEEPS IT ALIVE WERE HALVES, which the parked project's page left beside a hole. */
+  const blocks = Array.isArray(d.blocks) ? (d.blocks as Body[]).map((b) => (HALVES.has(String(b.heading)) && b.span === 12 ? { ...b, span: 6 } : b)) : d.blocks;
+  return { ...d, for: { register: 'things', where: 'lane is building or earning' }, ...(blocks === undefined ? {} : { blocks }) };
 };
 
 /** A use case's document as the version before things, not rows declared it: its project pages for those in play alone. */

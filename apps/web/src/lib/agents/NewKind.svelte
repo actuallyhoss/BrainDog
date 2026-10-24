@@ -239,7 +239,8 @@
   }
 
   .preset[data-on] {
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+    outline: 1.5px solid var(--ink);
+    outline-offset: -1.5px;
   }
 
   .preset input {

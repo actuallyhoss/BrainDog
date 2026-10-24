@@ -379,7 +379,7 @@ export function keysOf(
         grant: grant ? grant.id : null,
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
-        provider: typeof r.fields.provider === 'string' && r.fields.provider.trim() !== '' ? r.fields.provider.trim() : null,
+        ...(typeof r.fields.provider === 'string' && r.fields.provider.trim() !== '' ? { provider: r.fields.provider.trim() } : {}),
         project,
         scope,
         sealed,
