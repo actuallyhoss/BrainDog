@@ -15,6 +15,13 @@ import assert from 'node:assert/strict';
 import type { CtxHost, ScriptAnswer, ScriptDecl } from '../src/index.ts';
 import { runInQuickJs } from '../src/quickjs.ts';
 
+/* THE THREAD'S OWN CPU, in milliseconds, which is what cpu_ms meters (`threadCpu` in `quickjs.ts`): a refusal at cpu_ms
+   is held to the CPU spent before it came, since on a loaded machine the wall it took is mostly waiting for a core. */
+const cpuNow = (): number => {
+  const u = process.threadCpuUsage();
+  return (u.user + u.system) / 1_000;
+};
+
 const decl = (source: string, over: Partial<ScriptDecl> = {}): ScriptDecl => ({ id: 'folds', version: 1, egress: [], keys: [], reads: [], writes: ['seen'], source, ...over });
 
 const host = (fold?: (text: string) => Promise<string | null>): CtxHost & { folded: string[] } => {
@@ -85,15 +92,15 @@ test('a fold the host refuses is an error the script may catch, and no rule is b
    of the host function and after the decode can end it. */
 test('time spent handing ctx.fold its text is the script\'s CPU and is refused at cpu_ms', async () => {
   const h = host(async () => null);
-  const t = performance.now();
+  const t = cpuNow();
   const a = await runInQuickJs(
     decl(`export default async function run(ctx) { const s = 'x'.repeat(8 * 1024 * 1024); for (let i = 0; i < 100; i++) await ctx.fold(s); }`, { limits: { cpu_ms: 200 } }),
     h,
   );
-  const took = performance.now() - t;
+  const took = cpuNow() - t;
   assert.ok('refused' in a, `expected a refusal, got ${JSON.stringify(a).slice(0, 200)}`);
   assert.equal(a.refused.code, 'OUT_OF_BOUNDS');
   assert.match(a.refused.why, /cpu_ms of 200/u);
   assert.ok(h.folded.length < 100, `${h.folded.length} folds reached the host`);
-  assert.ok(took < 2 * 200 + 400, `took ${Math.round(took)} ms`);
+  assert.ok(took < 2 * 200 + 400, `took ${Math.round(took)} ms of CPU`);
 });

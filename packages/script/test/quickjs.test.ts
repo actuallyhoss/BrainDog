@@ -14,6 +14,13 @@ import { runInQuickJs } from '../src/quickjs.ts';
 
 const ORIGIN = 'https://api.gold.example';
 
+/* THE THREAD'S OWN CPU, in milliseconds, which is what cpu_ms meters (`threadCpu` in `quickjs.ts`): a refusal at cpu_ms
+   is held to the CPU spent before it came, since on a loaded machine the wall it took is mostly waiting for a core. */
+const cpuNow = (): number => {
+  const u = process.threadCpuUsage();
+  return (u.user + u.system) / 1_000;
+};
+
 const decl = (source: string, over: Partial<ScriptDecl> = {}): ScriptDecl => ({
   id: 'gold-rate',
   version: 1,
@@ -89,11 +96,11 @@ test('a loop at the top of the module, before any export runs, is refused the sa
 });
 
 test('cpu_ms stops a busy script well before its wall_ms', async () => {
-  const t = performance.now();
+  const t = cpuNow();
   const a = await runInQuickJs(decl('export default function run() { let x = 0; for (;;) x++ }', { limits: { cpu_ms: 100, wall_ms: 10_000 } }), host());
   const r = refusedOf(a);
   assert.match(r.why, /cpu_ms of 100/u);
-  assert.ok(performance.now() - t < 1_000);
+  assert.ok(cpuNow() - t < 1_000);
 });
 
 test('a fetch the host never answers is refused at wall_ms, because nothing is left to interrupt', async () => {
@@ -125,30 +132,30 @@ test('waiting on the host is not CPU: a slow answer inside wall_ms is a normal r
    `JSON.parse`. A probe measured this exact script, at the default limits, answer clean
    with 1,048,577,600 bytes queued and `cpu_ms: 6777` in its own usage. */
 test('time spent inside ctx.write is the script\'s CPU and is refused at cpu_ms', async () => {
-  const t = performance.now();
+  const t = cpuNow();
   const a = await runInQuickJs(
     decl(`export default function run(ctx) { const s = 'x'.repeat(5 * 1024 * 1024); for (let i = 0; i < 200; i++) ctx.write('series.gold-egp', { s }) }`),
     host(),
   );
-  const took = performance.now() - t;
+  const took = cpuNow() - t;
   const r = refusedOf(a);
   assert.equal(r.code, 'OUT_OF_BOUNDS');
   assert.match(r.why, /cpu_ms of 200/u);
-  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms`);
+  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms of CPU`);
 });
 
 /* The same shape through `ctx.log`: the log is cut to 8 KB, but each call copied the whole 8 MB
    onto the host first, and a probe's thousand of them were refused only after 16,930 ms against
    a cpu_ms of 1,000. */
 test('time spent inside ctx.log is refused at cpu_ms, although the log itself is cut', async () => {
-  const t = performance.now();
+  const t = cpuNow();
   const a = await runInQuickJs(
     decl(`export default function run(ctx) { const s = 'x'.repeat(8 * 1024 * 1024); for (let i = 0; i < 100; i++) ctx.log(s) }`, { limits: { cpu_ms: 200 } }),
     host(),
   );
-  const took = performance.now() - t;
+  const took = cpuNow() - t;
   assert.match(refusedOf(a).why, /cpu_ms of 200/u);
-  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms`);
+  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms of CPU`);
 });
 
 /* NO HOST CALL AND NO INTERRUPT. `JSON.stringify` of two 3 MB strings is one native call inside
@@ -191,17 +198,17 @@ test('a host answer that arrives past wall_ms is refused, not handed on to the s
    and the host read it outside every CPU slice, so the handler checked only the deadline. A
    probe spun for its whole 3,000 ms wall_ms and was metered at `cpu_ms: 12`. */
 test('a getter that spins while the host reads the thrown error is the script\'s CPU', async () => {
-  const t = performance.now();
+  const t = cpuNow();
   const a = await runInQuickJs(
     decl(`export default async function run(ctx) { await ctx.fetch('${ORIGIN}/'); throw { get message() { for (;;) {} } } }`, { limits: { cpu_ms: 100, wall_ms: 3_000 } }),
     host(),
   );
-  const took = performance.now() - t;
+  const took = cpuNow() - t;
   const r = refusedOf(a);
   assert.equal(r.code, 'OUT_OF_BOUNDS');
   assert.match(r.why, /cpu_ms of 100/u);
   assert.ok(a.usage.cpu_ms >= 100, `metered ${a.usage.cpu_ms} ms`);
-  assert.ok(took < 1_000, `took ${Math.round(took)} ms`);
+  assert.ok(took < 1_000, `took ${Math.round(took)} ms of CPU`);
 });
 
 /* ── Memory ───────────────────────────────────────────────────────────────────────────────────── */

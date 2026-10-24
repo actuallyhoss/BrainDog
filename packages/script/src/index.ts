@@ -152,8 +152,9 @@ export interface CtxHost {
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
   /**
-   * THE CLOCK BOTH METERS READ, wall_ms AND cpu_ms, in milliseconds from any fixed start. Absent, it is the machine's
-   * (`performance.now()`), and that is what a real run gets. A NAME OF ITS OWN BECAUSE `now` IS TAKEN: that is the
+   * THE CLOCK BOTH METERS READ, wall_ms AND cpu_ms, in milliseconds from any fixed start. Absent, wall_ms reads the
+   * machine's (`performance.now()`) and cpu_ms the thread's own CPU where the runtime can say (`threadCpu` in
+   * `quickjs.ts`), and that is what a real run gets. A NAME OF ITS OWN BECAUSE `now` IS TAKEN: that is the
    * instant a row is stamped with, an ISO string, and this is a meter's reading.
    *
    * A test that is not about limits hands a clock that does not move, so a busy machine cannot trip a limit the test

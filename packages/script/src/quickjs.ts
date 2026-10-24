@@ -11,8 +11,8 @@
  *            against the run's promise while it waits on a host call. The interrupt alone would
  *            let a script that awaits a fetch the host never answers wait forever, because nothing
  *            is being interpreted to interrupt.
- *   cpu_ms   the time spent inside the interpreter, summed over every slice (the first evaluation,
- *            and each `executePendingJobs` after a host call settles). Time waiting on the host is
+ *   cpu_ms   the thread's CPU spent inside the interpreter, summed over every slice (the first evaluation,
+ *            and each `executePendingJobs` after a host call settles; `threadCpu`). Time waiting on the host is
  *            not the script's CPU, and a Dynamic Worker's `cpuMs` does not count it either. A host
  *            function called from a slice is inside it: copying what the script handed across is
  *            work the script asked for.
@@ -99,9 +99,37 @@ const Wasm = (globalThis as unknown as {
   };
 }).WebAssembly;
 
+/**
+ * THE THREAD'S OWN CPU, IN MILLISECONDS, which is what `cpu_ms` meters, or `null` where the runtime cannot say.
+ *
+ * A SLICE TIMED ON THE WALL CLOCK WAS THE MACHINE'S BUSYNESS AS MUCH AS THE SCRIPT'S. The interpreter runs on this
+ * thread and nowhere else, so the thread's CPU across a slice is exactly the script's; a slice timed with
+ * `performance.now()` also counted every moment the thread sat waiting for a core. On a loaded machine the cost script
+ * of `fx-rate` was refused at `cpu_ms: 219` of 200 in a run whose wall was 297 ms, and the same run alone spends a few.
+ * Node's `process.threadCpuUsage` (24) is user and system time in microseconds. Asked once here, since a runtime that
+ * names it but does not carry it out throws, and then the wall clock meters as it did.
+ */
+const threadCpu = ((): (() => number) | null => {
+  const proc = (globalThis as { process?: { threadCpuUsage?: () => { user: number; system: number } } }).process;
+  const usage = proc?.threadCpuUsage;
+  if (typeof usage !== 'function') return null;
+  const read = (): number => {
+    const u = usage.call(proc);
+    return (u.user + u.system) / 1_000;
+  };
+  try {
+    read();
+    return read;
+  } catch {
+    return null;
+  }
+})();
+
 export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<ScriptAnswer> {
   /* EVERY READING OF TIME GOES THROUGH THE HOST'S CLOCK, the machine's when it names none (`CtxHost.clock`). */
   const clock = host.clock?.bind(host) ?? ((): number => performance.now());
+  /* AND THE ONE `cpu_ms` READS: the thread's CPU, or the host's clock when it hands one, so a test holds both meters. */
+  const cpuClock = host.clock === undefined ? (threadCpu ?? clock) : clock;
   const started = clock();
   const usage: ScriptUsage = { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 };
   const writes: ScriptWrite[] = [];
@@ -184,9 +212,8 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
    * and the end of the run all ask this same question.
    */
   const overBudget = (): ScriptRefusal | null => {
-    const now = clock();
-    if (now > deadline) return wallRefusal;
-    if (cpu + (slice === null ? 0 : now - slice) > limits.cpu_ms) return cpuRefusal;
+    if (clock() > deadline) return wallRefusal;
+    if (cpu + (slice === null ? 0 : cpuClock() - slice) > limits.cpu_ms) return cpuRefusal;
     return null;
   };
 
@@ -207,12 +234,12 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   /** Every entry into the interpreter goes through here, so the CPU budget sees all of it. */
   const inVm = <T>(fn: () => T): T => {
     const outer = slice === null;
-    if (outer) slice = clock();
+    if (outer) slice = cpuClock();
     try {
       return fn();
     } finally {
       if (outer && slice !== null) {
-        cpu += clock() - slice;
+        cpu += cpuClock() - slice;
         slice = null;
       }
     }
