@@ -37,6 +37,13 @@
   const ENTER_HELD_MS = 900;
   /** Whether this tab's first Today has taken what `boot` said was new: only that read can, as `boot` is that old. */
   let bootNewsTaken = false;
+  /* THE PAGE READER, LOADED BESIDE TODAY'S FIRST READ AND NOT IN FRONT OF IT (scope 2026-10-24 A19): it brings every
+     block kind's code, and a static import put all of it on the cold open's path before Today's head could draw. Asked
+     once, when this module is first evaluated, so it is on its way while the page is read; held for every later Today. */
+  let pageViewIs: Promise<typeof import('$lib/page/PageView.svelte')> | null = null;
+  /** The reader once landed, so a later Today draws it at once and not a turn after. */
+  let pageViewHad: (typeof import('$lib/page/PageView.svelte'))['default'] | null = null;
+  const pageViewOf = () => (pageViewIs ??= import('$lib/page/PageView.svelte').then((m) => ((pageViewHad = m.default), m)));
 </script>
 
 <script lang="ts">
@@ -56,7 +63,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
-  import PageView from '$lib/page/PageView.svelte';
+  import type PageViewOf from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
@@ -121,6 +128,10 @@
   import type { Near } from '$lib/data/local.ts';
 
   let { data }: { data: Shell } = $props();
+
+  /* THE READER ONCE ITS CODE HAS LANDED (`pageViewOf`), drawn where it is the moment it has. */
+  let PageView = $state.raw<typeof PageViewOf | null>(pageViewHad);
+  if (PageView === null) void pageViewOf().then((m) => (PageView = m.default), () => undefined);
 
   /* WHAT HE HAS SHARED OUT, for the one line in Needs you's foot (`shared-line.ts`): asked once the screen is idle, an
      owner's alone, and never a part of `boot`, which an owner is answered as before sharing. */
@@ -1129,7 +1140,7 @@
       {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
            desk the parts that are the desk's own stand among its tiles, in the order they are seen (`amid`). -->
-      {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
+      {#if reader && PageView}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
       <!-- THE PARTS NO TILE OF THE PAGE COMES AFTER. -->
       {#if board}{@render placedParts(anchors.tail)}{/if}
     </div>

@@ -26,7 +26,8 @@
     "bundle.firstLoadJsBrotli": {
       "kind": "ceiling",
       "lines": [
-        { "at": 640000, "on": "2026-10-22", "why": "What a cold open of Today waits for, measured at 639,093 brotli once the kernel, the seed's documents and the decision card left its path (759,591 before), with under a kilobyte of room. It only falls.", "by": "22 section 9" }
+        { "at": 640000, "on": "2026-10-22", "why": "What a cold open of Today waits for, measured at 639,093 brotli once the kernel, the seed's documents and the decision card left its path (759,591 before), with under a kilobyte of room. It only falls.", "by": "22 section 9" },
+        { "at": 338700, "on": "2026-10-24", "why": "Today loads the page reader beside its first read, not before it: measured at 337,717 brotli (about 625,000 before), with under a kilobyte of room. It only falls.", "by": "scope 2026-10-24 A19" }
       ]
     },
     "bundle.mainCssBrotli": {
