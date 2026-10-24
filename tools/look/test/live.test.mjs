@@ -151,12 +151,14 @@ test('a live look writes only under loop/proof/looks', () => {
   assert.throws(() => outFor(source, join(tmpdir(), 'elsewhere')), /writes only under loop\/proof\/looks/u);
 });
 
-test('a read sent as a POST goes on, and the two write-marked routes that are reads are the only ones that do', () => {
+test('a read sent as a POST goes on, and the three write-marked routes that are reads are the only ones that do', () => {
   const posts = ROUTES.filter((r) => r.writes && r.postRead && READING.has(r.group)).map((r) => r.name);
   /* `reads` IS SEVERAL READS IN ONE POST (scope 2026-10-24 A6), and the host refuses any write inside it, so it goes on. */
-  assert.deepEqual(posts.sort(), ['previewPage', 'reads']);
+  /* `today` IS TODAY'S TILES IN ONE READ (scope 2026-10-24 A12), each part asked as its own method would be, so it goes on. */
+  assert.deepEqual(posts.sort(), ['previewPage', 'reads', 'today']);
   assert.ok(allowed().has('previewPage'));
   assert.ok(allowed().has('reads'));
+  assert.ok(allowed().has('today'));
   /* THE SHARE SHEET'S PREVIEW IS A READ SENT AS A POST TOO, so See as may ask it, and it is ADMIN, so it never goes on. */
   assert.ok(ROUTES.some((r) => r.name === 'sharePreview' && r.postRead));
   assert.ok(!allowed().has('sharePreview'));
