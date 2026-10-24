@@ -433,15 +433,17 @@ const okValue = <T>(r: unknown, what: string): T => {
  * Build the record. `seed` picks the words and the order of nothing else, so two builds are the same record with
  * different ids. `file` keeps it on disk, as a `.brain` the drill (`tools/drill/leak-on-copy.mjs`) can open a copy of.
  */
-export async function build(options: { seed?: number; shapes?: readonly Shape[]; file?: string } = {}) {
+/* `keys` and `sign` MAKE A RECORD THAT SIGNS ITS EXPORTS, as a host's does, for a test that restores one (the leak
+   drill on an export, `tools/drill/drill.test.mjs`). Without them the record is as it always was. */
+export async function build(options: { seed?: number; shapes?: readonly Shape[]; file?: string; keys?: Record<string, unknown>; sign?: Parameters<typeof createRecordApi>[0]['sign'] } = {}) {
   const sql: NodeSql = openSqlite(options.file);
   const clock = fixedClock(NOW);
-  const api: Api = await createRecordApi({ sql, clock, invitations: () => null });
+  const api: Api = await createRecordApi({ sql, clock, invitations: () => null, ...(options.sign ? { sign: options.sign } : {}) });
   const mint = minter(options.seed ?? 0x5eed);
   const prime = primes();
   const owner: CallContext = { principal: { kind: 'person', id: OWNER, level: 'owner' }, credentialed: true };
 
-  okValue(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: OWNER, email: 'ada@example.com' } }), 'createRecord');
+  okValue(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: OWNER, email: 'ada@example.com' }, ...(options.keys ? { keys: options.keys as never } : {}) }), 'createRecord');
   okValue(await api.kernel.install([...LISTS, ...METRICS]), 'install');
 
   const rows = new Map<string, RowInfo>();

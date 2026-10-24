@@ -1,7 +1,14 @@
 /**
  * The leak matrix on a real record (sharing plan §4.5, §6 step 4), run on a copy and never on the file itself.
  *
- *   node tools/drill/leak-on-copy.mjs <record.brain>
+ *   node tools/drill/leak-on-copy.mjs <record.brain | export.brainl>
+ *
+ * ON HIS RECORD (G2): `braindog export -o ~/Desktop/record.brainl` (he approves the export in the browser, the one
+ * step only he can take), then `node tools/drill/leak-on-copy.mjs ~/Desktop/record.brainl`. A `.brainl` is restored
+ * first by this checkout's own `braindog init --from` into a throwaway data folder (`restoreCopy`), with none of his
+ * shell's BRAINDOG_ variables, so it opens no root key of his and reaches no host. Nothing is sent anywhere, and the
+ * export and the restored folder are the only copies. A file inside this repository is refused, so a copy of a real
+ * record never sits where a commit could take it.
  *
  * 1. Copies the file (and its `-wal` beside it) into a fresh temporary folder and opens the copy in process.
  * 2. For each share template (`packages/kernel/src/share-templates.ts`) makes a real share for a fake guest, through the
@@ -23,15 +30,46 @@
  * `KNOWN` lists the routes a known gap holds open, and the matrix closed every one (`leak-matrix.test.ts`).
  */
 
+import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createRecordApi } from '../../packages/record/src/index.ts';
 import { ROUTES, handlersFor } from '../../packages/host/src/index.ts';
 import { sessionContext } from '../../packages/host/src/auth.ts';
 import { SHARE_TEMPLATES } from '../../packages/kernel/src/share-templates.ts';
 import { openSqlite } from '../../packages/kernel/test/sqlite.ts';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SELFHOST = join(ROOT, 'apps', 'selfhost', 'src', 'main.ts');
+
+/** Whether a path is inside this repository, where a copy of a real record must never be kept. */
+export const inRepository = (path) => {
+  const rel = relative(ROOT, resolve(path));
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+};
+
+/**
+ * An export (`.brainl`) restored into a throwaway data folder by this checkout's `braindog init --from`, as a host
+ * restores one: `{ data, file }`, the folder to remove and the `record.brain` in it. HIS SHELL'S BRAINDOG_ VARIABLES ARE
+ * LEFT OUT, so the restore makes a root key of its own in the folder and never reads his, never starts another
+ * self-host and never names an owner. Throws with the restore's own last lines when it refuses the file.
+ */
+export function restoreCopy(file) {
+  const data = mkdtempSync(join(tmpdir(), 'leak-on-copy-restore-'));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toUpperCase().startsWith('BRAINDOG_')));
+  env.BRAINDOG_DATA = data;
+  const run = spawnSync(process.execPath, [SELFHOST, 'init', 'leak-drill', '--from', resolve(file)], { encoding: 'utf8', env });
+  const made = join(data, 'leak-drill', 'record.brain');
+  if (run.status !== 0 || !existsSync(made)) {
+    rmSync(data, { recursive: true, force: true });
+    const said = `${run.stderr ?? ''}`.trim().split('\n').slice(-3).join(' ');
+    throw new Error(`braindog init --from refused ${basename(file)} (exit ${String(run.status)})${said ? `: ${said}` : ''}`);
+  }
+  return { data, file: made };
+}
 
 /** The routes a known gap holds open, and the gap. None: the matrix closed G1 to G8. */
 export const KNOWN = {};
@@ -223,6 +261,16 @@ function argsFor(route, lists, sample, words, pages, figures) {
 export async function drill(file) {
   const source = resolve(file);
   if (!existsSync(source)) throw new Error(`There is no file at ${source}.`);
+  if (inRepository(source)) throw new Error(`${source} is inside this repository. Keep a copy of a record outside it, such as on the Desktop, and name it there.`);
+  /* AN EXPORT IS RESTORED FIRST, and the drill reads the record that restore wrote, on a copy of its own as ever. */
+  if (source.endsWith('.brainl')) {
+    const restored = restoreCopy(source);
+    try {
+      return { ...(await drill(restored.file)), file: source };
+    } finally {
+      rmSync(restored.data, { recursive: true, force: true });
+    }
+  }
   const dir = mkdtempSync(join(tmpdir(), 'leak-on-copy-'));
   const copy = join(dir, basename(source));
   copyFileSync(source, copy);
@@ -354,7 +402,7 @@ function safeJson(text) {
 if (import.meta.main) {
   const file = process.argv[2];
   if (!file) {
-    console.error('  leak-on-copy: name a record file, such as node tools/drill/leak-on-copy.mjs ~/braindog/record.brain');
+    console.error('  leak-on-copy: name a record file or an export, such as node tools/drill/leak-on-copy.mjs ~/Desktop/record.brainl');
     process.exitCode = 2;
   } else {
     const report = await drill(file);

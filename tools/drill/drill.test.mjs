@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,7 +20,9 @@ import { planFor, stranger } from '../canary/lane.d/60-stranger.mjs';
 import { close, erase, fileDelete, soleOwnerFix, sweep } from './ends.mjs';
 import { argsOf, ORDER, runDrill } from './run.mjs';
 import { capturedMail, drill, NOTE } from './steps.mjs';
-import { countsWorking, drill as leakDrill, hiddenAmounts, KNOWN } from './leak-on-copy.mjs';
+import { countsWorking, drill as leakDrill, hiddenAmounts, inRepository, KNOWN } from './leak-on-copy.mjs';
+import { openKeyStore, recordKeys } from '../../apps/selfhost/src/keys.ts';
+import { signerFor } from '../../apps/selfhost/src/sign.ts';
 import { build as leakRecord } from '../../packages/record/test/leak/fixture.ts';
 import { openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { SHARE_TEMPLATES } from '../../packages/kernel/src/share-templates.ts';
@@ -294,6 +296,37 @@ test('THE LEAK DRILL MAKES EVERY TEMPLATE A REAL SHARE AND FINDS NOTHING on the 
     const run = leakCli(file);
     assert.equal(run.status, 0, run.stdout + run.stderr);
     assert.match(run.stdout, /6 share\(s\), 0 leak\(s\)/u);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('THE LEAK DRILL TAKES AN EXPORT: a .brainl is restored into a throwaway folder and drilled, and a file in the repository is refused', async () => {
+  /* SIGNED AS A HOST SIGNS ITS NIGHTLY COPY, under a root key of the test's own, since a restore takes no unsigned file. */
+  const dir = mkdtempSync(join(tmpdir(), 'leak-drill-test-'));
+  try {
+    const store = await openKeyStore(join(dir, 'kek'));
+    const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
+    let signer = null;
+    const built = await leakRecord({ file: join(dir, 'studio.brain'), shapes: [], keys: await recordKeys(store, REC), sign: async (bytes) => (signer ? signer(bytes) : null) });
+    signer = await signerFor(built.sql, store, REC);
+    assert.ok(signer, 'the fixture has no signing key');
+    const out = await built.api.kernel.export({ redactGrants: false, actor: 'system' });
+    assert.ok(out.ok, JSON.stringify(out));
+    built.sql.close();
+    const brainl = join(dir, 'studio.brainl');
+    writeFileSync(brainl, `${out.value.join('\n')}\n`);
+    const report = await leakDrill(brainl);
+    assert.equal(report.file, brainl);
+    assert.deepEqual(report.skipped, []);
+    assert.equal(report.grants.length, SHARE_TEMPLATES.length + 1);
+    for (const g of report.grants) assert.deepEqual(g.leaks, [], g.template);
+    const run = leakCli(brainl);
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.match(run.stdout, /share\(s\), 0 leak\(s\)/u);
+    assert.ok(inRepository(new URL('./leak-on-copy.mjs', import.meta.url).pathname));
+    assert.ok(!inRepository(brainl));
+    await assert.rejects(leakDrill(new URL('./leak-on-copy.mjs', import.meta.url).pathname), /inside this repository/u);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
