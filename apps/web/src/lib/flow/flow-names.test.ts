@@ -64,3 +64,21 @@ test('a field no list this tab knows declares is its id in words, and a referenc
   assert.equal(fieldName('next_due_on'), 'next due on');
   assert.equal(sayParts({ notify: { say: 'Rate is {{vars.rate}}' } } as never).find((p) => p.ref)?.text, 'rate');
 });
+
+/* ONE FIELD THAT MUST CHANGE, AND ONE CLAUSE SAYING WHAT IT CHANGES TO, IS ONE THING (audit B of 25 October, Y14): "When an
+   item in Bills and invoices is changed, only when Status changes, Status is paid" said one event three times. */
+test('a change to one field, waiting for one value of it, is said as that field being set to it', () => {
+  const paused = { trigger: { written: { register: 'filing_rules', op: ['update'], fields: ['state'] } }, when: 'state is paused' };
+  assert.equal(sayStart(paused as never, () => 'Kiln orders'), 'When an item in Kiln orders has its Status set to paused');
+  /* ANY OTHER SHAPE IS SAID AS IT WAS: two clauses, two fields, a clause about another field, or one that is not "is". */
+  const twoClauses = { ...paused, when: 'state is paused, match is set' };
+  assert.match(sayStart(twoClauses as never, () => 'Kiln orders'), /only when Status changes, Status is paused and Matches is set$/u);
+  const otherField = { ...paused, when: 'match is set' };
+  assert.match(sayStart(otherField as never, () => 'Kiln orders'), /only when Status changes, Matches is set$/u);
+  const twoFields = { trigger: { written: { register: 'filing_rules', op: ['update'], fields: ['state', 'match'] } }, when: 'state is paused' };
+  assert.match(sayStart(twoFields as never, () => 'Kiln orders'), /only when Status or Matches changes, Status is paused$/u);
+  const notPaused = { ...paused, when: 'state is not paused' };
+  assert.match(sayStart(notPaused as never, () => 'Kiln orders'), /only when Status changes, Status is not paused$/u);
+  const filled = { ...paused, when: 'state is set' };
+  assert.match(sayStart(filled as never, () => 'Kiln orders'), /only when Status changes, Status is set$/u);
+});

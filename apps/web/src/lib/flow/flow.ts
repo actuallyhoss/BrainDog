@@ -1360,6 +1360,9 @@ function conditionWords(cond: unknown, register?: string): string {
   return isObject(cond) ? 'the condition holds' : '';
 }
 
+/** Words matched as they are written, for a pattern built around them. */
+const escaped = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
 /** A condition's clauses as one list: "Account is set, Book is empty" said "Account is set and Book is empty". */
 const clausesJoined = (cond: string): string => (/\s(?:and|or)\s/u.test(cond) ? cond : cond.replace(/,\s+(?=[^,]*$)/u, ' and '));
 
@@ -1377,7 +1380,12 @@ export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
   const cond = filed === null ? '' : clausesJoined(sayCondition(filed, 'written' in d.trigger ? (d.trigger.written.register ?? undefined) : undefined));
   if (cond === '') return sayTrigger(d.trigger, listSaid);
   if ('written' in d.trigger && d.trigger.written.fields?.length) {
-    const p = writtenParts(d.trigger.written, listSaid);
+    const w = d.trigger.written;
+    const p = writtenParts(w, listSaid);
+    /* ONE FIELD, AND ONE CLAUSE SAYING WHAT IT IS SET TO, IS ONE EVENT (audit B of 25 October, Y14): "When an item in Bills
+       and invoices is changed, only when Status changes, Status is paid" said it three times. A delete sets nothing. */
+    const set = w.fields.length === 1 && !(w.op ?? []).includes('delete') ? new RegExp(`^${escaped(p.changes)} is (?!not |set$|empty$)([^,]+)$`, 'u').exec(cond) : null;
+    if (set && !/\s(?:and|or)\s/u.test(set[1]!)) return `When an item in ${w.register ? (listSaid ?? ((id: string) => id))(w.register) : 'a list'} has its ${p.changes} set to ${set[1]}${p.rules}`;
     return `${p.said}, only when ${p.changes} changes, ${cond}${p.rules}`;
   }
   return `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
