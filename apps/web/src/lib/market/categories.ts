@@ -30,5 +30,23 @@ export function chipsOf(listings: readonly Listing[]): Chip[] {
   });
 }
 
+/** The three sections browse draws, in order (E20). */
+export const SECTIONS = ['setups', 'addons', 'looks'] as const;
+export type Section = (typeof SECTIONS)[number];
+
+/** Which section a listing is in: a use case is a ready-made setup, a theme is a look, and anything else an add-on. */
+export const sectionOf = (l: Pick<Listing, 'kind' | 'categories'>): Section =>
+  l.kind === 'usecase' ? 'setups' : l.categories.includes('themes') ? 'looks' : 'addons';
+
+export type SectionChip = { section: Section; name: string; count: number };
+
+/** A chip for each section that holds anything, with how many it holds: the same number its heading says. */
+export function sectionChips(listings: readonly Pick<Listing, 'kind' | 'categories'>[]): SectionChip[] {
+  return SECTIONS.flatMap((section) => {
+    const count = listings.filter((l) => sectionOf(l) === section).length;
+    return count === 0 ? [] : [{ section, name: words.sections[section], count }];
+  });
+}
+
 /** The listings in one category, or every one when none is picked. */
 export const inCategory = (listings: readonly Listing[], category: Category | null): Listing[] => (category === null ? [...listings] : listings.filter((l) => l.categories.includes(category)));

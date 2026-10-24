@@ -4,13 +4,13 @@
   ONE LISTING MODEL. The modules this build ships, its built-in use cases and every entry the Kennel answers are read into
   `Listing`s by `listingsOf` (`$lib/market/listing.ts`), so they are searched, counted, filtered and sorted the same
   way. A search reads the title, the summary, the id, the lists and pages it adds, who made it and its categories; the
-  filter keeps one category; the sort is For you, Most installed or Newest.
+  chips keep one section; the sort is For you, Most installed or Newest.
 
-  TWO SECTIONS, NOT ONE GRID (the UI pass of 20 October, agents F9). The use cases are ways of working, so each is a card
-  with its Home drawn small (`Mini.svelte`), three across from 900px and one on a phone, each as tall as what it holds.
-  What is built in is a thing you hold, so it is a list of rows, as /packs lists what is installed: its place's glyph,
-  its name, its line, and "Installed" or the cue at the end. An add-on from outside is a third section of rows. A filter
-  that would keep every listing (every one is BrainDog's) is not drawn, and neither is a count that repeats the sentence.
+  THREE SECTIONS, SINCE the screens scope of 24 October (E20): Ready-made setups, Add-ons and Looks, and the chips are
+  the same three with the same counts. A setup is a way of working, so each is a card, three across from 900px and one on
+  a phone, each as tall as what it holds, with no miniature: its grey bars read as a page still loading. An add-on, built
+  in or from outside, is a thing you hold, so it is a list of rows, as /packs lists what is installed. A chip that would
+  keep every listing is not drawn, and neither is a count that repeats the sentence.
 
   NOTHING HERE INSTALLS. A card or a row opens the listing's own page, where the file is verified and the record's plan
   is read before anything can be pressed. The record's packs are read only to say what is already in.
@@ -25,7 +25,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import type { CatalogueIndex, Category } from '@braindog/declare/catalogue';
+  import type { CatalogueIndex } from '@braindog/declare/catalogue';
   import { useCase } from '@braindog/seed/usecases';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { titleOf } from '$lib/title.ts';
@@ -41,15 +41,14 @@
   import { isGlyph } from '$lib/ui/icons.ts';
   import ListingCard from '$lib/market/ListingCard.svelte';
   import ListingRow from '$lib/market/ListingRow.svelte';
-  import { chipsOf, categoryName, inCategory } from '$lib/market/categories.ts';
+  import { categoryName, sectionChips, sectionOf, SECTIONS, type Section } from '$lib/market/categories.ts';
   import { readCounts } from '$lib/market/counts.ts';
-  import { actionOf, listingsOf, ordered, searchListings, type Listing, type ListingKind, type Order } from '$lib/market/listing.ts';
+  import { actionOf, listingsOf, ordered, searchListings, type Listing, type Order } from '$lib/market/listing.ts';
   import { words } from '$lib/market/words.ts';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import AddonsTabs from '../AddonsTabs.svelte';
   import { words as packWords } from '../words.ts';
   import { glyphOf as placeGlyph } from '../glyph.ts';
-  import Mini from './Mini.svelte';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
 
@@ -60,19 +59,20 @@
   let states = $state.raw<PackState[] | null>(null);
 
   let query = $state(page.url.searchParams.get('q') ?? '');
-  let category = $state<Category | null>(null);
+  let category = $state<Section | null>(null);
   let order = $state<Order>('for-you');
 
   const listings = $derived(listingsOf({ kennel, counts }));
   const searched = $derived(searchListings(listings, query, categoryName));
-  /* A FILTER THAT KEEPS EVERY LISTING SAYS NOTHING ("Made by BrainDog 13" beside "All 13"), so it is not drawn. */
-  const chips = $derived(chipsOf(searched).filter((c) => c.count < searched.length));
+  /* THE CHIPS ARE THE SECTIONS (E20), so each says the count its heading says. One section alone draws no chips: a filter
+     that keeps every listing says nothing. */
+  const chips = $derived(sectionChips(searched).filter((c) => c.count < searched.length));
   /* A CHIP THAT A NEW SEARCH EMPTIED lets go, so the page never says nothing matches because of a chip no longer drawn. */
-  const picked = $derived(category !== null && chips.some((c) => c.category === category) ? category : null);
+  const picked = $derived(category !== null && chips.some((c) => c.section === category) ? category : null);
+  const inSection = (ls: readonly Listing[], s: Section | null): Listing[] => (s === null ? [...ls] : ls.filter((l) => sectionOf(l) === s));
   /* WITH A SEARCH, THE BEST MATCH LEADS under For you; the other orders are what a person asked for, search or not. */
-  const shown = $derived(order === 'for-you' && query.trim() !== '' ? inCategory(searched, picked) : ordered(inCategory(searched, picked), order));
+  const shown = $derived(order === 'for-you' && query.trim() !== '' ? inSection(searched, picked) : ordered(inSection(searched, picked), order));
   const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
-  const SECTIONS: readonly ListingKind[] = ['usecase', 'module', 'pack'];
 
   /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered. */
   const held = $derived(states ? listings.filter((l) => actionOf(l, states!).kind !== 'install').length : null);
@@ -131,8 +131,8 @@
           <button type="button" class="segment chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
             {words.all}<span class="n">{searched.length}</span>
           </button>
-          {#each chips as c (c.category)}
-            <button type="button" class="segment chip" aria-pressed={picked === c.category} data-on={picked === c.category ? '' : undefined} onclick={() => (category = picked === c.category ? null : c.category)}>
+          {#each chips as c (c.section)}
+            <button type="button" class="segment chip" aria-pressed={picked === c.section} data-on={picked === c.section ? '' : undefined} onclick={() => (category = picked === c.section ? null : c.section)}>
               {c.name}<span class="n">{c.count}</span>
             </button>
           {/each}
@@ -152,23 +152,18 @@
   {#if shown.length === 0}
     <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
   {:else}
-    {#each SECTIONS as kind (kind)}
-      {@const items = shown.filter((l) => l.kind === kind)}
+    {#each SECTIONS as section (section)}
+      {@const items = shown.filter((l) => sectionOf(l) === section)}
       {#if items.length > 0}
-        <section class="part" aria-labelledby="browse-{kind}">
-          <h2 class="part-h" id="browse-{kind}">{words.sections[kind]}<span class="n num">{items.length}</span></h2>
-          {#if kind === 'usecase'}
+        <section class="part" aria-labelledby="browse-{section}">
+          <h2 class="part-h" id="browse-{section}">{words.sections[section]}<span class="n num">{items.length}</span></h2>
+          {#if section === 'setups'}
+            <!-- NO MINIATURE (E20): grey bars under a heading read as a page still loading. The card is its glyph, its
+                 name, what it is for and the lists it brings. -->
             <ul class="cards">
               {#each items as l (l.key)}
                 {@const mini = miniFor(l)}
-                {@const action = states ? actionOf(l, states) : null}
-                {#if mini && mini.tiles.length > 0}
-                  <ListingCard listing={l} {action} glyph={KNOWN_BY[l.id] ?? asGlyph(mini.glyph)}>
-                    {#snippet drawing()}<Mini tiles={mini.tiles} />{/snippet}
-                  </ListingCard>
-                {:else}
-                  <ListingCard listing={l} {action} />
-                {/if}
+                <ListingCard listing={l} action={states ? actionOf(l, states) : null} glyph={KNOWN_BY[l.id] ?? asGlyph(mini?.glyph)} />
               {/each}
             </ul>
           {:else}

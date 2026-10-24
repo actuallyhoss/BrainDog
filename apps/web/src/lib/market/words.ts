@@ -9,9 +9,10 @@ import type { Category } from '@braindog/declare/catalogue';
 export const words = {
   searchLabel: 'Search add-ons',
   searchHint: 'Search add-ons',
-  /* BROWSE IN TWO SECTIONS (the UI pass of 20 October, agents F9): the ways of working as cards with their Home drawn
-     small, and what is built in as rows, the way /packs lists what is installed. An add-on from outside is a third. */
-  sections: { usecase: 'Use cases', module: 'Built in', pack: 'From others' } as const,
+  /* BROWSE IN THREE SECTIONS, SINCE the screens scope of 24 October (E20): the ready-made setups as cards, then every
+     add-on, built in or from outside, as rows, then the looks. "From others" and "Built in" said where a thing came
+     from, which is not what a person shops for. The chips are these sections, so a chip's count is its section's. */
+  sections: { setups: 'Ready-made setups', addons: 'Add-ons', looks: 'Looks' } as const,
   sortLabel: 'Sort',
   all: 'All',
   categoriesLabel: 'Categories',
@@ -21,7 +22,7 @@ export const words = {
     modules: 'Built in',
     templates: 'Templates',
     connectors: 'Connectors',
-    doors: 'Doors',
+    doors: 'Ways in',
     automations: 'Automations',
     blocks: 'Blocks',
     themes: 'Themes',

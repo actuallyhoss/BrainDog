@@ -4,7 +4,7 @@
 
   A PICTURE FIRST, THEN THE WORDS (the UI pass of 20 October, agents F9). The cards were a grid of the same glyph, the
   same grey box of text lines and "By BrainDog" thirteen times. Each card now leads with what is its own: a miniature of
-  the Home it installs (`drawing`, `routes/packs/browse/Mini.svelte`), or, for a use case from outside with a trusted
+  the Home it installs (`drawing`, which browse no longer passes since its grey bars read as loading), or, for a use case from outside with a trusted
   preview, its first page through the real renderer (`PreviewPage.svelte`). Its glyph is its own (the Home's or its first
   list's), its lists are named, and who made it is said only when it is not BrainDog, which is the one case it tells
   apart.
@@ -62,6 +62,7 @@
     drawing,
   }: { listing: Listing; action?: Action | null; glyph?: IconName | null; drawing?: Snippet | undefined } = $props();
 
+  const broughtBy = (names: string[]): string | null => (names.length > 0 ? words.brings(names) : null);
   const latest = $derived(latestOf(listing));
   const reach = $derived(latest?.reach ?? null);
   const hosts = $derived(hostsOf(listing));
@@ -71,7 +72,8 @@
   /* ITS OWN LISTS BY NAME, and what it turns on beside them by the names the modules go by. */
   const lists = $derived(reach?.lists ?? []);
   const brings = $derived(
-    reach && reach.modules.length > 0 ? words.brings(reach.modules.map((id) => firstPartyModules().find((m) => m.id === id)?.name ?? id)) : null,
+    /* BY NAME OR NOT AT ALL (E20): a module this build does not know was said by its id. */
+    reach && reach.modules.length > 0 ? broughtBy(reach.modules.flatMap((id) => firstPartyModules().find((m) => m.id === id)?.name ?? [])) : null,
   );
 
   /* WHO MADE IT, ONLY WHEN IT IS NOT BRAINDOG: every built-in is BrainDog's, and saying so on each said nothing. */

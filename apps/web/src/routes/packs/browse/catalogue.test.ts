@@ -237,8 +237,9 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
   /* ONE PLACE, ONE NAME (the UI pass of 20 October, agents F9): browse is the other half of Add-ons, and its sections
      name the kinds. */
   assert.equal(copy.packs, 'Add-ons');
-  assert.match(market.sections.usecase, /use cases/iu);
-  assert.match(market.sections.module, /built in/iu);
+  /* THREE SECTIONS SINCE the screens scope of 24 October (E20), and never where a thing came from. */
+  assert.deepEqual(Object.values(market.sections), ['Ready-made setups', 'Add-ons', 'Looks']);
+  assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
   assert.match(copy.browseAll, /use cases/iu);
   assert.match(copy.browseAll, /add-ons/iu);
   assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
