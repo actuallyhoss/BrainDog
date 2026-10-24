@@ -241,3 +241,47 @@ test('A CALL THAT IS NOT A LIST OF TOOLS is refused at what is wrong, and nothin
   }
   assert.equal((await tools(r)).length, count);
 });
+
+test("A TOOL OF THE USER CONFIG THAT A PROJECT HOLDS stamps the project's row, and makes no global copy", async () => {
+  const r = await record();
+  value(await r.seen({ machine: HERE, found: [server('copperleaf', { scope: 'project', source: '.mcp.json in this folder' })] }, inPortage()));
+  const got = value<ToolsSeen>(await r.seen({ machine: THERE, found: [server('copperleaf')] }, loose()));
+  assert.equal(got.tools[0]!.did, 'seen');
+  const rows = await named(r, 'copperleaf');
+  assert.equal(rows.length, 1, "one row, the project's");
+  assert.deepEqual(rows[0]!.fields.hosts, [HERE, THERE]);
+  /* One address under two names is still two tools: the name has to agree too. */
+  const twin = value<ToolsSeen>(await r.seen({ machine: THERE, found: [server('copperleaf-two', { args: ['-y', '@pellucid/copperleaf-server'] })] }, loose()));
+  assert.equal(twin.tools[0]!.did, 'added');
+});
+
+test('AN OPEN "ADD EVERYWHERE" QUESTION gives up a tool added directly since, so a yes makes one row', async () => {
+  const r = await record();
+  const asked = value<ToolsSeen>(await r.seen({ machine: HERE, found: [server('brightwell'), server('saltmarsh', { args: ['-y', 'saltmarsh-mcp'] })] }, inPortage()));
+  const id = asked.tools[0]!.question!;
+  assert.equal(value<ToolsSeen>(await r.seen({ machine: THERE, found: [server('brightwell')] }, loose())).tools[0]!.did, 'added');
+  value(await r.api.decide({ id, decide: { option: 'accept', reason: 'Fine.' } } as never, owner));
+  assert.equal((await named(r, 'brightwell')).length, 1, 'one brightwell');
+  assert.equal((await named(r, 'saltmarsh')).length, 1, 'saltmarsh still added');
+
+  /* A question left with nothing to add is closed as moot. */
+  const lone = value<ToolsSeen>(await r.seen({ machine: HERE, found: [server('thimble')] }, inPortage('c-p2')));
+  value(await r.seen({ machine: THERE, found: [server('thimble')] }, loose('c-l2')));
+  const q = r.sql.one<{ status: string; resolved_as: string }>('SELECT status, resolved_as FROM suggestion WHERE id = ?', lone.tools[0]!.question!)!;
+  assert.deepEqual([q.status, q.resolved_as], ['resolved', 'moot']);
+  assert.equal((await named(r, 'thimble')).length, 1);
+});
+
+test('A RETIRED ROW AND A LIVE ONE OF ONE NAME: the sighting stamps the live one', async () => {
+  const r = await record();
+  value(await r.seen({ machine: HERE, found: [server('lantern')] }, loose()));
+  const [old] = await named(r, 'lantern');
+  value(r.api.kernel.update('tools', old!.id, { state: 'retired' }, { actor: 'p_1' } as never));
+  const fresh = value<{ id: string }>(
+    await r.api.create({ register: 'tools', fields: { name: 'lantern', kind: 'mcp', transport: 'stdio', command: 'npx', args: ['-y', '@pellucid/lantern-server'], state: 'active' } }, owner),
+  );
+  const got = value<ToolsSeen>(await r.seen({ machine: THERE, found: [server('lantern')] }, loose('c-two')));
+  assert.equal(got.tools[0]!.did, 'seen');
+  assert.equal(got.tools[0]!.row, r.api.kernel.nameOf(fresh.id));
+  assert.deepEqual(r.api.kernel.get(fresh.id)?.fields.hosts, [THERE]);
+});

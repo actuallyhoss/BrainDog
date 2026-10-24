@@ -30,7 +30,7 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { looksLikeCredential, type Entry, type WriteContext } from '@braindog/kernel';
+import { MOOT_HELD, looksLikeCredential, ulids, type Entry, type WriteContext } from '@braindog/kernel';
 
 import { listFor, noListSaid } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
@@ -222,6 +222,7 @@ function malformed(t: unknown): string | null {
 
 export function methods(deps: RecordDeps) {
   const { kernel, sql, guard, no, tail, clock } = deps;
+  const mint = ulids(() => clock.now());
 
   /**
    * Who writes down what a machine holds, and the project its run is in: the caller's run, found or opened as
@@ -309,6 +310,8 @@ export function methods(deps: RecordDeps) {
       const held = read.value.map(heldOf);
       const out: SeenTool[] = [];
       const everywhere: { f: FoundTool; i: number; fields: Record<string, unknown> }[] = [];
+      /* The rows this call added or stamped, which an open "add everywhere" question must no longer add again. */
+      const touched: Held[] = [];
 
       for (const f of found) {
         const name = f.name.trim();
@@ -324,8 +327,9 @@ export function methods(deps: RecordDeps) {
         const place = f.scope === 'project' ? project : null;
         const program = programOf(f);
         const start = startOf(f);
-        /* INSIDE ONE SCOPE, and a tool of the user's config from a run in a project is also the project's own row of it. */
-        const among = (p: string | null) => held.filter((h) => h.place === p);
+        /* INSIDE ONE SCOPE, and a tool of the user's config from a run in a project is also the project's own row of it.
+           Live rows first, so a retired copy never takes the sighting its live twin should get. */
+        const among = (p: string | null) => liveFirst(held.filter((h) => h.place === p));
         const scopes = place === null && project !== null ? [among(null), among(project)] : [among(place)];
         /* A SCRIPT IS ONE PROGRAM ONLY WHEN THE NAMES AGREE OR ITS PATH NAMES THE ROW: two scripts in folders of one name
            are otherwise two tools (decision 2, its cost). */
@@ -339,9 +343,15 @@ export function methods(deps: RecordDeps) {
           byName ??= rows.find((h) => folded(h.fields.name) === folded(name));
           if (match !== undefined) break;
         }
+        /* A TOOL OF THE USER'S CONFIG THAT A PROJECT ALREADY HOLDS, same program and same name, is that row: matching
+           only global rows made a global copy of every project's server. The name is asked because one address can be three. */
+        if (match === undefined && place === null)
+          match = liveFirst(held.filter((h) => h.place !== null && sameProgram(h) && folded(h.fields.name) === folded(name)))[0];
 
         if (match !== undefined) {
-          out.push(stamp(match, f, needs));
+          const said = stamp(match, f, needs);
+          if (said.did === 'seen') touched.push(match);
+          out.push(said);
           continue;
         }
         if (byName !== undefined) {
@@ -361,8 +371,10 @@ export function methods(deps: RecordDeps) {
         }
         const row = heldOf(made.value);
         held.push(row);
+        touched.push(row);
         out.push({ name, did: 'added', row: row.spoken });
       }
+      if (touched.length > 0) unask(touched);
       if (everywhere.length > 0) askEverywhere(everywhere, out);
       return tail(ok({ tools: out }));
 
@@ -457,6 +469,42 @@ export function methods(deps: RecordDeps) {
       }
 
       /**
+       * A TOOL THE RECORD NOW HOLDS IS TAKEN OUT OF EVERY OPEN "ADD EVERYWHERE" QUESTION that would add it again, by its
+       * name and program: on 20 Oct one run asked, another added the same tools directly, and his yes two days later
+       * made them twice. A question left with nothing to add is closed as moot, as `recheck` closes one already so.
+       */
+      function unask(rows: Held[]): void {
+        const holds = new Set(rows.map((h) => `${folded(h.fields.name)}\u0000${h.program}`));
+        for (const q of sql.all<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE cause LIKE 'tools-seen#everywhere#%' AND status = 'open'")) {
+          let body: { rows?: unknown } & Record<string, unknown>;
+          try {
+            body = JSON.parse(q.body) as typeof body;
+          } catch {
+            continue;
+          }
+          const asked = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
+          const left = asked.filter((r) => !holds.has(`${folded(r.name)}\u0000${programOf(r)}`));
+          if (left.length === asked.length) continue;
+          const ts = new Date(now).toISOString();
+          if (left.length === 0) {
+            sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", q.id);
+            sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, 'system', 'resolve', ?, 'suggestion', 'moot', ?)", mint(), ts, `suggestion:${q.id}`, MOOT_HELD);
+            continue;
+          }
+          const gone = asked.length - left.length;
+          sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, rows: left }), q.id);
+          sql.exec(
+            "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, 'system', 'note', ?, 'suggestion', ?, ?)",
+            mint(),
+            ts,
+            `suggestion:${q.id}`,
+            String(gone),
+            gone === 1 ? 'One of these tools is in the record already, so a yes no longer adds it again.' : `${String(gone)} of these tools are in the record already, so a yes no longer adds them again.`,
+          );
+        }
+      }
+
+      /**
        * A RUN IN A PROJECT DOES NOT ADD A TOOL FOR EVERY PROJECT BY ITSELF: the tools of the user's config it found new
        * are one question, with their keys by name only. One already carried by an open question waits on it.
        */
@@ -500,6 +548,10 @@ export function methods(deps: RecordDeps) {
     },
   };
 }
+
+/** Rows with the live ones first and the retired last, each kept in the order it was read. */
+const liveFirst = <T extends { fields: Record<string, unknown> }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => Number(a.fields.state === 'retired') - Number(b.fields.state === 'retired'));
 
 /** The longest question the record asks: one line on a phone. */
 const QUESTION = 80;
