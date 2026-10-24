@@ -464,9 +464,9 @@ export function variableOf(label: string): string {
 }
 
 const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --vault and --host, and reads the value from standard input.';
-const USAGE_EXEC = 'braindog keys exec takes one label or spoken id, --as, --vault and --host, then -- and the command to run.';
-const USAGE_HEADERS = 'braindog keys headers takes one spoken id or label, --as with the header name, --vault and --host, and nothing else.';
-const USAGE_HELPER = 'braindog keys helper takes one spoken id or label, --vault and --host, and nothing else.';
+const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --vault and --host, then -- and the command to run.';
+const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --vault and --host, and nothing else.';
+const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --vault and --host, and nothing else.';
 
 /** `braindog keys list|put|scan|exec|headers|helper`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {

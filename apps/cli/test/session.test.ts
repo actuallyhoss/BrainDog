@@ -343,7 +343,7 @@ test('a run the host does not know is one sentence, not a 401', async (t) => {
   const h = setup(t, host.base);
 
   assert.equal(await session(['end'], h.io), 1, h.said.join('\n'));
-  assert.deepEqual(h.said, ['The host has no open run for this folder. Start a session here and try again.']);
+  assert.deepEqual(h.said, ['The host has no open run for this folder. Start a Claude Code session here, then try again.']);
   assert.deepEqual(h.out, []);
   assert.deepEqual(host.seen.map((s) => s.method), ['context']);
 });

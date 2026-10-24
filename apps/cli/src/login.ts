@@ -208,7 +208,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   const { key } = host;
   const vault = io.vault;
   if (vault !== undefined && !SCOPE.test(vault)) {
-    io.say('--vault names a project by its spoken id, such as things#3, or * for the keys that belong to no project.');
+    io.say('--vault names a project by its number, as things#3, or * for the keys that belong to no project.');
     return REFUSED;
   }
 

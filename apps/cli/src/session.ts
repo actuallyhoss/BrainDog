@@ -58,7 +58,7 @@ const isState = (x: string): x is State => (STATES as readonly string[]).include
    and denied by the usage line, which is the worst of the two outcomes. */
 const BAD_STATE = `braindog session end takes --state ${STATES.slice(0, -1).join(', ')} or ${STATES.at(-1)}.`;
 const NO_SESSION = 'No session is open in this folder. Start a Claude Code session here, or run braindog hook start.';
-const NO_RUN = 'The host has no open run for this folder. Start a session here and try again.';
+const NO_RUN = 'The host has no open run for this folder. Start a Claude Code session here, then try again.';
 
 const SAID: Record<Line, (spoken: string) => string> = {
   next: (spoken) => `${spoken} now carries that next step.`,

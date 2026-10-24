@@ -221,7 +221,7 @@ export async function projectDoor(project: string, host: string | undefined, io:
   }
   return ids.length > 0
     ? `No vault grant for that project is kept here. Run ${login} --vault ${ids[0]!}, then this again.`
-    : `No vault grant for that project is kept here, and no project of yours has that name. Run ${login} --vault <its spoken id>, then this again.`;
+    : `No vault grant for that project is kept here, and no project of yours has that name. Run ${login} --vault <project>, as things#3, then this again.`;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);

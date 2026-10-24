@@ -287,7 +287,13 @@ async function answered(client: Reader, said: { ids: ReadonlySet<string>; near: 
 }
 
 /** The sentence for a record that will not answer, by why. */
-const refusalLine = (r: Result<unknown>, to: Target): string => (refused(r) && r.refusal.code === 'UNREACHABLE' ? `${to.key} did not answer.` : printable(fixOf(r)));
+const refusalLine = (r: Result<unknown>, to: Target): string =>
+  refused(r) && r.refusal.code === 'UNREACHABLE'
+    ? `${to.key} did not answer.`
+    : /* A RECORD WITH NO KEYS LIST SAYS SO, not "There is no register called credentials" (audit D, W10). */
+      refused(r) && r.refusal.code === 'REGISTER_UNKNOWN'
+      ? 'This record keeps no keys yet. Deposit one with braindog keys put <label>.'
+      : printable(fixOf(r));
 
 /**
  * `braindog keys list`, and the exit code: 0 read, 1 refused, 3 unreachable.
