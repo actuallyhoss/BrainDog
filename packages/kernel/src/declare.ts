@@ -1577,6 +1577,17 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
   const forFault = forShapeFault(id, (body as { for?: unknown }).for);
   if (forFault) return forFault;
 
+  /* `list:` SENDS A LIST TO THIS PAGE: `/r/<list>` opens here, and the list's rows say where they are drawn. One list, by
+     its id, and never on a template, which is one page a row and so no one list's page. Whether the list is installed is
+     asked when the pages are read, as `for:`'s is, so a page whose list went stops being its page and nothing more. */
+  const sent = (body as { list?: unknown }).list;
+  if (sent !== undefined) {
+    if (typeof sent !== 'string' || !/^[a-z][a-z0-9_]*$/u.test(sent))
+      return bad('DECLARATION_INVALID', `${id}'s list: is the id of the list this page is the page of, such as datapoints.`, 'list');
+    if ((body as { for?: unknown }).for !== undefined)
+      return bad('DECLARATION_INVALID', `${id} is one page a row (for:), so it is no one list's page. Take list: off, or for:.`, 'list');
+  }
+
   /* `06 §3`: *"pages can appear on their own; navigation cannot"* — a nav entry with no section is
      an item in no menu, and one with no order sorts against whatever the reader last wrote. Both
      install cleanly and both produce a page you can only reach by typing its slug. */

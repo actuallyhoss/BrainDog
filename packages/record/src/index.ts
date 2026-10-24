@@ -1301,6 +1301,8 @@ export type Boot = {
      * names no accent, which is a list whose rows have no colour to wear.
      */
     about: { register: string; seq: number | null; updated_at: string; hue?: number | null } | null;
+    /** The list whose page this is (its `list:`), so `/r/<list>` opens here. Absent on every other page, and on one whose list this caller cannot read. */
+    opens?: string;
   }[];
   /**
    * THE PAGES OF ROWS THAT COME AND GO, BY THEIR ADDRESS ALONE (scope 2026-10-24 A8): a run's page, and any template that
@@ -8554,6 +8556,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
            draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
         about: page.about === null || accentOf(page.about.register) === null ? page.about : { ...page.about, hue: hueOf(page.about) },
+        /* THE LIST IT IS THE PAGE OF, held to what this caller reads as `list` is, so her `/r/<list>` opens on it. */
+        ...(typeof page.opens === 'string' && !readable(ctx, page.opens) ? { opens: page.opens } : {}),
       }));
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,

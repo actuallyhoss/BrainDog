@@ -28,6 +28,12 @@ export const MEASURE_BACK = { least: 2, most: 366, fallback: 30 } as const;
 export const MEASURES_MOST = 12;
 
 /**
+ * The most readings a grouped block lists (`grouped` below): one line a measure, so forty lines is a page a person reads
+ * down once, where forty charts were not.
+ */
+export const MEASURES_LISTED = 40;
+
+/**
  * One reading as the record holds it: the fields a block named, unconverted, and `of`, the name of the project it was
  * reported for when its list says (`readings` in `index.ts`).
  */
@@ -36,7 +42,7 @@ export const MEASURES_MOST = 12;
  * which only keeps two projects apart and is never drawn, so two projects with no name (or one name) are two measures.
  * `amount` is the reading as money, minor units and a currency, and when it is money it is read in place of `value`.
  */
-export type RawReading = { at: unknown; value: unknown; amount?: unknown; name?: unknown; unit?: unknown; of?: unknown; project?: unknown };
+export type RawReading = { at: unknown; value: unknown; amount?: unknown; name?: unknown; unit?: unknown; of?: unknown; project?: unknown; group?: unknown };
 
 export type MeasureSeries = {
   name: string;
@@ -45,6 +51,8 @@ export type MeasureSeries = {
    * measures, each drawn under its own project, and never one line through both projects' numbers.
    */
   of?: string;
+  /** The group it is listed under, by the sixth column's value as a person reads it, on a block that names one. */
+  group?: string;
   /** A currency code, another unit, or ''. */
   unit: string;
   bucket: MeasureBucket;
@@ -154,6 +162,8 @@ export type MeasureLatest = {
   measure: string;
   /** The project it was reported for, by its name, as `MeasureSeries.of`. */
   of?: string;
+  /** The group it is listed under, as `MeasureSeries.group`. */
+  group?: string;
   /** The reading as a number: money in major units of `unit`, as a series holds it. */
   value: number;
   /** A currency code, another unit, or ''. */
@@ -166,8 +176,11 @@ export type MeasureLatest = {
 /** What a `lines` block over readings is handed: the lines worth drawing, and the measures that have only a reading. */
 export type MeasureLines = { lines: MeasureSeries[]; latest: MeasureLatest[] };
 
-/** The options both readers take. `fallback` names the measure of a block with no name column, by its heading. */
-type MeasureOpts = { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number };
+/**
+ * The options both readers take. `fallback` names the measure of a block with no name column, by its heading. `grouped`
+ * is a block with a sixth column: every measure is listed under its group, the quiet ones too (`measureLines`).
+ */
+type MeasureOpts = { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number; grouped?: boolean };
 
 /** How many points a measure has in the period, which is what a line needs two of. */
 const pointsIn = (m: MeasureSeries): number => m.now.reduce<number>((n, v) => n + (v === null ? 0 : 1), 0);
@@ -224,13 +237,32 @@ export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts):
     .sort((a, b) => movedBy(b) - movedBy(a) || newestFirst(a, b))
     .slice(0, most)
     .map(({ ms: _ms, ...m }) => m);
-  const latest = all
-    .filter((m) => pointsIn(m) === 1 && m.latest !== null)
-    .sort(newestFirst)
-    .slice(0, most)
-    .map((m): MeasureLatest => ({ measure: m.name, ...(m.of !== undefined ? { of: m.of } : {}), value: m.latest!.value, unit: m.unit, at: m.latest!.at, day: m.latest!.day }));
+  /* GROUPED, EVERY MEASURE NOT DRAWN AS A LINE IS LISTED, the quiet ones too: a page of a list's numbers says each kind
+     once, under its group, whether it was read this month or not, so a measure is never missing for having gone quiet.
+     The lines' measures are left out, and so are the ones past the lines' `most`, which are listed instead. */
+  const listed = opts.grouped
+    ? all.filter((m) => m.latest !== null && !lines.some((l) => sameMeasure(l, m))).sort((a, b) => byGroup(a, b) || newestFirst(a, b)).slice(0, MEASURES_LISTED)
+    : all.filter((m) => pointsIn(m) === 1 && m.latest !== null).sort(newestFirst).slice(0, most);
+  const latest = listed.map(
+    (m): MeasureLatest => ({
+      measure: m.name,
+      ...(m.of !== undefined ? { of: m.of } : {}),
+      ...(m.group !== undefined ? { group: m.group } : {}),
+      value: m.latest!.value,
+      unit: m.unit,
+      at: m.latest!.at,
+      day: m.latest!.day,
+    }),
+  );
   return { lines, latest };
 }
+
+/** One measure by what keeps it apart: its name, its project, its group and its unit. */
+const sameMeasure = (a: MeasureSeries, b: MeasureSeries): boolean => a.name === b.name && a.of === b.of && a.group === b.group && a.unit === b.unit;
+
+/** Groups by name, the measures with no group after every named one. */
+const byGroup = (a: MeasureSeries, b: MeasureSeries): number =>
+  a.group === b.group ? 0 : a.group === undefined ? 1 : b.group === undefined ? -1 : a.group.localeCompare(b.group);
 
 /** Every measure the readings hold, each over its period and the period before, in no order, with its newest instant. */
 function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSeries & { ms: number })[] {
@@ -240,7 +272,7 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
   const dayOf = localDays(tz);
   const inWindow = new Set([...before, ...keys]);
 
-  type Group = { name: string; of: string | null; unit: string; last: Map<string, { ms: number; value: number }>; latest: { ms: number; value: number; day: string } | null };
+  type Group = { name: string; of: string | null; group: string | null; unit: string; last: Map<string, { ms: number; value: number }>; latest: { ms: number; value: number; day: string } | null };
   /* ONE GROUP A MEASURE AND PROJECT. By name alone, two projects' "Orders" were one line through both projects' numbers,
      whichever reported last that day standing for the day, and the importer glued the project onto the name to tell them
      apart ("Aov, Oxbow.gg"). */
@@ -257,16 +289,18 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
     const said = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : opts.fallback;
     const of = typeof r.of === 'string' && r.of.trim() !== '' ? r.of.trim() : null;
     const project = typeof r.project === 'string' ? r.project : null;
-    let id = JSON.stringify([said, of, project]);
+    /* AND ITS GROUP, where the block names a sixth column: the same measure in two groups is two lines. */
+    const under = typeof r.group === 'string' && r.group.trim() !== '' ? r.group.trim() : null;
+    let id = JSON.stringify([said, of, project, under]);
     let group = groups.get(id);
     /* TWO CURRENCIES ARE NEVER ONE LINE. A measure that turns from EUR to JPY under one name drew its yen as euros, under
        the first reading's code; the reading in the other currency is a line of its own, of the same name. */
     const code = currencyCode(reading.unit);
     if (group && code !== null && currencyCode(group.unit) !== null && currencyCode(group.unit) !== code) {
-      id = JSON.stringify([said, of, project, code]);
+      id = JSON.stringify([said, of, project, under, code]);
       group = groups.get(id);
     }
-    if (!group) groups.set(id, (group = { name: said, of, unit: reading.unit, last: new Map(), latest: null }));
+    if (!group) groups.set(id, (group = { name: said, of, group: under, unit: reading.unit, last: new Map(), latest: null }));
     if (!group.unit && reading.unit) group.unit = reading.unit;
     const day = dated ? r.at : dayOf(ms);
     if (!group.latest || ms >= group.latest.ms) group.latest = { ms, value: reading.value, day };
@@ -279,6 +313,7 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
   return [...groups.values()].map((g): MeasureSeries & { ms: number } => ({
     name: g.name,
     ...(g.of !== null ? { of: g.of } : {}),
+    ...(g.group !== null ? { group: g.group } : {}),
     unit: g.unit,
     bucket,
     keys,

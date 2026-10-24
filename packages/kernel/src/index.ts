@@ -7464,22 +7464,37 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          `fieldSqlIn` on a money field reads its number alone (the path a sort uses), and a number with no code is the
          very misreading this stops. */
       const amount = q.amount ? fieldSqlIn(schema, q.amount, 'text') : 'NULL';
-      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing`;
+      /* AND THE GROUP A MEASURE IS LISTED UNDER, the block's sixth column (E26), said as a person reads it below. */
+      const grouped = q.group ? fields.find((f) => f.id === q.group && !f.retired) : undefined;
+      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing, ${grouped ? fieldSqlIn(schema, grouped.id) : 'NULL'} AS grp`;
       const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
-      type Read = { at: unknown; value: unknown; amount: unknown; name: unknown; unit: unknown; thing: unknown };
+      type Read = { at: unknown; value: unknown; amount: unknown; name: unknown; unit: unknown; thing: unknown; grp: unknown };
       const titles = new Map<string, string | null>();
       /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
          ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
          projects' numbers (audit 16, L9). */
-      const named = ({ thing: of, ...r }: Read): RawReading => {
-        if (typeof of !== 'string' || of === '') return r;
+      /* A GROUP BY A LINK IS ITS ROW'S NAME, by a choice its label, and anything else as it is held. */
+      const labels = grouped && 'labels' in grouped && grouped.labels && typeof grouped.labels === 'object' ? (grouped.labels as Record<string, string>) : null;
+      const groupOf = (v: unknown): string | null => {
+        if (v === null || v === undefined || v === '') return null;
+        if (grouped?.type === 'ref' && typeof v === 'string') {
+          if (!titles.has(v)) titles.set(v, titleOfRow(v));
+          return titles.get(v) ?? null;
+        }
+        const said = String(v);
+        return labels !== null && Object.hasOwn(labels, said) ? labels[said]! : said;
+      };
+      const named = ({ thing: of, grp, ...r }: Read): RawReading => {
+        const under = grouped ? groupOf(grp) : null;
+        const withGroup = under === null ? r : { ...r, group: under };
+        if (typeof of !== 'string' || of === '') return withGroup;
         if (!titles.has(of)) titles.set(of, titleOfRow(of));
         const title = titles.get(of);
-        return title ? { ...r, of: title, project: of } : { ...r, project: of };
+        return title ? { ...withGroup, of: title, project: of } : { ...withGroup, project: of };
       };
       const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
       const latest = sql
-        .all<Read>(`SELECT at, value, amount, name, unit, thing FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing)`, q.register, ...c.params, q.since)
+        .all<Read>(`SELECT at, value, amount, name, unit, thing, grp FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing, grp)`, q.register, ...c.params, q.since)
         .map(named);
       return ok({ readings, latest });
     },
@@ -9609,6 +9624,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* AND WHETHER ITS ROWS COME AND GO (`claimRank`: the runs, or a template that says `fleeting`), so `boot` can send
            such a page as its address alone: on his record 908 of 990 pages were runs, 207 KB of a 278 KB boot. */
         fleeting: p.row !== undefined && claimRank(p.decl) === 2,
+        /* THE LIST THIS PAGE IS THE PAGE OF (`list:`), so `/r/<list>` opens here: only while that list is installed, and
+           never on a page a template made, which is one row's. `null` for every other page. */
+        opens: !p.row && typeof p.decl.list === 'string' && registers.has(p.decl.list) ? p.decl.list : null,
       }));
     },
 

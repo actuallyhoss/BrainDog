@@ -498,11 +498,12 @@ export function wrongKindKey(key: string, kind: string): string {
  * `placed`, and nothing else. `icon`, `for` and `pack` were missing from the table while thirty-three pages, seven
  * templates and eight pages carried them, so the table was the thing that was wrong and it gains them. `layout` is
  * new. `filters` is read now: the reader's own choices over every block (`pages.ts` `readPage`). `header` is the head
- * over the title, checked by `page-head.ts` at install and resolved by the read.
+ * over the title, checked by `page-head.ts` at install and resolved by the read. `list` names the list whose page this
+ * is, so its address (`/r/<list>`) opens here (`pages()` answers it as `opens`).
  */
 export const PAGE_KEYS: ReadonlySet<string> = new Set([
   'page', 'title', 'nav', 'icon', 'requires', 'blocks', 'for', 'pack', 'origin', 'derived_from', 'placed', 'tone', 'layout',
-  'filters', 'header',
+  'filters', 'header', 'list',
 ]);
 
 /** Published in `06 §1.1` and read by nothing in this build, so the repair is a deploy rather than an edit. None now. */

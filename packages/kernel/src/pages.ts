@@ -339,6 +339,8 @@ export type PageDecl = {
    * (`resolvePages`). A template over the runs' own list is read so without saying it.
    */
   for?: { register: string; where?: string; fleeting?: boolean };
+  /** The list whose page this is: `/r/<list>` opens here (`pages()` answers it as `opens`). Never with `for:`. */
+  list?: string;
   requires?: string[];
   [key: string]: unknown;
 };
@@ -996,6 +998,8 @@ export type PageDeps = {
     unit?: string;
     /** A money field each reading may hold in place of `value`: minor units and a currency, read whole (REC-C03). */
     amount?: string;
+    /** The sixth column: a field each measure is listed under, answered as a person reads it (a link by its row's name). */
+    group?: string;
     since: string;
   }) => Result<{ readings: RawReading[]; latest: RawReading[] }>;
   /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
@@ -2797,8 +2801,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     /* THE FIFTH COLUMN IS THE READING AS MONEY (REC-C03): integer minor units with the reading's own currency, read in
        place of `value` where a row holds it (`measures.ts` `moneyOf`), so "Monthly revenue" of USD 48.15 is never the
        decimal 4,815 with a unit of text. A reading in another currency is a line of its own, never added to this one. */
-    const [when, val, name, unit, amount] = (block.columns ?? []).map((c) => c.field);
-    const missing = [when, val, name, unit, amount].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
+    /* AND THE SIXTH GROUPS THEM (E26): a field each measure is listed under, such as its project, and a grouped `lines`
+       block lists every measure it draws no line for under its group, the quiet ones too (`measureLines`). */
+    const [when, val, name, unit, amount, group] = (block.columns ?? []).map((c) => c.field);
+    const missing = [when, val, name, unit, amount, group].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
     if (missing.length)
       return {
         ...base,
@@ -2813,11 +2819,23 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `bucket: is ${MEASURE_BUCKETS.join(' or ')}.`, at: 'bucket' }) };
     const tz = readableZone(deps.tz);
     const window = measureWindow(deps.ctx.nowMs, block.back, measureBucket(block.bucket), tz);
-    const read = deps.readings({ register, where: said.predicate, when: when!, value: val!, ...(name ? { name } : {}), ...(unit ? { unit } : {}), ...(amount ? { amount } : {}), since: window.since });
+    if (group !== undefined && block.kind !== 'lines')
+      return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'The sixth column groups the measures a lines block lists. Take it off this stat, or make it lines.', at: 'columns' }) };
+    const read = deps.readings({
+      register,
+      where: said.predicate,
+      when: when!,
+      value: val!,
+      ...(name ? { name } : {}),
+      ...(unit ? { unit } : {}),
+      ...(amount ? { amount } : {}),
+      ...(group ? { group } : {}),
+      since: window.since,
+    });
     if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
     /* `limit:` IS HOW MANY MEASURES, at most the twelve a block is ever handed, so Today can draw the four that moved. */
     const most = typeof block.limit === 'number' && Number.isFinite(block.limit) ? Math.min(MEASURES_MOST, Math.max(0, Math.floor(block.limit))) : MEASURES_MOST;
-    const opts = { nowMs: deps.ctx.nowMs, back: block.back, bucket: block.bucket, tz, fallback: block.heading ?? '', most };
+    const opts = { nowMs: deps.ctx.nowMs, back: block.back, bucket: block.bucket, tz, fallback: block.heading ?? '', most, ...(group ? { grouped: true } : {}) };
     const all = [...read.value.latest, ...read.value.readings];
     /* A TILE OF ONE READING IS STILL A FIGURE, AND A LINE OF ONE IS A DOT. So a `stat` draws every measure, the ones that
        moved first, and a `lines` block draws a line only where there are two points to join, ranked by how much each
