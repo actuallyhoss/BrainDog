@@ -1596,3 +1596,17 @@ test('a day figure answered as its ISO day is said as the day, with its paramete
   assert.match(counted ?? '', /1 Jun/u);
   assert.equal(resolverOf({ note: '2027-06-01' })('note'), '2027-06-01', 'a word that is no day figure is said as written');
 });
+
+/* A STORE PREVIEW DRAWS A LIST THE RECORD DOES NOT HOLD YET (audit C of 25 October, X11): with no rows to label there is
+   nothing it cannot draw, so it says its heading and its own empty line, never that it cannot be drawn. */
+test('an empty table on a list this record does not hold draws its heading and empty line', () => {
+  const block = blockOf(
+    { kind: 'table', source: 'register.glazes-tried', heading: 'Glazes to try', empty: 'No glaze is waiting.', columns: [{ field: 'name', label: 'Glaze' }], rows: [], matched: 0, refusals: [] } as never,
+    new Map(),
+    Date.UTC(2026, 9, 25),
+  );
+  assert.equal(block.cannot, undefined);
+  assert.equal(block.heading, 'Glazes to try');
+  assert.equal(block.empty, 'No glaze is waiting.');
+  assert.equal(block.rows.length, 0);
+});

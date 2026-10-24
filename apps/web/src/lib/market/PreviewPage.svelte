@@ -20,7 +20,8 @@
   import { openedOf } from './preview.ts';
   import { words } from './words.ts';
 
-  let { preview, large = false }: { preview: Preview; large?: boolean } = $props();
+  /* `lists`: the add-on's own list declarations, lent to the drawing (`preview.ts` `openedOf`). */
+  let { preview, large = false, lists = [] }: { preview: Preview; large?: boolean; lists?: readonly Record<string, unknown>[] } = $props();
 
   /* THE DAY THE PREVIEW WAS MADE IS ITS "NOW", so a row it shows as due tomorrow reads as it did in the scratch record,
      not as long overdue a month later. */
@@ -28,7 +29,7 @@
   let at = $state(0);
   const pages = $derived(large ? preview.pages : preview.pages.slice(0, 1));
   const shown = $derived(pages[Math.min(at, Math.max(pages.length - 1, 0))] ?? null);
-  const got = $derived(shown ? openedOf(shown, now) : null);
+  const got = $derived(shown ? openedOf(shown, now, lists) : null);
 </script>
 
 {#if shown && got}

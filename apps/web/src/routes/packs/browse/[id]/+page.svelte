@@ -576,7 +576,7 @@
             {#if u}
               <Preview preview={previewOf(u)} large />
             {:else if preview.state === 'ready' && preview.preview.pages.length > 0}
-              <PreviewPage preview={preview.preview} large />
+              <PreviewPage preview={preview.preview} large lists={declared.filter((d) => typeof d.register === 'string')} />
             {:else}
               <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
             {/if}

@@ -1855,7 +1855,10 @@ export function blockOf(
       return { ...shell, columns, rows, shown: rows.length, total: Math.max(matched, rows.length) };
     }
   }
-  /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer. */
+  /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer.
+     WITH NO ROW TO LABEL THERE IS NO HALF ANSWER: a list this record does not hold yet, as a store's preview of an
+     add-on draws it, says its heading and its own empty line (audit C, X11). */
+  if ((!register || !REGISTERS[register]) && sent.length === 0 && matched === 0 && kind === 'table') return shell;
   if (!register || !REGISTERS[register]) return cannot;
   /* THE NUMBERS A PROJECT REPORTED, worked out by the record: one series a measure, drawn as tiles or charts. */
   if (kind === 'stat' || kind === 'lines') {

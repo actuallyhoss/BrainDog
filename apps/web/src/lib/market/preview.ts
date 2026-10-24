@@ -12,7 +12,10 @@
 
 import type { EntryKind, PageAnswer, Preview } from '@braindog/declare/catalogue';
 
+import { REGISTERS } from '../record/held.ts';
 import { blockOf, type Opened } from '../record/page-live.ts';
+import { declOf } from '../record/remote.ts';
+import type { RegisterDecl } from '../record/schema.ts';
 import { KENNEL_AT } from './counts.ts';
 import { words } from './words.ts';
 
@@ -42,8 +45,26 @@ export async function readVersionPreview(fetcher: Fetcher, kind: EntryKind, id: 
   return read.ok ? { state: 'ready', preview: read.value } : { state: 'refused', fix: 'refusal' in read ? read.refusal.fix : words.previewRefused };
 }
 
-/** One page of a preview as `PageView` draws it: the page's own title, and each block through `blockOf`. */
-export function openedOf(answer: PageAnswer, now: number): Opened {
-  const blocks = (answer.blocks as unknown as Parameters<typeof blockOf>[0][]).map((b) => blockOf(b, new Map(), now));
-  return { from: 'live', now, page: { page: { page: answer.page, title: answer.title }, blocks } };
+/**
+ * One page of a preview as `PageView` draws it: the page's own title, and each block through `blockOf`.
+ *
+ * THE ADD-ON'S OWN LISTS ARE LENT FOR THE DRAWING (`lists`, its file's list declarations) and taken back after it
+ * (audit C of 25 October, X11). `blockOf` labels a list's cells from what this tab knows of it, and a list the record
+ * does not hold yet drew "This part of the page cannot be drawn from the record yet" on every part of the preview. One
+ * the record already holds is never replaced, and none is left behind for the rest of the tab to offer.
+ */
+export function openedOf(answer: PageAnswer, now: number, lists: readonly Record<string, unknown>[] = []): Opened {
+  const lent: string[] = [];
+  for (const d of lists) {
+    const id = typeof d.register === 'string' ? d.register : null;
+    if (id === null || REGISTERS[id] !== undefined || !Array.isArray(d.fields)) continue;
+    REGISTERS[id] = declOf({ ...(d as unknown as RegisterDecl), id });
+    lent.push(id);
+  }
+  try {
+    const blocks = (answer.blocks as unknown as Parameters<typeof blockOf>[0][]).map((b) => blockOf(b, new Map(), now));
+    return { from: 'live', now, page: { page: { page: answer.page, title: answer.title }, blocks } };
+  } finally {
+    for (const id of lent) delete REGISTERS[id];
+  }
 }
