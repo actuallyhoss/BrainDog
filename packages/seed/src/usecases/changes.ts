@@ -29,7 +29,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '3.4.0',
-      notes: "A project page says when it was last worked on from its tasks and its agents' runs together, the time Projects and Today say.",
+      notes: "A project page says when it was last worked on from its tasks and its agents' runs together, the time Projects and Today say. Where the newest number is more than a week old, the Dashboard says how long ago it came in, in place of thirty days, and a project page heads its numbers Numbers.",
     },
     {
       version: '3.3.0',

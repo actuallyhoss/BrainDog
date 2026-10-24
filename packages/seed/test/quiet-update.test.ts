@@ -1593,7 +1593,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
     /* NUMBERS IS HANDED TO PORTFOLIO, NOT RETIRED, SINCE founder 3.0.0: a hand is no loss, so it is not counted here. */
-    assert.deepEqual([diff.adds.length, diff.retires.filter((r) => r.to === undefined).length, diff.conflicts.length], [id === 'founder' ? 4 : id === 'team' ? 5 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61), and the team's three rules and two scripts (team-cycle-follows-100)`);
+    assert.deepEqual([diff.adds.length, diff.retires.filter((r) => r.to === undefined).length, diff.conflicts.length], [id === 'founder' ? 5 : id === 'team' ? 5 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61, and datapoints-age the fifth, Z20 of 25 October), and the team's three rules and two scripts (team-cycle-follows-100)`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;

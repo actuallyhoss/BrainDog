@@ -215,6 +215,21 @@
         "compare": "none"
       },
       {
+        "metric": "datapoints-age",
+        "name": "Days since a number was reported",
+        "source": "register.datapoints",
+        "where": "source is not example, at before tomorrow",
+        "value": {
+          "age": "at"
+        },
+        "format": "int",
+        "target": {
+          "lte": 6
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
         "metric": "service-numbers",
         "name": "Server and provider numbers",
         "source": "register.datapoints",
@@ -702,8 +717,57 @@
             "where": "source is not example",
             "back": 30,
             "when": {
-              "metric": "datapoints-30d",
-              "gte": 1
+              "all": [
+                {
+                  "metric": "datapoints-30d",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-age",
+                  "lt": 7
+                }
+              ]
+            }
+          },
+          {
+            "kind": "lines",
+            "heading": "Numbers, last reported {{datapoints-age}} days ago",
+            "icon": "chart-line",
+            "span": 12,
+            "source": "register.datapoints",
+            "columns": [
+              {
+                "field": "at"
+              },
+              {
+                "field": "value"
+              },
+              {
+                "field": "name"
+              },
+              {
+                "field": "unit"
+              },
+              {
+                "field": "amount"
+              },
+              {
+                "field": "thing"
+              }
+            ],
+            "where": "source is not example",
+            "back": 30,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-30d",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-age",
+                  "gte": 7
+                }
+              ]
             }
           },
           {
@@ -1068,7 +1132,7 @@
           },
           {
             "kind": "lines",
-            "heading": "Numbers, 30 days",
+            "heading": "Numbers",
             "icon": "chart-line",
             "span": 12,
             "source": "register.datapoints",

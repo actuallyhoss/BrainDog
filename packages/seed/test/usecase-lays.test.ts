@@ -187,7 +187,7 @@ const LAID: Record<string, Laid> = {
       'hands register.datapoints to portfolio',
     ],
     declares: '192a7f45d2533b26',
-    history: ['3.4.0 lays what 3.3.0 laid, word for word: Last worked on its project page reads the runs too (Z7) -> 192a7f45d2533b26'],
+    history: ['3.4.0 lays what 3.3.0 laid, word for word: Last worked reads the runs too and the Dashboard says the age of its numbers (Z7, Z20) -> 192a7f45d2533b26'],
   },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */

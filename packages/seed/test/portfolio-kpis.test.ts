@@ -109,7 +109,7 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
   const doc = useCaseDocument('founder', TODAY) as { version: string; declarations: Body[]; hands: Record<string, string>; seeds?: Body[] };
   /* 3.1.0 SINCE 24 October (things, not rows): its project page is drawn for every project; Numbers is handed as 3.0.0 did.
      3.2.0 since its project page draws Portfolio 1.23.0's stages, and 3.3.0 since it declares the project's shape as
-     blocks (C28, C29), and 3.4.0 since Last worked reads the runs too (Z7). */
+     blocks (C28, C29), and 3.4.0 since Last worked reads the runs too and the Dashboard says how old its numbers are (Z7, Z20). */
   assert.equal(doc.version, '3.4.0');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');

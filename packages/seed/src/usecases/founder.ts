@@ -59,9 +59,9 @@ const NUMBER_COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, 
  * its latest reading, for a small table under the lines (`measureLines` in `packages/kernel/src/measures.ts`). No
  * empty line: a page with no number has nothing here, and where a project sends them is the section under it.
  */
-const numbers = (where: string | null, when?: Record<string, unknown>): Record<string, unknown> => ({
+const numbers = (where: string | null, when?: Record<string, unknown>, heading = 'Numbers, 30 days'): Record<string, unknown> => ({
   kind: 'lines',
-  heading: 'Numbers, 30 days',
+  heading,
   icon: 'chart-line',
   span: 12,
   source: 'register.datapoints',
@@ -71,6 +71,37 @@ const numbers = (where: string | null, when?: Record<string, unknown>): Record<s
   ...(when ? { when } : {}),
 });
 
+/** How many days a number may be old before its heading stops saying thirty days and says how old the newest is. */
+const NUMBERS_FRESH_DAYS = 7;
+
+/**
+ * THE NUMBERS UNDER A HEADING THAT SAYS THEIR REAL AGE, SINCE 3.4.0 (the audit of 25 October, Z20): every number on a
+ * record was a month-old import drawn under "Numbers, 30 days". While the newest is from this week the heading is as
+ * it was; past a week the same lines say how long since the last one came in ("Numbers, last reported 27 days ago"),
+ * the age read off the readings themselves (`age`, by the figure named), so nothing is guessed. Two blocks and never
+ * both: the age is under a week or it is not. THE DASHBOARD'S ONLY: a project page is at its ceiling of blocks, so its
+ * one block is headed Numbers and claims no window.
+ */
+const numbersAged = (where: string | null, age: string, when?: Record<string, unknown>): Record<string, unknown>[] => {
+  const gate = (own: Record<string, unknown>): Record<string, unknown> => (when ? { all: [when, own] } : own);
+  return [
+    numbers(where, gate({ metric: age, lt: NUMBERS_FRESH_DAYS })),
+    numbers(where, gate({ metric: age, gte: NUMBERS_FRESH_DAYS }), `Numbers, last reported {{${age}}} days ago`),
+  ];
+};
+
+/** How long since the newest number was reported, in days, the example left out and nothing dated after today counted. */
+const numbersAge = (metric: string, name: string, where?: string): Record<string, unknown> => ({
+  metric,
+  name,
+  source: 'register.datapoints',
+  where: ['source is not example', ...(where ? [where] : []), SERVICE_NUMBERS_UNTIL].join(', '),
+  value: { age: 'at' },
+  format: 'int',
+  target: { lte: NUMBERS_FRESH_DAYS - 1 },
+  window: '30d',
+  compare: 'none',
+});
 
 /**
  * THE TEMPLATE'S WHERE IT STANDS FIGURES WITH THE NUMBERS THIS WEEK AFTER THEM, SINCE 2.5.0 (REC-C16 part b): a founder's
@@ -453,9 +484,12 @@ export const FOUNDER = {
      page drew only where the shape was not, went for them, and More about is declared folded, as it was drawn. No id
      added or taken away, and 3.2.0 is live, so a minor step of its own.
 
-     3.4.0, THE AUDIT OF 25 OCTOBER (Z7): the project page's Where it stands says Last worked from the record's own
-     `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads. No id added or
-     taken away, and 3.3.0 is master's, so a minor step of its own. */
+     3.4.0, THE AUDIT OF 25 OCTOBER (Z7 and Z20): the project page's Where it stands says Last worked from the record's
+     own `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads; Numbers on
+     the Dashboard says how long ago the newest came in once that is past a week (`datapoints-age`), where it said thirty
+     days over a month-old import; and a project page's Numbers is headed Numbers, since that page is at its ceiling of
+     blocks and has no room for the second heading. A figure and a block added and none taken away, and 3.3.0 is
+     master's, so a minor step of its own. */
   version: '3.4.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -537,6 +571,9 @@ export const FOUNDER = {
          project page's Where it stands says while nobody has said, beside what changed and when it was last worked.
          The week ends today, as above. */
       counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', `thing is {{it}}, at after -7d, source is not example, ${SERVICE_NUMBERS_UNTIL}`),
+      /* HOW OLD THE NEWEST NUMBER IS, SINCE 3.4.0 (the audit of 25 October, Z20), which the Dashboard's heading over the
+         numbers says once it is past a week (`numbersAged`). */
+      numbersAge('datapoints-age', 'Days since a number was reported'),
       /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0 (REC-C12), over the clauses and the ninety days of the block Renewals
          draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. The
          clauses end the ninety days today (`SERVICE_NUMBERS_UNTIL`), and this says where they start: a reading dated
@@ -678,7 +715,7 @@ export const FOUNDER = {
           },
           /* ON THE FIGURE THE LINE SAYS, so the chart is drawn exactly while the sentence over it counts something. The
              example number shows under Latest numbers and is left out here. */
-          numbers(null, { metric: 'datapoints-30d', gte: 1 }),
+          ...numbersAged(null, 'datapoints-age', { metric: 'datapoints-30d', gte: 1 }),
           {
             /* EVERY NUMBER AND EVERY ORGANISATION, FOLDED SHUT, SINCE 1.11.0: the lines above draw the same numbers, and
                these are looked up. */
@@ -749,7 +786,7 @@ export const FOUNDER = {
         blocks: [
           ...beforeMore(
             withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
-            numbers('thing is {{name}}'),
+            numbers('thing is {{name}}', undefined, 'Numbers'),
             /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
                the project draws the scheduled actions alone (`BlockSlot.svelte`). */
             { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },

@@ -1583,13 +1583,13 @@ const DECLARED: Record<string, Version> = {
   },
   /* NUMBERS HANDED TO PORTFOLIO (the KPI plan of 21 October, K1-A): 2.7.0 IS PUBLISHED AND FROZEN, and a list this pack
      declared goes, so a major step, as 2.0.0 was when organisations went to People. */
-  /* THE AUDIT OF 25 OCTOBER (Z7). 3.3.0 IS MASTER'S, so a version of its own. No id added or taken away. */
+  /* THE AUDIT OF 25 OCTOBER (Z7, Z20). 3.3.0 IS MASTER'S, so a version of its own. A figure added. */
   'founder@3.4.0': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
       adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
       extends.register.datapoints.organisation extends.register.datapoints.about_service
-      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
       metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
       metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
       setting.label_accounts setting.label_books setting.label_categories
@@ -1603,9 +1603,10 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
-    declares: '0ff9d64c783bfafe',
+    declares: 'd81b8e572fbeb078',
     history: [
       "The audit of 25 October (Z7): `page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
+      "The audit of 25 October (Z20): `page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
     ],
   },
   /* THE PROJECT'S SHAPE AS BLOCKS (C28, C29). 3.2.0 IS LIVE, so a version of its own. */

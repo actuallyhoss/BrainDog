@@ -275,15 +275,32 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
       }
       const all = (b.when as { all?: unknown[] } | undefined)?.all;
       if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
-      /* AND FOUNDER 3.4.0 (Z7 of 25 October): Last worked read the tasks alone, laid back here as 2.6.0 drew it. */
+      /* AND FOUNDER 3.4.0 (Z7, Z20 of 25 October): Last worked read the tasks alone, and the numbers were headed thirty
+         days, laid back here as 2.6.0 drew them. */
+      if (b.kind === 'lines' && b.heading === 'Numbers') return [{ ...b, heading: 'Numbers, 30 days' }];
       if (b.kind === 'stat' && Array.isArray(b.cells))
         return [{ ...b, cells: (b.cells as { metric?: string }[]).map((c) => (c.metric === 'project-worked:{{name}}' ? { ...c, metric: 'project-last-worked:{{name}}' } : c)) }];
       return [b];
     });
+  /* AND THE DASHBOARD'S TWO CHARTS SINCE founder 3.4.0 (Z20): the one headed with its age taken out, and the other's
+     gate on the age. */
+  const dashboardBefore = (blocks: Block[]): Block[] =>
+    blocks.flatMap((b): Block[] => {
+      if (b.kind !== 'lines') return [b];
+      if (String(b.heading).startsWith('Numbers, last reported')) return [];
+      const all = (b.when as { all?: unknown[] } | undefined)?.all;
+      return [Array.isArray(all) ? { ...b, when: all[0] } : b];
+    });
   /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */
-  const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[] })[]).map((d) =>
-    d.page === 'project' ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: asBefore(d.blocks as Block[]) } : d,
-  );
+  const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[]; metric?: string })[])
+    .filter((d) => d.metric !== 'datapoints-age')
+    .map((d) =>
+      d.page === 'project'
+        ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: asBefore(d.blocks as Block[]) }
+        : d.page === 'dashboard'
+          ? { ...d, blocks: dashboardBefore(d.blocks as Block[]) }
+          : d,
+    );
   /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. */
   const WENT = new Set(['Handed back or blocked', 'Money by month']);
   const was26 = frozen.pack.declarations

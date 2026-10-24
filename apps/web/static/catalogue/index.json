@@ -3651,10 +3651,10 @@
       "versions": [
         {
           "version": "3.4.0",
-          "checksum": "0f13ffa6d40b6f52d160e759e0754250be3afc6110960df1b128739937132f51",
-          "bytes": 41412,
-          "published_at": "2026-10-24T21:22:50.198Z",
-          "bump": "patch",
+          "checksum": "f16fba6f8af440e23a779c1fe1d364d8d098de28f032aa6bab61edd193002066",
+          "bytes": 43010,
+          "published_at": "2026-10-24T21:24:19.680Z",
+          "bump": "minor",
           "reach": {
             "modules": [
               "portfolio",
