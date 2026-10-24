@@ -294,6 +294,22 @@ test('A DEPLOY MID-SESSION: one list-changed line when the build moves, and the 
   await b.end();
 });
 
+test('A NEWER COMMAND INSTALLED UNDER THE SESSION is said once, at the end of the next tool answer', async (t) => {
+  const s = await stack(t);
+  let installed: string | null = null;
+  const b = bridge({ key: s.base, base: s.base, token: s.serverKey }, s.dir, watched().fetch, { installed: () => installed });
+  await b.ask('initialize', HELLO);
+  const before = await b.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
+  assert.ok(!textOf(before).includes('newer BrainDog command'), textOf(before));
+  installed = 'A newer BrainDog command is installed (2026.10.23); this session still runs 2026.10.22. Start a new session to use it.';
+  const after = await b.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
+  const content = after.result?.content as { type: string; text: string }[];
+  assert.equal(content.at(-1)?.text, installed, 'the next answer did not end on the line');
+  assert.ok(textOf(after).includes('Kiln'), 'the answer itself was lost');
+  assert.ok(b.said.includes(installed), 'the log did not say it');
+  await b.end();
+});
+
 test('A 503 REFUSES THE CALL ONCE, and a cancelled request is never answered', async (t) => {
   const s = await stack(t);
   const w = watched((one, real, signal) => {

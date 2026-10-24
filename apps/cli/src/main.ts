@@ -51,7 +51,8 @@ import { peopleCommand } from './people.ts';
 import { privateTermsCommand } from './private-terms.ts';
 import { understandCommand } from './understand.ts';
 import { signsCommand } from './signs.ts';
-import { AGENTS, hostSessionOf, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
+import { AGENTS, cliBuild, hostSessionOf, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
+import { watchInstalled } from './installed-build.ts';
 import { context } from './context.ts';
 import { doctor } from './doctor.ts';
 import { envCommand } from './env.ts';
@@ -495,7 +496,9 @@ async function mcp(args: string[]): Promise<void> {
     /* CODEX SAYS NO SESSION ID, so its session's inbox file goes by the Codex process that started this server, which
        also starts its turn-end program (`codexSession`, `notifyHook`). */
     const session = agent === 'codex' && hostSessionOf(process.env) === null ? codexSession(process.ppid) : undefined;
-    await serveBridge({ input: process.stdin, output, say, session }, to, hints);
+    /* AN UPDATE UNDER THIS SESSION IS SAID ONCE in its next tool answer (`installed-build.ts`); a checkout says nothing. */
+    const installed = installedBuild() ? watchInstalled({ file: fileURLToPath(import.meta.url), mine: cliBuild() }) : undefined;
+    await serveBridge({ input: process.stdin, output, say, session, installed }, to, hints);
     process.exitCode = 0;
     setTimeout(() => process.exit(0), 1_000).unref();
     return;

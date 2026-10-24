@@ -133,7 +133,21 @@ export type BridgeIo = {
    * (`codexSession`). Its pulse then names no session, and the record finds the run as it finds every Codex call.
    */
   session?: string | undefined;
+  /**
+   * The line to say once in the next tool answer when a newer command was installed under this session
+   * (`watchInstalled`), else `null`. Left out, nothing is ever said.
+   */
+  installed?: (() => string | null) | undefined;
 };
+
+/**
+ * A tool's answer with one more line of text at its end, for the agent to read: how a newer command reaches a session
+ * that is open. Anything but a tool's answer with content is left as it is.
+ */
+export function withLine(reply: Reply, line: string): Reply {
+  if (!('result' in reply) || !isObject(reply.result) || !Array.isArray(reply.result.content)) return reply;
+  return { ...reply, result: { ...reply.result, content: [...reply.result.content, { type: 'text', text: line }] } };
+}
 
 /** The longest a tool call waits for the pulse that tells the record what the hooks showed first (`seenFirst`). */
 export const SEEN_FIRST_MS = 2_000;
@@ -752,7 +766,10 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       version = agreed(reply) ?? version;
       reply = listChanged(reply);
     }
-    await send(linesForModel(reply, client, message));
+    /* A NEWER COMMAND INSTALLED UNDER THIS SESSION is said once, at the end of the next tool answer (`installed`). */
+    const newer = method === 'tools/call' ? (io.installed?.() ?? null) : null;
+    if (newer !== null) say(newer);
+    await send(linesForModel(newer === null ? reply : withLine(reply, newer), client, message));
   };
 
   for await (const line of createInterface({ input: io.input, crlfDelay: Infinity })) {
