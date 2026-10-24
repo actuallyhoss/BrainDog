@@ -46,8 +46,8 @@
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
-  import { lineOf, partsOf } from '$lib/record/apps.ts';
-  import { planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
+  import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
+  import { foldedAdds, planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `vault.ts` `approve`,
      the approval `/vault` sends, so the screens cannot drift apart. */
   import CodeForm from '$lib/agents/CodeForm.svelte';
@@ -65,7 +65,7 @@
   import { TONES, relative, since } from 'braindog-render';
   import { isQuiet } from '@braindog/kernel/constants';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
-  import { PRESENCE_WORDS, presenceSaid, type RunPresence } from '$lib/ui/presence-words.ts';
+  import { presenceSaid, stillWord, type RunPresence } from '$lib/ui/presence-words.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
@@ -359,11 +359,12 @@
   /** The run's ring: at work, gone quiet or stopped, from the record's own row for it. */
   const liveOfRun = (run: Run): RunLive => held.value?.live.get(run.seq) ?? 'stopped';
 
-  /** The run's word beside its face: Working now, Gone quiet, Left a step, Ended, Stopped or From before. */
-  const wordOfRun = (run: Run): string | null => {
-    const p = held.value?.presence.get(run.seq);
-    return p ? PRESENCE_WORDS[p] : null;
-  };
+  /** The run's word as the link beside a key: Working now, Gone quiet or Left a step; a finished run is its last run. */
+  const wordOfRun = (run: Run): string | null => stillWord(held.value?.presence.get(run.seq));
+
+  /** The reader, by their person id, so a key they made says so and never "made by" their own name. */
+  const me = $derived((shell.me as { person?: string | null }).person ?? null);
+  const lineOf = (c: Connection, parts: ReturnType<typeof partsOf>): string => appLineOf(c, parts, me);
 
   /* HOW MANY ARE AT WORK NOW, which is the tile's meta only when some are: "all at work now" when every connection that
      can act has a run working, and the count when only some do. */
@@ -407,7 +408,7 @@
     /* WHOSE KEY IT IS, since a colleague may mint their own: Revoke means something different on a key the
        owner made and on one a colleague's agent runs on. `person_name` is on `listTokens`'s rows and not on the type
        `device.ts` declares, so it is read here as the optional it is. */
-    const whose = (c.token as { person_name?: string | null } | null | undefined)?.person_name;
+    const whose = madeByOther(c, me);
     if (whose) facts.push(ownWords.madeBy(whose));
     /* A CONNECTION GONE QUIET FOR OVER A WEEK SAYS SO IN ITS OWN MARKED WORDS on the row, so not twice here. */
     if (idle === null) facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
@@ -724,48 +725,47 @@
   />
   <TrustRows />
 
-  <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, on the ground under the list it follows from. -->
+  <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, in a tile of its own that says what it is (audit C, X16):
+       its lists and pages by name and its figures as one count, so the offer fits on a phone's screen. -->
   {#if offer}
-    <div class="code-form offer">
-      <p class="code-label">{copy.installDiff}</p>
-      {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
-      <dl class="plan">
-        <dt>{copy.diffAdds}</dt>
-        <dd>
-          <ul class="plan-adds">
-            {#each offer.adds as add (add.kind + add.name)}
-              <li>
-                <Icon name={add.kind === 'list' ? 'rows' : add.kind === 'figure' ? 'observe' : 'doc'} size="s" />
-                <span class="plan-name">{add.name}</span>
-                <span class="plan-detail">{add.detail}</span>
-              </li>
-            {/each}
-          </ul>
-        </dd>
-        {#if offer.changes.length}
-          <dt>{vaultWords.changesTitle}</dt>
-          <dd>{#each offer.changes as c (c)}<p>{c}</p>{/each}</dd>
+    {@const folded = foldedAdds(offer)}
+    <Tile icon="session" title={vaultWords.offerTitle} data-wide data-part="agents-offer">
+      <div class="offer">
+        {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
+        <ul class="plan-adds">
+          {#each folded.named as add (add.kind + add.name)}
+            <li>
+              <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+              <span class="plan-name">{add.name}</span>
+              <span class="plan-detail">{add.detail}</span>
+            </li>
+          {/each}
+          {#if folded.more}<li><Icon name="observe" size="s" /><span class="plan-detail">{folded.more}</span></li>{/if}
+        </ul>
+        {#if offer.changes.length || offer.conflicts.length}
+          <dl class="plan">
+            {#if offer.changes.length}
+              <dt>{vaultWords.changesTitle}</dt>
+              <dd>{#each offer.changes as c (c)}<p>{c}</p>{/each}</dd>
+            {/if}
+            {#if offer.conflicts.length}
+              <dt>{copy.diffConflicts}</dt>
+              <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
+            {/if}
+          </dl>
         {/if}
-        {#if offer.conflicts.length}
-          <dt>{copy.diffConflicts}</dt>
-          <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
-        {/if}
-        <CallsOut calls={offerCalls} hosted={hostedHere(shell)} />
-        {#if offer.seeds}
-          <dt>{copy.diffSeeds}</dt>
-          <dd>{offer.seeds}</dd>
-        {/if}
-        <dt>{copy.diffTouches}</dt>
-        <dd>{offer.touches}</dd>
-      </dl>
-      <div class="row-actions">
-        <Button disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
-        <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+        {#if offerCalls.length}<dl class="plan"><CallsOut calls={offerCalls} hosted={hostedHere(shell)} /></dl>{/if}
+        {#if offer.seeds}<p class="who-why">{offer.seeds}</p>{/if}
+        <p class="who-why">{offer.touches}</p>
+        <div class="row-actions">
+          <Button weight="primary" disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
+          <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+        </div>
+        <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
+          {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}
+        </p>
       </div>
-      <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
-        {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}
-      </p>
-    </div>
+    </Tile>
   {/if}
 
   <!-- ANSWER FROM INSIDE CHAT APPS, the owner's one switch for the decision card in Claude and ChatGPT
@@ -1088,29 +1088,16 @@
     }
   }
 
-  /* THE ADD-ON OFFER, on the ground under the tile it follows from. */
+  /* THE ADD-ON OFFER, its own tile: what it is, what it adds, and the two buttons, a step apart. */
   .offer {
-    margin-block-start: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
   }
 
   /* A whole sentence, wrapping, under the row it is about. */
   .who-why {
     margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-  }
-
-  /* THE BLOCKS BELOW THE SIX-DIGIT FIELD, which show a key once and offer an install: not field rows. The field itself
-     is `CodeForm.svelte`'s, with its own styles, since Home's connect sheet draws it too. Nothing here sets a colour:
-     the answer's tone comes from `[data-intent]`. */
-  .code-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
-  }
-
-  .code-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
   }

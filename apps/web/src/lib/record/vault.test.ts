@@ -14,7 +14,7 @@ import type { Client, DeviceRow } from '@braindog/client';
 import { copy } from '../copy.ts';
 import * as vault from './vault.ts';
 import {
-  GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
+  GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, foldedAdds, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
   READ_ALL_PAGES, RECONNECT_STATE, readAll, reconnectFrom, reconnectOf, scopeName, words,
   type GrantState, type KeyRow, type ReconnectState,
 } from './vault.ts';
@@ -186,7 +186,7 @@ test('a key whose grant was revoked is not sealed any more', () => {
 test('NOTHING A PERSON READS CARRIES A VALUE, A CODE OR A HANDLE', () => {
   const keys = keysOf([{ id: 'c1', fields: { label: 'K', opens: 'o', value: 'grant_secret_id' } }], [], new Map());
   for (const k of keys) assert.doesNotMatch(JSON.stringify({ label: k.label, opens: k.opens, project: k.project }), /grant_secret_id/);
-  const drawn = [words.waiting, words.keys, words.mayOpen, words.noKeys, words.noKeysHow, words.noMachines, words.notNow, words.packInstalled, words.touches];
+  const drawn = [words.waiting, words.keys, words.mayOpen, words.noKeys, words.noKeysHow, words.noMachines, words.notNow, words.packInstalled, words.touches, words.offerTitle, words.moreFigures(36)];
   const dash = String.fromCharCode(0x2014);
   for (const line of drawn) assert.ok(!line.includes(dash), 'no em dash on screen');
   assert.equal(words.noKeysCommand, 'braindog keys put <name>', 'the one way an agent adds a key is the one named, on its own line');
@@ -315,6 +315,23 @@ test('a plan from the record reads in the Packs screen words, and keeps its hash
   assert.deepEqual(plan.changes, []);
   assert.equal(plan.seeds, '1 example row, marked example, clearable in one action');
   assert.equal(plan.touches, words.touches);
+});
+
+test('THE OFFER NAMES ITS LISTS AND PAGES AND FOLDS ITS FIGURES INTO ONE COUNT, and says plainly that nothing you wrote is touched', () => {
+  const adds = [
+    { id: 'register.learnings', summary: '10 fields' },
+    ...Array.from({ length: 36 }, (_, i) => ({ id: `metric.m${String(i)}`, summary: '' })),
+    { id: 'page.agents', summary: '13 blocks' },
+  ];
+  const plan = planOf({ adds, planHash: '4.abc' }, (_, id) => ({ learnings: 'Learnings', agents: 'Agents' })[id] ?? 'Slowest start hook, in milliseconds');
+  const folded = foldedAdds(plan!);
+  assert.deepEqual(folded.named.map((a) => a.name), ['Learnings', 'Agents']);
+  assert.equal(folded.more, 'and 36 numbers');
+  assert.equal(foldedAdds({ ...plan!, adds: plan!.adds.slice(0, 2) }).more, 'and 1 number');
+  assert.equal(foldedAdds({ ...plan!, adds: [plan!.adds[0]!] }).more, null);
+  assert.equal(plan!.touches, 'Nothing you wrote is touched');
+  assert.equal(words.offerTitle, 'Add the Agents add-on?');
+  assert.doesNotMatch(plan!.touches, /0 rows|nothing you have written/u);
 });
 
 test('a plan that writes no example rows has no line about them, not "0 example rows, marked example"', () => {

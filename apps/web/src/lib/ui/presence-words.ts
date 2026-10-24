@@ -27,6 +27,13 @@ export const PRESENCE_WORDS: Record<RunPresence, string> = {
   before: 'From before',
 };
 
+/**
+ * The word for a run that is still going (working, gone quiet, left a step), or `null` for one that is over. A link
+ * beside a key reads "Ended" as the key's own state, so a finished run is said as "last run" there instead.
+ */
+export const stillWord = (p: RunPresence | undefined): string | null =>
+  p === 'working' || p === 'quiet' || p === 'left' ? PRESENCE_WORDS[p] : null;
+
 /** A run active and heard from inside fifteen minutes is working: the kernel's `WORKING_MS`. */
 export const WORKING_MS = 15 * 60_000;
 

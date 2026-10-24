@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { presenceOf, WORKING_MS as KERNEL_WORKING_MS } from '@braindog/kernel';
 
 import { liveOf } from './face.ts';
-import { PRESENCE_WORDS, WORKING_MS, presenceSaid, ringOf, type RunPresence } from './presence-words.ts';
+import { PRESENCE_WORDS, WORKING_MS, presenceSaid, ringOf, stillWord, type RunPresence } from './presence-words.ts';
 
 const NOW = Date.UTC(2026, 9, 15, 12);
 const MIN = 60_000;
@@ -24,6 +24,14 @@ const SIX: readonly [RunPresence, ReturnType<typeof row>][] = [
   ['stopped', row('abandoned', 700)],
   ['before', row('done', null, { seen_before: iso(NOW - 90 * 24 * 60 * MIN) })],
 ];
+
+test('A LINK BESIDE A LIVE KEY SAYS A RUN THAT IS STILL GOING, never Ended or Stopped, which read as the key (audit C, X17)', () => {
+  assert.deepEqual(
+    (['working', 'quiet', 'left', 'ended', 'stopped', 'before'] as const).map((p) => stillWord(p)),
+    ['Working now', 'Gone quiet', 'Left a step', null, null, null],
+  );
+  assert.equal(stillWord(undefined), null);
+});
 
 test('SIX WORDS: each run reads its own, from the row a page holds', () => {
   for (const [word, r] of SIX) assert.equal(presenceSaid(r.state, r.fields, NOW), word, word);

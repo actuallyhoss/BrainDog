@@ -14,7 +14,7 @@ import {
   reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, connected, nameOf, normalise, reachKey,
   revocable, standing, type Connection, type DeviceRow, type TokenRow,
 } from './device.ts';
-import { APP_NAMES, clientOf, lineOf, partsOf } from './apps.ts';
+import { APP_NAMES, clientOf, lineOf, madeByOther, partsOf } from './apps.ts';
 import * as device from './device.ts';
 import { REACHES, SCOPES } from '@braindog/kernel';
 import { copy } from '../copy.ts';
@@ -235,6 +235,14 @@ test('a key with no client reads its label and is a key you made', () => {
   assert.deepEqual(partsOf(c, NOW), { app: 'nightly-report', where: null, how: 'a key you made', idle: null });
   assert.equal(lineOf(c), 'A key you made');
   assert.equal(nameOf(c), 'nightly-report');
+});
+
+test('A KEY THE READER MADE IS THEIRS, never "made by" their own name; a colleague’s says whose (audit C, X17)', () => {
+  const c = only(key({ person_id: 'p_owner', person_name: 'The Studio' }));
+  assert.equal(lineOf(c, partsOf(c, NOW), 'p_owner'), 'A key you made');
+  assert.equal(madeByOther(c, 'p_owner'), null);
+  assert.equal(lineOf(c, partsOf(c, NOW), 'p_lina'), 'A key');
+  assert.equal(madeByOther(c, 'p_lina'), 'The Studio');
 });
 
 test('a machine reads its agent on its machine, as it did before the stamp', () => {

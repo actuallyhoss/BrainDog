@@ -89,9 +89,12 @@ export const words = {
   ],
   /* The pack offered after "Connect an agent". */
   notNow: 'Not now',
+  offerTitle: 'Add the Agents add-on?',
   packInstalled: 'The agents add-on is installed.',
   seeds: (n: number) => `${n} example ${n === 1 ? 'row' : 'rows'}, marked example, clearable in one action`,
-  touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
+  touches: 'Nothing you wrote is touched',
+  /* THE OFFER'S FIGURES, FOLDED: forty engineer-worded names were a wall under Settings › Agents (audit C, X16). */
+  moreFigures: (n: number) => `and ${String(n)} ${n === 1 ? 'number' : 'numbers'}`,
   conflict: (name: string, pack: string) => `${name} already exists, from ${pack}`,
   /* WHAT AN UPDATE CHANGES. A declaration another pack handed this one is taken over, said by both names; one of its own
      is changed. */
@@ -538,6 +541,12 @@ export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page' | 'metr
     touches: words.touches,
     planHash: d.planHash,
   };
+}
+
+/** A plan's lists and pages by name, and its figures as one count ("and 36 numbers"), or `null` with none. */
+export function foldedAdds(plan: Pick<Plan, 'adds'>): { named: Plan['adds']; more: string | null } {
+  const figures = plan.adds.filter((a) => a.kind === 'figure').length;
+  return { named: plan.adds.filter((a) => a.kind !== 'figure'), more: figures === 0 ? null : words.moreFigures(figures) };
 }
 
 /**

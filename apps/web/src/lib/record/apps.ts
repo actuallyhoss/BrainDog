@@ -136,13 +136,23 @@ export function partsOf(c: Connection, nowMs: number = Date.now()): Parts {
 }
 
 /**
+ * Whose key it is, by name, when somebody other than the reader (`me`, their person id) made it, else `null`. The
+ * owner's own key named them by their Directory name, which on a new record is the record's ("made by The Studio").
+ */
+export function madeByOther(c: Connection, me: string | null = null): string | null {
+  const whose = (c.token as { person_name?: unknown } | null | undefined)?.person_name;
+  if (typeof whose !== 'string' || whose.trim() === '') return null;
+  return me !== null && c.token?.person_id === me ? null : whose;
+}
+
+/**
  * The quieter line under a connection's name: where it runs and how it came in, as one sentence.
  *
  * A KEY SOMEBODY ELSE MADE IS "A KEY", because the facts beside it already say whose, and "a key you made" over a
- * colleague's name would be untrue.
+ * colleague's name would be untrue. One the reader made is theirs.
  */
-export function lineOf(c: Connection, parts: Parts = partsOf(c)): string {
-  if (parts.how === 'a key you made') return typeof c.token?.person_name === 'string' ? copy.connectedKey : copy.connectedKeyYours;
+export function lineOf(c: Connection, parts: Parts = partsOf(c), me: string | null = null): string {
+  if (parts.how === 'a key you made') return madeByOther(c, me) === null ? copy.connectedKeyYours : copy.connectedKey;
   if (parts.how === 'this machine') return copy.connectedHere;
   if (parts.where === null) return copy.connectedSignedIn;
   return c.machine || clientOf(c.token?.client)?.kind === 'device' ? copy.connectedOn(parts.where) : copy.connectedFrom(parts.where);
