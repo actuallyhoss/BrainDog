@@ -243,3 +243,25 @@ test('ON THE SEED, A QUESTION THAT NAMES A ROW BY HANDLE OR BY ID IS READ IN ITS
   assert.doesNotMatch(card, /\b[0-9A-HJKMNP-TV-Z]{26}\b/u, 'a row id reached the card');
   sql.close();
 });
+
+/* ── a page of the queue, read once ─────────────────────────────────────── */
+
+test('A PAGE OF THE QUEUE TOO LARGE FOR ONE ANSWER IS READ ONCE AND CUT WHERE IT STANDS, its cursor the last row kept', async () => {
+  /* SIX BACKFILLS OF A SCRIPT'S, as on his record (bench 24 Oct, H1): a page of twenty did not fit, and the door read it
+     four times, each working out every card again, and still answered over the budget. */
+  const big = (i: number) => ({ id: `SG${String(100 - i)}`, status: 'open', question: `Backfill ${String(i)}?`, money: Array.from({ length: 200 }, () => ({ amount: 1_000_000, currency: 'EGP' })) });
+  const small = (i: number) => ({ id: `SG${String(50 - i)}`, status: 'open', question: `Small ${String(i)}?` });
+  const queue = [...Array.from({ length: 6 }, (_, i) => big(i)), ...Array.from({ length: 20 }, (_, i) => small(i))];
+  const { surface, calls } = stub({
+    governance: async (args: unknown, c: Ctx) => {
+      calls.push({ method: 'governance', args, ctx: c });
+      return { ok: true, value: queue.slice(0, Number((args as { limit?: number }).limit ?? queue.length)) };
+    },
+  });
+  const out = (await tools(surface).call('governance', {}, ctx)) as { ok: true; value: { rows: { id: string }[]; cursor?: string } };
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(calls.filter((c) => c.method === 'governance').length, 1, 'the page was read more than once');
+  assert.ok(JSON.stringify(out.value).length <= ANSWER_MOST, `the page is ${String(JSON.stringify(out.value).length)} characters`);
+  assert.ok(out.value.rows.length >= 1 && out.value.rows.length < 6, `kept ${String(out.value.rows.length)}`);
+  assert.equal(out.value.cursor, out.value.rows.at(-1)!.id, 'the cursor is not the last row kept');
+});

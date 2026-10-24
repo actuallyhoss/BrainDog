@@ -1092,6 +1092,22 @@ const GOVERNANCE_MOST = 100;
 export const ANSWER_MOST = 40_000;
 
 /**
+ * The longest run of `rows` from the first whose JSON fits in one answer (`ANSWER_MOST`), and never fewer than one: a
+ * page cut where it stands, for a read whose cursor is its own last row, so it is asked of the record once.
+ */
+export function fitRows<T>(rows: readonly T[]): T[] {
+  /* THE ANSWER AROUND THEM, its `rows` key, a cursor and `matched`, comes inside the same budget. */
+  let size = 64;
+  let kept = 0;
+  for (const row of rows) {
+    size += (JSON.stringify(row) ?? '').length + 1;
+    if (size > ANSWER_MOST && kept >= 1) break;
+    kept += 1;
+  }
+  return rows.slice(0, kept);
+}
+
+/**
  * The page `braindog:handoffs` draws: one table over the steps runs left, newest first, with the app that left each and
  * when. `run` rides on every row as the handle the app's name links by, and is not a column a person reads alone.
  */
@@ -2808,7 +2824,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return { result: { ok: true, value }, say: (look) => governanceBrief(args, value, look), names: { people: true, runs: actorsIn([value]) } };
       }
       const limit = limitOf(args.limit, GOVERNANCE_PAGE, GOVERNANCE_MOST);
-      const out = await fitted(limit, async (n) => {
+      /* ONE READ, CUT HERE TO FIT (bench 24 Oct, H1). `fitted` asked the record again with fewer rows, and every read
+         worked out every question's card again, a script's backfill of two hundred rows among them: on his record a page
+         of the queue was read twice and three times to answer two questions, which made `governance` twice `record_index`.
+         The cursor is the last row kept, so the rows a smaller read would have answered are exactly these. */
+      const out = await (async (): Promise<Result<{ rows: unknown[]; cursor?: string }>> => {
+        const n = limit;
         /* ONE MORE THAN THE PAGE, and a limit under 1 as sent, so the record refuses it rather than answering one. */
         const got = await surface.governance({ ...args, limit: typeof n === 'number' && Number.isInteger(n) && n >= 1 ? n + 1 : n } as never, ctx);
         if (!got.ok || !Array.isArray(got.value)) return got as Result<{ rows: unknown[] }>;
@@ -2819,11 +2840,11 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           const options = args.id !== undefined && isObject(row.body) && Array.isArray(row.body.options) ? row.body.options : undefined;
           return options === undefined ? kept : { ...kept, options };
         });
-        const rows = all.slice(0, n);
+        const rows = fitRows(all.slice(0, n));
         const last = rows.at(-1);
-        const cursor = all.length > n && isObject(last) && typeof last.id === 'string' ? last.id : undefined;
+        const cursor = all.length > rows.length && isObject(last) && typeof last.id === 'string' ? last.id : undefined;
         return { ok: true, value: { rows, ...(cursor === undefined ? {} : { cursor }) } };
-      });
+      })();
       if (!out.ok) return { result: out };
       /* HOW MANY WAIT IS THE RECORD'S COUNT, for the one page it counts: the open questions, which is the default. */
       const open = register === 'suggestion' && (args.status === undefined || args.status === 'open');
