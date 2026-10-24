@@ -37,12 +37,17 @@ const walksNow = (): Map<string, Kept> => {
   return m;
 };
 
-/** Every row of `register`, a page of 500 at a time to the end of its cursor, or the refusal of one. */
+/**
+ * Every row of `register`, a page of 500 at a time to the end of its cursor, or the refusal of one.
+ *
+ * EACH LONG TEXT CUT TO ITS FIRST LINE (`short`): a walk names rows, adds up their money and marks the finished ones, and
+ * never draws a note, and on his record the projects' notes were 457 KB of a 466 KB walk. A row's own screen reads it whole.
+ */
 export async function walkSaid(client: Pick<Client, 'list'>, register: string): Promise<Walked> {
   const rows: RecordRow[] = [];
   let cursor: string | null = null;
   do {
-    const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
+    const out = await client.list({ register, limit: 500, short: true, ...(cursor === null ? {} : { cursor }) });
     if (!out.ok)
       return { ok: false, refusal: 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The row changed while it was being read.' } };
     rows.push(...(out.value.rows as RecordRow[]));

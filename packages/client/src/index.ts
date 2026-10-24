@@ -2389,6 +2389,8 @@ export function createClient(options: ClientOptions) {
       includeDeleted?: boolean;
       /** Only these fields of each row, its other columns kept: a walk for names need not carry every note. */
       fields?: string[];
+      /** Each long text cut to its first line, at most 200 characters and a closing `…`: for a walk that never draws a note. */
+      short?: boolean;
     }) => call<Page<unknown>>('list', args as Record<string, unknown>),
     /**
      * How many entries of one list hold each value of one field, in one read. `counts` is the most common values; `more`

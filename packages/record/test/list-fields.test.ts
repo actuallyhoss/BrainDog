@@ -41,3 +41,17 @@ test('FIELDS THAT ARE NOT A LIST OF NAMES ARE REFUSED, naming fields', async () 
   }
   sql.close();
 });
+
+test('LIST WITH SHORT CUTS EACH LONG TEXT TO ITS FIRST LINE, and leaves the rest whole', async () => {
+  const { sql, api } = await record();
+  await api.create({ register: 'things', fields: { name: 'Kiln', notes: 'First line\nSecond line' } }, owner);
+  const out = await api.list({ register: 'things', short: true }, owner);
+  assert.ok(out.ok, JSON.stringify(out));
+  const notes = String(out.value.rows.find((r) => r.fields.name === 'Lamp')!.fields.notes);
+  assert.ok(notes.length <= 201 && notes.endsWith('…'), `${notes.length} characters`);
+  assert.ok('A long note '.repeat(200).startsWith(notes.slice(0, -1)));
+  assert.equal(out.value.rows.find((r) => r.fields.name === 'Kiln')!.fields.notes, 'First line\nSecond line');
+  const bad = await api.list({ register: 'things', short: 'yes' as never }, owner);
+  assert.equal(!bad.ok && 'refusal' in bad && bad.refusal.at, 'short');
+  sql.close();
+});

@@ -121,10 +121,12 @@ const clientOf = (base: string, io?: Fetch) => createClient({ base, ...(io ? { f
 
 /** The runs an agent has made on this record, newest first: one page is plenty to know who they are. */
 const RUNS_READ = 200;
+/** And of each run only who ran it and where: a run's doing, its notes and its handoff were most of 200 runs' bytes. */
+const RUN_FIELDS = ['agent', 'host', 'seat'];
 
 /** Every row of a list this caller may read, or `null` when it may not. People is small; a page of 500 is its whole. */
-async function rowsOf(base: string, register: string, io?: Fetch, limit = 500): Promise<RecordRow[] | null> {
-  const got = await clientOf(base, io).list({ register, limit });
+async function rowsOf(base: string, register: string, io?: Fetch, limit = 500, fields?: string[]): Promise<RecordRow[] | null> {
+  const got = await clientOf(base, io).list({ register, limit, ...(fields ? { fields } : {}) });
   return got.ok ? (got.value.rows as RecordRow[]) : null;
 }
 
@@ -149,7 +151,7 @@ export async function readHolders(
   const [asked, rows, runs] = await Promise.all([
     hand.person ? client.members().catch(() => null) : Promise.resolve(null),
     hand.person ? rowsOf(base, people.register, io).catch(() => null) : Promise.resolve([]),
-    hand.agent ? rowsOf(base, 'session', io, RUNS_READ).catch(() => null) : Promise.resolve([]),
+    hand.agent ? rowsOf(base, 'session', io, RUNS_READ, RUN_FIELDS).catch(() => null) : Promise.resolve([]),
   ]);
   if (rows === null && runs === null) return { from: 'refused', fix: copy.handReadFailed };
   const listed: Member[] =
@@ -264,7 +266,7 @@ export async function startWith(base: string, now: number, io?: Fetch): Promise<
   const kind = kinds?.ok ? startKindOf(kinds.value) : null;
   if (kind === null) return null;
   const machines = runs.value.jobs.some((r) => typeof r.ran_on === 'string' && r.ran_on !== '');
-  const sessions = machines ? await rowsOf(base, 'session', io, RUNS_READ).catch(() => null) : null;
+  const sessions = machines ? await rowsOf(base, 'session', io, RUNS_READ, RUN_FIELDS).catch(() => null) : null;
   return { kind, places: startPlacesOf(runs.value.jobs, sessions ?? [], now) };
 }
 

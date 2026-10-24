@@ -737,6 +737,26 @@ const HELD_MS = 30_000;
 /** The most field names one `list` may ask for (`fields`). */
 const LIST_FIELDS_MOST = 64;
 
+/** The most characters of one text field a `list` asked `short` sends (`shortFields`). */
+const LIST_SHORT = 200;
+
+/**
+ * One row with each long text cut to its first line, at most `LIST_SHORT` characters and a closing `…`: a walk that names
+ * rows and adds up their money read every note whole, and his things list was 466 KB, 457 KB of it notes.
+ */
+function shortFields(row: Entry): Entry {
+  let cut = false;
+  const kept: Record<string, JsonValue> = {};
+  for (const [k, v] of Object.entries(row.fields)) {
+    if (typeof v === 'string' && v.length > LIST_SHORT) {
+      const line = v.split('\n', 1)[0]!;
+      kept[k] = `${line.slice(0, LIST_SHORT).trimEnd()}…`;
+      cut = true;
+    } else kept[k] = v as JsonValue;
+  }
+  return cut ? { ...row, fields: kept } : row;
+}
+
 /** One row with only the fields asked for; its other columns stay. */
 function onlyFields(row: Entry, fields: readonly string[]): Entry {
   const kept: Record<string, JsonValue> = {};
@@ -10177,6 +10197,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* SOME FIELDS ONLY (scope 2026-10-24 A10): a walk that wants each row's name read every note whole, and his things
            list was 466 KB, 457 KB of it notes. Absent is every field, as before; each row keeps its other columns. */
         fields?: string[];
+        /* AND EACH LONG TEXT CUT TO ITS FIRST LINE (`shortFields`), for a walk that names rows and never draws a note. */
+        short?: boolean;
       },
       ctx: CallContext,
     ): Promise<Result<Page<Entry>>> {
@@ -10243,7 +10265,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          register called tasks", which sends a person looking for a list that is only asleep. */
       /* HER OWN FILTER AND ORDER ARE READ WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), so naming one is a
          field the list does not have, and the rows come back without them (`sight.mask`). */
-      const { fields: _picked, ...asked } = args;
+      if (args.short !== undefined && args.short !== null && typeof args.short !== 'boolean')
+        return no('VALUE_MALFORMED', `short is true or false, and ${JSON.stringify(args.short) ?? String(args.short)} is neither.`, { at: 'short' });
+      const { fields: _picked, short: _short, ...asked } = args;
       const read = offRegister(
         args.register,
         sight.mask(
@@ -10264,7 +10288,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ),
         ),
       );
-      return Array.isArray(picked) && read.ok ? { ...read, value: { ...read.value, rows: read.value.rows.map((r) => onlyFields(r, picked)) } } : read;
+      const shaped = (r: Entry): Entry => {
+        const some = Array.isArray(picked) ? onlyFields(r, picked) : r;
+        return args.short === true ? shortFields(some) : some;
+      };
+      return (Array.isArray(picked) || args.short === true) && read.ok ? { ...read, value: { ...read.value, rows: read.value.rows.map(shaped) } } : read;
     },
 
     /**
