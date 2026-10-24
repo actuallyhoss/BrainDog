@@ -218,6 +218,7 @@ const BOOT = {
       }),
     ),
   ),
+  rowPages: optional(list(keys({ register: 'string', rows: list(list(or('number', 'string'))) }))),
   counts: optional(keys({ decide: 'number', inbox: or('number', 'null'), decided: optional('number'), arrived: optional(or('number', 'null')) })),
   pen: optional(list('any')),
   whatsNew: optional(keys({ events: list(keys({ id: 'string' })), upTo: or(map('any'), 'string', 'number', 'null'), sinceCapped: 'boolean' })),

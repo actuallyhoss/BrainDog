@@ -13,8 +13,8 @@ import test from 'node:test';
 
 import { SCREENS, judge, seededBy } from '../perf.mjs';
 
-const P = { paintMs: 10, drawnMs: 20, copyMs: 30, todayCopyMs: 40, revisitMs: 50 };
-const row = (screen, over = {}) => ({ screen, width: 390, paint: 1, drawn: 1, copy: 1, revisit: 1, ...over });
+const P = { paintMs: 10, drawnMs: 20, copyMs: 30, todayCopyMs: 40, revisitMs: 50, callsMax: Object.fromEntries(SCREENS.map((s) => [s.name, 5])) };
+const row = (screen, over = {}) => ({ screen, width: 390, paint: 1, drawn: 1, copy: 1, revisit: 1, calls: 1, by: { boot: 1 }, asked: ['boot'], ...over });
 
 test('times inside every ceiling are green', () => {
   assert.deepEqual(judge(SCREENS.map((s) => row(s)), P), []);
@@ -34,6 +34,15 @@ test('Today is held to its own ceiling for the kept copy, and every other screen
   assert.deepEqual(judge([row(today, { copy: 40 })], P), []);
   assert.equal(judge([row(today, { copy: 41 })], P).length, 1);
   assert.equal(judge([row(other, { copy: 31 })], P).length, 1);
+});
+
+test('a screen over its reads budget, one with none, and one asking a read twice are each a finding (scope 2026-10-24 A6, A11)', () => {
+  const other = SCREENS.find((s) => !s.today);
+  const over = judge([row(other, { calls: 6, by: { list: 6 } })], P);
+  assert.equal(over.length, 1);
+  assert.match(over[0], new RegExp(`^${other.name} @390  asked 6 reads, over its budget of 5 \\(list 6\\)$`, 'u'));
+  assert.match(judge([row(other)], { ...P, callsMax: {} })[0], /has no reads budget in perf.callsMax/u);
+  assert.equal(judge([row(other, { asked: ['list tasks', 'list tasks'] })], P).length, 1);
 });
 
 test('the nine screens are the ones the roadmap names, and exactly one is Today', () => {

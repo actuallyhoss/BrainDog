@@ -19,7 +19,7 @@ function host(mode: Mode) {
   const asked: string[] = [];
   const one = (method: string, args: Record<string, unknown>) =>
     method === 'list' && args['register'] === 'nowhere'
-      ? { status: 404, body: { ok: false, refusal: { code: 'LIST_UNKNOWN', fix: 'There is no list called nowhere.' } } }
+      ? { status: 404, body: { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'There is no list called nowhere.' } } }
       : { status: 200, body: { ok: true, value: { method, register: args['register'] ?? null, rows: [] } } };
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -62,7 +62,7 @@ test('READS ASKED TOGETHER GO AS ONE, each answered as it would be alone, a refu
     assert.deepEqual(h.asked, ['reads(list:tasks,list:nowhere,list:things)']);
     assert.equal(tasks.ok && (tasks.value as unknown as { register: string }).register, 'tasks');
     assert.equal(things.ok && (things.value as unknown as { register: string }).register, 'things');
-    assert.equal(!nowhere.ok && 'refusal' in nowhere && nowhere.refusal.code, 'LIST_UNKNOWN');
+    assert.equal(!nowhere.ok && 'refusal' in nowhere && nowhere.refusal.code, 'REGISTER_UNKNOWN');
   }));
 
 test('ONE READ BY ITSELF GOES AS IT ALWAYS DID, and the version poll never waits on a wave', () =>

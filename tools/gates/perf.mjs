@@ -311,7 +311,7 @@ export function judge(rows, P = budget('perf')) {
     else if (r.calls > most) out.push(`${r.screen.name} @${r.width}  asked ${r.calls} reads, over its budget of ${most} (${Object.entries(r.by).map(([k, v]) => `${k} ${v}`).join(', ')})`);
     /* A SCREEN ASKS NO READ TWICE (scope 2026-10-24 A11): one tile asking what another already asked is the record's
        time spent twice, and the first sign of a screen that has started asking for itself again. */
-    for (const [read, n] of twiceAsked(r.asked)) out.push(`${r.screen.name} @${r.width}  asked ${read.slice(0, 120)} ${n} times in one open`);
+    for (const [read, n] of twiceAsked(r.asked)) out.push(`${r.screen.name} @${r.width}  asked ${read} ${n} times in one open`);
   }
   return out;
 }

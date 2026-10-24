@@ -52,7 +52,7 @@ const asked = (calls: unknown[], headers: Record<string, string> = {}) =>
 test('EACH READ ANSWERED 200 IS KEPT UNDER ITS OWN ADDRESS, and a refused one is not', async () => {
   const things = { ok: true, value: { rows: [{ seq: 1 }] } };
   const w = await worker(() =>
-    json({ ok: true, value: { answers: [{ status: 200, body: things }, { status: 404, body: { ok: false, refusal: { code: 'LIST_UNKNOWN', fix: 'No.' } } }] } }),
+    json({ ok: true, value: { answers: [{ status: 200, body: things }, { status: 404, body: { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'No.' } } }] } }),
   );
   const res = await w.send(asked([{ method: 'list', args: { register: 'things' }, at: at('list?register=things') }, { method: 'list', args: { register: 'nowhere' }, at: at('list?register=nowhere') }]));
   assert.equal(res?.status, 200);
