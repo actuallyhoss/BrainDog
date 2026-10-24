@@ -218,6 +218,23 @@ function wholeName(typed: string): string | null {
   return HANDABLE.test(n) && !SPOKEN.test(n) ? n : null;
 }
 
+/* The words that name a mailbox and never a person: "info@", "hello@", "studio@". */
+const MAILBOXES: ReadonlySet<string> = new Set([
+  'info', 'hello', 'hi', 'hey', 'admin', 'contact', 'mail', 'email', 'office', 'team', 'sales', 'support', 'help', 'studio', 'shop',
+  'store', 'orders', 'billing', 'accounts', 'enquiries', 'inquiries', 'noreply', 'test', 'user', 'me', 'home', 'work', 'design',
+]);
+
+/**
+ * THE NAME AN ADDRESS GIVES ITS PERSON, or '' (audit C, X4): the first word of its local part, capitalised, where that
+ * word is letters alone, two or more of them, and not a mailbox's name. "mariam@" is Mariam, which People already calls
+ * her; "info@", "j.smith@" and "x7@" give none, and the person is asked for a name where one is needed.
+ */
+export function nameOfAddress(email: string): string {
+  const first = (email.trim().split('@')[0] ?? '').split(/[._+-]/u)[0] ?? '';
+  if (!/^\p{L}{2,24}$/u.test(first) || MAILBOXES.has(first.toLowerCase())) return '';
+  return first.charAt(0).toLocaleUpperCase() + first.slice(1).toLocaleLowerCase();
+}
+
 /** What the first sentence named: the person, and the business or project they run, as `propose` heard them. */
 export type HeardNames = { person: string | null; business: string | null };
 

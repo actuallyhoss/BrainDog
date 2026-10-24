@@ -10,7 +10,7 @@ import type { UseCase } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
 import { amend, NO_AMEND, type Amend, type Reply } from '../../lib/first-run.ts';
 import { closeOver, INSTALL_ORDER } from '../../lib/shape.ts';
-import type { Draft } from '../../lib/signup.ts';
+import { nameOfAddress, type Draft } from '../../lib/signup.ts';
 import { placesOf, type Proposal } from '../../lib/start/propose.ts';
 import { answer } from '../../lib/start/question.ts';
 import type { Accepting } from '../start/accept.ts';
@@ -22,10 +22,11 @@ import { caseOf, keepsCurrency } from '../start/preview.ts';
  * THE TWO NAMES THE PAGE SENDS, one place for both, so the page and the people walk (`tools/people`) send the same.
  *
  * `nameSent`, at the start: the person's own name heard in her sentence, which the Directory makes her by ("Mariam").
+ *   With none heard, the name her address gives (`nameOfAddress`), the one People already calls her by (audit C, X4).
  * `titleSent`, when the record is made: the name she was shown for it ("Mariam's Candles", uc6-walk-50), else what
  * the host already holds. By then she is a person already, so the name the record is made under names the record alone.
  */
-export const nameSent = (p: Pick<Proposal, 'name'> | null): string => p?.name ?? '';
+export const nameSent = (p: Pick<Proposal, 'name'> | null, email = ''): string => p?.name ?? nameOfAddress(email);
 export const titleSent = (p: Pick<Proposal, 'title' | 'name'> | null, held: string | null): string | null => p?.title ?? held ?? (p?.name || null);
 
 export type Extra = { amend: Amend; reply: Reply | null };

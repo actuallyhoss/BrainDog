@@ -801,7 +801,7 @@
     if (!ready) return;
     /* HER NAME AT THE START, AND THE RECORD'S WHEN IT IS MADE (`nameSent`, `titleSent`): the record opens as the name she
        was shown, "Mariam's Candles", and she is Mariam. */
-    const person = nameSent(read);
+    const person = nameSent(read, email);
     if (signedIn !== null) {
       /* NO MAIL TO WAIT ON: kept now, because a paid plan leaves for Stripe's page and comes back to a new page load. */
       keepAll();

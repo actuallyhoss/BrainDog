@@ -11,7 +11,7 @@ import { NO_AMEND, type Reply } from '../../lib/first-run.ts';
 import type { Draft } from '../../lib/signup.ts';
 import { propose, type Proposal } from '../../lib/start/propose.ts';
 import { browserCurrencyEnv, zoneCurrency } from '../start/building.ts';
-import { accepting, picked, replyOf, type BuildEnv, type Extra } from './build.ts';
+import { accepting, nameSent, picked, replyOf, type BuildEnv, type Extra } from './build.ts';
 
 const SAID = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
 const ZONE = 'Africa/Cairo';
@@ -107,4 +107,15 @@ test('A USE CASE PICKED BY HAND stands over the one heard and leaves out the one
   assert.equal(alone.one?.usecase, 'shop');
   assert.deepEqual(alone.modules, picked({ usecase: null, also: [], modules: [] }, 'shop').modules);
   assert.ok(alone.modules.length > 0);
+});
+
+/* A NEW PERSON WITH NO NAME HEARD WAS NOBODY (audit C, X4): the face said "Y" and Signing in said her address twice,
+   while People already called her Mariam from the same address. She is sent as People names her. */
+test('WITH NO NAME HEARD SHE IS SENT AS HER ADDRESS NAMES HER, and never as a word that names a mailbox', () => {
+  assert.equal(nameSent({ name: 'Nadia' }, 'someone@pots.example'), 'Nadia', 'a name heard comes first');
+  assert.equal(nameSent({ name: null }, 'mariam@ceramics.example'), 'Mariam');
+  assert.equal(nameSent({ name: null }, 'Mariam.K@ceramics.example'), 'Mariam');
+  assert.equal(nameSent(null, 'tomas_berg+shop@pots.example'), 'Tomas');
+  for (const box of ['info@pots.example', 'hello@pots.example', 'j.smith@pots.example', 'x7@pots.example', 'studio@pots.example', ''])
+    assert.equal(nameSent({ name: null }, box), '', box);
 });
