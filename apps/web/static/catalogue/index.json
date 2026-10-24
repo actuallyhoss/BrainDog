@@ -855,8 +855,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.4.0",
+      "latest": "1.4.1",
       "versions": [
+        {
+          "version": "1.4.1",
+          "checksum": "6acfb2ba757e4476cf2fd395fbfdb62de63e0d4d69b0fd02ac2d03a0666148a3",
+          "bytes": 15354,
+          "published_at": "2026-10-24T21:49:45.144Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged.",
+          "preview": true
+        },
         {
           "version": "1.4.0",
           "checksum": "e3a9c43402aecd60659a723b72d0f7b8fb83435c337a0ca283dad1e7cabdf01c",

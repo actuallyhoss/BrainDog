@@ -1,0 +1,180 @@
+{
+  "format": 1,
+  "made_at": "2026-10-24T21:49:45.144Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "cells": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            }
+          ],
+          "heading": "What you hold",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-unpriced"
+          },
+          "key": "k1x4zwfp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value"
+            }
+          ],
+          "heading": "What you hold",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-unpriced"
+          },
+          "key": "k1x4zwfp-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on"
+            }
+          ],
+          "heading": "Priced on",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k0fyxxqv",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on",
+              "target": {
+                "gte": 0
+              },
+              "reading": {
+                "value": null,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": null
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "label",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "qty"
+            },
+            {
+              "field": "unit_cost"
+            },
+            {
+              "field": "price"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "acquired_on"
+            },
+            {
+              "field": "matures_on"
+            }
+          ],
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost, and what it is worth now when you know.",
+          "heading": "Everything you hold",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "acquired_on"
+            }
+          ],
+          "source": "register.holdings",
+          "span": 12,
+          "key": "k00991of",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "holdings",
+      "page": "holdings",
+      "requires": [
+        "register.holdings"
+      ],
+      "title": "Holdings",
+      "read_at": "2026-10-24T21:49:45.144Z",
+      "zone": "UTC",
+      "look": {
+        "look": "holdings",
+        "basis": "r0j5pvwi",
+        "by": "rule",
+        "hide": [
+          "k0fyxxqv",
+          "k00991of"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}
