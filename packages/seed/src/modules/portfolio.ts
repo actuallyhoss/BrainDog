@@ -7,6 +7,7 @@
 
 import { LOOKUPS, NOW, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 import { KPI_BACKFILL_SCRIPT } from './portfolio/kpi-backfill.js';
+import { KIND_DRAFTS } from './portfolio/kind-drafts.js';
 
 /* ── things, and their frozen identity hues ───────────────────────────────
    The hue is chosen at create by the theme's `nextAccentHue` and written once. The kernel never
@@ -1019,7 +1020,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
  * plan's K2-C). It was written and tested (`portfolio/kpi-backfill.js`) and declared nowhere, so a record that kept
  * readings in Numbers held no key number and nothing offered one. It asks, once a project, and writes nothing itself.
  */
-export const PORTFOLIO_AUTOMATIONS: readonly Record<string, unknown>[] = [KPI_BACKFILL_SCRIPT];
+export const PORTFOLIO_AUTOMATIONS: readonly Record<string, unknown>[] = [KPI_BACKFILL_SCRIPT, ...KIND_DRAFTS];
 
 /**
  * WHAT ASKS A PERSON ON ITS OWN: a project still in play whose day has passed. It writes nothing; the question lands on

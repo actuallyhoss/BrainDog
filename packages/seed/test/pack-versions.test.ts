@@ -1648,9 +1648,10 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '51dc5d1980e22138',
+    declares: 'e6838ed287542b79',
     history: [
       "Money 3.20.0 (the scope of 24 October, B6, B8, B24): `rule.bill-moves-line` and `script.move_line` ask once to move a paid bill's twin repeating line on, and `script.match_payment` links the bill where a bill and a line share a name; `register.accounts` gains `limit`, `to_pay` and `to_pay_on`, `rule.card-text-owes`, `rule.card-limit-owes` and `script.card_owed` work out what is to pay on a card, `metric.card-to-pay` and `metric.card-to-pay-on` read it, and `page.money`'s lines say it; `page.money-rules` says the entries with no category with File old entries -> 51dc5d1980e22138",
+      "Money 3.20.0: `rule.card-limit-owes` drops its `when`, which a record updating from before Accounts had `limit` refuses to plan, so `script.card_owed` alone says which card it works on -> e6838ed287542b79",
     ],
   },
   'work@1.17.0': {
@@ -1841,6 +1842,24 @@ const DECLARED: Record<string, Version> = {
     declares: 'e28e87b9a2383950',
     history: [
       "Portfolio 1.22.0 (B26): `script.kpi_backfill` offers each project its key numbers from Numbers, once a day and once a project, as questions; one script added -> e28e87b9a2383950",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: portfolio 1.23.0 is on master. */
+  'portfolio@1.24.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: '15715957db36963f',
+    history: [
+      "Projects 1.24.0 (the scope of 24 October, B27): `rule.kind-offers-kpis` starts `script.kind_drafts` when a project's kind is set, which offers its kind's four key numbers as drafts in one question -> 15715957db36963f",
     ],
   },
   'portfolio@1.19.0': {

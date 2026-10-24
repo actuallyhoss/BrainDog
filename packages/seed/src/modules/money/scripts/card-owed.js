@@ -82,7 +82,10 @@ export const CARD_OWED_SCRIPT = {
   source: `${cardOwed.toString()}\nexport default ${run.toString()}`,
 };
 
-/** A LEDGER ROW THAT SAYS WHAT IS AVAILABLE, AND A CARD WHOSE LIMIT IS TYPED, each start `script.card_owed`. */
+/**
+ * A LEDGER ROW THAT SAYS WHAT IS AVAILABLE, AND A CARD WHOSE LIMIT IS TYPED, each start `script.card_owed`. Neither has
+ * a `when`: a record updating from before the field was there plans the rule without it, so the script checks.
+ */
 export const CARD_OWED_RULES = [
   {
     rule: 'card-text-owes',
@@ -96,7 +99,6 @@ export const CARD_OWED_RULES = [
     name: 'Work out what a card owes once its limit is typed',
     pack: 'money-core',
     on: { written: { register: 'accounts', op: ['create', 'update'], fields: ['limit'] } },
-    when: 'limit is set, kind is card',
     steps: [{ script: { id: 'card_owed', as: 'owing', input: { account: '{{trigger.entry}}' } } }],
   },
 ];

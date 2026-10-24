@@ -201,35 +201,40 @@ function drawn(doc: File): { metric: string; when: unknown }[] {
   return out;
 }
 
-test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, one rule and one script that only asks', () => {
+test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, two rules and two scripts that only ask', () => {
   const doc = file();
   assert.equal(doc.pack, 'portfolio');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
-    Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
+    Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
     /* TWENTY SINCE 1.17.0 (PGS-C17): `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
        the strip's Earning with its nights. THREE LISTS AND TWENTY-TWO FIGURES SINCE 1.19.0: Numbers and the key numbers,
        with how many key numbers are kept and how long since a measure was read. FOUR LISTS AND TWENTY-FIVE SINCE 1.23.0:
-       the stages, how many a project has, and which shape its plan is drawn in. */
-    { register: 4, page: 1, metric: 25, rule: 1 },
-    'four lists, one page, twenty-five figures and one rule',
+       the stages, how many a project has, and which shape its plan is drawn in. A SECOND RULE AND ITS SCRIPT SINCE 1.24.0
+       (B27 of 24 October): a project's kind offers its key numbers as drafts. */
+    { register: 4, page: 1, metric: 25, rule: 2, script: 2 },
+    'four lists, one page, twenty-five figures, two rules and two scripts',
   );
-  /* ONE SCRIPT SINCE 1.22.0, the key-numbers backfill: it reads Projects' own lists, reaches nothing outside and holds no
-     key, and it files questions rather than rows. Nothing else in the file runs a script or reaches out. */
+  /* ONE SCRIPT SINCE 1.22.0, the key-numbers backfill, AND A SECOND SINCE 1.24.0, the drafts by kind: each reads Projects'
+     own lists, reaches nothing outside and holds no key, and files questions rather than rows. Only the rule that starts
+     the second runs a script, and nothing reaches out. */
   assert.ok(!kinds.includes('something else'), 'the file declares something that is none of the five');
   const scripts = doc.declarations.filter((d) => typeof d.script === 'string');
   assert.deepEqual(
     scripts.map((d) => [d.script, d.egress, d.keys, d.reads, d.writes]),
-    [['kpi_backfill', [], [], ['things', 'kpis', 'datapoints'], ['kpis']]],
-    'the one script reaches out, holds a key or touches a list that is not Projects\'',
+    [
+      ['kpi_backfill', [], [], ['things', 'kpis', 'datapoints'], ['kpis']],
+      ['kind_drafts', [], [], ['things', 'kpis'], ['kpis']],
+    ],
+    'a script reaches out, holds a key or touches a list that is not Projects\'',
   );
-  const rest = doc.declarations.filter((d) => typeof d.script !== 'string');
+  const rest = doc.declarations.filter((d) => typeof d.script !== 'string' && d.rule !== 'kind-offers-kpis');
   assert.doesNotMatch(JSON.stringify(rest), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
 
   /* NO FIGURE OVER A LIST IT DOES NOT OWN, and the rule is on the projects: a project past the day it aims for. */
   for (const d of doc.declarations)
     if (typeof d.metric === 'string') assert.ok(LISTS.some((l) => d.source === `register.${l}`), `${String(d.name)} reads a list that is not Projects'`);
-  assert.deepEqual(doc.declarations.filter((d) => typeof d.rule === 'string').map((d) => [d.rule, d.register]), [['project-past-aim', OWN[0]]]);
+  assert.deepEqual(doc.declarations.filter((d) => typeof d.rule === 'string').map((d) => [d.rule, d.register ?? ((d.on as Body | undefined)?.written as Body | undefined)?.register]), [['project-past-aim', OWN[0]], ['kind-offers-kpis', OWN[0]]]);
 
   /* A FIGURE DRAWN HERE THAT THE FILE DOES NOT DECLARE IS WORK'S, and its line waits for the list that figure reads. */
   const mine = new Set(doc.declarations.flatMap((d) => (typeof d.metric === 'string' ? [d.metric] : [])));
@@ -246,9 +251,9 @@ test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, 
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.23.0');
+  assert.equal(doc.version, '1.24.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -343,14 +348,14 @@ function project(api: Api, name: string): string {
 }
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same thirty-two parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same thirty-four parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const parts = await ours();
-    assert.equal(parts.length, 32);
+    assert.equal(parts.length, 34);
     for (const id of parts) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

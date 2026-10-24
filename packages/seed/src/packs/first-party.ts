@@ -692,9 +692,12 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `card-text-owes`, `card-limit-owes`, `card_owed`, `card-to-pay`, `card-to-pay-on`), said in Money's first line;
  *   and Filing rules says how many entries have no category with File old entries. 3.19.0 is master's (things,
  *   not rows), so a version of its own. Ids added and none taken away, so a minor step.
+ * - portfolio 1.24.0 (the scope of 24 October, B27): a project's kind set offers its kind's four key numbers as drafts,
+ *   one question a project (`kind-offers-kpis`, `kind_drafts`), and none to a project that holds key numbers. One rule
+ *   and one script added and nothing taken away, so a minor step. 1.23.0 is master's (the stages road).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.23.0',
+  portfolio: '1.24.0',
   people: '3.6.0',
   'money-core': '3.20.0',
   estate: '2.3.0',
