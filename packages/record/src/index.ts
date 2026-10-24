@@ -176,6 +176,8 @@ import {
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
   HEADLINES_HELD,
+  tiledLead,
+  tileValuesOf,
   HEADLINES_OWED,
   headlineBasis,
   headlineFault,
@@ -4834,7 +4836,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const asked = askedOn(prefs[HEADLINES_ASKED], today);
     if (asked.asks >= HEADLINE_ASKS_DAY) return { said: [], dropped: [] };
     const pressing = pressingRead(today);
-    let due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[] = [];
+    let due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[]; row?: true }[] = [];
     /* A PAGE IS DUE when what it would be written from is not what its line was, and it was not asked at that today. */
     const owed = (slug: string, basis: string, facts: string | undefined): boolean => {
       const stored = storedHeadline(prefs[headlineKey(slug)]);
@@ -4846,21 +4848,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const basis = homeBasis(home, today);
       if (owed(HOME_PAGE, basis, undefined)) due.push({ page: home, basis });
     }
-    for (const p of kernel.pages()) {
+    /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October, C4): a project's hero said its
+       rules' line alone. Pages somebody wrote first, then a page per row, the row touched last first, all under the same
+       `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
+    const listed = kernel.pages();
+    const touched = (p: (typeof listed)[number]): string => String(p.about?.updated_at ?? '');
+    const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
+    for (const p of ordered) {
       if (due.length >= HEADLINE_PAGES_MOST) break;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
-      if (p.nav === null || p.about !== null || p.slug === HOME_PAGE) continue;
+      if (p.nav === null || p.slug === HOME_PAGE) continue;
+      const row = p.about !== null;
       const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
       if (!read.ok) continue;
-      const lead = leadBlockOf(read.value.blocks);
-      if (lead === null) continue;
+      const plain = leadBlockOf(read.value.blocks);
+      if (plain === null) continue;
+      /* A PAGE PER ROW IS WRITTEN FROM ITS TILES TOO (`tiledLead`), and so asked again when one of them moves. */
+      const lead = row ? tiledLead(plain, read.value.blocks) : plain;
       const basis = headlineBasis(p.slug, lead);
-      const named = pressingOf(pressing, listsRead(read.value.blocks));
+      /* WHAT IS LATE OR DUE ON A LIST IS NOT NAMED ON A PAGE ABOUT ONE ROW: the late task may be another project's. */
+      const named = row ? { items: [], question: undefined } : pressingOf(pressing, listsRead(read.value.blocks));
       const facts = factsBasis(named.items, named.question);
       if (!owed(p.slug, basis, facts)) continue;
       /* HOW FAR EACH FIGURE MOVED, asked of the record in one block over every figure the note names, so the model can say
          "up on last month" from the record's own arithmetic rather than its guess. */
-      const holes = holesOf(lead.body);
+      const holes = [...new Set([...holesOf(lead.body), ...(row ? Object.keys(tileValuesOf(read.value.blocks)) : [])])];
       let moved: Record<string, JsonValue> = {};
       const changing = holes.filter((h) => !h.includes('.') && !Object.hasOwn(lead.values, `${h}.change`));
       if (changing.length > 0)
@@ -4881,7 +4893,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (figures.length === 0) continue;
       /* AND WHAT ITS LOOK IS MADE OF, in the same ask (`compose-look.ts`): its blocks by key and a few rows it draws, so the
          model may answer an order and one next step beside the line, at no ask beyond it. */
-      const look = lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null, groupListsOf(kernel));
+      /* NOT ON A PAGE PER ROW, whose order is its template's: one row's page is not arranged apart from the rest. */
+      const look = row ? { blocks: [], rows: [] } : lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null, groupListsOf(kernel));
       due.push({
         page: {
           page: p.slug,
@@ -4897,6 +4910,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(facts === undefined ? {} : { facts }),
         /* THE BLOCKS AS READ, kept beside the ask and never sent in it: where the questions are, for the look step. */
         read: read.value.blocks,
+        ...(row ? { row: true as const } : {}),
       });
     }
     /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`, ENG-B09 job 5): each page whose basis moved
@@ -4957,7 +4971,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     /* THEN THE LOOK STEP, from the same answer: Slash's order and next step over each page that answered more than a line,
        written as a versioned look so Undo restores the one before, and never over a look the person set. */
-    const looked = await composeLooks(kernel, due, lines, lookRehearsed);
+    const looked = await composeLooks(
+      kernel,
+      due.filter((d) => d.row !== true),
+      lines,
+      lookRehearsed,
+    );
     for (const page of looked.said) if (!said.includes(page)) said.push(page);
     dropped.push(...looked.dropped);
     return { said, dropped };
@@ -5020,7 +5039,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A LINE THAT NAMES THINGS (`facts`) IS SENT ONLY TO SOMEBODY WHO READS ALL OF EVERY LIST THE PAGE DOES, and only while the
    * same things are still late or due: a bill named late is not named once it is paid.
    */
-  const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext): { line: { at: number; text: string } | null; next: LookNext | null } => {
+  const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext, row = false): { line: { at: number; text: string } | null; next: LookNext | null } => {
     const none = { line: null, next: null };
     if (slug === HOME_PAGE) return none;
     const lead = leadBlockOf(blocks);
@@ -5043,7 +5062,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (look.ownerHeadline) return { line: null, next: look.next };
     const keptLine = kernel.prefsOf(SLASH)[headlineKey(slug)];
     const stored = storedHeadline(keptLine);
-    if (stored === null || stored.basis !== basis) return { line: null, next: look.next };
+    if (stored === null) return { line: null, next: look.next };
+    /* A PAGE PER ROW'S LINE WAS WRITTEN FROM ITS TILES (`tiledLead`), so it goes only to a reader of all of every list the
+       page reads, and only while the tiles she is shown still say what they said. */
+    if (row) {
+      if ([...listsRead(blocks)].some((l) => readable(ctx, l) !== null || kernel.scope(ctx, l) !== undefined)) return { line: null, next: look.next };
+      if (stored.basis !== headlineBasis(slug, tiledLead(lead, blocks))) return { line: null, next: look.next };
+    } else if (stored.basis !== basis) return { line: null, next: look.next };
     if (stored.facts !== undefined && facts() !== stored.facts) return { line: null, next: look.next };
     /* AN ANSWER WHOSE LOOK WAS REFUSED IS REFUSED WHOLE (`lookRehearsed`): its line came from the same answer, so the page
        keeps the line its rules wrote until the page is answered for again. */
@@ -10931,7 +10956,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         out.value.blocks.map((b) => heldBlock(ctx, b)),
       );
       /* THE MODEL'S LINE ON THE LEAD NOTE, AS `said`, while its figures hold (`slashHeadlines`). */
-      const { line, next } = headlineFor(args.slug, blocks, ctx);
+      /* A PAGE PER ROW HAS NO DECLARATION OF ITS OWN SLUG (`pageDeclaredAt`), and its line is written from its tiles. */
+      const { line, next } = headlineFor(args.slug, blocks, ctx, declared === null);
       const filters = out.value.filters as PageFilter[] | undefined;
       /* A BLOCK HELD FROM HER IS KEYED AGAIN WITHOUT ITS SOURCE (`shellOf`), and the look names it by the new key too. */
       const rekeyed = new Map<string, string>();

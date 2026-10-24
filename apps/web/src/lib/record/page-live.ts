@@ -300,6 +300,8 @@ type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown
 export type LiveBlock = BlockResult & {
   /** A queue of questions narrowed to the page's own by its `where`, which the clause itself never reaches the page as. */
   narrowed?: true;
+  /** A lead note's: its sentence is the line the model wrote, not the rules' (`said`), so a hero can say who wrote it. */
+  modelLine?: true;
   /** The block's `{{path}}` values as the record answered them. */
   values?: Record<string, unknown>;
   /** An `actions` block's rows, in the shape "Runs on" reads. */
@@ -1497,7 +1499,7 @@ export function blockOf(
     const own = typeof modelSaid === 'string' ? modelSaid.trim() : '';
     /* AND IT ENDS AS A SENTENCE DOES (`stopped`, P13): "Portage and Kiln need a push, Marlow & Co is on track" ran out
        with no full stop under Projects' name, while the header's own line ended with one. */
-    if (own !== '') return { ...shell, body: stopped(own) };
+    if (own !== '') return { ...shell, body: stopped(own), modelLine: true };
     const lead = leadOf(body, namedResolverOf(values, unnamedOf(b)));
     return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: stopped(lead) };
   }

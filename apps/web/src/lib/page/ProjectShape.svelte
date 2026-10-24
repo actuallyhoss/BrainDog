@@ -61,10 +61,13 @@
   let {
     register,
     seq,
+    modelLine = null,
     onshape,
   }: {
     register: string;
     seq: number;
+    /** The line the model wrote for this project, kept while its tiles still say it, said in place of the rules' line. */
+    modelLine?: string | null;
     /** What the shape draws, the row it drew it for, and whether its reads are back: until they are, nothing it may say is known. */
     onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null, known: boolean) => void;
   } = $props();
@@ -138,6 +141,8 @@
       ? shapeOf({ fields: read.fields, title: REGISTERS[register]!.title, incoming: read.incoming, history: read.history, money: read.money, working: workingNow() })
       : null,
   );
+  /* WHO WROTE THE LINE, on hover: the model, from this project's figures (C4). */
+  const WROTE = 'Written by BrainDog from this project’s figures';
   const said = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
 
   /* ── the hero ── */
@@ -308,7 +313,9 @@
         </p>
       {/if}
     </div>
-    {#if hero.sentences.length > 0}
+    {#if modelLine}
+      <p class="h-say" title={WROTE} dir="auto">{modelLine}</p>
+    {:else if hero.sentences.length > 0}
       <p class="h-say">
         {#each hero.sentences as s, n (n)}{#if n > 0}{' '}{/if}{#each s as part, k (k)}{#if part.figure}<b class="fig num">{part.text}</b>{:else if part.late}<span class="late">{part.text}</span>{:else}{part.text}{/if}{/each}{/each}
       </p>

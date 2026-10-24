@@ -564,6 +564,12 @@
    * Every block drawn: the page's own, then the reader's note. NOT WHILE AN ARRANGEMENT IS IN FORCE, where a block added
    * in the mode takes the next place after the declared ones and the note is nothing a person can move or save.
    */
+  /* THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October, C4), which the hero says in place of its rules'
+     line: the declared lead is not drawn under the hero (`project-page.ts`), so the hero is where a kept line is read. */
+  const modelLine = $derived.by(() => {
+    const lead = (live?.page.blocks ?? []).find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false);
+    return lead?.modelLine === true && typeof lead.body === 'string' && lead.body.trim() !== '' ? lead.body : null;
+  });
   const all = $derived<LiveBlock[]>(arrangement.editing || arrangement.slots !== null ? own : [...own, ...feet]);
 
   /* ── the line a page opens on ──────────────────────────────────────────────
@@ -868,7 +874,7 @@
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
     <!-- THE SHAPE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a project's shape, so its
          first load does not carry one. The page waits on the shape's reads either way (`shapeWaits`). -->
-    {#snippet shapeAt()}{#await import('./ProjectShape.svelte')}{@render waiting?.()}{:then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
+    {#snippet shapeAt()}{#await import('./ProjectShape.svelte')}{@render waiting?.()}{:then { default: ProjectShape }}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} {modelLine} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/await}{/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"

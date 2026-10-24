@@ -190,6 +190,36 @@ export function leadBlockOf(blocks: readonly unknown[]): LeadBlock | null {
   return null;
 }
 
+/** The most figures a page per row hands the model from its tiles (`tileFiguresOf`). */
+export const HEADLINE_ROW_FIGURES = 6;
+
+/**
+ * WHAT A PAGE PER ROW'S TILES SAY, by the figure each names, in the order drawn, as the page read answered them (the
+ * thinking scope of 24 October, C4). A project's lead is its next step, which the template fills in as words, so it
+ * names no figure and no line was ever asked of it: what its tiles count (open work, done this week, last worked) is
+ * what the model's line is written from, and what moves it. Read off the blocks as the caller is shown them, never
+ * asked of the record again, so a reader whose tiles are held reads other values and no line. At most
+ * `HEADLINE_ROW_FIGURES`; a money figure as the lead's own values carry one.
+ */
+export function tileValuesOf(blocks: readonly unknown[]): Record<string, Json> {
+  const out: Record<string, Json> = {};
+  for (const raw of blocks) {
+    const b = raw as { kind?: unknown; readings?: unknown } | null;
+    if (b === null || typeof b !== 'object' || b.kind !== 'stat' || !Array.isArray(b.readings)) continue;
+    for (const r of b.readings as { metric?: unknown; reading?: { value?: unknown; unit?: unknown } | null }[]) {
+      if (Object.keys(out).length >= HEADLINE_ROW_FIGURES) return out;
+      const value = r?.reading?.value;
+      if (typeof r?.metric !== 'string' || r.metric === '' || Object.hasOwn(out, r.metric) || typeof value !== 'number') continue;
+      const unit = r.reading?.unit;
+      out[r.metric] = typeof unit === 'string' && unit !== '' ? { amount: value, currency: unit } : value;
+    }
+  }
+  return out;
+}
+
+/** A page per row's lead with what its tiles say beside its own values (`tileValuesOf`): what its line is written from. */
+export const tiledLead = (lead: LeadBlock, blocks: readonly unknown[]): LeadBlock => ({ ...lead, values: { ...tileValuesOf(blocks), ...lead.values } });
+
 /** Every `{{path}}` a template names, in order and once each. */
 export const holesOf = (template: string): string[] => [...new Set([...template.matchAll(/\{\{\s*([^{}\s]+)\s*\}\}/gu)].map((m) => m[1]!))];
 

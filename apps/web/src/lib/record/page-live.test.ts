@@ -1296,6 +1296,9 @@ test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules'
   const said = blockOf({ ...lead, said: 'GBP 33,850.00 across HSBC and Monzo, steady on last month.' }, new Map(), AT);
   assert.equal(said.body, 'GBP 33,850.00 across HSBC and Monzo, steady on last month.');
   assert.equal(Object.hasOwn(said, 'said'), false, 'the line rode through onto the block as a key of its own');
+  /* AND IT SAYS THE MODEL WROTE IT (C4), so a project's hero that says it in place of the rules' line can say who wrote it. */
+  assert.equal(said.modelLine, true);
+  assert.equal(blockOf(lead, new Map(), AT).modelLine, undefined);
   /* A LINE THAT IS NOT TEXT, OR IS BLANK, IS NO LINE: the rules say theirs. */
   assert.equal(blockOf({ ...lead, said: '  ' }, new Map(), AT).body, rules);
   assert.equal(blockOf({ ...lead, said: 7 }, new Map(), AT).body, rules);
