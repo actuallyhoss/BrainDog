@@ -12,6 +12,13 @@ const joined = (parts: readonly string[]): string =>
 
 const counted = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
+/**
+ * HOW MANY ADD-ONS ARE IN THIS BRAINDOG, ONE COUNT FOR BOTH TABS (audit Z10, packs-browse-390-light.png): Browse said "7
+ * are already in your BrainDog", counting only the installed ones the catalogue lists, while Installed said "9 add-ons
+ * installed" over every one the record holds. Both say the record's own list. `null` until the record answers.
+ */
+export const installedCount = (states: readonly unknown[] | null): number | null => (states === null ? null : states.length);
+
 export const words = {
   tabsLabel: 'Add-ons',
   /* TWO HALVES OF ONE PLACE (agents F8, F9): what is in, and what there is to add. Updates sit at the top of Installed

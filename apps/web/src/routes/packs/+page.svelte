@@ -60,7 +60,7 @@
   import { catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor, withheld } from './browse/catalogue.ts';
   import { recordKeys } from './browse/known-keys.ts';
   import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
-  import { words } from './words.ts';
+  import { installedCount, words } from './words.ts';
   import { glyphOf } from './glyph.ts';
   import { readRemoved, wayBack, type Removed } from './removed.ts';
   /* WHAT BRAINDOG ITSELF HAS IMPROVED, read from the one place Decide reads it too, so the Updates tab and the card on
@@ -602,7 +602,7 @@
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
 <!-- NO COUNT BESIDE THE NAME (E21): the sentence under it says how many are installed, and once is enough. -->
-<PageHead icon="packs" title={copy.packs} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
+<PageHead icon="packs" title={copy.packs} sentence={live ? words.sentence(installedCount(states) ?? 0, updates ? updates.length : null) : undefined}>
   {#snippet actions()}
     <!-- THE PAGE'S "⋯", ALWAYS DRAWN: installing from a file or a link, and sharing this setup. -->
     <Menu label={words.more} align="end">

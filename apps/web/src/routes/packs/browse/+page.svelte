@@ -47,7 +47,7 @@
   import { words } from '$lib/market/words.ts';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import AddonsTabs from '../AddonsTabs.svelte';
-  import { words as packWords } from '../words.ts';
+  import { installedCount, words as packWords } from '../words.ts';
   import { glyphOf as placeGlyph } from '../glyph.ts';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
@@ -74,8 +74,9 @@
   const shown = $derived(order === 'for-you' && query.trim() !== '' ? inSection(searched, picked) : ordered(inSection(searched, picked), order));
   const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
 
-  /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered. */
-  const held = $derived(states ? listings.filter((l) => actionOf(l, states!).kind !== 'install').length : null);
+  /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered: the number Installed
+     says (audit Z10), and not only the ones this catalogue lists. */
+  const held = $derived(installedCount(states));
 
   /* A BUILT-IN USE CASE'S HOME IN MINIATURE, and the glyph it is known by. */
   const voiced = (u: NonNullable<ReturnType<typeof useCase>>) => (key: string): string | null =>
