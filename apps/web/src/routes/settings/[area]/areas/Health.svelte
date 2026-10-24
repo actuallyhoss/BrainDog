@@ -18,6 +18,7 @@
   import { onMount } from 'svelte';
   import { apiBase } from '$lib/at.ts';
   import { idle } from '$lib/ui/idle.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import type { Fetch } from '$lib/record/boot-live.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
@@ -26,6 +27,7 @@
 
   const words = {
     reading: 'Reading the record for anything to tidy.',
+    readingPages: 'Still reading every page and note.',
     clear: 'Nothing to tidy',
     clearBody: 'Every page and note reads as it should, and nothing has gone stale.',
     pages: 'Pages and notes',
@@ -50,6 +52,8 @@
   let imported = $state.raw<{ found: import('$lib/home/imported-rules.ts').ImportedFound; Part: ImportedPart } | null>(null);
   /** Whether every part has answered, so the calm line is said only once nothing is left to land. */
   let heard = $state(false);
+  /** Whether every part but the long walk of pages and notes has answered. */
+  let quick = $state(false);
   /** Whether the record has not walked its words yet: said as not checked, and the calm line does not vouch for them. */
   let unchecked = $state(false);
 
@@ -69,15 +73,6 @@
     addEventListener('beforeunload', leave);
     const io: Fetch = (url, init) => fetch(url, { ...init, signal: leaving.signal });
     const parts: (() => Promise<unknown>)[] = [
-      /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES: the long walk, kept for the tab (`textFaultsOnce`), and every
-         thing the night's page lint found the pages print raw (`printed`). */
-      () =>
-        Promise.all([import('$lib/home/text-faults.ts'), import('$lib/home/TextFaults.svelte')]).then(async ([m, part]) => {
-          const found = await m.textFaultsOnce(base, io);
-          if (!here) return;
-          unchecked = m.notChecked(found);
-          faults = found && m.anyFound(found) ? { found, Part: part.default } : null;
-        }),
       /* WHAT WENT STALE, AND WHERE EACH IS CLEARED. */
       () =>
         Promise.all([import('$lib/home/stale.ts'), import('$lib/home/Stale.svelte')]).then(async ([m, part]) => {
@@ -115,14 +110,37 @@
           const found = await m.loadImported(base, io);
           if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
         }),
+      /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES: the long walk, kept for the tab (`textFaultsOnce`), and every
+         thing the night's page lint found the pages print raw (`printed`). LAST, SINCE the audit of 25 October (Z36): it
+         was asked first, and on his record its 11 to 16 seconds held the six quick parts behind it, so Health said
+         "Reading the record for anything to tidy." long after it said it was drawn. */
+      () =>
+        Promise.all([import('$lib/home/text-faults.ts'), import('$lib/home/TextFaults.svelte')]).then(async ([m, part]) => {
+          const found = await m.textFaultsOnce(base, io);
+          if (!here) return;
+          unchecked = m.notChecked(found);
+          faults = found && m.anyFound(found) ? { found, Part: part.default } : null;
+        }),
     ];
+    /* THE SCREEN IS DRAWN ONCE ITS FIRST PART HAS ANSWERED, and not on the shell alone (Z36): one call is held open until
+       then, so `data-screen` waits for it (`screen.svelte.ts`). */
+    let first: number | null = opened();
+    const drawn = (): void => {
+      if (first === null) return;
+      closed(true, first);
+      first = null;
+    };
     void (async () => {
-      for (const part of parts) {
+      for (const [i, part] of parts.entries()) {
         await idle();
         if (!here || leaving.signal.aborted) break;
         /* A PART THAT FAILS IS NOT DRAWN, and the next is still asked. */
         await part().catch(() => undefined);
+        drawn();
+        /* THE QUICK PARTS HEARD: what they found is drawn, or that there is nothing, while the walk reads on. */
+        if (here && i === parts.length - 2) quick = true;
       }
+      drawn();
       if (here) heard = true;
       removeEventListener('beforeunload', leave);
     })();
@@ -147,10 +165,13 @@
   {#if named}<named.Part found={named.found} />{/if}
   {#if hues}<hues.Part found={hues.found} />{/if}
   {#if imported}<imported.Part found={imported.found} />{/if}
-  {#if !heard}
+  {#if !heard && !quick}
     <p class="health-reading" role="status">{words.reading}</p>
   {:else if !any}
-    <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
+    <Empty kind="cleared" title={words.clear} body={unchecked || !heard ? words.clearBodyUnchecked : words.clearBody} />
+  {/if}
+  {#if quick && !heard}
+    <p class="health-reading" role="status">{words.readingPages}</p>
   {/if}
 </div>
 
