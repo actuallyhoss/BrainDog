@@ -236,6 +236,7 @@ import type { EngineHealthRead } from './methods/engine.ts';
 import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
+import { drawingsOf, drewDraft, drewFiled } from './drew.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
@@ -3381,7 +3382,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         continue;
       }
       /* WHO DRAFTED IT IS KEPT WITH IT, so a reload still says whether it came from how he uses BrainDog or a model. */
-      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: { ...prepared.value, ...lapsing(d) } }, SLASH, d.by);
+      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: { ...prepared.value, ...lapsing(d) }, ...(d.cause === undefined ? {} : { cause: d.cause }) }, SLASH, d.by);
       if (!put.ok) {
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
@@ -3476,6 +3477,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ];
     const { filed, skipped } = await slashFiling(drafts, r);
     return { by, filed, skipped: [...queue.held, ...skipped], dropped, large };
+  };
+
+  /**
+   * WHAT BRAINDOG DRAWS UNASKED (§45 "Who designs", `drew.ts`): at most one "I drew X. Keep it?" a day, and none while
+   * one waits, filed as Slash's question through the same loop as every other, so the cap and a no hold for it too. A
+   * plan is kept by setting its project's plan, a page's calendar by accepting the change to the page.
+   */
+  const slashDrew = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const draft = drewDraft(clock.now(), drawingsOf(sql, kernel), drewFiled(sql));
+    if (draft === null) return { filed: [], dropped: [] };
+    const { filed, skipped } = await slashFiling([draft], slashReading());
+    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
   };
 
   /**
@@ -10650,6 +10663,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const projects = await slashProjects();
       out.filed.push(...projects.filed);
       out.dropped.push(...projects.dropped);
+      /* THEN THE ONE THING BRAINDOG DREW TODAY, if anything has data for a picture and none (`slashDrew`). */
+      const drew = await slashDrew();
+      out.filed.push(...drew.filed);
+      out.dropped.push(...drew.dropped);
       /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */
       const understood = await slashUnderstanding();
       out.filed.push(...understood.filed);

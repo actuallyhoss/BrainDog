@@ -35,6 +35,8 @@ export type SlotQuestion = {
   cost?: string | undefined;
   about?: string | undefined;
   drafted_by?: string | undefined;
+  /** What it is about as one key (`cause.ts`): `drew:` on a drawing BrainDog made unasked (`packages/record/src/drew.ts`). */
+  cause?: string | undefined;
   options: readonly { key: string; label: string; because: string; recommended: boolean }[];
 };
 
@@ -48,11 +50,23 @@ export const slotWords = {
   notNow: 'Not now',
   open: 'Open in Needs you',
   done: (label: string) => `Done: ${label}.`,
+  drew: 'BrainDog drew this',
+  keep: 'Keep it',
   later: 'Set aside here. It still waits in Needs you.',
   why: 'This one needs a reason, so it opens in Needs you.',
 };
 
 const isBag = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Whether a question is a drawing BrainDog made unasked: its cause says so (`drew.ts` `DREW_CAUSE`). */
+export const isDrawing = (q: Pick<SlotQuestion, 'cause'>): boolean => typeof q.cause === 'string' && q.cause.startsWith('drew:');
+
+/**
+ * The answers a question offers in the slot: its own, or for a drawing that is a change to a page, which carries none
+ * (the drawer names accept and reject), Keep it as the one suggested answer. Throw away is asked in Needs you.
+ */
+const answersOf = (q: SlotQuestion): SlotQuestion['options'] =>
+  q.options.length === 0 && isDrawing(q) ? [{ key: 'accept', label: slotWords.keep, because: q.why, recommended: true }] : q.options;
 
 /** Whether BrainDog itself asked: a rule, or Slash, or a question Slash drafted for whoever filed it. */
 export const isOwn = (q: Pick<SlotQuestion, 'who' | 'drafted_by'>): boolean =>
@@ -84,7 +98,7 @@ export function slotPick(
 ): SlotPick | null {
   const answerable = questions.flatMap((question) => {
     if (o.drawn.has(question.id) || o.dismissed.has(question.id) || question.cost === 'undo') return [];
-    const suggested = question.options.filter((x) => x.recommended);
+    const suggested = answersOf(question).filter((x) => x.recommended);
     if (suggested.length !== 1) return [];
     const [answer] = suggested;
     return answer ? [{ question, answer: { key: answer.key, label: answer.label, because: answer.because }, own: isOwn(question) }] : [];
@@ -143,6 +157,7 @@ export function slotQuestion(v: unknown): SlotQuestion | null {
     ...(typeof v.cost === 'string' ? { cost: v.cost } : {}),
     ...(typeof v.about === 'string' ? { about: v.about } : {}),
     ...(typeof v.drafted_by === 'string' ? { drafted_by: v.drafted_by } : {}),
+    ...(typeof v.cause === 'string' ? { cause: v.cause } : {}),
     options,
   };
 }

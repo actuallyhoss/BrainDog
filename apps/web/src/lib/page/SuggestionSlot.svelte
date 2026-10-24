@@ -19,7 +19,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drawnIn, putAside, readSlot, setAside, slotPick, slotQuestion, slotWords as words, type SlotQuestion, type SlotRow } from './slot.ts';
+  import { drawnIn, isDrawing, putAside, readSlot, setAside, slotPick, slotQuestion, slotWords as words, type SlotQuestion, type SlotRow } from './slot.ts';
 
   let {
     blocks,
@@ -89,7 +89,7 @@
 
 {#if pick}
   <aside class="slot" aria-label={words.label}>
-    <p class="slot-who">{pick.own ? words.own : words.asked}</p>
+    <p class="slot-who">{isDrawing(pick.question) ? words.drew : pick.own ? words.own : words.asked}</p>
     <a class="slot-question" href={inApp(`/decide/${pick.question.id}`)}>{pick.question.question}</a>
     {#if pick.answer.because || pick.question.why}<p class="slot-why">{pick.answer.because || pick.question.why}</p>{/if}
     <div class="slot-row">

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { drawnIn, isOwn, putAside, readSlot, setAside, slotPick, slotPlace, slotQuestion, type SlotQuestion } from './slot.ts';
+import { drawnIn, isDrawing, isOwn, putAside, readSlot, setAside, slotPick, slotPlace, slotQuestion, type SlotQuestion } from './slot.ts';
 
 const ask = (id: string, over: Partial<SlotQuestion> = {}): SlotQuestion => ({
   id,
@@ -113,4 +113,17 @@ test('a page with no queue reads the questions through previewPage, and a failed
     throw new Error('offline');
   }) as unknown as typeof fetch;
   assert.deepEqual(await readSlot('https://example.test', down), []);
+});
+
+test('a drawing BrainDog made unasked stands on the page it is about, with Keep it as its one answer', () => {
+  /* A CHANGE TO A PAGE CARRIES NO OPTIONS OF ITS OWN, so the slot offers Keep it, which accepts it. */
+  const drew = ask('SG10', { who: 'slash', about: 'page.money', cause: 'drew:money:calendar:bills', options: [], question: 'I drew Bills on Money as a calendar. Keep it?' });
+  const got = slotPick([drew], { ...none, page: 'money' });
+  assert.equal(got?.question.id, 'SG10');
+  assert.deepEqual(got?.answer, { key: 'accept', label: 'Keep it', because: 'Because.' });
+  assert.equal(isDrawing(drew), true);
+  /* A QUESTION WITH NO OPTIONS THAT IS NOT A DRAWING still offers nothing here. */
+  assert.equal(slotPick([ask('SG11', { who: 'slash', about: 'page.money', options: [] })], { ...none, page: 'money' }), null);
+  /* AND THE CAUSE IS READ OFF WHAT THE RECORD SENT. */
+  assert.equal(slotQuestion({ id: 'SG10', who: 'slash', question: 'I drew it. Keep it?', why: 'Why.', options: [], cause: 'drew:x' })?.cause, 'drew:x');
 });

@@ -282,6 +282,23 @@ export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, t
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
 /* The design book: every kind, the tokens and the layout rules, generated from the tables and the skin. */
 export { designBook, type BookKind, type BookStep, type BookToken, type DesignBook } from './design-book.ts';
+/* Compose's shape rules (Compose): the columns each shape reads over a list, and the one block it makes there. */
+export {
+  SHAPE_BY_DAY,
+  SHAPE_LIMITS,
+  SHAPE_SAY,
+  SHAPE_SLOTS,
+  isChoiceField,
+  isDateField,
+  isNumberField,
+  shapeBlock,
+  shapeColumns,
+  type ShapeBlock,
+  type ShapeField,
+  type ShapeList,
+  type ShapeSlot,
+  type ShapeWant,
+} from './compose-shape.ts';
 /* The design check (§45): one check every draft passes before it is shown, with the sentence that refuses one. */
 export {
   DESIGN_BUDGET,

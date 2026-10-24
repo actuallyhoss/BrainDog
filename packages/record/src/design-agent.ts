@@ -439,3 +439,128 @@ export function roomFor<T extends { rank: number }>(asks: readonly T[], waiting:
   const ranked = [...asks].sort((a, b) => b.rank - a.rank);
   return { file: ranked.slice(0, room), wait: ranked.slice(room) };
 }
+
+/* ── what BrainDog draws unasked ───────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * WHAT IT DRAWS UNASKED (§45 "Who designs": "I drew Encore's payroll as a calendar. Keep it?"). The tiers above arrange;
+ * this one draws: a visual offered for a thing that has data for one and no picture of it, filed as a draft in the
+ * page's one reserved slot and kept or thrown away there. AT MOST ONE A DAY AND ONE AT A TIME (`DREW_A_DAY`), so a
+ * person is asked one "Keep it?" a day at most, never a queue of them, and A NO IS TERMINAL: a key once asked is never
+ * offered again, whatever was answered.
+ *
+ * TWO SIGNALS, each read by the caller and handed in, and neither names a list or a project:
+ * - `dated`: a page somebody wrote that draws a list whose entries have a day, with no calendar, lanes, timeline or
+ *   roadmap of it, so nothing on the page shows them by day;
+ * - `plan`: a project whose plan reads best in another shape than the one it is drawn in (`planShapeOf`): its stages as
+ *   a path, its dated work as a roadmap, its milestones as a timeline, its undated work as a board.
+ *
+ * THE DRAFT IS THE CALLER'S, as every tier's is: what keeping it writes, checked by the design check before it is filed.
+ */
+export type Unpictured =
+  | { kind: 'dated'; page: string; pageTitle: string; list: string; listName: string; rows: number; draft?: Draft }
+  | { kind: 'plan'; list: string; seq: number; name: string; shape: PlanShape; was: PlanShape | null; rows: number; draft?: Draft };
+
+/** The most "I drew X. Keep it?" a day, and at once. */
+export const DREW_A_DAY = 1;
+
+/** How a drawing ranks among its own: a plan above a list, each lifted by how much it draws. */
+export const DREW_TIER = { plan: 2000, dated: 1000 } as const;
+
+/** What a plan shape is called in a sentence. */
+const PLAN_SAY: Readonly<Record<PlanShape, string>> = { path: 'a path of stages', roadmap: 'a roadmap', timeline: 'a timeline', board: 'a board' };
+
+/** The key a drawing is asked under, which is never asked again once filed. */
+export const drewKey = (u: Unpictured): string => (u.kind === 'dated' ? `drew:${u.page}:calendar:${u.list}` : `drew:plan:${u.list}#${u.seq}:${u.shape}`);
+
+/**
+ * The one drawing to offer today, or `null`: none while one waits or once one was filed today, none for a key asked
+ * before, and otherwise the strongest. `filedOn` is every day one was filed, `asked` every key ever filed.
+ */
+export function drewOffer(signals: { nowMs: number; unpictured: readonly Unpictured[]; filedOn: readonly string[]; waiting: number; asked: ReadonlySet<string> }): Offer | null {
+  const today = dayOf(signals.nowMs);
+  if (signals.waiting >= DREW_A_DAY || signals.filedOn.filter((d) => d === today).length >= DREW_A_DAY) return null;
+  const lapses = lapsesFrom(signals.nowMs);
+  const offers = signals.unpictured
+    .filter((u) => u.rows > 0 && !signals.asked.has(drewKey(u)))
+    .map((u): Offer => {
+      const drafted = u.draft === undefined ? {} : { draft: u.draft };
+      if (u.kind === 'dated')
+        return {
+          key: drewKey(u),
+          class: 'arrange',
+          rank: DREW_TIER.dated + within(u.rows),
+          basis: `dated@${u.rows}`,
+          lapses,
+          title: `I drew ${u.listName} on ${u.pageTitle} as a calendar. Keep it?`,
+          why: `${count(u.rows)} entries in ${u.listName} have a day, and nothing on ${u.pageTitle} shows them by day.`,
+          change: { kind: 'block', page: u.page, list: u.list, block: 'calendar', ...drafted },
+        };
+      return {
+        key: drewKey(u),
+        class: 'arrange',
+        rank: DREW_TIER.plan + within(u.rows),
+        basis: `${u.shape}@${u.rows}`,
+        lapses,
+        title: `I drew ${u.name}'s plan as ${PLAN_SAY[u.shape]}. Keep it?`,
+        why: planWhy(u.name, u.shape, u.rows),
+        change: { kind: 'block', page: `${u.list}#${u.seq}`, list: u.list, block: u.shape, ...drafted },
+      };
+    })
+    .sort((a, b) => b.rank - a.rank);
+  return offers[0] ?? null;
+}
+
+/* ── a project's plan, shaped for that project ─────────────────────────────────────────────────────────────────── */
+
+/** The shapes a project's plan is drawn in. */
+export type PlanShape = 'path' | 'roadmap' | 'timeline' | 'board';
+export const PLAN_SHAPES: readonly PlanShape[] = ['path', 'roadmap', 'timeline', 'board'];
+
+/** What a project's plan holds, as the caller counted it: its stages, and its open work by what it says of time. */
+export type PlanFacts = {
+  /** Its stages: entries of a list of steps that point at it. */
+  stages: number;
+  /** Its open work with a day and an effort, so each is a window on a time axis. */
+  spans: number;
+  /** Its open work with a day and no effort, so each is a moment. */
+  moments: number;
+  /** Its open work with no day. */
+  undated: number;
+};
+
+/** A stage path wants at least this many stages; fewer is a step, not a road. */
+export const PLAN_STAGES_LEAST = 2;
+/** Work drawn on a time axis or a board wants at least this much of it. */
+export const PLAN_WORK_LEAST = 3;
+
+/**
+ * The shape a project's plan reads best in, from what it holds, or `null` when it holds too little to draw.
+ *
+ * STAGES FIRST: a project that says its stages has a road, and the road is its plan (§45 "A roadmap is drawn, not
+ * listed: its stages, each one's done-when line, and where it stands"). Then its dated work: windows as a roadmap,
+ * moments (releases, launches, due days) as a timeline. Undated work alone is a board by its state. So two projects
+ * that keep different things draw different plans, with nothing here knowing either one.
+ */
+export function planShapeOf(f: PlanFacts): PlanShape | null {
+  if (f.stages >= PLAN_STAGES_LEAST) return 'path';
+  const dated = f.spans + f.moments;
+  if (dated >= PLAN_WORK_LEAST) return f.spans >= f.moments ? 'roadmap' : 'timeline';
+  if (f.undated >= PLAN_WORK_LEAST) return 'board';
+  return null;
+}
+
+/** The weight of what a plan shape draws: how many of the project's things it puts on the screen. */
+export function planRows(f: PlanFacts, shape: PlanShape): number {
+  if (shape === 'path') return f.stages;
+  if (shape === 'roadmap' || shape === 'timeline') return f.spans + f.moments;
+  return f.undated;
+}
+
+/** Why a plan is drawn in its shape, in one sentence. */
+function planWhy(name: string, shape: PlanShape, rows: number): string {
+  if (shape === 'path') return `${name} has ${count(rows)} stages, so its plan reads as where it stands on them and what each one is done when.`;
+  if (shape === 'roadmap') return `${count(rows)} things on ${name} have a day and an effort, so its plan reads as windows on a time axis.`;
+  if (shape === 'timeline') return `${count(rows)} things on ${name} fall on a day without a span, so its plan reads as moments on a timeline.`;
+  return `${count(rows)} things on ${name} are open with no day, so its plan reads as a board of what is open, doing and done.`;
+}

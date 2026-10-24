@@ -293,6 +293,8 @@ export type SlashDraft = {
    */
   rank?: number;
   lapses?: string;
+  /** What it is about as one key (`cause.ts`), filed with it so it is asked once: a drawing's `drew:` key (`drew.ts`). */
+  cause?: string;
 };
 
 export type Offered = {

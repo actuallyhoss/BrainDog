@@ -14,7 +14,7 @@
  * holds it in Node.
  */
 
-import { KINDS, isKind } from 'braindog-render';
+import { KINDS, SHAPE_BY_DAY, SHAPE_LIMITS, SHAPE_SAY, isChoiceField, isDateField, isKind, isNumberField, shapeColumns } from 'braindog-render';
 import { readSentence } from '../query/tree.ts';
 import { choiceIn, fieldIn, norm, periodOf, queryFields, type AskField } from './change-this.ts';
 import type { Declared } from './shelf.ts';
@@ -48,22 +48,8 @@ export const composeWords = {
   noLists: 'There is no list to draw from yet.',
 };
 
-/** What each shape is called in a sentence about it. */
-const SAY: Readonly<Record<string, string>> = {
-  lines: 'a line chart',
-  bar: 'a bar chart',
-  split: 'a split',
-  ring: 'a ring',
-  gauge: 'a gauge',
-  heat: 'a heat map',
-  calendar: 'a calendar',
-  board: 'a board',
-  lanes: 'lanes',
-  timeline: 'a timeline',
-  todo: 'a checklist',
-  table: 'a table',
-  cards: 'cards',
-};
+/** What each shape is called in a sentence about it: compose's shape rules, shared with the record (`compose-shape.ts`). */
+const SAY = SHAPE_SAY;
 
 /** The shape a line asks for, first match wins: the specific words before the general "chart". */
 const SHAPES: readonly (readonly [RegExp, string])[] = [
@@ -82,37 +68,13 @@ const SHAPES: readonly (readonly [RegExp, string])[] = [
   [/\b(?:table|grid|sheet)\b/u, 'table'],
 ];
 
-const DATES: readonly string[] = ['day', 'instant', 'date'];
-const NUMBERS: readonly string[] = ['int', 'number', 'decimal', 'money', 'quantity'];
-const isDate = (f: AskField): boolean => DATES.includes(f.type ?? '');
-const isNumber = (f: AskField): boolean => NUMBERS.includes(f.type ?? '');
-const isChoice = (f: AskField): boolean => f.type === 'enum' || (f.values?.length ?? 0) > 0;
+const isDate = (f: AskField): boolean => isDateField(f);
+const isNumber = (f: AskField): boolean => isNumberField(f);
+const isChoice = (f: AskField): boolean => isChoiceField(f);
 
-type Want = 'date' | 'number' | 'group' | 'choice' | 'title' | 'more';
-type Slot = { want: Want; hard?: boolean };
-
-/** What each shape's columns read, in order. A hard slot with no field to fill it means the list cannot be drawn so. */
-const SLOTS: Readonly<Record<string, readonly Slot[]>> = {
-  lines: [{ want: 'date', hard: true }, { want: 'number', hard: true }],
-  bar: [{ want: 'group', hard: true }, { want: 'number', hard: true }],
-  split: [{ want: 'choice', hard: true }, { want: 'number', hard: true }],
-  ring: [{ want: 'title', hard: true }, { want: 'number', hard: true }],
-  gauge: [{ want: 'title', hard: true }, { want: 'number', hard: true }],
-  heat: [{ want: 'date', hard: true }, { want: 'number' }],
-  calendar: [{ want: 'title', hard: true }, { want: 'date', hard: true }],
-  board: [{ want: 'choice', hard: true }, { want: 'title', hard: true }],
-  lanes: [{ want: 'title', hard: true }, { want: 'date', hard: true }, { want: 'date' }],
-  timeline: [{ want: 'date', hard: true }, { want: 'title', hard: true }],
-  todo: [{ want: 'title', hard: true }, { want: 'date' }],
-  table: [{ want: 'title', hard: true }, { want: 'number' }, { want: 'date' }, { want: 'more' }],
-  cards: [{ want: 'title', hard: true }, { want: 'number' }, { want: 'date' }, { want: 'choice' }],
-};
-
-/** How many rows a shape shows unless the line says "top 5". A ring is five parts at most. */
-const LIMITS: Readonly<Record<string, number>> = { table: 8, cards: 6, todo: 8, timeline: 8, bar: 8, split: 6, ring: 5 };
-
-/** The kinds that sort their rows by the day they read. */
-const BY_DAY: readonly string[] = ['table', 'cards', 'todo', 'timeline', 'calendar', 'lanes'];
+/** How many rows a shape shows unless the line says "top 5", and the kinds that sort their rows by the day they read. */
+const LIMITS = SHAPE_LIMITS;
+const BY_DAY = SHAPE_BY_DAY;
 
 const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
@@ -159,40 +121,7 @@ function windowOf(t: string): { from: string; to: string; what: string } | null 
 }
 
 /** The columns a shape reads, filled by what each field is, preferring one the line names; `null` where a hard slot has none. */
-function fill(kind: string, list: ComposeList, t: string): AskField[] | null {
-  const slots = SLOTS[kind];
-  if (!slots) return null;
-  const fields = list.fields;
-  const used = new Set<string>();
-  const out: AskField[] = [];
-  const titleId = list.title && fields.some((f) => f.id === list.title) ? list.title : null;
-  for (const slot of slots) {
-    const free = fields.filter((f) => !used.has(f.id));
-    const pool =
-      slot.want === 'date'
-        ? free.filter(isDate)
-        : slot.want === 'number'
-          ? free.filter(isNumber)
-          : slot.want === 'choice'
-            ? free.filter(isChoice)
-            : slot.want === 'group'
-              ? free.filter((f) => !isNumber(f) && !isDate(f) && f.type !== 'secret')
-              : slot.want === 'title'
-                ? [...free.filter((f) => f.id === titleId), ...free.filter((f) => !isNumber(f) && !isDate(f) && !isChoice(f) && f.type !== 'secret')]
-                : free.filter((f) => f.type !== 'secret');
-    /* A group reads best by a choice or a link, then by a name: "spend by owner" names its own. */
-    const ordered = slot.want === 'group' ? [...pool.filter(isChoice), ...pool.filter((f) => f.type === 'ref'), ...pool] : pool;
-    const named = slot.want === 'title' || slot.want === 'more' ? null : fieldIn(t, ordered);
-    const pick = named ?? ordered[0] ?? null;
-    if (!pick) {
-      if (slot.hard) return null;
-      continue;
-    }
-    used.add(pick.id);
-    out.push(pick);
-  }
-  return out;
-}
+const fill = (kind: string, list: ComposeList, t: string): AskField[] | null => shapeColumns(kind, list, (pool) => fieldIn(t, pool));
 
 const NEGATES = '(?:not|without|except|excluding|exclude|hide|no)';
 
