@@ -1,14 +1,11 @@
 /**
- * The one sentence under Settings' title: what is broken, whether Slash's model answers, how many vital signs need a
- * look, whether last night's copy is in, and whether anything runs out before the month resets. "All healthy: Slash's
- * model answered 3 hours ago, last night's copy is in, and nothing runs out before 1 October." The phrase that needs
- * him is marked, and only when something does: "One thing is not working: ...", "No copy last night", or "Runs are at
- * 91%, 2 days to go".
+ * The one sentence under Settings' title: the worst thing, or nothing (U-C7). "BrainDog could not send a mail.", "Last
+ * night's copy did not run. Backups", "No copy last night." or "Runs are at 91%, 2 days to go.", marked. A record with
+ * nothing wrong has no line at all, and Slash's model is said in Settings > Agents, never here.
  *
  * WHAT IS BROKEN LEADS (AGT-C06, ENG-A02, PRF-A05). It said "All healthy" on his record the day a model job died in
- * Decide, because it read the copies and the meters only. Open faults come first, then the engine when it is not
- * answering, then the red vital signs as a count, and only then the copy and the month. A good state of any of them
- * joins "All healthy"; a bad one is its own sentence ahead of it, and "All healthy" is never said beside one.
+ * Decide, because it read the copies and the meters only. Open faults come first, then a red check, and only then the
+ * copy and the month. Since 24 October only the first is said, and a good state is said by no line at all.
  *
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE. `+page.svelte` reads the record and hands the answers here; this file
  * says what they mean and never asks the record anything.
@@ -120,8 +117,6 @@ const METER: Record<MeterKey, { name: string; plural: boolean }> = {
   ms: { name: 'Run time', plural: false },
 };
 
-const lower = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
-
 /** The phrase for a meter that is near its limit, or past it. */
 export function nearSaid(near: { key: MeterKey; share: number }, days: number, resets: string): string {
   const m = METER[near.key];
@@ -131,17 +126,11 @@ export function nearSaid(near: { key: MeterKey; share: number }, days: number, r
 
 const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** A list said as people say it: "a", "a, and b", "a, b, and c". */
-const joined = (xs: readonly string[]): string => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')}, and ${xs.at(-1)}`);
-
 /** A sentence that ends as one, whatever the record wrote. */
 const ended = (s: string): string => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
 
 /** The engine's states that are a fault: no model answers, or his own key will not open. */
 const DOWN = new Set<Engine['health']['state']>(['not_answering', 'key_closed']);
-
-/** The engine's states that join "All healthy". `off` is said by Slash's own row, and here it is nothing. */
-const UP = new Set<Engine['health']['state']>(['answering', 'never_asked']);
 
 /**
  * The fault the sentence leads with and Try again acts on: the one broken longest, so a fault that keeps coming back
@@ -167,104 +156,31 @@ export function unreadSigns(signs: readonly Sign[] | null | undefined): number |
   return signs ? signs.filter((s) => s.state === 'none').length : null;
 }
 
-/** The sentence, in its parts, or `null` when nothing was read to say it from. */
+/** The first sentence of a record's sentence, ended: "BrainDog could not send a mail." of a longer one. */
+const firstSentence = (said: string): string => {
+  const t = said.trim();
+  const cut = t.indexOf('. ');
+  return ended(cut < 0 ? t : t.slice(0, cut + 1));
+};
+
+/**
+ * THE ONE SENTENCE, IN ITS PARTS: THE WORST THING, OR NOTHING (U-C7). An open fault, the one broken longest; then a red
+ * check, by its own sentence; then a night with no copy; then a meter near its limit. Only the first that holds is said,
+ * as one plain sentence, marked, with the one link to where it is shown. "and 9 more" and the model's status are gone:
+ * the rest is on the Health page, and the model is Settings > Agents' (`SlashAsks`). With nothing wrong, `null`.
+ */
 export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}): Part[] | null {
-  /* ── what leads: each its own sentence, marked ─────────────────────────── */
-  const lead: Part[][] = [];
   const fault = leadFault(more.faults);
-  if (fault) {
-    const n = more.faults?.length ?? 1;
-    const rest = n - 1;
-    lead.push([
-      { text: n === 1 ? 'One thing is not working' : `${n} things are not working`, needs: true },
-      { text: `: ${ended(fault.said)}${rest === 0 ? '' : rest === 1 ? ' And one more.' : ` And ${rest} more.`}` },
-    ]);
-  }
-  const engine = more.engine ?? null;
-  if (engine && DOWN.has(engine.health.state)) {
-    /* THE FIRST SENTENCE IS WHAT IS WRONG, and the rest is whose it is and what happens meanwhile, so only it is marked.
-       A record that hands no words for it still has the fault said, never passed over. */
-    const own = engine.said.text.trim();
-    const text = ended(own !== '' ? own : engine.health.state === 'key_closed' ? 'Your own key for Slash will not open' : 'Slash’s model is not answering');
-    const cut = text.indexOf('. ');
-    lead.push(cut < 0 ? [{ text, needs: true }] : [{ text: text.slice(0, cut + 1), needs: true }, { text: text.slice(cut + 1) }]);
-  }
-  /* A RED SIGN IS NAMED BY ITS OWN SENTENCE (agents F13): "Last night's copy did not run." and, with more, ", and 1
-     more." A sign that hands no sentence is counted as before. */
-  const red = redSigns(more.signs);
-  let copies = copy === 'missing';
-  if (red !== null && red > 0) {
+  if (fault) return [{ text: firstSentence(fault.said), needs: true }];
+  if ((redSigns(more.signs) ?? 0) > 0) {
     const raw = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '')?.said;
-    const named = raw === undefined ? undefined : plainSign(raw).replace(/[.!?]$/u, '');
-    if (named !== undefined && aboutCopies(named)) copies = true;
-    const said = named ? (red === 1 ? named : `${named}, and ${red - 1} more`) : red === 1 ? 'One vital sign needs a look' : `${red} vital signs need a look`;
-    lead.push([{ text: said, needs: true }, { text: '.' }]);
+    const named = raw === undefined ? 'One check needs a look' : plainSign(raw).replace(/[.!?]$/u, '');
+    const link = aboutCopies(named) && more.backupsAt ? { text: BACKUPS, href: more.backupsAt } : more.signsAt ? { text: LOOK, href: more.signsAt } : null;
+    return [{ text: `${named}.`, needs: true }, ...(link ? [{ text: ' ' }, link] : [])];
   }
-
-  /* ── the copy and the month, as before ─────────────────────────────────── */
-  const bad: string[] = [];
-  const good: string[] = [];
-  if (engine && UP.has(engine.health.state) && engine.said.text.trim() !== '') good.push(engine.said.text.trim().replace(/[.!?]$/, ''));
-  if (copy === 'missing') bad.push('No copy last night');
-  if (copy === 'in') good.push('last night’s copy is in');
-  if (usage !== null) {
-    if (usage.near) bad.push(nearSaid(usage.near, usage.daysLeft, usage.resets));
-    else good.push(`nothing runs out before ${usage.resets}`);
-  }
-  /* "ALL HEALTHY" ONLY WHERE THE FAULTS WERE READ AS NONE. A member the record refuses them to, a build without them or
-     a read that dropped has the good parts said as they are, never under "All healthy": that is how it said so while a
-     model job lay dead. Green signs alone are not "nothing is broken" either; the faults are what says it. */
-  const faultsClear = more.faults !== undefined && more.faults !== null && more.faults.length === 0;
-  if (lead.length === 0 && faultsClear) good.push('nothing is broken');
-
-  /* UNREAD SIGNS ARE THEIR OWN SENTENCE, LAST, AND NEVER UNDER "ALL HEALTHY": not marked, since nothing is wrong yet, but
-     a link to where the signs are shown, as the red count is. */
-  const unread = unreadSigns(more.signs) ?? 0;
-  const unreadSaid: Part[] =
-    unread === 0
-      ? []
-      : [{ text: unread === 1 ? 'One vital sign has not been read yet' : `${unread} vital signs have not been read yet` }, { text: '.' }];
-  /* THE ONE LINK, AT THE END: "Look", to where the signs are shown, when a sign is red or unread. WHEN WHAT NEEDS A
-     LOOK IS A COPY it is "Backups", to the area that says the same thing, so this line and that area never disagree. */
-  const look: Part[] =
-    copies && more.backupsAt
-      ? [{ text: ' ' }, { text: BACKUPS, href: more.backupsAt }]
-      : more.signsAt && ((red ?? 0) > 0 || unread > 0)
-        ? [{ text: ' ' }, { text: LOOK, href: more.signsAt }]
-        : [];
-
-  if (lead.length === 0 && bad.length === 0 && good.length === 0) return unreadSaid.length > 0 ? [...unreadSaid, ...look] : null;
-  if (lead.length === 0 && bad.length === 0 && unreadSaid.length === 0) return [{ text: faultsClear ? `All healthy: ${joined(good)}.` : `${upper(joined(good))}.` }];
-
-  const parts: Part[] = [];
-  const space = (): void => {
-    if (parts.length > 0) parts.push({ text: ' ' });
-  };
-  for (const sentence of lead) {
-    space();
-    parts.push(...sentence);
-  }
-  if (bad.length > 0) {
-    space();
-    bad.forEach((b, i) => {
-      if (i > 0) parts.push({ text: ', and ' });
-      parts.push({ text: i > 0 ? lower(b) : b, needs: true });
-    });
-    if (good.length > 0) parts.push({ text: `, and ${joined(good)}` });
-    parts.push({ text: '.' });
-  } else if (good.length > 0) {
-    space();
-    parts.push({ text: `${upper(joined(good))}.` });
-  }
-  /* WHAT IS BROKEN IS SAID ALONE, SINCE BATCH 6: "One vital sign needs a look. 15 vital signs have not been read yet." put a second
-     sentence in link colour behind the one that matters, and the line is a plain one. The signs not read yet are the Health
-     page's own Not read yet; they are said here only where nothing is broken and so no sentence leads. */
-  if (unreadSaid.length > 0 && lead.length === 0) {
-    space();
-    parts.push(...unreadSaid);
-  }
-  parts.push(...look);
-  return parts;
+  if (copy === 'missing') return [{ text: 'No copy last night.', needs: true }, ...(more.backupsAt ? [{ text: ' ' }, { text: BACKUPS, href: more.backupsAt }] : [])];
+  if (usage?.near) return [{ text: `${upper(nearSaid(usage.near, usage.daysLeft, usage.resets))}.`, needs: true }];
+  return null;
 }
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
