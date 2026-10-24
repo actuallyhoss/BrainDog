@@ -1241,6 +1241,16 @@
   ]);
 
   /**
+   * WHAT THE HEAD COUNTS AGAINST: the answer while filtering, the list otherwise.
+   *
+   * Unfiltered the two are the same number, so this changes nothing on the ordinary screen. Filtered
+   * they are not, and the head and the cap line have to be talking about the same denominator or one
+   * of them is wrong wherever they are both visible, which is exactly at the cap, the one place the
+   * cap line exists for.
+   */
+  const denominator = $derived(narrowed || q ? result.matched : result.total);
+
+  /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
    *
    * `more()` stops once `loaded` reaches the cap, and a page is two hundred rows, so it overshoots:
@@ -1252,7 +1262,7 @@
 
   /* THE HEAD SAYS THE LIST'S COUNT (Y18), which the record answered with the first page, and never "200+ of 2,527": what
      is drawn so far is the foot's to say (`shownSaid`). */
-  const head = $derived(headCount({ matched: result.matched, total: result.total, drawn, narrowed: narrowed || Boolean(q) }));
+  const head = $derived(headCount({ matched: result.matched, drawn }));
 
   /**
    * A SORTED LIST THE RECORD STOPPED, which is the one list with no next page that is not whole.
@@ -1457,8 +1467,8 @@
     return f ? columns.findIndex((c) => c.field === f.id) : -1;
   });
   const rows = $derived.by(() => {
-    const shown = result.entries.slice(0, DOM_CAP);
-    const drawn = toRows(id, shown, columns, now, result.names ?? undefined);
+    const drawn = toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined);
+    const shown = result.entries;
     const at = readings ? columns.findIndex((c) => c.field === readings.value) : -1;
     if (at < 0 && amountAt < 0) return drawn;
     return drawn.map((r, n) => {
@@ -2983,8 +2993,8 @@
   <div class="list-screen">
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
-    count={head.count}
-    total={head.total}
+    count={head}
+    total={denominator}
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}

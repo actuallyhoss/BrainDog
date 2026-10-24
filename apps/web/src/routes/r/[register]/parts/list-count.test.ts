@@ -10,17 +10,13 @@ import { readFileSync } from 'node:fs';
 
 import { headCount, shownSaid } from './list.ts';
 
-test('THE HEAD SAYS THE LIST\'S COUNT, never a floor of what is loaded', () => {
-  assert.deepEqual(headCount({ matched: 2527, total: 2527, drawn: 200, narrowed: false }), { count: 2527 });
-  assert.deepEqual(headCount({ matched: 322, total: 322, drawn: 200, narrowed: false }), { count: 322 });
-});
-
-test('A FILTERED LIST SAYS HOW MANY MATCH OF HOW MANY IT HOLDS', () => {
-  assert.deepEqual(headCount({ matched: 41, total: 2527, drawn: 41, narrowed: true }), { count: 41, total: 2527 });
+test('THE HEAD SAYS THE ANSWER\'S COUNT, never a floor of what is loaded', () => {
+  assert.equal(headCount({ matched: 2527, drawn: 200 }), 2527);
+  assert.equal(headCount({ matched: 322, drawn: 200 }), 322);
 });
 
 test('A ROW TYPED HERE BEFORE THE RECORD COUNTED IT IS COUNTED', () => {
-  assert.deepEqual(headCount({ matched: 12, total: 12, drawn: 13, narrowed: false }), { count: 13 });
+  assert.equal(headCount({ matched: 12, drawn: 13 }), 13);
 });
 
 test('THE FOOT SAYS WHAT IS SHOWN while the rest is on its way', () => {
