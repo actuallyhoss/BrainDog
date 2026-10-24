@@ -107,6 +107,8 @@
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
+  import NoteText from './NoteText.svelte';
+  import { isMemo } from './note-text.ts';
   import VisualStrip from '$lib/visual/VisualStrip.svelte';
   import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
@@ -1118,6 +1120,9 @@
       <a class="ref-link" href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
     {:else if f.type === 'enum'}
       <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
+    {:else if f.type === 'text' && typeof value === 'string' && isMemo(value)}
+      <!-- A MEMO DRAWS AS A NOTE (Y13): its headings, bold and tables, folded past eight lines with Show all. -->
+      <NoteText text={value} />
     {:else}
       {display(id, f.id, value, clock, names)}
     {/if}
