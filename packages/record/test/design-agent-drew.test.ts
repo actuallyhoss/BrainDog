@@ -46,19 +46,19 @@ test('A PLAN IS SHAPED BY WHAT ITS PROJECT HOLDS: stages, windows, moments or op
 
 test('EACH PROJECT IS OFFERED THE PLAN ITS OWN FACTS READ BEST IN, and a kept one holds still until it draws nothing', () => {
   const keeps = ['path', 'roadmap'] as const;
-  /* MARSH, ITS ART AND ISLAND AS STAGES BESIDE A FEW DAYS: its road. ENCORE, ONE STAGE AND ITS RELEASES ON DAYS: its roadmap. */
+  /* MARSH, ITS ART AND ISLAND AS STAGES BESIDE A FEW DAYS: its road. FERRIS, ONE STAGE AND ITS RELEASES ON DAYS: its roadmap. */
   const marsh = { stages: 3, spans: 0, moments: 4, undated: 0 };
-  const encore = { stages: 1, spans: 2, moments: 6, undated: 1 };
+  const ferris = { stages: 1, spans: 2, moments: 6, undated: 1 };
   assert.deepEqual(planOffered(marsh, null, keeps), { shape: 'path', was: null });
   /* A TIMELINE THE LIST CANNOT KEEP IS ITS ROADMAP, which draws a release with no effort as a line on its day. */
-  assert.deepEqual(planOffered(encore, null, keeps), { shape: 'roadmap', was: null });
-  assert.deepEqual(planOffered(encore, null, ['path', 'roadmap', 'timeline']), { shape: 'timeline', was: null });
+  assert.deepEqual(planOffered(ferris, null, keeps), { shape: 'roadmap', was: null });
+  assert.deepEqual(planOffered(ferris, null, ['path', 'roadmap', 'timeline']), { shape: 'timeline', was: null });
   /* DRAWN ONE WAY ALREADY, NOTHING: the page is that shape. */
   assert.equal(planOffered({ stages: 0, spans: 3, moments: 0, undated: 0 }, null, keeps), null);
   assert.equal(planOffered({ stages: 4, spans: 0, moments: 0, undated: 9 }, null, keeps), null);
   /* KEPT, IT HOLDS STILL WHILE IT DRAWS. */
   assert.equal(planOffered(marsh, 'roadmap', keeps), null);
-  assert.equal(planOffered(encore, 'path', keeps), null);
+  assert.equal(planOffered(ferris, 'path', keeps), null);
   /* KEPT AS ITS ROAD WITH NO STAGES LEFT, IT DRAWS NOTHING, so the shape it holds now is offered, saying what was kept. */
   assert.deepEqual(planOffered({ stages: 0, spans: 5, moments: 0, undated: 0 }, 'path', keeps), { shape: 'roadmap', was: 'path' });
   assert.deepEqual(planOffered({ stages: 3, spans: 0, moments: 0, undated: 0 }, 'roadmap', keeps), { shape: 'path', was: 'roadmap' });

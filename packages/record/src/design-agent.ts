@@ -609,7 +609,7 @@ const NEARER: Readonly<Record<PlanShape, PlanShape | null>> = { path: null, road
 /**
  * THE ONE PLAN THE DESIGN AGENT WOULD DRAW FOR THIS PROJECT, or `null` when what it draws now is what it would (C19,
  * §45 "Each project's roadmap is designed for that project"). Read from that project's own facts and nothing else, so
- * Marsh, with its stages, is offered its road and Encore, with its releases on days, its roadmap.
+ * Marsh, with its stages, is offered its road and Ferris, with its releases on days, its roadmap.
  *
  * TWO CASES, and only these:
  * - NOTHING KEPT, DRAWN BOTH WAYS: the shape that reads best, its road where its stages say the most (`PLAN_STAGES_LEAST`),

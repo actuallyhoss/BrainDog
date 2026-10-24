@@ -152,17 +152,17 @@ test('KEEPING A PAGE’S CALENDAR WRITES THE BLOCK ON THAT PAGE', async () => {
   sql.close();
 });
 
-test('MARSH AND ENCORE ARE EACH OFFERED THEIR OWN PLAN, ONE A DAY, AND EACH KEEPS ITS OWN SHAPE', async () => {
+test('MARSH AND FERRIS ARE EACH OFFERED THEIR OWN PLAN, ONE A DAY, AND EACH KEEPS ITS OWN SHAPE', async () => {
   const { api, sql, day } = await record();
-  /* ENCORE: ONE STAGE AND ITS RELEASES ON DAYS, so its plan is its roadmap where the plan of Marsh is its road. */
-  value(api.kernel.create('projects', { name: 'Encore' }, { actor: 'p_owner' }));
+  /* FERRIS: ONE STAGE AND ITS RELEASES ON DAYS, so its plan is its roadmap where the plan of Marsh is its road. */
+  value(api.kernel.create('projects', { name: 'Ferris' }, { actor: 'p_owner' }));
   value(api.kernel.create('stages', { name: 'Payroll', project: 'projects#2', order: 0 }, { actor: 'p_owner' }));
-  for (let i = 1; i <= 7; i++) value(api.kernel.create('jobs', { what: `Encore ${i}`, project: 'projects#2', due: `2026-12-0${i}` }, { actor: 'p_owner' }));
+  for (let i = 1; i <= 7; i++) value(api.kernel.create('jobs', { what: `Ferris ${i}`, project: 'projects#2', due: `2026-12-0${i}` }, { actor: 'p_owner' }));
 
   const first = drew((await api.slashTick()) as Ticked);
   assert.deepEqual(
     first.map((f) => f.question),
-    ["I drew Encore's plan as a roadmap. Keep it?"],
+    ["I drew Ferris's plan as a roadmap. Keep it?"],
   );
   value(await api.decide({ id: first[0]!.id, decide: { option: 'keep', reason: 'yes' } }, owner));
   day(1);
@@ -175,7 +175,7 @@ test('MARSH AND ENCORE ARE EACH OFFERED THEIR OWN PLAN, ONE A DAY, AND EACH KEEP
 
   const kept = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'projects' }, owner)).rows.map((r) => [r.fields.name, r.fields.drawn_as]);
   assert.deepEqual(kept.sort(), [
-    ['Encore', 'roadmap'],
+    ['Ferris', 'roadmap'],
     ['Marsh', 'path'],
   ]);
   /* KEPT, BOTH HOLD STILL: the next day draws no plan again, only the page's calendar. */
