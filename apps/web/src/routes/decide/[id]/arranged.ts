@@ -85,7 +85,8 @@ export type Stop = { part: string; name: string; unless?: string };
  * `takes` only on an arrangement with parts, and `stops` only when a live door goes, with the add-on taking it if one
  * does: both are left out otherwise, so a story without them reads as it always did.
  */
-export type Arranged = { lead: string; parts: Part[]; summary: string; takes?: Take[]; stops?: Stop[] };
+/** `said` is the whole change as one sentence, for the question's own page (scope E37); `summary` the queue's counts. */
+export type Arranged = { lead: string; parts: Part[]; summary: string; said?: string; takes?: Take[]; stops?: Stop[] };
 
 /**
  * What the screen knows that the body does not: the record's name for each list, the labels it gives them now (the rail's
@@ -745,7 +746,7 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
     otherLines.length ? copy.arrangeCountSettings(otherLines.length) : '',
   ].filter((b) => b !== '');
   const takes = kind === 'arrange' ? takesOf(body, needs) : [];
-  return { lead, parts, summary: bits.join(', '), ...(takes.length ? { takes } : {}), ...(plan.stops.length ? { stops: plan.stops } : {}) };
+  return { lead, parts, summary: bits.join(', '), said: copy.arrangeSaid(lead, bits), ...(takes.length ? { takes } : {}), ...(plan.stops.length ? { stops: plan.stops } : {}) };
 }
 
 /** A row's title as a plan carries it: the first line of text among its fields. */

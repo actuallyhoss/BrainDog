@@ -40,7 +40,8 @@
   {#if compact}
     <p class="arr-summary">{arranged.summary ? copy.arrangeLeadSummary(arranged.lead, arranged.summary) : arranged.lead}</p>
   {:else}
-    <p class="arr-lead">{arranged.lead}</p>
+    <!-- ON ITS OWN PAGE, ONE SENTENCE for the whole change, and the parts under it (scope E37). -->
+    <p class="arr-lead">{arranged.said ?? arranged.lead}</p>
   {/if}
   {#if picking && ticks}
     <section class="arr-part" aria-label={copy.arrangeTakesH}>

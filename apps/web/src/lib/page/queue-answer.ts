@@ -15,7 +15,7 @@ import { day, fileSrc, relative, showsOf } from 'braindog-render';
 import { citedWords } from '../cite.ts';
 import { copy } from '../copy.ts';
 import { moneyInText } from '../record/money.ts';
-import { actor, type Actor } from '../record/names.ts';
+import { actor, type Actor, type RunBy } from '../record/names.ts';
 import { spoken } from '../decide/spoken.ts';
 import { mergeOf, type Merge } from '../../routes/decide/merge.ts';
 
@@ -91,8 +91,8 @@ const inSentence = (name: string): string => (/^\p{Lu}{2}/u.test(name) ? name : 
  * `actor` SAYS EVERY SHAPE, and this adds one thing to it: a rule's name is said as a rule's, because on a card with no
  * face beside it ("Keep balances current" in the renderer's by-line) a rule's name reads as a person's request.
  */
-export function proposer(who: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Actor {
-  const said = actor(who, me, names);
+export function proposer(who: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): Actor {
+  const said = actor(who, me, names, run_by);
   return said.kind === 'rule' ? { name: queueWords.rule(inSentence(said.name)), kind: 'rule' } : said;
 }
 

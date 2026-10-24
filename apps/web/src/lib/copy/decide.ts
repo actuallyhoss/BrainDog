@@ -298,6 +298,9 @@ export const decide = {
   arrangeCountOther: (n: number) => `${n} more ${n === 1 ? 'change' : 'changes'}`,
   arrangeCountWords: (n: number) => `${n} ${n === 1 ? 'word changes' : 'words change'}`,
   arrangeLeadSummary: (lead: string, summary: string) => `${lead}: ${summary}`,
+  /** What an arrangement changes, as one sentence on its own page (scope E37): "Adds Profiles, with 1 new page and 2 new lists." */
+  arrangeSaid: (lead: string, bits: readonly string[]) =>
+    bits.length === 0 ? `${lead}.` : `${lead}, with ${bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(', ')} and ${bits.at(-1)}`}.`,
   arrangeCountSettings: (n: number) => `${n} ${n === 1 ? 'setting' : 'settings'}`,
   arrangeApplied: 'What was applied',
   arrangeDidInstall: (names: readonly string[]) => `Installed ${list([...names])}`,

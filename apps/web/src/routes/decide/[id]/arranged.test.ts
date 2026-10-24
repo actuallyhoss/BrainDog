@@ -53,6 +53,8 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   /* A pack this same proposal installs is not on yet, so the sentence starts from the house word. */
   assert.deepEqual(words?.part === 'words' && words.lines, ['Home will be called “Today”', 'In Things, “Earning” will be called “Handed in”']);
   assert.equal(out.summary, '1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes, 2 words change');
+  /* ON ITS OWN PAGE THE CHANGE IS ONE SENTENCE (scope E37), and never a list of field names. */
+  assert.equal(out.said, `${out.lead}, with 1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes and 2 words change.`);
 });
 
 test('a settings change says each word before and after, from what the record holds now', () => {

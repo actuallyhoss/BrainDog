@@ -76,7 +76,7 @@
   import { aboutLine, aboutOf, sideOf, words as sideWords } from './side.ts';
   import { moneyRowOf } from '$lib/decide/money-row.ts';
   import { rowHref } from '$lib/record/row-href.ts';
-  import { listName } from '$lib/record/names.ts';
+  import { listName, runByIn, type RunBy } from '$lib/record/names.ts';
   import { readFiles, visualsOf } from './option-visual.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
@@ -131,6 +131,7 @@
     if (live?.about && isArranging(live.about.kind)) void readHeld();
     void readPictures(id);
     void readAbout(id);
+    void readRun(id, live?.about?.by);
   }
 
   /**
@@ -355,7 +356,22 @@
   const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
   /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
-  const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))) : null);
+  const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)), runBy) : null);
+
+  /**
+   * THE RUN THAT ASKED, read once for its app and kind, so the line says "Claude Code" and never "An agent" (scope E37).
+   * A run handle only; a refused or missing read leaves the plain word.
+   */
+  let runBy = $state.raw<RunBy | null>(null);
+  async function readRun(id: string, by: string | undefined) {
+    runBy = null;
+    const seq = /^S(\d+)$/u.exec(by ?? '')?.[1];
+    if (!client || seq === undefined) return;
+    const got = await client.get('session', Number(seq)).catch(() => ({ ok: false as const }));
+    if (String(page.params.id) !== id || !got.ok || got.value === null || typeof got.value !== 'object') return;
+    const f = (got.value as { fields?: Record<string, unknown> }).fields ?? {};
+    runBy = runByIn({ run: by, agent: f.agent, client: f.client, parent: f.parent });
+  }
 
   /**
    * WHEN THE RECORD STILL KEEPS A REASON FOR A QUESTION, it answers the press with `wants: 'reason'` (`decide-write.ts`),
@@ -1231,29 +1247,8 @@
               </section>
             {/if}
       {/if}
-    </Tile>
-    {#if aside}
-    <Tile class="gate-aside">
-      <!-- WHAT IT IS ABOUT, FIRST: the row by its title, a link to it, and its list, amount and how late under it. -->
-      {#if asking && aboutRow}
-        <section class="aside-part" aria-labelledby="gate-about-h">
-          <h2 class="gate-h" id="gate-about-h">{sideWords.about}</h2>
-          <p class="gate-about">
-            {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}
-            {#if aboutRow.line}<span class="gate-about-line">{aboutRow.line}</span>{/if}
-          </p>
-        </section>
-      {/if}
-      <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
-      {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
-      <!-- WHY IT IS ASKED, in the asker's own words. -->
-      {#if asking && question.context}
-        <section class="aside-part" aria-labelledby="gate-why-h">
-          <h2 class="gate-h" id="gate-why-h">{gate.whyAsked}</h2>
-          <p class="gate-why">{symbolText(spoken(question.context))}</p>
-        </section>
-      {/if}
-      <!-- WHAT IT CHANGES, beside the answers: what an arrangement does, what a proposal puts in place, the rows to tick,
+      <!-- WHAT IT CHANGES, under the answers in their own tile (scope E37: beside them it left half the board empty under
+           two buttons): what an arrangement does, what a proposal puts in place, the rows to tick,
            the rows it changes, what it calls out, and what deciding late costs. Each under its own small heading, open, read
            before the press and never in the way of it. -->
       {#if asking && doesAny}
@@ -1344,6 +1339,28 @@
                 </div>
               </section>
             {/if}
+    </Tile>
+    {#if aside}
+    <Tile class="gate-aside">
+      <!-- WHAT IT IS ABOUT, FIRST: the row by its title, a link to it, and its list, amount and how late under it. -->
+      {#if asking && aboutRow}
+        <section class="aside-part" aria-labelledby="gate-about-h">
+          <h2 class="gate-h" id="gate-about-h">{sideWords.about}</h2>
+          <p class="gate-about">
+            {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}
+            {#if aboutRow.line}<span class="gate-about-line">{aboutRow.line}</span>{/if}
+          </p>
+        </section>
+      {/if}
+      <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
+      {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
+      <!-- WHY IT IS ASKED, in the asker's own words. -->
+      {#if asking && question.context}
+        <section class="aside-part" aria-labelledby="gate-why-h">
+          <h2 class="gate-h" id="gate-why-h">{gate.whyAsked}</h2>
+          <p class="gate-why">{symbolText(spoken(question.context))}</p>
+        </section>
+      {/if}
       <!-- AND THE REST OF THE SIDE: the share the asker gave on the question's body, and the things the reasons name, each
            a link to it by its own name. -->
       {#if asking && side && sideMore}
@@ -1647,11 +1664,14 @@
 
   /* ── what accepting does, a plain part of the tile ─────────────────────── */
 
-  /* UNDER WHY IT IS ASKED, a hairline over it where something came first. */
+  /* UNDER THE ANSWERS IN THEIR TILE (scope E37), a hairline over it. */
   .does {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    margin-block-start: var(--sp-5);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
   }
 
   .gate-h {

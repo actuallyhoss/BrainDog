@@ -133,7 +133,7 @@ test('the sentence the controls point at is rendered, and before the first of th
  * laptop the one thing this screen is for was below the fold. Then they were one folded tile under the options, a
  * second treatment beside the options' tile and the comments floating on the board under both.
  */
-test('the options come first, and why, what it changes and the comments are the second tile beside them (today F9)', () => {
+test('the options come first with what it changes under them in their tile, and why and the comments are the second tile (scope E37)', () => {
   const head = page.indexOf('<PageHead icon="decide"');
   const tile = page.indexOf('<Tile class="gate">');
   const options = page.indexOf('<section class="options"');
@@ -141,17 +141,18 @@ test('the options come first, and why, what it changes and the comments are the 
   const does = page.indexOf('<section class="does"');
   const thread = page.indexOf('<Thread');
   const shut = page.lastIndexOf('</Tile>');
-  assert.ok(head >= 0 && tile > head && options > tile && aside > options && does > aside && thread > does && shut > thread, 'the tiles no longer read options, then what it changes, then the comments');
+  /* WHAT IT CHANGES UNDER THE ANSWERS, IN THEIR TILE (scope E37): beside them it left half the board empty under two buttons. */
+  assert.ok(head >= 0 && tile > head && options > tile && does > options && aside > does && thread > aside && shut > thread, 'the tiles no longer read options, then what it changes, then the comments');
   /* TWO TILES ON THE SCREEN, and nothing folded shut in the way of what it changes. */
   assert.equal(page.match(/<Tile\b/gu)?.length, 2, 'the gate is one tile again, or three');
   assert.doesNotMatch(page, /<details class="does"/u, 'what accepting does is folded shut again');
   for (const part of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.costOfDelay}']) {
     const at = page.indexOf(part);
-    assert.ok(at > does && at < thread, `${part} is not inside what accepting does`);
+    assert.ok(at > does && at < aside, `${part} is not inside what accepting does`);
   }
-  /* WHY IT IS ASKED LEADS THE SECOND TILE, in the asker's words, before what it changes. */
+  /* WHY IT IS ASKED IS IN THE SECOND TILE, in the asker's words, before the comments. */
   const why = page.indexOf('<p class="gate-why">');
-  assert.ok(why > aside && why < does, 'why it is asked no longer leads the second tile');
+  assert.ok(why > aside && why < thread, 'why it is asked is no longer in the second tile');
 });
 
 test('no option carries a key cap, and no sentence is typed into the gate', () => {

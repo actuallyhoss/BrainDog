@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COMPACT_MOST, compactOf, laterLine, queueMergeOf, queueWords, visualOf, waysOf } from './queue-answer.ts';
+import { COMPACT_MOST, compactOf, laterLine, proposer, queueMergeOf, queueWords, visualOf, waysOf } from './queue-answer.ts';
 
 const now = Date.parse('2026-10-02T09:00:00Z');
 
@@ -232,4 +232,9 @@ test('THE WAYS TO ANSWER CARRY THE PICTURE ONLY WHERE THE CARD WAS HANDED THE WA
   } as Parameters<typeof waysOf>[0];
   assert.deepEqual(waysOf(q).map((w) => w.shows), [null, { swatch: ['#c9a227'] }]);
   assert.deepEqual(waysOf(q, serves).map((w) => w.shows), [{ file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } }, { swatch: ['#c9a227'] }]);
+});
+
+test('A RUN THAT ASKED IS NAMED BY THE APP IT RAN IN, never "An agent", once its run is read (scope E37)', () => {
+  assert.equal(proposer('S42').name, 'An agent', 'before the run is read');
+  assert.deepEqual(proposer('S42', null, new Map(), { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null }), { name: 'Claude Code', kind: 'agent' });
 });
