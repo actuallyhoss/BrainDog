@@ -57,7 +57,7 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
-  import { catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor, withheld } from './browse/catalogue.ts';
+  import { catalogueLines, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, readShippedCatalogue, trustForEntry, updatesFor, withheld } from './browse/catalogue.ts';
   import { recordKeys } from './browse/known-keys.ts';
   import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { installedCount, words } from './words.ts';
@@ -73,6 +73,8 @@
   const byId = new Map(firstPartyModules().map((p) => [p.id, p]));
   /* AN ADD-ON FROM THE KENNEL is not one of the modules, so its catalogue title names it, and its id only when neither knows it. */
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
+  /* AND ITS LINE, what the catalogue says it is for, where this build's modules do not know it (Z11). */
+  let catalogueSays = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
   const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
   /* A LIST BY THE NAME THIS RECORD GIVES IT: `REGISTERS` holds what this tab has learnt of the record's declarations, and
@@ -165,7 +167,10 @@
   const lineOf = (state: PackState): string =>
     state.disabled_at !== null
       ? copy.packTurnedOff
-      : (byId.get(state.id)?.blurb ?? (state.id.startsWith('usecase-') ? useCase(state.id.slice('usecase-'.length))?.summary : undefined) ?? state.registers.map(listName).join(', '));
+      : (byId.get(state.id)?.blurb ??
+        (state.id.startsWith('usecase-') ? useCase(state.id.slice('usecase-'.length))?.summary : undefined) ??
+        catalogueSays.get(state.id) ??
+        state.registers.map(listName).join(', '));
 
   /**
    * One press of a switch, or of the button a refusal offered.
@@ -578,11 +583,17 @@
    * `drew('ready')` is the claim for when it has come back.
    */
   onMount(() => {
-    void readHostCatalogue(fetch).then(async (got) => {
-      kennel = got.ok ? got.index : null;
-      looked = true;
-      if (got.ok) catalogueNames = await catalogueTitles(got.index);
-    });
+    /* THE NAMES ARE PART OF THE SCREEN: an installed add-on the build's modules do not know is named and described by the
+       Kennel's catalogue, else by the catalogue this build ships, and the screen says it is drawn only once they have
+       landed, so it is never drawn as "Bank hsbc eg" over "Holdings" (the audit of 25 October, Z11). */
+    const named = readHostCatalogue(fetch)
+      .then(async (got) => {
+        kennel = got.ok ? got.index : null;
+        looked = true;
+        const index = got.ok && got.index ? got.index : await readShippedCatalogue(fetch);
+        [catalogueNames, catalogueSays] = await Promise.all([catalogueTitles(index), catalogueLines(index)]);
+      })
+      .catch(() => undefined);
     void read(async () => {
       client = createClient({ base: apiBase() });
       const chosen = await choose(client);
@@ -593,6 +604,7 @@
       }
       states = chosen.first.value;
       void readGone();
+      await named;
       return true;
     });
   });

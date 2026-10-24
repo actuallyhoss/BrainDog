@@ -111,6 +111,38 @@ export async function catalogueTitles(index: CatalogueIndex | null): Promise<Map
   return new Map(index.entries.map((e) => [installedIdOf(e), e.title]));
 }
 
+/**
+ * The line a person reads under each entry's name, by the pack id a record holds it under: what its catalogue says it is
+ * for. An installed add-on that is not one of this build's modules read only its lists there, so Holdings was described
+ * as "Holdings" (the audit of 25 October, Z11).
+ */
+export async function catalogueLines(index: CatalogueIndex | null): Promise<Map<string, string>> {
+  if (!index) return new Map();
+  const { installedIdOf } = await import('@braindog/declare/catalogue');
+  return new Map(index.entries.filter((e) => e.summary.trim() !== '').map((e) => [installedIdOf(e), e.summary.trim()]));
+}
+
+/** Where this build's own catalogue is served, under the app's base, as `lib/start/offer.ts` reads it. */
+export const SHIPPED_INDEX_AT = '/app/catalogue/index.json';
+
+/**
+ * THE CATALOGUE THIS BUILD SHIPS, for naming what is installed when the Kennel does not answer. Every pack in `packs/` is
+ * in it, listed or not, so an add-on installed by id is named by its title ("HSBC Egypt alerts") and never by its id
+ * ("Bank hsbc eg"), which is what a host with no Kennel, or a read the Kennel refused, drew (the audit of 25 October,
+ * Z11). `null` when it cannot be read: the names then fall back as before.
+ */
+export async function readShippedCatalogue(fetcher: Fetcher): Promise<CatalogueIndex | null> {
+  try {
+    const res = await fetcher(SHIPPED_INDEX_AT, { credentials: 'same-origin', headers: { accept: 'application/json' } });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
+    const { readCatalogue } = await import('@braindog/declare/catalogue');
+    const read = readCatalogue(await res.json());
+    return read.ok ? read.value : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ── signatures and trust on first use ──────────────────────────────────── */
 
 /* Where the keys are kept moved to `known-keys.ts`; these stay importable from here for the screens that read them. */
