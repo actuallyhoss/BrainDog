@@ -126,6 +126,26 @@ test('A RUNG LETS ITS KIND THROUGH AND NO OTHER, and the floor always asks', asy
   sql.close();
 });
 
+test('A RUN MARKS DONE THE TASK IN ITS OWN HAND AT DO AND TELL; another task, or more than done, still asks', async () => {
+  const { api, sql } = await record();
+  const mine = value<Entry>(await api.create({ register: 'tasks', fields: { name: 'Kern the pairs' } }, owner));
+  const other = value<Entry>(await api.create({ register: 'tasks', fields: { name: 'Order paper' } }, owner));
+  value(await api.handoff({ task: `tasks#${String(mine.seq)}` }, agent()));
+  /* NOT IN ITS HAND: asked, as before. */
+  const asked = value<Asked>(await api.update({ register: 'tasks', seq: other.seq!, patch: { state: 'done' } }, agent()));
+  assert.equal(asked.asked.question, 'Mark Order paper done?');
+  /* MORE THAN DONE ON ITS OWN TASK: the rename asks with it. */
+  const renamed = value<Asked>(await api.update({ register: 'tasks', seq: mine.seq!, patch: { state: 'done', name: 'Kerned' } }, agent()));
+  assert.ok(renamed.asked, 'a rename rode in on its own task');
+  /* ITS OWN, DONE AND NOTHING ELSE, through the handoff that finishes it. */
+  const done = value<Entry & { task?: { state: string | null; asked?: unknown } }>(await api.handoff({ done: `tasks#${String(mine.seq)}` }, agent()));
+  assert.equal(done.task?.state, 'done');
+  assert.equal(done.task?.asked, undefined, 'its own task was asked');
+  assert.equal(sql.one<{ s: string }>("SELECT state AS s FROM entry WHERE register = 'tasks' AND seq = ?", mine.seq)?.s, 'done');
+  assert.ok([null, 'ask'].includes(rung(sql, 'tasks:move:done')), 'closing its own task climbed the rung for every task');
+  sql.close();
+});
+
 test('A PROPOSAL ITS RUNG LETS THROUGH IS ACCEPTED BY THE LADDER, with the decision Undo takes back', async () => {
   const { api, sql } = await record();
   climb(sql, 'tasks:add');

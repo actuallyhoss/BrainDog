@@ -345,6 +345,22 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
+   * Whether a write only marks done the task in the run's own hand: the one `handoff` put on the run (`task`, by its
+   * spoken name), moved to `done` and nothing else changed (H16, "a task shows the agent's work").
+   *
+   * A RUN FINISHING ITS OWN WORK IS TOLD, NOT ASKED. Every kind asked until ten were kept, so on the owner's record twelve
+   * tasks sat with agents and none was ever closed by one: each "done" waited in Needs you beside the questions that
+   * matter. The floors and outside text are read before this, so a task with an amount, another person's row or a run
+   * that read outside text still asks. A task the run did not take is not its own and climbs as before.
+   */
+  const ownDone = (c: Caller, shape: ListShape | null, kinds: readonly ChangeKind[], selfId: string | null): boolean => {
+    if (c.run === null || selfId === null || shape?.state === undefined) return false;
+    if (kinds.length === 0 || !kinds.every((k) => k.verb === 'move:done')) return false;
+    const held = kernel.get(c.run)?.fields.task;
+    return typeof held === 'string' && held.trim() !== '' && rowNamed(held) === selfId;
+  };
+
+  /**
    * What one write by an agent does at its rung (`Gate`). `self` is the row an update or a delete writes, whose maker the
    * `others` floor reads; a new row has none.
    */
@@ -362,6 +378,8 @@ export function ladder(deps: LadderDeps) {
        answered as written and told, and with no kinds: `kept` counts what is handed to it towards the next rung, and
        a kind that never asked has no rung to be offered. */
     if (op !== 'delete' && learnt(c, list, shape, op, patch, was)) return { write: true, rung: 'tell', kinds: [] };
+    /* AND SO DOES A RUN MARKING DONE THE TASK IN ITS OWN HAND (`ownDone`), at Do and tell, counted towards nothing. */
+    if (op === 'update' && ownDone(c, shape, kinds, selfId)) return { write: true, rung: 'tell', kinds: [] };
     const rung = rungFor(c.token, c.scope, kinds);
     if (rung === 'ask') return { write: false, kinds, why: `Changes like this ask until ${OFFER_AFTER} of them have been kept as they were.` };
     return { write: true, rung, kinds };
