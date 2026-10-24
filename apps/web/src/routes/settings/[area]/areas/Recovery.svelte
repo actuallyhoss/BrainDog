@@ -92,7 +92,7 @@
 {#if livePasskeys}
   <!-- THE HOST'S OWN PASSKEYS, for somebody signed in to a host that offers them. Adding one is
        real only here, because only a live session can say whose passkey it is. -->
-  <Tile icon="key" class="section" data-surface="tile" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
+  <Tile icon="key" class="section" data-surface="tile" id="passkeys" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
     <div class="section-body">
       <p class="hint">{copy.passkeyHow}</p>
       {#if liveKeys === null}

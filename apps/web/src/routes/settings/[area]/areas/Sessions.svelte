@@ -77,7 +77,6 @@
   /* ── what this browser keeps ── */
   const keptWords = {
     title: 'Kept on this device',
-    none: 'Nothing of this record is kept on this device yet.',
     held: (size: string) => `About ${size} of what you read here is kept on this device, so screens draw at once and you can read offline.`,
     forget: "Forget this device's copy",
     forgetting: 'Forgetting…',
@@ -140,20 +139,22 @@
   </div>
 </Tile>
 
+<!-- ONLY ONCE SOMETHING IS KEPT (audit 25 October, X18): a card saying nothing was kept here was a
+     card with nothing in it to act on. Just forgotten, it says so once. -->
+{#if forgot || (kept !== null && kept.answers > 0)}
 <Tile icon="download" class="section" data-surface="tile" title={keptWords.title}>
   <div class="section-body">
     {#if forgot}
       <p class="hint" role="status">{keptWords.forgot}</p>
     {:else if kept !== null}
-      <p class="hint">{kept.answers === 0 ? keptWords.none : keptWords.held(sized(kept.bytes))}</p>
-      {#if kept.answers > 0}
-        <div class="row-actions">
-          <Button tone="bad" onclick={forget} aria-busy={forgetting} disabled={forgetting}>{forgetting ? keptWords.forgetting : keptWords.forget}</Button>
-        </div>
-      {/if}
+      <p class="hint">{keptWords.held(sized(kept.bytes))}</p>
+      <div class="row-actions">
+        <Button tone="bad" onclick={forget} aria-busy={forgetting} disabled={forgetting}>{forgetting ? keptWords.forgetting : keptWords.forget}</Button>
+      </div>
     {/if}
   </div>
 </Tile>
+{/if}
 
 <style>
   .hint {

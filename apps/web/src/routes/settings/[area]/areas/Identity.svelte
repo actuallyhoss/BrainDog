@@ -40,6 +40,7 @@
     here: 'This browser',
     openHost: 'Let in without signing in, as this BrainDog’s one person',
     notSignedIn: 'Not signed in',
+    seeBelow: 'See below',
   };
   const signedInEmail = $derived(s.hostAuth?.me?.email ?? null);
   const namesOf = s.namesOf;
@@ -430,7 +431,9 @@
           <li class="fact-act">
             <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
             <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
-            {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/signing-in')}>{copy.addPasskey}</Button></span>{/if}
+            <!-- ONE ADD A PASSKEY ON THE SCREEN (audit 25 October, X18): it is the Passkeys tile's, under this one, so
+                 this row says the count and links down to it. -->
+            {#if keysSaid.short}<span class="fact-do"><Button weight="bare" href="#passkeys">{identityWords.seeBelow}</Button></span>{/if}
           </li>
         {/if}
         {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
