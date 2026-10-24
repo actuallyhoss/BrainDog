@@ -173,6 +173,29 @@ export async function keep(base: string, dev: boolean): Promise<void> {
 }
 
 /**
+ * Drop the kept shell, so the next open of the app asks the network for it: the page heard that a newer build is live
+ * (`newerBuild` in `live.ts`), and the shell kept is the old one's.
+ */
+export async function dropShell(): Promise<void> {
+  await (await cachesHere()?.open(COPY))?.delete(scopeHere());
+}
+
+/**
+ * Hear the worker say the shell it drew this page from is not the one the network now answers (a deploy), with a short
+ * mark of the new one (`refresh` in `service-worker.ts`).
+ */
+export function hearShell(fn: (mark: string) => void): () => void {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return () => {};
+  const on = (e: MessageEvent<unknown>) => {
+    const said = e.data;
+    if (said !== null && typeof said === 'object' && 'shell' in said && typeof said.shell === 'string') fn(said.shell);
+  };
+  navigator.serviceWorker.addEventListener('message', on);
+  navigator.serviceWorker.startMessages();
+  return () => navigator.serviceWorker.removeEventListener('message', on);
+}
+
+/**
  * Hear the worker say it answered from the copy, with the time that answer was kept.
  *
  * `startMessages` BECAUSE A LISTENER ADDED WITH `addEventListener` DOES NOT OPEN THE QUEUE: messages a worker posts to

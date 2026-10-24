@@ -7,11 +7,20 @@
  * and the kernel's `notify.push` job still writes `{ title, url }`, so this file is the place that guarantees it: the
  * payload is never read, and `push.test.ts` fires a push whose payload throws when touched.
  *
- * THE NETWORK FIRST, ALWAYS, AND THE COPY ONLY WHEN IT FAILS. Every read, every address of the app and every file of it
- * goes to the network as it did before this file cached anything, and what answers is what is drawn; the copy is
- * written on the way through and read only when the network did not answer at all. So a deploy is never hidden behind
- * a stale shell while he is online. The one exception is a file under `_app/immutable/`, whose name is its content's
- * hash, so the copy of it cannot be stale and is answered first.
+ * THE NETWORK FIRST FOR EVERY READ AND FILE, AND THE COPY ONLY WHEN IT FAILS. Every read and every file of the app goes
+ * to the network as it did before this file cached anything, and what answers is what is drawn; the copy is written on
+ * the way through and read only when the network did not answer at all. A file under `_app/immutable/` is answered from
+ * the copy first, because its name is its content's hash, so the copy of it cannot be stale.
+ *
+ * THE SHELL IS ANSWERED FROM THE COPY, AND ASKED FOR AGAIN BEHIND IT (scope 2026-10-24 A17). Network first, an open on
+ * his phone waited the whole trip to the record's front (90 ms at best from Marseille, often 400) before a single pixel,
+ * though the shell is the same few kilobytes every time until a deploy. Now an address of the app is answered with the
+ * kept shell at once and the network's is fetched behind it: the same shell is kept again, and a different one (a
+ * deploy) is kept and the page told (`{ shell }`), which reloads onto it before anybody has touched it, and the next
+ * open draws it either way. The page also hears a newer build from `/api/version` and drops the kept shell
+ * (`live.svelte.ts`). Sign-in and sign-up are never answered from the copy, because the Worker sends their pages a
+ * different policy (Turnstile's), and the bare start address goes to the record's own address as the copy's mark names
+ * it, while the Worker's entry is still asked behind it for the session it keeps.
  *
  * NO WRITE IS KEPT AND NONE WAITS. A write the network does not take is answered at once with a refusal saying it was
  * not sent (`words.notSent`), and nothing is queued to send later: `offline.ts` says why.
@@ -81,7 +90,7 @@ sw.addEventListener('notificationclick', (e) => {
    controls no page that loaded before it; either would leave the first visit keeping nothing, which on a phone that
    goes offline on the way home is the visit that mattered. The worker answers network first, so an older page it
    takes over gets what the network gives it, as it did before. */
-sw.addEventListener('install', (e) => e.waitUntil(sw.skipWaiting()));
+sw.addEventListener('install', (e) => e.waitUntil(Promise.all([sw.skipWaiting(), keepShell(Date.now())])));
 sw.addEventListener('activate', (e) => e.waitUntil(Promise.all([sw.clients.claim(), sweep(Date.now())])));
 
 sw.addEventListener('fetch', (e) => {
@@ -102,6 +111,10 @@ const shell = (): string => sw.registration.scope;
 
 async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: number): Promise<Response> {
   const req = e.request;
+  if (kind === 'shell') {
+    const quick = await shellFirst(e, now).catch(() => null);
+    if (quick !== null) return quick;
+  }
   if (kind === 'asset') {
     const held = await kept(req.url, now);
     if (held) return held.res;
@@ -114,7 +127,7 @@ async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: num
   if (net !== null) {
     const json = (net.headers.get('content-type') ?? '').includes('application/json');
     const keepable = net.ok && net.type === 'basic' && (kind === 'read' ? json : kind !== 'write' && kind !== 'door');
-    if (keepable) e.waitUntil(put(kind === 'shell' ? shell() : req.url, net.clone(), now));
+    if (keepable && !(kind === 'shell' && !keepsShell(req.url))) e.waitUntil(put(kind === 'shell' ? shell() : req.url, net.clone(), now));
     if (several !== null && net.ok && net.type === 'basic' && json) e.waitUntil(putEach(several, net.clone(), now));
     if (kind === 'shell' && now - swept > HOUR) e.waitUntil(sweep(now));
     return net;
@@ -198,6 +211,76 @@ async function kept(key: string, now: number): Promise<{ res: Response; at: numb
 async function tell(client: string, at: number): Promise<void> {
   if (client === '') return;
   (await sw.clients.get(client))?.postMessage({ kept: at });
+}
+
+/** Sign-in and sign-up, whose pages the Worker sends with Turnstile's policy: never answered from the copy, nor kept. */
+const SIGNING = /\/(signup|signin)\/?$/u;
+const keepsShell = (url: string): boolean => !SIGNING.test(new URL(url).pathname);
+
+/**
+ * An address of the app answered from the kept shell, or `null` for the network to answer as before.
+ *
+ * THE BARE START ADDRESS (the home screen's `start_url`) is the Worker's entry, which sends a signed-in person on to
+ * their record's address. Answered from the copy it goes to the record the copy's mark names (`keep` writes it), and the
+ * entry is still asked behind it, so the session it keeps is kept. With no mark naming a record's address, the network.
+ */
+async function shellFirst(e: Fetched & { resultingClientId?: string }, now: number): Promise<Response | null> {
+  const req = e.request;
+  if (!keepsShell(req.url)) return null;
+  const held = await kept(shell(), now);
+  if (held === null) return null;
+  const url = new URL(req.url);
+  const root = new URL(shell());
+  if (url.pathname === root.pathname || `${url.pathname}/` === root.pathname) {
+    const mark = await (await sw.caches.open(COPY)).match(markOf(shell()));
+    const base = mark ? await mark.text() : '';
+    const to = new URL(`${base}/`, root);
+    if (to.origin !== root.origin || !/^[^/]+\/$/u.test(to.pathname.slice(root.pathname.length))) return null;
+    e.waitUntil(network(req));
+    return Response.redirect(`${to.href}${url.search}`, 302);
+  }
+  const answered = held.res.clone();
+  e.waitUntil(refresh(req, answered, e.resultingClientId ?? '', now));
+  return held.res;
+}
+
+/** A shell the network answered, kept if it may be: a page of this origin, 200, and HTML. */
+const shellable = (res: Response): boolean => res.ok && res.type === 'basic' && /^text\/html\b/iu.test(res.headers.get('content-type') ?? '');
+
+/**
+ * The shell asked for again behind the copy that answered: kept again, and when it is not the one drawn (a deploy), the
+ * page that drew the old one is told, with a short mark of the new one so it reloads onto it once.
+ */
+async function refresh(req: Request, answered: Response, client: string, now: number): Promise<void> {
+  const net = await network(req);
+  if (net === null || !shellable(net)) return;
+  const [was, is] = await Promise.all([answered.text(), net.clone().text()]);
+  await put(shell(), net, now);
+  if (was === is || client === '') return;
+  /* THE PAGE MAY NOT BE A CLIENT YET when the network answers first: asked again for a few seconds, then let go, since
+     the next open draws the new shell either way. */
+  for (let i = 0; i < 30; i++) {
+    const page = await sw.clients.get(client);
+    if (page) return page.postMessage({ shell: markOfText(is) });
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+/** The shell kept when the worker installs, so the first open after the one that registered it is drawn from the copy. */
+async function keepShell(now: number): Promise<void> {
+  try {
+    const net = await fetch(shell(), { credentials: 'same-origin' });
+    if (shellable(net)) await put(shell(), net, now);
+  } catch {
+    /* No network at install keeps nothing; the next open through the worker keeps it. */
+  }
+}
+
+/** A short mark of a text, to tell one shell from another: FNV-1a, 32 bits, in hex. */
+function markOfText(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16);
 }
 
 const HOUR = 60 * 60 * 1000;

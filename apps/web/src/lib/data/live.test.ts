@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { delayOf, endedBy, poller, regranted, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
+import { delayOf, endedBy, newerBuild, poller, regranted, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
 import { accessEnded } from './offline.ts';
 
 /**
@@ -379,4 +379,15 @@ test('A BUSY RECORD IS NOT OFFLINE: the poll waits as it was told', async () => 
   assert.equal(calls, 3);
   assert.deepEqual(states, []);
   stop();
+});
+
+test('A NEWER BUILD IS ONE BOTH SIDES NAME AND DISAGREE ON, tried once a pair (scope 2026-10-24 A17)', () => {
+  assert.equal(newerBuild('2026.10.24+aaaaaaa', '2026.10.24+bbbbbbb', null), '2026.10.24+aaaaaaa>2026.10.24+bbbbbbb');
+  assert.equal(newerBuild('2026.10.24+aaaaaaa', '2026.10.24+aaaaaaa', null), null, 'the same build');
+  assert.equal(newerBuild('', '2026.10.24+bbbbbbb', null), null, 'a build made without a tuple compares nothing');
+  for (const heard of ['', null, undefined, 7]) assert.equal(newerBuild('2026.10.24+aaaaaaa', heard, null), null, `a host naming ${String(heard)}`);
+  assert.equal(newerBuild('2026.10.24+aaaaaaa', '2026.10.24+bbbbbbb', '2026.10.24+aaaaaaa>2026.10.24+bbbbbbb'), null, 'a pair already tried');
+  const poll = readFileSync(new URL('./live.svelte.ts', import.meta.url), 'utf8');
+  assert.match(poll, /newerBuild\(OWN_BUILD, out\.value\.app, tried\(\)\)/, 'the poll compares what version answers');
+  assert.match(poll, /hearShell\(/, 'and hears the worker say the shell moved');
 });

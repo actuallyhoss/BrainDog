@@ -223,7 +223,10 @@ const routeRuntimePlugin: Plugin = {
 
 export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin],
-  define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
+  /* `__BRAINDOG_BUILD__` IS THE DEPLOY'S BUILD TUPLE, the one the Worker answers `/api/version` with as `app`, so a tab can
+     tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a build without one,
+     which compares nothing. */
+  define: { __BRAINDOG_ENV__: JSON.stringify(ENV), __BRAINDOG_BUILD__: JSON.stringify(process.env.BRAINDOG_BUILD ?? '') },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
      there (`routes/packs/browse/catalogue.ts`), so a proxy on the old path forwarded nothing. The sign-in and the

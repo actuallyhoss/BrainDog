@@ -18,13 +18,13 @@ import type { createClient } from '@braindog/client';
 import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
-import { endedBy, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
+import { endedBy, newerBuild, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
 /* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
    predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
 const localTab = () => import('./local-tab.ts');
 /** The local copy wiped, through the reader that arrives after the shell. */
 const wipeLocal = (): Promise<void> => localTab().then((m) => m.wipeLocal());
-import { forget, hear, keep } from './offline.ts';
+import { dropShell, forget, hear, hearShell, keep } from './offline.ts';
 
 /**
  * `state` is what the hairline draws.
@@ -87,6 +87,52 @@ function end(said: string): void {
   following = null;
 }
 
+/* ── a newer build ── */
+
+/** The build this tab runs, the deploy's tuple (`vite.config.ts`), or `''` in a build without one. */
+const OWN_BUILD = typeof __BRAINDOG_BUILD__ === 'string' ? __BRAINDOG_BUILD__ : '';
+/** Where the tab keeps the last build change it reloaded for, so each one is tried once (`newerBuild`). */
+const TRIED = 'braindog.build-tried';
+const tried = (): string | null => {
+  try {
+    return localStorage.getItem(TRIED);
+  } catch {
+    return null;
+  }
+};
+/** Whether anybody has pressed or typed in this tab yet: until then a reload onto the new build loses nothing. */
+let touched = false;
+
+/**
+ * A NEWER BUILD IS LIVE (scope 2026-10-24 A17): heard from `version`'s `app`, or from the worker, whose kept shell was
+ * not the one the network answers. Untouched, the tab reloads onto it at once, which is the next open drawing the new
+ * build; touched, nothing he is doing is thrown away, and the next link he follows loads the new build whole
+ * (`data-sveltekit-reload`). `drop` takes the kept shell first, when it may still be the old one.
+ */
+function newer(key: string, drop: boolean): void {
+  try {
+    localStorage.setItem(TRIED, key);
+  } catch {
+    /* A tab that cannot keep the key still reloads once: the build it lands on is the new one. */
+  }
+  void (drop ? dropShell() : Promise.resolve()).catch(() => undefined).then(() => {
+    if (!touched) globalThis.location.reload();
+    else document.body.setAttribute('data-sveltekit-reload', '');
+  });
+}
+
+/* HEARD FROM THE FIRST MOMENT THE SHELL'S SCRIPT RUNS, not once the record is followed: the worker tells the page the
+   shell moved once the network has answered behind the copy, and a message that arrives before anybody listens is lost. */
+if (typeof window !== 'undefined') {
+  hearShell((mark) => {
+    const key = `shell>${mark}`;
+    if (key !== tried()) newer(key, false);
+  });
+  const touch = () => (touched = true);
+  window.addEventListener('pointerdown', touch, { once: true, capture: true, passive: true });
+  window.addEventListener('keydown', touch, { once: true, capture: true, passive: true });
+}
+
 const timers = {
   after(fn: () => void, ms: number): () => void {
     const h = setTimeout(fn, ms);
@@ -146,6 +192,9 @@ function asker(base: string): () => Promise<number> {
     /* A RECORD WHOSE FORMAT MOVED UNDER THE LOCAL COPY wipes what it kept (`local.ts`). */
     const stamped = out.value;
     void localTab().then((m) => m.stampLocal(stamped));
+    /* A NEWER BUILD LIVE THAN THE ONE THIS TAB RUNS takes the kept shell and moves the tab onto it. */
+    const build = newerBuild(OWN_BUILD, out.value.app, tried());
+    if (build !== null) newer(build, true);
     /* AND AN ACCESS EPOCH THAT MOVED BOOTS THE TAB AGAIN, once: the new shell says the epoch it booted with. */
     const heard = (out.value as { grant?: { epoch?: unknown } }).grant?.epoch;
     const epoch = typeof heard === 'number' ? heard : null;

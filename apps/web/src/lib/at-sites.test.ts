@@ -48,6 +48,7 @@ const RENDERED_IN = new Map([
   ['lib/page/Arrange.svelte withoutEntry(route.url', 'the page the person is on, with the entry line taken off its query: `route.url` already holds the app base'],
   ['lib/shell.ts url', 'an outside link opened in this tab (a payment page), which is not an address in the app'],
   ['routes/+layout.svelte path', '`appPath` answers only an address under `/app`, from the Mac app\'s Go menu'],
+  ['service-worker.ts `${to.href}${url.search}`', 'the start address sent on to the record the copy\'s mark names, an absolute address `keep` wrote from `apiBase`'],
 ]);
 
 /** The files that read the bare origin on purpose, and what for. Anything else reading it is a record call gone to the root. */

@@ -188,6 +188,20 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, idle 
   };
 }
 
+/* ── a newer build: the tab is running an older one than the one live ─────────────────────────────────────────── */
+
+/**
+ * Whether the build `version` answered (`app`, the deploy's tuple) is not the one this tab runs (`own`), as a key to
+ * try once, or `null`. NOTHING IS COMPARED WITHOUT BOTH: a build made without a tuple (a dev server, the gates) or a
+ * host that names none moves nothing. AND EACH PAIR IS TRIED ONCE (`tried`, kept by the tab across reloads), so a
+ * shell that cannot become the build live, whatever the reason, reloads once and never again.
+ */
+export function newerBuild(own: string, heard: unknown, tried: string | null): string | null {
+  if (own === '' || typeof heard !== 'string' || heard === '' || heard === own) return null;
+  const key = `${own}>${heard}`;
+  return key === tried ? null : key;
+}
+
 /* ── access: a share changed, or ended ───────────────────────────────────────────────────────────────────────── */
 
 /**
