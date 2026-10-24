@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_PAGES, type CallContext } from '../src/index.ts';
+import { leadDrawn, unworded } from '../src/page-lint.ts';
 import type { PageResult } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -249,4 +250,50 @@ test("A RUN'S PROJECT IS DRAWN BY ITS NAME, so its spoken id in the cell is no f
   assert.deepEqual(lintAnswer(runs({ title: 'Ledger sync', project: 'projects#7', token: '01JZ8QK3F7R2M9V4XN6TCB5HAD' }), null, types), []);
   /* AND THE SAME SPOKEN ID IN ANY OTHER TEXT CELL STILL PRINTS RAW. */
   assert.deepEqual(lintAnswer(runs({ title: 'projects#7' }), null, types).map((f) => [f.part, f.rule]), [['Runs, Title', 'raw-id']]);
+});
+
+/* ── what his record showed on 24 October (C38): 20 findings, 12 of them the lint's own ───────────────────────── */
+
+test('A BLOCK NAMES ITS LIST register.<id>, and the cells are typed by the list it names, so a declared time is not raw', () => {
+  const byId = (register: string) => (register === 'tools' ? { name: 'text', seen: 'instant' } : null);
+  const answer = tools([{ name: 'Wrangler', seen: RAW_AT }]);
+  (answer.blocks[0] as unknown as { source: string }).source = 'register.tools';
+  assert.deepEqual(lintAnswer(answer, null, byId), [], 'a declared instant read as raw');
+  /* A COMPUTED SOURCE OVER ONE LIST'S ROWS is typed by that list. */
+  (answer.blocks[0] as unknown as { source: string }).source = 'tools.working';
+  assert.deepEqual(lintAnswer(answer, null, byId), []);
+  /* AND A TIME IN A TEXT COLUMN OF IT IS STILL RAW. */
+  assert.deepEqual(lintAnswer(answer, null, () => ({ name: 'text', seen: 'text' })).map((f) => f.rule), ['raw-instant']);
+});
+
+test('A LEAD IS READ AS THE WEB DRAWS IT: the model line when sent, else without the clauses whose figure did not read', () => {
+  const body = 'Cash is {{cash-now}} across {{cash-accounts}} accounts. {{late.first}} is {{bad:late}}: {{late.first_amount}}, due {{ago:late.first_due}}.';
+  assert.equal(leadDrawn(body, { 'cash-now': 12, 'cash-accounts': 2 }), 'Cash is {{cash-now}} across {{cash-accounts}} accounts.');
+  assert.equal(leadDrawn(body, {}, 'EGP 12 on hand.'), 'EGP 12 on hand.');
+  const lead = (said?: string) =>
+    ({ page: 'money', title: 'Money', blocks: [{ kind: 'note', lead: true, body, values: { 'cash-now': 12, 'cash-accounts': 2 }, ...(said ? { said } : {}), rows: [], matched: 0 }] }) as unknown as PageResult;
+  assert.deepEqual(lintAnswer(lead(), null), []);
+  assert.deepEqual(lintAnswer(lead('EGP 12 on hand.'), null), []);
+  /* A NOTE THAT IS NOT A LEAD IS READ WHOLE, as it is drawn whole. */
+  const whole = { page: 'money', title: 'Money', blocks: [{ kind: 'note', body, values: {}, rows: [], matched: 0 }] } as unknown as PageResult;
+  assert.deepEqual(lintAnswer(whole, null).map((f) => f.rule), ['placeholder']);
+});
+
+test('A CLOSED VALUE WITH NO NAME IS A KEY ONLY WHERE IT DOES NOT READ AS A WORD: vm and tier2 are, claude and owed_to_me are not', () => {
+  assert.deepEqual(['vm', 'mrr', 'tier2', 'claude', 'daily', 'owed_to_me', 'contractor'].filter(unworded), ['vm', 'mrr', 'tier2']);
+});
+
+test("A PERSON'S PROJECTS, A LIST OF REFS, ARE DRAWN BY THEIR NAMES: the record types a list by what it holds", async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const people = decl('register', 'people', { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'projects', type: 'list', of: 'ref', to: 'projects', label: 'Met in' }] });
+  const page = decl('page', 'everyone', { page: 'everyone', title: 'Everyone', blocks: [{ kind: 'table', heading: 'Everyone', span: 12, source: 'register.people', columns: [{ field: 'name' }, { field: 'projects' }] }] });
+  assert.ok((await api.kernel.install([...DECLS, people, page])).ok);
+  const kiln = api.kernel.create('projects', { name: 'Kiln' }, { actor: 'p_1' });
+  assert.ok(kiln.ok);
+  assert.ok(api.kernel.create('people', { name: 'Mara', projects: [kiln.value.id] }, { actor: 'p_1' }).ok);
+  const ran = await api.lintTick();
+  assert.ok(ran.ran);
+  assert.equal(ran.ran && ran.findings, 0, 'a list of refs read as raw ids');
+  sql.close();
 });

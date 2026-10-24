@@ -17,7 +17,7 @@
 
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
-import { lintRound, pagesCleanReading } from './page-lint.ts';
+import { lintRound, pagesCleanReading, unworded } from './page-lint.ts';
 import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
@@ -4756,7 +4756,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      and each closed field's values that have no name. */
   const lintTypesOf = (register: string): Record<string, string> | null => {
     const s = kernel.schemaOf(register);
-    return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type])) : null;
+    /* A LIST IS DRAWN AS WHAT IT HOLDS: a person's projects, a list of refs, are drawn by their names (C38). */
+    return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type === 'list' && typeof (f as { of?: unknown }).of === 'string' ? (f as { of: string }).of : f.type])) : null;
   };
   const lintKeysOf = (register: string): Record<string, string[]> | null => {
     const s = kernel.schemaOf(register);
@@ -4764,7 +4765,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ? Object.fromEntries(
           Object.entries(s.fields)
             .filter(([, f]) => f.type === 'enum')
-            .map(([k, f]) => [k, (f.values ?? []).filter((v) => !f.labels?.[v])]),
+            .map(([k, f]) => [k, (f.values ?? []).filter((v) => !f.labels?.[v] && unworded(v))]),
         )
       : null;
   };

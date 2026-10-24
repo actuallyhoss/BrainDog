@@ -54,6 +54,17 @@ export type PageLintDeps = {
   keysOf?: KeysOf;
 };
 
+/**
+ * Whether a closed value with no name of its own still reads as a word once the web draws it (`claude`, `daily`,
+ * `owed_to_me` as "owed to me"), or is a key a reader cannot read (`vm`, `mrr`, `tier2`): three letters or fewer, or
+ * holding a digit. THE WEB SAYS AN UNNAMED VALUE AS ITS WORDS, in lower case as every value mid-line is, so only the
+ * second kind prints a key where a name goes (C38: his record's agents, roles and schedules read as words).
+ */
+export const unworded = (key: string): boolean => {
+  const letters = key.replace(/[_-]+/gu, '');
+  return letters.length <= 3 || /\d/u.test(key);
+};
+
 /** The unnamed values of each closed field of one list, or `null` for a list the record does not declare. */
 export type KeysOf = (register: string) => Readonly<Record<string, readonly string[]>> | null;
 
@@ -128,6 +139,33 @@ function said(v: unknown): string | null {
 const drawn = (text: string, values: BlockResult['values']): string =>
   toHTML(parse(text, { page: true }), { resolve: (path) => (values && Object.hasOwn(values, path) ? said(values[path]) : null) });
 
+/** A `{{path}}` in a lead, its typed form (`{{ago:x.first_due}}`) read by the path after it, as the web reads it. */
+const LEAD_HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*(?::[^{}\s]+)?)\s*\}\}/gu;
+const TYPED_FORM = /^(?:date|day|until|ago|money|quantity|pct|ref):(?=[A-Za-z])/u;
+
+/**
+ * A LEAD NOTE AS THE WEB DRAWS IT (`page-live.ts`): the model's line when the record sent one, else the body with every
+ * clause whose figure did not read taken out (`metrics.ts` `leadOf`), so a hole there is never printed. Read whole, a
+ * lead counted the holes of the clauses the web drops (C38: Money's "first, first amount, first due" on his record).
+ */
+export function leadDrawn(body: string, values: BlockResult['values'], modelSaid?: unknown): string {
+  if (typeof modelSaid === 'string' && modelSaid.trim() !== '') return modelSaid;
+  const reads = (path: string): boolean => {
+    const p = path.replace(TYPED_FORM, '');
+    return p.startsWith('bad:') || (values !== undefined && values !== null && Object.hasOwn(values, p) && said(values[p]) !== null);
+  };
+  return body
+    .split(/(?<=[.!?])\s+(?=\S)/u)
+    .map((sentence) =>
+      sentence
+        .split(/,\s+/u)
+        .filter((clause) => [...clause.matchAll(LEAD_HOLE)].every((m) => reads(m[1]!)))
+        .join(', '),
+    )
+    .filter((s) => s.trim() !== '')
+    .join(' ');
+}
+
 /** A figure as a person says it when it carries no label: its id's words, `cash-now` as "cash now". */
 const figureWords = (metric: string): string => metric.split(':')[0]!.replace(/[-_.]+/g, ' ').trim();
 
@@ -196,6 +234,14 @@ const CELL_RULES = new Set<LintRule>(['raw-instant', 'raw-id', 'dev-name', 'bare
 /** A whole ULID, which the web draws as nothing in a column no list declares (`undeclared` in `api.ts`). */
 const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 
+/** The list a block's rows are, by its id: the block's own `register.<id>`, else the one list its rows all come from. */
+function listOfBlock(b: BlockResult): string | null {
+  if (typeof b.source === 'string' && b.source.startsWith('register.')) return b.source.slice('register.'.length);
+  const lists = new Set((b.rows ?? []).map((r) => r.register).filter((r): r is string => typeof r === 'string' && r !== ''));
+  if (lists.size === 1) return [...lists][0]!;
+  return typeof b.source === 'string' ? b.source : null;
+}
+
 /** What one block's cells come to: each column's text as one part, how many rows were read, and how many were not. */
 export type BlockCells = { parts: LintPart[]; read: number; unread: number };
 
@@ -212,7 +258,11 @@ export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesO
   /* WITH NO DECLARATIONS TO ASK AND NO TYPES ON THE ANSWER, A CELL'S TYPE IS NOT KNOWN, and a time the web says in words
      would read here as raw: the block is not read rather than read wrong. */
   if (!typesOf && !b.types) return { parts: [], read: 0, unread: 0 };
-  const declared = typeof b.source === 'string' && typesOf ? typesOf(b.source) : null;
+  /* THE LIST BY ITS ID: a block names it `register.<id>` and the record's declarations are keyed by the id, so asked as
+     the block names it every declared instant read as a raw time (C38: ten of the twenty findings on his record). A
+     computed source over one list's rows (`sessions.working`) is that list's. */
+  const list = listOfBlock(b);
+  const declared = list !== null && typesOf ? typesOf(list) : null;
   const read = rows.slice(0, CELLS_ROWS);
   const parts: LintPart[] = [];
   for (const c of cols) {
@@ -234,7 +284,7 @@ export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesO
     const words = figureWords(c.field);
     const label = c.label?.trim() || words.charAt(0).toUpperCase() + words.slice(1);
     /* THE KEYS OF A CLOSED FIELD WITH NO NAME, so a cell that prints one as itself is a key where a name goes. */
-    const keys = typeof b.source === 'string' ? keysOf?.(b.source)?.[c.field] : undefined;
+    const keys = list !== null ? keysOf?.(list)?.[c.field] : undefined;
     parts.push({ name: name === null || name === label ? label : `${name}, ${label}`, text: texts.join('\n'), theirs: true, ...(keys?.length ? { keys } : {}) });
   }
   return { parts, read: read.length, unread: rows.length - read.length };
@@ -259,7 +309,8 @@ export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: T
     const parts: LintPart[] = [];
     /* THE HEADING IS READ AS HIS WORDS: a template fills it with a row's name, and the copy rules hold the product's. */
     if (b.heading) parts.push({ name, html: drawn(b.heading, b.values), theirs: true });
-    const body = (b as { body?: unknown }).body;
+    const written = (b as { body?: unknown }).body;
+    const body = typeof written === 'string' && b.kind === 'note' && (b as { lead?: unknown }).lead === true ? leadDrawn(written, b.values, (b as { said?: unknown }).said) : written;
     /* A DOCUMENT IS HIS, as a project's note is. A note that is not one is the declaration's own sentence. */
     if (typeof body === 'string' && body.trim() !== '' && !/^\{\{\w+\}\}$/u.test(body.trim()))
       parts.push({ name, html: drawn(body, b.values), theirs: b.document === true });
