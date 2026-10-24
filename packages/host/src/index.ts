@@ -722,6 +722,9 @@ export async function serveApi(
    * that sentence, row and all, to whoever asked, and neither host's log had a line about it. `crashed` logs the reason
    * under a new reference and answers the reference alone; `test/crash.test.ts` holds the probe's sentence.
    */
+  /* SEVERAL READS IN ONE REQUEST (`routes/reads.ts`): the record checks who asks and the list, and each read is then
+     answered here by its own route, as it would be asked alone. */
+  if (name === READS) return readsAnswer(handler, handlers, args, ctx);
   try {
     const out = await handler(args, ctx);
     /* THE FIREWALL (sharing plan §2.5 item 6): a field hidden from this caller still on a row of the answer is taken off
@@ -735,6 +738,58 @@ export async function serveApi(
 }
 
 export { FIREWALL_FAULT };
+
+/** The route that carries several reads (`routes/reads.ts`). */
+const READS = 'reads';
+
+/** One read inside `reads`, as it went out: its status and the envelope it would have been answered alone. */
+export type ReadAnswered = { status: number; body: unknown };
+
+/**
+ * `reads`: the record's half first (`methods/reads.ts`, the guard and the list's shape), then each read in order through
+ * `oneRead`. One after another, because the record's object answers one at a time whichever way they arrive.
+ */
+async function readsAnswer(handler: Handler, handlers: Record<string, Handler>, args: Record<string, unknown>, ctx: unknown): Promise<Response> {
+  let asked: Result<unknown>;
+  try {
+    asked = await handler(args, ctx);
+  } catch (e) {
+    return json(500, crashed(`/api/${READS}`, e));
+  }
+  if (!asked.ok) return json(httpStatus(asked), asked);
+  const calls = (asked.value as { calls: { method: string; args: Record<string, unknown> }[] }).calls;
+  const answers: ReadAnswered[] = [];
+  for (const one of calls) answers.push(await oneRead(one.method, one.args, handlers, ctx));
+  return json(200, { ok: true, value: { answers } });
+}
+
+/**
+ * One read of a `reads` request, answered as `serveApi` answers it alone: a route nobody routes is `ROUTE_UNKNOWN`, a
+ * route that writes is refused (a write is never carried inside a read), its arguments are held to the types its row
+ * declares as a POST body's are, a throw is a 500 with a reference, and the answer goes through the firewall.
+ */
+async function oneRead(name: string, args: Record<string, unknown>, handlers: Record<string, Handler>, ctx: unknown): Promise<ReadAnswered> {
+  const route = BY_NAME.get(name);
+  const handler = handlers[name];
+  if (!route || !handler) return { status: 404, body: { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${name}.` } } };
+  if ((route.writes && route.postRead !== true) || name === READS)
+    return { status: 403, body: { ok: false, refusal: { code: 'FORBIDDEN', fix: `${name} is not a read, so it is sent by itself and never inside reads.`, at: 'calls' } } };
+  for (const [key, kind] of Object.entries(route.takes ?? {})) {
+    if (!Object.hasOwn(args, key)) continue;
+    const value = args[key];
+    if (value === null || value === undefined) continue;
+    if (kind === 'text' && typeof value !== 'string') return { status: 422, body: { ok: false, refusal: notText(key, value) } };
+    if (kind === 'integer' && !Number.isSafeInteger(value)) return { status: 422, body: { ok: false, refusal: notWhole(key, value) } };
+  }
+  try {
+    const out = await handler(args, ctx);
+    const held = firewall(ctx, out);
+    if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
+    return { status: httpStatus(held.answer), body: held.answer };
+  } catch (e) {
+    return { status: 500, body: crashed(`/api/${name}`, e) };
+  }
+}
 
 /**
  * The most an `/api` body may weigh, for every method but `import`: a mebibyte.

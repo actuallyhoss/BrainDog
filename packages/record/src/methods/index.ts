@@ -87,6 +87,7 @@ import { methods as chatAnswer } from './chat-answer.ts';
 import { methods as sealedMethods } from './sealed.ts';
 import { methods as visualsMethods } from './visuals.ts';
 import { methods as metricsMethods } from './metrics.ts';
+import { methods as readsMethods } from './reads.ts';
 /* END METHODS */
 
 /**
@@ -281,6 +282,7 @@ export function methods(deps: RecordDeps) {
     ...sealedMethods(deps),
     ...visualsMethods(deps),
     ...metricsMethods(deps),
+    ...readsMethods(deps),
     /* END METHODS */
   };
 }

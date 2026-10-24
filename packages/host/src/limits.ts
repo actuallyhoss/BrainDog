@@ -87,7 +87,10 @@ export function limitKey(door: LimitDoor | null, ip: string): string {
   return `${kind}:${id}`;
 }
 
-const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
+/* A READ SENT AS A WRITE (`postRead`: `previewPage`, `reads`) CHANGES NOTHING, so it spends the read budget. `reads`
+   carries at most `READS_MOST` reads (`packages/record/src/methods/reads.ts`) and is counted once, as the one request it
+   is: what it saves the record is the doors each of them would have passed. */
+const WRITES = new Set(ROUTES.filter((r) => r.writes && r.postRead !== true).map((r) => r.name));
 
 /** The routes a screen polls on a clock, which spend `POLL_PER_MINUTE` and not the read budget. */
 const POLLS: ReadonlySet<string> = new Set(['version']);
