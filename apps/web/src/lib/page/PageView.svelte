@@ -56,6 +56,7 @@
   import PageBody from './PageBody.svelte';
   import { isProject, withoutRepeats, type Block } from '$lib/record/project.ts';
   import { REGISTERS } from '$lib/record/held.ts';
+  import { rowScreen } from '$lib/record/row-href.ts';
   import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
   import { onProject, moreSaid } from './project-page.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
@@ -197,6 +198,33 @@
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
   /* A PAGE ABOUT A PROJECT'S ROW (proj section 4): its hero holds the name, so the head is the way back and the actions. */
   const projectPage = $derived(about !== null && isProject(REGISTERS[about.register]));
+  /* THE ROW'S OWN FIELDS UNDER A PAGE ABOUT IT (things, not rows): the page speaks first, and "Show the data" opens the
+     row's screen, which stays where it is because the address asks for its fields. A project's shape has its own. */
+  const dataHref = $derived(about !== null ? rowScreen(about.register, about.seq) : null);
+  /* AND ITS ONE PRESS, the list's own finishing word ("Mark paid" on a bill), read for the row once (`row-finish.ts`). */
+  let finish = $state.raw<{ key: string; said: string } | null>(null);
+  $effect(() => {
+    const of = about && !projectPage ? about : null;
+    const key = of ? `${of.register}#${of.seq}` : '';
+    untrack(() => {
+      if (finish?.key !== key) finish = null;
+      if (!of) return;
+      void import('./row-finish.ts')
+        .then((m) => m.finishFor(apiBase(), of.register, of.seq))
+        .then((f) => {
+          if (f && spoken === key) finish = { key, said: f.said };
+        })
+        .catch(() => undefined);
+    });
+  });
+  async function pressFinish(): Promise<void> {
+    const key = finish?.key;
+    if (!key) return;
+    const { finishLate } = await import('$lib/home/late-finish.ts');
+    const out = await finishLate(apiBase(), key, () => void reread());
+    if (out.ok) finish = null;
+    else if ('fix' in out) toasts.push(out.fix, { intent: 'warn' });
+  }
   /* THE WAY BACK TO THE PROJECTS, the page the rail files this one under, else the list itself. */
   const projectBack = $derived.by(() => {
     if (!projectPage || !about) return undefined;
@@ -733,6 +761,12 @@
         <!-- AN ADD WEARS THE PLUS, so on a phone it is the 36px square the head draws for a glyph (`PageHead.svelte`). -->
         <Button weight="primary" onclick={pressHead}>{#if /^(add|new)\b/iu.test(declared.action.label)}<Icon name="plus" size="s" />{/if}{declared.action.label}</Button>
       {/if}
+      {#if finish && finish.key === spoken && !arranging && !showSource}
+        <Button weight="primary" onclick={() => void pressFinish()}>{finish.said}</Button>
+      {/if}
+      {#if dataHref && !projectPage && !arranging && !showSource}
+        <Button href={at(dataHref)}>{words.showData}</Button>
+      {/if}
       {#if !arranging}
         <!-- SHARE, AND ONE "⋯" FOR THE REST: How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
@@ -751,7 +785,7 @@
           {look}
           keys={drawnKeys}
           heads={blockHeads}
-          extra={projectPage && about ? [{ label: 'Edit details', icon: 'edit', href: `/r/${about.register}/${about.seq}` }] : []}
+          extra={projectPage && dataHref ? [{ label: 'Edit details', icon: 'edit', href: dataHref }] : []}
         />
       {/if}
   {/snippet}

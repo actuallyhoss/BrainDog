@@ -23,6 +23,14 @@ export type Decl = {
 /** A projects list is the one that declares `scopes`, the places its runs are placed by. Only its rows take this shape. */
 export const isProject = (decl: Decl | undefined): boolean => decl?.scopes !== undefined;
 
+/**
+ * WHETHER A ROW OF THIS LIST OPENS ON THE PAGE ITS LIST MADE FOR IT (things, not rows): a project, a run, an account, a
+ * bill or a service is read on its page, which speaks first, and its fields are one press under it ("Show the data").
+ * A list of people or organisations keeps its row's screen, which is where who somebody is, and how they are known, is
+ * read. Read off the declaration and never the list's name; a list not declared keeps its screen.
+ */
+export const opensOnPage = (decl: Decl | undefined): boolean => decl !== undefined && decl.meets === undefined && decl.org === undefined;
+
 export const BLOCKS = ['brief', 'next', 'money', 'crew', 'workers', 'runs-on'] as const;
 export type Block = (typeof BLOCKS)[number];
 export type Pointed = Exclude<Block, 'brief'>;

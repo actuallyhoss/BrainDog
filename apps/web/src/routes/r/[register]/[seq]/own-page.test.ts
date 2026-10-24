@@ -46,16 +46,21 @@ test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the she
   learnRowPages([
     { slug: 'kiln', about: { register: 'things', seq: 3 } },
     { slug: 'ada-vine', about: { register: 'people', seq: 4 } },
+    { slug: 'hsbc-current', about: { register: 'accounts', seq: 2 } },
     { slug: 'review-pr', about: { register: 'skills', seq: 1 } },
     { slug: 'drafting-the-specimen-page-copy', about: { register: 'session', seq: 20 } },
   ]);
   REGISTERS.things = { scopes: {}, fields: [] } as unknown as RegisterDecl;
-  REGISTERS.people = { fields: [] } as unknown as RegisterDecl;
+  REGISTERS.people = { meets: {}, fields: [] } as unknown as RegisterDecl;
+  REGISTERS.accounts = { fields: [] } as unknown as RegisterDecl;
   try {
     assert.deepEqual(await loaded('/app/studio/r/things/3'), { status: 307, location: '/app/studio/p/kiln' });
     assert.equal(await loaded('/app/studio/r/things/3?fields=1'), null, 'the fields stay on the row');
     assert.equal(await loaded('/app/studio/r/tasks/3'), null, 'a row with no page stays');
-    assert.equal(await loaded('/app/studio/r/people/4'), null, 'a row of a list that is not the projects list keeps its own screen');
+    assert.equal(await loaded('/app/studio/r/people/4'), null, 'a person keeps their own screen');
+    /* AN ACCOUNT, A BILL OR A SERVICE OPENS ON ITS PAGE TOO (things, not rows), and its fields stay one press away. */
+    assert.deepEqual(await loaded('/app/studio/r/accounts/2'), { status: 307, location: '/app/studio/p/hsbc-current' });
+    assert.equal(await loaded('/app/studio/r/accounts/2?fields=1'), null, 'Show the data stays on the row');
     assert.equal(await loaded('/app/studio/r/skills/1'), null, 'a list not yet declared, and whose declaration was refused, stays');
     /* A RUN'S ROW OPENS ON THE RUN'S OWN PAGE, where what it did is read: there is one page for one run. */
     assert.deepEqual(await loaded('/app/studio/r/session/20'), { status: 307, location: '/app/studio/p/drafting-the-specimen-page-copy' });
@@ -64,5 +69,6 @@ test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the she
     learnRowPages([]);
     delete REGISTERS.things;
     delete REGISTERS.people;
+    delete REGISTERS.accounts;
   }
 });
