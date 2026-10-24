@@ -702,11 +702,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - people 3.7.0 (C33, 24 October): Scripts is a page, `page.scripts`, a table of every installed script over the
  *   kernel's `scripts` source, which `/scripts` draws where it drew a list by hand, so it can be changed by saying so and
  *   pulled as any page. 3.6.0 is master's (Everyone as faces). A page added and nothing taken away, so a minor step.
+ * - money-core 3.21.0 (the audit of 25 October, Z14 and Z18): the calendar of what falls due on `page.money` wears no
+ *   heading or glyph of its own, since it opens Coming and going and the tile read two headings one over the other; and
+ *   it reads `source: deadlines` with money on it, as Today's Due soon does, where it read Bills and invoices alone.
+ *   3.20.0 is master's (B6, B8 and B24). One block changed, nothing added or taken away, so a minor step that reaches a
+ *   record on its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.25.0',
   people: '3.7.0',
-  'money-core': '3.20.0',
+  'money-core': '3.21.0',
   estate: '2.3.0',
   work: '1.19.0',
 };

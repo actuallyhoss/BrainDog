@@ -727,8 +727,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
        History. One view of the month is kept of three (3.4.0). */
     'Coming and going',
     /* NO WALK OF THE NEXT THIRTY DAYS, SINCE REC-B23: it was Cash ahead's arithmetic again, so the calendar of them
-       opens the tile. */
-    'Due in the next 30 days',
+       opens the tile. WITH NO HEADING OF ITS OWN SINCE money-core 3.21.0 (the audit of 25 October, Z18): two headings
+       stood one over the other. */
+    undefined,
     'Instalments',
     /* THE MONTHS BEHIND, OPEN UNDER COMING AND GOING: the folded History heading stood over this one chart and went
        to make room, and Being chased went with it. */
@@ -751,7 +752,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   /* UNDER COMING AND GOING, SINCE REC-B23, THE CALENDAR AND NO WALK: the walk of thirty days is off the page
      (`money-page.test.ts` holds it there). */
   const under = (page.blocks as { kind: string; heading?: string }[])[blocks.findIndex((b) => b.heading === 'Coming and going') + 1]!;
-  assert.deepEqual([under.kind, under.heading], ['calendar', 'Due in the next 30 days']);
+  assert.deepEqual([under.kind, under.heading], ['calendar', undefined]);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
 
@@ -1003,14 +1004,20 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
   assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
   assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
 
-  /* THE NEXT THIRTY DAYS AND NOTHING ELSE, each open, from tomorrow's side of today to the thirtieth day. */
-  const due = blockOf(k, 'money', 'Due in the next 30 days');
-  assert.equal(due.rows.length, reading(k, 'due-items-30d'), 'the calendar and the figure it is drawn under count two sets');
+  /* THE NEXT THIRTY DAYS AND NOTHING ELSE, each with its money, from today to the thirtieth day. */
+  const due = blockOf(k, 'money', 'calendar');
   assert.ok(due.rows.length > 0, 'nothing falls due on the sample, so this proves nothing');
   for (const r of due.rows) {
-    assert.ok(['open', 'part'].includes(String(r.fields.state)), `${String(r.fields.what)} is ${String(r.fields.state)}`);
-    assert.ok(String(r.fields.due) >= day(0) && String(r.fields.due) <= day(30), `${String(r.fields.what)} falls due on ${String(r.fields.due)}`);
+    assert.ok(r.fields.amount !== null && typeof r.fields.amount === 'object', `${String(r.fields.title)} holds no money`);
+    assert.ok(String(r.fields.day) >= day(0) && String(r.fields.day) <= day(30), `${String(r.fields.title)} falls due on ${String(r.fields.day)}`);
   }
+  /* ONE SOURCE FOR THE THIRTY DAYS, SINCE money-core 3.21.0 (the audit of 25 October, Z14): what Today's Due soon reads
+     across every list, with money on it, over the same days. Money's calendar read Bills and invoices alone. */
+  const across = k.block({ kind: 'table', source: 'deadlines', where: 'amount is set, day after yesterday, day before +31d', horizon: 31, limit: 200 } as never);
+  const named = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => `${String(r.fields.day)} ${String(r.fields.row)}`).sort();
+  assert.deepEqual(named(due.rows), named(across.rows ?? []));
+  assert.ok(due.rows.some((r) => r.fields.list === 'recurring'), 'a repeating line is not on the calendar');
+  assert.ok(due.rows.some((r) => r.fields.list === 'obligations'), 'a bill is not on the calendar');
 
   /* NEWEST FIRST, AND THE AMOUNT AS THE ROW HOLDS IT: a ledger keeps every minor unit. */
   const moved = blockOf(k, 'money', 'Ledger');

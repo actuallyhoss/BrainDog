@@ -25,6 +25,7 @@ import { peopleBefore3 } from './people-before-3.ts';
 import { thingsUndone, useCaseThingsUndone } from './things-before.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
+import { DUE_30D } from '../src/modules/money/pages/shared.ts';
 import { QUEUE } from '../src/modules/money/pages/parts/queue.ts';
 import { AGES } from '../src/modules/money/pages/parts/ages.ts';
 import { BUDGET } from '../src/modules/money/pages/parts/budget.ts';
@@ -860,6 +861,30 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
+ * MONEY 3.21.0 COMES OFF FIRST (the audit of 25 October, Z14 and Z18): the calendar of what falls due under Coming and
+ * going wears its own heading and glyph again, and reads Bills and invoices alone, while one falls due.
+ */
+const withoutCalendar21 = (doc: Body): Body =>
+  withPage(doc, 'money', (now) =>
+    now.map((b) =>
+      b.kind === 'calendar' && b.source === 'deadlines'
+        ? {
+            kind: 'calendar',
+            heading: 'Due in the next 30 days',
+            icon: 'calendar',
+            span: b.span,
+            source: 'register.obligations',
+            where: DUE_30D,
+            columns: [{ field: 'what' }, { field: 'due' }, { field: 'amount', sign: { field: 'direction', minus: 'owed_by_me' } }],
+            back: b.back,
+            ahead: b.ahead,
+            when: { metric: 'due-items-30d', gt: 0 },
+            empty: b.empty,
+          }
+        : b,
+    ),
+  );
+/**
  * MONEY 3.20.0 COMES OFF BEFORE IT (B6, B8 and B24 of 24 October): no sentence of what is to pay on the card in the lines
  * and no figure of it, no card fields on Accounts, no rule or script that works it out or asks to move a twin line on,
  * and no File old entries on the filing rules page.
@@ -985,7 +1010,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(raw)))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(raw))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -5,7 +5,6 @@
  */
 
 import { CASH_LEGS } from '../../legs.ts';
-import { DUE_30D } from '../shared.ts';
 
 export const NEXT_30: Record<string, unknown>[] = [
   {
@@ -50,18 +49,26 @@ export const NEXT_30: Record<string, unknown>[] = [
     /* WHAT FALLS DUE IN THE NEXT THIRTY DAYS, ON THE DAYS IT FALLS, SINCE money-core 3.3.0: a calendar of the month
        ahead where a table of twelve rows was, each bill and invoice named as the record names it on its day, and an
        agenda of the days under it. This month and the next, because thirty days from today cross into it. Only while
-       something falls due (`due-items-30d`, the same sentence); what is already late is the two notes above. */
+       something falls due (`due-items-30d`, the same sentence); what is already late is the two notes above.
+
+       NO HEADING OF ITS OWN, SINCE money-core 3.21.0 (the audit of 25 October, Z18), for the reason the walk above lost
+       its own in 3.13.0: on Money it opens Coming and going, and the tile read two headings, each with its glyph, one
+       straight over the other. The month it draws says which days it is.
+
+       EVERY LIST'S MONEY, SINCE money-core 3.21.0 (the audit of 25 October, Z14): it read Bills and invoices alone, so on
+       his record it marked one premium while Today's Due soon named the premium and a salary coming in. Now it reads what
+       falls due across every list, as Due soon does (`source: deadlines`), with money on it, and what the cash walk
+       moves: a repeating line and a part of a plan as well as a bill, a bill that repeats once, on its line. Drawn
+       once there is an account, as the box round it is, and a month with nothing in it is not drawn. */
     kind: 'calendar',
-    heading: 'Due in the next 30 days',
-    icon: 'calendar',
     span: 12,
-    source: 'register.obligations',
-    where: DUE_30D,
+    source: 'deadlines',
+    where: 'amount is set, day after yesterday, day before +31d',
     /* THE AMOUNT SIGNED BY THE WAY IT GOES, as the Ledger beside it says it: "−£19,100.00" for a bill, "+£960.00" for an invoice. */
-    columns: [{ field: 'what' }, { field: 'due' }, { field: 'amount', sign: { field: 'direction', minus: 'owed_by_me' } }],
+    columns: [{ field: 'title' }, { field: 'day' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
     back: 0,
     ahead: 1,
-    when: { metric: 'due-items-30d', gt: 0 },
+    when: { metric: 'cash-accounts', gt: 0 },
     empty: 'Nothing falls due in the next 30 days.',
   },
 ];

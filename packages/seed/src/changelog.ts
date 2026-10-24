@@ -152,6 +152,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.21.0',
+      notes:
+        'Coming and going on Money opens on its calendar of the next 30 days, with no second heading over it. The calendar now holds everything with money on it that falls due, repeating lines and parts of a plan as well as bills, the same things Today names under Due soon, and a bill that repeats once.',
+    },
+    {
       version: '3.20.0',
       notes: 'When a bill is paid and a repeating line carries the same money, Money asks once whether to move the line on to its next day, so it is not read late. A payment that fits a bill and a repeating line of the same name pays the bill. A card can say its credit limit, and then what is to pay on it is worked out from the bank\'s texts and said in Money\'s first line with the day of the newest text. Filing rules says how many entries have no category, with File old entries to file them in one change you can undo.',
     },
