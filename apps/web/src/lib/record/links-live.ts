@@ -22,6 +22,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { columnsFor, iconFor, labelOf, toRows, type Backlink } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -61,14 +62,10 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
     const kept = maps.get(register);
     if (kept) return kept;
     await learn(client.schema, register, asked);
-    const rows: RecordRow[] = [];
-    let cursor: string | null = null;
-    do {
-      const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
-      if (!out.ok) return null;
-      rows.push(...(out.value.rows as RecordRow[]));
-      cursor = out.value.cursor;
-    } while (cursor !== null);
+    /* THE TAB'S WALK (`ref-rows.ts`), which the page beside this panel walked already to name its own refs (scope
+       2026-10-24 A21): this walked every list again for itself. A reader handed a fetch of its own walks for itself. */
+    const rows = io ? await walkRows(client, register) : await tabRows(client, base, register);
+    if (rows === null) return null;
     const map = refMapOf(register, rows);
     maps.set(register, map);
     return map;

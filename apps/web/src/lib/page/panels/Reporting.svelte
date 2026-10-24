@@ -25,6 +25,7 @@
   import { untrack } from 'svelte';
   import { createClient, type ReportKeyRow } from '@braindog/client';
   import { apiBase } from '$lib/at.ts';
+  import { rowsOf as tabRows } from '$lib/data/ref-rows.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -98,7 +99,9 @@
     const listsOrgs = register === 'things' && bound.field !== 'organisation';
     const [row, orgs, read, keyed] = await Promise.all([
       client.get(register, seq),
-      listsOrgs ? client.list({ register: 'organisations', limit: 200 }) : Promise.resolve(null),
+      /* THE TAB'S WALK OF ORGANISATIONS (`ref-rows.ts`), which the page beside this walked already to name its refs (scope
+         2026-10-24 A21), and not a read of its own. */
+      listsOrgs ? tabRows(client, apiBase(), 'organisations') : Promise.resolve(null),
       client.list({ register: READINGS, where: { field: bound.field, is: spoken }, order: [{ field: 'at', dir: 'desc' }], limit: 1 }),
       client.reportKeys(),
     ]);
@@ -106,7 +109,7 @@
     let organisation: string | null = null;
     if (listsOrgs) {
       const id = row.ok ? (row.value as { id?: unknown } | null)?.id : null;
-      if (typeof id === 'string' && orgs?.ok) organisation = organisationOf(orgs.value.rows as never, id);
+      if (typeof id === 'string' && orgs) organisation = organisationOf(orgs as never, id);
     }
     listedBy = bound.links.includes('organisation') ? organisation : null;
     binding = bindingOf(bound.field, spoken, { source: bound.source, organisation, links: bound.links });
