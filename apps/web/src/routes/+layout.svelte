@@ -638,6 +638,18 @@
     fromPalette = document.activeElement?.closest('dialog.palette') != null;
   }
 
+  /* WHAT THE READER LAST DID, A KEY OR A PRESS, heard before anything else hears it, so a page's name focused after a
+     move wears its ring only for a keyboard (`quiet-focus.ts`, Z26). */
+  $effect(() => {
+    const opts = { capture: true, passive: true } as const;
+    addEventListener('keydown', heard, opts);
+    addEventListener('pointerdown', heard, opts);
+    return () => {
+      removeEventListener('keydown', heard, opts);
+      removeEventListener('pointerdown', heard, opts);
+    };
+  });
+
   /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent (E55). The first screen counts too. */
   afterNavigate((nav) => {
     if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
@@ -1171,7 +1183,7 @@
 </script>
 
 <svelte:window {onkeydown} />
-<svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} onkeydowncapture={heard} onpointerdowncapture={heard} />
+<svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} />
 
 <a class="skip" href="#main">Skip to content</a>
 
