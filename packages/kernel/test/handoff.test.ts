@@ -257,10 +257,16 @@ test('PASSED IN THE HOUR: a later run here still at work twelve hours past a ste
   const s2 = work('codex', { agent: 'codex' });
   work('far', { repo: 'other' });
   const marks = () => openHandoffs(sql, HERE, null, clock.now()).map((h) => [h.spoken, h.mark]);
-  /* Under twelve hours of work past the step, a run still at it was maybe handed it, so nothing closes. */
-  clock.advance(PASSED_ACTIVE_MS - 2 * MIN);
-  ok(k.create('tasks', { what: 'More work' }, as('codex', { agent: 'codex' })));
-  ok(k.create('tasks', { what: 'More work there' }, as('far', { repo: 'other' })));
+  /* Under twelve hours of work past the step, a run still at it was maybe handed it, so nothing closes. Both keep at
+     it every half hour: a run silent an hour that writes again begins a new stretch (`RESUMED_MS`). */
+  const span = PASSED_ACTIVE_MS - 2 * MIN;
+  for (let gone = 0; gone < span; ) {
+    const by = Math.min(30 * MIN, span - gone);
+    clock.advance(by);
+    gone += by;
+    ok(k.create('tasks', { what: 'More work' }, as('codex', { agent: 'codex' })));
+    ok(k.create('tasks', { what: 'More work there' }, as('far', { repo: 'other' })));
+  }
   assert.deepEqual(marks(), [[s1.spoken, 'next']]);
   assert.equal(closePassed(sql, clock.now(), write), 0);
 
