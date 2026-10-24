@@ -1817,6 +1817,26 @@ export function feedDay(day: string, today: string): string {
 /** What a run's newest line says of the lines folded under it. */
 const feedMore = (n: number): string => `and ${integer(n)} more`;
 
+/**
+ * WHAT A BURST'S LINE SAYS OF THE LINES ALIKE UNDER IT, after its words: "and 7 more like this". It was a bare number in
+ * a column of its own before the face, "8", which on a project's What changed read as a stray digit beside a line that
+ * said one thing (the audit of 25 October, Z22, `-more/row-braindog-390-light.png`).
+ */
+const feedAlike = (n: number): string => `and ${integer(n)} more like this`;
+
+/** The note an undo writes on what it puts back (`PUT_BACK` in `kernel/src/undo.ts`), which is a key the kernel reads. */
+const UNDO_NOTE = 'Put back by an undo.';
+
+/**
+ * A NOTE SAID AFTER WHO WROTE IT, as part of one sentence: "Claude Code added the visual…", where it read "Claude Code
+ * Added the visual…", and an undo as what was done, "You undid a change to Kiln", where it read "You Put back by an
+ * undo." (Z22). Only a first word that is a verb in the past is lowered, so a note that opens on a name keeps it.
+ */
+export function noteAfterWho(note: string, thing: string | null): string {
+  if (note.trim() === UNDO_NOTE) return thing ? `undid a change to ${thing}` : 'undid a change';
+  return note.replace(/^(\p{Lu}\p{Ll}+ed|Put|Paid|Sent|Made|Set|Kept|Left|Got|Took|Ran|Found|Wrote|Read|Built|Held|Brought|Bought|Sold|Told)\b/u, (w) => w.toLowerCase());
+}
+
 /** Where the run that signed a line opens, or nothing where the record named no run a person could open. */
 function runHref(r: FeedRow): string | undefined {
   const run = r.run_by?.run ?? r.who ?? '';
@@ -1862,11 +1882,15 @@ export function feedTable(
     const line = feedLine(r);
     const more = r.run_more !== undefined && r.run_more > 0 ? r.run_more : 0;
     const run = more > 0 ? runHref(r) : undefined;
+    /* A BURST SAYS ITS LINES ALIKE IN WORDS AFTER IT (`feedAlike`), where a run's fold does not already say what it folds. */
+    const alike = !line.counted && more === 0 && r.count > 1 ? r.count - 1 : 0;
+    const who = r.who === null || line.whole ? '' : feedWho(r.who, me, names, r.run_by ?? null);
+    const what = who !== '' && r.note !== null && r.note.trim() !== '' && line.what === r.note ? noteAfterWho(r.note, r.thing ?? null) : line.what;
     rows.push({
       key: `${r.at}-${i}`,
-      /* A LINE THAT SAYS ITS OWN NUMBER IS ONE LINE, so the renderer does not draw "6" in front of "Categorised 6
-         payments" as well (`feedBurst`). */
-      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names, r.run_by ?? null), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now), ...(more > 0 ? [run ? `[${feedMore(more)}](${run})` : feedMore(more)] : [])],
+      /* NO NUMBER IN FRONT OF A LINE: a burst says its alike lines after it (`feedAlike`), and a line that says its own
+         number, "Categorised 6 payments", says it once (`feedBurst`). */
+      cells: [r.by, who, line.counted || alike > 0 ? '1' : String(r.count), what, whenOf(r.at, now), ...(more > 0 ? [run ? `[${feedMore(more)}](${run})` : feedMore(more)] : alike > 0 ? [feedAlike(alike)] : [])],
       href: run,
       tone: undefined,
     });

@@ -24,14 +24,15 @@ const FLAT: FeedRow[] = [
 /** The same lines as a feed with `group: day` answers them. */
 const DAYS: FeedRow[] = FLAT.map((r) => ({ ...r, day: r.at.slice(0, 10) }));
 
-/* CAPTURED FROM `feedTable` BEFORE IT KNEW A DAY, over FLAT: with a read mark, with no marks, and with no mark yet. */
+/* CAPTURED FROM `feedTable` BEFORE IT KNEW A DAY, over FLAT: with a read mark, with no marks, and with no mark yet. A
+   burst of three says "and 2 more like this" after it since the audit of 25 October (Z22), where a bare 3 stood in front. */
 const BEFORE = {
   marked:
-    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","3","changed Ship the feed","20 min ago"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"seen","cells":["seen","14h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]}],"shown":4}',
+    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","1","changed Ship the feed","20 min ago","and 2 more like this"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"seen","cells":["seen","14h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]}],"shown":4}',
   unmarked:
-    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","3","changed Ship the feed","20 min ago"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]}],"shown":4}',
+    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","1","changed Ship the feed","20 min ago","and 2 more like this"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]}],"shown":4}',
   unread:
-    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","3","changed Ship the feed","20 min ago"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]},{"key":"seen","cells":["seen",""]}],"shown":4}',
+    '{"rows":[{"key":"2026-10-14T09:40:00.000Z-0","cells":["agent","Claude Code","1","changed Ship the feed","20 min ago","and 2 more like this"]},{"key":"2026-10-14T08:00:00.000Z-1","cells":["you","You","1","added Learn to swim","2h ago"]},{"key":"2026-10-13T16:00:00.000Z-2","cells":["rule","","1","Categorised 2 payments: TALLYARD and HALDEN","18h ago"]},{"key":"2026-10-12T11:00:00.000Z-3","cells":["rule","BrainDog","1","Set up Personal with 56 example items","2d ago"]},{"key":"seen","cells":["seen",""]}],"shown":4}',
 };
 
 /** The first word of each row, and a heading's words beside it. */

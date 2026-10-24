@@ -158,14 +158,17 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  /* ONE PLAIN LINE PER EVENT: the name and what they did in the same weight, cut at the end edge rather than wrapped,
-     so a long payee never makes one event three lines tall beside its neighbours. */
+  /* TWO PLAIN LINES AT MOST PER EVENT: the name and what they did in the same weight, cut at the end of the second line,
+     so a long payee never makes one event three lines tall beside its neighbours. One line cut a phone's "Claude Code
+     added the visu…" before it said anything, and hid a burst's "and 7 more like this" (the audit of 25 October, Z22). */
   .feed-what {
+    display: -webkit-box;
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink-2);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .feed-who {
