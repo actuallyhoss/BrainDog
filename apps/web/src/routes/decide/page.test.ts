@@ -93,7 +93,7 @@ test('every option is words and not a button for a reader who may not answer, an
      buttons under the choices (Decide, Accept and Decline, Not now) are not drawn for them at all. */
   assert.match(card, /\{#if drawn\}\n\s+<button\n\s+type="button"\n\s+role="radio"\n\s+class="queue-act dc-choice"/u, 'the card draws a live choice for a reader who may not answer');
   assert.match(card, /\{:else\}\n\s+<div class="dc-choice" data-read>\n\s+\{@render choiceBody\(way\)\}/u, 'the card draws nothing in place of the option it will not offer');
-  assert.match(card, /\{#if drawn && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
+  assert.match(card, /\{#if drawn && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?(\s+\{#if moneyAbove\}[^\n]*\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
   /* THE KEPT COPY IS THE ONE EXCEPTION (VERIFY H45): while it is drawn nobody is known to answer or not, so the controls
      keep their boxes, quiet and `aria-disabled`, and nothing presses; the live shell decides. A reader the live shell
      says may not answer still reads words. */

@@ -51,8 +51,8 @@ test('THE SUGGESTION STAYS, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONE
   assert.equal(paying.money, 'Moves £12.98');
   assert.deepEqual(
     paying.ways.map((w) => w.label),
-    ['Accept £12.98', 'Decline'],
-    'Accept names the amount and Reject says Decline',
+    ['Accept', 'Decline'],
+    'Accept says Accept, the amount on the line over it, and Reject says Decline',
   );
   assert.equal(paying.enter, null, 'Enter never accepts money');
   assert.equal(paying.decline, 'reject');
@@ -101,7 +101,7 @@ test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was 
   assert.deepEqual(byWords(card.by), ['Claude Code', 'Tidy the March invoices'], 'a run is named by its app, never An agent or S42');
   assert.equal(card.by.kind, 'agent');
   assert.equal(card.money, 'Moves −£17.98 and $7\u00a0USD');
-  assert.equal(card.ways[0]?.label, 'Accept −£17.98 and $7\u00a0USD');
+  assert.equal(card.ways[0]?.label, 'Accept');
   assert.equal(card.enter, null, 'Enter never accepts money');
   assert.equal(card.slash, true, 'drafted by Slash');
   const old = cardOf(ask({ who: 'S42', run: { id: 'S42', app: 'Claude Code' } }), { now });

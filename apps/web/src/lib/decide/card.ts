@@ -32,7 +32,6 @@ import type { Merge } from '../../routes/decide/merge.ts';
 import { copy } from '../copy.ts';
 import { nameWords } from '../record/names.ts';
 import { acceptKey, amountSaid, declineKey, labelOf, twoWords } from '../../routes/decide/press.ts';
-import { words as decideWords } from '../../routes/decide/words.ts';
 import { arrangedOf, isArranging } from '../../routes/decide/[id]/arranged.ts';
 import { spoken } from './spoken.ts';
 
@@ -144,7 +143,7 @@ export type Card = {
   lines: ShiftLine[];
   /** How many more changes could be drawn and were not, past the three a card draws: said under them, or 0. */
   more: number;
-  /** The ways to answer, in the record's order; Accept names its amount and Reject says Decline. */
+  /** The ways to answer, in the record's order; Accept says Accept, with the money over it, and Reject says Decline. */
   ways: Way[];
   /** The answer Enter gives, or `null` where a key must not answer (hard to undo, or money moves). */
   enter: string | null;
@@ -460,8 +459,8 @@ function lapseLine(q: QueueQuestion, kind: string, body: unknown, now: number): 
 /**
  * THE CARD, from one question.
  *
- * ACCEPT NAMES ITS AMOUNT AND REJECT SAYS DECLINE, on the record's own two answers (`press.ts` `labelOf`), so a button
- * says what it does. The suggestion is marked on every card; Enter gives an answer only where the choice can be undone
+ * ACCEPT SAYS ACCEPT, WITH THE MONEY IT MOVES THE LINE OVER IT, AND REJECT SAYS DECLINE, on the record's own two
+ * answers (`press.ts` `labelOf`), so a button says what it does. The suggestion is marked on every card; Enter gives an answer only where the choice can be undone
  * and no money moves (`acceptKey`).
  */
 export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
@@ -470,9 +469,9 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const plain = waysOf(q, ctx.file);
   const keyed = { options: plain.map((w) => ({ key: w.key, recommended: w.recommended, hard: w.hard })) };
   const said = moves.length === 0 ? '' : ctx.home === undefined ? amountSaid(moves) : amountSaid(moves, ctx.home);
-  /* THE AMOUNT IN THE RECORD'S OWN CURRENCY, which `labelOf` reads from the shell: here it is the host's, when handed. */
-  const labelled = (w: Way): string =>
-    w.key === 'accept' && said !== '' && twoWords(keyed) ? decideWords.acceptFor(said) : labelOf({ key: w.key, title: w.label }, keyed, moves);
+  /* ACCEPT SAYS ACCEPT, AND THE AMOUNT IS THE LINE OVER IT (`money`, the scope of 24 October, E10): a button naming two
+     currencies and the care it asks for wrapped to five lines at 390. */
+  const labelled = (w: Way): string => labelOf({ key: w.key, title: w.label }, keyed, []);
   /* THE SUGGESTED OPTION LEADS (§45); every key and number follows `ways`, so they follow what is drawn. */
   const ways = leadFirst(plain.map((w) => ({ ...w, label: labelled(w) })));
   const merge = queueMergeOf(q, plain.map((w) => w.key));

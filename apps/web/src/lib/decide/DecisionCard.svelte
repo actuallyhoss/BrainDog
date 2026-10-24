@@ -193,7 +193,11 @@
   const seeWhole = $derived(card.seeWhole && whole && !link);
   /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, or a change from what to what. The
      heading is drawn only over such a line; the link to the whole change alone is drawn alone. */
-  const changesSaid = $derived(saysChanges(card));
+  /* THE MONEY AN ANSWER MOVES IS THE LINE OVER THE BUTTONS (the scope of 24 October, E10), and the button says Accept:
+     "Accept EGP 74,092.16 and $9,074.01 USD, can't be undone easily" wrapped to five lines at 390. Where nobody may
+     answer, there are no buttons to stand over, and the side says it under what it changes as before. */
+  const moneyAbove = $derived(drawn && card.money !== '' && (!card.merge || compact));
+  const changesSaid = $derived(saysChanges(moneyAbove ? { ...card, money: '' } : card));
   const changesAny = $derived(changesSaid || seeWhole);
   /* THE SIDE IS DRAWN ONLY WITH SOMETHING IN IT: why it is asked, or what it changes. Who asked is the line over the question. */
   const side = $derived(!compact && (card.why !== '' || changesAny));
@@ -795,6 +799,7 @@
              key may press carries `data-enter`: nothing hard to undo, nothing that moves money. Where the choices
              themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). DECIDE NEVER
              LOOKS SWITCHED OFF (VERIFY H9): pressed with nothing chosen, it puts the focus on the first answer. -->
+        {#if moneyAbove}<p class="dc-money dc-money-above num" dir="auto">{card.money}</p>{/if}
         <div class="dc-actions" data-inline={inline ? '' : undefined}>
           {#if inline}
             <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
@@ -853,9 +858,9 @@
           <div class="dc-part dc-part-changes" role="group" aria-labelledby="{uid}-changes">
             <h4 class="dc-h" id="{uid}-changes" dir="auto">{#if card.list}{cardWords.changesIn(card.list)}{:else}{cardWords.changes}{/if}</h4>
             {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
-            {#if card.money || card.lines.length > 0}
+            {#if (card.money && !moneyAbove) || card.lines.length > 0}
               <ul class="dc-moves">
-                {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
+                {#if card.money && !moneyAbove}<li class="dc-money num">{card.money}</li>{/if}
                 {#each card.lines as s, i (i)}
                   <li class="dc-shift">
                     {#if s.what}<span class="dc-what">{s.what}</span>{/if}
@@ -1124,6 +1129,14 @@
     color: var(--ink);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+  }
+
+  .dc-money-above {
+    max-inline-size: var(--measure);
+    margin: 0;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
   }
 
   .dc-shift {
