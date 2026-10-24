@@ -24,7 +24,6 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
-  import StateRow from './StateRow.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
 
   let { shell }: AreaProps = $props();
@@ -262,13 +261,14 @@
     </div>
   </Tile>
 {:else}
-  <Tile icon="money" class="section" data-surface="tile" title={copy.billing}>
+  <!-- THE CARD SAYS WHAT IT HOLDS (audit 25 October, X23): it was "Billing" under a page called Billing, over a row
+       saying Not billed. The state is the card's title now, and the host's sentence its one line. -->
+  <Tile icon="money" class="section" data-surface="tile" title={copy.billingNotBilled}>
     <div class="section-body">
       <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
            every shipped bundle, so a live Cloud record was told "This record runs on your own
            machine." `billing.ts` says what is asked instead. -->
-      <!-- AS A ROW, NOT A PARAGRAPH: the state in its title, the host's sentence as its line. -->
-      <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
+      <p class="hint">{billingLine({ host: shell.host, mintsMail: mintsHere })}</p>
       {@render foot()}
     </div>
   </Tile>

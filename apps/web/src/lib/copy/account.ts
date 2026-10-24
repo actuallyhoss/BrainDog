@@ -506,7 +506,6 @@ export const account = {
   restoreSelfHost: 'On the machine BrainDog runs on, braindog backup <folder> keeps a copy of all of it, and braindog restore <folder> puts that copy back.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
-  billing: 'Billing',
   billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
 
   /* SAID ONLY UNDER AN AREA WHOSE CHOICES NEVER LEAVE THIS BROWSER (`KEEPS` in `settings/[area]/+page.svelte`), which

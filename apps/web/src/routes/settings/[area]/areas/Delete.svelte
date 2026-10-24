@@ -32,7 +32,8 @@
   let typed = $state('');
   let deleting = $state(false);
   let deletedSaid = $state('');
-  /* SAID ONLY AFTER A PRESS OR AN ENTER WITH THE WRONG NAME, never while typing. */
+  /* SAID ONLY AFTER A PRESS OR AN ENTER WITH THE WRONG NAME, never while typing and never before anything is typed:
+     "Type The Studio exactly." under the button before a key was pressed read as an error (audit 25 October, X23). */
   let wrong = $state(false);
   let field = $state<HTMLInputElement | null>(null);
 
@@ -48,7 +49,8 @@
     if (deleting) return;
     /* OFF IS NOT DISABLED: the press says why and puts the person in the field (first F16). */
     if (!matches) {
-      wrong = typed.trim() !== '';
+      /* A PRESS WITH NOTHING TYPED SAYS WHAT TO TYPE, and a wrong name says it is not this one (X23). */
+      wrong = true;
       field?.focus();
       return;
     }
@@ -103,7 +105,7 @@
   who is not one has no second step to take on this screen except asking somebody.
 -->
 {#if !anOwner}
-  <Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord}>
+  <Tile icon="trash" class="section" data-surface="tile" title={RECORD}>
     <div class="section-body">
       <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
     </div>
@@ -111,7 +113,9 @@
 {:else}
 <!-- ON THE GROUND AND UNBOXED: the sentence, what it costs, the typed name and the verb. The box this
      sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
-<Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord}>
+<!-- THE CARD IS THE RECORD IT DELETES (audit 25 October, X23): "Delete this record" stood over a card of the same name,
+     so the card is named by what it holds. -->
+<Tile icon="trash" class="section" data-surface="tile" title={RECORD}>
   <div class="section-body">
     <div class="danger">
       <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
@@ -159,7 +163,7 @@
           </span>
         </div>
         <p id="delete-said" class="said" data-wrong={wrong ? '' : undefined} aria-live="polite">
-          {#if wrong}<Icon name="alert" size="s" />{words.notIt(RECORD)}{:else if !matches}{words.exactly(RECORD)}{/if}
+          {#if wrong}<Icon name="alert" size="s" />{typed.trim() === '' ? words.exactly(RECORD) : words.notIt(RECORD)}{/if}
         </p>
       </div>
       {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
