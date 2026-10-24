@@ -579,6 +579,9 @@
      the header does not change when the look moves a tile. Not while arranging or reading the source, where the line is
      a block like any other, and only a line this reader's list can take. */
   const wide = new MediaQuery('(width >= 900px)', true);
+  /* A PHONE'S HEAD HOLDS TWO CONTROLS BESIDE THE NAME, Share and the "⋯" menu, so Show the data is the menu's first row
+     there, as Edit details is on a project: a button of its own pushed the row past a 390px screen. */
+  const roomy = new MediaQuery('(width >= 640px)', true);
   const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
     if (!hosting || !live) return null;
     const layout = layoutOf(live.page.page);
@@ -775,7 +778,7 @@
       {#if finish && finish.key === spoken && !arranging && !showSource}
         <Button weight="primary" onclick={() => void pressFinish()}>{finish.said}</Button>
       {/if}
-      {#if dataHref && !projectPage && !arranging && !showSource}
+      {#if dataHref && !projectPage && !arranging && !showSource && roomy.current}
         <Button href={at(dataHref)}>{words.showData}</Button>
       {/if}
       {#if !arranging}
@@ -796,7 +799,11 @@
           {look}
           keys={drawnKeys}
           heads={blockHeads}
-          extra={projectPage && dataHref ? [{ label: 'Edit details', icon: 'edit', href: dataHref }] : []}
+          extra={projectPage && dataHref
+            ? [{ label: 'Edit details', icon: 'edit', href: dataHref }]
+            : dataHref && !showSource && !roomy.current
+              ? [{ label: words.showData, icon: 'rows', href: dataHref }]
+              : []}
         />
       {/if}
   {/snippet}
