@@ -56,6 +56,8 @@ export type LiveRun = {
   /** Seconds since its last call; absent from a host older than the Agents page of 23 October, `null` before any call. */
   quiet_s?: number | null;
   reach: 'hooks' | 'next_call';
+  /** Its key proves the app it says it is (H19); absent from a host older than 24 October. */
+  verified?: boolean;
 };
 
 export type SeenHow = 'start' | 'prompt' | 'tool' | 'channel' | 'job' | 'asked';
@@ -467,7 +469,8 @@ export function presenceOf(r: LiveRun, rows: readonly LiveRun[], projects: Reado
     doing: doing === name ? null : doing,
     project: project ? { name: project.name, slot: slotOf(project.hue) } : null,
     /* THE PROFILE IT RUNS UNDER, BY NAME, where it is one of his own and not the default one (migration 44). */
-    meta: [r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
+    /* "verified" FIRST WHERE ITS KEY PROVES ITS APP (H19): "Claude Code · verified · as quartz · main". */
+    meta: [r.verified === true ? 'verified' : null, r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
       .filter((x): x is string => !!x)
       .join(' · '),
     live: r.state === 'working' || r.state === 'thinking' ? r.state : 'waiting',

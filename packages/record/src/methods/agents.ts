@@ -16,6 +16,7 @@ import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
 import { readSight } from '../sight.ts';
+import { verifiedBy, type RunToken } from '../run-verified.ts';
 import { OWN_RUN, stopLine, toldOf, toldTo, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
@@ -143,6 +144,8 @@ export type PresenceRow = {
   quiet_s: number | null;
   /** `hooks`: a stop halts its next tool call. `next_call`: it is told at its next BrainDog call, and keeps editing till then. */
   reach: 'hooks' | 'next_call';
+  /** Its key proves the app it says it is (`run-verified.ts`): a checked client document, or a key made for that app. */
+  verified: boolean;
 };
 
 /** What `presence` takes: one project or one repository. */
@@ -419,6 +422,9 @@ export function methods(deps: RecordDeps) {
         const at = [of(f, 'started') ?? r.created_at, back.get(r.id) ?? null, of(f, 'stretch_at')].filter((v): v is string => v !== null && Number.isFinite(Date.parse(v)));
         return at.reduce((a, z) => (Date.parse(z) > Date.parse(a) ? z : a), at[0] ?? r.created_at);
       };
+      /* THE KEYS THE RUNS SPOKE WITH, read once, so each row can say whether its key proves its app (H19). */
+      const keys = new Map<string, RunToken>();
+      for (const t of kernel.listTokens()) for (const k of [t, ...(t.children ?? [])]) keys.set(k.id, { label: k.label, ...(k.client ? { client: k.client } : {}) });
       const out: PresenceRow[] = rows
         .filter((r) => (projectSaid === null || of(r.fields, 'project') === projectSaid) && (repoSaid === null || of(r.fields, 'repo') === repoSaid))
         .map((r) => {
@@ -448,6 +454,7 @@ export function methods(deps: RecordDeps) {
             heard_s: secs(heard),
             quiet_s: of(f, 'last_seen') === null ? null : secs(of(f, 'last_seen')),
             reach: agent === 'claude' && profile.enforce.hooks ? 'hooks' : 'next_call',
+            verified: verifiedBy(f, keys.get(of(f, 'token_id') ?? '') ?? null),
           };
         });
       return ok(out);
