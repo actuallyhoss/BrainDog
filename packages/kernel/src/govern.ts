@@ -405,7 +405,33 @@ export type Proposal = {
    * the record or own it. Left out, any member who may decide may answer it, as before.
    */
   decider?: string;
+  /**
+   * THE OPEN QUESTIONS THIS ONE ANSWERS TOO (scope D13), by their SG: "Covers SG242 too" said in words left SG242 open
+   * after its twin was accepted. Accepting this one closes each still open as moot, in the decision's batch, so its
+   * Undo asks them again. Declining it leaves them as they are.
+   */
+  covers?: string[];
 };
+
+/** The most questions one may say it covers. */
+const COVERS_MOST = 20;
+
+/** What a note holds in `to_v` before the ids of the questions a question covers: `covers:SG242,SG243`. */
+const COVERS = 'covers:';
+
+/** The ids `covers` names, or the sentence that says what is wrong with them. */
+function coversFault(sql: Sql, covers: unknown): string | null {
+  if (!Array.isArray(covers) || covers.length === 0 || covers.length > COVERS_MOST || covers.some((c) => typeof c !== 'string' || !/^SG\d+$/u.test(c)))
+    return `covers is a list of the open questions this one answers too, as ["SG242"], at most ${COVERS_MOST}, or leave it out.`;
+  const shut = (covers as string[]).find((c) => sql.one("SELECT 1 AS x FROM suggestion WHERE id = ? AND status = 'open'", c) === undefined);
+  return shut === undefined ? null : `${shut} is not an open question, so this cannot cover it. Leave it out of covers.`;
+}
+
+/** The questions an open question said it covers when it was filed (`Proposal.covers`). */
+function coveredBy(sql: Sql, id: string): string[] {
+  const said = sql.one<{ v: string }>("SELECT to_v AS v FROM event WHERE kind = 'note' AND target = ? AND to_v LIKE 'covers:%' ORDER BY rowid DESC LIMIT 1", `suggestion:${id}`);
+  return said === undefined ? [] : said.v.slice(COVERS.length).split(',').filter((c) => /^SG\d+$/u.test(c));
+}
 
 /**
  * What the person said the last time this cause was asked, when it is answered from memory: `said` is "No" or the
@@ -419,6 +445,9 @@ export type Remembered = { said: string; reason: string; at: string };
  * `answered` when the person already answered this cause and nothing was filed: `id` is then the question they answered.
  */
 export type Filed = { id: string; joined?: true; widened?: number; answered?: Remembered; handled?: true };
+
+/** How a question another one covered is closed: this, then the question whose accept settled it. */
+export const COVERED = 'Settled by';
 
 /** The one sentence a rowset that would change nothing is refused with. */
 export const NOTHING_TO_DECIDE = 'Everything this asks for is already so. Nothing to decide.';
@@ -455,6 +484,11 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   }
   if (p.again !== undefined && (typeof p.again !== 'string' || p.again.trim() === '' || new TextEncoder().encode(p.again).length > AGAIN_BYTES))
     return no<Filed>('VALUE_MALFORMED', `again is one sentence of at most ${AGAIN_BYTES} bytes saying what changed since this was last answered, or leave it out.`, { at: 'again' });
+
+  if (p.covers !== undefined) {
+    const bad = coversFault(deps.sql, p.covers);
+    if (bad !== null) return no<Filed>('VALUE_MALFORMED', bad, { at: 'covers' });
+  }
 
   /* WHO DECIDES IT is checked before anything is filed. */
   if (p.decider !== undefined) {
@@ -604,6 +638,12 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
   /* AND WHO DECIDES IT, written as `handQuestion` writes it, so an agent's question that names Ada arrives already hers. */
   if (p.decider !== undefined) handEvent(deps, at, by, id, p.decider);
+  /* AND WHAT IT COVERS, the ids in `to_v` and the questions in words in the note, which the card can say. */
+  if (p.covers !== undefined) {
+    const ids = [...new Set(p.covers)];
+    const said = ids.map((c) => `“${(questionOf(deps.sql, c) ?? c).replace(/\?+\s*$/u, '')}”`).join(', ');
+    event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', `${COVERS}${ids.join(',')}`, `Answers ${said} too.`);
+  }
   /* BRAINDOG'S OWN ARRANGING NEEDS NO PRESS, being small and reversible: a question that only moves the owner's own rows
      and can be undone is answered now, marked, with its Undo. Anything else, or a refusal, stays the open question it was. */
   if (p.body_kind === 'rowset' && deps.settle && handledFault(deps.sql, { body_kind: p.body_kind, body: JSON.stringify(body), opened_by: by }) === null) {
@@ -2916,6 +2956,8 @@ export type Decided = {
    * (`moved`): nothing was written, and the question is closed as moot.
    */
   settled?: string;
+  /** The open questions this one covered (`Proposal.covers`), closed as moot by its accept. */
+  covered?: string[];
   /** A declaration an accepted `pattern` or `change` asks the caller to install. */
   install?: Record<string, unknown>;
   /**
@@ -3432,12 +3474,24 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     event(deps, at, actor, 'note', `suggestion:${id}`, 'suggestion', `taken:${n}`, `${n === 1 ? 'One part of this was' : `${n} parts of this were`} accepted, and the rest still wait here.`, batch);
   } else event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason, batch);
 
+  /* THE QUESTIONS IT COVERS GO WITH IT (scope D13): accepted whole, each one it named that still waits is closed as moot
+     with a line saying which answer settled it (any answer but no), in this batch, so the decision's Undo asks them again. */
+  const covered: string[] = [];
+  if (option !== 'reject' && !taking)
+    for (const c of coveredBy(deps.sql, id)) {
+      if (deps.sql.one("SELECT 1 AS x FROM suggestion WHERE id = ? AND status = 'open'", c) === undefined) continue;
+      deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", c);
+      event(deps, at, 'system', 'resolve', `suggestion:${c}`, 'suggestion', 'moot', `${COVERED} “${question.replace(/\?+\s*$/u, '')}”.`, batch);
+      covered.push(c);
+    }
+
   return ok({
     decision,
     batch,
     suggestion: id,
     status: taking ? 'open' : 'resolved',
     wrote,
+    ...(covered.length === 0 ? {} : { covered }),
     ...(install === undefined ? {} : { install }),
     ...(expect === undefined ? {} : { expect }),
     ...(expects === undefined ? {} : { expects }),

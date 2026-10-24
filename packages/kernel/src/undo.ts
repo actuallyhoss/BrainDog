@@ -53,6 +53,7 @@ import { BACKFILL_ACTOR } from './backfill.ts';
 import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
 import { jcs, type Declaration } from './declare.ts';
+import { COVERED } from './govern.ts';
 import type { Patch } from './index.ts';
 import { keyedLists, mergeFieldOf } from './entities.ts';
 import type { RoleList } from './roles.ts';
@@ -1520,11 +1521,15 @@ const ASKED_AGAIN = 'Puts the question back in Decide.';
  * undo that puts back what the first left reopens it too.
  */
 function answered(sql: Sql, lines: readonly Line[]): { id: string; as: string }[] {
+  /* AND THE QUESTIONS IT COVERED (scope D13), closed as moot in its batch with `COVERED`'s line: asked again with it. */
+  const covered = (l: Line): boolean => l.to_v === 'moot' && typeof l.note === 'string' && l.note.startsWith(COVERED);
   const ids = [
-    ...new Set(lines.filter((l) => l.kind === 'resolve' && l.to_v === 'addressed' && l.target?.startsWith('suggestion:')).map((l) => l.target!.slice('suggestion:'.length))),
+    ...new Set(
+      lines.filter((l) => l.kind === 'resolve' && (l.to_v === 'addressed' || covered(l)) && l.target?.startsWith('suggestion:')).map((l) => l.target!.slice('suggestion:'.length)),
+    ),
   ];
   return ids.flatMap((id) => {
-    const q = sql.one<{ r: string }>("SELECT resolved_as AS r FROM suggestion WHERE id = ? AND status = 'resolved' AND resolved_as IN ('addressed', 'undone')", id);
+    const q = sql.one<{ r: string }>("SELECT resolved_as AS r FROM suggestion WHERE id = ? AND status = 'resolved' AND resolved_as IN ('addressed', 'undone', 'moot')", id);
     return q ? [{ id, as: q.r }] : [];
   });
 }

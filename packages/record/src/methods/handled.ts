@@ -6,11 +6,14 @@
  * READ FROM THE DECISIONS THE RECORD ALREADY KEEPS, signed by `rule:handled` (`handledFault` in the kernel), with no
  * table of its own. One that was put back since is left out, and so is one in a list the caller may not read whole.
  *
+ * AND THE QUESTIONS AN ANSWER COVERED (scope D13): one a newer question said it answers too is closed as moot when that
+ * one is answered, and is told here under its own words, with the answer that settled it and that decision's Undo.
+ *
  * IT WRITES NOTHING. Undoing a line is the record's own `undo` on its decision.
  */
 
 import type { Result } from '@braindog/ports';
-import { HANDLED_REASONS, HANDLED_RULE } from '@braindog/kernel';
+import { COVERED, HANDLED_REASONS, HANDLED_RULE } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -50,7 +53,31 @@ export function methods(deps: RecordDeps) {
         today,
         SCANNED,
       );
+      /* THE COVERED ONES: a moot close in a decision's batch, with the line `decide` writes for it. */
+      const covered = sql.all<{ id: string; question: string | null; note: string; ts: string; body: string | null; undone: number | null }>(
+        `SELECT d.target AS id, r.note AS note, r.ts AS ts, s.body AS body,
+           (SELECT coalesce(q.to_v, q.note) FROM event q WHERE q.kind = 'suggest' AND q.target = r.target AND q.field IS NULL ORDER BY q.rowid LIMIT 1) AS question,
+           (SELECT 1 FROM undone u WHERE u.batch = r.batch) AS undone
+         FROM event r JOIN event d ON d.batch = r.batch AND d.kind = 'decide' JOIN suggestion s ON 'suggestion:' || s.id = r.target
+         WHERE r.kind = 'resolve' AND r.to_v = 'moot' AND r.batch IS NOT NULL AND r.note LIKE ? AND r.ts >= ? AND s.resolved_as = 'moot'
+         ORDER BY r.ts DESC, r.rowid DESC LIMIT ?`,
+        `${COVERED}%`,
+        today,
+        SCANNED,
+      );
       const rows: HandledRow[] = [];
+      for (const c of covered) {
+        if (c.undone !== null || c.question === null) continue;
+        let list: unknown;
+        try {
+          list = (JSON.parse(c.body ?? '{}') as { register?: unknown }).register;
+        } catch {
+          list = undefined;
+        }
+        if (typeof list === 'string' && (readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0)) continue;
+        const line = lineOf(c.question);
+        if (line !== '') rows.push({ decision: c.id.slice('decision:'.length), line, why: lineOf(c.note), at: c.ts });
+      }
       for (const f of found) {
         if (f.undone !== null || f.batch === null) continue;
         let list: unknown;
@@ -69,6 +96,7 @@ export function methods(deps: RecordDeps) {
         const why = HANDLED_REASONS.includes(f.reason.trim()) ? '' : lineOf(f.reason);
         rows.push({ decision: f.id, line, why, at: f.ts });
       }
+      rows.sort((a, b) => b.at.localeCompare(a.at));
       return { ok: true, value: { rows: rows.slice(0, HANDLED_MOST), more: Math.max(0, rows.length - HANDLED_MOST) } };
     },
   };

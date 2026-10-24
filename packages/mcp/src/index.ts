@@ -639,6 +639,8 @@ export const TOOLS: readonly Tool[] = [
         },
         cause: str('A short key, so it is asked once.'),
         again: str('What changed since they answered.'),
+        /* `covers` (scope D13): the open SGs this one answers too, closed as moot when it is accepted. */
+        covers: { type: 'array', items: { type: 'string' }, description: 'Open SGs this answers too.' },
         withdraw: str('Alone, takes back an SG you asked.'),
       },
     ),
