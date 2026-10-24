@@ -8,6 +8,11 @@
  * first, `complete` once every part hashes right, `NOT_FOUND` for a file not there). The secret store is a map. Every
  * home is a temporary folder, so nothing of this machine's is read or written, and no real store is asked anything.
  *
+ * `BRAINDOG_TEST_STORE=secret-service` RUNS THE SAME FLOW ON A REAL KEYRING (G18), in a Linux container and nowhere
+ * else: each machine keeps its items in the secret service through `secretService`, under a service name of its own
+ * (`bd-test-<pid>-<n>-`), so two machines never read each other's key, and every item written is removed at the end.
+ * `apps/cli/scripts/linux-keyring.sh` starts the container, its session bus and an unlocked keyring, and runs this file.
+ *
  * Every name here is invented; the sign-ins are planted values.
  */
 
@@ -25,7 +30,7 @@ import { shown } from '../src/doctor.ts';
 import { hostKey } from '../src/http.ts';
 import { pinsFile, readPins } from '../src/pins.ts';
 import { keyFromText, open } from '../src/sealer.ts';
-import type { Item, SecretStore } from '../src/secret-store.ts';
+import { secretService, type Item, type SecretStore } from '../src/secret-store.ts';
 import { unpack } from '../src/carry.ts';
 import { syncJoin, syncRetire, type JoinIo } from '../src/sync-join.ts';
 import { syncPatches } from '../src/sync-patches.ts';
@@ -155,10 +160,44 @@ type Record_ = ReturnType<typeof fakeRecord>;
 
 /* ── a machine ─────────────────────────────────────────────────────────── */
 
-/** A store that keeps what it is handed, by service and account. */
+/** Whether the flow runs on the real secret service (`apps/cli/scripts/linux-keyring.sh`) rather than a map. */
+const REAL = process.env.BRAINDOG_TEST_STORE === 'secret-service';
+let stores = 0;
+const written: [SecretStore, Item][] = [];
+after(async () => {
+  for (const [store, item] of written) await store.remove(item);
+});
+
+/**
+ * A store that keeps what it is handed, by service and account. ON A REAL KEYRING `held` is what this machine wrote and
+ * did not remove, kept beside the keyring so a test reads it the same way, and every read goes to the keyring itself.
+ */
 function fakeStore(): SecretStore & { held: Map<string, string> } {
   const held = new Map<string, string>();
   const name = (i: Item) => `${i.service}/${i.account}`;
+  if (REAL) {
+    const real = secretService();
+    const tag = `bd-test-${String(process.pid)}-${String(stores++)}-`;
+    const own = (i: Item): Item => ({ ...i, service: `${tag}${i.service}` });
+    return {
+      held,
+      name: real.name,
+      read: async (i) => real.read(own(i)),
+      write: async (i, v) => {
+        const done = await real.write(own(i), v);
+        if (done.ok) {
+          held.set(name(i), v);
+          written.push([real, own(i)]);
+        }
+        return done;
+      },
+      remove: async (i) => {
+        const done = await real.remove(own(i));
+        if (done.ok) held.delete(name(i));
+        return done;
+      },
+    };
+  }
   return {
     held,
     name: 'the test store',
@@ -446,7 +485,7 @@ test('TOOL SIGN-INS MOVE ONLY FROM A RETIRED MACHINE, never over sign-ins held h
   const a = await joined(record, 'Studio Mac', 'darwin');
   const b = await joined(record, 'Field Laptop');
   record.add('carry', { name: 'Tool sign-ins', kind: 'sign_ins', mac: 'keychain:ccenv-mcp-auth/rowan', linux: '~/.ccenv/shared/mcp-auth.json', state: 'on' });
-  a.store.held.set('ccenv-mcp-auth/rowan', SIGN_INS);
+  assert.deepEqual(await a.store.write({ service: 'ccenv-mcp-auth', account: 'rowan' }, SIGN_INS), { ok: true });
   assert.equal(await syncPush([], a.io), 0, a.all());
   for (const f of record.files.values()) assert.ok(!Buffer.concat(f.parts as Buffer[]).includes(Buffer.from('rt-planted-value')), 'a sign-in in the clear');
 
@@ -704,4 +743,12 @@ test('UNPUSHED WORK: commits, staged and unstaged changes and new files carried,
   b.clear();
   assert.equal(await syncPatches([], b.io), 1);
   assert.match(b.out.join('\n'), /has changes of its own here, so nothing was applied/u);
+});
+
+test('ON A REAL KEYRING the keys above went into the secret service and read back from it', { skip: REAL ? false : 'runs only on a real keyring, through apps/cli/scripts/linux-keyring.sh' }, async () => {
+  assert.ok(written.length > 0, 'nothing reached the keyring');
+  const [store, item] = written[0]!;
+  assert.equal(store.name, 'the secret service');
+  const found = await store.read(item);
+  assert.ok(found.ok);
 });
