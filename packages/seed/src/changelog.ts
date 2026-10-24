@@ -307,6 +307,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.19.0',
+      notes: 'With nobody working, the first line on Agents says Nobody working right now, where it said Nobody at work over runs that are open and quiet.',
+    },
+    {
       version: '1.18.0',
       notes: 'A key kept in the vault says Locked value over what it holds, where it said Sealed value.',
     },

@@ -786,8 +786,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      cards, What the brain learned and its log, and Machines and profiles go; a foot line holds the doors. No list, field
      or figure goes.
      1.18.0 IS WORDS, SO IT IS MINOR (the screens scope of 24 October, U-C7): a key's value is headed Locked value, where
-     it said Sealed value. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.18.0', requires: ['register.things'] },
+     it said Sealed value. No list, field or figure goes.
+     1.19.0 IS WORDS, SO IT IS MINOR (the agents scope of 24 October, H26): with nobody working the line says Nobody
+     working right now, where it said Nobody at work over a tile called At work holding quiet runs. No list, field or
+     figure goes. */
+  manifest: { id: 'agents', version: '1.19.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
