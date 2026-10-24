@@ -27,8 +27,9 @@
  *
  * AND HOW MANY READS A COLD OPEN ASKS, with their bytes (scope 2026-10-24 A6): every `/api/` answer the page fetched from
  * the open until it went quiet (`html[data-quiet]`), read off the browser's own resource timing. Each screen is held to
- * `callsMax`, the most it was measured asking, so a tile that starts asking the record again, or a read asked twice, is
- * red here before it reaches his record. The count only falls.
+ * `callsMax`, the most it was measured asking, so a tile that starts asking the record again is red here before it
+ * reaches his record. The count only falls. AND NO READ TWICE: every read asked is counted by what it asked, inside a
+ * `reads` or alone, and one asked twice with the same arguments in one open is a finding, the version poll aside.
  *
  * `BRAINDOG_GATE_SEED=perf` holds every script of the build back before it is served, on one screen at one width, which
  * is what a bundle that suddenly weighs a second looks like from outside; `self-test` needs it to go red.
@@ -87,6 +88,22 @@ function stamp() {
   /* ROOM FOR EVERY READ IN THE BROWSER'S TIMING: its buffer holds 250 entries by default, and a cold open's modules
      fill it before the screen's reads are asked, so they were never counted. */
   performance.setResourceTimingBufferSize(Number.MAX_SAFE_INTEGER);
+  /* EVERY READ ASKED, ONE A LINE, inside a `reads` or by itself: what the record is asked, whichever way it travels. */
+  const asked = [];
+  window.__asked = asked;
+  const real = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    try {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+      const m = /\/api\/([A-Za-z][A-Za-z0-9/]*)$/u.exec(url.pathname);
+      const body = typeof init?.body === 'string' ? init.body : '';
+      if (m !== null && m[1] === 'reads') for (const c of JSON.parse(body).calls ?? []) asked.push(`${c.method} ${JSON.stringify(c.args ?? {})}`);
+      else if (m !== null) asked.push(`${m[1]} ${url.search}${body}`);
+    } catch {
+      /* A request this cannot read is the page's own business; it is still counted by the browser's timing. */
+    }
+    return real(input, init);
+  };
   const d = { at: null, t0: 0, before: null };
   window.__perf = d;
   const heading = () => (document.querySelector('#main h1') ?? document.querySelector('h1'))?.textContent.trim() ?? null;
@@ -108,8 +125,8 @@ function stamp() {
 }
 
 /**
- * THE PLANTED DUPLICATE (`perf-reads`): every read sent as a GET is sent a second time and its answer dropped, which is
- * what tiles asking for themselves what the screen already holds look like to the record. Every one and not a single
+ * THE PLANTED DUPLICATE (`perf-reads`): every read sent as a GET, and every `reads`, is sent a second time and its
+ * answer dropped, which is what tiles asking for themselves what the screen already holds look like to the record. Every one and not a single
  * read, because a cold open's count moves by one or two between runs (a version poll, a presence beat), and a fault
  * the gate is sure to see is one far past that.
  */
@@ -119,7 +136,7 @@ function twice() {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const method = (init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET')).toUpperCase();
     /* The copy's body is read, or the browser never finishes the answer and its timing never counts it. */
-    if (method === 'GET' && /\/api\/[A-Za-z]/u.test(url)) void real(input, init).then((r) => r.arrayBuffer()).catch(() => {});
+    if ((method === 'GET' && /\/api\/[A-Za-z]/u.test(url)) || /\/api\/reads$/u.test(url)) void real(input, init).then((r) => r.arrayBuffer()).catch(() => {});
     return real(input, init);
   };
 }
@@ -136,7 +153,7 @@ function readsIn() {
     bytes += e.decodedBodySize;
     by[m[1]] = (by[m[1]] ?? 0) + 1;
   }
-  return { calls, bytes, by };
+  return { calls, bytes, by, asked: [...(window.__asked ?? [])] };
 }
 
 /** The middle of an odd count of runs; of an even count, the upper of the middle two. */
@@ -194,7 +211,7 @@ async function once(browser, origin, screen, width, { record, ready, reads }) {
     await page.reload({ waitUntil: 'commit' });
     await stamped(page, 'on a reload');
     const copy = await page.evaluate(() => window.__perf.at);
-    return { paint: cold.paint, drawn: cold.drawn, copy, revisit, calls: asked.calls, bytes: asked.bytes, by: asked.by };
+    return { paint: cold.paint, drawn: cold.drawn, copy, revisit, calls: asked.calls, bytes: asked.bytes, by: asked.by, asked: asked.asked };
   } finally {
     await opened.context.close().catch(() => {});
   }
@@ -252,7 +269,7 @@ async function walk(root, seeded, reads = false) {
         /* TIMES ARE THE MIDDLE RUN'S; READS ARE THE MOST ANY RUN ASKED, because a read asked once in three is still asked. */
         const most = runs.reduce((a, r) => (r.calls > a.calls ? r : a), runs[0]);
         if (runs.length === P.samples)
-          rows.push({ screen, width, ...Object.fromEntries(['paint', 'drawn', 'copy', 'revisit'].map((k) => [k, Math.round(median(runs.map((r) => r[k])))])), calls: most.calls, bytes: Math.max(...runs.map((r) => r.bytes)), by: most.by });
+          rows.push({ screen, width, ...Object.fromEntries(['paint', 'drawn', 'copy', 'revisit'].map((k) => [k, Math.round(median(runs.map((r) => r[k])))])), calls: most.calls, bytes: Math.max(...runs.map((r) => r.bytes)), by: most.by, asked: most.asked });
       }
     }
     const blind = ready.nothingDrawn();
@@ -268,6 +285,16 @@ async function walk(root, seeded, reads = false) {
 /** Whether a run is the planted one: `perf` (or `name`) among the seeds named, one or several joined by commas. */
 export const seededBy = (value, name = 'perf') => String(value ?? '').split(',').some((s) => s.trim() === name);
 
+/** The poll, which asks on a clock and not because a screen wants something: never a read asked twice. */
+const POLLS = new Set(['version']);
+
+/** The reads a cold open asked more than once with the same arguments, the poll aside: `[read, times]`. */
+export function twiceAsked(asked = []) {
+  const seen = new Map();
+  for (const a of asked) if (!POLLS.has(a.split(' ')[0])) seen.set(a, (seen.get(a) ?? 0) + 1);
+  return [...seen].filter(([, n]) => n > 1);
+}
+
 /** The findings a table of measured rows holds, each saying the number, the budget and the screen. */
 export function judge(rows, P = budget('perf')) {
   const out = [];
@@ -282,6 +309,9 @@ export function judge(rows, P = budget('perf')) {
     const most = P.callsMax?.[r.screen.name];
     if (most === undefined) out.push(`${r.screen.name} @${r.width}  has no reads budget in perf.callsMax`);
     else if (r.calls > most) out.push(`${r.screen.name} @${r.width}  asked ${r.calls} reads, over its budget of ${most} (${Object.entries(r.by).map(([k, v]) => `${k} ${v}`).join(', ')})`);
+    /* A SCREEN ASKS NO READ TWICE (scope 2026-10-24 A11): one tile asking what another already asked is the record's
+       time spent twice, and the first sign of a screen that has started asking for itself again. */
+    for (const [read, n] of twiceAsked(r.asked)) out.push(`${r.screen.name} @${r.width}  asked ${read.slice(0, 120)} ${n} times in one open`);
   }
   return out;
 }
