@@ -859,6 +859,29 @@ const withoutLatePart = (doc: Body): Body =>
       }),
     (d) => d.metric !== 'installments-late',
   );
+/**
+ * MONEY 3.20.0 COMES OFF BEFORE IT (B6, B8 and B24 of 24 October): no sentence of what is to pay on the card in the lines
+ * and no figure of it, no card fields on Accounts, no rule or script that works it out or asks to move a twin line on,
+ * and no File old entries on the filing rules page.
+ */
+const CARD_20 = ' On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
+const CARD_FIELDS_20: ReadonlySet<string> = new Set(['limit', 'to_pay', 'to_pay_on']);
+const withoutCard20 = (doc: Body): Body => {
+  const off = withPage(
+    doc,
+    'money',
+    (now) => now.map((b) => (b.lead === true && typeof b.body === 'string' ? { ...b, body: b.body.replace(CARD_20, '') } : b)),
+    (d) =>
+      d.metric !== 'card-to-pay' && d.metric !== 'card-to-pay-on' && d.rule !== 'bill-moves-line' && d.rule !== 'card-text-owes' && d.rule !== 'card-limit-owes' && d.script !== 'move_line' && d.script !== 'card_owed',
+  );
+  const rules = withPage(off, 'money-rules', (now) => now.filter((b) => !(typeof b.body === 'string' && b.body.includes('[File old entries]'))));
+  return {
+    ...rules,
+    declarations: (rules.declarations as Body[]).map((d) =>
+      d.register === 'accounts' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !CARD_FIELDS_20.has(String(f.id))) } : d,
+    ),
+  };
+};
 const withoutUiPassR3 = (doc: Body): Body =>
   withPage(itemAgain(doc), 'money', (now) =>
     now
@@ -959,7 +982,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(raw))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(raw)))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -151,7 +151,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * WHAT IS TO PAY ON THE CARDS, AND THE DAY THAT WAS TRUE, SINCE money-core 3.19.0 (B8 of 24 October): "To pay on it", which
+   * WHAT IS TO PAY ON THE CARDS, AND THE DAY THAT WAS TRUE, SINCE money-core 3.20.0 (B8 of 24 October): "To pay on it", which
    * `card_owed` writes from each card text, summed over the open cards that say it, and the newest of their days. No
    * card that says it, no value, so Money's first line leaves the sentence out.
    */

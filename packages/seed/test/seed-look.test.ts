@@ -178,7 +178,7 @@ test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
 
 /* AND HOW MUCH THERE IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): with two books the line leads with Cash
    now, and every line ends on the part that is late, a sentence the app leaves out while none is. */
-/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.19.0 (B8), left out whole with no card that says it. */
+/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0 (B8), left out whole with no card that says it. */
 const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
 test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and with one book on its cash', async () => {
   const k = await founder();

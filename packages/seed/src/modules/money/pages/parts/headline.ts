@@ -12,7 +12,7 @@ const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s),
 const LATE_PART = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
 
 /**
- * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.19.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
+ * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.20.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
  * page is at its ceiling of blocks, so the sentence is the line's. No card that says it, and the sentence goes whole.
  */
 const CARD_OWES = ' On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';

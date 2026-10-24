@@ -59,7 +59,7 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
      */
     { id: 'arrives', label: 'Arrives', type: 'day' },
     /**
-     * WHAT IS TO PAY ON A CARD, SINCE money-core 3.19.0 (B8 of 24 October). A card text says what is left of the limit, never what
+     * WHAT IS TO PAY ON A CARD, SINCE money-core 3.20.0 (B8 of 24 October). A card text says what is left of the limit, never what
      * is owed, so the limit is typed once and `card_owed` writes "To pay on it" as the limit less the newest available, with
      * the day of that text (`scripts/card-to-pay.js`). Money's first line says it. Empty on every account that is no card.
      */

@@ -55,7 +55,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       body: 'No rule has filed anything in the last 30 days. {{rules-filing}} rule(s) filed {{rule-filed}} of your entries before that.',
     },
     {
-      /* FILE OLD ENTRIES, SINCE money-core 3.19.0 (B24 of 24 October): a rule files what is written after it, and the
+      /* FILE OLD ENTRIES, SINCE money-core 3.20.0 (B24 of 24 October): a rule files what is written after it, and the
          entries already there with no category wait for a rule made later. The link opens the filing rule's Run again,
          which says how many it would file before anything is written, and files them as one change one Undo takes back. */
       kind: 'note',

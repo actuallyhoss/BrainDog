@@ -686,11 +686,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   kept from what BrainDog drew for it. Its two lead notes are one note with two sentences (`says:`), so the page
  *   stays at twenty-one blocks. A list, a field and three figures added and nothing taken away, so a minor step that
  *   reaches a record on its own. 1.22.0 is master's (the KPI backfill).
+ * - money-core 3.20.0 (the scope of 24 October, B6, B8 and B24): a paid bill asks once to move its twin repeating line
+ *   on (`bill-moves-line`, `move_line`), and a payment that fits a bill and a line under one name links the bill; a card
+ *   says what is to pay on it from its texts once its limit is typed (`limit`, `to_pay`, `to_pay_on` on Accounts,
+ *   `card-text-owes`, `card-limit-owes`, `card_owed`, `card-to-pay`, `card-to-pay-on`), said in Money's first line;
+ *   and Filing rules says how many entries have no category with File old entries. 3.19.0 is master's (things,
+ *   not rows), so a version of its own. Ids added and none taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.23.0',
   people: '3.6.0',
-  'money-core': '3.19.0',
+  'money-core': '3.20.0',
   estate: '2.3.0',
   work: '1.19.0',
 };
