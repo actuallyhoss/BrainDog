@@ -47,6 +47,7 @@
   import { moduleName } from '@braindog/seed/usecases/names';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
+  import { decideSecond, foldSaid } from './pages-fold.ts';
 
   /**
    * PAGES IS FOLDED INTO NAVIGATION (UI pass 20 Oct, agents F14): Navigation draws this file three times, one `part` each,
@@ -93,7 +94,6 @@
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
     under: (section: string) => `In ${section}`,
-    morePages: (n: number) => (n === 1 ? '1 more page' : `${n} more pages`),
     none: 'No pages yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages Slash makes for you.',
     renameTitle: (title: string) => `Rename ${title}`,
@@ -118,7 +118,7 @@
    * One page as this area lists it: where it is, its own title, its glyph, and its slug when it is a declared page
    * (`/p/<slug>`). A thread in the nav is not one, so it has no layout to edit and no page for Slash to change.
    */
-  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean; row: boolean; section?: string; app?: true };
+  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean; row: boolean; section?: string; app?: true; register?: string | null };
 
   const slugOf = (href: string): string => href.replace(/^\/p\//u, '');
   /* A PAGE WITH NO TITLE TO READ IS NAMED BY ITS ADDRESS, in words: `client-portal` is Client portal. */
@@ -173,7 +173,8 @@
     const bySection = new Map(groups.map(([section, list]) => [section.trim().toLocaleLowerCase(), { section, list }] as const));
     const app = (href: string, own: string, icon: IconName): Listed => ({ href, slug: null, own, icon, inNav: true, row: false, app: true });
     const out: Listed[] = [];
-    for (const item of [...flat.main, ...flat.more]) {
+    /* NEEDS YOU SECOND, AS THE BAR DRAWS IT (Y20): it was ninth, under Activity. */
+    for (const item of [...decideSecond(flat.main), ...flat.more]) {
       if (item.key === 'today') out.push(app('/', item.label, 'today'));
       else if (item.key === 'activity') out.push(app('/audit', item.label, 'activity'));
       else if (item.key === 'decide') out.push(app('/decide', item.label, 'decide'));
@@ -199,7 +200,7 @@
    * EVERY OTHER PAGE THE RECORD DECLARES, by the title the record gives it: one `pages` read, asked once for this visit.
    * A shell no record answered has the slugs `boot` sent and nothing more, so a page is named by its address there.
    */
-  let titled = $state<{ slug: string; title: string; row: boolean }[] | null>(null);
+  let titled = $state<{ slug: string; title: string; row: boolean; register: string | null }[] | null>(null);
   $effect(() => {
     if (!shell.live || titled !== null) return;
     let current = true;
@@ -219,14 +220,21 @@
 
   /* `about` NAMES THE ROW A PAGE WAS MADE FOR (a person, a project), and is `null` on a page somebody wrote. The record's
      `pages` sends only a slug and a title today, so `others` also asks the nav, whose entries carry it from `boot`. */
-  async function readPages(): Promise<{ slug: string; title: string; row: boolean }[]> {
+  async function readPages(): Promise<{ slug: string; title: string; row: boolean; register: string | null }[]> {
     const { createClient } = await import('@braindog/client');
     const out = await createClient({ base: apiBase() }).pages();
     if (!out.ok || !Array.isArray(out.value)) return [];
     return out.value.flatMap((p) => {
       const page = p as { slug?: unknown; title?: unknown; about?: unknown };
       return typeof page.slug === 'string' && page.slug !== ''
-        ? [{ slug: page.slug, title: typeof page.title === 'string' ? page.title : '', row: page.about !== null && typeof page.about === 'object' }]
+        ? [
+            {
+              slug: page.slug,
+              title: typeof page.title === 'string' ? page.title : '',
+              row: page.about !== null && typeof page.about === 'object',
+              register: page.about !== null && typeof page.about === 'object' && typeof (page.about as { register?: unknown }).register === 'string' ? (page.about as { register: string }).register : null,
+            },
+          ]
         : [];
     });
   }
@@ -234,7 +242,7 @@
   const others = $derived.by((): Listed[] => {
     const drawn = new Set(inNav.map((e) => e.href));
     const known = new Map(shell.nav.map((e) => [e.id, e] as const));
-    const all = titled ?? shell.pages.map((slug) => ({ slug, title: '', row: known.get(slug)?.row === true }));
+    const all = titled ?? shell.pages.map((slug) => ({ slug, title: '', row: known.get(slug)?.row === true, register: null }));
     /* NOR IS A PAGE LISTED HERE UNDER A NAME THE NAV ALREADY SHOWS (H34): Activity was in both lists. */
     const shown = new Set(ordered.map((o) => o.own.trim().toLocaleLowerCase()));
     const listed = all
@@ -247,6 +255,7 @@
         icon: known.get(p.slug)?.icon ?? 'doc',
         inNav: false,
         row: p.row || known.get(p.slug)?.row === true,
+        register: p.register,
       }));
     /* THE PAGES SOMEBODY WROTE FIRST, and the pages a row made after them, each in the record's order. */
     return [...listed.filter((p) => !p.row), ...listed.filter((p) => p.row)];
@@ -265,6 +274,14 @@
   const navShown = $derived(ordered.filter((p) => !navPrefs.isHidden(p.href)));
   const hiddenRows = $derived(ordered.filter((p) => navPrefs.isHidden(p.href)));
   const outCount = $derived(hiddenRows.length + others.length);
+  /* WHAT THE FOLD HOLDS, BY KIND (Y20): "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
+  const foldLine = $derived.by(() => {
+    const drawn = new Set(othersShown.map((p) => p.href));
+    return foldSaid(
+      others.filter((p) => !drawn.has(p.href)).map((p) => ({ row: p.row, register: p.register ?? null })),
+      shell.index.registers,
+    );
+  });
 
   /* ── the home page ── */
 
@@ -504,7 +521,7 @@
             <li class="page-row page-fold">
               <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
                 <span class="line-mark"><IconWell name="doc" size="l" /></span>
-                <span class="line-main"><span class="line-title">{words.morePages(others.length - othersShown.length)}</span></span>
+                <span class="line-main"><span class="line-title">{foldLine}</span></span>
                 <span class="line-amount"></span>
                 <span class="line-when fold-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
               </button>
