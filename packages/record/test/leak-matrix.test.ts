@@ -648,9 +648,10 @@ test('SHAPES: the §4.2 hidden fields are in the matrix, the rate and notes of t
   for (const wanted of ['hidden-field', 'hide-amounts']) assert.ok(built.has(wanted), wanted);
 });
 
-test('SHAPES: the §4.2 grants that wait on later slices', { todo: 'outside its hours, once after it ran out, and child tokens (Slice 9)' }, () => {
+test('SHAPES: the §4.2 grants of Slice 9 are in the matrix: outside its hours, once after it ran out, a child key', () => {
   const built = new Set(SHAPES.map((s: Shape) => s.id));
   for (const wanted of ['hours', 'once', 'child-token']) assert.ok(built.has(wanted), wanted);
+  assert.ok(variantsOf(SHAPES.find((s) => s.id === 'child-token')!).includes('child-key'), 'the guest runs as a child key');
 });
 
 /* ── T6: guessing a hidden value through a filter, a sort, a search, a count or a preview ── */

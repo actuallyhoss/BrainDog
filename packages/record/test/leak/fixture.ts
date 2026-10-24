@@ -205,7 +205,9 @@ export type Shape = {
    * The shares that make the grant, through the share API as the owner makes them (Slice 7), each lasting 30 days. The
    * person is a guest with no member row. `ended` is a share that has run out by the time the matrix asks.
    */
-  shares?: (f: Built) => (Record<string, unknown> & { ended?: true; named?: string[] })[];
+  shares?: (f: Built) => (Record<string, unknown> & { ended?: true; named?: string[]; hours?: { days: number[]; from: string; to: string }; once?: true; used?: true })[];
+  /** The person also runs as a child key minted under one of their own keys, as an app's one-hour key is (Slice 9). */
+  child?: true;
   /** The shares go to a group the person is in, not to the person. */
   group?: true;
   /** The fields its shares hide, by list, in plain words (sharing plan §2.7): what it must never be answered on a row it sees. */
@@ -370,6 +372,30 @@ export const SHAPES: readonly Shape[] = [
     hides: { things: ['earned'], tasks: ['rate'], money: ['amount'] },
     narrowed: true,
   },
+  /* WHEN A SHARE HOLDS (Slice 9): a whole-record share good on Sundays from nine to ten, asked on a Tuesday at noon;
+     a whole-record share good once, asked two days after its first use; each beside Notes, which holds all the time. */
+  {
+    id: 'hours',
+    name: 'The whole record in its hours, asked outside them',
+    person: 'p_hrs',
+    shares: () => [
+      { what: { lists: ['notes'] }, can: 'view' },
+      { what: { record: true }, can: 'view', hours: { days: [0], from: '09:00', to: '10:00' } },
+    ],
+    sees: (r) => r.list === 'notes',
+  },
+  {
+    id: 'once',
+    name: 'The whole record once, asked after it ran out',
+    person: 'p_onc',
+    shares: () => [
+      { what: { lists: ['notes'] }, can: 'view' },
+      { what: { record: true }, can: 'view', once: true, used: true },
+    ],
+    sees: (r) => r.list === 'notes',
+  },
+  /* A CHILD KEY OF A GUEST'S OWN KEY, as an app is handed one: it reads what its parent's person reads, and no more. */
+  { id: 'child-token', name: 'A guest on Notes, through a child key', person: 'p_chd', shares: () => [{ what: { lists: ['notes'] }, can: 'view' }], sees: (r) => r.list === 'notes', child: true },
   {
     id: 'comment',
     name: 'Comment on Kiln',
@@ -390,7 +416,9 @@ export const variantsOf = (shape: Shape): readonly Variant[] =>
   shape.id === 'owner'
     ? [...VARIANTS.filter((v) => v !== 'see-as'), 'child-key', 'narrowed-key']
     : shape.shares
-      ? VARIANTS
+      ? shape.child
+        ? [...VARIANTS, 'child-key']
+        : VARIANTS
       : VARIANTS.filter((v) => v !== 'see-as');
 
 export type Fixture = Awaited<ReturnType<typeof build>>;
@@ -532,8 +560,10 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       okValue(await api.groupMember({ group: made.id, person: shape.person, in: true } as never, owner), `group member ${shape.id}`);
       who = { kind: 'group', id: made.id };
     }
-    for (const { ended, named, ...share } of shape.shares(built)) {
-      const made = okValue<{ id: string }>(await api.share({ share: { effect: 'allow', ...share, who, when: { until } } } as never, owner), `share ${shape.id}`);
+    for (const { ended, named, hours, once, used, ...share } of shape.shares(built)) {
+      const when = { until, ...(hours ? { hours } : {}), ...(once ? { once } : {}) };
+      const made = okValue<{ id: string }>(await api.share({ share: { effect: 'allow', ...share, who, when } } as never, owner), `share ${shape.id}`);
+      if (used) sql.exec('UPDATE share SET first_used_at = ? WHERE id = ?', new Date(NOW - 2 * 86_400_000).toISOString(), made.id);
       if (ended) sql.exec('UPDATE share SET starts_at = ?, ends_at = ? WHERE id = ?', new Date(NOW - 30 * 86_400_000).toISOString(), new Date(NOW - 86_400_000).toISOString(), made.id);
       if (named) sql.exec('UPDATE share SET what = ? WHERE id = ?', JSON.stringify({ lists: named }), made.id);
     }
@@ -625,19 +655,21 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
         ctx = as.ctx as CallContext;
       } else if (variant === 'child-key' || variant === 'narrowed-key') {
         /* THE OWNER'S OWN KEYS HELD TO LESS, read as a host reads one: `access` with the key's id, then `heldContext`. A
-           child is minted under a token and acts by its parent's id; a narrowed key names Setups and is still held off it. */
+           child is minted under a token and acts by its parent's id; a narrowed key names Setups and is still held off it.
+           A guest's child key is made the same way, under a key of their own. */
+        const holder = shape.person;
         const id = `t_leak_${++tokens}`;
         const at = new Date(NOW).toISOString();
-        sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, OWNER, `h_${id}`, variant === 'child-key' ? 'write' : 'read', `owner ${variant}`, at);
+        sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, holder, `h_${id}`, variant === 'child-key' ? 'write' : 'read', `${shape.id} ${variant}`, at);
         let key = id;
         if (variant === 'child-key') {
           key = `t_leak_${++tokens}`;
-          sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', key, OWNER, `h_${key}`, 'write', `owner ${variant}`, at);
-          sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, ?, NULL, ?, ?)', key, id, OWNER, at);
-        } else sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, NULL, ?, ?, ?)', id, JSON.stringify({ lists: ['notes', ...PERSONAL] }), OWNER, at);
-        const held = api.kernel.access(OWNER, key) as HeldAccess | null;
-        assert.ok(held !== null, `the owner's ${variant} is on the record`);
-        ctx = { ...heldContext(held), principal: { kind: 'token', id, scope: variant === 'child-key' ? 'write' : 'read', person: OWNER, level: held.level } } as CallContext;
+          sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', key, holder, `h_${key}`, 'write', `${shape.id} ${variant}`, at);
+          sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, ?, NULL, ?, ?)', key, id, holder, at);
+        } else sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, NULL, ?, ?, ?)', id, JSON.stringify({ lists: ['notes', ...PERSONAL] }), holder, at);
+        const held = api.kernel.access(holder, key) as HeldAccess | null;
+        assert.ok(held !== null, `${shape.id}'s ${variant} is on the record`);
+        ctx = { ...heldContext(held), principal: { kind: 'token', id, scope: variant === 'child-key' ? 'write' : 'read', person: holder, level: held.level } } as CallContext;
       } else if (variant !== 'person') {
         const id = `t_leak_${++tokens}`;
         const scope = variant === 'write-token' ? 'write' : 'read';
