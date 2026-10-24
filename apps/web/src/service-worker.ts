@@ -106,11 +106,16 @@ async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: num
     const held = await kept(req.url, now);
     if (held) return held.res;
   }
+  /* SEVERAL READS SENT AS ONE (`reads`) ARE KEPT ONE BY ONE, each under the address it would have been asked at alone,
+     so offline each is answered from the copy as it always was (the client asks them one at a time when `reads` cannot
+     be sent). Its body is read before the network takes it. */
+  const several = kind === 'write' && READS.test(new URL(req.url).pathname) && !req.headers.has('authorization') ? req.clone().text() : null;
   const net = await network(req);
   if (net !== null) {
     const json = (net.headers.get('content-type') ?? '').includes('application/json');
     const keepable = net.ok && net.type === 'basic' && (kind === 'read' ? json : kind !== 'write' && kind !== 'door');
     if (keepable) e.waitUntil(put(kind === 'shell' ? shell() : req.url, net.clone(), now));
+    if (several !== null && net.ok && net.type === 'basic' && json) e.waitUntil(putEach(several, net.clone(), now));
     if (kind === 'shell' && now - swept > HOUR) e.waitUntil(sweep(now));
     return net;
   }
@@ -145,6 +150,30 @@ async function network(req: Request): Promise<Response | null> {
   }
   if (res.status === 401 || accessEnded(res.headers)) await sw.caches.delete(COPY);
   return res;
+}
+
+/** The address several reads are sent to as one, under the session's record or a named one. */
+const READS = /\/api\/reads$/u;
+
+/**
+ * Each read of a `reads` answered 200, kept under the address it names (`at`) as that read asked alone would have been:
+ * only an address this worker would keep a read at (`route` says `read`), and nothing when either body does not parse.
+ */
+async function putEach(asked: Promise<string>, res: Response, now: number): Promise<void> {
+  try {
+    const calls = (JSON.parse(await asked) as { calls?: { at?: unknown }[] }).calls ?? [];
+    const answers = ((await res.json()) as { value?: { answers?: { status?: unknown; body?: unknown }[] } }).value?.answers ?? [];
+    await Promise.all(
+      calls.map((c, i) => {
+        const a = answers[i];
+        if (typeof c.at !== 'string' || a?.status !== 200) return undefined;
+        if (route({ url: c.at, method: 'GET', mode: 'cors', authorised: false }, sw.registration.scope) !== 'read') return undefined;
+        return put(c.at, new Response(JSON.stringify(a.body), { status: 200, headers: { 'content-type': 'application/json' } }), now);
+      }),
+    );
+  } catch {
+    /* A body that is not what `reads` answers keeps nothing; each read is asked alone next time anyway. */
+  }
 }
 
 /** Keep an answer under `key`, stamped with the time it was kept. */

@@ -14,7 +14,7 @@
  * state rather than about whether there is one. `forget` drops the answer after a write that changes it.
  */
 
-import { batchMetrics, batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
+import { batchMetrics, batchReads, batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel/constants';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
@@ -117,6 +117,12 @@ type ShellBase = {
   people: Person[];
   questions: Question[];
   whatsNew: NewsItem[];
+  /**
+   * THE LINES `boot` SAID WERE NEW, as the record sent them, with the cursor they reach (`upTo`): Today's first read keeps
+   * them beside its page and does not ask `whatsNew` for the same lines again (scope 2026-10-24 A16). Absent on a shell no
+   * record answered.
+   */
+  newsLines?: readonly EventLine[];
   sinceCapped: boolean;
   version: number;
   /** Absent means every "Ask BrainDog" affordance is ABSENT, not disabled (23 §8). */
@@ -318,6 +324,8 @@ export function firstOpen(base: string): void {
   batchSchemas(true);
   /* AND THE FIGURES A SCREEN ASKS TOGETHER GO AS ONE `metrics` (the sidebar's one a project, a project page's own). */
   batchMetrics(true);
+  /* AND EVERY READ A SCREEN ASKS AT ONCE GOES AS ONE `reads` (Today's tiles, a project's blocks, the sidebar's lists). */
+  batchReads(true);
   const url = `${base}/api/schemas?every=true`;
   const held = (globalThis as { __bdSchemas?: { url?: unknown; at?: unknown } }).__bdSchemas;
   if (!held || held.url !== url || !(held.at instanceof Promise)) return;
@@ -1084,6 +1092,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */
     questions: (b.waiting ?? []).map((w, i) => ({ id: w.id, title: w.question || w.id, cost: '', rank: i + 1, opened: w.opened_at, options: [] })),
     whatsNew: newsOf(b.whatsNew?.events ?? [], person, new Map(Object.entries(b.names ?? {}))),
+    newsLines: b.whatsNew?.events ?? [],
     sinceCapped: b.whatsNew?.sinceCapped ?? false,
     /* THE NEWEST LINE THIS CALLER MAY SEE, which is as near the record's version as `boot` says. A member held to named
        lists is sent a cursor and no number, and 0 is what "names no event" already means. */

@@ -1378,6 +1378,44 @@ const NO_SCHEMAS = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
 const TRANSIENT = new Set(['UNREACHABLE', 'INTERNAL', 'RECORD_UNAVAILABLE', 'RATE_LIMITED']);
 
 /**
+ * READS ASKED TOGETHER ARE SENT TOGETHER (`reads`, scope 2026-10-24 A12), for an app that turns it on (`batchReads`).
+ *
+ * WHY. Today asked about thirty reads of his record as it opened, and each was its own request: through the doors in
+ * front of the record (the session, the Directory, the record's own three checks of who is asking), then the record's
+ * one thread, behind every other. The record answered most in 2 to 40 ms and the front saw 100 to 500. A read asked
+ * while others are going out now waits a moment for them (`READ_WAVE_QUIET_MS`, never more than `READ_WAVE_MOST_MS`),
+ * and they go as one `reads`; each is answered as its own route answers it, with its status, so nothing reads a
+ * difference. One read by itself goes as it always did.
+ *
+ * WHAT NEVER WAITS: the version poll (`ALONE`), which must not sit behind a screen's reads, `boot`, and a write. A read
+ * kept at this version is answered from the kept copy before it gets here (`keptOr`), so a revisit pays nothing.
+ *
+ * WHEN `reads` FAILS: a host without it is asked one read a call from then on; one this browser could not reach is asked
+ * one read a call now, which is what lets the service worker answer each from its copy offline; any other refusal (a
+ * record still busy after its tries, a sign-in gone) is every read's answer, and is never fanned out into the requests
+ * the batch was there to save (23 Oct, a failed wave of 28 became 28 more requests into the record that had failed it).
+ */
+let READ_BATCHING = false;
+/** Send the reads a screen asks at once as one request from now on, or each by itself again. */
+export function batchReads(on: boolean): void {
+  READ_BATCHING = on;
+}
+/** How long a wave waits with nothing new joining it before it goes. */
+export const READ_WAVE_QUIET_MS = 8;
+/** The longest a wave waits from its first read, however many keep joining. */
+export const READ_WAVE_MOST_MS = 30;
+/** The most reads one `reads` carries, as the record takes them (`READS_MOST`). */
+const READS_WAVE_MOST = 32;
+/** The reads that always go by themselves. */
+const ALONE = new Set(['version', 'boot', 'reads']);
+type ReadAsk = { name: string; url: URL; writes: boolean; sent: string | undefined; args: Record<string, unknown>; done: (r: Result<unknown>) => void };
+type ReadWave = { asks: ReadAsk[]; quiet: ReturnType<typeof setTimeout> | undefined; most: ReturnType<typeof setTimeout> | undefined; hold: AbortController };
+/** The wave filling now, by the fetch it will go through and then the host and token. */
+let READ_WAVES = new WeakMap<object, Map<string, ReadWave>>();
+/** The hosts that answered `reads` as a method they do not have. */
+let NO_READS = new Set<string>();
+
+/**
  * The app's word on the record's declarations, or `null` where it has none to give.
  *
  * A KEPT SCHEMA WENT STALE ON EVERY MOVE OF THE RECORD'S VERSION, and a lived-in record moves it with every row an agent
@@ -1425,6 +1463,8 @@ let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
 
 /** Drop every kept schema, as the app's `forget` does on a record switch and a sign-out, so the next ask goes out. */
 export function forgetSchemas(): void {
+  READ_WAVES = new WeakMap();
+  NO_READS = new Set();
   METRIC_WAVES = new Map();
   NO_METRICS = new Set();
   SCHEMAS = new WeakMap();
@@ -1894,30 +1934,30 @@ export function createClient(options: ClientOptions) {
        lands, if nothing moved while it was out. */
     const waved = how.wave === true && typeof args.metric === 'string' ? () => inMetricWave(args.metric as string) as Promise<Result<T>> : null;
     if (KEEPING && KEEPS.has(name) && (!WRITES.has(name) || POST_READS.has(name)) && !outlives && how.bare !== true) {
-      const ask = waved ?? (() => (sent === undefined ? shared<T>(name, url, writes, sent, outlives) : send<T>(name, url, writes, sent, outlives)));
+      const ask = waved ?? (() => (sent === undefined ? shared<T>(name, url, writes, sent, outlives, args) : send<T>(name, url, writes, sent, outlives, args)));
       return keptOr<T>(`${base} ${options.token ?? ''}`, `${url.toString()} ${options.token ?? ''} ${sent ?? ''}`, MARKED.has(name), ask);
     }
 
     /* A READ ALREADY OUT IS NOT SENT TWICE (`FLYING`). The first caller gets the answer itself and every other one its
        own copy, so a reader that sorts or trims the rows it was handed cannot reach into another's. */
     if (waved !== null) return waved();
-    if (sent === undefined) return shared<T>(name, url, writes, sent, outlives);
+    if (sent === undefined) return shared<T>(name, url, writes, sent, outlives, args);
     /* A WRITE GOING OUT ENDS THE SHARING: a read asked after it must not be handed one sent before it. */
     if (WRITES.has(name) && !POST_READS.has(name)) {
       FLYING.get(doFetch)?.clear();
       OUT.clear();
     }
-    return send<T>(name, url, writes, sent, outlives);
+    return send<T>(name, url, writes, sent, outlives, args);
   }
 
   /** A read sent once while it is out, every other asker handed its own copy (`FLYING`). */
-  function shared<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
+  function shared<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean, args?: Record<string, unknown>): Promise<Result<T>> {
     let byFetch = FLYING.get(doFetch);
     if (byFetch === undefined) FLYING.set(doFetch, (byFetch = new Map()));
     const key = `${JSON.stringify(READER)} ${url.toString()} ${options.token ?? ''}`;
     const out = byFetch.get(key);
     if (out !== undefined) return out.then((r) => structuredClone(r) as Result<T>);
-    const flight = send<T>(name, url, writes, sent, outlives);
+    const flight = send<T>(name, url, writes, sent, outlives, args);
     const flights = byFetch;
     flights.set(key, flight as Promise<Result<unknown>>);
     void flight.finally(() => {
@@ -1926,7 +1966,80 @@ export function createClient(options: ClientOptions) {
     return flight;
   }
 
-  async function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
+  /** A request out now, or a read put in the wave filling now (`batchReads`) when it may wait for one. */
+  function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean, args?: Record<string, unknown>): Promise<Result<T>> {
+    const read = !WRITES.has(name) || POST_READS.has(name);
+    const host = `${base} ${options.token ?? ''}`;
+    if (READ_BATCHING && read && args !== undefined && !outlives && !ALONE.has(name) && !NO_READS.has(host) && !LEAVING) return inReadWave<T>(host, { name, url, writes, sent, args });
+    return sendNow<T>(name, url, writes, sent, outlives);
+  }
+
+  /** One read into the wave filling for `host`, which goes once nothing has joined it for a moment. */
+  function inReadWave<T>(host: string, ask: Omit<ReadAsk, 'done'>): Promise<Result<T>> {
+    return new Promise((done) => {
+      let byHost = READ_WAVES.get(doFetch);
+      if (byHost === undefined) READ_WAVES.set(doFetch, (byHost = new Map()));
+      const waves = byHost;
+      let wave = waves.get(host);
+      const go = (w: ReadWave): void => {
+        if (waves.get(host) !== w) return;
+        waves.delete(host);
+        clearTimeout(w.quiet);
+        clearTimeout(w.most);
+        /* THE WAVE COUNTS AS A CALL OUT WHILE IT FILLS, so the page is not quiet over reads that have not gone yet. */
+        if (OUTGOING.delete(w.hold)) tell();
+        void sendReadWave(w.asks);
+      };
+      if (wave === undefined) {
+        const made: ReadWave = { asks: [], quiet: undefined, most: undefined, hold: new AbortController() };
+        made.most = setTimeout(() => go(made), READ_WAVE_MOST_MS);
+        OUTGOING.add(made.hold);
+        tell();
+        waves.set(host, (wave = made));
+      }
+      const w = wave;
+      w.asks.push({ ...ask, done: done as (r: Result<unknown>) => void });
+      clearTimeout(w.quiet);
+      w.quiet = setTimeout(() => go(w), READ_WAVE_QUIET_MS);
+      if (w.asks.length >= READS_WAVE_MOST) go(w);
+    });
+  }
+
+  /** A wave of reads, sent: by itself for one, else as one `reads`, each answered as it would have been alone. */
+  async function sendReadWave(asks: readonly ReadAsk[]): Promise<void> {
+    const alone = (a: ReadAsk): Promise<void> =>
+      sendNow<unknown>(a.name, a.url, a.writes, a.sent, false).then(a.done, (e) => a.done({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }));
+    if (asks.length === 1) return alone(asks[0]!);
+    if (LEAVING) {
+      for (const a of asks) a.done({ ok: false, refusal: unreachable('This page is being left.') });
+      return;
+    }
+    /* A READ SENT AS AN ADDRESS LEAVES OUT WHAT IS ABSENT, as a query string does (`call`); its address goes too, so the
+       service worker can keep each answer under it, as it keeps a read asked by itself. */
+    const calls = asks.map((a) => ({
+      method: a.name,
+      args: a.writes ? a.args : Object.fromEntries(Object.entries(a.args).filter(([, v]) => v !== undefined && v !== null)),
+      ...(a.writes ? {} : { at: a.url.toString() }),
+    }));
+    const out = (await sendNow<{ answers?: { status: number; body: unknown }[] }>('reads', new URL(`${base}/api/reads`), true, JSON.stringify({ calls }), false).catch(
+      (e: unknown): Result<never> => ({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }),
+    ));
+    const answers = out.ok ? out.value?.answers : undefined;
+    if (out.ok && Array.isArray(answers) && answers.length === asks.length) {
+      asks.forEach((a, i) => a.done(answered<unknown>(answers[i]!.status, answers[i]!.body)));
+      return;
+    }
+    const refusal = !out.ok && 'refusal' in out ? out.refusal : undefined;
+    /* A HOST WITHOUT `reads` IS ASKED ONE READ A CALL FROM NOW ON; ONE NOT REACHED, ONE READ A CALL NOW. */
+    if (refusal === undefined || NO_SCHEMAS.has(refusal.code) || refusal.code === 'UNREACHABLE') {
+      if (refusal !== undefined && NO_SCHEMAS.has(refusal.code)) NO_READS.add(`${base} ${options.token ?? ''}`);
+      await Promise.all(asks.map(alone));
+      return;
+    }
+    asks.forEach((a, i) => a.done(i === 0 ? out : (structuredClone(out) as Result<unknown>)));
+  }
+
+  async function sendNow<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
     if (LEAVING && !outlives) return { ok: false, refusal: unreachable('This page is being left.') };
     let res: Response;
     const leaving = outlives ? null : new AbortController();
