@@ -633,6 +633,11 @@ export type Version = {
   primitives: number;
   app: string | null;
   slash: boolean;
+  /**
+   * The lists that moved since the version asked about (`since`), `[]` when none did and `null` when the record cannot
+   * say; absent when nothing was asked, or from an older host. The tab keeps what it read over the rest (`keptOr`).
+   */
+  moved?: string[] | null;
 };
 
 /** `listDevices` and `revokeDevice`: one device grant, by its handle and never its poll id. See `DeviceRow` in `@braindog/kernel`. */
@@ -1585,7 +1590,26 @@ let REGRANTS = 0;
  * never handed to another in the same tab, and naming somebody else drops what was kept for the last.
  */
 let READER = '';
-type KeptRead = { version: number | null; sent: number; marks: number; at: number; marked: boolean; answer: Result<unknown> };
+/**
+ * `lists` IS WHAT THE READ IS OVER, when it is over one list (`list`, `get` and the rest that name a `register`), and
+ * `null` for a read over anything else (a page, a figure, the questions): a version that moved over other lists keeps
+ * the first and drops the second (`keepOver`). `heard` is the record it was read from.
+ */
+type KeptRead = { version: number | null; sent: number; marks: number; at: number; marked: boolean; answer: Result<unknown>; lists: readonly string[] | null; heard: string };
+
+/** The reads over one list, which a version that moved over other lists leaves kept (scope 2026-10-24 A15). */
+const OVER_ONE_LIST = new Set(['list', 'get', 'countBy', 'history', 'backlinks']);
+
+/**
+ * The record `heard` moved from `from` to `to` over `moved` alone: every read kept at `from` over one list that is not
+ * among them is the record's at `to` too, and stays kept; one over a moved list, or over anything else, is dropped by
+ * the version it stands at, as before. Nothing is kept on when the record could not say what moved.
+ */
+function keepOver(heard: string, from: number, to: number, moved: readonly string[]): void {
+  const gone = new Set(moved);
+  for (const kept of READS.values())
+    if (kept.heard === heard && kept.version === from && kept.lists !== null && !kept.lists.some((l) => gone.has(l))) kept.version = to;
+}
 
 /** Whether a read kept at `kept`, asked at `at`, is the record's at the version the tab has heard now. */
 function sameVersion(heard: string, kept: number | null, at: number): boolean {
@@ -1608,7 +1632,7 @@ let MARKS = 0;
  * The kept answer for `key` on the record `heard` names, or `ask`ed and kept once it lands if nothing moved while it was
  * out. `marked`: the answer may carry the reader's mark (`carriesMark`).
  */
-function keptOr<T>(heard: string, asked: string, marked: boolean, ask: () => Promise<Result<T>>): Promise<Result<T>> {
+function keptOr<T>(heard: string, asked: string, marked: boolean, ask: () => Promise<Result<T>>, lists: readonly string[] | null = null): Promise<Result<T>> {
   const reader = READER;
   const regrants = REGRANTS;
   const key = `${JSON.stringify(reader)} ${asked}`;
@@ -1640,7 +1664,7 @@ function keptOr<T>(heard: string, asked: string, marked: boolean, ask: () => Pro
     const carries = marked && carriesMark(got.value);
     if (carries && MARKS !== at.marks) return;
     READS.delete(key);
-    READS.set(key, { ...at, marked: carries, answer: structuredClone(got) });
+    READS.set(key, { ...at, marked: carries, answer: structuredClone(got), lists, heard });
     if (READS.size > KEPT_READS_MOST) READS.delete(READS.keys().next().value!);
   });
   return flight;
@@ -1941,7 +1965,8 @@ export function createClient(options: ClientOptions) {
     const waved = how.wave === true && typeof args.metric === 'string' ? () => inMetricWave(args.metric as string) as Promise<Result<T>> : null;
     if (KEEPING && KEEPS.has(name) && (!WRITES.has(name) || POST_READS.has(name)) && !outlives && how.bare !== true) {
       const ask = waved ?? (() => (sent === undefined ? shared<T>(name, url, writes, sent, outlives, args) : send<T>(name, url, writes, sent, outlives, args)));
-      return keptOr<T>(`${base} ${options.token ?? ''}`, `${url.toString()} ${options.token ?? ''} ${sent ?? ''}`, MARKED.has(name), ask);
+      const over = OVER_ONE_LIST.has(name) && typeof args.register === 'string' ? [args.register] : null;
+      return keptOr<T>(`${base} ${options.token ?? ''}`, `${url.toString()} ${options.token ?? ''} ${sent ?? ''}`, MARKED.has(name), ask, over);
     }
 
     /* A READ ALREADY OUT IS NOT SENT TWICE (`FLYING`). The first caller gets the answer itself and every other one its
@@ -2260,13 +2285,20 @@ export function createClient(options: ClientOptions) {
     boot: () => call<Boot>('boot'),
     version: async () => {
       const asked = Date.now();
-      const out = await call<Version>('version');
+      const heard = `${base} ${options.token ?? ''}`;
+      /* WHAT MOVED SINCE THE VERSION THIS TAB HEARD LAST is asked with it, while reads are kept, so a move over other lists
+         drops nothing kept over these (`keepOver`). */
+      const since = KEEPING ? HEARD.get(heard) : undefined;
+      const out = await call<Version>('version', since === undefined ? {} : { since });
       if (out.ok && typeof out.value.version === 'number') {
+        const moved = out.value.moved;
+        if (since !== undefined && HEARD.get(heard) === since && Array.isArray(moved) && out.value.version !== since) keepOver(heard, since, out.value.version, moved);
         const store = schemas();
-        /* THE FIRST VERSION HEARD names what was asked before it, the boot's schemas, so they are not all asked again. */
+        /* THE FIRST VERSION HEARD names what was asked before it, the boot's schemas, so they are not all asked again. AND A
+           MOVE THE RECORD SAYS WAS OVER ROWS ALONE CHANGED NO DECLARATION, so the kept schemas stand at the new one. */
         if (store.version === null) for (const kept of store.lists.values()) if (kept.version === null) kept.version = out.value.version;
+        if (since !== undefined && store.version === since && Array.isArray(moved)) for (const kept of store.lists.values()) if (kept.version === since) kept.version = out.value.version;
         store.version = out.value.version;
-        const heard = `${base} ${options.token ?? ''}`;
         if (!HEARD.has(heard)) FIRST.set(heard, { asked, version: out.value.version });
         HEARD.set(heard, out.value.version);
         /* A GRANT THAT MOVED DROPS EVERY KEPT READ, whatever the version says: they were held to what was held before. */
