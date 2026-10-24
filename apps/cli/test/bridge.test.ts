@@ -25,7 +25,7 @@ import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { openKeyStore, recordKeys } from '../../selfhost/src/keys.ts';
 import { start } from '../../selfhost/src/server.ts';
 import { cacheFile, readDoorCache, writeDoorCache } from '../src/bridge-cache.ts';
-import { attaches, linesForModel, mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
+import { attaches, linesForModel, mayHaveLeft, namedIn, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
 import { readSession, sessionPath, writeSession } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
@@ -610,4 +610,17 @@ test('CLAUDE CODE IS HANDED THE LINES, not the JSON copy it would give its model
   assert.deepEqual(linesForModel(card, code, call()), card);
   const refusal = { ...reply, result: { ...answer, isError: true } };
   assert.deepEqual(linesForModel(refusal, code, call()), refusal);
+});
+
+test('A CLIENT THAT SAYS HELLO WITH server/discover is named from its _meta, so Claude Code still gets the lines', async (t) => {
+  const s = await stack(t);
+  const b = bridge({ key: s.base, base: s.base, token: s.serverKey }, s.dir, watched().fetch);
+  const meta = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientInfo': { name: 'claude-code', version: '2.1.310' } };
+  await b.ask('server/discover', { _meta: meta });
+  const call = await b.ask('tools/call', { name: 'list', arguments: { register: 'things' }, _meta: meta });
+  assert.equal(call.result?.structuredContent, undefined, 'the JSON copy went to Claude Code');
+  assert.ok(textOf(call).includes('Kiln'), textOf(call));
+  assert.deepEqual(namedIn({ method: 'tools/call', params: { _meta: meta } }), { name: 'claude-code', version: '2.1.310' });
+  assert.equal(namedIn({ method: 'tools/call', params: {} }), null);
+  await b.end();
 });

@@ -261,6 +261,20 @@ export function linesForModel(reply: Reply, client: ClientInfo, message: Message
   return { ...reply, result: rest };
 }
 
+/**
+ * The client as a 2026-07-28 request names itself, in `_meta['io.modelcontextprotocol/clientInfo']`, or `null`.
+ *
+ * A CLIENT OF THAT REVISION NEVER SENDS `initialize`, so its name was never read and `linesForModel` never knew it was
+ * Claude Code: a session started with `claude -p` on 24 Oct had its `context` handed to the model as the JSON copy, not
+ * the card's lines (H3). Every request carries the name, so the bridge reads it there too.
+ */
+export function namedIn(message: unknown): ClientInfo | null {
+  if (!isObject(message) || !isObject(message.params) || !isObject(message.params._meta)) return null;
+  const info = message.params._meta['io.modelcontextprotocol/clientInfo'];
+  if (!isObject(info) || typeof info.name !== 'string' || info.name.trim() === '') return null;
+  return { name: info.name, ...(typeof info.version === 'string' ? { version: info.version } : {}) };
+}
+
 /** A tool call refused, in the shape the host answers one: the refusal as the text, and whole beside it. */
 const toolRefusal = (id: Id, refusal: Refusal, version: string | undefined): Reply => ({
   jsonrpc: '2.0',
@@ -783,7 +797,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       track(send({ jsonrpc: '2.0', id: null, error: { code, message: 'This line is not JSON. Send one JSON-RPC message per line.' } }));
       continue;
     }
-    const said = helloOf(message);
+    const said = helloOf(message) ?? namedIn(message);
     if (said !== null) client = said;
     /* WITH THE CHANNEL ON, THE HANDSHAKE ASKS FOR A REVISION CLAUDE CODE DELIVERS A CHANNEL ON (see the top). */
     if (channel) message = channelHello(message);
