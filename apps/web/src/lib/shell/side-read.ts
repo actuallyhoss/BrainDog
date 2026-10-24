@@ -9,7 +9,7 @@
 import { createClient } from '@braindog/client';
 
 import { latesOf } from '../home/card-late.ts';
-import { hueOf, projectsOf, type CardDecl, type CardRow } from '../home/project-cards.ts';
+import { drawnRead, hueOf, projectsOf, type CardDecl, type CardRow } from '../home/project-cards.ts';
 import { REGISTERS } from '../record/held.ts';
 import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
@@ -97,7 +97,8 @@ async function readSideOnce(base: string, lists: readonly { id: string }[]): Pro
     if (lists.some((l) => REGISTERS[l.id] === undefined)) throw new NotReached();
     return null;
   }
-  const out = await client.list({ register: decl.id, limit: READ }).catch(() => null);
+  /* ONLY THE FIELDS A ROW IS DRAWN FROM (`drawnRead`), never its notes. */
+  const out = await client.list(drawnRead(decl, READ)).catch(() => null);
   if (out === null || (!out.ok && (!('refusal' in out) || AGAIN.has(out.refusal.code)))) throw new NotReached();
   if (!out.ok) return null;
   const state = decl.state ? (decl.fields.find((f) => f.id === decl.state) as StateField | undefined) : undefined;

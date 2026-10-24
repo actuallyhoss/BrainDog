@@ -11,7 +11,7 @@ import { REGISTERS } from '../record/held.ts';
 import { learnRowPages } from '../record/row-href.ts';
 import type { RegisterDecl } from '../record/schema.ts';
 import { cardKpiOf, withKpis, type KpiAnswered } from './card-kpi.ts';
-import { DESK_MOST, agentsOn, cardsOf, trendsOf, projectsOf, type CardDecl } from './project-cards.ts';
+import { DESK_MOST, agentsOn, cardsOf, drawnRead, trendsOf, projectsOf, type CardDecl } from './project-cards.ts';
 
 const decl: CardDecl = {
   id: 'ventures',
@@ -210,4 +210,12 @@ test('a key number nothing has arrived for leaves the card as it was', () => {
   const { cards } = cardsOf(decl, [{ seq: 1, id: 'row-kiln', fields: { name: 'Kiln', lane: 'earning' } }]);
   assert.equal(cardKpiOf({ ...revenue, points: [] }, at), null);
   assert.equal(withKpis(cards, [{ ...revenue, points: [] }], at)[0]?.kpi, null);
+});
+
+test('THE SIDEBAR READS A PROJECT BY THE FIELDS IT DRAWS, never its notes: name, mark, hue, lane and next step, as declared', () => {
+  const full: CardDecl = { ...decl, fields: ['name', 'mark', 'hue', 'lane', 'next', 'about', 'notes'].map((id) => ({ id, type: 'text' })) };
+  assert.deepEqual(drawnRead(full, 500), { register: 'ventures', limit: 500, fields: ['name', 'mark', 'hue', 'lane', 'next'] });
+  /* A FIELD THE LIST DOES NOT DECLARE IS NOT ASKED, and a list that declares none of them is read as before. */
+  assert.deepEqual(drawnRead(decl, 500), { register: 'ventures', limit: 500, fields: ['name'] });
+  assert.deepEqual(drawnRead({ ...decl, title: 'title', fields: [] }, 500), { register: 'ventures', limit: 500 });
 });

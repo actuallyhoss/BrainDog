@@ -203,6 +203,18 @@ export function lifeOf(card: Pick<ProjectCard, 'worked' | 'last' | 'moved'>, age
 }
 
 /**
+ * The read of every project the sidebar draws, by the fields a row of it is drawn from: its name, mark, hue, lane and
+ * next step, each row keeping its number and id. Read whole, his 27 projects were 468 KB at every open, nearly all of it
+ * their notes. ONE SHAPE FOR THE SIDEBAR AND THE WEEK'S LATE WORK (`card-late.ts`), which reads the same rows for their
+ * ids, so the two are one read kept by the version, as they were while both read the rows whole.
+ */
+export function drawnRead(decl: Pick<CardDecl, 'id' | 'title' | 'state' | 'identity' | 'fields'>, limit: number): { register: string; limit: number; fields?: string[] } {
+  const drawn = [decl.title, decl.identity?.mark, decl.identity?.accent ?? 'hue', decl.state, 'next'];
+  const fields = [...new Set(drawn)].filter((f): f is string => typeof f === 'string' && decl.fields.some((d) => d.id === f));
+  return { register: decl.id, limit, ...(fields.length > 0 ? { fields } : {}) };
+}
+
+/**
  * The row's hue where it holds a number, else the hue its name is drawn in on the rail and in Today's tasks (`hueFor`);
  * an empty field is not hue 0. EVERY PROJECT IN ITS OWN COLOUR, SINCE the audit of 22 October (U5, U-B13): most
  * projects on a record keep no hue, so five of eight cards on Today were grey on grey, and a project's dot in a task

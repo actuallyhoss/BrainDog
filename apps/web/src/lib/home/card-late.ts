@@ -22,6 +22,7 @@ import { createClient } from '@braindog/client';
 import { learn } from '../record/remote.ts';
 import { viaOf } from '../../routes/r/[register]/[seq]/figures.ts';
 import { cardsHeld } from './today-read.ts';
+import { drawnRead, type CardDecl } from './project-cards.ts';
 
 /** What this tab has asked, so a list's declaration is asked for once. */
 const asked = new Map<string, Promise<void>>();
@@ -64,7 +65,9 @@ async function rowLates(client: ReturnType<typeof createClient>, projects: strin
   );
   const links = reads.flat().filter((v): v is string => typeof v === 'string' && v !== '');
   if (links.length === 0) return out;
-  const all = await client.list({ register: projects, limit: PROJECTS_READ }).catch(() => null);
+  /* AS THE SIDEBAR READS THEM (`drawnRead`), so the week's ids are the sidebar's kept read and never a second one. */
+  const decl = REGISTERS[projects] as unknown as CardDecl | undefined;
+  const all = await client.list(decl ? drawnRead({ ...decl, id: projects }, PROJECTS_READ) : { register: projects, limit: PROJECTS_READ }).catch(() => null);
   const seqOf = new Map(all?.ok ? (all.value.rows as { id?: unknown; seq?: unknown }[]).flatMap((r) => (typeof r.id === 'string' && typeof r.seq === 'number' ? [[r.id, r.seq] as const] : [])) : []);
   for (const link of links) {
     const spoken = new RegExp(`^${projects}#(\\d+)$`, 'u').exec(link);
