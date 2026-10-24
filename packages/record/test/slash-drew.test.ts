@@ -151,3 +151,64 @@ test('KEEPING A PAGE’S CALENDAR WRITES THE BLOCK ON THAT PAGE', async () => {
   );
   sql.close();
 });
+
+test('MARSH AND ENCORE ARE EACH OFFERED THEIR OWN PLAN, ONE A DAY, AND EACH KEEPS ITS OWN SHAPE', async () => {
+  const { api, sql, day } = await record();
+  /* ENCORE: ONE STAGE AND ITS RELEASES ON DAYS, so its plan is its roadmap where the plan of Marsh is its road. */
+  value(api.kernel.create('projects', { name: 'Encore' }, { actor: 'p_owner' }));
+  value(api.kernel.create('stages', { name: 'Payroll', project: 'projects#2', order: 0 }, { actor: 'p_owner' }));
+  for (let i = 1; i <= 7; i++) value(api.kernel.create('jobs', { what: `Encore ${i}`, project: 'projects#2', due: `2026-12-0${i}` }, { actor: 'p_owner' }));
+
+  const first = drew((await api.slashTick()) as Ticked);
+  assert.deepEqual(
+    first.map((f) => f.question),
+    ["I drew Encore's plan as a roadmap. Keep it?"],
+  );
+  value(await api.decide({ id: first[0]!.id, decide: { option: 'keep', reason: 'yes' } }, owner));
+  day(1);
+  const second = drew((await api.slashTick()) as Ticked);
+  assert.deepEqual(
+    second.map((f) => f.question),
+    ["I drew Marsh's plan as a path of stages. Keep it?"],
+  );
+  value(await api.decide({ id: second[0]!.id, decide: { option: 'keep', reason: 'yes' } }, owner));
+
+  const kept = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'projects' }, owner)).rows.map((r) => [r.fields.name, r.fields.drawn_as]);
+  assert.deepEqual(kept.sort(), [
+    ['Encore', 'roadmap'],
+    ['Marsh', 'path'],
+  ]);
+  /* KEPT, BOTH HOLD STILL: the next day draws no plan again, only the page's calendar. */
+  day(2);
+  assert.deepEqual(
+    drew((await api.slashTick()) as Ticked).map((f) => f.question),
+    ['I drew Jobs on Desk as a calendar. Keep it?'],
+  );
+  sql.close();
+});
+
+test('A PLAN KEPT AS ITS ROAD WITH NO STAGES LEFT IS REDRAWN AS WHAT IT HOLDS NOW, SAYING WHAT WAS KEPT', async () => {
+  const { api, sql, day } = await record();
+  /* KILN WAS KEPT AS ITS STAGES AND HAS NONE, only work on days, so its page draws no plan at all. */
+  value(api.kernel.create('projects', { name: 'Kiln', drawn_as: 'path' }, { actor: 'p_owner' }));
+  for (let i = 1; i <= 9; i++) value(api.kernel.create('jobs', { what: `Kiln ${i}`, project: 'projects#2', due: `2026-12-0${i}` }, { actor: 'p_owner' }));
+  /* THE PLAN OF KILN IS THE STRONGER TODAY, nine things on days against three stages. */
+  const kiln = drew((await api.slashTick()) as Ticked);
+  assert.deepEqual(
+    kiln.map((f) => f.question),
+    ["I drew Kiln's plan as a roadmap. Keep it?"],
+  );
+  const q = sql.one<{ cause: string; body: string }>('SELECT cause, body FROM suggestion WHERE id = ?', kiln[0]!.id)!;
+  assert.equal(q.cause, 'drew:plan:projects#2:from-path:roadmap');
+  assert.match(JSON.stringify((JSON.parse(q.body) as { why: unknown }).why), /Kiln's plan was kept as its stages, and it has none now/u);
+  value(await api.decide({ id: kiln[0]!.id, decide: { option: 'keep', reason: 'yes' } }, owner));
+  const row = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'projects' }, owner)).rows.find((r) => r.fields.name === 'Kiln')!;
+  assert.equal(row.fields.drawn_as, 'roadmap');
+  /* AND THE ONE FOR MARSH COMES THE NEXT DAY. */
+  day(1);
+  assert.deepEqual(
+    drew((await api.slashTick()) as Ticked).map((f) => f.question),
+    ["I drew Marsh's plan as a path of stages. Keep it?"],
+  );
+  sql.close();
+});

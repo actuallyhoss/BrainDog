@@ -89,3 +89,25 @@ test('A PROJECT WITH BOTH DRAWS BOTH, AND A SHAPE KEPT FOR IT DRAWS ONLY THAT ON
   const roadmap = opened(k, 'Harbour');
   assert.deepEqual([drawn(headed(roadmap, 'The road')[0]), drawn(headed(roadmap, 'The plan')[0])], [false, true]);
 });
+
+test('TWO PROJECTS KEPT TWO WAYS DRAW TWO PLANS: Marsh its road, Encore its roadmap (C19)', async () => {
+  const k = await seeded();
+  const project = (name: string, drawn_as: string): string => {
+    const made = k.create('things', { name, lane: 'building' }, PERSON);
+    assert.ok(made.ok, sayOf(made));
+    const spoken = `things#${made.value.seq}`;
+    assert.ok(k.create('stages', { name: 'First', thing: spoken, order: 1 }, PERSON).ok);
+    assert.ok(k.create('stages', { name: 'Second', thing: spoken, order: 2 }, PERSON).ok);
+    assert.ok(k.create('tasks', { what: `Ship ${name}`, thing: spoken, state: 'open', by: '2026-11-02' }, PERSON).ok);
+    assert.ok(k.update('things', spoken, { drawn_as }, PERSON).ok);
+    return spoken;
+  };
+  project('Marsh', 'path');
+  project('Encore', 'roadmap');
+  const shapes = (name: string): boolean[] => {
+    const p = opened(k, name);
+    return [drawn(headed(p, 'The road')[0]), drawn(headed(p, 'The plan')[0])];
+  };
+  assert.deepEqual(shapes('Marsh'), [true, false]);
+  assert.deepEqual(shapes('Encore'), [false, true]);
+});

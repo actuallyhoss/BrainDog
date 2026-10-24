@@ -470,8 +470,17 @@ export const DREW_TIER = { plan: 2000, dated: 1000 } as const;
 /** What a plan shape is called in a sentence. */
 const PLAN_SAY: Readonly<Record<PlanShape, string>> = { path: 'a path of stages', roadmap: 'a roadmap', timeline: 'a timeline', board: 'a board' };
 
+/** What a kept plan shape is said as once the project holds nothing it draws. */
+const WAS_SAY: Readonly<Record<PlanShape, string>> = {
+  path: 'its stages, and it has none now',
+  roadmap: 'a roadmap, and nothing open on it has a day now',
+  timeline: 'a timeline, and nothing open on it falls on a day now',
+  board: 'a board, and nothing on it is open now',
+};
+
 /** The key a drawing is asked under, which is never asked again once filed. */
-export const drewKey = (u: Unpictured): string => (u.kind === 'dated' ? `drew:${u.page}:calendar:${u.list}` : `drew:plan:${u.list}#${u.seq}:${u.shape}`);
+export const drewKey = (u: Unpictured): string =>
+  u.kind === 'dated' ? `drew:${u.page}:calendar:${u.list}` : `drew:plan:${u.list}#${u.seq}:${u.was === null ? '' : `from-${u.was}:`}${u.shape}`;
 
 /**
  * The one drawing to offer today, or `null`: none while one waits or once one was filed today, none for a key asked
@@ -503,7 +512,7 @@ export function drewOffer(signals: { nowMs: number; unpictured: readonly Unpictu
         basis: `${u.shape}@${u.rows}`,
         lapses,
         title: `I drew ${u.name}'s plan as ${PLAN_SAY[u.shape]}. Keep it?`,
-        why: planWhy(u.name, u.shape, u.rows),
+        why: u.was === null ? planWhy(u.name, u.shape, u.rows) : `${u.name}'s plan was kept as ${WAS_SAY[u.was]}. ${planWhy(u.name, u.shape, u.rows)}`,
         change: { kind: 'block', page: `${u.list}#${u.seq}`, list: u.list, block: u.shape, ...drafted },
       };
     })
@@ -555,6 +564,54 @@ export function planRows(f: PlanFacts, shape: PlanShape): number {
   if (shape === 'path') return f.stages;
   if (shape === 'roadmap' || shape === 'timeline') return f.spans + f.moments;
   return f.undated;
+}
+
+/**
+ * What a project's page draws its plan as, from what it holds and the shape kept for it: the kept shape, else its road
+ * where it has stages, its roadmap where it has dated work, BOTH where it has both, and nothing where it has neither
+ * (`packages/seed/src/modules/portfolio.ts` `projectTemplate`, whose road and roadmap each step aside only for the other
+ * kept alone).
+ */
+export const planDrawnOf = (f: PlanFacts, chosen: PlanShape | null): PlanShape | 'both' | null => {
+  if (chosen !== null) return chosen;
+  const road = f.stages > 0;
+  const dated = f.spans + f.moments > 0;
+  return road && dated ? 'both' : road ? 'path' : dated ? 'roadmap' : null;
+};
+
+/** Whether a plan kept in `shape` draws anything of what the project holds now. */
+const planDraws = (f: PlanFacts, shape: PlanShape): boolean => planRows(f, shape) > 0;
+
+/**
+ * A shape the project list cannot keep, said as the nearest one it can: moments on a timeline are lines on their day
+ * in a roadmap, which draws work with no effort that way. A board has no nearer shape, so none.
+ */
+const NEARER: Readonly<Record<PlanShape, PlanShape | null>> = { path: null, roadmap: null, timeline: 'roadmap', board: null };
+
+/**
+ * THE ONE PLAN THE DESIGN AGENT WOULD DRAW FOR THIS PROJECT, or `null` when what it draws now is what it would (C19,
+ * §45 "Each project's roadmap is designed for that project"). Read from that project's own facts and nothing else, so
+ * Marsh, with its stages, is offered its road and Encore, with its releases on days, its roadmap.
+ *
+ * TWO CASES, and only these:
+ * - NOTHING KEPT, DRAWN BOTH WAYS: the shape that reads best, its road where its stages say the most (`PLAN_STAGES_LEAST`),
+ *   else its dated work.
+ * - KEPT, AND THE PROJECT CHANGED SHAPE UNDER IT: a plan kept as its road with no stages left, or as a roadmap with no
+ *   dated work left, draws nothing at all, so the shape it holds now is offered in its place, with `was` saying what was
+ *   kept (§45: "It is redesigned only when the thing changes shape"). A kept shape that still draws holds still.
+ *
+ * `keeps` is the shapes the project list can hold: a shape outside it goes to its nearer one, or is not offered.
+ */
+export function planOffered(f: PlanFacts, chosen: PlanShape | null, keeps: readonly PlanShape[]): { shape: PlanShape; was: PlanShape | null } | null {
+  const kept = (s: PlanShape | null): PlanShape | null => (s === null ? null : keeps.includes(s) ? s : NEARER[s] !== null && keeps.includes(NEARER[s]!) ? NEARER[s] : null);
+  if (chosen !== null) {
+    if (planDraws(f, chosen)) return null;
+    const now = kept(planShapeOf(f));
+    return now !== null && now !== chosen && planDraws(f, now) ? { shape: now, was: chosen } : null;
+  }
+  if (planDrawnOf(f, null) !== 'both') return null;
+  const best = kept(f.stages >= PLAN_STAGES_LEAST ? 'path' : planShapeOf({ ...f, stages: 0 }));
+  return best === null ? null : { shape: best, was: null };
 }
 
 /** Why a plan is drawn in its shape, in one sentence. */
