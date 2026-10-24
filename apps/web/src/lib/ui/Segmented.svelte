@@ -23,9 +23,9 @@
   ITS HEIGHT IS HELD BEFORE ITS LABELS LAND (the UI pass of 20 October, 2.A.9, motion F2.4): the track is 36 tall at
   least, 48 under a thumb or on a phone, so a segment whose count arrives a beat late does not push the page down.
 
-  `full` IS A PAGE'S OWN CONTROL ON A PHONE: below 640px the track is the page's width and its segments share it
-  equally, each at 15 with an ellipsis. When a label would be cut, or there are more than four, it scrolls instead, on
-  its own row, with 16 of room at its end and the last 24px fading out, so a strip that runs on looks like one.
+  `full` IS A PAGE'S OWN CONTROL ON A PHONE: below 640px the track is the page's width and its segments share it by
+  their words, each at 15. When a label would be cut, or there are more than four, a group of choices wraps, every
+  choice whole, and a `nav` scrolls on its own row, with 16 of room at its end and the last 24px fading out.
 
   `many` IS A TRACK WHERE MORE THAN ONE CAN BE CHOSEN (toggles pressed in and out). One thumb cannot sit under two
   segments, and a thumb under the first slid across to a second that already looked chosen when the first was switched
@@ -204,7 +204,8 @@
   data-slides=""
   data-many={many ? '' : undefined}
   data-full={full ? '' : undefined}
-  data-scroll={full && scroll ? '' : undefined}
+  data-scroll={full && scroll && tag === 'nav' ? '' : undefined}
+  data-wrap={full && scroll && tag !== 'nav' ? '' : undefined}
   data-thumb={thumb ? (slide ? 'slide' : 'jump') : undefined}
   style:--x={thumb ? `${thumb.x}px` : undefined}
   style:--y={thumb ? `${thumb.y}px` : undefined}
@@ -234,17 +235,30 @@
       flex-wrap: nowrap;
     }
 
+    /* SHARED BY THEIR WORDS, NOT IN EQUAL PARTS (Y30): an equal share cut "Comfortable" while "Roomy" had room to
+       spare, and eight of padding a side lets four tabs fit 390 whole. */
     .segmented[data-full] > :global(.segment) {
-      flex: 1 1 0;
+      flex: 1 1 auto;
       min-inline-size: 0;
+      padding-inline: var(--sp-2);
       overflow: hidden;
       font-size: var(--fs-body);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    /* AND WHEN THEY DO NOT FIT, IT SCROLLS: each segment its own width, 16 of room at the end, the last 24px fading out
-       so a strip that runs on looks like one. */
+    /* AND WHEN THEY DO NOT FIT, A GROUP OF CHOICES WRAPS, every choice whole (Y30): a strip cut at the edge hid "Roomy"
+       with no sign there was more. */
+    .segmented[data-full][data-wrap] {
+      flex-wrap: wrap;
+    }
+
+    .segmented[data-full][data-wrap] > :global(.segment) {
+      overflow: visible;
+    }
+
+    /* A NAV OF PLACES STILL SCROLLS: each segment its own width, 16 of room at the end, the last 24px fading out so a
+       strip that runs on looks like one. */
     .segmented[data-full][data-scroll] {
       overflow-x: auto;
       overscroll-behavior-x: contain;

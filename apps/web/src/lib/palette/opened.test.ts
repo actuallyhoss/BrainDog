@@ -43,3 +43,19 @@ test('RECENT NEVER NAMES A PLACE BY ITS HANDLE: SG240, S42 or tasks#4', () => {
   assert.deepEqual(withOpened([], { href: '/decide/SG240', title: 'SG240', at: 1 }), []);
   assert.deepEqual(openedKept(JSON.stringify([{ href: '/decide/SG240', title: 'SG240', at: 1 }, { href: '/p/people', title: 'People', at: 2 }])).map((o) => o.title), ['People']);
 });
+
+/* THE AUDIT OF 25 OCTOBER, Y30 (`people-390-light-palette.png`): Recent said "Browse" for Add-ons' Browse, and "Add-ons 2"
+   for two places it had both kept as "Add-ons". */
+test('RECENT NAMES A PLACE INSIDE ANOTHER BY BOTH, AND ONE NAME ONCE', () => {
+  assert.equal(titleIn('Browse · Add-ons · BrainDog', 'BrainDog'), 'Add-ons: Browse');
+  assert.equal(titleIn('Kiln log · Add-ons · BrainDog', 'BrainDog'), 'Add-ons: Kiln log');
+  assert.equal(titleIn('Navigation · Settings · BrainDog', 'BrainDog'), 'Settings: Navigation');
+  assert.equal(titleIn('Add-ons · BrainDog', 'BrainDog'), 'Add-ons');
+  const kept = [
+    { href: '/packs', title: 'Add-ons', at: 3 },
+    { href: '/packs?tab=updates', title: 'Add-ons', at: 2 },
+    { href: '/p/potters', title: 'Potters', at: 1 },
+  ];
+  assert.deepEqual(openedKept(JSON.stringify(kept)).map((o) => o.href), ['/packs', '/p/potters']);
+  assert.deepEqual(withOpened(kept.slice(1), kept[0]!).map((o) => o.href), ['/packs', '/p/potters']);
+});

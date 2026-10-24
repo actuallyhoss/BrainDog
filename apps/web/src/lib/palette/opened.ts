@@ -23,13 +23,24 @@ const PASSED = /^\/(?:$|signin|signup|start|invite|connect)(?:[/?#]|$)/u;
  */
 const HANDLE = /^(?:[A-Z]{1,3}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u;
 
+/**
+ * THE PLACES WHOSE SCREENS ARE NAMED UNDER THEM, so a screen of one is said with it: "Add-ons: Browse", "Settings:
+ * Navigation" (the audit of 25 October, Y30). Recent said "Browse" alone, which names nothing.
+ */
+const WITHIN = new Set(['Add-ons', 'Settings']);
+
 /** The name a screen gave itself: the first part of its tab title, or `null` when it only said the product or a handle. */
 export function titleIn(tab: string, product: string): string | null {
   const parts = tab.split(' · ').map((p) => p.trim()).filter(Boolean);
   if (parts.length < 2) return null;
   const first = parts[0]!;
-  return first === product || HANDLE.test(first) ? null : first;
+  if (first === product || HANDLE.test(first)) return null;
+  const place = parts.length > 2 ? parts[1]! : null;
+  return place !== null && WITHIN.has(place) ? `${place}: ${first}` : first;
 }
+
+/** One place a name: the newest of those kept under the same name, so Recent never folds two into "Add-ons 2". */
+const onceEach = (list: readonly Opened[]): Opened[] => list.filter((o, i) => list.findIndex((p) => p.title.trim() === o.title.trim()) === i);
 
 /** What was kept, read back; anything unreadable is nothing. */
 export function openedKept(raw: string | null): Opened[] {
@@ -39,6 +50,7 @@ export function openedKept(raw: string | null): Opened[] {
     if (!Array.isArray(list)) return [];
     return list
       .filter((o): o is Opened => o !== null && typeof o === 'object' && typeof o.href === 'string' && typeof o.title === 'string' && typeof o.at === 'number' && !HANDLE.test(o.title.trim()))
+      .filter((o, i, all) => all.findIndex((p) => p.title.trim() === o.title.trim()) === i)
       .slice(0, OPENED_CAP);
   } catch {
     return [];
@@ -48,7 +60,7 @@ export function openedKept(raw: string | null): Opened[] {
 /** The list with `place` first, once, and at most `cap` long. A place that is no place to go back to changes nothing. */
 export function withOpened(list: readonly Opened[], place: Opened, cap: number = OPENED_CAP): Opened[] {
   if (PASSED.test(place.href) || !place.title.trim() || HANDLE.test(place.title.trim())) return [...list];
-  return [place, ...list.filter((o) => o.href !== place.href)].slice(0, cap);
+  return onceEach([place, ...list.filter((o) => o.href !== place.href)]).slice(0, cap);
 }
 
 /** The places opened, newest first, for the palette. */
