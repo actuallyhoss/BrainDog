@@ -29,6 +29,7 @@
     ask,
     onsource,
     onkept,
+    built,
   }: {
     /** The page the description is about, by its address. Left out on the Slash screen, which is about everything. */
     page?: string | undefined;
@@ -40,6 +41,11 @@
     onsource?: (() => void) | undefined;
     /** Called once a draft is kept, so the page behind reads itself again. */
     onkept?: (() => void | Promise<void>) | undefined;
+    /**
+     * The body a page the record holds none of yet is drawn from (Today, Decide), which the draft changes; keeping it
+     * is the page's first write. Left out for a page the record holds.
+     */
+    built?: (() => Promise<unknown>) | undefined;
   } = $props();
 
   /** One draft as the sheet holds it: what the record drew for it, and what a press on it came to. */
@@ -85,7 +91,8 @@
     fix = null;
     const mine = ++sends;
     try {
-      const out = await draftChange(client(), text, about);
+      const body = built === undefined ? undefined : ((await built()) ?? undefined);
+      const out = await draftChange(client(), text, about, body);
       if (mine !== sends) return;
       answered = true;
       if (!out.ok) {

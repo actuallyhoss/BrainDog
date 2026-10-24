@@ -479,6 +479,11 @@
   });
   /** The page this home arranges and whether the record holds it, or `null` off a home or for one with nothing to arrange. */
   const kept = $derived(mode === 'home' && live ? keptAs(slug, shell.pages ?? []) : null);
+  /**
+   * THE BODY A HOME IS BUILT FROM WHILE THE RECORD HOLDS NONE, as its first Done keeps it (`previewedBody`), for Change
+   * this page to draft over (C25, C26): the record's week with it, as Edit layout reads it.
+   */
+  const builtBody = async (): Promise<unknown> => previewedBody(slug, holdsOf(shell, undefined, await weekHeld(shell)));
   /** The home's body as the mode moves it, from the moment Edit layout is chosen until the arrangement is let go. */
   let toArrange = $state.raw<ToArrange | null>(null);
   let opening = false;
@@ -911,6 +916,7 @@
             {reread}
             source={kept.installed ? `/p/${kept.id}?src=1` : null}
             change={kept.installed}
+            built={kept.installed ? null : builtBody}
             {look}
             keys={drawnKeys}
             heads={blockHeads}

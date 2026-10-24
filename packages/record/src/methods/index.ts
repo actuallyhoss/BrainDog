@@ -149,7 +149,7 @@ export type RecordDeps = {
    * model, the reading of use and Slash's ledger are the record's and a method file is handed none of them. Absent,
    * `slashDraft` answers `NOT_IN_THIS_BUILD`.
    */
-  slashDescribed?: (args: { asked: string; page?: string }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
+  slashDescribed?: (args: { asked: string; page?: string; body?: Record<string, unknown> }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
   /**
    * The next slice of the walk over what the record holds, looked at (`dry`) or done (`understandNow` in `index.ts`), which
    * `understand.ts` answers `understand` with, because the cursor the night keeps and Slash's filing are the record's.

@@ -175,6 +175,45 @@ test('slashDraft HANDS THE MODEL THE PAGE A DESCRIPTION IS ABOUT, and refuses on
   sql.close();
 });
 
+test('A PAGE THE RECORD HOLDS NONE OF YET IS DRAFTED FROM THE BODY THE SCREEN BUILT (Today, Decide), and a held one never is', async () => {
+  const { heard, model } = listening(() => ({ drafts: [] }));
+  const { api, sql } = await record(model);
+  const built = { page: 'today', title: 'Today', blocks: [{ kind: 'note', span: 12, body: 'Morning.' }] };
+
+  value(await api.slashDraft({ asked: 'Put what is late first.', page: 'home', body: built }, OWNER));
+  assert.equal(heard[0]!.page?.id, 'page.home');
+  assert.deepEqual(heard[0]!.page?.body, { ...built, page: 'home' }, 'the draft starts from the body built');
+  assert.equal(((await api.page({ slug: 'home' }, OWNER)) as Out).ok, false, 'drafting kept a page');
+
+  /* HELD, IT IS READ AS THE RECORD HOLDS IT, whatever body the screen sends. */
+  assert.ok((await api.kernel.install([RIGHT] as never)).ok);
+  value(await api.slashDraft({ asked: 'Put the open steps first.', page: 'desk', body: built }, OWNER));
+  assert.equal((heard[1]!.page?.body as { title?: string }).title, 'Desk');
+
+  const refusal = async (args: unknown) => ((await api.slashDraft(args as never, OWNER)) as Out).refusal;
+  assert.equal((await refusal({ asked: 'A desk.', page: 'home', body: 'Today' }))?.at, 'body');
+  assert.equal((await refusal({ asked: 'A desk.', body: built }))?.at, 'page');
+  assert.equal(heard.length, 2, 'a refused body reached the model');
+  sql.close();
+});
+
+test('A DRAFT OVER A BUILT BODY IS HELD ONLY TO WHAT IT MADE WORSE: Today greets with no figure, and adding a block to it is no fault', async () => {
+  const built = { page: 'today', title: 'Today', requires: ['register.tasks'], blocks: [{ kind: 'note', lead: true, span: 12, body: 'Good morning.' }] };
+  const table = { kind: 'table', span: 12, heading: 'Open steps', source: 'register.tasks', empty: 'No steps yet.' };
+  const { model } = listening((input) => drafted({ id: 'page.home', kind: 'page', body: { ...(input.page!.body as object), blocks: [...built.blocks, table] } }));
+  const { api, sql } = await record(model);
+  const got = value<Drafted>(await api.slashDraft({ asked: 'Show my open steps.', page: 'home', body: built }, OWNER));
+  assert.equal(got.drafts.length, 1, JSON.stringify(got.dropped));
+  assert.equal(got.drafts[0]!.change.to.id, 'page.home');
+  /* THE SAME DRAFT WITH NO BUILT BODY BEHIND IT is a new page, and opening on no figure is its own fault. */
+  const bare = await record(listening(() => drafted({ id: 'page.fresh', kind: 'page', body: { ...built, page: 'fresh', blocks: [...built.blocks, table] } })).model);
+  const none = value<Drafted>(await bare.api.slashDraft({ asked: 'Show my open steps.' }, OWNER));
+  assert.equal(none.drafts.length, 0);
+  assert.match(none.dropped.join(' '), /opens with one lead sentence/u);
+  sql.close();
+  bare.sql.close();
+});
+
 test('WHAT slashDraft TAKES IS HELD BEFORE ANY ASK: the words in characters, and nothing it does not take', async () => {
   const { heard, model } = listening(() => ({ drafts: [] }));
   const { api, sql } = await record(model);

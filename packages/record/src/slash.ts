@@ -2381,7 +2381,7 @@ function sampleRows(raw: unknown): SlashRows {
  * Everything the record refused about one drawn draft: the lint's or the try's refusal, or each block that drew nothing and
  * each step a try failed, each with the path the model reads it by. An empty list is a draft that previews clean.
  */
-function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
+function faultsOf(seen: Result<SlashPreview>, built?: { id: string; blocks: readonly unknown[] }): { at: string; fix: string }[] {
   if (!seen.ok) return [{ at: ('refusal' in seen ? seen.refusal.at : undefined) ?? 'to', fix: 'refusal' in seen ? seen.refusal.fix : 'The change could not be drawn.' }];
   const faults: { at: string; fix: string }[] = [];
   for (const page of seen.value.pages)
@@ -2393,7 +2393,13 @@ function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
     for (const s of t.steps) if (s.state === 'failed') faults.push({ at: `${t.rule}.${s.path}`, fix: s.say });
   /* AND WHAT DRAWS BUT IS NOT A GOOD PAGE, so the same repair that mends a refusal mends a page that opens on nothing,
      leaves a hole in a row, or calls the person's things rows. */
-  faults.push(...calmFaults(seen.value.pages));
+  /* A PAGE BUILT IN THE BROWSER AND NOT YET HELD (Today, Decide: C25, C26) stood as that body, so it is held only to
+     faults of a kind the body did not have already: the body is the person's screen, and a draft that adds one calendar
+     to it is not asked to mend how many tiles Today opens on. By kind, since the body is measured as written and the
+     draft as drawn, so the numbers and the block named in a fault differ between the two. */
+  const kindOf = (fix: string): string => fix.replace(/"[^"]*"/gu, '').replace(/\d+/gu, '#');
+  const stood = built === undefined ? new Set<string>() : new Set(calmFaults([{ id: built.id, blocks: built.blocks as SlashPreviewedPage['blocks'] }]).map((f) => kindOf(f.fix)));
+  faults.push(...calmFaults(seen.value.pages).filter((f) => built === undefined || !f.at.startsWith(`${built.id}.`) || !stood.has(kindOf(f.fix))));
   return faults;
 }
 
@@ -2549,6 +2555,8 @@ export async function describe(deps: {
   drawn: (id: string) => number;
   preview: SlashPreviewer;
   most?: number;
+  /** The body a page not yet held was built as, which the draft is measured against (C25, C26). */
+  built?: { id: string; blocks: readonly unknown[] };
 }): Promise<SlashDescribed> {
   const most = deps.most ?? SLASH_OPEN_CAP;
   const dropped: string[] = [];
@@ -2607,7 +2615,7 @@ export async function describe(deps: {
       } catch {
         seen = { ok: false, refusal: { code: 'INTERNAL', fix: 'The record could not draw this change.', at: 'to' } };
       }
-      const faults = faultsOf(seen);
+      const faults = faultsOf(seen, deps.built);
       if (seen.ok && faults.length === 0) clean.push({ ...draft, preview: seen.value });
       else next.push({ draft, said: (x as { question: string }).question.trim(), faults });
     }

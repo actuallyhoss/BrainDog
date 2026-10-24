@@ -5130,8 +5130,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * reads the list that row lives in. Two templates over one list cannot be told apart from the row's page, so that page
    * is refused, and the template is named by its own slug instead, which is accepted while she can read its list.
    */
-  const describedPage = (slug: string, ctx: CallContext): Result<{ id: string; body: unknown }> => {
+  const describedPage = (slug: string, ctx: CallContext, built?: Record<string, unknown>): Result<{ id: string; body: unknown }> => {
     const bare = slug.startsWith('page.') ? slug.slice('page.'.length) : slug;
+    /* A PAGE THE RECORD HOLDS NONE OF YET, drawn from the body the screen built (Today, Decide): the draft changes that
+       body, and keeping it is the first write of the page. A page the record holds is always read as it holds it. */
+    if (built !== undefined && kernel.declarations().every((d) => d.id !== `page.${bare}`)) return ok({ id: `page.${bare}`, body: { ...built, page: bare } });
     const shown = kernel.pages().filter((p) => seesPage(ctx, p));
     const about = shown.find((p) => p.slug === bare)?.about ?? null;
     const templates = kernel.declarations().flatMap((d) => {
@@ -5165,8 +5168,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx: CallContext,
     preview: SlashPreviewer | null,
     r: ReturnType<typeof slashReading> = slashReading(ctx),
+    built?: Record<string, unknown>,
   ): Promise<Result<SlashDescribed>> => {
-    const about = page === undefined ? null : describedPage(page, ctx);
+    const about = page === undefined ? null : describedPage(page, ctx, built);
     if (about !== null && !about.ok) return about;
     const model = deps.slashModel;
     if (!model) return ok({ by: 'rules', drafts: [], dropped: [DESCRIBED_NO_MODEL], large: false });
@@ -5189,6 +5193,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         drawn: drawnVersions(sql),
         preview,
+        ...(about !== null && built !== undefined && Array.isArray(built.blocks) && kernel.declarations().every((d) => d.id !== about.value.id)
+          ? { built: { id: about.value.id, blocks: built.blocks as unknown[] } }
+          : {}),
       }),
     );
   };
@@ -5220,9 +5227,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * carries the page too, because the same words about two pages are two drafts.
    */
   const drafting = describedPresses<Result<SlashDrafted>>();
-  const slashDrafted = (args: { asked: string; page?: string }, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashDrafted>> =>
-    drafting.once(args.asked, JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, args.page ?? null]), async () => {
-      const got = await slashDescribed(args.asked, args.page, ctx, preview);
+  const slashDrafted = (args: { asked: string; page?: string; body?: Record<string, unknown> }, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashDrafted>> =>
+    drafting.once(args.asked, JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, args.page ?? null, args.body === undefined ? null : 'built']), async () => {
+      const got = await slashDescribed(args.asked, args.page, ctx, preview, undefined, args.body);
       return got.ok ? ok(draftedOf(got.value)) : got;
     });
 

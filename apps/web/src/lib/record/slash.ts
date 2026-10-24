@@ -181,8 +181,9 @@ export type DraftedAll = { by: string; drafts: Drafted[]; dropped: string[] };
  * What the owner described, drafted and checked, filing nothing. `page` is the page it is about, by its address, and is
  * left out on the Slash screen, where the description is about the whole BrainDog.
  */
-export async function draftChange(client: SlashClient, asked: string, page?: string): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
-  const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked } : { asked, page });
+export async function draftChange(client: SlashClient, asked: string, page?: string, body?: unknown): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
+  /* A PAGE THE RECORD HOLDS NONE OF YET (Today, Decide) IS SENT AS IT IS DRAWN, so the draft changes that (C25). */
+  const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked } : { asked, page, ...(body === undefined ? {} : { body }) });
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   return { ok: true, drafted: out.value };
 }
@@ -205,7 +206,11 @@ export type Kept = { kind: 'kept' } | { kind: 'filed'; id: string; href: string;
  * waits on Decide, as a member's field does (`action-draft.ts` `fileDraft`).
  */
 export async function fileDrafted(client: SlashClient, draft: Drafted, keep: boolean): Promise<Kept> {
-  const filed = await client.call<{ id?: unknown }>('propose', { question: draft.question, body_kind: 'change', body: { to: draft.change.to } });
+  /* `declaration_id` IS WHAT THE CHANGE INSTALLS, which the record asks for by name: without it every Keep it was refused
+     ("A change proposal needs declaration_id"), found on the first walk of moment 5 (C35). A bundle names none. */
+  const to = draft.change.to as { id?: unknown };
+  const named = typeof to.id === 'string' ? { declaration_id: to.id } : {};
+  const filed = await client.call<{ id?: unknown }>('propose', { question: draft.question, body_kind: 'change', body: { ...named, to: draft.change.to } });
   if (!filed.ok) return { kind: 'refused', fix: fixOf(filed) };
   const id = String(filed.value?.id ?? '');
   const href = decideHref(id);

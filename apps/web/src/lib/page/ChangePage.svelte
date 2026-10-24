@@ -14,8 +14,10 @@
   Edit layout is offered from 900px only, since authoring is a desktop surface (13 §10); a phone still changes a page
   by describing it, and still reads how it is built.
 
-  ON A HOME (Today, Decide) THE SAME MENU, with what that home can take: Edit layout always, and Change this page and How
-  this is built once the record holds the page, the second at the page's own address since a home draws no source.
+  ON A HOME (Today, Decide) THE SAME MENU, with what that home can take: Edit layout and Change this page always, and How
+  this is built once the record holds the page, at the page's own address since a home draws no source. CHANGE THIS
+  PAGE ON A HOME THE RECORD HOLDS NONE OF YET (C25, C26) drafts from the body the screen built (`built`), and keeping a
+  draft is the page's first write, with an Undo that retires it so the built one is drawn again.
   A menu with nothing to offer is not drawn.
 
   ITS OWN FILE, NOT LINES IN `PageView.svelte`, which several units write: the head's actions region there is one line
@@ -67,6 +69,7 @@
     keys = () => [],
     heads = () => [],
     extra = [],
+    built = null,
   }: {
     /** Links the page offers first, above its own entries: a project's "Edit details" (proj F7, VERIFY H13). */
     extra?: readonly { label: string; icon: IconName; href: string }[];
@@ -90,6 +93,11 @@
     keys?: () => readonly string[];
     /** The page's blocks by key with their headings, which Hidden names what the look hides by. */
     heads?: () => readonly Headed[];
+    /**
+     * The body a home is built from while the record holds none (`home-arrange.ts` `previewedBody`), which Change this
+     * page drafts over; `null` for a page the record holds.
+     */
+    built?: (() => Promise<unknown>) | null;
   } = $props();
 
   let open = $state(false);
@@ -100,7 +108,24 @@
 
   /* ONLY AN OWNER MAY ASK SLASH TO DRAFT, as the record's `slashDraft` holds, so a member is not offered a press that
      is always refused. A reader of the sample has no person, and is shown it, since the sheet says why nothing drafts. */
-  const mayChange = $derived(change && page.data.me?.owner !== false);
+  const mayChange = $derived((change || built !== null) && page.data.me?.owner !== false);
+
+  /**
+   * A DRAFT KEPT ON A HOME THE RECORD HELD NONE OF is the page's first write: the shell is read again so the screen draws
+   * the kept page, and the toast's Undo retires it, which draws the built one again (`home-arrange.ts` `unkeep`).
+   */
+  async function keptFirst() {
+    const { reboot, unkeep } = await import('./home-arrange.ts');
+    await reboot();
+    toasts.push(pageWords.homeKept(title), {
+      undo: () =>
+        void unkeep(apiBase(), slug).then(async (out) => {
+          if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+          await reboot();
+          toasts.push(pageWords.homeBack(title));
+        }),
+    });
+  }
 
   /* A PAGE JUST MADE OPENS ON ITS DESCRIBE FIELD (ENG-B11): the palette opens it at `?describe=1`, and this reads the
      mark once. The sheet opens when this reader may change the page and the host has a model; with none the page opens
@@ -269,7 +294,10 @@
   <Sheet bind:open title={words.change}>
     <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's. -->
     {#key slug}
-      {#await import('./AskPage.svelte') then { default: AskPage }}<AskPage page={slug} {model} onsource={toSource} onkept={reread} />{/await}
+      {#await import('./AskPage.svelte') then { default: AskPage }}
+        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} />
+        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} />{/if}
+      {/await}
     {/key}
   </Sheet>
 {/if}

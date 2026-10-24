@@ -47,6 +47,9 @@ export const words = {
   unpin: 'Unpin',
   pinned: (title: string) => `Pinned ${title}. It stays as it is until you unpin it.`,
   unpinned: (title: string) => `Unpinned ${title}. Slash may arrange it again.`,
+  /* A HOME CHANGED THE FIRST TIME BY SAYING IT: the record keeps it as a page from then on, and Undo goes back to the built one. */
+  homeKept: (title: string) => `${title} is kept as you changed it.`,
+  homeBack: (title: string) => `${title} is drawn as BrainDog builds it again.`,
   arranged: (title: string) => `Slash arranged ${title}.`,
   slashArranged: 'Slash arranged',
   slashKept: (who: string) => `Slash arranged · ${who} kept`,
