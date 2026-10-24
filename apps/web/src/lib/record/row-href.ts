@@ -21,7 +21,7 @@ import { REGISTERS } from './held.ts';
 import { hrefFor } from './metrics.ts';
 
 /** A page as `boot` lists it, as far as this file reads it: its slug and the row a template made it for. */
-export type PageAbout = { slug: string; about?: { register: string; seq: number | null } | null | undefined; opens?: string | undefined };
+export type PageAbout = { slug: string; about?: { register: string; seq: number | null } | null | undefined; opens?: string | null | undefined };
 
 /** A list and a row's number, from `tasks#241`. Nothing else is a spoken id: no path, no query, no address. */
 export function spokenOf(spoken: string): { register: string; seq: number } | null {

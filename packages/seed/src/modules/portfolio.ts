@@ -1346,8 +1346,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    *
    * THE ROWS AS A TABLE ARE ONE LINK AWAY, `?rows=1`, the list's own screen, for a person who wants every reading.
    */
-  numbers: {
-    page: 'numbers',
+  'all-numbers': {
+    page: 'all-numbers',
     title: 'Numbers',
     icon: 'observe',
     list: 'datapoints',
@@ -1374,6 +1374,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         back: 366,
         bucket: 'week',
         limit: 2,
+        most: 40,
         empty: 'No project has reported a number this year.',
       },
       {

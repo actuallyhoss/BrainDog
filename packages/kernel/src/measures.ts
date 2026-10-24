@@ -180,7 +180,7 @@ export type MeasureLines = { lines: MeasureSeries[]; latest: MeasureLatest[] };
  * The options both readers take. `fallback` names the measure of a block with no name column, by its heading. `grouped`
  * is a block with a sixth column: every measure is listed under its group, the quiet ones too (`measureLines`).
  */
-type MeasureOpts = { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number; grouped?: boolean };
+type MeasureOpts = { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number; grouped?: boolean; listed?: number };
 
 /** How many points a measure has in the period, which is what a line needs two of. */
 const pointsIn = (m: MeasureSeries): number => m.now.reduce<number>((n, v) => n + (v === null ? 0 : 1), 0);
@@ -239,12 +239,12 @@ export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts):
     .map(({ ms: _ms, ...m }) => m);
   /* GROUPED, EVERY MEASURE READ IN THE PERIOD THAT DRAWS NO LINE IS LISTED, under its group: a page of a list's numbers
      says each kind once, so one read twice but past the lines' `most` is listed too rather than missing. A measure with
-     no reading in the period is quiet and drawn as neither, as ungrouped. Up to `MEASURES_LISTED`, a line each. */
+     no reading in the period is quiet and drawn as neither, as ungrouped. Up to `listed`, a line each. */
   const listed = opts.grouped
     ? all
         .filter((m) => m.latest !== null && pointsIn(m) >= 1 && !lines.some((l) => sameMeasure(l, m)))
         .sort((a, b) => byGroup(a, b) || newestFirst(a, b))
-        .slice(0, MEASURES_LISTED)
+        .slice(0, opts.listed ?? MEASURES_LISTED)
     : all.filter((m) => pointsIn(m) === 1 && m.latest !== null).sort(newestFirst).slice(0, most);
   const latest = listed.map(
     (m): MeasureLatest => ({

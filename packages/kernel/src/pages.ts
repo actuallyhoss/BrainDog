@@ -62,7 +62,7 @@ import { quietSign, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost, type Wait } from './weigh.ts';
 import { REDUCES, ROW_TEXT_MOST, RAIL_PAGES, SUMS, railRoom } from './constants.ts';
-import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
+import { MEASURES_LISTED, MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
 import { localDays } from './measures.ts';
 
 /** One test of one figure in a block's `when:`: the figure, and the one of `empty`, `beyond` or a comparison it is held to. */
@@ -145,7 +145,10 @@ export type PageBlock = {
    * newest, with how many more that run wrote (`FeedRow.run_more`).
    */
   fold?: boolean | number | 'run';
-  /** A `cards` or `series` block's: how many it shows before "Show all", 1 to 24 (`mostOf` in braindog-render); six for cards where it says nothing. */
+  /**
+   * A `cards` or `series` block's: how many it shows before "Show all", 1 to 24 (`mostOf` in braindog-render); six for cards
+   * where it says nothing. A grouped `lines` block's (a sixth column): how many readings it lists under its lines.
+   */
   most?: number;
   /**
    * A `cards` or a `table` block's: a field of its list that draws its rows in groups. A link groups them by the row it
@@ -2835,7 +2838,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
     /* `limit:` IS HOW MANY MEASURES, at most the twelve a block is ever handed, so Today can draw the four that moved. */
     const most = typeof block.limit === 'number' && Number.isFinite(block.limit) ? Math.min(MEASURES_MOST, Math.max(0, Math.floor(block.limit))) : MEASURES_MOST;
-    const opts = { nowMs: deps.ctx.nowMs, back: block.back, bucket: block.bucket, tz, fallback: block.heading ?? '', most, ...(group ? { grouped: true } : {}) };
+    /* GROUPED, THE LIST UNDER THE LINES TAKES `most:`, else the block's `limit:` as before, else `MEASURES_LISTED`. */
+    const listed = typeof block.most === 'number' ? Math.min(MEASURES_LISTED, Math.max(1, Math.floor(block.most))) : typeof block.limit === 'number' ? most : MEASURES_LISTED;
+    const opts = { nowMs: deps.ctx.nowMs, back: block.back, bucket: block.bucket, tz, fallback: block.heading ?? '', most, ...(group ? { grouped: true, listed } : {}) };
     const all = [...read.value.latest, ...read.value.readings];
     /* A TILE OF ONE READING IS STILL A FIGURE, AND A LINE OF ONE IS A DOT. So a `stat` draws every measure, the ones that
        moved first, and a `lines` block draws a line only where there are two points to join, ranked by how much each

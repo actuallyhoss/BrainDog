@@ -81,7 +81,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   document: ['note'],
   says: ['note'],
   fold: ['section', 'cards', 'feed'],
-  most: ['cards', 'series'],
+  most: ['cards', 'series', 'lines'],
   group: ['cards', 'table', 'feed'],
   box: ['section'],
   panel: ['section'],

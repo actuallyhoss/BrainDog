@@ -154,7 +154,8 @@ type Body = Record<string, unknown>;
 const portfolioBeforeNumbers = (doc: Body): Body => ({
   ...doc,
   version: '1.18.0',
-  declarations: (doc.declarations as Body[]).filter((d) => !['datapoints', 'kpis'].includes(String(d.register)) && !['kpis-held', 'kpi-stale'].includes(String(d.metric))),
+  /* AND NUMBERS' OWN PAGE (portfolio 1.22.0), which reads the readings this version does not hold. */
+  declarations: (doc.declarations as Body[]).filter((d) => !['datapoints', 'kpis'].includes(String(d.register)) && !['kpis-held', 'kpi-stale'].includes(String(d.metric)) && d.page !== 'all-numbers'),
   ...(Array.isArray(doc.seeds) ? { seeds: (doc.seeds as Body[]).filter((s) => !['datapoints', 'kpis'].includes(String(s.register))) } : {}),
 });
 

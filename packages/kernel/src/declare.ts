@@ -17,6 +17,7 @@
  * record got slow.
  */
 
+import { MEASURES_LISTED } from './measures.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predicate } from '@braindog/where';
@@ -1929,6 +1930,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     if ((kind === 'cards' || kind === 'series') && block.most !== undefined && !isInt(block.most, 1, 24))
       return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many it shows before "Show all", a whole number from 1 to 24.`, `${at}.most`);
+    /* A GROUPED `lines` BLOCK'S `most:` IS HOW MANY READINGS IT LISTS under the lines (E26, `MEASURES_LISTED` at most). */
+    if (kind === 'lines' && block.most !== undefined && !isInt(block.most, 1, MEASURES_LISTED))
+      return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many readings a grouped lines block lists, a whole number from 1 to ${MEASURES_LISTED}.`, `${at}.most`);
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
     if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))

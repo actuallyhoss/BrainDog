@@ -15,6 +15,10 @@ const DAY = 86_400_000;
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAE';
 const OWNER: WriteContext = { actor: 'p_1' };
 const on = (daysAgo: number): string => new Date(NOW - daysAgo * DAY).toISOString();
+/** What an install refused with, read the same way whichever kind of no it was. */
+const refusalOf = (r: object): { fix?: string; at?: string } | undefined => (r as { refusal?: { fix?: string; at?: string } }).refusal;
+const saidOf = (r: object): string => refusalOf(r)?.fix ?? '';
+const atOf = (r: object): string | null => refusalOf(r)?.at ?? null;
 
 test('GROUPED, every measure read in the period without a line is listed under its group, named groups first', () => {
   const readings: RawReading[] = [
@@ -38,6 +42,7 @@ test('GROUPED, every measure read in the period without a line is listed under i
   const past = measureLines(readings, { ...opts, grouped: true, most: 0 });
   assert.deepEqual(past.lines, []);
   assert.deepEqual(past.latest.map((m) => m.measure), ['Memory', 'Players', 'Rows written'], 'a measure past the lines\' most is listed, not missing');
+  assert.deepEqual(measureLines(readings, { ...opts, grouped: true, listed: 1 }).latest.map((m) => m.measure), ['Memory'], 'most: caps the list');
 });
 
 const PROJECTS: Declaration = {
@@ -70,7 +75,7 @@ async function record() {
   const k = await openRecord(sql, fixedClock(NOW));
   assert.ok(k.createRecord({ id: ID, slug: 'the-flat', name: 'The Flat', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   const done = await k.install([PROJECTS, NUMBERS]);
-  assert.ok(done.ok, done.ok ? '' : done.refusal.fix);
+  assert.ok(done.ok, saidOf(done));
   return { k, sql };
 }
 
@@ -97,12 +102,12 @@ test('THE SIXTH COLUMN GROUPS BY ITS PROJECT\'S NAME', async () => {
 test('A PAGE WITH list: IS THAT LIST\'S PAGE, answered as opens while the list is installed', async () => {
   const { k, sql } = await record();
   const installed = await k.install([page({ page: 'numbers', title: 'Numbers', list: 'datapoints', requires: ['register.datapoints'], blocks: [LINES] })]);
-  assert.ok(installed.ok, installed.ok ? '' : installed.refusal.fix);
+  assert.ok(installed.ok, saidOf(installed));
   const numbers = k.pages().find((p) => p.slug === 'numbers');
   assert.equal(numbers?.opens, 'datapoints');
   const bad = await k.install([page({ page: 'odd', title: 'Odd', list: 'Data points', blocks: [] })]);
-  assert.equal(bad.ok ? null : bad.refusal.at, 'list');
+  assert.equal(atOf(bad), 'list');
   const template = await k.install([page({ page: 'each', title: '{{name}}', list: 'datapoints', for: { register: 'things' }, blocks: [] })]);
-  assert.equal(template.ok ? null : template.refusal.at, 'list');
+  assert.equal(atOf(template), 'list');
   sql.close();
 });

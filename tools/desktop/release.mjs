@@ -96,6 +96,9 @@ function main() {
   const env = {
     ...process.env,
     PATH: `${CARGO}:${process.env.PATH ?? ''}`,
+    /* NO FINDER WINDOW DRESSING: Tauri's dmg script lays out the window through AppleScript, which a shell without
+       Finder's automation permission fails at; `CI` makes it skip that step and build the same dmg, plainly laid out. */
+    CI: 'true',
     TAURI_SIGNING_PRIVATE_KEY: key,
     TAURI_SIGNING_PRIVATE_KEY_PASSWORD: keyPassword,
     ...(identity !== null ? { APPLE_SIGNING_IDENTITY: identity } : {}),
