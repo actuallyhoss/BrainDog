@@ -595,8 +595,16 @@
      it reads the row; a write's answer carries neither, so what a press settled is remembered here by the row it was for. */
   let privacy = $state<{ key: string; mine: boolean; on: boolean | null }>({ key: '', mine: false, on: null });
   const rowKey = $derived(`${id}#${seq}`);
+  /* WRITTEN ONLY WHEN IT CHANGES, AND READ UNTRACKED (the scope of 24 October, E41): the effect read `privacy` and wrote a
+     new object into it every time, so on a row the reader made it ran itself until Svelte stopped it
+     (`effect_update_depth_exceeded` on /r/datapoints/522, at every width). */
   $effect(() => {
-    if (row?.mine) privacy = { key: rowKey, mine: true, on: privacy.key === rowKey ? privacy.on : null };
+    if (!row?.mine) return;
+    const key = rowKey;
+    untrack(() => {
+      if (privacy.key === key && privacy.mine) return;
+      privacy = { key, mine: true, on: privacy.key === key ? privacy.on : null };
+    });
   });
   const mine = $derived(row?.mine === true || (privacy.key === rowKey && privacy.mine));
   const isPrivate = $derived(privacy.key === rowKey && privacy.on !== null ? privacy.on : row?.private === true);
