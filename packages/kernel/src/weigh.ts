@@ -252,12 +252,26 @@ export type CostRows = { withheld: (register: string) => readonly string[]; held
  * one alone. That is the rule the write path redacts by (`index.ts`, `redactedFields`): once withheld, always, since a
  * row written under an older version holds the value still. `costRows` and `COST_SQL` both read through it.
  */
-const withheldIdsSql = (register: string): string =>
-  `SELECT json_extract(df.value, '$.id') AS id FROM declaration d,
-      json_each(CASE WHEN json_valid(d.body) THEN (CASE WHEN json_type(d.body, '$.fields') = 'array' THEN d.body END) END, '$.fields') AS df
-    WHERE d.id = 'register.' || ${register} AND d.kind = 'register' AND df.type = 'object' AND json_type(df.value, '$.id') = 'text'
+const WITHHELD_FIELD_SQL = `df.type = 'object' AND json_type(df.value, '$.id') = 'text'
       AND (json_type(df.value, '$.redact') = 'true' OR (CASE WHEN json_type(df.value, '$.type') = 'text' AND json_extract(df.value, '$.type') = 'list'
         THEN json_extract(df.value, '$.of') ELSE json_extract(df.value, '$.type') END) IN ('secret', 'money'))`;
+const DECLARED_FIELDS_SQL = `declaration d,
+      json_each(CASE WHEN json_valid(d.body) THEN (CASE WHEN json_type(d.body, '$.fields') = 'array' THEN d.body END) END, '$.fields') AS df`;
+const withheldIdsSql = (register: string): string =>
+  `SELECT json_extract(df.value, '$.id') AS id FROM ${DECLARED_FIELDS_SQL}
+    WHERE d.id = 'register.' || ${register} AND d.kind = 'register' AND ${WITHHELD_FIELD_SQL}`;
+
+/**
+ * Whether the field `field` of the list `register` (both SQL expressions) is withheld, as `withheldIdsSql` says.
+ *
+ * ONE READ OF EVERY DECLARATION A STATEMENT, NOT ONE A FIELD. `withheldIdsSql` names the list from outside, so SQLite
+ * ran it again for every field of every row of every open question, each time parsing every version of that list's
+ * declaration: on his record a queue of 35 questions held 600 patched fields, and its weighing was most of a 450 ms
+ * read. The pairs here name no outside column, so SQLite reads them once and looks each field up.
+ */
+const withheldPairSql = (register: string, field: string): string =>
+  `(${register}, ${field}) IN (SELECT substr(d.id, 10), json_extract(df.value, '$.id') FROM ${DECLARED_FIELDS_SQL}
+    WHERE d.kind = 'register' AND substr(d.id, 1, 9) = 'register.' AND ${WITHHELD_FIELD_SQL})`;
 
 /** `CostRows` over the record, through the very SQL `COST_SQL` reads, so the two cannot drift apart. */
 export function costRows(sql: WaitSql): CostRows {
@@ -336,7 +350,7 @@ function patchesWithheld(body: Record<string, unknown>, rows?: CostRows): boolea
 /** `patchesWithheld` as SQL over a `suggestion` row; its caller has already seen that `$.rows` is an array. */
 const PATCHES_WITHHELD_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.register') AS g, json_each(body, '$.rows') AS r, json_each(CASE
       WHEN r.type = 'object' AND json_type(r.value, '$.at') IS NOT NULL AND json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
-    WHERE json_type(body, '$.register') = 'text' AND f.key IN (${withheldIdsSql('g.value')}))`;
+    WHERE json_type(body, '$.register') = 'text' AND ${withheldPairSql('g.value', 'f.key')})`;
 
 /** The `at` of one of an option's patches, `p`. */
 const PATCH_AT_SQL = `json_extract(p.value, '$.at')`;
@@ -359,7 +373,7 @@ const PATCH_LIST_SQL = `(CASE
 const OPTION_UNDO_SQL = `(COALESCE(json_type(o.value, '$.hard'), '') = 'true' OR (COALESCE(json_type(o.value, '$.patches'), '') = 'array' AND (${movesMoneySql('o.value', '$.patches')}
       OR EXISTS (SELECT 1 FROM json_each(o.value, '$.patches') AS p, json_each(CASE WHEN p.type <> 'object' THEN NULL
         WHEN json_type(p.value, '$.at') IS NOT NULL AND json_type(p.value, '$.patch') = 'object' THEN json_extract(p.value, '$.patch') END) AS f
-      WHERE f.key IN (${withheldIdsSql(PATCH_LIST_SQL)})))))`;
+      WHERE ${withheldPairSql(PATCH_LIST_SQL, 'f.key')}))))`;
 
 /**
  * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open

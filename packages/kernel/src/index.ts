@@ -171,10 +171,10 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
+import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -904,7 +904,6 @@ export type ViewRow = {
  * can say: a money field cleared (`movesMoney` below, read by the field's declared type).
  */
 const BAND_SQL = COST_SQL;
-const BAND_RANK_SQL = `(CASE ${BAND_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;
 
 /** How many of its writes a dry walk over the past says, in names (`kernel.backfill({ dry: true })`). */
 const BACKFILL_PLANNED = 10;
@@ -7696,7 +7695,6 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const nowMs = clock.now();
       const now = instant(nowMs);
       const drawn = Math.max(0, Math.floor(limit));
-      const staleBefore = instant(nowMs - STALE_DAYS * 86_400_000);
       const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
       /* ONLY THE QUESTIONS DRAWN ARE READ WHOLE (`questionFrom`). Every other one is ranked and counted by its band in SQL
          (`BAND_SQL`), so no body is read into this process to be counted (audit 16, M5): before, the newest past two
@@ -7714,33 +7712,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                 .map((r) => [String(r.id), r]),
         );
       const open = countOpenQuestions({ sql, nowMs });
-      if (!keep && !sees) {
-        /* A STABLE ORDER: how long it can wait first (`weigh.ts` `WAIT_RANK_SQL`, AGT-C08: due inside two days or moving
-           money, then open past three days, then new), then the band, then the oldest first within it, since the
-           expensive question that has been sitting is the one worth meeting, and the id when two were asked in the same
-           millisecond, so two reads never swap them. */
-        const ids = sql
-          .all<{ id: string }>(
-            `SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${WAIT_RANK_SQL} ASC, ${BAND_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`,
-            now,
-            ...waitParams(nowMs),
-            drawn,
-          )
-          .map((r) => r.id);
-        const rows = whole(ids);
-        const questions = ids.flatMap((id) => {
-          const r = rows.get(id);
-          return r ? [questionFrom(r)] : [];
-        });
-        const counted = sql.one<{ stale: number; hard: number }>(
-          `SELECT COALESCE(SUM(opened_at < ?), 0) AS stale, COALESCE(SUM(${BAND_SQL} = 'undo'), 0) AS hard FROM suggestion WHERE ${OPEN}`,
-          staleBefore,
-          now,
-        );
-        return { questions, open, matched: open, stale: counted?.stale ?? 0, hardToUndo: counted?.hard ?? 0 };
-      }
-      /* A `where:` IS READ OVER THE FACTS OF EVERY OPEN QUESTION, each fact read in SQL: who asked, the kind, the band,
-         and what it is about. */
+      /* THE FACTS OF EVERY OPEN QUESTION, each read in SQL once: who asked, the kind, the band, how long it can wait and
+         what it is about, which a `where:` reads and the order and the counts are taken from. The band is the dear one
+         (`BAND_SQL` reads the declarations), and a queue with no `where:` once weighed every question twice, to order
+         them and again to count the hard ones. */
       const lean = sql
         .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; wait: string; about: string | null }>(
           `SELECT id, body_kind, opened_by, opened_at, ${BAND_SQL} AS cost, ${WAIT_SQL} AS wait,
@@ -7758,6 +7733,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* AND ONLY THE QUESTIONS THE READER IS SHOWN (`PageSees`), asked before anything is counted, so every count is hers. */
       const hers = sees ? lean.filter((q) => sees.question('suggestion', q.id)) : lean;
       const kept = keep ? hers.filter((q) => keep(q.facts)) : hers;
+      /* A STABLE ORDER: how long it can wait first (`weigh.ts` `waitRank`, AGT-C08: due inside two days or moving money,
+         then open past three days, then new), then the band, then the oldest first within it, since the expensive
+         question that has been sitting is the one worth meeting, and the id when two were asked in the same millisecond,
+         so two reads never swap them. */
       kept.sort((a, b) => waitRank(a.wait) - waitRank(b.wait) || costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       const ids = kept.slice(0, drawn).map((q) => q.id);
       const rows = whole(ids);
