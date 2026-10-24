@@ -213,6 +213,10 @@
           {busy ? words.applySending : waitsForCheck ? checkWords.send : words.applySend}
         </Button>
       </div>
+      <p class="agree">
+        {words.agree} <a class="link" href="https://brain.dog/legal/terms" target="_blank" rel="noopener">{words.terms}</a>
+        {words.agreeAnd} <a class="link" href="https://brain.dog/legal/privacy" target="_blank" rel="noopener">{words.privacy}</a>.
+      </p>
     </form>
   {/if}
   <p class="have">{words.haveAsk} <a class="link" href={at('/signin')}>{copy.signIn}</a></p>
@@ -315,6 +319,13 @@
 
   .go {
     display: flex;
+  }
+
+  .agree {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 20px;
   }
 
   /* THE ONE PRESS IS THE COLUMN'S WIDTH, as every way in on sign in is. */

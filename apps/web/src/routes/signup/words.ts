@@ -117,6 +117,15 @@ export const words = {
   /** Beside the two questions a person may leave blank. */
   optional: 'Optional',
   applySend: 'Ask for an invite',
+  /**
+   * THE ONE LINE UNDER EACH FORM THAT NAMES THE TERMS AND THE PRIVACY POLICY (the scope of 24 October, F8): the Terms say
+   * "By making an account or using BrainDog, you agree to these terms", and nothing on sign-up linked them. Short, so it
+   * is one line on a phone. Each link opens the site's own page in a tab of its own, so what was typed here stays.
+   */
+  agree: 'You agree to the',
+  terms: 'Terms',
+  agreeAnd: 'and',
+  privacy: 'Privacy policy',
   /** Under a field left empty when the button was pressed: why it is needed, and nothing more (first F16). */
   applyNeedsName: 'Add your name so we know who is asking.',
   applyNeedsEmail: 'Add your email so we can send the invite.',

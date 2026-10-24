@@ -354,3 +354,14 @@ test('SIGNED IN, NO EMAIL: the address field and the link are only for somebody 
   assert.match(PAGE, /const ready = \$derived\([^;]*signedIn !== null \|\|/, 'a person signed in still needs an email to go on');
   assert.match(PAGE, /\{#if signedIn === null && plan === 'free'\}<p class="quiet open-here">/, 'a person signed in is told to open a link');
 });
+
+test('BOTH FORMS LINK THE TERMS AND THE PRIVACY POLICY, in one short line under the press (F8)', () => {
+  const line = `${words.agree} ${words.terms} ${words.agreeAnd} ${words.privacy}.`;
+  assert.ok(line.length <= 48, `"${line}" fits one line at 390`);
+  assert.doesNotMatch(line, /—/u);
+  const apply = readFileSync(new URL('./Apply.svelte', import.meta.url), 'utf8');
+  for (const [name, source] of [['the make form', PAGE], ['the apply form', apply]] as const) {
+    assert.match(source, /<a class="link" href="https:\/\/brain\.dog\/legal\/terms" target="_blank" rel="noopener">\{words\.terms\}<\/a>/u, `${name} links the Terms`);
+    assert.match(source, /<a class="link" href="https:\/\/brain\.dog\/legal\/privacy" target="_blank" rel="noopener">\{words\.privacy\}<\/a>/u, `${name} links the Privacy policy`);
+  }
+});

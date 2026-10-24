@@ -1384,6 +1384,10 @@
         </Button>
       </div>
       {#if signedIn === null && plan === 'free'}<p class="quiet open-here">{onPhone ? words.openHere : words.openHereWide}</p>{/if}
+      <p class="quiet agree">
+        {words.agree} <a class="link" href="https://brain.dog/legal/terms" target="_blank" rel="noopener">{words.terms}</a>
+        {words.agreeAnd} <a class="link" href="https://brain.dog/legal/privacy" target="_blank" rel="noopener">{words.privacy}</a>.
+      </p>
     </form>
   {:else if step === 'lock'}
     <h1 class="entry-title" id="lock-h" tabindex="-1">{words.lockTitle}</h1>
@@ -1556,6 +1560,12 @@
     color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
+  }
+
+  /* THE TERMS LINE IS THE FORM'S SMALL PRINT, one line on a phone. */
+  .agree {
+    font-size: var(--fs-meta);
+    line-height: 20px;
   }
 
   .form {
