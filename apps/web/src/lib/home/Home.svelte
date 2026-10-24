@@ -1259,6 +1259,23 @@
     order: 19;
   }
 
+  /* UNDER A THUMB THE ⋯ IS IN THE HEAD, AS ON A DECLARED PAGE (Y24): at the end of the greeting's row, raised over the
+     board as a pointer raises it, and never a row of its own among the tiles, where it stood alone between People and
+     Handed back to you. The greeting keeps a tap of room at its end so no word runs under it. */
+  @media (hover: none) {
+    .today-head + .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .home-tools) {
+      position: absolute;
+      inset-block-end: 100%;
+      inset-inline-end: 0;
+      margin: 0;
+      padding-block-end: var(--sp-1);
+    }
+
+    .today-head:has(+ .body[data-board] :global(.home-tools :is(button, a))) {
+      padding-inline-end: calc(var(--tap) + var(--sp-2));
+    }
+  }
+
   /* ON A PHONE, NEEDS YOU'S FIRST QUESTION IS ANSWERED WHERE IT STANDS AND THE REST ARE ROWS (the Bento phone board): each
      after the first loses its buttons, its title keeps one line, and the whole row is the title's link to its page. */
   @media (width < 600px) {
