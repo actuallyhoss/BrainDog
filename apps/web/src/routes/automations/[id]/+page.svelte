@@ -209,18 +209,32 @@
     if (one.body) flow.open(one.id, one.body, one.version);
   }
 
+  /**
+   * THE SCREEN'S ONE CALL IS THE WHOLE OPENING, the list and then the one automation (audit B of 25 October, Y15). It was
+   * closed once the list came back, so with nothing else out the screen said it was ready while `from` was still
+   * `reading` and nothing was drawn: the look caught a blank page at 390 dark marked ready at 0.8 s.
+   */
   async function load(want: string) {
     const at = opened();
+    let ok = false;
+    try {
+      ok = await openOne(want);
+    } finally {
+      closed(ok, at);
+    }
+  }
+
+  /** The opening itself: whether it came back with something to draw, a refusal being the only `false`. */
+  async function openOne(want: string): Promise<boolean> {
     const out = await openAutomations((url, init) => fetch(url, init), apiBase(), { acted: true });
     source = out.source;
     const rows = out.first.ok ? out.first.value : [];
     taken = rows.map((r) => r.id);
     ruleNames = new Map(rows.map((r) => [r.id, r.name]));
-    closed(out.first.ok || out.absent, at);
     if (!out.first.ok && !out.absent) {
       fix = out.first.refusal.fix;
       from = 'refused';
-      return;
+      return false;
     }
     filed = null;
     refusal = '';
@@ -247,7 +261,7 @@
         startedAs = JSON.stringify(flow.body);
       }
       from = 'ready';
-      return;
+      return true;
     }
     /* THE LIST CARRIES NO BODY, so the one is asked for by its id. A record without the read cannot open one it has, and
        says so the same way as an id it does not have. */
@@ -255,13 +269,14 @@
     if (!one?.ok || !one.value.body) {
       row = null;
       from = 'missing';
-      return;
+      return true;
     }
     /* THE LISTS IT NAMES, LEARNT BEFORE ITS STEPS ARE DRAWN, so a field is said by its name ("As the bank wrote it")
        and never its id (`fieldName` in `flow.ts`). A list the record will not describe keeps its id in words. */
     await Promise.all(listsIn(one.value.body).map((list) => learn(described.schema, list, listsAsked))).catch(() => undefined);
     take({ ...one.value, acted: rows.find((r) => r.id === one.value.id)?.acted });
     from = 'ready';
+    return true;
   }
 
   /* THE SCRIPTS' TITLES BEFORE THE STEPS ARE DRAWN, so a script step names the script as it declares itself
