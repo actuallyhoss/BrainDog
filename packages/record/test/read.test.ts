@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { createRecordApi, type Boot, type CallContext, type Cursor, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
 import type { ArrivalSettled, Backlinks } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { bootFilled, type Boot as ClientBoot } from '../../client/src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 
@@ -218,7 +219,11 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   assert.equal(boot.counts.decide, 1);
   assert.equal(boot.counts.inbox, null, 'a reader was told how much waits in the inbox');
   assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, 0);
-  assert.deepEqual(boot.whatsNew, value<WhatsNew>(await api.whatsNew(undefined, bo)), 'boot and whatsNew disagree');
+  /* AS THE CLIENT READS IT (`bootFilled`): `boot` leaves out what a line need not say again (`newsCut`), and a line that
+     says a row was added carries none of its fields. */
+  const said = value<WhatsNew>(await api.whatsNew(undefined, bo));
+  const added = (e: WhatsNew['events'][number]) => (e.kind === 'create' && e.register !== null && e.title ? { ...e, to: null } : e);
+  assert.deepEqual(bootFilled(boot as unknown as ClientBoot).whatsNew, { ...said, events: said.events.map(added) }, 'boot and whatsNew disagree');
   sql.close();
 });
 
