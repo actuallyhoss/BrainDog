@@ -181,7 +181,11 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.ok(page, 'a project has its own page');
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
-    /* THE OPENING SENTENCE FIRST, which carries no heading: one note since portfolio 1.23.0, its second sentence said
+    /* THE PROJECT'S SHAPE FIRST, SINCE founder 3.3.0 (C28, C29): the hero with Path and Money, then Work and Who is on
+       it with Runs on and the agents on it, two blocks the app draws from its read of the project. */
+    'Overview',
+    'Work, people and agents',
+    /* THE OPENING SENTENCE, which carries no heading: one note since portfolio 1.23.0, its second sentence said
        while nothing is handed back. The figures beside it sit in the rail. */
     undefined,
     'Waiting on you',
@@ -190,10 +194,10 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     /* THE RAIL'S COLUMN SINCE portfolio 1.10.0: the figures, where it stands and what is handed back, one above the
        other beside the chart. */
     'At a glance',
-    /* TWICE SINCE portfolio 1.16.0: the typed card while somebody has said where it stands, else its own figures. */
+    /* TWICE SINCE portfolio 1.16.0: the typed card while somebody has said where it stands, else its own figures.
+       NO HANDED BACK OR BLOCKED SINCE founder 3.3.0: the Work tile's With you says it. */
     'Where it stands',
     'Where it stands',
-    'Handed back or blocked',
     /* ITS ROAD, SINCE portfolio 1.23.0: its stages in the rail, drawn only when it has any. */
     'The road',
     /* THE TEMPLATE SINCE work 1.15.0: the plan, then one More about tile holding what changed, who worked on it, its
@@ -207,8 +211,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'More about Harbour app',
     'What changed',
     'Agents',
+    /* NO MONEY BY MONTH SINCE founder 3.3.0: the Money tile's bars say it. */
     'Notes',
-    'Money by month',
     'Bills and invoices',
     'Keeping it alive',
     /* SINCE founder 2.6.0's last step: what it runs on has a heading of its own, with what reaches it from everywhere. */
@@ -222,8 +226,9 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
   /* ONE NOTE SINCE portfolio 1.23.0: nothing is handed back, so it says its second sentence and not the first. */
-  assert.notEqual(blocks[0]!.drawn, false, 'the opening note is drawn');
-  assert.doesNotMatch(String((blocks[0] as { body?: unknown }).body ?? ''), /handed back/u, 'nothing is handed back, so that sentence is not said');
+  const opening = blocks.find((b) => b.kind === 'note' && (b as { lead?: unknown }).lead === true)!;
+  assert.notEqual(opening.drawn, false, 'the opening note is drawn');
+  assert.doesNotMatch(String((opening as { body?: unknown }).body ?? ''), /handed back/u, 'nothing is handed back, so that sentence is not said');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
   /* FOUND BY HEADING, since the template's blocks move with each version and a place in the list says nothing. */
   const headed = (heading: string) => blocks.find((b) => b.heading === heading)!;

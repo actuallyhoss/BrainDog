@@ -28,6 +28,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
     {
+      version: '3.3.0',
+      notes: "A project page says what its own picture is made of: its overview with its path and money, and its work, who is on it, what it runs on and the agents on it, each a part of the page that can be moved or hidden like any other. Two tiles that only repeated it went.",
+    },
+    {
       version: '3.2.0',
       notes: "A project page draws the project's stages as its road, each with the line that says when it is done and the next one marked. A project with both stages and dated work can keep its plan as its stages alone or as a roadmap alone.",
     },
@@ -56,6 +60,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    {
+      version: '2.25.0',
+      notes: "A project page says what its own picture is made of: its overview with its path and money, and its work, who is on it, what it runs on and the agents on it, each a part of the page that can be moved or hidden like any other. Two tiles that only repeated it went.",
+    },
     {
       version: '2.24.0',
       notes: "A project page draws the project's stages as its road, each with the line that says when it is done and the next one marked. A project with both stages and dated work can keep its plan as its stages alone or as a roadmap alone.",

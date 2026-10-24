@@ -1398,6 +1398,19 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     layout: { rail: 4 },
     requires: ['register.things', 'register.stages', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
     blocks: [
+      /* THE PROJECT'S OWN SHAPE, AS BLOCKS OF ITS PAGE, SINCE founder 3.3.0 and team 2.25.0 (C28, C29, 24 October): its hero with its
+         Path and Money under it, then its Work and Who is on it with Runs on and the agents on it under them. They were
+         drawn by hand over the blocks below, so the page pulled as text did not say they were there and none could be
+         moved, hidden or changed. Each is a `project` block now, its parts named in the order they are drawn, read for
+         the row the page is about, and drawn only where a part of it has something to say: a part with nothing is left
+         out, and its partner beside it takes the whole row. The widths are the shape's from a wide screen: the path at
+         two thirds beside the money, the work beside who is on it, what it runs on beside who was here today.
+
+         TWO BLOCKS AND NOT A PART A BLOCK, since a page holds 24 blocks and shows six tiles before it folds, and a
+         founder's project page held 24 already. So two blocks the page drew only where the shape was not went for them:
+         Handed back or blocked (the Work tile's With you) and Money by month (the Money tile's bars). */
+      { kind: 'project', parts: ['hero', 'path', 'money'], heading: 'Overview', icon: 'eye', span: 12 },
+      { kind: 'project', parts: ['work', 'people', 'runs-on', 'agents'], heading: 'Work, people and agents', icon: 'task', span: 12 },
       /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
          (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
          instead, as the launch desk's are.
@@ -1533,29 +1546,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         when: { metric: 'project-said:{{name}}', is: 0 },
       },
-      {
-        /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.
-           Its own heading, since the questions above are what "Waiting on you" names on every module's page.
-
-           IN THE RAIL, AND ONLY WHILE IT LISTS A TASK, SINCE portfolio 1.10.0 (`project-held-up`, over its own clauses).
-           It was drawn on everything open, to keep a row whole beside What is open, and that row is gone.
-
-           A TO-DO AND NOT A TABLE, SINCE portfolio 1.12.0: three columns squeezed into a rail cut "Decide the licensing
-           tie…" to a stub, and "Changed by: You, 3 Sep" told a person what they did themselves. Each task is one line
-           with its status beside it, and can be ticked off where it is read. */
-        kind: 'todo',
-        heading: 'Handed back or blocked',
-        icon: 'hourglass',
-        span: 12,
-        area: 'rail',
-        source: 'register.tasks',
-        where: 'thing is {{name}}, state is review or blocked',
-        columns: [{ field: 'what' }, { field: 'state' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 6,
-        when: { metric: 'project-held-up:{{name}}', gt: 0 },
-        empty: 'Nothing on {{name}} is handed back or blocked.',
-      },
       /* NO DONE, BY WEEK, SINCE founder 2.3.0 and team 2.18.0: from work 1.10.0 it charted what was finished on the
          project each of the last eight weeks, the whole of the main column, and on most projects that is a bar of 1
          beside a bar of 2. Done this week is the last figure of At a glance. */
@@ -1624,15 +1614,20 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 12,
         box: true,
         panel: 'actions',
+        /* FOLDED SHUT, SINCE founder 3.3.0 and team 2.25.0, as the project's page has drawn it since the hero (`project-page.ts`):
+           said here, so the page read as text says so too. */
+        fold: true,
       },
       {
         /* WHAT CHANGED ON THE PROJECT, from the record's own log, newest first: who said how it is going, what is next and
            how far along, a person or an agent or a rule. `{{spoken}}` is this project's row, which is what an edit of it
-           names as its target. THREE, SINCE work 1.15.0, and the project's own history holds the rest. */
+           names as its target. THREE, SINCE work 1.15.0, and the project's own history holds the rest. THE TILE'S WIDTH
+           SINCE founder 3.3.0 and team 2.25.0, and so are the agents' cards: with Money by month gone, the rules' look
+           ordered a half between two whole rows, a hole beside it, and the project's page drew both whole already. */
         kind: 'feed',
         heading: 'What changed',
         icon: 'activity',
-        span: 6,
+        span: 12,
         source: 'activity',
         where: 'target is {{spoken}}',
         first: 3,
@@ -1649,7 +1644,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Agents',
         icon: 'bot',
-        span: 6,
+        span: 12,
         columns: [{ field: 'agent', as: 'title' }, { field: 'doing_said', as: 'reply' }, { field: 'last_seen', as: 'when' }],
         source: 'register.session',
         /* BY `project`, WHICH HOLDS THE PROJECT'S SPOKEN ID, `things#1`. `{{spoken}}` is that id for the
@@ -1672,25 +1667,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 12,
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
-      },
-      {
-        /* ITS MONEY MONTH BY MONTH, in and out, from what moved in the twelve months to now, with what was left each month
-           as a line. Read from Money's transactions, so a record that keeps no Money has the page without it
-           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does. HALF THE
-           TILE FROM work 1.15.0, beside the bills and invoices, AND THE TILE'S WIDTH AGAIN since the keys, tools and
-           skills left for Runs on: five halves were left here, so the last of them sat beside a hole over the next
-           heading (`apps/web/src/lib/record/layout.test.ts`). A chart of twelve months reads better wide, and the four
-           halves left pair up in whatever order the page's look puts them. */
-        kind: 'series',
-        heading: 'Money by month',
-        icon: 'chart-column',
-        span: 12,
-        series: [
-          { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
-          { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
-        ],
-        back: 12,
-        net: true,
       },
       {
         kind: 'table',

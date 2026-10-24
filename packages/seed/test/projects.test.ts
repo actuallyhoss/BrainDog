@@ -357,7 +357,10 @@ test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be ch
   const page = opened(k, 'kiln');
   const leads = page.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false);
   assert.equal(leads.length, 1, 'not exactly one line');
-  assert.equal(page.blocks.find((b) => b.drawn !== false), leads[0], 'the line is not the first thing drawn');
+  /* THE PROJECT'S SHAPE OPENS THE PAGE, SINCE founder 3.3.0 and team 2.25.0 (C28, C29), and the line comes straight
+     after it, as it was drawn under the shape when the shape was drawn by hand. */
+  assert.deepEqual(page.blocks.slice(0, 2).map((b) => b.kind), ['project', 'project'], 'the page does not open on its shape');
+  assert.equal(page.blocks.find((b) => b.drawn !== false && b.kind !== 'project'), leads[0], 'the line is not the first thing drawn after the shape');
   const kiln = THINGS.find((t) => t.name === 'Kiln')!;
   /* THE NEXT STEP ALONE, SINCE portfolio 1.12.0: the title already names the project. */
   assert.equal((leads[0] as { body?: string }).body, String(kiln.next));
@@ -372,28 +375,22 @@ test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be ch
   assert.deepEqual(back.map((b) => (b as { body?: string }).body), ['Work on Kiln has been handed back, and it waits for you to check it.']);
 });
 
-test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN BESIDE ITS PLAN, and lists its open work once', async () => {
+test('A PROJECT PAGE KEEPS WHERE IT STANDS IN ONE COLUMN BESIDE ITS PLAN, and lists its open work once', async () => {
   /* SINCE portfolio 1.10.0: Where it stands was five twelfths beside a chart twice its height, Handed back seven beside
      What is open, and What is open listed the tasks the plan under it draws again. */
   const k = await seeded();
   const page = opened(k, 'kiln');
   const of = (heading: string) => block(page, heading) as ReturnType<typeof block> & { area?: string; span?: number };
-  assert.deepEqual(['At a glance', 'Where it stands', 'Handed back or blocked'].map((h) => of(h).area), ['rail', 'rail', 'rail']);
+  assert.deepEqual(['At a glance', 'Where it stands'].map((h) => of(h).area), ['rail', 'rail']);
   /* AND NO CHART BESIDE THEM SINCE founder 2.3.0 and team 2.18.0: the plan leads the main column, the whole of it. */
   assert.ok(!page.blocks.some((b) => b.heading === 'Done, by week'), 'the weeks are a tile of their own again');
   assert.deepEqual([of('The plan').area, of('The plan').span], [undefined, 12]);
   assert.ok(!page.blocks.some((b) => b.heading === 'What is open'), 'the open tasks are listed twice');
-  /* KILN HAS A BLOCKED TASK, so what is handed back is drawn; a project with none draws no tile saying so. */
-  assert.notEqual(of('Handed back or blocked').drawn, false);
-  for (const slug of ['kiln', 'marlow-co', 'portage']) {
-    const held = block(opened(k, slug), 'Handed back or blocked');
-    assert.equal(held.drawn !== false, held.rows.length > 0, `${slug}: drawn over nothing, or hidden over a task`);
-  }
-  const portage = THINGS.findIndex((t) => t.name === 'Portage') + 1;
-  const open = k.list({ register: 'tasks', where: `thing is things#${portage}, state is review or blocked` } as never);
-  assert.ok(open.ok, sayOf(open));
-  for (const t of open.value.rows) assert.ok(k.update('tasks', t.id, { state: 'open' } as never, { actor: 'p_1', version: t.version } as never).ok);
-  assert.equal(block(opened(k, 'portage'), 'Handed back or blocked').drawn, false, 'a tile saying nothing is handed back');
+  /* WHAT IS HANDED BACK OR BLOCKED IS THE WORK TILE'S WITH YOU, SINCE founder 3.3.0 and team 2.25.0 (C28, C29): its
+     tile, drawn only where the shape was not, went for the shape's parts, which the page declares. */
+  assert.ok(!page.blocks.some((b) => b.heading === 'Handed back or blocked'), 'what is handed back is said twice');
+  const work = page.blocks.find((b) => b.kind === 'project' && ((b as { parts?: string[] }).parts ?? []).includes('work'));
+  assert.ok(work && work.drawn !== false, 'the page declares no Work part');
 });
 
 test('A PROJECT PAGE SAYS WHAT WAS FINISHED THIS WEEK AT A GLANCE, ITS MONEY BY THE MONTH, AND WHAT IT RUNS ON UNDER MORE ABOUT IT', async () => {
@@ -432,9 +429,20 @@ test('A PROJECT PAGE SAYS WHAT WAS FINISHED THIS WEEK AT A GLANCE, ITS MONEY BY 
   const line = cards.trends?.[cards.rows.findIndex((r) => r.fields.name === 'Kiln')];
   assert.ok(Array.isArray(line) && line.reduce((n: number, v) => n + (v ?? 0), 0) > 0, 'nothing finished on Kiln in the weeks its card draws');
 
-  /* THIS MONTH IS THE CHART'S NEWEST MONTH, SINCE portfolio 1.8.0, and not a tile beside it saying it again: in and out
-     to the minor unit, over the same rows. */
-  const byMonth = block(page, 'Money by month');
+  /* THIS MONTH IS THE NEWEST MONTH OF THE MONEY TILE'S BARS, SINCE portfolio 1.8.0, and not a tile beside it saying it
+     again: in and out to the minor unit, over the same rows. THE MONEY PART DRAWS THEM SINCE founder 3.3.0 and team
+     2.25.0 (C28, C29), from the two figures Money by month drew, so they are read here as that chart read them. */
+  assert.ok(!page.blocks.some((b) => b.heading === 'Money by month'), 'the months are drawn twice');
+  const byMonth = k.block({
+    kind: 'series',
+    series: [
+      { metric: 'project-in-by-month:Kiln', label: 'Money in' },
+      { metric: 'project-out-by-month:Kiln', label: 'Money out', dir: 'out' },
+    ],
+    back: 12,
+    net: true,
+  } as never);
+  assert.deepEqual(byMonth.refusals, []);
   assert.deepEqual(byMonth.bars?.values.map((line) => Math.abs(line.at(-1) ?? 0)), [50_000, 12_000]);
   assert.ok(!page.blocks.some((b) => b.heading === 'This month so far'), 'the month so far is said beside the chart that draws it');
 

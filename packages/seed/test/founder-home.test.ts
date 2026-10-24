@@ -258,6 +258,14 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   const asBefore = (blocks: Block[]): Block[] =>
     blocks.flatMap((b): Block[] => {
       if (b.kind === 'kpis' || (b.kind === 'steps' && b.heading === 'The road')) return [];
+      /* AND THE PROJECT'S SHAPE AS BLOCKS, SINCE founder 3.3.0 (C28, C29): its two blocks, and More about declared folded
+         as it was drawn, laid back here too. */
+      if (b.kind === 'project') return [];
+      if (b.kind === 'section' && b.box === true && b.fold === true) {
+        const { fold: _fold, ...rest } = b;
+        return [rest as Block];
+      }
+      if ((b.kind === 'feed' && b.heading === 'What changed') || (b.kind === 'cards' && b.heading === 'Agents')) return [{ ...b, span: 6 }];
       if (b.kind === 'note' && b.lead === true && Array.isArray(b.says)) {
         const { says, ...rest } = b;
         return [
@@ -273,7 +281,12 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[] })[]).map((d) =>
     d.page === 'project' ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: asBefore(d.blocks as Block[]) } : d,
   );
-  assert.deepEqual(less, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
+  /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. */
+  const WENT = new Set(['Handed back or blocked', 'Money by month']);
+  const was26 = frozen.pack.declarations
+    .filter((d) => d.register !== 'datapoints')
+    .map((d) => ((d as Page).page === 'project' ? { ...d, blocks: ((d as Page).blocks as Block[]).filter((b) => !WENT.has(String(b.heading))) } : d));
+  assert.deepEqual(less, was26, '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
   assert.equal(next.hands['register.datapoints'], 'portfolio');
   const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;
   const laid = next.extends['register.datapoints']!.fields;

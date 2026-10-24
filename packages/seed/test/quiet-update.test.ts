@@ -1346,8 +1346,56 @@ const roadBefore = (doc: Body): Body =>
       }),
   );
 
+/** Handed back or blocked, as the project page declared it until founder 3.3.0 and team 2.25.0. */
+const HANDED_BACK: Body = {
+  kind: 'todo',
+  heading: 'Handed back or blocked',
+  icon: 'hourglass',
+  span: 12,
+  area: 'rail',
+  source: 'register.tasks',
+  where: 'thing is {{name}}, state is review or blocked',
+  columns: [{ field: 'what' }, { field: 'state' }],
+  order: [{ field: 'by', dir: 'asc' }],
+  limit: 6,
+  when: { metric: 'project-held-up:{{name}}', gt: 0 },
+  empty: 'Nothing on {{name}} is handed back or blocked.',
+};
+
+/** Money by month, as the project page declared it until founder 3.3.0, on a record that keeps Money's transactions. */
+const MONEY_BY_MONTH: Body = {
+  kind: 'series',
+  heading: 'Money by month',
+  icon: 'chart-column',
+  span: 12,
+  series: [
+    { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
+    { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
+  ],
+  back: 12,
+  net: true,
+};
+
+/**
+ * THE PROJECT PAGE AS IT WAS BEFORE ITS SHAPE WAS BLOCKS (founder 3.3.0, team 2.25.0; C28 and C29): no `project`
+ * blocks, More about not declared folded, Handed back or blocked and Money by month back at their places, and What
+ * changed and the agents' cards half a row each.
+ */
+const shapeBefore = (doc: Body, id: string): Body =>
+  withPage(doc, 'project', (now) =>
+    now.flatMap((b): Body[] => {
+      if (b.kind === 'project') return [];
+      if (b.kind === 'section' && b.box === true && b.fold === true) return [(({ fold: _fold, ...section }) => section)(b)];
+      if (b.key === 'stands-figures') return [b, HANDED_BACK];
+      if (b.kind === 'note' && b.document === true && id === 'founder') return [b, MONEY_BY_MONTH];
+      if (b.kind === 'feed' && b.heading === 'What changed') return [{ ...b, span: 6 }];
+      if (b.kind === 'cards' && b.heading === 'Agents') return [{ ...b, span: 6 }];
+      return [b];
+    }),
+  );
+
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(roadBefore(doc), id), id)), id), id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(roadBefore(shapeBefore(doc, id)), id), id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* AND UNTIL THE KPI PLAN OF 21 OCTOBER (K3-C) no project page drew its Key numbers. */

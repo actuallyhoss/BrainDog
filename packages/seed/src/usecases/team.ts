@@ -231,8 +231,14 @@ export const TEAM = {
      2.24.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October, C18 and C19): the project page it embeds draws the
      project's stages as its road in the rail, keeps its plan as its road or its roadmap alone once a shape is kept,
      and opens on one note of two sentences where it was two notes. A block added, nothing taken away, and 2.23.0 is
-     published, so a minor step of its own. */
-  version: '2.24.0',
+     published, so a minor step of its own.
+
+     2.25.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October, C28 and C29): the project page it embeds
+     declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two
+     `project` blocks where they were drawn by hand over the page; Handed back or blocked, which the page drew only
+     where the shape was not, went for them, and More about is declared folded, as it was drawn. No id added or taken
+     away, and 2.24.0 is live, so a minor step of its own. */
+  version: '2.25.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

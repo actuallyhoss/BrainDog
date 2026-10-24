@@ -251,7 +251,13 @@ test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and it
   const headings = page.blocks.map((b) => b.heading);
   assert.ok(headings.includes('Where it stands') && headings.includes('Waiting on you') && headings.includes('Agents'), headings.join(', '));
   assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
-  assert.deepEqual(page.blocks.find((b) => b.heading === 'Handed back or blocked')!.rows?.map((r) => r.fields.what), ['Review the store listing']);
+  /* WHAT IS HANDED BACK IS THE WORK TILE'S WITH YOU SINCE team 2.25.0 (C28, C29): the page declares the shape's parts,
+     which the app draws from its read of the product, and its own tile of the same tasks went. */
+  assert.deepEqual(page.blocks.filter((b) => b.kind === 'project').map((b) => (b as { parts?: string[] }).parts), [['hero', 'path', 'money'], ['work', 'people', 'runs-on', 'agents']]);
+  assert.ok(!headings.includes('Handed back or blocked'), 'what is handed back is said twice');
+  const held = k.list({ register: 'tasks', where: `thing is things#${product.seq}, state is review or blocked` } as never);
+  assert.ok(held.ok);
+  assert.deepEqual(held.value.rows.map((r) => r.fields.what), ['Review the store listing'], 'the Work tile has the task to say');
   /* THE ROW OF FIGURES IS MADE UP FROM ITS TICKETS, with money left out: open, due soon, in review, done this week. */
   const glance = page.blocks.find((b) => b.heading === 'At a glance')! as unknown as { readings: { label?: string; reading: { value: number } | null }[] };
   assert.deepEqual(glance.readings.map((r) => [r.label, r.reading?.value]), [['Open', 1], ['Due soon', 0], ['In review', 1], ['Done this week', 0]]);
