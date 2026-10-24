@@ -39,7 +39,8 @@
   import { lanesOf } from '$lib/shell/side.ts';
   import VisualStrip from '../visual/VisualStrip.svelte';
   import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
-  import { HEALTH, cardKpiOf, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
+  import { HEALTH, daySaid, figureOf, hueOf, slotStyle } from '$lib/home/project-cards.ts';
+  import { cardKpiOf } from '$lib/home/card-kpi.ts';
   import { pathOf, trendOf } from '$lib/record/visuals.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { money, monthShort } from 'braindog-render';

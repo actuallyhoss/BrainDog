@@ -10,7 +10,8 @@ import { hueFor } from '../ui/hue.ts';
 import { REGISTERS } from '../record/held.ts';
 import { learnRowPages } from '../record/row-href.ts';
 import type { RegisterDecl } from '../record/schema.ts';
-import { DESK_MOST, agentsOn, cardKpiOf, cardsOf, trendsOf, projectsOf, withKpis, type CardDecl, type KpiAnswered } from './project-cards.ts';
+import { cardKpiOf, withKpis, type KpiAnswered } from './card-kpi.ts';
+import { DESK_MOST, agentsOn, cardsOf, trendsOf, projectsOf, type CardDecl } from './project-cards.ts';
 
 const decl: CardDecl = {
   id: 'ventures',

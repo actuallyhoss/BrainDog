@@ -12,7 +12,7 @@
 import { createClient } from '@braindog/client';
 import { KPIS_KIND } from 'braindog-render';
 
-import type { KpiAnswered } from './project-cards.ts';
+import type { KpiAnswered } from './card-kpi.ts';
 
 /** The most key numbers asked for the cards: one a project, and the desk and Projects draw fewer projects than this. */
 const MOST = 200;

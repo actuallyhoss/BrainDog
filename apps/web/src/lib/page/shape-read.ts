@@ -28,7 +28,7 @@ import { linkReader } from '../record/links-live.ts';
 import { handFor } from '../record/hand.ts';
 import { midnightOf, sessionsOf, type SessionRow } from '../record/today-live.ts';
 import { isProject, type Figure, type shapeOf } from '../record/project.ts';
-import type { KpiAnswered } from '../home/project-cards.ts';
+import type { KpiAnswered } from '../home/card-kpi.ts';
 import type { Months } from '../record/visuals.ts';
 import { rowReader } from '../record/row-live.ts';
 import { readBoot, recordNow } from '../record/boot-live.ts';

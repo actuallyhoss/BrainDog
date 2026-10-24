@@ -69,7 +69,8 @@
   import { blockWords } from '$lib/record/block-edit.ts';
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
   import KpisBlock from '$lib/kpis/KpisBlock.svelte';
-  import { agentsOn, cardFactsOf, cardsOf, trendsOf, withKpis, type CardDecl, type KpiAnswered } from '$lib/home/project-cards.ts';
+  import { agentsOn, cardFactsOf, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import { withKpis, type KpiAnswered } from '$lib/home/card-kpi.ts';
   import { knowProjects } from './known-project.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { valueSaid } from '$lib/voice.ts';
