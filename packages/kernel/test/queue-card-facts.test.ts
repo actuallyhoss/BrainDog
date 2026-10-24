@@ -197,3 +197,31 @@ test('ONE QUESTION READ ON ITS OWN SAYS WHAT THE QUEUE SAYS, and the run and the
 
   assert.equal(k.queueQuestion('nothing-here'), null);
 });
+
+test('A CHANGE TO MANY ROWS SAYS WHAT IT MOVES THEM TO, AND NEW ROWS SAY THEIR NAMES, so the card can draw them', async () => {
+  const { k } = await record();
+  value(k.create('tasks', { what: 'Bisque', stage: 'to_do' }, OWNER));
+  value(k.create('tasks', { what: 'Fire', stage: 'to_do' }, OWNER));
+  value(
+    k.propose(
+      {
+        question: 'Put both in the kiln, and name the first one again?',
+        body_kind: 'rowset',
+        body: {
+          register: 'tasks',
+          rows: [
+            { at: 'tasks#2', version: 1, patch: { stage: 'in_kiln', pin: '9999' } },
+            { at: 'tasks#3', version: 1, patch: { stage: 'in_kiln' } },
+            { at: 'tasks#1', version: 1, patch: { what: 'Glaze test two' } },
+          ],
+        },
+      } as never,
+      OWNER,
+    ),
+  );
+  value(k.propose({ question: 'Add two?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Kiln wash' }, { what: 'Cones' }] } } as never, OWNER));
+  const [moved, added] = queued(k).sort((a, b) => a.id.localeCompare(b.id));
+  /* A CHOICE BY ITS LABEL, WITH HOW MANY ROWS; A SECRET AND A LONG TEXT NEVER. */
+  assert.deepEqual(moved?.rows_said, { list: 'Tasks', rows: 3, adds: [], more: 0, moves: [{ field: 'stage', to: 'In the kiln', n: 2 }] });
+  assert.deepEqual(added?.rows_said, { list: 'Tasks', rows: 2, adds: ['Kiln wash', 'Cones'], more: 0, moves: [] });
+});

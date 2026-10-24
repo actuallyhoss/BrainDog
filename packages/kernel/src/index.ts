@@ -173,7 +173,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -7221,6 +7221,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const patched = rows.some((x) => 'at' in x && x.patch !== null && typeof x.patch === 'object' && Object.values(x.patch as Record<string, unknown>).some((v) => moneyIn(v) !== null));
     if (money.length > 0 && !patched) out.records = true;
     const [only] = rows;
+    const said = every ? rowsSaidOf(register, rows) : null;
+    if (said !== null) out.rows_said = said;
     if (!every || rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
     const row = get(only.at, { includeDeleted: true });
     const list = registers.get(register);
@@ -7248,6 +7250,37 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     });
     if (changes.length > 0) out.changes = changes;
     return out;
+  };
+
+  /**
+   * WHAT A ROWSET OF MANY ROWS, OR OF NEW ONES, DOES, IN NAMES (`QueueQuestion.rows_said`): read off the body and the
+   * list's own declaration alone, so a card of forty rows reads no row. A choice is said by its label, a word or a number
+   * as it is; a link, a secret, a file, money and a long text are left out, which a card says in its other lines.
+   */
+  const rowsSaidOf = (register: string, rows: readonly Record<string, unknown>[]): NonNullable<QueueQuestion['rows_said']> | null => {
+    const list = registers.get(register);
+    const adds = rows.filter((x) => !('at' in x));
+    if (!list || (rows.length < 2 && adds.length === 0)) return null;
+    const titles = adds.map((x) => x[list.title]).filter((t): t is string => typeof t === 'string' && t.trim() !== '').map((t) => clipTitle(t.trim()));
+    const counted = new Map<string, { field: string; label?: string; to: Json; n: number }>();
+    for (const x of rows) {
+      const patch = 'at' in x ? x.patch : null;
+      if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) continue;
+      for (const [field, value] of Object.entries(patch as Record<string, unknown>)) {
+        const spec = list.fields.find((f) => f.id === field);
+        if (!spec || (spec.type !== 'enum' && spec.type !== 'bool' && spec.type !== 'int' && spec.type !== 'day')) continue;
+        if (value === null || value === undefined || (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')) continue;
+        const to = spec.type === 'enum' && typeof value === 'string' ? (spec.labels?.[value] ?? value) : value;
+        const key = `${field}\n${String(to)}`;
+        const label = typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : undefined;
+        const was = counted.get(key);
+        if (was) was.n += 1;
+        else counted.set(key, { field, ...(label ? { label } : {}), to: to as Json, n: 1 });
+      }
+    }
+    const moves = [...counted.values()].sort((a, b) => b.n - a.n).slice(0, ROWS_SAID_MOVES);
+    if (titles.length === 0 && moves.length === 0) return null;
+    return { list: list.name, rows: rows.length, adds: titles.slice(0, ROWS_SAID_NAMES), more: Math.max(0, titles.length - ROWS_SAID_NAMES), moves };
   };
 
   /** The lists a read of what went quiet watches: every one this record declares but the kernel's own list of runs. */

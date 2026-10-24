@@ -705,6 +705,13 @@ export type QueueQuestion = {
   records?: true;
   /** What accepting changes on the one row a question updates: each field, its name, what it holds now and what it will. */
   changes?: { field: string; label?: string; before: Json | null; after: Json | null }[];
+  /**
+   * WHAT ACCEPTING DOES TO MANY ROWS, said once for the card's picture (§45 "every decision carries its options drawn"):
+   * the list, the titles of the rows it adds (`ROWS_SAID_NAMES` at most, and how many more), and the value each field it
+   * sets most often moves rows to, with how many. Only on a rowset of more than one row or of new rows, where `changes`
+   * says nothing. A link, a secret, a file and money are never said here: money has its own line (`money`).
+   */
+  rows_said?: { list: string; rows: number; adds: string[]; more: number; moves: { field: string; label?: string; to: Json; n: number }[] };
   /** The kinds of change it is (`change-kind.ts`'s keys, `tasks:move:done`), dearest first, as the ladder counts it. */
   kinds?: string[];
   /**
@@ -722,7 +729,11 @@ export type QueueQuestion = {
  * change it is. The same facts a queue's question carries, so a card drawn outside a page's queue says what the queue's
  * says.
  */
-export type QuestionFacts = Pick<QueueQuestion, 'run' | 'drafted_by' | 'money' | 'records' | 'changes' | 'kinds'>;
+export type QuestionFacts = Pick<QueueQuestion, 'run' | 'drafted_by' | 'money' | 'records' | 'changes' | 'kinds' | 'rows_said'>;
+
+/** The most new rows' titles a card's picture names, and the most moves it says. */
+export const ROWS_SAID_NAMES = 6;
+export const ROWS_SAID_MOVES = 4;
 
 /** One name a merge question is about: its handle (`people#4`), its name, where it was seen, and whether it is kept. */
 export type QueueCandidate = { at: string; name: string; seen: string[]; kept?: true };

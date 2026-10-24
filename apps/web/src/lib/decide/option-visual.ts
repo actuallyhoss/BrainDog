@@ -34,7 +34,10 @@ export type OptionVisual =
   | { kind: 'date'; today: number; due: number; days: number; was: number | null; late: boolean }
   | { kind: 'change'; what: string; before: string; after: string }
   | { kind: 'merge'; names: string[]; into: string }
-  | { kind: 'filing'; list: string; figure: string };
+  | { kind: 'filing'; list: string; figure: string }
+  /* MANY ROWS AT ONCE (the thinking scope of 24 October, C20): the rows it adds, by name, or what it moves them to. */
+  | { kind: 'adds'; list: string; names: string[]; more: number }
+  | { kind: 'moves'; list: string; rows: number; moves: { what: string; to: string; n: number }[] };
 
 const rec = (v: unknown): Record<string, unknown> | null => (typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
@@ -138,5 +141,24 @@ export function visualOf(q: QueueQuestion, option: { key: string }, ctx: VisualC
     const [b, a] = [nameOrNull(first.before), nameOrNull(first.after)];
     if (b !== null && a !== null && b !== a) return { kind: 'change', what: nameOrNull(first.field) ?? '', before: b, after: a };
   }
-  return null;
+  return applies ? rowsVisual(q) : null;
+}
+
+/**
+ * WHAT A CHANGE TO MANY ROWS DOES, DRAWN (the thinking scope of 24 October, C20: "every open card draws what its options
+ * change"): the cleanup cards on his record, nine projects moved or forty keys retired or a person added, drew nothing,
+ * since `changes` says one row. The record says them once (`rows_said`): the rows it adds by name, else what it moves
+ * them to, most first. Nothing is drawn where it says neither.
+ */
+export function rowsVisual(q: QueueQuestion): OptionVisual | null {
+  const said = q.rows_said;
+  const list = nameOrNull(said?.list);
+  if (!said || list === null) return null;
+  const names = said.adds.map((n) => nameOrNull(spoken(n))).filter((n): n is string => n !== null);
+  if (names.length > 0) return { kind: 'adds', list, names, more: said.more + (said.adds.length - names.length) };
+  const moves = said.moves.flatMap((m) => {
+    const to = nameOrNull(typeof m.to === 'boolean' ? (m.to ? 'yes' : 'no') : String(m.to));
+    return to === null ? [] : [{ what: nameOrNull(m.label) ?? nameOrNull(m.field.replace(/_/gu, ' ')) ?? '', to, n: m.n }];
+  });
+  return moves.length > 0 ? { kind: 'moves', list, rows: said.rows, moves } : null;
 }

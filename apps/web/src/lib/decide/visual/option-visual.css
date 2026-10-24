@@ -17,4 +17,6 @@
 .ov-merge .ov-was { text-decoration: none; }
 .ov-now, .ov-list { font-weight: 600; overflow-wrap: anywhere; }
 .ov-arrow { color: var(--ink-3); }
+.ov-adds .ov-names > span, .ov-moves .ov-move { padding: 0 var(--sp-2); border-radius: var(--r-ctl); background: color-mix(in srgb, var(--ink) 6%, var(--tile)); overflow-wrap: anywhere; }
+.ov-moves { gap: var(--sp-1) var(--sp-2); }
 @media (prefers-reduced-motion: no-preference) { .ov-fill { transition: inline-size var(--d-state) var(--ease-out); } }

@@ -81,3 +81,34 @@ test('text that is no day on the calendar is no day', () => {
   assert.equal(dayOf('2026-02-30'), null);
   assert.notEqual(dayOf('2026-02-28'), null);
 });
+
+test('a change to many rows draws what it moves them to, and new rows draw by name, where the card drew nothing', () => {
+  /* NINE PROJECTS MOVED AT ONCE, as the cleanup card on his record asks: the most common move first. */
+  const moved = ask({
+    rows_said: {
+      list: 'Projects',
+      rows: 9,
+      adds: [],
+      more: 0,
+      moves: [
+        { field: 'lane', label: 'Status', to: 'Building', n: 5 },
+        { field: 'lane', label: 'Status', to: 'Finished', n: 2 },
+      ],
+    },
+  });
+  assert.deepEqual(visualOf(moved, { key: 'accept' }, { now }), {
+    kind: 'moves',
+    list: 'Projects',
+    rows: 9,
+    moves: [
+      { what: 'Status', to: 'Building', n: 5 },
+      { what: 'Status', to: 'Finished', n: 2 },
+    ],
+  });
+  /* A PERSON ADDED, BY NAME, and nothing drawn for the answer that leaves things as they are. */
+  const added = ask({ rows_said: { list: 'People', rows: 1, adds: ['Layla'], more: 0, moves: [] } });
+  assert.deepEqual(visualOf(added, { key: 'accept' }, { now }), { kind: 'adds', list: 'People', names: ['Layla'], more: 0 });
+  assert.equal(visualOf(added, { key: 'reject' }, { now }), null);
+  /* A CARD THAT SAYS NEITHER STILL DRAWS NOTHING. */
+  assert.equal(visualOf(ask({ rows_said: { list: 'Keys', rows: 40, adds: [], more: 0, moves: [] } }), { key: 'accept' }, { now }), null);
+});
