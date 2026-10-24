@@ -93,3 +93,28 @@ test('the screen draws the declared page through the one reader, and says its ow
   assert.match(screen, /sentenceOf\(rows\)/u);
   assert.doesNotMatch(screen, /HubRows/u, 'the list is the page’s table now, not rows built by hand');
 });
+
+/* SAY WHAT THE MONTH COUNTS (audit B of 25 October, Y11): Scripts said 64 runs where Automations said 42, and both read as
+   the same count. A script runs on its own clock, on a door's arrival and when an automation starts it, and Automations
+   counts only the last, so the sentence names what started the runs it counts. */
+test('the month says what started the runs it counts, from what starts each script that ran', () => {
+  const clock = { every: '1d', door: null, rule: false };
+  const rule = { every: null, door: null, rule: true };
+  const both = { every: '1d', door: null, rule: true };
+  const door = { every: null, door: 'kiln-orders', rule: false };
+  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule })]) ?? []), '2 scripts, 20 runs this month, on their clocks and when an automation started one.');
+  assert.equal(plain(sentenceOf([row({ runs: rule })]) ?? []), '1 script, 10 runs this month, when an automation started it.');
+  assert.equal(plain(sentenceOf([row({ runs: both })]) ?? []), '1 script, 10 runs this month, on its clock and when an automation started it.');
+  assert.equal(plain(sentenceOf([row({ runs: door }), row({ title: 'Glaze log', runs: door })]) ?? []), '2 scripts, 20 runs this month, as something arrived.');
+  /* A SCRIPT THAT DID NOT RUN SAYS NOTHING OF WHAT STARTS IT, and a month with no runs says no more than that. */
+  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '2 scripts, 10 runs this month, on their clocks.');
+  assert.equal(plain(sentenceOf([row({ runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, no runs this month.');
+});
+
+/* ONE SCRIPTS LIST (audit B of 25 October, Y11): `/p/scripts` drew the same scripts again, so the page's address goes to
+   the screen, as `/p/activity` goes to `/audit`. Read as text: the route's load imports `$lib`, which node cannot. */
+test('the Scripts page is the Scripts screen: its address goes there', async () => {
+  const { readFileSync } = await import('node:fs');
+  const route = readFileSync(new URL('../p/[slug]/+page.ts', import.meta.url), 'utf8');
+  assert.match(route, /SCREENS[^=]*=\s*\{[^}]*\bscripts: '\/scripts'/u);
+});

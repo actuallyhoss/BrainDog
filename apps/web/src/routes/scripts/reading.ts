@@ -16,16 +16,38 @@ export type Said = { text: string; tone?: 'needs' | undefined }[];
 
 const count = (n: number): string => n.toLocaleString('en-GB');
 
+/** A row the sentence reads: what starts it is optional, since a host that does not say draws the month alone. */
+export type SaidRow = Pick<Script, 'title' | 'status' | 'last' | 'month'> & Partial<Pick<Script, 'runs'>>;
+
 /**
- * "3 scripts, 41 runs this month; 1 is paused, and FX rate was refused on its last run."
+ * What started the month's runs, said after the count: "on their clocks and when an automation started one".
+ *
+ * SAID BECAUSE TWO SCREENS COUNT RUNS (audit B of 25 October, Y11). Automations counts the runs an automation started,
+ * and a script also runs on its own clock and when something arrives at its door, so Scripts said 64 where Automations
+ * said 42 and nothing said why. Only the scripts that ran this month are read, so a clock that never fired is not named.
+ */
+function startedBy(rows: readonly SaidRow[]): string {
+  const ran = rows.filter((r) => r.month.runs > 0 && r.runs);
+  const one = rows.length === 1;
+  const parts = [
+    ran.some((r) => r.runs!.every !== null) ? (one ? 'on its clock' : 'on their clocks') : null,
+    ran.some((r) => r.runs!.door !== null) ? 'as something arrived' : null,
+    ran.some((r) => r.runs!.rule) ? (one ? 'when an automation started it' : 'when an automation started one') : null,
+  ].filter((p): p is string => p !== null);
+  if (parts.length === 0) return '';
+  return `, ${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`}`;
+}
+
+/**
+ * "3 scripts, 41 runs this month, on their clocks; 1 is paused, and FX rate was refused on its last run."
  *
  * RED FOR WHAT HAS STOPPED OR IS STOPPING: a paused script runs no more until he resumes it, and a refused last run is
  * one refusal nearer to pausing. A paused script's own refusals are the pause, so they are not said twice.
  */
-export function sentenceOf(rows: readonly Pick<Script, 'title' | 'status' | 'last' | 'month'>[]): Said | null {
+export function sentenceOf(rows: readonly SaidRow[]): Said | null {
   if (rows.length === 0) return null;
   const runs = rows.reduce((s, r) => s + r.month.runs, 0);
-  const lead = `${rows.length === 1 ? '1 script' : `${count(rows.length)} scripts`}, ${runs === 0 ? 'no runs' : runs === 1 ? '1 run' : `${count(runs)} runs`} this month`;
+  const lead = `${rows.length === 1 ? '1 script' : `${count(rows.length)} scripts`}, ${runs === 0 ? 'no runs' : runs === 1 ? '1 run' : `${count(runs)} runs`} this month${runs === 0 ? '' : startedBy(rows)}`;
   const paused = rows.filter((r) => r.status === 'paused').length;
   const refused = rows.filter((r) => r.status !== 'paused' && r.last?.outcome === 'refused');
 

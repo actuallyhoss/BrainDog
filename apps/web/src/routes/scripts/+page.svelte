@@ -105,6 +105,12 @@
         status: e.fields.status === 'paused' ? ('paused' as const) : ('on' as const),
         last: typeof e.fields.last_at === 'string' ? { at: e.fields.last_at, version: null, outcome: typeof e.fields.last === 'string' ? e.fields.last : '', say: '' } : null,
         month: { runs: month, ok: 0, refused: 0 },
+        /* WHAT STARTS IT, so the head says what started the runs it counts (`reading.ts` `startedBy`). */
+        runs: {
+          every: typeof e.fields.every === 'string' ? e.fields.every : null,
+          door: typeof e.fields.door === 'string' ? e.fields.door : null,
+          rule: e.fields.rule === true,
+        },
       };
     }),
   );
