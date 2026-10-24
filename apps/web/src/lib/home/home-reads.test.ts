@@ -22,7 +22,6 @@ const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').
 
 const home = bare(source('./Home.svelte'));
 const door = bare(source('../../routes/+page.svelte'));
-const classic = bare(source('./Today.svelte'));
 const health = bare(source('../../routes/settings/[area]/areas/Health.svelte'));
 const area = bare(source('../../routes/settings/[area]/+page.svelte'));
 
@@ -80,13 +79,10 @@ test('the page read waits on it', () => {
   assert.doesNotMatch(home, /await\s+brief\b/u);
 });
 
-test('no address draws the briefing twice: Today as it was is a screen of its own, and Home is not under it', () => {
-  /* THE DOOR DRAWS ONE OR THE OTHER. `/?classic` loads Today as it was and Home is the last branch alone. */
-  assert.match(door, /\{:else if page\.url\.searchParams\.has\('classic'\)\}\s*\{#await import\('\$lib\/home\/Today\.svelte'\)/u);
+test('ONE TODAY: the old one is gone (C30), so `/?classic` is an address somebody kept and it opens Home', () => {
+  /* THE DOOR READS NO `classic`, and Home is the last branch alone. */
+  assert.doesNotMatch(door, /searchParams\.has\('classic'\)/u);
+  assert.doesNotMatch(door, /Today\.svelte/u);
   assert.match(door, /\{:else\}\s*<Home \{data\} \/>\s*\{\/if\}/u);
   assert.equal(door.split('<Home').length - 1, 1);
-  /* AND NEITHER SCREEN HOLDS THE OTHER, so one screen is one briefing. */
-  assert.doesNotMatch(classic, /Home\.svelte/u);
-  assert.doesNotMatch(home, /Today\.svelte/u);
-  assert.equal(classic.split('<Briefing ').length - 1, 1);
 });

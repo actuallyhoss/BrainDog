@@ -15,7 +15,7 @@
  * BACK FROM A MATCH DRAWS NO UNDO: its plan names nobody coming back (it leaves the matched one as it is, and the next
  * meeting would match the pair again), so `undoMatch` answers `null` for it and the tile only lists.
  *
- * A ROUTE-ONLY MODULE, like `briefing.ts`: the client carries the route table as a value, so this is imported lazily
+ * A ROUTE-ONLY MODULE, like `card-late.ts`: the client carries the route table as a value, so this is imported lazily
  * from the screen that draws it and never from anything every screen loads.
  */
 

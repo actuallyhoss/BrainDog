@@ -7,8 +7,8 @@
   every top-level folder is a word no record may be named (`APP_WORDS` in `lib/at.ts`), and a record somebody already
   called "overview" must still open.
 
-  TODAY AS IT WAS IS KEPT, at `/?classic` (`lib/home/Today.svelte`), until the declared page does everything it did. It
-  is loaded when it is asked for, so the front door carries none of it.
+  TODAY AS IT WAS IS GONE (C30, 24 October): the declared page does all it did, with who is working, for how long, as a
+  tile of its own. `/?classic` is an address somebody kept, and it opens Today; nothing reads the word.
 
   THE WORK PAGE IS HERE TOO, at `/?work`, for the same reason: `lib/work/Work.svelte` draws the declared Work page
   (`page.work`), and the screen as it was is kept at `/?work&classic` (`lib/work/WorkClassic.svelte`). The nav's Work
@@ -38,17 +38,13 @@
 
 {#if elsewhere && named !== null}
   <div class="nowhere">
-    <!-- BY `import()`, as Work and the classic Today are: a mistyped address is rare, and Today's first load is not the place for it. -->
+    <!-- BY `import()`, as Work is: a mistyped address is rare, and Today's first load is not the place for it. -->
     {#await Promise.all([import('$lib/ui/NotFound.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NotFound }, { nearest, shellPlaces }]}
       <NotFound title={copy.noPageCalled(named)} near={nearest(named, shellPlaces(data.nav ?? [], data.index?.registers ?? []))} />
     {/await}
   </div>
 {:else if page.url.searchParams.has('work')}
   {#await import('$lib/work/Work.svelte') then loaded}
-    <loaded.default {data} />
-  {/await}
-{:else if page.url.searchParams.has('classic')}
-  {#await import('$lib/home/Today.svelte') then loaded}
     <loaded.default {data} />
   {/await}
 {:else}

@@ -112,10 +112,6 @@ export const HELD = {
     ids: ['accounts', 'books', 'obligations', 'things'],
     why: "Today reads Money's accounts, books and bills, and the projects its tasks are filed under, by their list ids, because `boot` names no list by the part it plays.",
   },
-  'apps/web/src/lib/home/Today.svelte': {
-    ids: ['obligations'],
-    why: "a bill on Today links into Money's bills by the list id `today-live.ts` read it from.",
-  },
 
   /* The hand-built Work screen, which a declared page replaces. */
   'apps/web/src/lib/work/list.ts': {

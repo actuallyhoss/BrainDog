@@ -94,8 +94,8 @@ export const BINDINGS: Binding[] = [
   { id: 'help', scope: 'document', key: '?', label: 'These keys', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The menu of what has focus', bare: false },
 
-  /* A HOME (`lib/page`, PageBody in PageView mode=home: the declared Today, or any declared page a person opens on, and
-     `lib/home/Today.svelte` at `/?classic`): what needs you, worked from the keyboard. They stand down while a box has
+  /* A HOME (`lib/page`, PageBody in PageView mode=home: the declared Today, or any declared page a person opens on):
+     what needs you, worked from the keyboard. They stand down while a box has
      the caret, while anything is open over the page, and after `g`. */
   { id: 'today-move', scope: 'today', key: 'j  k', label: 'Next or previous', bare: true },
   { id: 'today-tick', scope: 'today', key: 'x', label: 'Mark it done, with an undo', bare: true },

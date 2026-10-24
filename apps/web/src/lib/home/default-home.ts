@@ -2,7 +2,7 @@
  * TODAY, DECLARED: the page every record opens on when it declares neither its use case's `home-<id>` nor a `home`
  * page, and what Home does to whichever of the three it draws ("every page is declared").
  *
- * A PAGE BODY LIKE ANY OTHER. Today was a screen of its own (`Today.svelte`, kept at `/?classic`), and Overview a second
+ * A PAGE BODY LIKE ANY OTHER. Today was a screen of its own (retired 24 October, C30), and Overview a second
  * one over the house Home; both are this body now, drawn by the one reader (`PageView` in `home` mode), so a person or
  * an agent reshapes Today by installing a `home` page, and one look holds everywhere.
  *

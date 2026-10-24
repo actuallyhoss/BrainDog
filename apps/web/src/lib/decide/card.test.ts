@@ -441,8 +441,8 @@ const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8
 test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
   for (const path of ['../palette/Palette.svelte'])
     assert.match(src(path), /import DecisionCard from '\$lib\/decide\/DecisionCard\.svelte'/u, `${path} draws a card of its own`);
-  /* A PAGE'S QUEUE AND TODAY'S QUESTION LOAD THE SAME CARD beside their data, rather than ahead of the first paint. */
-  for (const path of ['../page/QueueAnswer.svelte', '../home/Question.svelte']) {
+  /* A PAGE'S QUEUE LOADS THE CARD beside its data, rather than ahead of the first paint. */
+  for (const path of ['../page/QueueAnswer.svelte']) {
     assert.match(src(path), /import \{ cardNow, loadCard \} from '\$lib\/decide\/card-load\.ts'/u, `${path} draws the card it loads`);
     assert.match(src(path), /<DecisionCard [^>]*\{question\}/u, `${path} draws a card of its own`);
   }

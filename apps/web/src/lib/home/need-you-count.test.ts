@@ -93,7 +93,6 @@ test('the rail, the tab and Today all read the one count', () => {
   /* Today hands `boot`'s waits, less what was pressed, to the page it draws. */
   assert.match(read('./Home.svelte'), /const w = waitsNow\(\);/u);
   assert.match(read('./Home.svelte'), /homeDrawn\(live\.page\.blocks, live\.now, voice, one, waits/u);
-  assert.match(read('./Today.svelte'), /needYouCount\(waits, t\.open\)/u);
 });
 
 test('an agent asking him back, of what he told it, counts in the badge, the header and the tile’s head', () => {

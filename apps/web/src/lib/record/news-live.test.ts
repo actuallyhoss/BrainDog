@@ -252,9 +252,9 @@ test('the page below is asked for with the cursor the page above answered, and t
    device. With no sample a shell is a record or a refusal, and Home draws the record's answers or the
    refusal's sentence. */
 test("Home reads the record's answers and nothing of the sample", () => {
-  /* HOME IS ONE DECLARED PAGE NOW (`lib/home/Home.svelte`), `/?overview` opens the same page, and Today as it was is
-     kept at `/?classic`. None of them reads the sample. */
-  for (const at of ['../../routes/+page.svelte', '../home/Home.svelte', '../home/Today.svelte']) {
+  /* HOME IS ONE DECLARED PAGE NOW (`lib/home/Home.svelte`), and `/?overview` and `/?classic` open the same page.
+     Neither reads the sample. */
+  for (const at of ['../../routes/+page.svelte', '../home/Home.svelte']) {
     /* What the page does, not what its comments say: a comment that says "the same page now" reads nothing. */
     const page = readFileSync(new URL(at, import.meta.url), 'utf8')
       .replace(/<!--[\s\S]*?-->/gu, '')

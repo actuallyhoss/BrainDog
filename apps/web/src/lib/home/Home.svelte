@@ -4,8 +4,8 @@
   ONE PAGE, THROUGH THE ONE READER. Home draws the speaking use case's `home-<id>` page, else the record's `home` page,
   else Today's body (`todayHome` in `default-home.ts`), built from what the record holds and drawn by the record with
   `previewPage`. All three go through `PageView` with `mode: 'home'`, so a question is answered where it is shown, a
-  task is ticked where it is drawn, and a line is captured without leaving. Today was a screen of its own; it is kept at
-  `/?classic` (`Today.svelte`) until this one does all it did.
+  task is ticked where it is drawn, and a line is captured without leaving. Today was a screen of its own, retired on
+  24 October (C30) once this one did all it did; `/?classic` opens this one.
 
   CALM BEFORE RICH. One line under the title, worked out from the blocks drawn (`sentenceOf`), with the
   phrase that needs the reader in red. When Slash wrote Home's line today the line is its (`home-line.ts`), red only

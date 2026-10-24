@@ -1,7 +1,6 @@
 <!--
   ONE DECISION CARD, EVERYWHERE A QUESTION IS ANSWERED: Home, Money, Work, a project's page, the Agents
-  page and Decide (through `QueueAnswer.svelte`), Today's classic list (`home/Question.svelte`), Decide's classic screen
-  (`Classic.svelte`) and Slash's palette. What it says is `card.ts`'s; this draws it and answers it.
+  page and Decide (through `QueueAnswer.svelte`), and Slash's palette. What it says is `card.ts`'s; this draws it and answers it.
 
   IT READS LIKE A FORM. Who asked and when, one quiet line over the question on a laptop and a phone
   alike; the question; why it is asked; then the answers as a vertical list of full-width choices, each its name and one
