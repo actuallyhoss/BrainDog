@@ -425,13 +425,6 @@ export const account = {
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
   perDevice: 'This setting is remembered on this device.',
 
-  /* The shape of the navigation — `19 §3`'s table, in the words a reader would use for each one.
-     The labels name the THING and not the setting: somebody choosing between these is picking
-     where their navigation lives, so "Top bar" and "Side rail" are the answer and "Rail" alone is ours. */
-  navShapeRail: 'Side rail',
-  navShapeBar: 'Top bar',
-  navShapeMenu: 'Menu',
-
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
   /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. An invented key was once drawn here as every record's
