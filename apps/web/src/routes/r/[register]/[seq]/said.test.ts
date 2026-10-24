@@ -8,7 +8,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, sentenceOf } from './said.ts';
+import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, importKeysOnly, sentenceOf } from './said.ts';
+
+/* THE AUDIT OF 25 OCTOBER, Z23 (`row-390-light.png`): Tags "sambrain:servicereading:oracle-a1:cpu:2026-09-28" listed as
+   a fact. An import's keys are not a person's tags; a tag a person wrote is. */
+test('TAGS THAT ARE ONLY AN IMPORT\'S KEYS ARE NOT LISTED, and a person\'s tags are', () => {
+  assert.equal(importKeysOnly(['sambrain:servicereading:oracle-a1:cpu:2026-09-28']), true);
+  assert.equal(importKeysOnly('sambrain:servicereading:oracle-a1:cpu:2026-09-28'), true);
+  assert.equal(importKeysOnly(['sambrain:servicereading:oracle-a1:cpu:2026-09-28', 'urgent']), false);
+  assert.equal(importKeysOnly(['client: Halden']), false);
+  assert.equal(importKeysOnly([]), false);
+  assert.equal(importKeysOnly(undefined), false);
+});
 
 const MORNING = Date.UTC(2026, 8, 25, 8);
 const LATE = Date.UTC(2026, 8, 25, 23, 30);

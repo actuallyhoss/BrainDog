@@ -87,7 +87,7 @@
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
-  import { addedSaid, daySaid, dueSaid, localDay, rowWords, sentenceOf } from './said.ts';
+  import { addedSaid, daySaid, dueSaid, importKeysOnly, localDay, rowWords, sentenceOf } from './said.ts';
   import {
     aboutOf,
     figureReader,
@@ -762,10 +762,13 @@
   /**
    * THE FACTS, IN ONE LIST: where the row stands first, then every other field it has answered in the order its list
    * declares them. They were split in two, the status, days and links as pills in a strip under the title and the rest
-   * under Details, so a reader looked in two places and in two shapes for one answer.
+   * under Details, so a reader looked in two places and in two shapes for one answer. A list of tags that holds only the
+   * keys an import left is not one of them (`importKeysOnly`).
    */
   const facts = $derived(
-    shownFields.filter((f) => !evidence.has(f.id)).sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state)),
+    shownFields
+      .filter((f) => !evidence.has(f.id) && (editing === f.id || !importKeysOnly(row?.fields[f.id])))
+      .sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state)),
   );
 
   /**

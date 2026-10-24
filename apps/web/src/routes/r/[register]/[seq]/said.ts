@@ -14,6 +14,16 @@
 
 import { day, shortDay } from 'braindog-render';
 
+/**
+ * WHETHER A LIST OF TAGS IS ONLY THE KEYS AN IMPORT LEFT, which say where a row came from to the importer and nothing to
+ * a person: "sambrain:servicereading:oracle-a1:cpu:2026-09-28" (the audit of 25 October, Z23, `row-390-light.png`).
+ * Such a field is not listed as a fact. A tag a person wrote has a space or fewer than three parts, and keeps its place.
+ */
+export function importKeysOnly(v: unknown): boolean {
+  const tags = Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
+  return tags.length > 0 && tags.every((t) => typeof t === 'string' && /^[a-z0-9_.-]+(?::[a-z0-9_.-]+){2,}$/iu.test(t.trim()));
+}
+
 /** The row page's own words, kept beside the functions that say them. */
 export const rowWords = {
   /* THE LIST'S WORDS FOR IT (money F6): "64 days late" in the Due cell, on the card and here, never "overdue by". */
