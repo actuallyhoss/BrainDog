@@ -64,10 +64,19 @@ export const nameFor = (names: ReadonlyMap<string, string>) => (rule: string): s
   return names.get(bare) ?? names.get(rule) ?? humanize(bare);
 };
 
-/** The field an inline rule sets, or `null`: a rule that sets none has no gap to fill, and is offered nothing. */
+/**
+ * The field an inline rule sets or links, or `null`: a rule that fills none has no gap to fill, and is offered nothing.
+ *
+ * A LINK FILLS A FIELD TOO. Money's `txn-categorise` files an entry by linking its category (`link: { field }`), not by
+ * setting it, so it was offered no Run again, and a filing rule written today never reached the entries before it.
+ * `ruleApply` runs a link step as it runs a set one, under the same one batch.
+ */
 export function fieldOf(body: unknown): string | null {
   if (!isObject(body) || !Array.isArray(body.then)) return null;
-  for (const a of body.then) if (isObject(a) && isObject(a.set)) return text(a.set.field);
+  for (const a of body.then) {
+    if (isObject(a) && isObject(a.set)) return text(a.set.field);
+    if (isObject(a) && isObject(a.link)) return text(a.link.field);
+  }
   return null;
 }
 

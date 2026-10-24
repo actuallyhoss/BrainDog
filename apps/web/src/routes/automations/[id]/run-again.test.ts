@@ -82,6 +82,8 @@ test('the press says what it filled, what it refused, and carries the batch', as
 test('only a rule that sets a field is offered, by the field\'s label', () => {
   assert.equal(fieldOf({ register: 'ledger', then: [{ tag: 'tea' }, { set: { field: 'category', to: 'Tea' } }] }), 'category');
   assert.equal(fieldOf({ register: 'ledger', then: [{ notify: { say: 'Hi' } }] }), null);
+  /* Money's filing rule links its category, and is offered Run again for it. */
+  assert.equal(fieldOf({ register: 'transactions', then: [{ link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}' } } }] }), 'category');
   assert.equal(fieldOf(null), null);
   assert.equal(labelOf({ fields: [{ id: 'category', label: 'Spending kind' }] }, 'category'), 'Spending kind');
   assert.equal(labelOf(null, 'due_on'), 'Due on');
