@@ -15,8 +15,11 @@
 import { since } from 'braindog-render';
 import { presenceOf } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
-import { openAutomations, type AutomationRow, type RunRow } from '../flow/source.ts';
-import { openActions, type ActionRow } from './actions.ts';
+import { rowOf, rowsOf as rulesOf, type AutomationRow, type RunRow } from '../flow/source.ts';
+import type { ActionRow } from './actions.ts';
+
+/** A list read as a screen opens on it: its answer, and whether the host has no such read at all. */
+type Opened<T = AutomationRow[]> = { first: { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } }; absent: boolean };
 import { readScripts, type Script } from './scripts.ts';
 import { readJobs, runName, startedAt, statusOf } from './jobs.ts';
 import { runWho } from './api.ts';
@@ -223,11 +226,21 @@ export type AllRuns = { from: 'ready'; lines: RunLine[]; short: boolean; day: Ag
 
 /** Reads every source side by side and merges them, newest first. */
 export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
-  const io = (url: string, init?: RequestInit) => fetch(url, init);
   const client = createClient({ base });
+  /* EVERY READ GOES THROUGH THE ONE CLIENT, so the reads asked at once go as one `reads` (scope 2026-10-24): the rules and
+     the scheduled actions went by a fetch of their own, and each rule's last runs after them, twenty requests in a wave
+     of their own on the Agents page. */
+  const opened = <T>(got: Awaited<ReturnType<typeof client.call<unknown>>>, value: (raw: unknown) => T): Opened<T> => {
+    if (got.ok) return { first: { ok: true, value: value(got.value) }, absent: false };
+    const refusal = 'refusal' in got ? got.refusal : { code: 'VERSION_STALE', fix: 'The record moved while it was read.' };
+    return { first: { ok: false, refusal }, absent: refusal.code === 'ROUTE_UNKNOWN' };
+  };
+  const rules = async (): Promise<Opened> => opened(await client.call<unknown>('automations'), rulesOf);
+  const scheduled = async (): Promise<Opened<ActionRow[]>> =>
+    opened(await client.call<unknown>('actions'), (raw) => (Array.isArray(raw) ? (raw as ActionRow[]) : []));
   const [autos, actions, scripts, sessions, jobs] = await Promise.all([
-    openAutomations(io, base),
-    openActions(io, base),
+    rules(),
+    scheduled(),
     readScripts(base),
     client.list({ register: 'session', limit: AGENTS, order: [{ field: 'last_seen', dir: 'desc' }] }),
     readJobs(base),
@@ -255,10 +268,11 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
     .sort((a, b) => lastOf(b) - lastOf(a))
     .slice(0, DEEP);
   const runs = new Map<string, readonly RunRow[]>();
-  const each = await Promise.all(deep.map((a) => autos.source.automation(a.id, { limit: EACH })));
+  const each = await Promise.all(deep.map((a) => client.call<unknown>('automations', { rule: a.id.startsWith('rule.') ? a.id.slice('rule.'.length) : a.id, limit: EACH })));
   each.forEach((got, i) => {
     const rule = deep[i];
-    if (rule && got.ok) runs.set(rule.id, got.value.runs);
+    const row = got.ok ? rowOf(got.value) : null;
+    if (rule && row) runs.set(rule.id, row.runs);
   });
 
   const sessionRows: readonly unknown[] = sessions.ok && isBag(sessions.value) && Array.isArray(sessions.value.rows) ? sessions.value.rows : [];
