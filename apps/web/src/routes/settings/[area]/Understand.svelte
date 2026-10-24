@@ -1,9 +1,9 @@
 <!--
-  Settings › People, "Read what you already have" (understanding is the engine's first job): the record's
+  Settings › Tidy up, "Read what you already have" (understanding is the engine's first job): the record's
   walk over what it already holds, asked for now rather than tonight. One plain line and Look first; the look says, in
   names, what it would link and what it would ask on Decide, and only then Do it. What Do it did has an Undo beside it.
 
-  A SECTION, NOT AN AREA, mounted by one line in `areas/People.svelte` for an owner, because the record's `understand` is
+  A SECTION, NOT AN AREA, mounted by one line in `areas/Health.svelte` (Tidy up) for an owner, because the record's `understand` is
   ADMIN; anybody else is refused with its own sentence. A record with no such walk leaves the section out once it says so.
 
   A LIST WITHOUT A BOX for the changes, at the body size, and no red: nothing here is a danger, and every change has Undo.

@@ -56,6 +56,7 @@
   } from '$lib/sharing/sharing.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import type { Snippet } from 'svelte';
+  import Links from '../Links.svelte';
 
   /* `here` IS PEOPLE HERE, the People area as the page hands it: roles, invites and links (`+page.svelte`). */
   let { shell, here }: AreaProps & { here?: Snippet } = $props();
@@ -73,6 +74,8 @@
   let refused = $state<string | null>(null);
   /* A HOST OLDER THAN SHARING HAS NOTHING TO LIST, which is not a refusal: the area keeps People and says nothing more. */
   let unrouted = $state(false);
+  /** How many read-only links the Shared card's links part holds, so "Nothing is shared" is said only with none. */
+  let linkCount = $state(0);
 
   async function load(): Promise<void> {
     const at = opened();
@@ -290,7 +293,8 @@
 {/if}
 
 {#if unrouted}
-  <!-- A host with no sharing: People is the whole of it. -->
+  <!-- A host with no sharing: People is the whole of it, and the read-only links, an owner's, are a card of their own. -->
+  {#if team}<Links />{/if}
 {:else if !team}
   {#if refused !== null}
     <Tile icon="eye" title={copy.sharingYouCanSee}><Empty kind="error" title={refused} /></Tile>
@@ -316,15 +320,19 @@
 {:else if refused !== null}
   <Tile icon="link" title={copy.sharingShared}><Empty kind="error" title={refused} /></Tile>
 {:else if rows !== null}
-  <Tile icon="link" title={copy.sharingShared} count={liveCount || undefined}>
+  <!-- ONE SHARED CARD, FULL WIDTH (audit 25 October, X19): the shares, then the read-only links to single pages under
+       their own small heading once there is one, and "Nothing is shared" said once while there is neither. It hugged
+       its empty state at half the width and left a hole beside it at a desk. -->
+  <Tile icon="link" data-wide="" title={copy.sharingShared} count={liveCount + linkCount || undefined}>
     {#snippet actions()}
       <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
-    {#if sections.shared.length === 0}
+    {#if sections.shared.length === 0 && linkCount === 0}
       <Empty kind="no-data-yet" title={copy.sharingNothing} body={copy.sharingNothingBody} />
-    {:else}
+    {:else if sections.shared.length > 0}
       <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
+    <Links inside bind:count={linkCount} />
   </Tile>
 
   <Tile icon="clock" title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0) || undefined}>

@@ -34,10 +34,6 @@
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { hostedHere, readBilling } from '../../billing.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
-  import Links from '../Links.svelte';
-  import { createClient } from '@braindog/client';
-  import { readShareable } from '$lib/record/share-write.ts';
-  import Understand from '../Understand.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -47,16 +43,6 @@
   const s = settingsState(() => shell);
   const me = $derived(shell.me);
   const anOwner = $derived(s.anOwner);
-  /* THE LINKS ARE DRAWN ONLY WHERE THIS HOST CAN MAKE ONE (`shareable`): with links off, the part would list nothing and
-     offer a press the host refuses. */
-  let linksOn = $state(false);
-  $effect(() => {
-    if (!anOwner) {
-      linksOn = false;
-      return;
-    }
-    void readShareable(createClient({ base: apiBase() })).then((v) => (linksOn = v.can));
-  });
   /* TEAMS HELD: the Cloud says so in `/account/billing` (`teams_held`), and the invite form gives way to the sentence. */
   let teamsHeld = $state(false);
   $effect(() => {
@@ -902,12 +888,8 @@
 </Tile>
 {/if}
 
-<!-- The read-only links to single pages, beside who can see the record. -->
-{#if anOwner && linksOn}<Links />{/if}
-
-<!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
-     about, a dry look first and then Do it. The owner's, as the record's `understand` is. -->
-{#if anOwner}<Understand />{/if}
+<!-- THE READ-ONLY LINKS ARE IN SHARING'S SHARED CARD, and "Read what you already have" is under Tidy up (audit
+     25 October, X19): one card said what is shared, and linking old payments is tidying, not sharing. -->
 
 <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
      candidate for a red, irreversible "Erase a person" is the person reading it. -->

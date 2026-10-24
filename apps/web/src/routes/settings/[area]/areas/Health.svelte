@@ -21,9 +21,13 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import type { Fetch } from '$lib/record/boot-live.ts';
-  import type { AreaProps } from '../settings-state.svelte.ts';
+  import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import Understand from '../Understand.svelte';
 
   let { shell }: AreaProps = $props();
+
+  /* THE OWNER'S, as the record's `understand` is (People & sharing held it until 25 October, X19). */
+  const s = settingsState(() => shell);
 
   const words = {
     reading: 'Reading the record for anything to tidy.',
@@ -178,6 +182,9 @@
   {#if quick && !heard}
     <p class="health-reading" role="status">{words.readingPages}</p>
   {/if}
+  <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
+       about, a dry look first and then Do it. Tidying the record, so it is here and not in the sharing screen. -->
+  {#if s.anOwner}<Understand />{/if}
 </div>
 
 <style>

@@ -1,8 +1,12 @@
 <!--
   Settings, "Links": the read-only links this record opened to single pages, each open one with Close.
 
-  A SECTION, NOT AN AREA. It is mounted by one line in `areas/People.svelte`, beside who can see the record, because a
-  link is one more way somebody reads it; it is not an `AREAS` id and has no address of its own.
+  A SECTION, NOT AN AREA. It is not an `AREAS` id and has no address of its own.
+
+  INSIDE THE SHARED CARD (audit 25 October, X19): "Links: No page is shared" and "Shared: Nothing is shared" were two
+  cards for one idea, so `Sharing.svelte` draws the links in its Shared card (`inside`), under a small heading and only
+  once there is one, and tells the card how many there are (`count`) so its empty state is said once. Drawn alone, as a
+  tile, it is a host with no sharing's, where People & sharing has no Shared card.
 
   NEVER THE LINK ITSELF. `shares` answers what each link opens and when it stops, and no token: the link was shown once,
   to the owner who made it, and nobody keeps it. Closing is for good, so a closed link stays on the list as closed and
@@ -21,6 +25,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+
+  let { inside = false, count = $bindable(0) }: { inside?: boolean; count?: number } = $props();
 
   let links = $state<ShareRow[] | null>(null);
   let refused = $state<string | null>(null);
@@ -50,6 +56,9 @@
      what somebody came here to do. */
   const sorted = $derived(links === null ? [] : [...links].sort((a, b) => Number(linkState(a, now) !== 'open') - Number(linkState(b, now) !== 'open')));
   const openCount = $derived(sorted.filter((l) => linkState(l, now) === 'open').length);
+  $effect(() => {
+    count = links?.length ?? 0;
+  });
 
   function stateSaid(l: ShareRow): string {
     const s = linkState(l, now);
@@ -76,7 +85,39 @@
   }
 </script>
 
-{#if !unrouted}
+{#snippet rowsOf()}
+  <ul class="links">
+    {#each sorted as l (l.id)}
+      {@const open = linkState(l, now) === 'open'}
+      <li class="link" data-open={open ? '' : undefined}>
+        <IconWell name="link" size="l" />
+        <div class="link-text">
+          <span class="link-title">{l.title}</span>
+          <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
+        </div>
+        {#if open}
+          <Button
+            tone="bad"
+            disabled={closing !== null}
+            aria-busy={closing === l.id ? 'true' : undefined}
+            aria-label={words.linksClose(l.title)}
+            onclick={() => void close(l)}>{words.linksCloseShort}</Button
+          >
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#if inside}
+  {#if links !== null && links.length > 0}
+    <section class="links-inside" aria-labelledby="links-inside-h">
+      <h3 class="links-h" id="links-inside-h">{words.linksTitle}</h3>
+      <p class="links-lead">{words.linksLead}</p>
+      {@render rowsOf()}
+    </section>
+  {/if}
+{:else if !unrouted}
 <Tile icon="link" class="section" data-surface="tile" title={words.linksTitle} count={openCount || undefined}>
   <div class="section-body">
     <p class="links-lead">{words.linksLead}</p>
@@ -85,33 +126,28 @@
     {:else if links !== null && links.length === 0}
       <Empty kind="no-data-yet" title={words.linksNone} body={words.linksNoneBody} />
     {:else if links !== null}
-      <ul class="links">
-        {#each sorted as l (l.id)}
-          {@const open = linkState(l, now) === 'open'}
-          <li class="link" data-open={open ? '' : undefined}>
-            <IconWell name="link" size="l" />
-            <div class="link-text">
-              <span class="link-title">{l.title}</span>
-              <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
-            </div>
-            {#if open}
-              <Button
-                tone="bad"
-                disabled={closing !== null}
-                aria-busy={closing === l.id ? 'true' : undefined}
-                aria-label={words.linksClose(l.title)}
-                onclick={() => void close(l)}>{words.linksCloseShort}</Button
-              >
-            {/if}
-          </li>
-        {/each}
-      </ul>
+      {@render rowsOf()}
     {/if}
   </div>
 </Tile>
 {/if}
 
 <style>
+  /* INSIDE THE SHARED CARD: a heading at the card's row weight, over the lead and the links, after the shares. */
+  .links-inside {
+    display: grid;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-4);
+  }
+
+  .links-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
   .links-lead {
     margin: 0 0 var(--sp-3);
     color: var(--ink-3);
