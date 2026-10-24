@@ -33,7 +33,7 @@
  */
 
 import type { SearchResult } from '../../lib/record/api.ts';
-import { BY_MEANING, type Found, type Meaning } from '../../lib/record/search-live.ts';
+import { byMeaning, type Found, type Meaning } from '../../lib/record/search-live.ts';
 
 /**
  * The five arms of the page, named.
@@ -118,7 +118,7 @@ export function whereSaid(found: { total: number; groups: readonly Matched[] }):
 
 /** How many of an answer's hits the record found by meaning, and not by any word typed. */
 export function byMeaningOf(result: Pick<SearchResult, 'hits'>): number {
-  return result.hits.filter((h) => h.detail === BY_MEANING).length;
+  return result.hits.filter(byMeaning).length;
 }
 
 /**

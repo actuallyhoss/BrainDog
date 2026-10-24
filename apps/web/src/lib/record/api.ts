@@ -2036,6 +2036,8 @@ export type SearchHit = {
   spoken?: string;
   /** The searchable field that answered, when the title did not — `find.ts`'s `why`. */
   why?: string;
+  /** Found by meaning and by no word typed. Counted, never printed beside the row (E54). */
+  meaning?: true;
 };
 
 /**

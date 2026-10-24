@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import './fixtures/fill.ts';
 import { iconFor, REGISTERS } from './api.ts';
-import { answered, BY_MEANING, groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
+import { answered, groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -247,13 +247,13 @@ test('A HIT FOUND BY MEANING SAYS SO IN ITS LINE, and its list counts the wordsâ
   if (out.from !== 'live') return;
   assert.equal(out.meaning, 'fused');
   assert.deepEqual(
-    out.value.groups[0]!.hits.map((h) => [h.title, h.detail]),
+    out.value.groups[0]!.hits.map((h) => [h.title, h.detail, h.meaning ?? false]),
     [
-      ['Renew the van policy with Marlow', ''],
-      ['Kestrel motor insurance', BY_MEANING],
+      ['Renew the van policy with Marlow', '', false],
+      /* MARKED AND NEVER CAPTIONED (E54): the row says nothing about why it ranked. */
+      ['Kestrel motor insurance', '', true],
     ],
   );
-  assert.equal(BY_MEANING, 'Close in meaning, no word in common');
   assert.equal(out.value.groups[0]!.total, 8, '`matched` counts word matches only');
   assert.equal(out.value.total, 8);
 });
@@ -279,5 +279,6 @@ test('a word for how it searched that this build does not know is read as nothin
 test('a list only meaning reached counts what arrived', () => {
   const out = groupsOf('vehicle cover', [byMeaning], undefined, {});
   assert.equal(out.groups[0]!.total, 1);
-  assert.equal(out.hits[0]!.detail, BY_MEANING);
+  assert.equal(out.hits[0]!.meaning, true);
+  assert.equal(out.hits[0]!.detail, '');
 });

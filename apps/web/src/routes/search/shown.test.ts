@@ -19,7 +19,6 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { BY_MEANING } from '../../lib/record/search-live.ts';
 import { bestOf, byMeaningOf, marked, meaningLine, sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
@@ -100,7 +99,7 @@ test('nothing found says why it was searched by words only, and only when the re
 
 test('the hits by meaning are the ones whose line says so', () => {
   const hit = (detail: string) => ({ title: 'Marlow kiln', detail, href: '/r/tasks/1', kind: 'Tasks', icon: 'rows' as const });
-  assert.equal(byMeaningOf({ hits: [hit(BY_MEANING), hit(''), hit(BY_MEANING)] as never }), 2);
+  assert.equal(byMeaningOf({ hits: [{ ...hit(''), meaning: true }, hit(''), { ...hit(''), meaning: true }] as never }), 2);
   assert.equal(byMeaningOf({ hits: [] }), 0);
 });
 

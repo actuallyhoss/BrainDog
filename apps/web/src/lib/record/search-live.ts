@@ -41,10 +41,11 @@ const MEANINGS: readonly unknown[] = ['fused', 'words', 'none', 'off', 'spent', 
 export type Found = { from: 'live'; value: SearchResult; meaning?: Meaning } | { from: 'refused'; fix: string };
 
 /**
- * A ROW FOUND BY MEANING SAYS SO IN ITS OWN LINE, because it holds none of the words typed and a person reading the
- * list would otherwise take it for a mistake. `shown.ts` counts the hits that carry it.
+ * A ROW FOUND BY MEANING IS MARKED, NOT CAPTIONED (E54). It said "Close in meaning, no word in common" under every such
+ * row, which is why a result ranked and nothing a person asked. `meaning` is the mark; `shown.ts` counts the hits that
+ * carry it, and the search page says it once, in one quiet line over the list.
  */
-export const BY_MEANING = 'Close in meaning, no word in common';
+export const byMeaning = (h: Pick<SearchHit, 'meaning'>): boolean => h.meaning === true;
 
 /** One hit as the record's `search` sends it, and only the keys read here. `by` is there only for a hit no word found. */
 type Hit = { register: string; seq: number; title: string; by?: 'meaning' };
@@ -100,8 +101,7 @@ function said(q: string, text: string, id?: string): boolean {
  * best hit arrived, then the pages.
  *
  * The record says the register, the number and the title, and nothing else. So a live row has no
- * state beside it and no reason it matched, unless no word matched it: then its line says it was
- * found by meaning (`BY_MEANING`).
+ * state beside it and no reason it matched. A row no word matched is marked `meaning` and still has no line.
  *
  * A GROUP'S `total` IS HOW MANY MATCHED AND NOT HOW MANY ARRIVED, which is what `SearchResult` has
  * always documented it as ("how many rows matched across every list, what the caller is not
@@ -122,7 +122,8 @@ export function groupsOf(
     const group = byRegister.get(h.register) ?? [];
     group.push({
       title: h.title,
-      detail: h.by === 'meaning' ? BY_MEANING : '',
+      detail: '',
+      ...(h.by === 'meaning' ? { meaning: true as const } : {}),
       href: `/r/${h.register}/${h.seq}`,
       kind: decl?.name ?? h.register,
       icon: iconFor(decl?.icon, 'rows'),
@@ -152,7 +153,7 @@ export function groupsOf(
     const words = matched?.[register];
     groups.push({
       kind: g[0]?.kind ?? register,
-      total: words === undefined ? g.length : words + g.filter((h) => h.detail === BY_MEANING).length,
+      total: words === undefined ? g.length : words + g.filter(byMeaning).length,
       hits: g,
       href: `/r/${register}?q=${encodeURIComponent(q.trim())}`,
     });
