@@ -8479,6 +8479,33 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * register's rules apply to it, and a rowset that went in with the rules switched off would be a
    * back door into the record wearing a decision's name.
    */
+  /** One answer through the gate, in its own savepoint; `batch` is the one a group answer shares (`decideMany`). */
+  function decideOne(id: string, verdict: Verdict, actor: string, batch?: string): Result<Decided> {
+    return attempt(sql, transaction, () => {
+      const whole = mergePickFault(id, verdict);
+      if (whole) return { ok: false as const, refusal: whole };
+      const out = decide(governDeps(), id, verdict, actor, batch === undefined ? {} : { batch });
+      if (out.ok) {
+        /* AN ACCEPTED 'Add <organisation>?' OR DOMAIN OFFER LINKS EVERYONE AT THAT DOMAIN; any other answer links nobody. */
+        const joined = joinOrganisation(peopleDeps({ actor }, () => null, (p) => openSuggestion(governDeps(), actor, p)), id);
+        if (!joined.ok) return joined as Result<never>;
+        /* AN ACCEPTED MERGE KEEPS WHAT THE TWO DISAGREED ON, in the batch the rows were written in (`carryFolds`). */
+        for (const folded of foldBatches(out.value.wrote)) {
+          const carried = carryFolds(folded, { actor });
+          if (!carried.ok) return carried as Result<never>;
+        }
+        answered(id, verdict, actor);
+        /* AN ANSWER TO A QUESTION THE INBOX ASKED (which account a card's digits are, or moving what a wrong answer filed) IS
+           CARRIED OUT HERE, in the decision's transaction and batch, so one Undo puts all of it back (REC-A02). */
+        if ('decide' in verdict) {
+          const carried = answerAsked(ingestDeps(), { id, option: verdict.decide.option, actor, batch: out.value.batch ?? null });
+          if (!carried.ok) return carried as Result<never>;
+        }
+      }
+      return out;
+    });
+  }
+
   const governDeps = (): GovernDeps => ({
     sql,
     nowMs: clock.now(),
@@ -10927,29 +10954,16 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * `pattern` or a `change` comes back with the declaration to install, because installing is
      * asynchronous and a decision that resolved before its change landed would be a lie.
      */
-    decide: (id: string, verdict: Verdict, actor: string): Result<Decided> =>
-      attempt(sql, transaction, () => {
-        const whole = mergePickFault(id, verdict);
-        if (whole) return { ok: false as const, refusal: whole };
-        const out = decide(governDeps(), id, verdict, actor);
-        if (out.ok) {
-          /* AN ACCEPTED 'Add <organisation>?' OR DOMAIN OFFER LINKS EVERYONE AT THAT DOMAIN; any other answer links nobody. */
-          const joined = joinOrganisation(peopleDeps({ actor }, () => null, (p) => openSuggestion(governDeps(), actor, p)), id);
-          if (!joined.ok) return joined as Result<never>;
-          /* AN ACCEPTED MERGE KEEPS WHAT THE TWO DISAGREED ON, in the batch the rows were written in (`carryFolds`). */
-          for (const batch of foldBatches(out.value.wrote)) {
-            const carried = carryFolds(batch, { actor });
-            if (!carried.ok) return carried as Result<never>;
-          }
-          answered(id, verdict, actor);
-          /* AN ANSWER TO A QUESTION THE INBOX ASKED (which account a card's digits are, or moving what a wrong answer filed) IS
-             CARRIED OUT HERE, in the decision's transaction and batch, so one Undo puts all of it back (REC-A02). */
-          if ('decide' in verdict) {
-            const carried = answerAsked(ingestDeps(), { id, option: verdict.decide.option, actor, batch: out.value.batch ?? null });
-            if (!carried.ok) return carried as Result<never>;
-          }
-        }
-        return out;
+    decide: (id: string, verdict: Verdict, actor: string): Result<Decided> => decideOne(id, verdict, actor),
+
+    /**
+     * Answer several the same way in one transaction and one batch, so one Undo puts every one back (scope D2). Each is
+     * its own savepoint: a member the gate refuses writes nothing and the rest stay written. Answers each id in order.
+     */
+    decideMany: (ids: readonly string[], verdict: Verdict, actor: string): { batch: string; each: { id: string; out: Result<Decided> }[] } =>
+      transaction(() => {
+        const batch = mint();
+        return { batch, each: ids.map((id) => ({ id, out: decideOne(id, verdict, actor, batch) })) };
       }),
 
     /**

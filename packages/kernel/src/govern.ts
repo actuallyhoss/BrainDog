@@ -3057,7 +3057,7 @@ function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string
  * is asynchronous, so the caller is handed the body to install and this refuses to resolve the
  * suggestion until that has happened.
  */
-export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: string): Result<Decided> {
+export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: string, given: { batch?: string } = {}): Result<Decided> {
   const row = deps.sql.one<{ id: string; body_kind: BodyKind; body: string; status: string; opened_by: string }>(
     'SELECT id, body_kind, body, status, opened_by FROM suggestion WHERE id = ?',
     id,
@@ -3231,7 +3231,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   const wrote: string[] = [];
   /* ONE BATCH FOR THE WHOLE DECISION, minted before anything is written: the rows an accepted rowset writes and the
      rules they start share it with the decision's own two events, so a decision is undone as one. */
-  const batch = deps.mint();
+  /* OR THE ONE A GROUP ANSWER HANDS IN (`decideMany`), so every question it answers is put back by one Undo. */
+  const batch = given.batch ?? deps.mint();
   let install: Record<string, unknown> | undefined;
   let expect: Decided['expect'];
   let expects: Decided['expects'];

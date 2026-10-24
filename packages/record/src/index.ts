@@ -2169,6 +2169,9 @@ const SELF_HOLDER = 'braindog:self';
    same person again would take the Undo back. */
 const SELF_MARKED = 'marked';
 
+/** The most questions one group answer takes (`decide { ids }`): a run's cleanup filed about twenty-five. */
+export const DECIDE_MANY_MOST = 100;
+
 /** Whether a person's own address, or one of their keys, is `address` (a key as `keyOf('email', …)` makes it). */
 const holdsAddress = (parts: Record<string, string | undefined>, fields: Record<string, unknown>, address: string): boolean =>
   [parts.email === undefined ? null : fields[parts.email], ...(parts.keys !== undefined && Array.isArray(fields[parts.keys]) ? (fields[parts.keys] as unknown[]) : [])].some(
@@ -7689,6 +7692,72 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * ("SG7 is resolved"), so that sentence has the number put back as the handle she would be given for it. `spoken` is
    * the number the kernel was asked about, and only that word is rewritten, NOT EVERY NUMBER IN THE SENTENCE.
    */
+  /**
+   * MANY ANSWERED THE SAME WAY IN ONE CALL (scope D2): `decide { ids, decide: { option, reason? } }`. One transaction and
+   * one batch, so the record moves once and one Undo (`undo { decision }` on any of them) puts every one back. A member
+   * refused is named with its sentence and the rest stay written. Only rowsets and options go in a group: a kind that
+   * installs, applies or merges lands its own way, so it is answered on its own.
+   */
+  const answerMany = (
+    args: { ids?: unknown; decide?: { option?: unknown; reason?: unknown; rows?: unknown; parts?: unknown }; defer?: unknown; resolved_as?: unknown },
+    ctx: CallContext,
+  ): Result<{ batch: string | null; decided: { id: string; decision: string | null }[]; refused: { id: string; fix: string }[] }> => {
+    const ids = args.ids;
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > DECIDE_MANY_MOST || !ids.every((x) => typeof x === 'string' && x.trim() !== ''))
+      return no('VALUE_MALFORMED', `ids are the questions to answer, 1 to ${String(DECIDE_MANY_MOST)} of them, each by its name.`, { at: 'ids' });
+    if (new Set(ids).size !== ids.length) return no('VALUE_MALFORMED', 'Name each question in ids once.', { at: 'ids' });
+    const verdict = args.decide;
+    if (args.defer !== undefined || args.resolved_as !== undefined || verdict === undefined || typeof verdict.option !== 'string' || verdict.option.trim() === '')
+      return no('REQUIRED_MISSING', 'A group is answered with one option for all of them: decide { option }, and a reason if you have one.', { at: 'decide' });
+    if (verdict.rows !== undefined || verdict.parts !== undefined)
+      return no('VALUE_MALFORMED', 'Rows and parts are picked on one question at a time, never on a group.', { at: verdict.rows !== undefined ? 'rows' : 'parts' });
+    const reason = typeof verdict.reason === 'string' ? verdict.reason : '';
+    const actor = actorOf(ctx);
+    const refused: { id: string; fix: string }[] = [];
+    const asked: { given: string; id: string }[] = [];
+    const alone = 'This one is answered on its own, from its own card.';
+    for (const given of ids as string[]) {
+      const id = spokenIn(given);
+      const target = kernel.governanceRow('suggestion', id);
+      if (!target || holds(ctx, target)) {
+        refused.push({ id: given, fix: `There is no suggestion called ${given}.` });
+        continue;
+      }
+      /* THE SAME DOORS ONE ANSWER PASSES, asked of each member before anything is written. */
+      const run = ruleAsked(target);
+      const stop = run ? answersNot(ctx, run) : null;
+      const handed = kernel.deciderFault(id, actor, ctx.principal.kind === 'person' && ctx.principal.level === 'owner');
+      const special =
+        (target.body_kind !== 'rowset' && target.body_kind !== 'options') ||
+        foldsOf(target as Record<string, unknown>) !== null ||
+        kernel.prefsOf(SELF_HOLDER)[SELF_MARKED] === id ||
+        kernel.prefsOf(SELF_HOLDER)[id] !== undefined ||
+        kernel.prefsOf(KEPT_HOLDER)[id] !== undefined;
+      const fix = stop?.fix ?? handed ?? (special ? alone : null);
+      if (fix !== null) refused.push({ id: given, fix });
+      else asked.push({ given, id });
+    }
+    const many = asked.length === 0 ? null : kernel.decideMany(asked.map((a) => a.id), { decide: { option: verdict.option, reason } }, actor);
+    const decided: { id: string; decision: string | null }[] = [];
+    for (const [n, m] of (many?.each ?? []).entries()) {
+      const given = asked[n]!.given;
+      const said = settledAs(ctx, given, m.out);
+      if (!said.ok) {
+        refused.push({ id: given, fix: 'refusal' in said ? said.refusal.fix : 'The record moved while this was answered. Answer it again.' });
+        continue;
+      }
+      /* WHAT ONE ANSWER COUNTS AFTERWARDS, each member counted as its own answer. */
+      if (m.out.ok && m.out.value.settled === undefined) ladderAnswered(m.id, verdict.option, true);
+      understoodAnswer(m.id, verdict.option, actor);
+      firstPartyAnswered(m.id, verdict.option);
+      decided.push({ id: nameOf(ctx, 'suggestion', m.id) ?? given, decision: said.value.decision });
+    }
+    /* REFUSED IN THE ORDER ASKED, so a card lists them as it drew them. */
+    const place = new Map((ids as string[]).map((x, n) => [x, n]));
+    refused.sort((a, b) => (place.get(a.id) ?? 0) - (place.get(b.id) ?? 0));
+    return ok({ batch: decided.length === 0 ? null : (many?.batch ?? null), decided, refused });
+  };
+
   const settledAs = <T extends { decision: string | null; suggestion: string }>(ctx: CallContext, spoken: string, out: Result<T>): Result<T> => {
     if (readsEveryList(ctx)) return out;
     if (out.ok)
@@ -12125,9 +12194,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * An accepted `pattern` or `change` is installed here, after the gate has said yes and before
      * the suggestion is resolved — a decision that resolved before its change landed would be a lie.
      */
-    async decide(args: { id: string; decide?: { option: string; reason: string; parts?: string[] }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string }, ctx: CallContext) {
+    async decide(
+      args: { id: string; ids?: string[]; decide?: { option: string; reason: string; parts?: string[] }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string },
+      ctx: CallContext,
+    ) {
       const stop = guard(ctx, 'decide');
       if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
+      /* SEVERAL AT ONCE (`answerMany`): `ids` in place of `id`, never both. */
+      if (args?.ids !== undefined) {
+        if (args.id !== undefined) return no('VALUE_MALFORMED', 'Name one question in id, or several in ids, not both.', { at: 'ids' });
+        return tail(answerMany(args, ctx));
+      }
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
       /* A HANDLE IS TAKEN AS THE NUMBER IT NAMES, before anything reads the id, as `governance` takes one. */
       const given = String(args.id);
