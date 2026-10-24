@@ -233,7 +233,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     '/p/estate',
     '/p/work',
     '/p/kiln',
-    '/t/3',
+    '/r/tracks/3',
     '/nowhere',
     '/automations?tab=scheduled',
     '/automations?tab=scripts',

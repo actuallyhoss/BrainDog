@@ -1,7 +1,7 @@
 /**
  * The page declarations a record holds, read as the record stores them.
  *
- * A ROUTE-ONLY MODULE, like `track-live.ts`: the client carries the route table as a value.
+ * A ROUTE-ONLY MODULE: the client carries the route table as a value.
  *
  * WHY THIS EXISTS. `setDeclaration` installs a WHOLE page declaration body, so adding one block to a
  * page needs that page's entire current body first, and the app had no way to ask for one. The only

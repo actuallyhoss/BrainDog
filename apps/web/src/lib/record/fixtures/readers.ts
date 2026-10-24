@@ -741,7 +741,9 @@ export function boot() {
     nav.push({
       id: `track-${t.seq}`,
       title: String(t.fields.name),
-      href: `/t/${t.seq}`,
+      /* ON ITS ROW, where a live record opens a thread: the thread's own screen (`/t/<n>`) is gone. The list's id is the
+         declaration's, which the sample always holds here. */
+      href: `/r/${String(REGISTERS.tracks?.id)}/${t.seq}`,
       /* THE REGISTER'S OWN NAME, NOT A SECOND SPELLING OF IT. This was the literal `Tracks`, so
          renaming the register to Threads renamed the list, the page heading, the palette and the
          rail's own Lists section, and left the rail section above these rows saying the old word.

@@ -31,11 +31,8 @@
  * now draws through `stateSaid` and the options through `choicesOf`, the tests run both with Personal's labels, and
  * each keeps the same single source check that the page calls them.
  *
- * AND A THREAD'S PAGE DID THE SAME WITH HEALTH. Each update's chip and the composer's menu spelt the stored value with
- * its underscores out, so the menu offered "on track" under a header reading "On track"
- * (both tests failed against the page before it changed). They draw through `t/[track]/health.ts` now.
- *
- * THEN THE HEADER ABOVE THEM, AND AN ADD-ON'S SETTINGS. With those chips fixed, a record labelling on_track Fine read
+ * THEN A THREAD'S HEALTH, AND AN ADD-ON'S SETTINGS. The thread's own screen (`/t/<n>`) is gone, a thread is read on
+ * its row now, and `healthLabel` stays the one place its health is said. With those chips fixed, a record labelling on_track Fine read
  * Fine on every update and On track in the header, whose `healthLabel` read a table and no labels; it takes the
  * declaration now. The settings page spelt an enum setting's values with the underscores out, and there the honest fix
  * is smaller than asked: a pack's setting cannot declare a value's words, so the page says each the way an
@@ -57,7 +54,6 @@ import { heldBy, plainOf, type Governor } from '../record/governance.ts';
 import { heardLabels, relabelAll } from '../voice.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import { choicesOf, stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
-import { healthChoices, healthSaid } from '../../routes/t/[track]/health.ts';
 import { healthLabel } from '../record/api.ts';
 import { settingChoices } from '../../routes/packs/[id]/said.ts';
 
@@ -69,7 +65,6 @@ const PAGE = ['+page.svelte', ...readdirSync(join(LIST, 'parts')).filter((f) => 
   .join('\n');
 const CARDS = readFileSync(join(here, 'RowCards.svelte'), 'utf8');
 const ROW_PAGE = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
-const TRACK_PAGE = readFileSync(join(here, '../../routes/t/[track]/+page.svelte'), 'utf8');
 const PACK_PAGE = readFileSync(join(here, '../../routes/packs/[id]/+page.svelte'), 'utf8');
 
 const PERSONAL = useCase('personal')!.labels as Record<string, string>;
@@ -203,34 +198,13 @@ test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the fie
   assert.deepEqual(spelt, [], 'a value on the row page is still spelt from its stored id');
 });
 
-test("NEITHER A ROW'S PAGE NOR A THREAD'S SPELLS A VALUE WITH ITS UNDERSCORES TAKEN OUT", () => {
-  /* The register page's own check, laid on the two pages that draw one row or one thread, WITHOUT ITS LEADING `\w`.
-     That pattern was expected to find two lines on each page; measured, it found one, since
-     `String(u.fields.health).replace(...)` puts a bracket before the dot, and so did the row page's chip before
-     `fbf9e708`. Neither page has a helper that reads labels to exempt. Before this held, it found the thread's update
-     chip and its composer's menu; the row page was already clean. */
-  for (const [name, source] of [['the row page', ROW_PAGE], ['the thread page', TRACK_PAGE]] as const) {
-    const spelt = source.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));
-    assert.deepEqual(spelt, [], `${name} still spells a stored value:\n${spelt.join('\n')}`);
-  }
-});
-
-test("A THREAD SAYS EACH UPDATE'S HEALTH, AND OFFERS EACH, BY THE RECORD'S LABELS", () => {
-  /* NO SHIPPED USE CASE LABELS A HEALTH, so these are a record's own, written as its settings would write them
-     (`label_updates__health__on_track`). Before, the composer offered "on track" in lower case under a header chip
-     reading "On track", and a labelled record read the stored id on every update. */
-  relabelAll(REGISTERS, { 'updates.health.on_track': 'Fine', 'updates.health.at_risk': 'Wobbling' });
-  assert.equal(healthSaid(REGISTERS.updates, 'on_track'), 'Fine');
-  const offered = healthChoices(REGISTERS.updates);
-  assert.deepEqual(offered.map(([v]) => v), ['on_track', 'at_risk', 'off_track'], 'the composer offers other values than the field declares');
-  assert.deepEqual(offered.map(([, said]) => said), ['Fine', 'Wobbling', 'Off track']);
-  /* A record with no labels reads the value's own words, capital first, as the header chip does. */
-  relabelAll(REGISTERS, {});
-  assert.deepEqual(healthChoices(REGISTERS.updates).map(([, said]) => said), ['On track', 'At risk', 'Off track']);
-  /* The two source checks: the page draws both through the functions above, and keeps writing the stored value. */
-  assert.ok(TRACK_PAGE.includes('{#each healthChoices(REGISTERS.updates) as [v, said] (v)}'), "the composer no longer offers a health through `healthChoices`");
-  assert.ok(TRACK_PAGE.includes('onclick={() => (draftHealth = v)}>{said}</button>'), 'the composer no longer draws the health it offers in the words `healthChoices` gives');
-  assert.ok(TRACK_PAGE.includes('label={healthSaid(REGISTERS.updates, String(u.fields.health))}'), "an update's chip no longer says its health through `healthSaid`");
+test("A ROW'S PAGE SPELLS NO VALUE WITH ITS UNDERSCORES TAKEN OUT", () => {
+  /* The register page's own check, laid on the page that draws one row, WITHOUT ITS LEADING `\w`. That pattern was
+     expected to find two lines; measured, it found one, since `String(u.fields.health).replace(...)` puts a bracket
+     before the dot, and so did the row page's chip before `fbf9e708`. The row page has no helper that reads labels to
+     exempt. */
+  const spelt = ROW_PAGE.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));
+  assert.deepEqual(spelt, [], `the row page still spells a stored value:\n${spelt.join('\n')}`);
 });
 
 test("A THREAD'S HEADER SAYS ITS HEALTH BY THE SAME LABELS AS THE CHIPS UNDER IT", () => {
@@ -239,7 +213,6 @@ test("A THREAD'S HEADER SAYS ITS HEALTH BY THE SAME LABELS AS THE CHIPS UNDER IT
      labels (failed against `api.ts` before it changed). */
   const current = { health: 'on_track', asOf: '2026-09-20', by: 'Sami', state: 'current' } as const;
   relabelAll(REGISTERS, { 'updates.health.on_track': 'Fine' });
-  assert.equal(healthLabel(current, REGISTERS.updates), healthSaid(REGISTERS.updates, 'on_track'));
   assert.equal(healthLabel(current, REGISTERS.updates), 'Fine');
   assert.equal(healthLabel({ ...current, state: 'missing' }, REGISTERS.updates), 'Fine, and stale');
   /* A health the record does not label keeps the table's words, and so does a caller that hands no declaration. */
@@ -249,7 +222,6 @@ test("A THREAD'S HEADER SAYS ITS HEALTH BY THE SAME LABELS AS THE CHIPS UNDER IT
   assert.equal(healthLabel(current, REGISTERS.updates), 'On track');
   /* The two states with no health say so whatever the labels are. */
   assert.equal(healthLabel({ health: null, asOf: null, by: null, state: 'missing' }, REGISTERS.updates), 'Update missing');
-  assert.ok(TRACK_PAGE.includes('<Chip label={healthLabel(health, REGISTERS.updates)}'), 'the header chip no longer hands `healthLabel` the declaration');
 });
 
 test("AN ADD-ON'S SETTINGS PAGE SAYS AN ENUM SETTING'S VALUES AS THE REST OF THE PRODUCT SAYS AN UNLABELLED VALUE", () => {

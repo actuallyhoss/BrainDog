@@ -163,7 +163,6 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/routes/settings/[area]/areas/Identity.svelte': ['.rename-bad'], // edge
   'apps/web/src/routes/settings/[area]/areas/Ingest.svelte': ['.door-state[data-state=\'off\']::before'], // edge
   'apps/web/src/routes/settings/[area]/settings.css': ['.settings-place .picture-shot', '.settings-place .picture[data-on] .picture-shot', '.settings-place .picture:not([data-on]):hover .picture-shot'], // edge, ring
-  'apps/web/src/routes/t/[track]/+page.svelte': ['.line-mark :global(.agent-face:is([data-live=\'working\'], [data-live=\'quiet\']))'], // edge
   'packages/skin/blocks-charts.css': ['.split-dot:not([data-step]), .ring-dot:not([data-step])', '.roadmap-item[data-date] .roadmap-bar', '.roadmap-bar[data-dragging]', '.heat-day'], // edge, ring
   'packages/skin/kinds/board.css': ['.board-col[data-drop]'], // edge
   'packages/skin/kinds/feed.css': ['.feed-row[data-focused]'], // ring

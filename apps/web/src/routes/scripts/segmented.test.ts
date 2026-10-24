@@ -24,10 +24,9 @@ const read = (path: string): string =>
     .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
 const FORM = { name: 'scripts/[id]/ScriptForm.svelte', text: read('./[id]/ScriptForm.svelte'), tracks: 2 };
-const TRACK = { name: 't/[track]/+page.svelte', text: read('../t/[track]/+page.svelte'), tracks: 1 };
 const USAGE = { name: 'usage/+page.svelte', text: read('../usage/+page.svelte'), tracks: 1 };
 const DECIDE = { name: 'decide/Classic.svelte', text: read('../decide/Classic.svelte'), tracks: 1 };
-const FILES = [FORM, TRACK, USAGE, DECIDE];
+const FILES = [FORM, USAGE, DECIDE];
 
 /** An element of the page's own (a lower-case tag) that carries the track's class. */
 const BY_HAND = /<[a-z][a-z0-9]*\b[^>]*\bclass="[^"]*\bsegmented\b/u;
@@ -67,12 +66,6 @@ test('a script: how often and which door are two named groups of pressed buttons
   assert.match(form, /<Segmented\b[^>]*\brole="group"[^>]*\baria-labelledby="script-door"/u);
   assert.match(form, /aria-pressed=\{draft\.every === e\} data-on=\{draft\.every === e \? '' : undefined\}/u);
   assert.match(form, /aria-pressed=\{draft\.door === d\.id\} data-on=\{draft\.door === d\.id \? '' : undefined\}/u);
-});
-
-test('a track: the health of an update is a named group, the chosen one marked', () => {
-  const page = markup(TRACK.text);
-  assert.match(page, /<Segmented\b[^>]*\brole="group"[^>]*\baria-labelledby="update-health"/u);
-  assert.match(page, /aria-pressed=\{draftHealth === v\} data-on=\{draftHealth === v \? '' : undefined\}/u);
 });
 
 test('usage: the months are a nav of links, and the month on screen is the current one', () => {

@@ -283,8 +283,6 @@ const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[
   ['audit/+page.svelte', 'the log, which grows with writes', /matched\.slice\(0, DOM_CAP\)/],
   ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
   ['decide/Classic.svelte', 'every decision ever taken', /DECIDED\.slice\(0, DOM_CAP\)/],
-  ['t/[track]/+page.svelte', 'a track’s updates', /updates\.slice\(0, DOM_CAP\)/],
-  ['t/[track]/+page.svelte', 'the agent runs on a track’s project', /runs\.slice\(0, DOM_CAP\)/],
 ];
 
 test('every list surface applies the cap, and there is one cap', () => {
@@ -306,7 +304,7 @@ test('and every capped list draws the line that says so', () => {
      one thing this product must not do. `Table` draws its own; the four ledgers do not have one, so
      they render `CapLine` themselves. */
   const routes = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes');
-  for (const route of ['audit/+page.svelte', 'inbox/+page.svelte', 'decide/Classic.svelte', 't/[track]/+page.svelte']) {
+  for (const route of ['audit/+page.svelte', 'inbox/+page.svelte', 'decide/Classic.svelte']) {
     const src = readFileSync(join(routes, route), 'utf8');
     /* The line has to be ABOUT the capped list, so it carries the count — a bare `<CapLine />` with
        no numbers would satisfy a substring check and say nothing. */

@@ -215,7 +215,6 @@ const PICKED = {
   '/scripts/[id]': { name: 'A script', from: 'script', path: (s) => `/scripts/${encodeURIComponent(s.id)}` },
   '/automations/[id]': { name: 'An automation', from: 'automation', path: (a) => `/automations/${encodeURIComponent(a.id)}` },
   '/jobs/[id]': { name: 'A run', from: 'job', path: (j) => `/jobs/${encodeURIComponent(j.id)}` },
-  '/t/[track]': { name: 'A thread', from: 'track', path: (t) => `/t/${t.seq}` },
 };
 
 /** Every page pattern of the app, `/r/[register]/[seq]` and the like, from the route directory. */

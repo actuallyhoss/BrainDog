@@ -118,14 +118,6 @@ export const HELD = {
   },
 
   /* The hand-built Work screen, which a declared page replaces. */
-  'apps/web/src/lib/record/track-live.ts': {
-    ids: ['tasks', 'things', 'tracks', 'updates'],
-    why: 'the hand-built Work screen reads Work and Projects by their list ids.',
-  },
-  'apps/web/src/routes/t/[track]/+page.svelte': {
-    ids: ['tasks', 'tracks', 'updates'],
-    why: 'the hand-built Work screen writes an update and links into Work by its list ids.',
-  },
   'apps/web/src/lib/work/list.ts': {
     ids: ['tasks'],
     why: "`TASKS`, the one list the hand-built Work screen, Today's tasks and the shell's Work row read by its id.",

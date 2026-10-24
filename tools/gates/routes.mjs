@@ -55,7 +55,6 @@ export const SAMPLE_OF = {
     asks: (s) => s.rows.map((r) => ({ ...fill('[register]', r.register), ...fill('[seq]', r.seq) })),
     was: [{ ...fill('[register]', 'obligations'), ...fill('[seq]', '1') }],
   },
-  'web:/t/[track]': { asks: (s) => s.tracks.map((seq) => fill('[track]', seq)), was: [fill('[track]', '2')] },
   'web:/settings/[area]': { fixed: [...AREAS.keys()].map((area) => fill('[area]', area)) },
   'site:/packs/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
   'site:/legal/[name]': { fixed: [fill('[name]', 'terms')] },
@@ -65,9 +64,9 @@ export const SAMPLE_OF = {
 /**
  * What the record holds that an address can name, asked through its own doors with the gate's key (`record.ask`).
  *
- * `{ questions, automations, scripts, jobs, addOns, entries, views, pages, rows, tracks }`, each a list, empty where the
+ * `{ questions, automations, scripts, jobs, addOns, entries, views, pages, rows }`, each a list, empty where the
  * record has nothing or refused. One open question, automation, script, job, installed add-on, catalogue entry, saved
- * view and thread; `rows` is one row of the first list that holds any, and `pages` the first page of the navigation.
+ * view; `rows` is one row of the first list that holds any, and `pages` the first page of the navigation.
  * `every: true` makes those two one row of EACH list and every page, for a sweep that can afford it.
  *
  * A CATALOGUE ENTRY IS A USE CASE THE RECORD OFFERS (`arrangement`'s `offer`), opened by the id the catalogue lists it
@@ -87,7 +86,6 @@ export async function readRecord(record, { every = false } = {}) {
     const seq = (await read('list', { register, limit: 1 }))?.rows?.[0]?.seq;
     if (Number.isInteger(seq)) rows.push({ register, seq });
   }
-  const track = (await read('list', { register: 'tracks', limit: 1 }))?.rows?.[0]?.seq;
   const pages = (boot.pages ?? []).map((p) => p?.slug).filter((s) => typeof s === 'string' && s !== '');
   const asked = await read('governance');
   const views = await read('views');
@@ -101,7 +99,6 @@ export async function readRecord(record, { every = false } = {}) {
     views: first((Array.isArray(views) ? views : []).map((v) => `${v.register}.${v.id}`)),
     pages: every ? pages : first(pages),
     rows,
-    tracks: Number.isInteger(track) ? [track] : [],
   };
 }
 

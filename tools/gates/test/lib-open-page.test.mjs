@@ -317,9 +317,9 @@ test('the record names the ids, and what it has nothing for is said, not invente
   for (const r of ['/SG10', '/decide/SG10', '/automations/rule.close_follow_ups', '/packs/agents', '/packs/browse/personal', '/v/obligations.open', '/p/money', '/r/obligations', '/r/obligations/4'])
     assert.ok(routes.includes(r), `${r} is not among ${routes.join(' ')}`);
   assert.equal(routes.includes('/automations/SG5'), false, 'an automation is opened by its own id');
-  assert.deepEqual(unseen.sort(), ['/jobs/j_none', '/scripts/no-script', '/t/2']);
+  assert.deepEqual(unseen.sort(), ['/jobs/j_none', '/scripts/no-script']);
   /* AND WHAT IS DRAWN AS NOT FOUND ON PURPOSE: the unseen. The shared page is `/s`, static, its link in the fragment. */
-  assert.deepEqual((await routesFor(WEB, record)).missing.sort(), ['/jobs/j_none', '/scripts/no-script', '/t/2']);
+  assert.deepEqual((await routesFor(WEB, record)).missing.sort(), ['/jobs/j_none', '/scripts/no-script']);
   assert.ok(routes.includes('/s'), 'the shared page is swept at its one address');
   assert.ok(!routes.includes('/p/kiln'), 'one page unless every page is asked for');
   assert.ok((await routesFor(WEB, record, { every: true })).routes.includes('/p/kiln'));

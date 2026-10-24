@@ -177,7 +177,7 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..'), rec
        which is how the coverage test and the early unsampled check read it. */
     web: await routesFor(join(root, 'apps', 'web'), record, { extra: [
       '/p/kiln',
-      '/t/3',
+      '/r/tracks/3',
       '/nowhere',
       '/automations?tab=scheduled',
       '/automations?tab=scripts',

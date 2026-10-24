@@ -42,7 +42,6 @@ const TODAY = new Set([
   'settings/[area]/areas/Recovery.svelte',
   'settings/[area]/areas/Sessions.svelte',
   'slash/+page.svelte',
-  't/[track]/+page.svelte',
   'usage/+page.svelte',
   'vault/+page.svelte',
 ]);
