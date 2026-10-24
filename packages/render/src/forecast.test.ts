@@ -529,7 +529,7 @@ test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line
   assert.match(html, /<path class="forecast-cross-rule" /u);
   assert.match(
     html,
-    /<span class="forecast-now-label num" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true"><span class="forecast-now-word">Today<\/span><span class="forecast-now-figure">£1,000<\/span><\/span>/u,
+    /<span class="forecast-now-label num" data-place="under" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true"><span class="forecast-now-word">Today<\/span><span class="forecast-now-figure">£1,000<\/span><\/span>/u,
   );
   assert.equal(plan.now.rule, `M${/^M([\d.]+)/u.exec(plan.now.d)![1]} 0V100`, 'and a hairline down the chart at today');
   assert.match(html, /<path class="forecast-walk" [^>]*style="stroke:url\(#[^)]+-under\)"/u, 'the line is cut at zero: ink above, red under');
@@ -552,6 +552,32 @@ test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS HOW LONG IT LASTS, the fl
   const html = toHTML(parse(['```forecast', ...ROWS.map((r) => r.join(' | ')), 'headline | under |  | ', '```'].join('\n'), { page: true }));
   assert.doesNotMatch(html, /forecast-said/u);
   assert.match(html, /class="forecast-pin"/u);
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z16 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`, Cash ahead): cash fell to
+   today and the walk steps up three days on, and "Today" over "EGP 752,841.68", set over the dot to the end side, was drawn
+   across the line that climbs there. The label goes to a corner the line leaves free, inside the plot. */
+test('TODAY\'S LABEL SITS IN A CORNER THE LINE LEAVES FREE, so a walk that climbs the day after never runs through it', () => {
+  const fell = Array.from({ length: 30 }, (_, i) => ['past', new Date(Date.UTC(2026, 8, 24 + i)).toISOString().slice(0, 10), '', `£${900 - i * 5}.00`]);
+  const rows = [
+    ['opening', '2026-10-24', 'Cash now', '£752.84'],
+    ...fell,
+    ['step', '2026-10-27', 'Salary', '£300.00'],
+    ['step', '2026-11-10', 'Invoice', '£400.00'],
+    ['step', '2026-12-03', 'Tax', '−£900.00'],
+    ['horizon', '60', '', ''],
+  ];
+  const m = forecastModel(rows)!;
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.notEqual(plan.now.place, 'above', 'over the dot to the end side is where the walk climbs');
+  const html = toHTML(parse(['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n'), { page: true }));
+  assert.match(html, new RegExp(`<span class="forecast-now-label num" data-place="${plan.now.place}" style=`, 'u'));
+  assert.equal(plan.now.place, 'under', 'under the dot, where the walk runs above it');
+  /* AND A WALK THAT LEAVES THE CORNER OVER THE DOT FREE KEEPS THE LABEL WHERE IT ALWAYS SAT, with no mark. */
+  const level = forecastModel([['opening', '2026-10-24', 'Cash now', '£1,000.00'], ['step', '2026-12-10', 'Invoice', '£500.00'], ['horizon', '60', '', '']])!;
+  const kept = forecastPlan(level, scenario(level, baseKnobs(level)), null);
+  assert.equal(kept.now.place, 'above');
+  assert.doesNotMatch(toHTML(parse(['```forecast', 'opening | 2026-10-24 | Cash now | £1,000.00', 'step | 2026-12-10 | Invoice | £500.00', 'horizon | 60 |  | ', '```'].join('\n'), { page: true })), /data-place=/u);
 });
 
 test('A CROSSING NEAR TODAY SETS THE LABELS APART: the balance marked near the flag, the flag\'s day after its rule', () => {

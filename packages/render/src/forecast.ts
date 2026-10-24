@@ -880,7 +880,7 @@ export type ForecastPlan = {
   area: string;
   below: string;
   /** Today's dot, where its balance is said (shares across and down), and the balance as a headline says it. */
-  now: { d: string; at: string; y: string; label: string; rule: string };
+  now: { d: string; at: string; y: string; label: string; place: NowPlace; rule: string };
   base: string;
   /** Where the solid rule is drawn: zero where the axis holds it, and else the end of the axis nearest zero. */
   zero: string;
@@ -1030,6 +1030,60 @@ const TICK_START_ROOM = 0.06;
 const FLAG_NEAR = 0.15;
 
 /**
+ * Today's label as a share of the plot on a phone, its worst case: "EGP 752,841.68" is about 105px of a 280px plot, and
+ * the word over the figure two lines of 16px in a 160px one. A desk's plot is wider and taller, so a corner free on a
+ * phone is free there.
+ */
+const NOW_WIDE = 0.38;
+const NOW_TALL = 0.2;
+/** The gap between the dot and its label, as a share of the plot's height. */
+const NOW_GAP = 0.025;
+
+/** Where today's label sits round its dot: over it to the end side, under it, or to the start side over or under. */
+export type NowPlace = 'above' | 'under' | 'start' | 'start-under';
+
+/**
+ * THE CORNER OF TODAY'S DOT THAT THE LINE DOES NOT RUN THROUGH, AND THAT STAYS INSIDE THE PLOT (the audit of 25
+ * October, Z16): over the dot to the end side, where the label always sat, drew "Today" and "EGP 752,841.68" across a
+ * walk that steps up the day after, at 390. `points` are the line's own, as shares across and down. With the crossing's
+ * flag near, the corners over the dot are the flag's. A dot with no free corner keeps the first, as it always did.
+ */
+export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: number; y: number }, near: boolean): NowPlace {
+  const order: NowPlace[] = near ? ['under', 'start-under'] : ['above', 'under', 'start', 'start-under'];
+  const boxOf = (place: NowPlace) => {
+    const start = place === 'start' || place === 'start-under';
+    const under = place === 'under' || place === 'start-under';
+    return {
+      x0: start ? dot.x - NOW_WIDE : dot.x,
+      x1: start ? dot.x : dot.x + NOW_WIDE,
+      y0: under ? dot.y + NOW_GAP : dot.y - NOW_GAP - NOW_TALL,
+      y1: under ? dot.y + NOW_GAP + NOW_TALL : dot.y - NOW_GAP,
+    };
+  };
+  /* HOW MUCH OF THE LINE A CORNER HOLDS, or `null` for one that would hang outside the plot. */
+  const crossed = (place: NowPlace): number | null => {
+    const b = boxOf(place);
+    if (b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) return null;
+    return points.filter((p) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1).length;
+  };
+  /* THE FIRST CORNER THE LINE LEAVES FREE, else the one it crosses least, else where the label always sat. */
+  let best: { place: NowPlace; n: number } | null = null;
+  for (const place of order) {
+    const n = crossed(place);
+    if (n !== null && (best === null || n < best.n)) best = { place, n };
+    if (n === 0) break;
+  }
+  return best?.place ?? order[0]!;
+}
+
+/**
+ * The `data-place` both drawers set on today's label, or `null` where it sits where it always did: over the dot, or under
+ * it with the flag near, which `data-near-flag` already says.
+ */
+export const nowPlaced = (plan: Pick<ForecastPlan, 'now' | 'cross'>): NowPlace | null =>
+  plan.now.place === (plan.cross?.near ? 'under' : 'above') ? null : plan.now.place;
+
+/**
  * A name on the time axis: the month, and the year where the names are a year apart or a year begins between them.
  *
  * A JANUARY SAYS ITS YEAR ONCE THE AXIS SKIPS MONTHS, because "Jan Jul Jan Jul" does not say which year a point is in,
@@ -1123,6 +1177,18 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day, model.today)) : forecastAbove(shortDay(end, model.today));
   const nowAt = daysBetween(start, model.today) / span;
+  /* THE LINE AS SHARES OF THE PLOT, each stretch between two days walked in eighths, so a step that leaps a whole corner
+     in one day is still found in it. */
+  const shareOf = (day: string, v: number) => ({ x: daysBetween(start, day) / span, y: (hi - v) / (hi - lo) });
+  const traced: { x: number; y: number }[] = [];
+  for (const run of [model.past.map((p) => shareOf(p.day, p.value)), [shareOf(model.today, model.opening), ...shown.days.filter((p) => p.day <= end).map((p) => shareOf(p.day, p.balance))]])
+    run.forEach((p, i) => {
+      const before = run[i - 1];
+      if (before) for (let k = 1; k < 8; k++) traced.push({ x: before.x + ((p.x - before.x) * k) / 8, y: before.y + ((p.y - before.y) * k) / 8 });
+      traced.push(p);
+    });
+  const nearFlag = c !== null && Math.abs(daysBetween(start, c.day) / span - nowAt) <= FLAG_NEAR;
+  const place = nowPlace(traced, shareOf(model.today, model.opening), nearFlag);
   const figure = (v: number) => forecastFigure(model, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
   /* TOP FIRST, so the foot is the last level and the top the first. */
@@ -1161,6 +1227,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       at: at(nowAt),
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
       label: forecastFigure(model, model.opening, 'read'),
+      place,
       /* TODAY IS A HAIRLINE DOWN THE WHOLE CHART as well as a dot, named "Today" with the balance under the word, so the
          eye finds where the remembered line ends and the walk begins (the money review, F2). */
       rule: `M${x(model.today)} 0V100`,

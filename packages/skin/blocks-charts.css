@@ -1657,6 +1657,34 @@
     translate: var(--sp-1) var(--sp-2);
   }
 
+  /* THE CORNER THE LINE DOES NOT RUN THROUGH (`data-place`, from `src/forecast.ts` `nowPlace`): at 390 a walk that
+     stepped up the day after today drew "Today" and the balance across the line (the audit of 25 October, Z16). Under
+     the dot to the end side, or to the start side over or under it, the words ending at the dot. */
+  .forecast-now-label[data-place='under'] {
+    translate: var(--sp-2) var(--sp-1);
+  }
+
+  .forecast-now-label[data-place='under']:dir(rtl) {
+    translate: calc(-1 * var(--sp-2)) var(--sp-1);
+  }
+
+  .forecast-now-label:is([data-place='start'], [data-place='start-under']) {
+    text-align: end;
+    translate: calc(-100% - var(--sp-2)) calc(-100% - var(--sp-1));
+  }
+
+  .forecast-now-label[data-place='start-under'] {
+    translate: calc(-100% - var(--sp-2)) var(--sp-1);
+  }
+
+  .forecast-now-label[data-place='start']:dir(rtl) {
+    translate: calc(100% + var(--sp-2)) calc(-100% - var(--sp-1));
+  }
+
+  .forecast-now-label[data-place='start-under']:dir(rtl) {
+    translate: calc(100% + var(--sp-2)) var(--sp-1);
+  }
+
   .forecast-pin {
     position: absolute;
     inset-block-start: 0;

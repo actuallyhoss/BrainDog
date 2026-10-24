@@ -46,7 +46,7 @@ import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPla
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
-import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NOW, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
+import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NOW, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, nowPlaced, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
@@ -1681,7 +1681,8 @@ function forecast(b: Block, o: RenderOptions): string {
   /* NO SENTENCE WHERE THE PAGE'S HEADLINE SAYS IT (`legend`): the flag on the crossing stays. */
   const said = plan.legend ? `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>` : '';
   /* A CROSSING NEAR TODAY SETS THE TWO LABELS APART: today's balance under its dot, the flag's day after its rule. */
-  const near = plan.cross?.near ? ' data-near-flag=""' : '';
+  const placed = nowPlaced(plan);
+  const near = `${plan.cross?.near ? ' data-near-flag=""' : ''}${placed ? ` data-place="${placed}"` : ''}`;
   /* THE END OF THE AXIS NEAREST ZERO, WHERE ZERO IS OFF IT, carries a break beside its real amount (`cut`), and the
      chart's name says where the axis starts, as `Forecast.svelte` draws it. */
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
