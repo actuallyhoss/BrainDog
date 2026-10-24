@@ -5,10 +5,10 @@
  * lockfile: `pnpm install --offline` cannot fetch it, so the pinned route was one nobody could build. What it would have
  * done is two things, and only one of them is needed here. Signing the JWT is an ES256 signature, which WebCrypto does
  * in one call in workerd and in Node alike. Encrypting a payload (RFC 8291, ECDH plus HKDF plus AES-GCM) is the other,
- * and a push with no body needs none of it.
+ * and since E44 it is done here too, over WebCrypto, for the one thing a push carries: where a tap opens.
  *
  * SO THE PUSH CARRIES NO CONTENT, which `09 §3` asks for in so many words ("one line, no content"). The kernel's
- * `notify.push` payload is `{ sub: { id } }` and nothing else, so there are no words to leave even by mistake: the
+ * `notify.push` payload is `{ sub: { id } }` and at most a path (`open`), so there are no words to leave even by mistake: the
  * service worker shows a fixed line, and the app reads what changed with the person's own session. A row an older
  * build queued still carries a title cut from a notice, which is somebody's overdue invoice, and it is never read.
  *
