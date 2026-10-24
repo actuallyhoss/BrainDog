@@ -275,3 +275,39 @@ test('NOTHING IS ASKED WHERE NOTHING COULD BE TRIED: no model, or a record with 
   assert.match(out.dropped[0]!, /cannot draw a change before it lands/u);
   sql.close();
 });
+
+test('TRY AGAIN ASKS THE SAME WORDS WITH THE DRAFT TURNED DOWN, answers another, drops the first if it comes back, and files nothing', async () => {
+  /* ANOTHER DESK, the second way of drawing the same words: its steps as a board. */
+  const OTHER = {
+    id: 'page.desk',
+    kind: 'page',
+    body: { page: 'desk', title: 'Desk', requires: ['register.tasks'], blocks: [{ kind: 'note', lead: true, span: 12, body: '{{tasks.count}} step(s) so far.' }, { kind: 'board', span: 12, source: 'register.tasks', columns: [{ field: 'state' }, { field: 'what' }], empty: 'No steps yet.' }] },
+  };
+  /* A MODEL THAT ANSWERS THE SAME DESK FIRST, and once it is turned down, that desk again beside another. */
+  const { heard, model } = listening((input) =>
+    input.declined === undefined
+      ? drafted(RIGHT)
+      : { drafts: [{ question: 'A desk for my launch?', body_kind: 'change', body: { to: RIGHT } }, { question: 'A desk of my launch as a board?', body_kind: 'change', body: { to: OTHER } }] },
+  );
+  const { api, sql } = await record(model);
+  const asked = 'A desk for my launch, with every step on it.';
+  const first = value<Drafted>(await api.slashDraft({ asked }, OWNER));
+  assert.equal(first.drafts.length, 1);
+  const again = value<Drafted>(await api.slashDraft({ asked, not: first.drafts.map((d) => ({ question: d.question, change: d.change })) } as never, OWNER));
+
+  /* THE SECOND ASK CARRIES WHAT WAS TURNED DOWN, as the model would answer it. */
+  assert.equal(heard.length, 2);
+  assert.deepEqual(heard[1]!.declined?.map((d) => d.question), ['A desk for my launch?']);
+  assert.deepEqual(JSON.parse(JSON.stringify(heard[1]!.declined?.[0]?.body.to)), JSON.parse(JSON.stringify(first.drafts[0]!.change.to)));
+  /* AND ANSWERS ONLY THE OTHER: the first, offered again, is left out with a sentence, never drawn. */
+  assert.deepEqual(again.drafts.map((d) => d.question), ['A desk of my launch as a board?']);
+  assert.notDeepEqual(again.drafts[0]!.change.to, first.drafts[0]!.change.to);
+  assert.ok(again.dropped.includes('Proposal 1 was the draft you turned down again, so it was left out.'), JSON.stringify(again.dropped));
+  /* NOTHING IS FILED, the first draft no more than the second. */
+  assert.equal(suggestions(sql), 0);
+  /* A NOT THAT IS NO LIST OF DRAFTS IS REFUSED BEFORE ANY ASK. */
+  const bad = (await api.slashDraft({ asked, not: [{ question: 'x' }] } as never, OWNER)) as Out;
+  assert.equal(bad.refusal?.at, 'not');
+  assert.equal(heard.length, 2);
+  sql.close();
+});

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { askSlash, canAsk, dailySaid, draftedBy, readSlash, setDaily, suggestionsOf, words, type Reading, type SlashClient } from './slash.ts';
+import { askSlash, canAsk, dailySaid, draftChange, draftedBy, readSlash, setDaily, suggestionsOf, words, type Drafted, type Reading, type SlashClient } from './slash.ts';
 
 const READING: Reading = {
   model: null,
@@ -138,4 +138,16 @@ test('a description goes to the same press as asked, and is said in the same sen
   assert.deepEqual(sent, [{ asked: 'A desk for my launch' }, {}]);
   const refused: SlashClient = { call: async () => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'asked: is at most 1000 characters.' } }) as never };
   assert.deepEqual(await askSlash(refused, 'x'), { ok: false, fix: 'asked: is at most 1000 characters.' });
+});
+
+test('TRY AGAIN SENDS THE SAME WORDS WITH THE DRAFTS TURNED DOWN, each as its question and change, and a first ask sends none', async () => {
+  const sent: Record<string, unknown>[] = [];
+  const c: SlashClient = { call: async (_name, args) => (sent.push(args ?? {}), { ok: true, value: { by: 'test model', drafts: [], dropped: [] } } as never) };
+  const shown: Drafted = { question: 'A desk?', change: { to: { id: 'page.desk', kind: 'page', body: { page: 'desk' } } }, rows: { tasks: [{ what: 'x' }] }, preview: { pages: [] } };
+  await draftChange(c, 'A desk for my launch.', 'desk');
+  await draftChange(c, 'A desk for my launch.', 'desk', undefined, [shown]);
+  assert.deepEqual(sent, [
+    { asked: 'A desk for my launch.', page: 'desk' },
+    { asked: 'A desk for my launch.', page: 'desk', not: [{ question: 'A desk?', change: { to: { id: 'page.desk', kind: 'page', body: { page: 'desk' } } } }] },
+  ]);
 });

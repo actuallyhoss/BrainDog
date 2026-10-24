@@ -10,5 +10,5 @@ import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
   { name: 'slashDraft', group: 'ADMIN', writes: true, what: 'Drafts from what you describe, each drawn before anything is filed and mended when the record refused it. It files nothing.',
-    takes: { asked: 'text', page: 'text', body: 'json' } },
+    takes: { asked: 'text', page: 'text', body: 'json', not: 'json' } },
 ];

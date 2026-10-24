@@ -160,7 +160,7 @@ import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Pr
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
-import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
+import { askedFault, declinedInput, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
 import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
@@ -284,7 +284,7 @@ admitHostSources(Object.keys(HOST_SOURCES));
 
 export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type Braked, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
-export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
+export { SAMPLE_ROWS_MOST, SLASH_DECLINED_MOST, SLASH_REPAIRS_MOST, type SlashDeclined, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, atWork, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
@@ -5236,6 +5236,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     preview: SlashPreviewer | null,
     r: ReturnType<typeof slashReading> = slashReading(ctx),
     built?: Record<string, unknown>,
+    not?: readonly SlashDeclined[],
   ): Promise<Result<SlashDescribed>> => {
     const about = page === undefined ? null : describedPage(page, ctx, built);
     if (about !== null && !about.ok) return about;
@@ -5257,6 +5258,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(r.partial ? { partial: true as const } : {}),
           grammar: describedGrammar(),
           ...(about === null ? {} : { page: about.value }),
+          ...(not === undefined || not.length === 0 ? {} : { declined: declinedInput(not) }),
         },
         drawn: drawnVersions(sql),
         preview,
@@ -5294,9 +5296,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * carries the page too, because the same words about two pages are two drafts.
    */
   const drafting = describedPresses<Result<SlashDrafted>>();
-  const slashDrafted = (args: { asked: string; page?: string; body?: Record<string, unknown> }, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashDrafted>> =>
-    drafting.once(args.asked, JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, args.page ?? null, args.body === undefined ? null : 'built']), async () => {
-      const got = await slashDescribed(args.asked, args.page, ctx, preview, undefined, args.body);
+  const slashDrafted = (args: { asked: string; page?: string; body?: Record<string, unknown>; not?: SlashDeclined[] }, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashDrafted>> =>
+    /* A TRY AGAIN IS ANOTHER ASK OF THE SAME WORDS, so what it turned down is part of who asks: it never shares the first's answer. */
+    drafting.once(args.asked, JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, args.page ?? null, args.body === undefined ? null : 'built', args.not ?? null]), async () => {
+      const got = await slashDescribed(args.asked, args.page, ctx, preview, undefined, args.body, args.not);
       return got.ok ? ok(draftedOf(got.value)) : got;
     });
 

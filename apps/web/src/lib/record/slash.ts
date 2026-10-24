@@ -144,6 +144,9 @@ export const changeWords = {
   keeping: 'Keeping',
   file: 'Ask in Needs you',
   drop: 'Not this',
+  /** Ask the same words again, with this draft turned down, so Slash drafts another way (§45 "Keep, Try again"). */
+  again: 'Try again',
+  againing: 'Trying again',
   /** Which of several drafts is drawn, for a screen reader. */
   which: 'Which draft to show',
   kept: 'Kept. This is how it stands now.',
@@ -181,9 +184,18 @@ export type DraftedAll = { by: string; drafts: Drafted[]; dropped: string[]; cos
  * What the owner described, drafted and checked, filing nothing. `page` is the page it is about, by its address, and is
  * left out on the Slash screen, where the description is about the whole BrainDog.
  */
-export async function draftChange(client: SlashClient, asked: string, page?: string, body?: unknown): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
+export async function draftChange(
+  client: SlashClient,
+  asked: string,
+  page?: string,
+  body?: unknown,
+  not: readonly Drafted[] = [],
+): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
+  /* TRY AGAIN SENDS THE SAME WORDS WITH WHAT IT TURNED DOWN (C34), each as its question and change, so the model drafts
+     another way and the record drops the same change if it comes back. */
+  const declined = not.length === 0 ? {} : { not: not.map((d) => ({ question: d.question, change: { to: d.change.to } })) };
   /* A PAGE THE RECORD HOLDS NONE OF YET (Today, Decide) IS SENT AS IT IS DRAWN, so the draft changes that (C25). */
-  const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked } : { asked, page, ...(body === undefined ? {} : { body }) });
+  const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked, ...declined } : { asked, page, ...(body === undefined ? {} : { body }), ...declined });
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   return { ok: true, drafted: out.value };
 }

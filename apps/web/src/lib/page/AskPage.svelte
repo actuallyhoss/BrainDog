@@ -4,7 +4,9 @@
   NOTHING IS FILED BY ASKING. The press calls the record's `slashDraft`, which drafts, checks and draws each change and
   keeps none of it. What the owner sees is the page as each draft would make it, beside the page as it is, through the
   same reader every declared page goes through (`PageView mode="preview"`). Only then does a press file it: "Keep it"
-  files it and accepts it in one go, "Ask in Needs you" files it for later, and "Not this" drops it unfiled.
+  files it and accepts it in one go, "Ask in Needs you" files it for later, and "Not this" drops it unfiled. "Try again"
+  asks the same words once more with the draft shown handed back as turned down, so Slash drafts another way; the one
+  turned down is dropped unfiled, and the record leaves it out if it comes back (C34).
 
   ONE COMPONENT FOR BOTH PLACES A DESCRIPTION IS TYPED. With `page` it is the sheet a page's head opens, about that
   page; without it it is the Slash screen's describe field, about the whole BrainDog. The drafts are drawn the same
@@ -64,6 +66,9 @@
   let cost = $state<string | null>(null);
   let shown = $state.raw<Shown[]>([]);
   let chosen = $state(0);
+  /** The words last sent, and the drafts turned down for them by Try again, which a new description forgets. */
+  let lastAsked = '';
+  let tried: Drafted[] = [];
 
   /* A LINE HANDED IN IS SENT ONCE, as if typed, so the model reads it only after the rules would not. */
   $effect(() => {
@@ -86,16 +91,18 @@
     shown = shown.map((s) => (s.key === key ? { ...s, ...patch } : s));
   };
 
-  async function send() {
-    const text = asked.trim();
+  async function send(again = false) {
+    const text = again ? lastAsked : asked.trim();
     if (sending || text === '') return;
+    if (!again) tried = [];
+    lastAsked = text;
     sending = true;
     fix = null;
     cost = null;
     const mine = ++sends;
     try {
       const body = built === undefined ? undefined : ((await built()) ?? undefined);
-      const out = await draftChange(client(), text, about, body);
+      const out = await draftChange(client(), text, about, body, tried);
       if (mine !== sends) return;
       answered = true;
       if (!out.ok) {
@@ -147,6 +154,14 @@
     } catch {
       put(key, { busy: false, said: words.unreached });
     }
+  }
+
+  /** Turn the draft shown down and ask the same words again: it goes unfiled, and Slash is told not to draft it again. */
+  function retry(key: number) {
+    const s = shown.find((x) => x.key === key);
+    if (!s || s.busy || s.kept || sending) return;
+    tried = [...tried, s.draft];
+    void send(true);
   }
 
   function drop(key: number) {
@@ -239,6 +254,7 @@
           <div class="ask-actions">
             <Button weight="primary" disabled={c.busy} onclick={() => void settle(c.key, true)}>{c.busy ? words.keeping : words.keep}</Button>
             <Button disabled={c.busy} onclick={() => void settle(c.key, false)}>{words.file}</Button>
+            <Button disabled={c.busy || sending} onclick={() => retry(c.key)}>{sending ? words.againing : words.again}</Button>
             <Button weight="bare" disabled={c.busy} onclick={() => drop(c.key)}>{words.drop}</Button>
           </div>
         {:else if c.kept.kind === 'kept'}

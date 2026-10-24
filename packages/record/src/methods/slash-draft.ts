@@ -15,14 +15,14 @@
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
-import { askedFault, pageFault, previewerOf, type SlashDrafted, type SlashPreviewer } from '../slash.ts';
+import { askedFault, declinedFault, pageFault, previewerOf, type SlashDeclined, type SlashDrafted, type SlashPreviewer } from '../slash.ts';
 import type { RecordDeps } from './index.ts';
 
 /** The keys `slashDraft` takes, named in the sentence that refuses any other. */
-const TAKES = ['asked', 'page', 'body'] as const;
+const TAKES = ['asked', 'page', 'body', 'not'] as const;
 
 /** The described path as `index.ts` hands it over (`RecordDeps.slashDescribed`), absent on a record built without it. */
-type SlashDescribe = (args: { asked: string; page?: string; body?: Record<string, unknown> }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
+type SlashDescribe = (args: { asked: string; page?: string; body?: Record<string, unknown>; not?: SlashDeclined[] }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
 
 /**
  * THE BODY A PAGE IS DRAWN FROM WHILE THE RECORD HOLDS NONE (C25, C26): Today and Decide are built in the browser until a
@@ -47,7 +47,7 @@ export function methods(deps: RecordDeps) {
      * covers every list the owner reads. `this` IS THE RECORD, whose `previewChange` is another file's method under
      * `methods/` (`previewerOf`), and the host calls every row's method on the record.
      */
-    async slashDraft(args: { asked?: unknown; page?: unknown; body?: unknown } | undefined, ctx: CallContext): Promise<Result<SlashDrafted>> {
+    async slashDraft(args: { asked?: unknown; page?: unknown; body?: unknown; not?: unknown } | undefined, ctx: CallContext): Promise<Result<SlashDrafted>> {
       const stop = admin(ctx, 'ask Slash to draft from what you described');
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
@@ -63,11 +63,17 @@ export function methods(deps: RecordDeps) {
         const unbuilt = builtFault(said.body);
         if (unbuilt) return no('VALUE_MALFORMED', unbuilt, { at: 'body' });
       }
+      /* TRY AGAIN (§45): the same words, with the drafts he turned down handed back so the model drafts another way. */
+      if (said.not !== undefined) {
+        const unsaid = declinedFault(said.not);
+        if (unsaid) return no('VALUE_MALFORMED', unsaid, { at: 'not' });
+      }
       if (described === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot draft from a description yet, so the model was not asked.');
       const asked = String(said.asked).trim();
       const page = typeof said.page === 'string' ? said.page.trim() : undefined;
       const body = said.body === undefined ? {} : { body: said.body as Record<string, unknown> };
-      return described({ asked, ...(page === undefined ? {} : { page }), ...body }, ctx, previewerOf(this, ctx));
+      const not = said.not === undefined || (said.not as unknown[]).length === 0 ? {} : { not: said.not as SlashDeclined[] };
+      return described({ asked, ...(page === undefined ? {} : { page }), ...body, ...not }, ctx, previewerOf(this, ctx));
     },
   };
 }

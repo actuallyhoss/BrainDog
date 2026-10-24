@@ -1518,6 +1518,12 @@ export type SlashModelInput = {
    */
   repair?: { drafts: readonly unknown[]; refusals: readonly { at: string; fix: string }[] };
   /**
+   * PRESENT ON A TRY AGAIN ONLY (§45 "Keep, Try again and Throw away"): the drafts he was shown for the same words and
+   * turned down, as the model would answer them, so it drafts another way. At most `SLASH_DECLINED_MOST`, and a draft
+   * that is one of them again is dropped (`describe`).
+   */
+  declined?: readonly { question: string; body_kind: 'change'; body: { to: unknown } }[];
+  /**
    * THE LOOKS HE INSTALLED AND MAY TRY, by name with the id as its handle (`theme-pick.ts` `looksOf`, less the one he is
    * drawn in). A model may answer one as `{ body_kind: 'settings', body: { look: { theme: '<id>' } } }`, and only one of
    * these is kept (`lookDraft`): a theme is picked, never designed. Absent, no look is offered.
@@ -1532,6 +1538,30 @@ export type SlashModelInput = {
  * reads well.
  */
 export const SLASH_ASKED_MOST = 1_000;
+
+/** The most drafts a Try again hands back as turned down: the ones shown for the same words, newest kept. */
+export const SLASH_DECLINED_MOST = 3;
+
+/** What a Try again said was turned down, as `slashDraft` takes it: each draft's question and the change it would make. */
+export type SlashDeclined = { question: string; change: { to: unknown } };
+
+/**
+ * The refusal a Try again's `not` earns, or `null` when it is a list of drafts as `slashDraft` answered them. More than
+ * `SLASH_DECLINED_MOST` are cut to the newest, never refused, since a sheet that tried many times still asks once more.
+ */
+export function declinedFault(v: unknown): string | null {
+  if (!Array.isArray(v)) return 'not is the drafts you turned down, each with its question and change, as Slash answered them.';
+  for (const d of v) {
+    const x = d as { question?: unknown; change?: { to?: unknown } } | null;
+    if (x === null || typeof x !== 'object' || typeof x.question !== 'string' || x.change === null || typeof x.change !== 'object' || x.change.to === null || typeof x.change.to !== 'object')
+      return 'not is the drafts you turned down, each with its question and change, as Slash answered them.';
+  }
+  return null;
+}
+
+/** A Try again's turned-down drafts as the model is handed them: the newest `SLASH_DECLINED_MOST`, each as it answered one. */
+export const declinedInput = (not: readonly SlashDeclined[]): NonNullable<SlashModelInput['declined']> =>
+  not.slice(-SLASH_DECLINED_MOST).map((d) => ({ question: d.question.trim().slice(0, 280), body_kind: 'change' as const, body: { to: d.change.to } }));
 
 /** How many descriptions `describedPresses` remembers what it filed from, oldest let go first. */
 const DESCRIBED_KEPT = 50;
@@ -2607,6 +2637,7 @@ export async function describe(deps: {
   let spentAsks = 0;
   let spentTokens = 0;
   const tokensOf = (v: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(v) ?? '').length / 3);
+  const turnedDown = new Set((deps.input.declined ?? []).map((d) => JSON.stringify(d.body.to ?? null)));
   for (let asks = 0; asks <= SLASH_REPAIRS_MOST && (asks === 0 || refused.length > 0); asks++) {
     const input: SlashModelInput =
       asks === 0 ? deps.input : { ...deps.input, repair: { drafts: refused.map((r) => answered(r.draft, r.said)), refusals: refused.flatMap((r) => r.faults) } };
@@ -2646,6 +2677,12 @@ export async function describe(deps: {
         continue;
       }
       if (clean.some((c) => c.key === one.draft.key)) continue;
+      /* A TRY AGAIN THAT ANSWERS WHAT HE TURNED DOWN HAS NOT TRIED AGAIN, so the same change is dropped, said, and never
+         drawn: the first draft stays thrown away. */
+      if (turnedDown.has(JSON.stringify(one.draft.body.to ?? null))) {
+        dropped.push(`Proposal ${i + 1} was the draft you turned down again, so it was left out.`);
+        continue;
+      }
       /* NO MORE ARE TRIED THAN MAY BE FILED, because each try is a rehearsal that installs the change and draws its pages,
          and an answer is bounded only by the model's own length, so an answer of many small pages would be as many
          rehearsals in one ask. An ask tries at most `most` drafts, the ones already clean counted, as `fromModel` keeps. */
