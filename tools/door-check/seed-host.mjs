@@ -119,6 +119,8 @@ export async function startSeedHost({ port = 0, grow } = {}) {
     base,
     record: IDENTITY.slug,
     key,
+    /* THE RECORD'S OWN API, for a caller in this process that times a call where the record answers it (`record-cost.mjs`). */
+    api: running.api,
     close: async () => {
       await new Promise((done) => front.close(() => done()));
       await running.close();
