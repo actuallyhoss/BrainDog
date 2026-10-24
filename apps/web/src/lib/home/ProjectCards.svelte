@@ -169,7 +169,7 @@
               {#if failed}<span class="d-fail" role="alert">{failed}</span>{/if}
             </div>
           {:else}
-            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late, last: lasts.get(c.seq) ?? c.last ?? null }} label={label(c)} agents={agentsOn(c.name, working)} />
+            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late, last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? c.last ?? null) }} label={label(c)} agents={agentsOn(c.name, working)} />
           {/if}
         </li>
       {/each}

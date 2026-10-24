@@ -6,7 +6,7 @@
  * a card; the lane is whatever the list's state field holds. Pure, so `project-cards.test.ts` holds the rules.
  */
 
-import { cardLayout, dayShort, trendOf } from 'braindog-render';
+import { cardLayout, dayShort, sinceWords, trendOf } from 'braindog-render';
 
 import { briefFromNote } from '../record/brief.ts';
 import { actor } from '../record/names.ts';
@@ -47,6 +47,8 @@ export type ProjectCard = {
   worked: { said: string; quiet: boolean } | null;
   /** Who worked on it last and how long ago, from the runs (`card-life.ts`), where one named it. */
   last?: { agent: string; name: string; said: string } | null;
+  /** The record's one figure said who and when (`lifeFromWorked`), so no run read beside it says otherwise. */
+  told?: boolean;
   /** The day the row itself last changed, YYYY-MM-DD: what a card with no other sign of life is quiet since. */
   moved?: string | null;
   /** What it is in a line: drawn on a draft's card only, since a project's page says it in its hero. */
@@ -137,8 +139,45 @@ export const HEALTH: Readonly<Record<string, { word: string; tone: 'warn' | 'off
 export function workedSaid(w: { said: string; quiet: boolean }): string {
   const t = w.said.trim();
   if (w.quiet) return `Quiet for ${t.replace(/\s+ago$/u, '')}`;
-  if (/^(today|yesterday)$/iu.test(t)) return `Worked on ${t.toLowerCase()}`;
+  if (/^(today|yesterday|just now)$/iu.test(t)) return `Worked on ${t.toLowerCase()}`;
   return `Worked on ${/ago$/u.test(t) ? t : `${t} ago`}`;
+}
+
+/** When a project was last worked on, as the record's figure `project-worked` says it: the moment, whose run, if quiet. */
+export type WorkedAt = { at: string; by: string | null; quiet: boolean };
+
+/**
+ * A CARD'S WHO AND WHEN FROM THE RECORD'S ONE FIGURE (the audit of 25 October, Z7): who worked on it last and how long
+ * ago where the newest sign of work was a run ("Claude worked on it 20 minutes ago"), else how long since its tasks
+ * moved ("Worked on 2 days ago"), and quiet past its thirty days. Projects read the tasks alone and Today the runs alone,
+ * so one project said "4 days ago" on one and "20 minutes ago" on the other; both draw this now. `now` is the record's
+ * clock, so a pinned record says its own "ago".
+ */
+export function lifeFromWorked(w: WorkedAt, now: number): Pick<ProjectCard, 'last' | 'worked'> {
+  const said = sinceWords(w.at, now);
+  if (w.by !== null && !w.quiet) return { last: { agent: w.by, name: actor(w.by).name, said }, worked: null };
+  return { last: null, worked: { said, quiet: w.quiet } };
+}
+
+/**
+ * Each card with its who and when from the figure, where the block's when column read one for it (`lastWorked`, aligned
+ * with the block's entries); a card it read nothing for is as it was.
+ */
+export function withWorked<C extends Pick<ProjectCard, 'seq'>>(
+  cards: readonly C[],
+  entries: readonly { seq?: unknown }[] | undefined,
+  lastWorked: readonly (WorkedAt | null)[] | undefined,
+  now: number,
+): (C & Partial<Pick<ProjectCard, 'last' | 'worked' | 'told'>>)[] {
+  const bySeq = new Map<number, WorkedAt>();
+  (entries ?? []).forEach((e, n) => {
+    const w = lastWorked?.[n];
+    if (typeof e.seq === 'number' && w) bySeq.set(e.seq, w);
+  });
+  return cards.map((c) => {
+    const w = bySeq.get(c.seq);
+    return w ? { ...c, ...lifeFromWorked(w, now), told: true } : c;
+  });
 }
 
 /**

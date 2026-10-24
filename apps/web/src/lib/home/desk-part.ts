@@ -17,7 +17,7 @@ import { REGISTERS } from '../record/held.ts';
 import { agentKindOf } from '../ui/face.ts';
 import { workingRows, type WorkingRow } from './desk.ts';
 import type { HomeLine } from './home-rows.ts';
-import { cardsOf, type CardDecl, type CardRow } from './project-cards.ts';
+import { cardsOf, withWorked, type CardDecl, type CardRow } from './project-cards.ts';
 
 /** How the desk draws a block of Today's body, where it draws it as one of its own tiles. */
 export type Desk =
@@ -56,8 +56,12 @@ export function runsOf(b: Pick<LiveBlock, 'entries' | 'rows' | 'columns'>): Work
   });
 }
 
-/** The cards a block of projects draws, by the desk's own rule (`cardsOf`): live ones, a draft first, then by lane. */
-export function deskCards(b: Pick<LiveBlock, 'register' | 'entries'>): ReturnType<typeof cardsOf> | null {
+/**
+ * The cards a block of projects draws, by the desk's own rule (`cardsOf`): live ones, a draft first, then by lane. EACH
+ * SAYS WHO WORKED ON IT LAST AND WHEN BY THE RECORD'S ONE FIGURE where the block read it (`lastWorked`, Z7 of 25 October),
+ * so Today and Projects say one time. `now` is the record's clock.
+ */
+export function deskCards(b: Pick<LiveBlock, 'register' | 'entries' | 'lastWorked'>, now: number = Date.now()): ReturnType<typeof cardsOf> | null {
   const list = b.register;
   const d = list ? (REGISTERS[list] as unknown as CardDecl | undefined) : undefined;
   if (!list || !d || (d as { scopes?: unknown }).scopes === undefined) return null;
@@ -66,7 +70,8 @@ export function deskCards(b: Pick<LiveBlock, 'register' | 'entries'>): ReturnTyp
       ? [{ seq: e.seq, fields: e.fields as Record<string, unknown>, ...(typeof e.id === 'string' ? { id: e.id } : {}), ...(typeof e.created === 'string' ? { created_at: e.created } : {}) }]
       : [],
   );
-  return cardsOf({ ...d, id: list }, rows);
+  const got = cardsOf({ ...d, id: list }, rows);
+  return { ...got, cards: withWorked(got.cards, b.entries, b.lastWorked, now) };
 }
 
 /** Each live project's colour by its name, which a run on it wears on its dot. */

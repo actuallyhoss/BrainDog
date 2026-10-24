@@ -628,6 +628,9 @@ export function workingTile(voice: HomeVoice = HOUSE): PageBlock {
   } as PageBlock;
 }
 
+/** The record's figure of when a project was last worked on, its tasks and runs together (`built-in-figures.ts`). */
+export const WORKED_FIGURE = 'project-worked';
+
 /** How many of a record's projects Today reads for its cards: every one a record keeps, as the old desk read them. */
 export const PROJECTS_READ = 500;
 
@@ -644,7 +647,9 @@ export function projectsTile(p: { register: string; title: string; name: string 
     heading: p.name,
     icon: 'grid',
     source: `register.${p.register}`,
-    columns: [{ field: p.title, as: 'title' }],
+    /* AND WHEN EACH WAS LAST WORKED ON, BY THE RECORD'S ONE FIGURE (the audit of 25 October, Z7): its tasks and its runs
+       read together (`project-worked`), the figure Projects' cards read too, so both say one time. */
+    columns: [{ field: p.title, as: 'title' }, { metric: `${WORKED_FIGURE}:{{${p.title}}}`, as: 'when', label: 'Worked on' }],
     limit: PROJECTS_READ,
   } as PageBlock;
 }

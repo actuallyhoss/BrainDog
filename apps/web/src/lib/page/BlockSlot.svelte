@@ -69,7 +69,7 @@
   import { blockWords } from '$lib/record/block-edit.ts';
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
   import KpisBlock from '$lib/kpis/KpisBlock.svelte';
-  import { agentsOn, cardFactsOf, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import { agentsOn, cardFactsOf, cardsOf, trendsOf, withWorked, type CardDecl } from '$lib/home/project-cards.ts';
   import { withKpis, type KpiAnswered } from '$lib/home/card-kpi.ts';
   import { knowProjects } from './known-project.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -632,7 +632,9 @@
     );
     const { cards: plain } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true, true);
     if (plain.length === 0) return null;
-    const cards = withKpis(plain, leads, { home: homeCurrency(), now });
+    /* WHO WORKED ON EACH LAST AND WHEN, BY THE RECORD'S ONE FIGURE where the block read it (Z7 of 25 October), the time
+       Today's cards say; the runs read beside the cards only where it read none. */
+    const cards = withWorked(withKpis(plain, leads, { home: homeCurrency(), now }), block.entries, block.lastWorked, now);
     const seg = drawn.segments.find((x) => x.type === 'block' && x.kind === 'cards');
     const trends = seg && seg.type === 'block' ? trendsOf(seg.rows) : new Map();
     const facts = seg && seg.type === 'block' ? cardFactsOf(seg.rows) : new Map();
@@ -640,13 +642,13 @@
     return cards.map((c) => {
       const f = c.figure ? fieldDecl(list, c.figure.field) : undefined;
       const said = facts.get(c.seq);
-      return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null, last: lasts.get(c.seq) ?? null, moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
+      return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: c.told ? (c.worked ?? null) : (said?.worked ?? null), last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? null), moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
   /* THE DESK'S ROW OF CARDS, by the desk's own rule (`deskCards`), each leading with its project's key number. */
   const deskProjects = $derived.by(() => {
     if (desk?.kind !== 'projects') return null;
-    const got = deskCards(block);
+    const got = deskCards(block, now);
     return got ? { cards: withKpis(got.cards, leads, { home: homeCurrency(), now }), more: got.more } : null;
   });
   $effect(() => {

@@ -28,6 +28,7 @@ import { stopped } from '../shell/headline.ts';
 import { presenceSaid, type RunPresence } from '../ui/presence-words.ts';
 import { factCells } from './card-fact-cells.ts';
 import { lateSaid } from '../home/today-tiles.ts';
+import type { WorkedAt } from '../home/project-cards.ts';
 import { ratesPreset } from './action-draft.ts';
 import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
 import {
@@ -351,6 +352,11 @@ export type LiveBlock = BlockResult & {
   runFaces?: (RunCell | null)[];
   /** HOW MANY HELPERS EACH RUN HAS WORKING WITH IT, on a block of runs at work (`sessions.working`), aligned with the rows. */
   helpers?: number[];
+  /**
+   * WHEN EACH CARD'S PROJECT WAS LAST WORKED ON, from a when column over `project-worked` (the audit of 25 October, Z7),
+   * aligned with the rows, or `null` for a card it said no moment of. Today and Projects draw a card's live line from it.
+   */
+  lastWorked?: (WorkedAt | null)[];
   /**
    * A QUEUE'S CARDS SHOWN BEFORE "N MORE" OPENS THE REST IN PLACE, questions of one family counted once (Needs you's
    * groups, `routes/decide/views.ts` `NEEDS_SHOWN`). Absent, a queue shows every card it holds.
@@ -1976,6 +1982,9 @@ export function blockOf(
       row.cells[whenAt] = whenSaid(whens?.[n], typeof b.columns?.[whenAt]?.label === 'string' ? (b.columns[whenAt]!.label as string) : undefined);
       if ((whens?.[n] as { met?: unknown } | null | undefined)?.met === false && !row.tone) Object.assign(row, { tone: 'bad' });
     });
+  /* AND THE MOMENT AND WHOSE RUN IT WAS, where the figure says them (`project-worked`, the audit of 25 October, Z7),
+     aligned with the rows, so a project's card on any page says the time Today's says. */
+  const lastWorked = whens?.some((w) => workedAtOf(w) !== null) ? whens.map(workedAtOf) : null;
   /* AND EACH CARD'S FACTS OVER A FIGURE, `facts` (REC-C16): a count as its number and money as the page says money, a
      fact the record read nothing for drawn as no fact rather than 0. */
   if (kind === 'cards' && Array.isArray(facted) && facted.length === got.length)
@@ -2033,7 +2042,19 @@ export function blockOf(
     ...(working ? { working } : {}),
     ...(workingNow ? { working_now: workingNow } : {}),
     ...(scopeCells ? { scopeCells } : {}),
+    ...(lastWorked ? { lastWorked } : {}),
   };
+}
+
+/**
+ * When a card's project was last worked on, from its when figure's reading: the moment, the agent whose run it was or
+ * `null` for a task, and whether it is past its target. `null` where the figure said no moment.
+ */
+export function workedAtOf(when: unknown): WorkedAt | null {
+  if (!when || typeof when !== 'object') return null;
+  const { at, by, met } = when as { at?: unknown; by?: unknown; met?: unknown };
+  if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null;
+  return { at, by: typeof by === 'string' && by.trim() !== '' ? by.trim() : null, quiet: met === false };
 }
 
 /**
