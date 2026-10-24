@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
+import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, phoneLine, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
 
 const HEADS = {
   money: { label: 'Money', icon: 'money' },
@@ -115,4 +115,14 @@ test('a name typed as a slug is said in words, and any other name is kept as wri
   assert.equal(shownName('kiln-site'), 'Kiln site');
   assert.equal(shownName('money_core'), 'Money core');
   for (const kept of ['Glaze shop', 'Clay.co', 'PotBoard', 'iOS app', 'glaze', 'kiln.gg', 'Kiln-site']) assert.equal(shownName(kept), kept);
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z32 (`projects-390-light.png` against `projects-1512-light.png`): on the phone Projects was a
+   bare list of names, while the laptop's cards said each one's lane and next step. */
+test('A PROJECT ON THE PHONE SAYS ITS LANE AND ITS NEXT STEP under its name, either alone, or nothing', () => {
+  const label = (lane: string): string => ({ building: 'Building', earning: 'Earning' })[lane] ?? lane;
+  assert.equal(phoneLine({ lane: 'building', next: ' Ship the first build ' }, label), 'Building · Ship the first build');
+  assert.equal(phoneLine({ lane: 'earning' }, label), 'Earning');
+  assert.equal(phoneLine({ lane: '', next: 'Write the store listing' }, label), 'Write the store listing');
+  assert.equal(phoneLine({ lane: '', next: '  ' }, label), null);
 });

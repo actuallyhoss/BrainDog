@@ -115,6 +115,8 @@ async function readSideOnce(base: string, lists: readonly { id: string }[]): Pro
         mark: decl.identity ? said(fields[decl.identity.mark]) : '',
         hue: hueOf(decl, fields),
         lane: decl.state ? said(fields[decl.state]) : '',
+        /* ITS NEXT STEP, the field its card says it from (`cardsOf`), for the phone's row (Z32 of 25 October). */
+        ...(said(fields.next) === '' ? {} : { next: said(fields.next) }),
       },
     ];
   });

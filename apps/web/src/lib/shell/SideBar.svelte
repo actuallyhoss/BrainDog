@@ -26,7 +26,7 @@
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
   import { REGISTERS } from '../record/held.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
+  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, phoneLine, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
   import { keptRead, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
@@ -319,7 +319,13 @@
     <a class="s-row tap" href={at(p.href)} aria-current={here ? 'page' : undefined}>
       {#if !phone}<span class="s-caret" aria-hidden="true"><Icon name={here ? 'chevronDown' : 'chevron'} size="s" /></span>{/if}
       {@render mark(p)}
-      <span class="s-name" dir="auto">{name}</span>
+      {#if fact}
+        <!-- ITS LANE AND NEXT STEP UNDER ITS NAME ON THE PHONE (Z32 of 25 October), as the laptop's cards say them. -->
+        {@const line = read ? phoneLine(p, read.label) : null}
+        <span class="s-two"><span class="s-name" dir="auto">{name}</span>{#if line}<span class="s-sub" dir="auto">{line}</span>{/if}</span>
+      {:else}
+        <span class="s-name" dir="auto">{name}</span>
+      {/if}
       {#if fact}
         {@const f = factOf(p)}
         {#if f}<span class="s-fact" data-tone={f.tone}>{f.text}</span>{/if}
@@ -886,6 +892,27 @@
   .s-phone .s-pm :global(.icon[data-size]) {
     inline-size: 18px;
     block-size: 18px;
+  }
+
+  /* THE NAME WITH ITS LANE AND NEXT STEP UNDER IT, on the phone's Projects tab. */
+  .s-two {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .s-two .s-name {
+    flex: none;
+  }
+
+  .s-sub {
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .s-fact {

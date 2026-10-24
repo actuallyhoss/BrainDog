@@ -14,6 +14,8 @@ export type SideProject = {
   mark: string;
   hue: number | null;
   lane: string;
+  /** Its next step as the row says it, where it says one: what the phone's row says under its name beside the lane. */
+  next?: string | undefined;
   /** How many of its open tasks are past their day. */
   late: number;
   /** An agent is at work on it now. */
@@ -88,6 +90,16 @@ export function factOf(p: Pick<SideProject, 'late' | 'working' | 'moved'>): { te
   if (p.working) return { text: 'An agent is on it', tone: 'live' };
   if (p.moved) return { text: 'Money in this month', tone: 'quiet' };
   return null;
+}
+
+/**
+ * WHAT A PROJECT'S ROW SAYS UNDER ITS NAME ON THE PHONE (the audit of 25 October, Z32): its lane and its next step, as
+ * the laptop's cards say them ("Building · Ship the first build"), where the phone drew a bare list of names. Either
+ * alone where the other is not said, and nothing where neither is. `label` is the lane's own word, as its list says it.
+ */
+export function phoneLine(p: Pick<SideProject, 'lane' | 'next'>, label: (lane: string) => string): string | null {
+  const parts = [p.lane === '' ? '' : label(p.lane).trim(), (p.next ?? '').trim()].filter((x) => x !== '');
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /**
