@@ -123,6 +123,12 @@ export type Boot = {
    */
   host?: 'cloud' | 'self-host';
   /**
+   * The pages of rows that come and go (a run's), by their address alone, by list: each row's number and its page's
+   * slug, so a link to the row opens its page. `pages` lists them no more. Absent from an older host, which lists them
+   * in `pages`.
+   */
+  rowPages?: { register: string; rows: [seq: number, slug: string][] }[];
+  /**
    * The pages the caller may open, each with its place in the rail when it has one.
    *
    * `about` IS THE ROW THE PAGE CAME OUT OF, and `null` for a page somebody wrote. A declaration

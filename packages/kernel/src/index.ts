@@ -173,7 +173,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -9570,6 +9570,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            the template's, so a reader of a page's source (`arrangement({ page })`) finds it by this. `fill` leaves
            `page` untouched, so this is the template's own id. */
         template: p.row ? p.decl.page : null,
+        /* AND WHETHER ITS ROWS COME AND GO (`claimRank`: the runs, or a template that says `fleeting`), so `boot` can send
+           such a page as its address alone: on his record 908 of 990 pages were runs, 207 KB of a 278 KB boot. */
+        fleeting: p.row !== undefined && claimRank(p.decl) === 2,
       }));
     },
 

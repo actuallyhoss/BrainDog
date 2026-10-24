@@ -1266,6 +1266,13 @@ export type Boot = {
      */
     about: { register: string; seq: number | null; updated_at: string; hue?: number | null } | null;
   }[];
+  /**
+   * THE PAGES OF ROWS THAT COME AND GO, BY THEIR ADDRESS ALONE (scope 2026-10-24 A8): a run's page, and any template that
+   * says `fleeting` and takes no place in the rail, by list: each row's number and its page's slug, so a link to the row
+   * opens its page, and nothing more: on his record 908 of 990 pages were runs, sent whole they were 207 KB of a 278 KB `boot`,
+   * and `pages` lists them no more. Absent from an older host, which lists them in `pages`.
+   */
+  rowPages?: { register: string; rows: [seq: number, slug: string][] }[];
   /** The rail's places in order, the frame's two first, `PLACES_MOST` drawn and the rest under More (`places.ts`). */
   places: { places: Place[]; more: Place[] };
   /** The figures the engine computes, by the source each draws as (`computed-set.ts`). */
@@ -8327,7 +8334,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return [...navs].map(([addon, pages]) => ({ addon, pages }));
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
+  /**
+   * THE HOLDING PEN, HELD (`heldFor`) for a reader and what they turned down: it weighed every page and every list's use
+   * again on every `boot`, two thirds of `boot`'s time on a seed with nine hundred runs. What moves it without a write is
+   * the clock, which `HELD_MS` bounds.
+   */
+  const penHeld = new Map<string, Held<ReturnType<typeof penFor>>>();
+  /* AND HOW MUCH THE RECORD HAS BEEN USED, which the pen ranks by and which moves without a write: a list opened is a count
+     of the day's observation raised, not a row. One read over a table of a line a kind, a subject and a day. */
+  const usedNow = (): unknown => sql.one('SELECT count(*) AS lines, total(n) AS uses FROM observation') ?? null;
+
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'rowPages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -8350,8 +8367,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        planted row they changed, and it is theirs. Asked of the whole list, as the planted rows are counted. */
     const planted = plantedRows();
     const theirs = (id: string): boolean => planted[id] === undefined || planted[id] < kernel.count(id);
+    /* A PAGE OF A ROW THAT COMES AND GOES, WITH NO PLACE IN THE RAIL, GOES BY ITS ADDRESS ALONE (`rowPages`). */
+    const fleeting = (page: (typeof opens)[number]): boolean => page.fleeting === true && page.nav === null && page.about !== null && page.about.seq !== null;
+    const byList = new Map<string, [number, string][]>();
+    for (const page of opens.filter(fleeting)) {
+      const rows = byList.get(page.about!.register) ?? [];
+      byList.set(page.about!.register, rows);
+      rows.push([page.about!.seq!, page.slug]);
+    }
+    const rowPages: NonNullable<Boot['rowPages']> = [...byList].map(([register, rows]) => ({ register, rows }));
     /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
     const pages: Boot['pages'] = opens
+      .filter((page) => !fleeting(page))
       /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
          A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
       .map((page) => ({
@@ -8393,6 +8420,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       pages,
+      rowPages,
       /* THE RAIL'S PLACES IN ORDER (`places.ts`), and which figures the engine computes. */
       places: railPlaces({ pages, navs: addonNavs() }),
       computed: computedSet(),
@@ -8419,7 +8447,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          they turned it off. A reader held to some lists is offered nothing, because every item is a page over a list. */
       pen:
         person !== null && readsEveryList(ctx) && prefs['pen.suggest'] !== false
-          ? penFor({
+          ? heldFor(penHeld, JSON.stringify([readerKey(ctx), prefs['pen.dismissed'] ?? null, usedNow()]), () => penFor({
               kernel,
               reads: (list) => readable(ctx, list) === null,
               pages: every,
@@ -8427,7 +8455,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               use: { sql, nowMs: clock.now() },
               /* THE WORDS THE SPEAKING USE CASE GIVES A LIST, so the week offer says Jobs where the rail does (offer-labels-60). */
               labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
-            })
+            }))
           : [],
       whatsNew: newsFor(ctx),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
