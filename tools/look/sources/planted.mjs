@@ -14,6 +14,8 @@
  * list, as the sidebar does, and since batch 4 it draws no Projects part until that list answers, so that half of the
  * fault no longer shows anywhere the checks read. AGES: the record's clock is put on nine days, so every figure
  * read on 2 September is ten days old with the product's own rule (stale at 14 days) still saying nothing of it.
+ * BLANK: a project's page is answered without its shape (`shape`), so it draws no name and no hero, which is how his
+ * project pages went blank on 25 October and the look called them ready (Z2).
  */
 
 import { open as openSeed } from './seed.mjs';
@@ -41,6 +43,8 @@ export function plant(pathname, answer) {
     return v !== null && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)])) : v;
   };
   const out = swap(answer);
+  /* A PROJECT'S PAGE WITH NO SHAPE TO DRAW: no name, no hero, as his were. */
+  if (/^\/api\/page\/?$/u.test(pathname) && out?.value !== null && typeof out?.value === 'object' && 'shape' in out.value) delete out.value.shape;
   if (/^\/api\/boot\/?$/u.test(pathname) && out?.value !== undefined) {
     const v = out.value;
     if (v.waits) v.waits = { ...v.waits, questions: 3 };

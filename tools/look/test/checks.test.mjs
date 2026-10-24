@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { kpiView } from '../../../packages/render/src/kpis.ts';
-import { CANNOT, OLD_AFTER_DAYS, agesOf, countsIn, dayFrom, judge, judgeAges, judgeCounts, newestIn, readingOf } from '../checks.mjs';
+import { BLANK_UNDER_WORDS, CANNOT, OLD_AFTER_DAYS, agesOf, blankOf, countsIn, dayFrom, judge, judgeAges, judgeBlank, judgeCounts, newestIn, readingOf } from '../checks.mjs';
 
 /* ── counts ─────────────────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -221,4 +221,33 @@ test('THE LINE THE BRIEF GAVE: "words: 12 on 5 screens; counts disagree: in play
   assert.equal(got.found, true);
   assert.equal(got.lines.length, 2 + 1 + 4, 'words once for each way the screens read alike (3 and 2), the count, and each old number');
   assert.ok(got.lines.every((l) => !l.includes('\u2014')), 'no em dash in what it says');
+});
+
+/* ── blank screens (the audit of 25 October, Z2) ───────────────────────────────────────────────────────────── */
+
+const DRAWN = { heading: true, words: 240, project: false, hero: false };
+
+test("A BLANK SCREEN IS FOUND: no name and next to nothing, or a project's page with no name or hero, as his were", () => {
+  assert.equal(blankOf(DRAWN, 'today'), null, 'a named screen with words on it is drawn');
+  assert.equal(blankOf({ ...DRAWN, heading: false, words: 4 }, 'money'), 'no name and 4 words');
+  assert.equal(blankOf({ ...DRAWN, heading: false, words: BLANK_UNDER_WORDS }, 'money'), null, 'a screen with words and no h1 of its own is not blank');
+  /* HIS PROJECT PAGES ON 25 OCTOBER: on a phone nothing under the bar, on a laptop the page opening on its blocks. */
+  assert.equal(blankOf({ heading: false, words: 0, project: true, hero: false }, 'p-portage'), 'no name and 0 words');
+  assert.equal(blankOf({ heading: false, words: 180, project: true, hero: false }, 'p-braindog'), 'a project page with no name or hero');
+  assert.equal(blankOf({ heading: false, words: 180, project: false, hero: false }, 'project'), 'a project page with no name or hero', 'the project the look picked, whatever the page says');
+  assert.equal(blankOf({ heading: true, words: 180, project: true, hero: false }, 'project'), 'a project page with no hero');
+  assert.equal(blankOf({ heading: true, words: 180, project: true, hero: true }, 'project'), null);
+  assert.equal(blankOf(null, 'project'), null, 'a picture whose facts were not read is not judged');
+});
+
+test('A BLANK SCREEN FAILS THE LOOK and says where; a clean look says what it always said', () => {
+  const blankProject = { ...clean('projects'), screen: 'project', name: 'Portage', width: 390, theme: 'light', drawn: { heading: false, words: 0, project: true, hero: false } };
+  const got = judge([{ ...clean('today'), drawn: DRAWN }, clean('decide'), clean('projects'), blankProject]);
+  assert.equal(got.found, true);
+  assert.match(got.summary, /; blank screens: 1$/u);
+  assert.ok(got.lines.includes('Portage at 390 light is blank: no name and 0 words'), got.lines.join(' | '));
+  assert.deepEqual(judgeBlank([{ ...clean('today'), drawn: DRAWN }]), { read: 1, blank: [] });
+  const fine = judge([{ ...clean('today'), drawn: DRAWN }, clean('decide'), clean('projects'), { ...blankProject, drawn: { heading: true, words: 300, project: true, hero: true } }]);
+  assert.equal(fine.found, false);
+  assert.doesNotMatch(fine.summary, /blank/u);
 });

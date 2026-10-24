@@ -11,7 +11,7 @@ import { chromium } from '@playwright/test';
 import { kpiView } from '../../../packages/render/src/kpis.ts';
 import { toHTML } from '../../../packages/render/src/html.ts';
 import { parse } from '../../../packages/render/src/parse.ts';
-import { agesOf, countsIn, pageFactsIn } from '../checks.mjs';
+import { agesOf, blankOf, countsIn, drawnIn, pageFactsIn } from '../checks.mjs';
 
 const NOW = Date.parse('2026-09-12T12:00:00Z');
 const at9 = (day) => `${day}T09:00:00.000Z`;
@@ -118,4 +118,24 @@ test('A PAGE WITH NONE OF THESE READS NOTHING, which is not the same as passing'
   const facts = await read('<!doctype html><main><p>Nothing here</p></main>');
   assert.deepEqual(facts, { badges: [], more: [], sentences: [], charts: [], decor: [] });
   assert.deepEqual(agesOf(facts, NOW), { read: 0, unread: 0, old: [] });
+});
+
+test("A BLANK PROJECT PAGE IS READ AS ONE IN THE PAGE (Z2): no name, no hero; and one with its hero is drawn", async (t) => {
+  if (browser === null) return t.skip('there is no browser to open');
+  const tab = await browser.newPage();
+  try {
+    const drawnOf = async (html) => {
+      await tab.setContent(html);
+      return tab.evaluate(drawnIn);
+    };
+    const blank = await drawnOf('<!doctype html><main><div data-project=""><div style="display:none"><h1>Kiln</h1></div></div></main>');
+    assert.deepEqual(blank, { heading: false, words: 0, project: true, hero: false });
+    assert.equal(blankOf(blank, 'project'), 'no name and 0 words');
+    const opened = await drawnOf(`<!doctype html><main><div data-project="">${'<p>Keeping it alive, renews 28 Feb, what changed today.</p>'.repeat(4)}</div></main>`);
+    assert.equal(blankOf(opened, 'p-braindog'), 'a project page with no name or hero', 'the laptop on 25 October: blocks, no hero');
+    const whole = await drawnOf('<!doctype html><main><div data-project=""><section class="hero"><h1>Kiln</h1><p>Earning, at risk, since Mar 2024. 1 of 8 tasks is late.</p></section></div></main>');
+    assert.equal(blankOf(whole, 'project'), null);
+  } finally {
+    await tab.close();
+  }
 });

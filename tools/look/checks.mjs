@@ -6,6 +6,8 @@
  *   words   what `words.mjs` counts in each screen's visible text (ids, handles, templates, codes, paths, machine words).
  *   counts  the same thing read on two screens must be one number: projects in play, and what needs you.
  *   ages    a number whose newest reading is more than a week old must say how old on the screen.
+ *   blank   a screen drawn with no name and next to nothing on it, or a project's page with no name or hero, is no
+ *           screen (the audit of 25 October, Z2): his project pages went blank and the look called them ready.
  *
  * NO BROWSER HERE. `pageFactsIn` is the one function that runs in the page (`page.evaluate`), and everything else takes
  * what it handed back, so each check is tried on a planted string and on clean text without drawing anything.
@@ -88,6 +90,49 @@ export function pageFactsIn() {
     .map((el) => String(el.innerText ?? '').trim())
     .filter((t) => /\d/u.test(t) && /\s/u.test(t));
   return { badges, more, sentences, charts, decor };
+}
+
+/**
+ * WHAT THE SCREEN DREW AT ALL (Z2), read in the page as `pageFactsIn` is (`page.evaluate(drawnIn)`): whether its main has
+ * a name, how many words it holds, and on a project's page whether its hero is drawn with the name in it.
+ */
+export function drawnIn() {
+  const main = document.querySelector('main') ?? document.body;
+  const shown = (el) => (el.checkVisibility ? el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) : true);
+  const words = (s) => String(s ?? '').replace(/\s+/gu, ' ').trim();
+  const named = (el) => shown(el) && words(el.textContent) !== '';
+  return {
+    heading: [...main.querySelectorAll('h1')].some(named),
+    words: words(main.innerText).split(' ').filter(Boolean).length,
+    project: main.querySelector('[data-project]') !== null,
+    hero: [...main.querySelectorAll('section.hero h1')].some(named),
+  };
+}
+
+/* ── blank screens ──────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** Fewer words than this in a screen's main, with no name over them, is a blank screen. */
+export const BLANK_UNDER_WORDS = 20;
+
+/**
+ * WHY A PICTURE IS A BLANK SCREEN, or `null`: no name and fewer than `BLANK_UNDER_WORDS` words, or a project's page (the
+ * page says it is one, or the look picked it as the project) with no name or no hero. `drawn` is `drawnIn`'s.
+ */
+export function blankOf(drawn, screen) {
+  if (!drawn) return null;
+  if (!drawn.heading && drawn.words < BLANK_UNDER_WORDS) return `no name and ${plural(drawn.words, 'word')}`;
+  if ((drawn.project || screen === 'project') && !(drawn.heading && drawn.hero)) return drawn.heading ? 'a project page with no hero' : "a project page with no name or hero";
+  return null;
+}
+
+/** Across a look: every picture of a blank screen, with how many pictures were read for it. */
+export function judgeBlank(shots) {
+  const read = shots.filter((s) => s.drawn);
+  const blank = read.flatMap((s) => {
+    const why = blankOf(s.drawn, s.screen);
+    return why === null ? [] : [{ screen: s.name ?? s.screen, at: `${s.width} ${s.theme}`, why }];
+  });
+  return { read: read.length, blank };
 }
 
 /* ── counts ─────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -309,6 +354,7 @@ export function judge(shots) {
   const words = judgeWords(shots);
   const counts = judgeCounts(shots);
   const ages = judgeAges(shots);
+  const blank = judgeBlank(shots);
   const split = Object.entries(counts).filter(([, c]) => !c.agree);
   const told = Object.entries(counts).filter(([, c]) => c.agree && c.read > 0);
   const unread = Object.entries(counts).filter(([, c]) => c.read === 0);
@@ -320,7 +366,8 @@ export function judge(shots) {
         : `counts agree: ${told.map(([thing, c]) => `${thing} ${c.values[0]} (${plural(c.places.length, 'place')})`).join(', ')}${unread.length > 0 ? `; not read: ${unread.map(([thing]) => thing).join(', ')}` : ''}`;
   const wordsSaid = words.total === 0 ? 'words: 0' : `words: ${words.total} on ${plural(words.screens, 'screen')}`;
   const agesSaid = `old numbers without age: ${ages.flagged.length}${ages.flagged.length === 0 ? ` (read ${plural(ages.read, 'dated figure')})` : ''}`;
-  const summary = [wordsSaid, countsSaid, agesSaid].join('; ');
+  /* SAID WHERE ONE IS FOUND, so a clean look's line is the one it always was. */
+  const summary = [wordsSaid, countsSaid, agesSaid, ...(blank.blank.length > 0 ? [`blank screens: ${blank.blank.length}`] : [])].join('; ');
 
   /* THE SENTENCES UNDER IT, short: screens that read the same are one sentence, and a long list of places is a few and a count. */
   const names = (xs) => (xs.length <= 3 ? listOf(xs) : `${xs.slice(0, 2).join(', ')} and ${xs.length - 2} more`);
@@ -339,13 +386,16 @@ export function judge(shots) {
   }
   for (const f of ages.flagged.slice(0, 6)) lines.push(`${f.name} on ${f.screen} is from ${f.said || daySaid(f.newest)}, ${plural(f.days, 'day')} old, and says nothing of it`);
   if (ages.flagged.length > 6) lines.push(`${ages.flagged.length - 6} more old numbers without an age`);
+  for (const b of blank.blank.slice(0, 6)) lines.push(`${b.screen} at ${b.at} is blank: ${b.why}`);
+  if (blank.blank.length > 6) lines.push(`${blank.blank.length - 6} more blank pictures`);
 
   return {
     summary,
-    found: words.total > 0 || split.length > 0 || ages.flagged.length > 0,
+    found: words.total > 0 || split.length > 0 || ages.flagged.length > 0 || blank.blank.length > 0,
     words: { total: words.total, screens: words.screens, byKind: words.byKind },
     counts,
     ages,
+    blank,
     lines,
     cannot: CANNOT,
   };

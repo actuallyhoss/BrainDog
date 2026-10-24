@@ -60,3 +60,12 @@ test('THE SOURCE ANSWERS AS THE SEED DOES, with the faults in what it says', asy
     await Promise.all([planted.close(), seed.close()]);
   }
 });
+
+test("A PROJECT'S PAGE IS PLANTED BLANK: answered without its shape, so it draws no name and no hero (Z2)", () => {
+  const page = { ok: true, value: { param: { register: 'things', seq: 1 }, blocks: [{ kind: 'project', parts: ['hero'] }], shape: { register: 'things', seq: 1 } } };
+  const got = plant('/api/page', page);
+  assert.equal('shape' in got.value, false);
+  assert.deepEqual(got.value.blocks, page.value.blocks, 'the blocks are left as they were');
+  assert.ok('shape' in page.value, 'the answer it was handed is not changed');
+  assert.ok('shape' in plant('/api/get', { ok: true, value: { shape: 1 } }).value, 'only a page is planted blank');
+});

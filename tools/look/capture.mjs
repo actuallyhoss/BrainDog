@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from '../gates/lib.mjs';
-import { agesOf, countsIn, judge, pageFactsIn } from './checks.mjs';
+import { agesOf, countsIn, drawnIn, judge, pageFactsIn } from './checks.mjs';
 import { pick, screensOf } from './screens.mjs';
 import { sheets } from './sheet.mjs';
 import { RAW, rawIn, slugsOf } from './words.mjs';
@@ -280,6 +280,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   const frame = await page.evaluate(frameTextIn).catch(() => '');
   /* WHAT THE THREE QUICK CHECKS NEED THAT TEXT DOES NOT HOLD (`checks.mjs`): the badge, the More sheet, the key numbers' sentences and the charts' points. */
   const seen = await page.evaluate(pageFactsIn).catch(() => ({ badges: [], more: [], sentences: [], charts: [], decor: [] }));
+  /* WHAT IT DREW AT ALL, which the blank check reads (`blankOf`, Z2). */
+  const drew = await page.evaluate(drawnIn).catch(() => null);
   /* TEXT THAT CROSSES TEXT, over the whole page and not only the first screen: a fault the look fails on. */
   const crossed = crossings(await page.evaluate(textBoxesIn).catch(() => []));
   const base = `${screen.key}-${width}-${theme}`;
@@ -325,6 +327,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     pressed: { palette: pressed.open, ...(pressed.open ? { image: `${base}-palette.png`, raw: rawIn(pressed.text, { all: true, slugs: known.slugs }) } : {}) },
     counts: countsIn(facts.text, seen),
     ages: agesOf(seen, now),
+    drawn: drew,
     overlaps: { count: crossed.length, e: crossed.slice(0, 5) },
     marked: facts.marked,
     lint: null,
