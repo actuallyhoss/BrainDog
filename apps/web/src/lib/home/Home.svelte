@@ -35,6 +35,8 @@
   let drewAt = 0;
   /** How long after the first read the tiles still come in, so the desk's late parts land the same way. */
   const ENTER_HELD_MS = 900;
+  /** Whether this tab's first Today has taken what `boot` said was new: only that read can, as `boot` is that old. */
+  let bootNewsTaken = false;
 </script>
 
 <script lang="ts">
@@ -323,6 +325,18 @@
       return null;
     }
   }
+  /**
+   * WHAT `boot` ALREADY SAID WAS NEW, for Today's first read on a shell the record answered (scope 2026-10-24 A16): the
+   * same lines `whatsNew` would answer, so they are not asked twice. A shell drawn from the copy, or none, asks.
+   */
+  function newsFirst(): Promise<News | null> {
+    const lines = data.newsLines;
+    /* ONCE A TAB: `boot` is read as the tab opens and not again into the shell, so a later Today asks for itself. */
+    if (bootNewsTaken || !data.live || data.stale || data.offline || lines === undefined) return newsNow();
+    bootNewsTaken = true;
+    const held = lines.reduce((top, e) => Math.max(top, e.rowid ?? 0), 0);
+    return Promise.resolve({ upTo: data.upTo, unseen: lines.length, held, lines });
+  }
   /** Keep what was new beside the page just drawn, unless a later read of the page has gone out since. */
   function keepNews(before: Promise<News | null>, mine: number, key: string | null = null): void {
     void before.then((now) => {
@@ -552,7 +566,8 @@
     const mark = import('$lib/data/local-tab.ts').then((m) => m.localTicket(), () => 0);
     const stamp = untrack(asOf);
     const mine = ++pageRead;
-    const before = newsNow();
+    /* THE TAB'S FIRST READ OF TODAY TAKES WHAT `boot` SAID WAS NEW; a later one (another voice, lists learnt) asks. */
+    const before = mine === 1 ? newsFirst() : newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
     void Promise.all([readBody(slug, spoken, held), Promise.race([Promise.all([handledLanded, deskLanded]), first])])
       .then(([out]) => {
@@ -761,9 +776,10 @@
    * month spent. The engine is asked only where a model is behind Slash. While it answers, nothing is said.
    */
   let engine = $state.raw<{ health: EngineHealth | null; month: SlashStatus | null } | null>(null);
+  /* ASKED ONCE A VISIT AND NOT ON EVERY MOVE OF THE RECORD (scope 2026-10-24 A16): whether the model answers is not moved
+     by an agent's write, and every outside write asked both again. */
   $effect(() => {
     if (data.refused || page.data.slash !== true) return;
-    void moving.version;
     let here = true;
     const client = createClient({ base: apiBase() });
     void Promise.all([client.engineHealth().catch(() => null), client.slashStatus().catch(() => null)]).then(([out, month]) => {
