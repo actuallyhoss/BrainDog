@@ -113,7 +113,18 @@ test('FLAGS NAME THE HOOKS WITH WORK, and none for a file two minutes old or fro
   const redirect = inbox({ pending: [toldOf(told('IN9', 'redirect', true))!] });
   assert.deepEqual(flagsOf(redirect, { ...NO_STATE, shown: { IN9: 'tool' }, redirected: ['IN9'] }, NOW), ['stop']);
   assert.deepEqual(flagsOf(redirect, { ...NO_STATE, shown: { IN9: 'tool' } }, NOW), ['tool', 'stop']);
+  /* A RUN THAT COMMITTED STARTS NODE AT ITS END ONCE, to be asked for its learnings (scope B31), and never after. */
+  assert.deepEqual(flagsOf(inbox({ committed: true }), NO_STATE, NOW), ['stop']);
+  assert.deepEqual(flagsOf(inbox({ committed: true }), { ...NO_STATE, learned: true }, NOW), []);
+  assert.equal(readInbox(writeAndRead(inbox({ committed: true })))?.committed, true, 'the reader keeps it');
 });
+
+/** An inbox written to a fresh file, and the file's path. */
+function writeAndRead(x: Inbox): string {
+  const file = inboxPath(envFor(), 'kept');
+  writeInbox(file, x);
+  return file;
+}
 
 test('THE START HOOK SEEDS THE FILE from the attach, the stop first, and marks what it printed shown at the start', () => {
   const env = envFor();

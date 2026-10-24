@@ -15,7 +15,10 @@
  *     reason, so local work halts at the next tool call; a subagent's calls are denied the same. A redirect is said
  *     once, as one denial carrying the new instruction, and never to a subagent.
  *   - stop: the turn may not end, once per instruction, while the run holds something he told it and has not answered.
- *     Never when Claude Code says a Stop hook already continued this turn (`stop_hook_active`).
+ *     And once a run, the first time it would end after it committed (`committed`, which the bridge reads from git),
+ *     it is asked whether a later session would get anything wrong, to keep as learnings with their skill's topic
+ *     (scope B31: 904 runs and no learning). Never when Claude Code says a Stop hook already continued this turn
+ *     (`stop_hook_active`), so neither can loop.
  *
  * EVERY HOOK FAILS OPEN. No file, a file that does not read, a file older than two minutes (the bridge is gone or the
  * host is away), a file for another host or run, or anything thrown: the hook says nothing and the call goes on. A stop
@@ -118,7 +121,8 @@ const SEEN: readonly SeenHow[] = ['start', 'prompt', 'tool', 'channel', 'job', '
  * The inbox file, the bridge's alone to write (the start hook seeds it). `at` is when it was written, `host` and `run`
  * whose it is. `stop_line` is the line the record said the stop in, kept while the same stop holds. `hooks` is the
  * stop switch in his settings for this agent, on unless the record says off. `reported` are the instructions the record
- * has been told this session was shown, so none is told twice.
+ * has been told this session was shown, so none is told twice. `committed` is the bridge's reading that HEAD moved since
+ * the session started, absent until it has.
  */
 export type Inbox = {
   v: 1;
@@ -131,6 +135,7 @@ export type Inbox = {
   stop_line: string | null;
   hooks: boolean;
   reported: string[];
+  committed?: true;
 };
 
 /**
@@ -139,7 +144,7 @@ export type Inbox = {
  * hook held the turn for (`blocked`), and those Codex's turn end told the person about (`noticed`). Each list only
  * grows, so a reader holding an older copy decides no less.
  */
-export type HookState = { shown: Record<string, SeenHow>; said_stop: string | null; redirected: string[]; blocked: string[]; noticed?: string[] };
+export type HookState = { shown: Record<string, SeenHow>; said_stop: string | null; redirected: string[]; blocked: string[]; noticed?: string[]; learned?: true };
 
 export const NO_STATE: HookState = { shown: {}, said_stop: null, redirected: [], blocked: [] };
 
@@ -186,6 +191,7 @@ export function readInbox(file: string): Inbox | null {
     stop_line: text(x.stop_line),
     hooks: x.hooks !== false,
     reported: ids(x.reported),
+    ...(x.committed === true ? { committed: true as const } : {}),
   };
 }
 
@@ -200,7 +206,7 @@ export function readState(file: string): HookState {
   const shown: Record<string, SeenHow> = {};
   if (isObject(x.shown)) for (const [id, how] of Object.entries(x.shown)) if (id.length <= 64 && SEEN.includes(how as SeenHow)) shown[id] = how as SeenHow;
   const noticed = ids(x.noticed);
-  return { shown, said_stop: text(x.said_stop, 64), redirected: ids(x.redirected), blocked: ids(x.blocked), ...(noticed.length > 0 ? { noticed } : {}) };
+  return { shown, said_stop: text(x.said_stop, 64), redirected: ids(x.redirected), blocked: ids(x.blocked), ...(noticed.length > 0 ? { noticed } : {}), ...(x.learned === true ? { learned: true as const } : {}) };
 }
 
 /* Written whole and renamed, at 0600 in a folder made at 0700, as the session files are. */
@@ -297,11 +303,21 @@ export function toolFor(inbox: Inbox, state: HookState, event: HookEvent): { rea
 const owed = (inbox: Inbox, state: HookState): Told[] =>
   inbox.stop !== null ? [] : inbox.pending.filter((t) => ANSWERED.has(t.kind) && (t.taken || (t.to === 'run' && state.shown[t.id] !== undefined)) && !state.blocked.includes(t.id));
 
-/** Stop: the reason to keep the turn going and the state after, or `null` to let it end. At most once per instruction. */
+/** The one question a run that committed is asked before it ends, once (scope B31). */
+export const LEARNING_ASK =
+  'You committed in this run. Is there anything a later session would get wrong without knowing it? If so, create learnings with topic set to the skill it bears on and the failure in because, then end. If not, end.';
+
+/** Whether a run that committed has not been asked for its learnings yet: once a run, never while he holds it. */
+const learningOwed = (inbox: Inbox, state: HookState): boolean => inbox.committed === true && state.learned !== true && inbox.stop === null;
+
+/**
+ * Stop: the reason to keep the turn going and the state after, or `null` to let it end. At most once per instruction,
+ * then once a run for its learnings after it committed.
+ */
 export function stopFor(inbox: Inbox, state: HookState, event: HookEvent): { reason: string; state: HookState } | null {
   if (event.continued || event.agent !== null) return null;
   const due = owed(inbox, state);
-  if (due.length === 0) return null;
+  if (due.length === 0) return learningOwed(inbox, state) ? { reason: LEARNING_ASK, state: { ...state, learned: true } } : null;
   const names = due.map((t) => t.id);
   const first = due[0]!;
   const said = first.said.replace(/\s+/gu, ' ').trim();
@@ -319,7 +335,7 @@ export function flagsOf(inbox: Inbox | null, state: HookState, now: number): str
   const { stop, told } = unshown(inbox, state);
   if (stop !== null || told.length > 0) out.push('prompt');
   if (inbox.hooks && (inbox.stop !== null || inbox.pending.some((t) => t.kind === 'redirect' && !state.redirected.includes(t.id)))) out.push('tool');
-  if (owed(inbox, state).length > 0) out.push('stop');
+  if (owed(inbox, state).length > 0 || learningOwed(inbox, state)) out.push('stop');
   return out;
 }
 

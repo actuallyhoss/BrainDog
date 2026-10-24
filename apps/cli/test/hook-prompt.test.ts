@@ -96,6 +96,31 @@ test('A TURN THAT OWES A REPLY IS HELD ONCE, per instruction, and let go when a 
   assert.equal(stopFor(fresh({ pending: [taken], stop: { kind: 'pause', id: 'IN8', said: '' } }), NO_STATE, turn()), null);
 });
 
+test('A RUN THAT COMMITTED IS ASKED FOR ITS LEARNINGS ONCE BEFORE IT ENDS, and never loops (scope B31)', () => {
+  assert.equal(stopFor(fresh(), NO_STATE, turn()), null, 'no commit, nothing asked');
+  const committed = fresh({ committed: true });
+  const asked = stopFor(committed, NO_STATE, turn())!;
+  assert.match(asked.reason, /^You committed in this run\. .*create learnings with topic set to the skill it bears on/u);
+  assert.equal(stopFor(committed, asked.state, turn()), null, 'asked twice in one run');
+  assert.equal(stopFor(committed, NO_STATE, turn({ continued: true })), null, 'stop_hook_active was not respected');
+  assert.equal(stopFor(committed, NO_STATE, turn({ agent: 'a1' })), null, 'a subagent is not asked');
+  assert.equal(stopFor(fresh({ committed: true, stop: { kind: 'stop', id: 'IN9', said: '' } }), NO_STATE, turn()), null, 'never while he holds the run');
+  /* AN INSTRUCTION OWED IS ANSWERED FIRST, and the learning is asked at the next end. */
+  const taken = toldOf({ ...tell('IN4'), taken_by: 'S883' })!;
+  const first = stopFor(fresh({ committed: true, pending: [taken] }), NO_STATE, turn())!;
+  assert.match(first.reason, /^Reply to IN4/u);
+  assert.match(stopFor(fresh({ committed: true, pending: [taken] }), first.state, turn())!.reason, /^You committed in this run/u);
+
+  /* WHOLE: the Stop JSON once, then nothing, and the state keeps that it asked. */
+  const env = envFor();
+  writeInbox(inboxPath(env, 's2'), committed);
+  const end = JSON.stringify({ session_id: 's2', cwd: '/w', hook_event_name: 'Stop', stop_hook_active: false });
+  const said = JSON.parse(runHook('stop', end, env)) as { decision: string; reason: string };
+  assert.equal(said.decision, 'block');
+  assert.equal(runHook('stop', end, env), '', 'asked twice');
+  assert.equal(readState(statePath(env, 's2')).learned, true);
+});
+
 test('RUN WHOLE: the JSON for Stop, and stop_hook_active read from the event', () => {
   const env = envFor();
   writeInbox(inboxPath(env, 's1'), fresh({ pending: [toldOf({ ...tell('IN4'), taken_by: 'S883' })!] }));

@@ -98,7 +98,7 @@ import {
   type Told,
 } from './inbox-file.ts';
 import { loginCommand } from './login.ts';
-import { cliBuild, positionOf, type ClientInfo } from './position.ts';
+import { cliBuild, git, positionOf, type ClientInfo } from './position.ts';
 import { keepPlace } from './profile-place.ts';
 import { signedOutSurface } from './signed-out.ts';
 import { helloOf } from './stdio.ts';
@@ -549,6 +549,9 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   const byChannel = new Set<string>();
   /* WHETHER THE APP HAS AGREED A REVISION, so no notification goes before the handshake is answered. */
   let greeted = false;
+  /* WHETHER THIS SESSION HAS COMMITTED (scope B31), read from git at most once a minute until it has, then kept. */
+  let committed = false;
+  let committedRead = 0;
 
   /** What his settings let this agent's hooks and channel do, from `whoami`; both on unless the record says off. */
   const readSettings = async (session: Record<string, string>): Promise<{ hooks: boolean; channel: boolean | null }> => {
@@ -625,6 +628,10 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     const kept = mine !== null && mine.run === value.run && mine.stop !== null && stop !== null && mine.stop.id === stop.id ? mine.stop_line : null;
     const said = stop !== null && value.changed === true && lines[0] !== undefined && (stop.id === '' || lines[0].includes(stop.id)) ? lines[0] : kept;
     const sameRun = mine !== null && mine.run === value.run;
+    if (!committed && Date.now() - committedRead >= COMMITTED_EVERY_MS) {
+      committedRead = Date.now();
+      committed = await committedSince(env, io.cwd ?? process.cwd(), id).catch(() => false);
+    }
     const inbox: Inbox = {
       v: 1,
       host: target.key,
@@ -636,6 +643,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       stop_line: said,
       hooks: settings.hooks,
       reported: [...new Set([...(sameRun ? [...reported] : []), ...sent])].slice(-REPORTED_MOST),
+      ...(committed ? { committed: true as const } : {}),
     };
     try {
       writeInbox(file, inbox);
@@ -926,6 +934,21 @@ async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, stri
   } catch {
     /* A host away or slow at the close leaves the run to the record's sweep, as before. The error could quote anything. */
   }
+}
+
+/** How often a bridge reads whether its session has committed, until it has. */
+export const COMMITTED_EVERY_MS = 60_000;
+
+/**
+ * WHETHER THE SESSION HAS COMMITTED SINCE IT STARTED (scope B31): HEAD in its folder is not the commit its start hook
+ * kept (`head_at_start`). The session's own file first, then the folder's. No file, no commit kept, or no git: no.
+ */
+export async function committedSince(env: Record<string, string | undefined>, cwd: string, client: string | null): Promise<boolean> {
+  const files = [...(client === null ? [] : [sessionPath(env, cwd, client)]), sessionPath(env, cwd)];
+  const from = files.map(readSession).find((held) => held !== null)?.head_at_start ?? null;
+  if (from === null) return false;
+  const head = await git(cwd, 'rev-parse', 'HEAD');
+  return head !== null && head !== from;
 }
 
 /**
