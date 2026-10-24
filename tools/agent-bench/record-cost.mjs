@@ -3,7 +3,7 @@
  * What `attach` and `boot` cost the record itself, on a host on this machine shaped like his record: milliseconds of
  * the record's own time and the queries it asked, median of `--runs`, nobody's rows.
  *
- *   node tools/agent-bench/record-cost.mjs [--runs 5] [--json] [--prof <dir>]
+ *   node tools/agent-bench/record-cost.mjs [--runs 5] [--his] [--json] [--prof <dir>] [--answers <file>]
  *
  * THE SHAPE IS THE START BENCH'S (`START_SHAPE`: 27 projects, 20 skills, 34 people, 300 runs, 35 questions waiting) and
  * a day of edits on top, two hundred over the last twenty-four hours, so the log a briefing reads since yesterday is as
@@ -25,11 +25,13 @@ import { join } from 'node:path';
 import { startSeedHost } from '../door-check/seed-host.mjs';
 import { growSeed, HIS } from './big-seed.mjs';
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '5' }, json: { type: 'boolean', default: false }, prof: { type: 'string' }, answers: { type: 'string' } } });
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '5' }, json: { type: 'boolean', default: false }, prof: { type: 'string' }, answers: { type: 'string' }, his: { type: 'boolean', default: false } } });
 const RUNS = Number(values.runs);
 const HOUR = 3_600_000;
 /** The start bench's shape (`start-hook.mjs`, 23 Oct): 27 projects, 20 skills, 34 people, 300 runs, 35 questions waiting. */
 const SHAPE = { ...HIS, things: 27, skills: 20, people: 34, session: 300, questions: 35 };
+/* `--his` GROWS IT TO HIS WHOLE RECORD OF 24 OCT instead (`big-seed.mjs`: 910 runs, 38 skills, 30 projects), for what grows with his runs. */
+const GROWN = values.his ? HIS : SHAPE;
 
 /* EVERY QUERY THE RECORD PREPARES, counted while a timed call runs. */
 let queries = 0;
@@ -49,7 +51,7 @@ DatabaseSync.prototype.prepare = function (...args) {
 
 const host = await startSeedHost({
   grow: (kernel) => {
-    growSeed(kernel, SHAPE);
+    growSeed(kernel, GROWN);
     const made = kernel.create('things', { name: 'Bench', lane: 'building', repos: ['https://github.com/bench/repo-0.git'] }, { actor: 'p_seed' });
     if (!made.ok) throw new Error(`no bench project: ${made.refusal?.fix ?? 'no reason'}`);
     /* A DAY OF EDITS: tasks and projects changed over the last day, each its own line of the log. */
@@ -129,7 +131,7 @@ if (values.prof) {
 /* ONE OF EACH FIRST, as a host's first calls after it woke, then the timed ones. */
 await one('attach', () => post('attach', bearer, { source: 'startup', client_id: randomUUID(), branch: 'master', head: 'abc1234' }, session(randomUUID())));
 await one('boot', () => post('boot', host.key, {}));
-const results = { attach: [], boot: [] };
+const results = { attach: [], boot: [], pages: [] };
 let n = 0;
 for (let i = 0; i < RUNS; i++) {
   const id = randomUUID();
@@ -138,6 +140,17 @@ for (let i = 0; i < RUNS; i++) {
   const edited = await post('update', host.key, { register: 'tasks', seq: 1, patch: { why: `Edited before boot ${n++}` } });
   if (edited?.ok !== true) throw new Error(`no edit: ${edited?.refusal?.code} ${edited?.refusal?.fix}`);
   results.boot.push(await one('boot', () => post('boot', host.key, {})));
+  /* AND THE PAGES BOOT IS BUILT FROM (`kernel.pages()`), after one more write, which is the part of a boot that grows with his runs. */
+  await post('update', host.key, { register: 'tasks', seq: 1, patch: { why: `Edited before pages ${n++}` } });
+  await quiet();
+  {
+    const q0 = queries;
+    const t0 = performance.now();
+    const c0 = process.cpuUsage();
+    const answer = api.kernel.pages();
+    const cpu = process.cpuUsage(c0);
+    results.pages.push({ ms: performance.now() - t0, cpu: (cpu.user + cpu.system) / 1000, queries: queries - q0, answer });
+  }
 }
 
 if (profiler) {
