@@ -9,8 +9,7 @@ import { USE_CASES } from '@braindog/seed/usecases';
 import { isGlyph } from '../../../lib/ui/icons.ts';
 import { copy } from '../../../lib/copy.ts';
 import { words } from '../../../lib/market/words.ts';
-import { readFileSync } from 'node:fs';
-import { ADDON_GLYPHS, FOLDED_MOST, folds, sectionChips } from '../../../lib/market/categories.ts';
+import { FOLDED_MOST, folds, sectionChips } from '../../../lib/market/categories.ts';
 import { miniOf, shapeOf } from './mini.ts';
 
 test('every use case draws one to four tiles, each named, with a glyph the app draws', () => {
@@ -52,16 +51,8 @@ test('ONE WORD FOR A SETUP EVERYWHERE, and the menu is never "Rail" (audit C of 
   for (const w of [copy.browseAll, copy.browseRail, copy.browseNoRail, words.kinds.usecase]) assert.doesNotMatch(w, /use case|rail/iu, w);
 });
 
-/* BROWSE FITS A PHONE (audit C of 25 October, X14): every listed add-on its own glyph, chips short enough for one
-   line, and each section showing a few with the rest a press away. */
-
-test('every add-on the store lists wears a glyph of its own, and no two share one', () => {
-  const listed = (JSON.parse(readFileSync(new URL('../../../../../../packs/listed.json', import.meta.url), 'utf8')) as { packs: string[] }).packs;
-  for (const id of listed) assert.ok(ADDON_GLYPHS[id], `${id} has no glyph of its own`);
-  const worn = listed.map((id) => ADDON_GLYPHS[id]!);
-  assert.equal(new Set(worn).size, worn.length, 'two listed add-ons wear the same glyph');
-  for (const g of worn) assert.ok(isGlyph(g), `${g} is not a glyph the app draws`);
-});
+/* BROWSE FITS A PHONE (audit C of 25 October, X14): chips short enough for one line, and each section showing a few
+   with the rest a press away. */
 
 test('the chips say each section in a word, and the headings say it whole', () => {
   const chips = sectionChips([{ kind: 'usecase', categories: [] }, { kind: 'pack', categories: [] }, { kind: 'pack', categories: ['themes'] }]);

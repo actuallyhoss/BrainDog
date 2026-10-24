@@ -219,20 +219,11 @@ export const shell = {
   pages: 'Pages',
   install: 'Install',
   installDiff: 'What this adds',
-  /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
+  /* `04 §3`'s sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those
-     teach people to ignore warnings. */
-  diffAdds: 'Adds',
+     teach people to ignore warnings. Adds, Examples and What you wrote went with the Agents
+     offer's tile (audit C of 25 October, X16), which names what it adds and says the rest as lines. */
   diffConflicts: 'Conflicts',
-  /* IN THE READER'S WORDS, AND THEY WERE IN THE SCHEMA'S. `Seeds` and `Touches` are `04 §3`'s
-     section names, and they were printed as headings over values that are already plain English:
-     "1 example row, marked example, clearable in one action" and "nothing you have written: 0 rows
-     read". This is the trust screen, where somebody decides whether to let a stranger's file into
-     their business, and the two labels on it were the two words nobody outside this repository
-     uses. `19 §9`: the product speaks the reader's words. The API keeps `seeds` and `touches`, the
-     way Slack's says `conversations` and its screens say channel. */
-  diffSeeds: 'Examples',
-  diffTouches: 'What you wrote',
   shareSetup: 'Share this setup',
   /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */
   today: 'Today',

@@ -17,7 +17,6 @@
 -->
 <script lang="ts" module>
   import type { Category } from '@braindog/declare/catalogue';
-  import { ADDON_GLYPHS } from './categories.ts';
   import type { IconName } from '../ui/icons.ts';
   import type { Listing } from './listing.ts';
 
@@ -38,10 +37,7 @@
    * A listing's glyph by what it is: a use case is a whole way of working, a module brings lists, and an add-on is drawn
    * by the first category it is in that is not one of the two that lead browse.
    */
-  export function glyphOf(l: { kind: Listing['kind']; categories: readonly Category[]; id?: string }): IconName {
-    /* AN ADD-ON THE STORE LISTS WEARS ITS OWN (`categories.ts` `ADDON_GLYPHS`), not its category's shared one. */
-    const listed = l.kind === 'pack' && l.id !== undefined ? ADDON_GLYPHS[l.id] : undefined;
-    if (listed) return listed;
+  export function glyphOf(l: { kind: Listing['kind']; categories: readonly Category[] }): IconName {
     if (l.kind === 'usecase') return CATEGORY_GLYPHS['ways-of-working'];
     if (l.kind === 'module') return CATEGORY_GLYPHS.modules;
     const own = l.categories.find((c) => c !== 'made-by-braindog' && c !== 'ways-of-working');
