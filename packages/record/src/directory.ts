@@ -83,7 +83,7 @@ const RESERVED = new Set([
      `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue` are the static folders served under
      `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
      set does not hold, so a route added later cannot fall behind it. */
-  'activity', 'agents', 'audit', 'automations', 'catalogue', 'connect', 'decide', 'design', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
+  'activity', 'add', 'agents', 'audit', 'automations', 'catalogue', 'connect', 'decide', 'design', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
   'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
 
