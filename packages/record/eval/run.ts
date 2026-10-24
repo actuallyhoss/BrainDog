@@ -1,5 +1,5 @@
 /**
- * Slash drafting pages from sixteen descriptions, and writing the nightly headlines over a seeded record, asked of a real
+ * Slash drafting pages from seventeen descriptions, and writing the nightly headlines over a seeded record, asked of a real
  * model on a key, scored on whether the first try was good.
  *
  *   DRAFT_EVAL_MODEL=<model> DRAFT_EVAL_KEY=<key> node packages/record/eval/run.ts
@@ -33,7 +33,7 @@
  *
  * It costs money and differs run to run, so it is not named `*.test.ts` and no package script runs it. CI does, by itself
  * and on its own schedule: `tools/model-checks/run.mjs --suite record` runs it with `--json` from
- * `.github/workflows/model-checks.yml`, a few chosen descriptions a night and all sixteen a week, asks a failed case twice
+ * `.github/workflows/model-checks.yml`, a few chosen descriptions a night and all seventeen a week, asks a failed case twice
  * more, and holds the share passed to the bar in `tools/model-checks/baseline.json`.
  *
  * THE ENGINE IS THE SHIPPED ONE. `createRecordApi` from `src/`, over a real SQLite from the kernel's test helper, drafting

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The sixteen descriptions asked through a host's own door on a fresh record, as the Slash page asks, so what is measured
+ * The seventeen descriptions asked through a host's own door on a fresh record, as the Slash page asks, so what is measured
  * is what ships (ENG-B11): how many draw a clean page on the first ask, counted apart from those clean only after a repair.
  *
  *   DRAFT_EVAL_MODEL=<model> DRAFT_EVAL_KEY=<key> node tools/model-checks/describe-live.mjs --bar 13
@@ -32,6 +32,10 @@
  * nothing was kept, and `unanswered` when the provider gave no answer in three tries, which is never red (`lib.mjs`).
  * The asks are counted where the host hands the model over, because the door's answer does not say how many it took.
  *
+ * A DESCRIPTION THAT NAMES ITS PARTS (`parts` in `cases.ts`, the seventeenth, the Trunk bar) is clean only when the page
+ * kept declares at least `need` of them, each read off its blocks (`TRUNK_PARTS`); the line says how many it drew and
+ * which were missing, so a draft that drew clean but left half the page out is `no`.
+ *
  * It exits 1 below the bar alone. A provider that was slow, a token turned away and no key are all not measured.
  */
 
@@ -46,7 +50,7 @@ const DOOR = 'POST /api/slashDraft';
 
 /* ── the flags ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** The flags, read plainly. An unknown one is an error, so a typo never asks sixteen descriptions of a paid model. */
+/** The flags, read plainly. An unknown one is an error, so a typo never asks every description of a paid model. */
 function flags(argv) {
   const out = { stub: false, json: false, bar: null, only: null, out: null };
   for (let i = 0; i < argv.length; i++) {
@@ -198,6 +202,21 @@ const kindsBuilt = (draft) => {
   return (Array.isArray(to?.declarations) ? to.declarations : to === undefined ? [] : [to]).map((d) => d.kind);
 };
 
+/** The blocks of the pages a draft declares, as the model wrote them. */
+const blocksBuilt = (draft) => {
+  const to = draft?.change?.to;
+  const decls = Array.isArray(to?.declarations) ? to.declarations : to === undefined ? [] : [to];
+  return decls.filter((d) => d.kind === 'page').flatMap((d) => (Array.isArray(d.body?.blocks) ? d.body.blocks : []));
+};
+
+/** Which of a description's parts its kept draft declares, and which it left out, or `null` for one that names none. */
+const partsDrawn = (c, draft) => {
+  if (c.parts === undefined) return null;
+  const blocks = blocksBuilt(draft);
+  const drew = c.parts.of.filter((p) => blocks.some((b) => p.is(b))).map((p) => p.name);
+  return { drew, missing: c.parts.of.map((p) => p.name).filter((n) => !drew.includes(n)), of: c.parts.of.length, need: c.parts.need };
+};
+
 /** One description on a fresh record, sent as the Slash page sends it, and what came back read as a person would see it. */
 async function described(c) {
   tally = { asks: 0, fault: null };
@@ -221,9 +240,31 @@ async function described(c) {
   const drafts = body?.ok === true ? (body.value?.drafts ?? []) : [];
   const { asks, fault } = tally;
   const quiet = fault !== null && (lib.noAnswer(fault) || lib.refused(fault));
-  const clean = drafts.length > 0 ? (asks === 1 ? 'first' : 'repaired') : quiet ? 'unanswered' : 'no';
-  const why = clean === 'first' || clean === 'repaired' ? '' : hide(fault ?? body?.value?.dropped?.[0] ?? body?.refusal?.fix ?? 'nothing was kept');
-  return { answered: clean !== 'unanswered', said: fault ?? '', n: c.n, name: c.name, status, asks, kept: drafts.length, clean, drew: kindsDrawn(drafts[0]), built: kindsBuilt(drafts[0]), ms, why };
+  const parts = drafts.length > 0 ? partsDrawn(c, drafts[0]) : null;
+  /* A PAGE THAT DREW CLEAN BUT LEFT ITS PARTS OUT IS NOT THE PAGE ASKED FOR. */
+  const short = parts !== null && parts.drew.length < parts.need;
+  const clean = drafts.length > 0 && !short ? (asks === 1 ? 'first' : 'repaired') : drafts.length > 0 || !quiet ? 'no' : 'unanswered';
+  const why =
+    clean === 'first' || clean === 'repaired'
+      ? ''
+      : short
+        ? `drew ${parts.drew.length} of the ${parts.of} parts, short of ${parts.need}: no ${parts.missing.join(', no ')}`
+        : hide(fault ?? body?.value?.dropped?.[0] ?? body?.refusal?.fix ?? 'nothing was kept');
+  return {
+    answered: clean !== 'unanswered',
+    said: fault ?? '',
+    n: c.n,
+    name: c.name,
+    status,
+    asks,
+    kept: drafts.length,
+    clean,
+    drew: kindsDrawn(drafts[0]),
+    built: kindsBuilt(drafts[0]),
+    ...(parts === null ? {} : { parts }),
+    ms,
+    why,
+  };
 }
 
 /* ── the run ───────────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -242,7 +283,8 @@ for (const c of asked) {
   const { answered: _a, said, tries, ...kept } = got;
   turnedAway = lib.refused(said);
   cases.push({ ...kept, tries });
-  say(`${String(c.n).padStart(2)} ${LABEL[kept.clean].padEnd(12)}  ${c.name.padEnd(16)} ${String(kept.ms).padStart(6)} ms  asks ${kept.asks}  kept ${kept.kept}${kept.why === '' ? '' : `  (${kept.why.slice(0, 160)})`}`);
+  const partsSaid = kept.parts === undefined ? '' : `  parts ${kept.parts.drew.length} of ${kept.parts.of}`;
+  say(`${String(c.n).padStart(2)} ${LABEL[kept.clean].padEnd(12)}  ${c.name.padEnd(16)} ${String(kept.ms).padStart(6)} ms  asks ${kept.asks}  kept ${kept.kept}${partsSaid}${kept.why === '' ? '' : `  (${kept.why.slice(0, 160)})`}`);
 }
 
 const of = asked.length;

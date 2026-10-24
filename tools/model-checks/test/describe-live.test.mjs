@@ -1,5 +1,5 @@
 /**
- * The live run of the sixteen descriptions, held without a model (ENG-B11): `describe-live.mjs` asks each description
+ * The live run of the seventeen descriptions, held without a model (ENG-B11): `describe-live.mjs` asks each description
  * through a host's own door on a fresh record, as the Slash page asks, and counts what drew clean on the first ask apart
  * from what drew clean only after a repair. The host here is a stub host, the shipped record and door over the stub model
  * of `packages/record/eval/stub.ts`, and the provider in the last two tests is stood up on localhost, so no test spends
@@ -66,11 +66,11 @@ const sentences = (text) => text.split(/(?<=[.?!])\s+/u).filter((s) => s.trim() 
 const kindsOf = (c) => (c.stub.built?.declarations ?? []).map((d) => d.kind);
 const CHARTS = ['lines', 'series', 'sparkline', 'bar', 'split', 'ring', 'gauge', 'heat', 'progress'];
 
-test('there are sixteen descriptions, and the last four ask for what the Trunk bar asks', () => {
-  assert.equal(CASES.length, 16);
-  assert.deepEqual(CASES.map((c) => c.n), Array.from({ length: 16 }, (_, i) => i + 1));
+test('there are seventeen descriptions, and the four before the last ask for what the Trunk bar asks', () => {
+  assert.equal(CASES.length, 17);
+  assert.deepEqual(CASES.map((c) => c.n), Array.from({ length: 17 }, (_, i) => i + 1));
   assert.equal(lib.CASES.record <= CASES.length, true);
-  for (const c of CASES.slice(12)) {
+  for (const c of CASES.slice(12, 16)) {
     assert.equal(sentences(c.asked).length, 3, `${c.name} is three sentences in a person's words`);
     assert.doesNotMatch(c.asked, /\u2014|\b(?:rows?|register|entity|metric|block)\b/iu, `${c.name} is said as a person says it`);
     /* WHAT A GOOD ANSWER TO IT DECLARES, which the stub host answers with: a list with its own fields, two figures, a
@@ -88,13 +88,26 @@ test('there are sixteen descriptions, and the last four ask for what the Trunk b
   }
 });
 
-test('with a stub host, sixteen are asked through the door, and a first ask is counted apart from a repair', async () => {
+test("THE TRUNK BAR BY DESCRIBING IT: three sentences in his words that ask for the six parts, and a good answer has all six (C36)", () => {
+  const c = CASES.find((x) => x.n === 17);
+  assert.ok(c?.parts, 'the seventeenth names its parts');
+  assert.equal(sentences(c.asked).length, 3);
+  assert.doesNotMatch(c.asked, /\u2014|\b(?:rows?|register|entity|metric|block)\b/iu, 'said as a person says it');
+  assert.equal(c.parts.of.length, 6);
+  assert.equal(c.parts.need, 5);
+  const blocks = c.stub.built.declarations.filter((d) => d.kind === 'page').flatMap((d) => d.body.blocks);
+  for (const p of c.parts.of) assert.ok(blocks.some((b) => p.is(b)), `the good answer has ${p.name}`);
+  /* A PAGE WITHOUT THEM IS NONE OF THEM: a lead with no figure is no sentence, and cards with no colour are no sections. */
+  assert.equal(c.parts.of.filter((p) => [{ kind: 'note', lead: true, body: 'Hello.' }, { kind: 'cards', columns: [{ field: 'name', as: 'title' }] }].some((b) => p.is(b))).length, 0);
+});
+
+test('with a stub host, seventeen are asked through the door, and a first ask is counted apart from a repair', async () => {
   const got = await run(['--stub', '--json']);
   assert.equal(got.code, 0, got.err);
   const r = got.report;
   assert.ok(r, got.out);
   assert.equal(r.door, 'POST /api/slashDraft');
-  assert.equal(r.cases.length, 16);
+  assert.equal(r.cases.length, 17);
   assert.ok(r.cases.every((c) => c.status === 200), 'every description was answered at the door');
   const mends = CASES.filter((c) => c.stub.mends === true).map((c) => c.n);
   assert.ok(mends.length > 0 && mends.some((n) => n > 12), 'one of the four is mended, so the repair is walked at that level too');
@@ -102,37 +115,43 @@ test('with a stub host, sixteen are asked through the door, and a first ask is c
     assert.equal(c.clean, mends.includes(c.n) ? 'repaired' : 'first', `description ${c.n}`);
     assert.equal(c.asks, mends.includes(c.n) ? 2 : 1, `description ${c.n}`);
   }
-  assert.equal(r.firstTry, 16 - mends.length);
-  assert.equal(r.afterRepair, 16);
-  assert.match(got.err, new RegExp(`first try: ${16 - mends.length} of 16`, 'u'));
+  assert.equal(r.firstTry, 17 - mends.length);
+  assert.equal(r.afterRepair, 17);
+  assert.match(got.err, new RegExp(`first try: ${17 - mends.length} of 17`, 'u'));
   /* THE FOUR DREW WHAT THEY WERE ASKED FOR, read off what the record drew and not off what the stub wrote. */
-  for (const c of r.cases.slice(12)) {
+  for (const c of r.cases.slice(12, 16)) {
     assert.equal(c.drew[0], 'note', `description ${c.n} opens on its lead line`);
     assert.ok(c.drew.includes('capture') && c.drew.some((k) => CHARTS.includes(k)), `description ${c.n} drew ${c.drew.join(', ')}`);
     assert.equal(c.built.join(','), 'register,metric,metric,page,rule', `description ${c.n}`);
   }
+  /* AND THE TRUNK DREW CLEAN WITH ALL SIX PARTS, so the record can hold that page from one ask (C36). */
+  const trunk = r.cases.find((c) => c.n === 17);
+  assert.equal(trunk.clean, 'first');
+  assert.equal(trunk.parts.drew.length, 6, trunk.parts.missing.join(', '));
+  assert.ok(['note', 'queue', 'cards', 'steps', 'capture', 'inputs'].every((k) => trunk.drew.includes(k)), trunk.drew.join(', '));
   /* A STUB IS NEVER A MEASUREMENT OF A MODEL, whatever it scored. */
   assert.equal(r.stub, true);
   assert.equal(r.outcome, lib.NONE);
 });
 
-test('it prints "first try: N of 16", exits 1 below the bar it is handed, and 0 at it', async () => {
-  const first = 16 - CASES.filter((c) => c.stub.mends === true).length;
+test('it prints "first try: N of 17", exits 1 below the bar it is handed, and 0 at it', async () => {
+  const first = 17 - CASES.filter((c) => c.stub.mends === true).length;
   const plain = await run(['--stub']);
   assert.equal(plain.code, 0, plain.err);
-  assert.match(plain.out, new RegExp(`^first try: ${first} of 16$`, 'mu'));
-  assert.match(plain.out, /^after repair: 16 of 16$/mu);
+  assert.match(plain.out, new RegExp(`^first try: ${first} of 17$`, 'mu'));
+  assert.match(plain.out, /^after repair: 17 of 17$/mu);
+  assert.match(plain.out, /^17 first ask .*parts 6 of 6/mu, 'the trunk says how many of its parts it drew');
 
   const below = await run(['--stub', '--bar', String(first + 1)]);
   assert.equal(below.code, 1, below.out);
-  assert.match(below.out, new RegExp(`first try: ${first} of 16`, 'u'));
+  assert.match(below.out, new RegExp(`first try: ${first} of 17`, 'u'));
   assert.match(below.out, new RegExp(`below the bar of ${first + 1}`, 'u'));
 
   const at = await run(['--stub', '--bar', String(first)]);
   assert.equal(at.code, 0, at.out);
 
   const typo = await run(['--stub', '--bars', '3']);
-  assert.equal(typo.code, 2, 'an unknown flag is refused, so a typo never runs the sixteen');
+  assert.equal(typo.code, 2, 'an unknown flag is refused, so a typo never runs the seventeen');
 });
 
 test('with no model key it says "no model key: not measured", exits 0, and is never a pass', async () => {

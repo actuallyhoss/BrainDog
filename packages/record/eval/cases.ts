@@ -1,5 +1,5 @@
 /**
- * Sixteen descriptions the owner would type on the Slash page, in his words, each drafted over a fresh copy of the seed.
+ * Seventeen descriptions the owner would type on the Slash page, in his words, each drafted over a fresh copy of the seed.
  *
  * `page` IS THE PAGE A DESCRIPTION IS ABOUT, as the page head's Ask sends it: present, the model is handed that page as it
  * is declared and asked to change it rather than build a new one.
@@ -13,10 +13,19 @@
  * is drawn over, three at least because a chart with fewer says nothing. `tools/model-checks/describe-live.mjs --stub`
  * answers with it, so the record is shown to draw that much clean from one ask; `mends` there leaves out what each table
  * says when it is empty on the first ask, as `stub.ts` does, so the repair is walked at this level too.
+ *
+ * THE SEVENTEENTH IS THE TRUNK BAR BY DESCRIBING IT (C36, DIRECTION §28): three sentences that ask for the six things a
+ * person must be able to make, each read off the draft by its block (`TRUNK_PARTS`), and clean only with five of them.
  */
 
 type Decl = { id: string; kind: string; body: Record<string, unknown> };
 export type Built = { declarations: Decl[]; rows: Record<string, Record<string, unknown>[]> };
+
+/**
+ * ONE PART OF A PAGE A DESCRIPTION ASKS FOR, read off the blocks the draft declares (C36): its name as a person says it,
+ * and whether a block is it. A case that names its parts is clean only with `need` of them drawn.
+ */
+export type CasePart = { name: string; is: (block: Record<string, unknown>) => boolean };
 
 export type Case = {
   n: number;
@@ -24,6 +33,8 @@ export type Case = {
   asked: string;
   page?: string;
   stub: { list: string; title: string; one: string; icon: string; mends?: true; built?: Built };
+  /** The parts the page must have, and how many of them a clean draft draws at least. */
+  parts?: { of: readonly CasePart[]; need: number };
 };
 
 const gbp = (amount: number) => ({ amount, currency: 'GBP' });
@@ -47,6 +58,27 @@ const fitted = (lead: string, chart: Record<string, unknown>, form: Record<strin
   { kind: 'lines', icon: 'chart-line', span: 8, ...chart },
   { kind: 'capture', icon: 'plus', span: 4, ...form },
   { kind: 'table', span: 12, limit: 20, ...table },
+];
+
+/* ── the Trunk bar, by describing it (C36, DIRECTION §28) ─────────────── */
+
+const columnsAs = (b: Record<string, unknown>): string[] =>
+  (Array.isArray(b['columns']) ? (b['columns'] as Record<string, unknown>[]) : []).map((c) => String(c['as'] ?? ''));
+const reads = (b: Record<string, unknown>, prefix: string): boolean => typeof b['source'] === 'string' && (b['source'] as string).startsWith(prefix);
+
+/**
+ * THE SIX THINGS §28 SAYS A PERSON MUST BE ABLE TO MAKE, each as the generic block that makes it and nothing that knows
+ * about one brand: a sentence over their own figures, their own sections with a colour and a picture each, decisions shown
+ * with what each option is, a path of steps, a pad with a second opinion under each note, and a few inputs with a verdict
+ * in words.
+ */
+export const TRUNK_PARTS: readonly CasePart[] = [
+  { name: 'a sentence', is: (b) => b['kind'] === 'note' && b['lead'] === true && /\{\{[^}]+\}\}/u.test(String(b['body'] ?? '')) },
+  { name: 'sections with a colour and a picture', is: (b) => b['kind'] === 'cards' && columnsAs(b).includes('hue') && columnsAs(b).includes('picture') },
+  { name: 'decisions with what each option is', is: (b) => b['kind'] === 'queue' && reads(b, 'governance.open') },
+  { name: 'a path', is: (b) => b['kind'] === 'steps' },
+  { name: 'a pad with a second opinion', is: (b) => b['kind'] === 'cards' && columnsAs(b).includes('reply') },
+  { name: 'inputs and a verdict', is: (b) => b['kind'] === 'inputs' },
 ];
 
 export const CASES: readonly Case[] = [
@@ -297,5 +329,82 @@ export const CASES: readonly Case[] = [
         },
       },
     },
+  },
+  {
+    n: 17,
+    name: 'launch trunk',
+    asked:
+      'A desk for launching my perfume line in parts, the bottle, the box and the shop page, each part with its own colour, a picture, how far along it is and its next step, and the steps in order as a path. ' +
+      'Open it on one sentence about how many steps are left, show the calls waiting on me with what each choice looks like, and keep a pad beside it where I write a thought and get a second opinion under it. ' +
+      'Add a price check where I type the price and what one costs to make, and it tells me in words whether the price holds.',
+    stub: {
+      list: 'parts',
+      title: 'Launch',
+      one: 'part',
+      icon: 'board',
+      built: {
+        declarations: [
+          list('parts', 'Parts', 'part', 'name', [
+            { id: 'name', type: 'text', required: true },
+            { id: 'what', type: 'text' },
+            { id: 'progress', type: 'int', min: 0, max: 100 },
+            { id: 'hue', type: 'int', min: 0, max: 359 },
+            { id: 'picture', type: 'file' },
+          ]),
+          /* THE STEPS SAY WHOSE STEPS THEY ARE, so a part's card draws its first open one as its next step. */
+          ((d) => ({ ...d, body: { ...d.body, steps: { of: 'part', done: 'done', order: 'rank' } } }))(
+            list('steps', 'Steps', 'step', 'what', [
+              { id: 'what', type: 'text', required: true },
+              { id: 'part', type: 'ref', to: 'parts' },
+              { id: 'done', type: 'bool', default: false },
+              { id: 'rank', type: 'int' },
+            ]),
+          ),
+          list('thoughts', 'Thoughts', 'thought', 'text', [
+            { id: 'text', type: 'text', required: true },
+            { id: 'reply', label: 'Second opinion', type: 'text' },
+          ]),
+          list('prices', 'Price check', 'check', 'what', [
+            { id: 'what', type: 'text', required: true },
+            { id: 'price', type: 'decimal', min: 0 },
+            { id: 'cost', label: 'Making one', type: 'decimal', min: 0 },
+            { id: 'room', label: 'Room over the cost', type: 'decimal', derive: { diff: ['price', 'cost'] } },
+          ]),
+          figure('steps-left', 'Steps left', 'steps', { count: 'id' }, 'int', 'done is not true'),
+          figure('priced', 'Price check filled in', 'prices', { count: 'id' }, 'int', 'price is set, cost is set'),
+          pageOf('launch', 'Launch', 'board', ['parts', 'steps', 'thoughts', 'prices'], [
+            { kind: 'note', lead: true, span: 12, body: '{{steps-left}} steps are left before the launch.' },
+            { kind: 'queue', span: 12, heading: 'Calls waiting on you', source: 'governance.open', tiles: true, empty: 'No call is waiting on you.' },
+            { kind: 'section', heading: 'The parts' },
+            { kind: 'cards', span: 12, source: 'register.parts', columns: [{ field: 'name', as: 'title' }, { field: 'progress', as: 'ring' }, { field: 'what', as: 'next' }, { field: 'hue', as: 'hue' }, { field: 'picture', as: 'picture' }], empty: 'No parts yet.' },
+            { kind: 'section', heading: 'The path' },
+            { kind: 'steps', span: 12, heading: 'The path', source: 'register.steps', columns: [{ field: 'what' }, { field: 'part' }], order: [{ field: 'rank', dir: 'asc' }], empty: 'No step yet.' },
+            { kind: 'section', heading: 'The pad' },
+            { kind: 'capture', heading: 'A thought', register: 'thoughts', span: 4 },
+            { kind: 'cards', span: 8, source: 'register.thoughts', columns: [{ field: 'text', as: 'title' }, { field: 'reply', as: 'reply' }], empty: 'Nothing on the pad yet.' },
+            { kind: 'section', heading: 'Does the price hold' },
+            { kind: 'inputs', register: 'prices', heading: 'The price check', columns: [{ field: 'price' }, { field: 'cost' }, { field: 'room' }], row: 'prices#1' },
+            /* THE VERDICT IS THE ROOM, worked out beside what is typed: a figure cannot add up a field worked out at read. */
+            { kind: 'note', when: { metric: 'priced', is: 0 }, body: 'Type the price and what one costs to make, and the room over the cost is worked out beside them.' },
+            { kind: 'note', when: { metric: 'priced', gt: 0 }, body: 'The price holds while the room over the cost is above nought.' },
+          ]),
+        ],
+        rows: {
+          parts: [
+            { name: 'The bottle', what: 'The glass and the cap', progress: 60, hue: 330 },
+            { name: 'The box', what: 'The paper and the print', progress: 30, hue: 40 },
+            { name: 'The shop page', what: 'The words and the pictures', progress: 10, hue: 200 },
+          ],
+          steps: [
+            { what: 'Approve the glass sample', rank: 1 },
+            { what: 'Pick the paper', rank: 2 },
+            { what: 'Write the first lines', rank: 3 },
+          ],
+          thoughts: [{ text: 'A smaller first run, so the box can change after it.', reply: 'Worth it if the printer keeps the plates.' }],
+          prices: [{ what: 'The first bottle', price: 45, cost: 12 }],
+        },
+      },
+    },
+    parts: { of: TRUNK_PARTS, need: 5 },
   },
 ];
