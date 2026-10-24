@@ -581,7 +581,8 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
   const { readFileSync } = await import('node:fs');
   const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
   assert.match(detail, /recordKeys\(/u);
-  assert.match(detail, /trustLine\(/u);
+  /* THROUGH `trustSaid`, which is `trustLine` but for BrainDog's own unsigned add-ons (X12). */
+  assert.match(detail, /trustSaid\(/u);
   assert.match(detail, /trustThisKey\(/u);
   assert.match(detail, /Trust this key/u);
   assert.doesNotMatch(detail, /trustForEntry\(browserStore\(\)/u);
