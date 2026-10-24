@@ -38,6 +38,22 @@ import { TASKS } from '../work/list.ts';
 
 type Fetch = NonNullable<Parameters<typeof createClient>[0]['fetch']>;
 
+/** The kernel's own list of runs, which Today's Working now reads (`sessions.working`). */
+const SESSION_LIST = 'session';
+
+/**
+ * THE LIST A RECORD KEEPS ITS PROJECTS IN, as Today declares its cards over it (C27): the one of its lists, as this tab
+ * has learnt them, that declares `scopes` (`project-cards.ts` `projectsOf`), with the field its rows are named by and the
+ * name the record gives it. `undefined` where it keeps none, or none is learnt yet.
+ */
+export function projectsHeld(lists: readonly { id: string; name: string }[]): Holds['projects'] {
+  for (const l of lists) {
+    const d = REGISTERS[l.id] as { scopes?: unknown; title?: unknown } | undefined;
+    if (d && d.scopes !== undefined && typeof d.title === 'string' && d.title !== '') return { register: l.id, title: d.title, name: l.name };
+  }
+  return undefined;
+}
+
 /** The previews a screen draws, by the address it draws them at, and the page each is kept as on its first Done. */
 const KEPT_AS: Readonly<Record<string, string>> = { today: 'home', decide: 'decide', scripts: 'scripts' };
 
@@ -71,7 +87,20 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
   const one = tasks && bare ? relabel(bare, heard).one : undefined;
-  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(shell.me.owner === true && shell.pages.includes('health') ? { health: true } : {}), ...(shell.me.owner === true ? { quiet: true } : {}), ...(one ? { one } : {}), ...(week ? { week } : {}) };
+  /* WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF TODAY'S BODY (C27): runs only for a reader who may read them, and the
+     projects over the list this tab has learnt keeps them. */
+  const projects = projectsHeld(shell.lists);
+  return {
+    tasks,
+    adds: tasks && may(shell, 'append', TASKS),
+    money: shell.pages.includes('money'),
+    ...(shell.me.owner === true && shell.pages.includes('health') ? { health: true } : {}),
+    ...(shell.me.owner === true ? { quiet: true } : {}),
+    ...(one ? { one } : {}),
+    ...(week ? { week } : {}),
+    ...(may(shell, 'read', SESSION_LIST) ? { runs: true } : {}),
+    ...(projects ? { projects } : {}),
+  };
 }
 
 /**

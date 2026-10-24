@@ -1,12 +1,12 @@
 /**
  * THE ORDER TODAY'S DESK IS SEEN IN IS THE ORDER IT IS TABBED IN. The desk's rows are laid on one board (Home's CSS puts
  * each tile in its row), and a keyboard walks the document and not the picture, so the document holds the tiles in the
- * order the picture shows them: what needs you, who is working, cash; the few key numbers; the record's week; the
- * projects; what landed,
- * what is coming up and a few people.
+ * order the picture shows them: what is late, what needs you, who is working, cash; the few key numbers; the record's
+ * week; the projects; what landed, what is coming up and a few people.
  *
- * The page's tiles are the reader's, and the desk's own parts (who is working, the projects, what landed) are Home's, so the page's blocks are put in the picture's order and each of Home's parts is anchored before the
- * first drawn block that comes after it. A part with no block after it follows the reader.
+ * The page's tiles are the reader's (what is late, who is working and the projects among them since C27), and Home's
+ * own parts (the foot of Needs you, what landed) are anchored before the first drawn block that comes after them. A part
+ * with no block after it follows the reader.
  *
  * PURE, AND NO SVELTE, so `node --test` reads the order as it is written.
  */
@@ -21,6 +21,7 @@ const RANKS: Readonly<Record<string, number>> = {
   numbers: 4,
   'week-due': 5,
   'week-money': 6,
+  projects: 7,
   'coming-up': 9,
   faces: 10,
 };
@@ -29,17 +30,19 @@ const RANKS: Readonly<Record<string, number>> = {
 export const REST = 30;
 
 /** Home's own parts, with the place each holds among the blocks. */
-export type Placed = 'needs' | 'working' | 'projects' | 'landed';
+export type Placed = 'needs' | 'landed';
 const PLACES: readonly (readonly [Placed, number])[] = [
   /* THE FOOT OF NEEDS YOU, right under its questions (or the whole tile with none to ask). */
   ['needs', 1],
-  ['working', 2],
-  ['projects', 7],
   ['landed', 8],
 ];
 
+/** What is late leads the desk (U2), whatever key the page declares it under: it is the late tile (`desk-part.ts`). */
+const LATE = 0;
+
 /** A block's place in the picture, by the key it is declared under. */
-export const rankOf = (b: { key?: string | undefined }): number => (b.key !== undefined ? (RANKS[b.key] ?? REST) : REST);
+export const rankOf = (b: { key?: string | undefined; desk?: { kind: string } | undefined }): number =>
+  b.desk?.kind === 'late' ? LATE : b.key !== undefined ? (RANKS[b.key] ?? REST) : REST;
 
 /** The blocks in the picture's order. A stable sort: blocks of one rank keep the order they were declared in. */
 export function inPicture<B extends { key?: string | undefined }>(blocks: readonly B[]): B[] {

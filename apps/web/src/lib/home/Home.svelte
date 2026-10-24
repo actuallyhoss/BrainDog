@@ -19,10 +19,14 @@
   IT LISTENS. A write from an agent, a rule or another tab moves the record's version, and Home reads its page again
   without a reload and without blanking it (`listen`).
 
-  TODAY'S OWN BODY IS THE DESK (roadmap slice 1a): what needs you, who is working and cash, the projects, then Arrivals,
-  what is coming up and people, on one board. NO MORE FOLD AT ITS FOOT (frame A, 23 October): it pointed at the same
-  things the tiles and the sidebar already hold. A page the person kept is drawn as they laid it out, with the desk
-  over it.
+  TODAY'S OWN BODY IS THE DESK (roadmap slice 1a): what is late, what needs you, who is working and cash, the projects,
+  then Arrivals, what is coming up and people, on one board. NO MORE FOLD AT ITS FOOT (frame A, 23 October): it pointed
+  at the same things the tiles and the sidebar already hold. A page the person kept is drawn as they laid it out, with
+  Arrivals over it.
+
+  WHAT IS LATE, WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY (C27, 24 October): declared in `todayHome`,
+  answered by the record, and drawn in their slots as the desk's own tiles (`desk-part.ts`, which this file marks the
+  blocks with). Only Arrivals and the foot of Needs you are still Home's own, laid among the tiles (`desk-order.ts`).
 
   THE RECORD'S HOUSEKEEPING IS NOT HERE (the audit of 22 October, U3): what went stale, who it matched, what it found
   wrong in its own pages and notes, what the answers taught, what may be one, what has no colour and the imported rules
@@ -91,8 +95,9 @@
   import TellOne from '$lib/home/TellOne.svelte';
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
-  import WorkingNow from '$lib/home/WorkingNow.svelte';
-  import { workingRows } from '$lib/home/desk.ts';
+  import Landed from '$lib/home/Landed.svelte';
+  import { landedOf } from '$lib/home/landed.ts';
+  import { desked as deskedOf, type Desked } from '$lib/home/desk-part.ts';
   import WantMore from '$lib/home/WantMore.svelte';
   import { read as readPref } from '$lib/pref.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
@@ -107,7 +112,6 @@
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
   import { verbOf } from '$lib/home/late-verb.ts';
-  import LateNow from '$lib/home/LateNow.svelte';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { toldNow } from '$lib/home/told-now.svelte.ts';
   import { answeredBy, doneToday, toldNeedOf } from '$lib/record/told-live.ts';
@@ -403,14 +407,10 @@
   const shown = $derived(got !== null || settled || waitedPage);
   /** The lists the copy put back, learnt again once the record's own Today has drawn. */
   let restored: string[] = [];
-  /** What the copy holds: Today's page, and the desk and what was handled beside it, so nothing moves when they land. */
-  type CopyBody = KeptBody & { desk?: DeskCards | null; handled?: HandledFound | null };
+  /** What the copy holds: Today's page, and what was handled beside it, so nothing moves when it lands. */
+  type CopyBody = KeptBody & { handled?: HandledFound | null };
   async function drawCopy(slug: string | null, near: Near<CopyBody>): Promise<void> {
     if (got !== null || declares !== slug || near.value.got.from !== 'live') return;
-    /* THE DESK'S OWN PART FIRST, so the page and the desk above it are drawn in one frame. */
-    const part = near.value.desk && desk === null ? await import('./Desk.svelte').catch(() => null) : null;
-    if (got !== null || declares !== slug) return;
-    if (part && desk === null) desk = { cards: near.value.desk ?? null, Part: part.default };
     if (near.value.handled !== undefined && handled === null) handled = near.value.handled;
     got = near.value.got;
     news = near.value.news;
@@ -486,9 +486,9 @@
     void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/local.ts'), import('$lib/data/plain.ts')]).then(async ([tab, l, p]) => {
       /* EVERY LIST'S DECLARATION GOES WITH IT, but a list the copy never keeps and one that holds a secret. */
       const lists = data.lists.map((x) => x.id).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
-      /* THE DESK AND WHAT WAS HANDLED GO WITH IT AS THEY LANDED, so the copy is the whole first screen and not the page
-         alone, with the desk pushing it down when it lands. */
-      await Promise.race([Promise.all([deskLanded, handledLanded]), new Promise((done) => setTimeout(done, DESK_WAIT_MS))]);
+      /* WHAT WAS HANDLED GOES WITH IT AS IT LANDED, so the copy is the whole first screen and not the page alone, with
+         the line pushing it down when it lands. The desk's tiles are blocks of the page (C27), so they go with it. */
+      await Promise.race([handledLanded, new Promise((done) => setTimeout(done, DESK_WAIT_MS))]);
       let ticket = mark;
       if (tab.localTicket() !== mark) {
         await tab.settledLocal();
@@ -496,7 +496,7 @@
         ticket = tab.localTicket();
       }
       if (readerOf() !== reader) return;
-      const kept: CopyBody = { got: out, news: said, desk: untrack(() => desk?.cards ?? null), handled: untrack(() => handled) };
+      const kept: CopyBody = { got: out, news: said, handled: untrack(() => handled) };
       tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf(kept), ticket, {}, { always: true });
     });
   }
@@ -580,7 +580,7 @@
     /* THE TAB'S FIRST READ OF TODAY TAKES WHAT `boot` SAID WAS NEW; a later one (another voice, lists learnt) asks. */
     const before = mine === 1 ? newsFirst() : newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
-    void Promise.all([readBody(slug, spoken, held), Promise.race([Promise.all([handledLanded, deskLanded]), first])])
+    void Promise.all([readBody(slug, spoken, held), Promise.race([handledLanded, first])])
       .then(([out]) => {
         if (slug !== declares) return;
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
@@ -613,9 +613,8 @@
         if (viaCopy && !ok) closed(false, opened());
         firstClosed(true);
       });
-    /* WHAT LANDED IS DRAWN WITH THE DESK IT STANDS IN, not with the page under it: on a first open the desk's projects
-       were drawn, then the page, and the lines put in between them pushed the page down as it drew. The mark still goes
-       only with the page (`keepNews`). */
+    /* WHAT LANDED IS DRAWN AS SOON AS IT IS KNOWN, not only with the page under it, so Arrivals does not wait on a slow
+       page. The mark still goes only with the page (`keepNews`). */
     if (was === null && untrack(() => got) === null)
       void before.then((now) => {
         if (now !== null && mine === pageRead && untrack(() => got) === null && untrack(() => newLines).length === 0) newLines = now.lines;
@@ -727,15 +726,21 @@
   const desked = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
     /* ON A PHONE NEEDS YOU SHOWS FOUR, the first with its buttons and the rest rows a tap opens (the style below), and
-       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk, at
-       the top with a button each, so the page's own late block is marked not drawn at its place. */
-    const lateAt = new Set(board ? (late?.at ?? []) : []);
-    const blocks =
-      board && (phone.current || lateAt.size > 0)
-        ? shaped.blocks.map((b, n) =>
-            lateAt.has(n) ? { ...b, drawn: false } : phone.current && b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b,
-          )
-        : shaped.blocks;
+       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk (C27):
+       the first late block of the page is drawn as the desk's late tile, a line a thing with its button, and any other
+       late block is marked not drawn at its place. */
+    const lateAt = board ? (late?.at ?? []) : [];
+    const lateTile = lateShown.length > 0 ? lateAt[0] : undefined;
+    const named = (id: string): string => data.lists.find((l) => l.id === id)?.name ?? '';
+    const blocks: Desked<LiveBlock>[] = deskedOf(
+      shaped.blocks.map((b, n): Desked<LiveBlock> => {
+        if (n === lateTile) return { ...b, desk: { kind: 'late', lines: lateShown, heading: late?.heading || voice.overdue, more: late?.more ?? 0, most: 4 } };
+        if (lateAt.includes(n)) return { ...b, drawn: false };
+        return board && phone.current && b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b;
+      }),
+      recordNow(),
+      named,
+    );
     /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
        reader indexes the blocks it is handed, so the order is made here, before it. */
     if (!board) return { blocks };
@@ -764,17 +769,12 @@
   const phone = new MediaQuery('(width < 600px)', false);
 
   type HandledFound = import('./handled.ts').Handled;
-  type DeskPart = typeof import('./Desk.svelte').default;
-  type DeskCards = import('./desk-read.ts').Cards;
   /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
   let handled = $state.raw<HandledFound | null>(null);
   /* THE FIRST BODY WAITS FOR THE FIRST HANDLED READ, a short while at most (`HANDLED_WAIT_MS`), so the foot's line is in
      the first picture and never pushes the board down when it lands (CLS, today F1). */
   let handledHeard: () => void = () => {};
   const handledLanded = new Promise<void>((done) => (handledHeard = done));
-  /* AND FOR THE DESK'S FIRST READ, the projects' row, which pushed what is under it down as it landed. */
-  let deskHeard: () => void = () => {};
-  const deskLanded = new Promise<void>((done) => (deskHeard = done));
   const HANDLED_WAIT_MS = 800;
   /**
    * THE VERSION A TILE IS ASKED ONCE AT (`tileOnce`): the record's, as the poll heard it, and this tab's writes. Read in
@@ -805,40 +805,6 @@
   const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, null));
 
   /**
-   * THE DESK ABOVE THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
-   * reader beside the page's own read and not after it, since it is what Today opens on. A read that fails draws no
-   * cards, and the desk then draws what it still has.
-   */
-  let desk = $state.raw<{ cards: DeskCards | null; Part: DeskPart } | null>(null);
-  /* A PROJECTS LIST THE TAB HAS LEARNT, so a little height is held for the desk until it lands and the page below does not
-     jump. Nothing is held for a record with no projects list, or before its lists are known. */
-  const deskExpected = $derived.by(() => {
-    void learnt;
-    return desk === null && data.lists.some((l) => (REGISTERS[l.id] as { scopes?: unknown } | undefined)?.scopes !== undefined);
-  });
-  $effect(() => {
-    if (data.refused) return;
-    const ver = asOf();
-    const base = apiBase();
-    let here = true;
-    /* THE DESK AS TODAY LAST DREW IT, at once (`today-kept.ts`), and read again behind it. */
-    if (untrack(() => desk) === null) desk = keptPart<NonNullable<typeof desk>>('desk', base);
-    if (untrack(() => desk) !== null) deskHeard();
-    void Promise.all([import('./desk-read.ts'), import('./Desk.svelte')]).then(
-      async ([m, part]) => {
-        const lists = data.lists;
-        const cards = await tileOnce('desk', base, ver, () => m.readCards(base, lists, asked)).catch(() => null);
-        if (here) keepPart('desk', base, (desk = { cards, Part: part.default }));
-        deskHeard();
-      },
-      () => deskHeard(),
-    );
-    return () => {
-      here = false;
-    };
-  });
-
-  /**
    * WHAT BRAINDOG DID BY ITSELF TODAY, read beside the page and not after it, since its line is part of the first tile:
    * read late, it pushed the board down as it landed. Kept for the next visit like the desk (`today-kept.ts`).
    */
@@ -866,15 +832,15 @@
   const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));
   const finishedBy = $derived(doneToday(toldNow().done, recordNow()).map((t) => answeredBy(t, toldNow().agents)));
 
-  /**
-   * WHO IS WORKING, FROM `boot` AND AT ONCE (today F1): Today's own body declares no table of runs, so nothing is drawn
-   * twice and nothing fades out over the board; the tile stands from the first paint, its project dots coloured once the
-   * desk's cards land. On the record's own clock (`recordNow`), so "for 32 min" is the record's time.
-   */
-  const workingTile = $derived.by(() => {
-    const hues = new Map((desk?.cards?.cards ?? []).map((c) => [c.name, c.hue] as const));
-    return workingRows(workingNow(), hues, recordNow());
+  /* WHAT LANDED SINCE THE READER LAST LOOKED, a line each, from Home's own read of what is new (`landed.ts`), which the
+     read mark is stamped from. ENOUGH LINES TO GROUP (`arrivalsOf`), which then shows the newest few. THE KERNEL'S OWN
+     LISTS (runs, what he told them) are nothing he filed, by their declaration (`kernel`). */
+  const LANDED_READ = 40;
+  const landed = $derived.by(() => {
+    const own = new Set(data.lists.filter((l) => (l as { kernel?: true }).kernel === true).map((l) => l.id));
+    return landedOf(newLines, new Map(data.lists.map((l) => [l.id, l.name])), data.me?.person ?? null, data.now, new Map(Object.entries(data.names ?? {})), LANDED_READ, own);
   });
+  const selfName = $derived(data.me?.person && data.names && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? null) : null);
 
   /* WHETHER THE PAGE DRAWS ITS NEEDS YOU QUESTIONS, so the foot is the tile's lower part, or the whole tile at nought. */
   const needsDrawn = $derived((desked?.blocks ?? []).some((b) => b.key === 'needs-you' && b.drawn));
@@ -1012,18 +978,9 @@
   {/if}
 {/snippet}
 
-<!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
-     Height is held while it is on its way where the record has projects. -->
-{#snippet deskPart(part: 'all' | 'working' | 'projects' | 'landed' = 'all')}
-  {#if part === 'working'}
-    <!-- WHO IS WORKING, from `boot`, standing from the first paint. -->
-    <WorkingNow rows={workingTile} />
-  {:else if desk}
-    {@const Desk = desk.Part}
-    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} {part} review={waits?.inbox ?? 0} />
-  {:else if deskExpected && (part === 'all' || part === 'projects')}
-    <div class="desk-held" aria-hidden="true"></div>
-  {/if}
+<!-- ARRIVALS, what landed since the reader last looked, left out where nothing did. -->
+{#snippet landedPart()}
+  <Landed rows={landed} review={waits?.inbox ?? 0} self={selfName} />
 {/snippet}
 
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
@@ -1037,7 +994,7 @@
      after the page. -->
 {#snippet placedParts(list: readonly Placed[])}
   {#each list as part (part)}
-    {#if part === 'needs'}{@render needsFoot()}{:else}{@render deskPart(part)}{/if}
+    {#if part === 'needs'}{@render needsFoot()}{:else}{@render landedPart()}{/if}
   {/each}
 {/snippet}
 
@@ -1103,8 +1060,8 @@
       <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
     {/if}
 
-    <!-- A PAGE THE PERSON KEPT: the desk over it, as before, and their page under it as they laid it out. -->
-    {#if !board}{@render deskPart('all')}{/if}
+    <!-- A PAGE THE PERSON KEPT: Arrivals over it, as before, and their page under it as they laid it out. -->
+    {#if !board}{@render landedPart()}{/if}
 
     <!--
       TODAY SPEAKS FIRST (U2), AND ONLY TO GREET (23 October, his word: the sentence under it "summarizes everything that's
@@ -1123,19 +1080,7 @@
     -->
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
       <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button (U2, U-A13): beside who is working at a desk, and the
-           first thing under the brief on a phone. -->
-      {#if board && lateShown.length > 0}
-        <div class="today-late">
-          <LateNow
-            lines={lateShown}
-            heading={late?.heading || voice.overdue}
-            more={late?.more ?? 0}
-            most={phone.current ? 3 : 4}
-            writes={(list) => may(data, 'write', list)}
-            onfinished={() => void reread()}
-          />
-        </div>
-      {/if}
+           first thing under the brief on a phone. A block of the page since C27, the first in its order (`desked`). -->
       <!-- THE FIRST ROW'S RIGHT COLUMN UNDER WHO IS WORKING AND CASH, held so nothing laid out later lands in it. -->
       {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
@@ -1152,11 +1097,6 @@
 </div>
 
 <style>
-  /* THE DESK'S PLACE WHILE IT IS ON ITS WAY: about one row of cards, so the page under it stays where it is drawn. */
-  .desk-held {
-    min-block-size: 180px;
-  }
-
   /* ── the head ─────────────────────────────────────────────────────────── */
 
   /* THE RULES' LINE (Today polish 7): its figures at 600 in the ink, and "8 need you" in the red at 600, the door to
@@ -1259,19 +1199,15 @@
   /* WHAT IS LATE STANDS IN NEEDS YOU'S PLACE IN THE ORDER, before it, so on a phone it is the first tile under the brief,
      and nothing the board draws at no height (the page's ⋯ on a phone) stands between them and opens a gap. Its tile
      fills its cell, so beside a taller Working now it does not end short. */
-  .body[data-board] > .today-late {
+  .body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
     display: flex;
     flex-direction: column;
     order: 1;
   }
 
-  .today-late > :global(.tile) {
-    flex: 1;
-  }
-
   /* THE PAGE'S ⋯ ROW, which a phone draws in the flow and which holds only closed sheets there, goes to the board's foot
      rather than over the late tile, where its row and its gap pushed the tile down. */
-  .body[data-board]:has(> .today-late) :global(.home-page > .home-tools) {
+  .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .home-tools) {
     order: 19;
   }
 
@@ -1483,8 +1419,7 @@
     order: 6;
   }
 
-  .body[data-board] > :global(:is(.projects, .desk-held)),
-  .body[data-board] :global(.home-page > .page > :is(.projects, .desk-held)) {
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='projects']) {
     order: 7;
   }
 
@@ -1545,37 +1480,37 @@
        its foot beside cash. The late tile and who is working fill their track together, so neither ends short of the
        other. THE FOOT STRETCHES TO THE LAST TRACK; CASH ENDS WHERE ITS FIGURES END, SINCE batch 4's look on his record:
        stretched beside Late and Needs you, Cash ahead was half a column of empty tile under three figures. */
-    .body[data-board]:has(> .today-late) > .today-late {
+    .body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
       grid-row: 1;
       grid-column: 1 / span var(--n);
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-late) > :global([data-working]),
-    .body[data-board]:has(> .today-late) :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) > :global([data-working]),
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-late) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
       grid-row: 2 / span 2;
     }
 
-    .body[data-board]:has(> .today-late):not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
-    .body[data-board]:has(> .today-late) :global(.home-page > .page > [data-needs-foot][data-alone]) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])):not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > [data-needs-foot][data-alone]) {
       grid-row: 2 / span 3;
     }
 
-    .body[data-board]:has(> .today-late) :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
       grid-row: 4;
       align-self: stretch;
     }
 
-    .body[data-board]:has(> .today-late) :global(.home-page > .page > .block-slot[data-key='cash']) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > .block-slot[data-key='cash']) {
       grid-row: 2 / span 3;
       align-self: start;
     }
 
-    .body[data-board]:has(> .today-late):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
       grid-row: 1 / span 4;
     }
 

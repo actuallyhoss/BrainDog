@@ -53,8 +53,15 @@ test('an installed home is arranged where it is, and an address that is neither 
 
 test("Today's body is built from what the shell says the record holds", () => {
   const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
-  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }, {}), { tasks: true, adds: true, money: true, quiet: true, one: 'task' });
-  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false, quiet: true });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }, {}), { tasks: true, adds: true, money: true, quiet: true, one: 'task', runs: true });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false, quiet: true, runs: true });
+});
+
+test("who is working and the projects are Today's blocks where the reader may read the runs and the record keeps projects (C27)", () => {
+  const member = { level: 'member', owner: false, person: 'p_2', lists: ['session'], levels: { session: 'read' } } as never;
+  assert.equal(holdsOf({ lists: [], pages: [], me: member }, {}).runs, true, 'a reader of the runs is shown who is working');
+  const none = { level: 'member', owner: false, person: 'p_2', lists: ['tasks'], levels: { tasks: 'read' } } as never;
+  assert.equal(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: [], me: none }, {}).runs, undefined);
 });
 
 test("what went quiet is the owner's, as the vital signs are, and a kept Today keeps the tile", async () => {

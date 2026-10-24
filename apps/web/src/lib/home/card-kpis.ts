@@ -3,7 +3,7 @@
  * `for: cards`, one a project, or `for: project` for one project's page, where the one its card leads with is marked.
  *
  * ASKED AS A BODY THE RECORD DRAWS AND KEEPS NOWHERE (`previewPage`), as Today's own body is, so no page has to carry a
- * block of them and the cards, the hero and Today read the one source. A ROUTE-ONLY MODULE, like `desk-read.ts`.
+ * block of them and the cards, the hero and Today read the one source. A ROUTE-ONLY MODULE, like `card-late.ts`.
  *
  * IT NEVER FAILS THE SCREEN: a record with no key numbers, a host built before the source and a refusal all answer
  * none, and a card then says what it said before.

@@ -29,30 +29,15 @@ export const decide = {
   deferHint: 'What has to happen first',
   deferAction: 'Park it',
   wakeOn: 'Wake me on',
-
-  /* Answering a question where it is drawn. The options used to be a printed span inside the card's
-     own link, so the thing that looked like the answer was decoration and answering meant a second
-     screen and a paragraph of prose. */
-  answeredOption: (option: string) => `Answered: ${option}`,
-  takeItBack: 'Take it back',
-  /* The visible words start the accessible name rather than being a different sentence, so "take it
-     back" said out loud reaches the control a person is looking at (WCAG 2.5.3). */
-  takeItBackOf: (title: string) => `Take it back: ${title}`,
-  whyForLater: 'Why, for whoever reads this in six weeks',
-  reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
-  rankedBy: 'Ranked by the cost of being wrong',
   costOfDelay: 'Cost of deciding late',
   theOptions: 'The options',
   recommended: 'Suggested',
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
      reason is the whole of what anybody reading it in six weeks will have. */
   reasonRequired: 'A decision is kept for ever and cannot be edited, so it needs a reason. Write why you chose it.',
-  reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
-  commit: 'Record the decision',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
   noQuestionsWhy: 'When your agent needs a choice from you, it shows up here.',
-  lastDecided: 'The last one was decided',
   /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person
      reads; the toast stands over the question it answers, so the option alone is the whole sentence. */
   decisionRecorded: (option: string) => `${option} is recorded as the decision.`,
@@ -68,11 +53,6 @@ export const decide = {
   archiveArrival: 'Archive this',
   inboxConnect: 'Set up a connector',
   inboxClearWhy: 'Mail and texts you forward land here until they are filed.',
-  /* THE AIM FOR THE DECIDE QUEUE, SAID WITH WHAT IT COUNTS. `/decide` printed the metric's note by itself at the end
-     of its heading row: a fragment with no subject, beside a count of 4 it was failing. The target is said as every
-     target is (`targetLine`, "Limit 3"), and this names what the limit is on. The tone and its glyph come from the
-     metric. */
-  aimFor: (target: string) => `${target} open at once`,
   /* Inbox and page-row writes (lane D) */
   inboxFileInto: 'File it in',
   /* BY THE LIST'S NAME, NEVER THE RECORD'S HANDLE: "Filed as tasks#12" put an id in front of a person. A handle, a
@@ -115,20 +95,12 @@ export const decide = {
   proposalCallsNothing: 'Nothing outside this record',
   proposalMaySend: 'May send',
   proposalSource: (name: string) => `The source of ${name}`,
-  decideRows: (n: number, list: string) => `Changes ${n === 1 ? 'one item' : `${n} items`} in ${list}`,
-  decideGroup: 'Group',
-  decideGroupNone: 'Ranked',
-  decideGroupList: 'By what it is about',
-  decideGroupElse: 'Everything else',
   decideSelected: (n: number) => `${n} selected`,
   decideAnswerSuggested: (n: number) => `Answer ${n} with what is suggested`,
   decideNoneSuggested: 'None of these has a suggested answer. Answer each one.',
   decideBatchReason: 'One reason for all of them',
   decideBatchDone: (n: number) => `${n} answered.`,
   clearSelection: 'Clear the selection',
-  decideDecided: (option: string) => `Decided: ${option}`,
-  decideToSend: 'sends it',
-  decideToLeave: 'goes back',
   decideNext: 'Next question',
   decideOpenInbox: 'Open the inbox',
   inboxOpenDecide: 'Open Needs you',

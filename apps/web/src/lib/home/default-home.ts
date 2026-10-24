@@ -140,6 +140,16 @@ export type Holds = {
    * none, and the row is Arrivals and Coming up.
    */
   people?: People | undefined;
+  /**
+   * THE READER MAY READ THE RECORD'S RUNS, so Today declares who is working (`sessions.working`), which the desk draws
+   * as Working now. Left out where the record would refuse the block.
+   */
+  runs?: boolean | undefined;
+  /**
+   * THE LIST THE RECORD KEEPS ITS PROJECTS IN (the one that declares `scopes`), by its id and the field its rows are
+   * named by, which Today declares its projects' cards over. Left out where it keeps none.
+   */
+  projects?: { register: string; title: string; name: string } | undefined;
 };
 
 /** The fewest days a figure's line is drawn from (a chart has at least three points, else the tile shows the number). */
@@ -167,11 +177,12 @@ const keyed = (key: DeskKey) => ({ key }) as const;
 /**
  * THE BLOCKS TODAY'S DESK SHOWS AT REST, by the key each is declared under (the 19 October desk, roadmap slice 1a): what
  * needs you, who is working and the cash in the first row, the few key numbers that lead under it (`numbersTile`), the
- * record's week where it keeps one, then (after the
- * projects, which are the desk's own) what is coming up and a few people beside Arrivals. Every other block of Today's
+ * record's week where it keeps one, then the projects, and what is coming up and a few people beside Arrivals. WHO IS
+ * WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY SINCE 24 OCTOBER (C27): Home draws each as the desk's own tile
+ * (`deskOf`), where they were parts it drew around the page. Every other block of Today's
  * own body folds behind one More (`deskFolded`), and so does every tile Home draws around the page.
  */
-export const DESK_KEYS = ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'coming-up', 'faces'] as const;
+export const DESK_KEYS = ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'projects', 'coming-up', 'faces'] as const;
 export type DeskKey = (typeof DESK_KEYS)[number];
 const ON_DESK: ReadonlySet<string> = new Set(DESK_KEYS);
 
@@ -189,7 +200,8 @@ export const onDesk = (b: { key?: string | undefined }): boolean => typeof b.key
 export function deskFolded<B extends { key?: string | undefined; kind?: string; drawn: boolean }>(blocks: readonly B[], open: boolean): { blocks: B[]; folded: number } {
   let folded = 0;
   const out = blocks.map((b) => {
-    if (!b.drawn || onDesk(b) || b.kind === 'todo') return b;
+    /* A BLOCK THE DESK DRAWS AS ITS OWN TILE (`desk-part.ts`), what is late among them, is on the desk wherever it is. */
+    if (!b.drawn || onDesk(b) || b.kind === 'todo' || (b as { desk?: unknown }).desk !== undefined) return b;
     folded += 1;
     return open ? b : { ...b, drawn: false };
   });
@@ -526,8 +538,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          unwell, and over the work, which a feed that stopped may be the reason for. Not drawn when nothing is quiet. */
       ...(holds.quiet ? [quietTile()] : []),
       ...(holds.tasks ? work : [lateMoney]),
-      /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY: Home draws it from `boot`'s own answer (`WorkingNow.svelte`),
-         so it stands at once and is never drawn twice (today F1). A page the record keeps may still declare one. */
+      /* WHO IS WORKING, the record's runs at work by its one clock (`sessions.working`), only while one is (`runs-working`).
+         The desk draws it as Working now, each run with how long it has been at it (`WorkingNow.svelte`, C27). */
+      ...(holds.runs ? [workingTile(voice)] : []),
       /* CASH AHEAD (today F5): the cash now over its twelve weeks, how long it lasts, and what comes in and goes out in
          the next thirty days, read from the Money page's own figures, where that page is. */
       ...(holds.money
@@ -548,6 +561,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         : []),
       /* THE FEW KEY NUMBERS THAT LEAD, under cash: drawn only where the record keeps one. */
       numbersTile(),
+      /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. The desk draws them as its row of
+         cards with the lanes over them (`ProjectCards.svelte`, C27). */
+      ...(holds.projects ? [projectsTile(holds.projects)] : []),
       /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
          takes their place; a task already drawn in a block above is not drawn again. */
       {
@@ -570,6 +586,45 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       { kind: 'feed', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew },
     ],
   };
+}
+
+/**
+ * WHO IS WORKING, as Today declares it (C27): the record's runs working now, with the agent, what it says it is doing,
+ * its project and when it was last heard from, six at most, and only while one is (the desk leaves an empty one out, `desk-part.ts`). A table, so a page kept from Today
+ * draws it as any page draws runs; Today's desk draws it as Working now.
+ */
+export function workingTile(voice: HomeVoice = HOUSE): PageBlock {
+  return {
+    kind: 'table',
+    ...keyed('working'),
+    span: 4,
+    heading: voice.workingNow,
+    icon: 'session',
+    source: 'sessions.working',
+    columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'project' }, { field: 'last_seen' }],
+    limit: 6,
+  } as PageBlock;
+}
+
+/** How many of a record's projects Today reads for its cards: every one a record keeps, as the old desk read them. */
+export const PROJECTS_READ = 500;
+
+/**
+ * THE PROJECTS, as Today declares them (C27): cards over the list that keeps them, by name. Which are in play and in
+ * what order is the desk's to say from each row's lane (`project-cards.ts` `cardsOf`), as it said it when it read the
+ * list itself, so the block reads the whole list and names no lane.
+ */
+export function projectsTile(p: { register: string; title: string; name: string }): PageBlock {
+  return {
+    kind: 'cards',
+    ...keyed('projects'),
+    span: 12,
+    heading: p.name,
+    icon: 'grid',
+    source: `register.${p.register}`,
+    columns: [{ field: p.title, as: 'title' }],
+    limit: PROJECTS_READ,
+  } as PageBlock;
 }
 
 /** Today's body in the house voice, on a record that holds everything it draws. */

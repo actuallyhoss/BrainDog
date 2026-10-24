@@ -33,11 +33,12 @@ test('A TILE IS ASKED ONCE A VERSION, again when the version moves, and a throw 
   assert.equal(await tileOnce('learned', 'https://a', '8 0', ask, NOON + 30), 4, 'the throw was not kept');
 });
 
-test('HOME DRAWS ITS BODY AND DESK FROM WHAT IT KEPT, and asks each tile through `tileOnce`', () => {
+test('HOME DRAWS ITS BODY FROM WHAT IT KEPT, and asks each tile through `tileOnce`', () => {
   const home = readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8');
   assert.match(home, /keptPart<KeptBody>\('body', key\)/u);
-  assert.match(home, /keptPart<NonNullable<typeof desk>>\('desk', base\)/u);
-  for (const tile of ['desk', 'handled'])
+  /* THE DESK'S TILES ARE BLOCKS OF THE BODY (C27), so they are kept with it and Home keeps no desk of its own. */
+  assert.doesNotMatch(home, /keptPart<[^>]*>\('desk'/u);
+  for (const tile of ['handled'])
     assert.match(home, new RegExp(`tileOnce\\('${tile}', base, ver,`, 'u'), `${tile} is asked again at the same version`);
   /* THE RECORD'S HOUSEKEEPING IS SETTINGS › HEALTH'S (U3), and Today asks none of it at any version, nor the briefing
      its More fold held (frame A). */

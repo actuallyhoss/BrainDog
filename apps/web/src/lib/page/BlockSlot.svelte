@@ -78,6 +78,8 @@
   import { quartOut } from 'svelte/easing';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
+  import { deskCards, type Desk } from '$lib/home/desk-part.ts';
+  import { MediaQuery } from 'svelte/reactivity';
   import { drawnOf } from './kinds/drawn.ts';
   import { goto } from '$app/navigation';
 
@@ -537,6 +539,14 @@
      draws (the plan of 20 October: one card everywhere). The list is found by what it declares (`scopes`), never by its
      name; the block's own rows, order and limit stand, and its line is read off its drawing (`trendsOf`). Not a block in
      groups, which draws its groups' heads. */
+  /* ── the desk's own tiles ───────────────────────────────────────────────
+     A BLOCK OF TODAY'S BODY THAT THE DESK DRAWS AS ITS OWN TILE (C27, `home/desk-part.ts`): what is late with a button a
+     line, who is working, and the projects' row of cards, each the desk's component over the block's own answer. The
+     block's bar is kept for a screen reader, as a lead question's is, since the tile says its own name. */
+  const desk = $derived((block as { desk?: Desk }).desk ?? null);
+  /* A PHONE SHOWS THREE LATE LINES AT REST, a desk four. */
+  const phone = new MediaQuery('(width < 600px)', false);
+
   /* HOW MUCH OF EACH CARD'S WORK IS LATE, read as its page reads it (`card-late.ts`), again when the record moves. */
   let lates = $state.raw<ReadonlyMap<number, number>>(new Map());
   const cardSeqs = $derived.by(() => {
@@ -549,7 +559,8 @@
   $effect(() => {
     const said = cardSeqs;
     void liveRecord.version;
-    if (said === '') return;
+    /* THE DESK'S CARDS READ THEIR OWN (`ProjectCards.svelte`). */
+    if (said === '' || desk !== null) return;
     untrack(() => {
       const [list, seqs] = said.split(':') as [string, string];
       void import('$lib/home/card-late.ts')
@@ -567,7 +578,7 @@
   $effect(() => {
     const said = cardSeqs;
     void liveRecord.version;
-    if (said === '') return;
+    if (said === '' || desk !== null) return;
     untrack(() => {
       const list = said.split(':')[0]!;
       const title = REGISTERS[list]?.title ?? 'name';
@@ -605,7 +616,7 @@
   const projectCards = $derived.by(() => {
     const list = block.register;
     const d = list ? REGISTERS[list] : undefined;
-    if (block.kind !== 'cards' || block.group || drawn.refusal || !list || !d || !isProject(d)) return null;
+    if (desk !== null || block.kind !== 'cards' || block.group || drawn.refusal || !list || !d || !isProject(d)) return null;
     const rows = (block.entries ?? []).flatMap((e) =>
       typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null ? [{ seq: e.seq, fields: e.fields, ...(typeof (e as { id?: unknown }).id === 'string' ? { id: (e as { id: string }).id } : {}) }] : [],
     );
@@ -621,6 +632,15 @@
       const said = facts.get(c.seq);
       return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null, last: lasts.get(c.seq) ?? null, moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
+  });
+  /* THE DESK'S ROW OF CARDS, by the desk's own rule (`deskCards`), each leading with its project's key number. */
+  const deskProjects = $derived.by(() => {
+    if (desk?.kind !== 'projects') return null;
+    const got = deskCards(block);
+    return got ? { cards: withKpis(got.cards, leads, { home: homeCurrency(), now }), more: got.more } : null;
+  });
+  $effect(() => {
+    if (deskProjects) knowProjects(apiBase(), deskProjects.cards);
   });
   /* EACH CARD'S PAGE CAN NOW OPEN IN ITS PROJECT'S OWN SHAPE (`known-project.ts`). */
   $effect(() => {
@@ -664,7 +684,7 @@
   <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
        ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
        heading list. While arranging it shows, since that is the label a block is moved by. -->
-  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) ? '' : undefined}>
+  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) || (desk && !arranging) ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
@@ -705,7 +725,22 @@
 <!-- Never hidden and never centred: the page's shape is information, and a page that silently shrinks teaches that
      blocks come and go (19 §6). ONE surface for every kind, so "nothing matched" and "this block is broken" are told
      apart. -->
-{#if block.cannot}
+{#if desk && !arranging && !block.refusals.length}
+  <!-- THE DESK'S OWN TILE, its component fetched as the tile is drawn, so a page that is not Today carries none of it. -->
+  <div class="desk-part" data-desk={desk.kind}>
+    {#if desk.kind === 'late'}
+      {#await import('$lib/home/LateNow.svelte') then { default: LateNow }}
+        <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
+      {/await}
+    {:else if desk.kind === 'working'}
+      {#await import('$lib/home/WorkingNow.svelte') then { default: WorkingNow }}<WorkingNow rows={desk.rows} />{/await}
+    {:else if desk.kind === 'projects' && deskProjects && block.register}
+      {#await import('$lib/home/ProjectCards.svelte') then { default: ProjectCards }}
+        <ProjectCards cards={deskProjects.cards} more={deskProjects.more} list={block.register} name={desk.name} working={workingNow()} />
+      {/await}
+    {/if}
+  </div>
+{:else if block.cannot}
   <p class="block-cannot">{block.cannot}</p>
 {:else if block.actions?.length && !block.refusals.length}
   <ActionRows rows={block.actions} {now} />
@@ -1145,6 +1180,24 @@
     .block-where {
       display: none;
     }
+  }
+
+  /* THE DESK'S OWN TILE IS ITS OWN TILE: the slot draws no fill round it, and the tile fills the slot's height. */
+  :global(.block-slot.block-slot:has(> .desk-part)) {
+    padding: 0;
+    background: none;
+    container-type: inline-size;
+  }
+
+  .desk-part {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    block-size: 100%;
+  }
+
+  .desk-part > :global(*) {
+    flex: 1;
   }
 
   /* THE CARDS STAND ON THE BOARD (proj F5): a slot holding them is no tile, so a card is the white card Today draws and

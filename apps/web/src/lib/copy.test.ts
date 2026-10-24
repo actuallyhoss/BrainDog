@@ -270,12 +270,10 @@ test('THE SIDEBAR, THE PALETTE, THE INBOX AND DECIDE DO NOT SAY "LIST"', () => {
   assert.equal(copy.lists, 'Your things');
   assert.equal(copy.pages, 'Pages');
   assert.equal(copy.records, 'In your things');
-  assert.equal(copy.decideGroupNone, 'Ranked');
-  assert.equal(copy.decideToLeave, 'goes back');
   assert.equal(copy.proposalFields, 'What it holds');
   assert.equal(copy.fileItIn('Invoices'), 'File it in Invoices', 'the file button names the place it goes');
   const keys = [
-    'lists', 'pages', 'records', 'searchWhere', 'fileIt', 'inboxNoLists', 'decideGroupNone', 'decideToLeave', 'scopeGrid',
+    'lists', 'pages', 'records', 'searchWhere', 'fileIt', 'inboxNoLists', 'scopeGrid',
     'sourcesAdd', 'accessScope', 'noRecordLevelMeans', 'addException', 'suggestPagesHint',
     'inviteChosenLists', 'inviteListsHint', 'inviteAddsOnlyLeavesOut', 'exceptionOnlyUnread', 'pageRowNoState',
   ] as const;
