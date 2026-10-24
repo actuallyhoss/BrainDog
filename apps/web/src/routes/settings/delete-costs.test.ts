@@ -70,6 +70,6 @@ test('and neither sentence repeats the other, nor leaves the house voice', () =>
      section's own comment condemns three lines that are two sentences. */
   assert.match(copy.deleteWhat('The Studio'), /cannot be undone/iu);
   assert.doesNotMatch(copy.deleteCosts, /cannot be undone|no undo/iu, 'it repeats the line above it');
-  for (const said of [copy.deleteCosts, copy.deleteWhat('The Studio'), copy.deleteRecord('The Studio')])
+  for (const said of [copy.deleteCosts, copy.deleteWhat('The Studio'), copy.deleteRecord])
     assert.doesNotMatch(said, /—|!|sorry|simply|just |Are you sure/u, `"${said}" is not the house voice`);
 });

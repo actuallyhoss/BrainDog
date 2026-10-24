@@ -17,6 +17,7 @@
   import Button from '$lib/ui/Button.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import { biggestNames } from './export-names.ts';
 
   let { shell }: AreaProps = $props();
 
@@ -102,22 +103,17 @@
     rowsLine: (things: string) => `Everything you have written in ${things}, without the pages around it.`,
     setupTitle: 'A setup somebody else can install',
     setupLine: 'Published as an add-on, with what you wrote left out.',
-    notHereYet: 'Not here yet',
     /** What the record keeps, when it keeps nothing it can name yet. */
     yourThings: 'your things',
-    /** The rest past the names said, "and 4 more". */
-    more: (n: number) => `${n} more`,
   };
 
   /**
-   * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: "Tasks, Clients and Invoices", or the first three and how many more. The
-   * two slices name the person's own things rather than the system's word for them.
+   * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: the three lists that hold the most, then how many more (Y22). The two
+   * slices name the person's own things rather than the system's word for them.
    */
-  const NAMED_MOST = 3;
   const things = $derived.by(() => {
-    const names = shell.lists.map((l) => l.name.trim()).filter((n) => n !== '');
-    if (names.length === 0) return words.yourThings;
-    const said = names.length > NAMED_MOST ? [...names.slice(0, NAMED_MOST), words.more(names.length - NAMED_MOST)] : names;
+    const said = biggestNames(shell.lists, shell.index.registers);
+    if (said.length === 0) return words.yourThings;
     return new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(said);
   });
 </script>
@@ -212,34 +208,6 @@
     <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine(things)} action={anOwner ? exportRows : undefined} />
     <!-- THE ARRANGEMENT, NOT WHAT IS WRITTEN IN IT: a use case somebody else can install. -->
     <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
-  </div>
-</Tile>
-<!--
-  THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE, and this screen is where four documents put
-  it. `53 §4`: *"the public half in Settings > export and at the well-known URL 03 §4 names"*.
-  `53 §5.4` step 3 has the operator paste it into
-  `braindog verify latest.brainl --key <the record's public key, Settings > export>`, and
-  `48 §5.6` says the answer without it reads **`unpinned`**: the file's own key proves
-  integrity, and origin is `--key`'s job.
-
-  THE ONE KEY THAT BELONGS ON A SCREEN. This product's first promise is that the record indexes
-  what a key opens and never the key, and that rule is about SECRETS; the whole mechanism here
-  is publication.
-
-  AND THE ONLY KEY THIS BLOCK EVER DREW WAS THE SAMPLE'S. `SIGNING_KEY` sat in `data.ts` with the
-  rest of the synthetic record: no keypair ever produced it, and its two halves were made to
-  agree, so `key_id` really was `sha256(raw)[0:16]` of the value beside it. It was drawn where
-  `shell.live` was false, the public demo, and there is no demo now, so the arm
-  went with it: a shell with no record is not handed an invented key either.
-
-  SO EVERY SHELL IS TOLD THE SAME TRUE THING. Its exports and its backups are signed, and this
-  screen has nowhere to get the public half from: `boot` does not carry it, and `03 §4`'s
-  well-known URL is served by none of the three apps. The value, a copy button and advice on
-  verifying come back together, the day there is a real key to stand beside them.
--->
-<Tile icon="key" class="section" data-surface="tile" title={copy.theSignature}>
-  <div class="section-body">
-    <StateRow icon="key" title={words.notHereYet} line={copy.theSignatureNotHere} />
   </div>
 </Tile>
 

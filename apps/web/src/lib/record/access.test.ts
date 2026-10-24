@@ -472,12 +472,8 @@ test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () =
   assert.doesNotMatch(SIGNING_KEY.publicKey, /public|key|studio|stamped/iu, 'the key is a sentence rather than a key');
   assert.ok(SIGNING_KEY.since, 'the key has no date, so nobody can tell a rotation from the original');
 
-  /* THE SCREEN DRAWS NO KEY YET, AND SAYS SO. The only key it ever drew was the sample's, so the sentences that
-     explained a drawn key went with it, and what is left says the files are signed and the key is not shown. */
-  assert.match(copy.theSignatureNotHere, /not shown here/iu, 'the screen implies a key it does not draw');
-  /* AND IT ASSERTS NO ROUTE THIS PRODUCT HAS NOT GOT. `/.well-known/braindog-key` is specified in `03 §4` and
-     served by no app. */
-  assert.doesNotMatch(copy.theSignatureNotHere, /well-known|https?:/iu, 'the sentence promises an endpoint again');
+  /* THE SCREEN DRAWS NO KEY, AND NO SENTENCE ABOUT ONE EITHER (Y22): the tile that said it was not here yet is gone. */
+  assert.equal('theSignatureNotHere' in copy, false, 'a sentence about a key nobody can see is back');
 });
 
 test('and the delete control is the confirmation rather than a sentence about one', () => {

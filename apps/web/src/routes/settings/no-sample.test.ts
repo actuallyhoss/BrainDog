@@ -48,7 +48,8 @@ test('and nothing on it says the demo sentence', () => {
   assert.doesNotMatch(PAGE, /copy\.mockNotice(Some)?\b/u);
 });
 
-test('the signing key is said to be out of reach on every shell, because the only key this screen ever drew was invented', () => {
+test('the signing key is not drawn, because the only key this screen ever drew was invented', () => {
+  /* THE TILE THAT SAID "Not here yet" WENT TOO (Y22): a card about a key nobody can see ended the Export screen. */
   const arm = strip(readFileSync(new URL('areas/Export.svelte', DIR), 'utf8'));
-  assert.match(arm, /<Tile icon="key" class="section" data-surface="tile" title=\{copy\.theSignature\}>\s*<div class="section-body">\s*<StateRow icon="key" title=\{words\.notHereYet\} line=\{copy\.theSignatureNotHere\} \/>\s*<\/div>\s*<\/Tile>/u);
+  assert.doesNotMatch(arm, /icon="key"|theSignature|SIGNING_KEY/u);
 });

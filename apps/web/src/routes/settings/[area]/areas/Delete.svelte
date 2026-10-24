@@ -103,7 +103,7 @@
   who is not one has no second step to take on this screen except asking somebody.
 -->
 {#if !anOwner}
-  <Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+  <Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord}>
     <div class="section-body">
       <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
     </div>
@@ -111,7 +111,7 @@
 {:else}
 <!-- ON THE GROUND AND UNBOXED: the sentence, what it costs, the typed name and the verb. The box this
      sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
-<Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+<Tile icon="trash" class="section" data-surface="tile" title={copy.deleteRecord}>
   <div class="section-body">
     <div class="danger">
       <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
@@ -154,7 +154,7 @@
               aria-busy={deleting}
               disabled={deleting}
               onclick={deleteNow}
-              >{#if !matches}<Icon name="trash" size="m" />{/if}{copy.deleteRecord(RECORD)}</Button
+              >{#if !matches}<Icon name="trash" size="m" />{/if}{copy.deleteRecord}</Button
             >
           </span>
         </div>

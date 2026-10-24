@@ -58,9 +58,10 @@ export const account = {
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
      the two disagreeing about what the record is called. */
+  /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE (Y22): a record named after its owner read "Delete Sam". */
   deleteWhat: (record: string): string =>
-    `Deleting ${record} removes every list and page, and everything they hold. It cannot be undone.`,
-  deleteRecord: (record: string): string => `Delete ${record}`,
+    `Deleting the record named ${record} removes every list and page, and everything they hold. It cannot be undone.`,
+  deleteRecord: 'Delete this record',
   holdingPen: 'Not placed. Nothing moved.',
 
   /* settings */
@@ -425,19 +426,12 @@ export const account = {
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
   perDevice: 'This setting is remembered on this device.',
 
-  /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
-  theSignature: 'How anybody checks a copy is yours',
-  /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. An invented key was once drawn here as every record's
-     own, which no reader could tell by looking, so none is drawn now. `boot` does
-     not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
-     record gets the fact that its files are signed and the absence said plainly. */
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
      a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
   fileChecked: (name: string) =>
     `${name} is whole and signed. Nothing in it has changed since it was written, and the signature holds for the key inside the file.`,
   fileFailed: (name: string, fix: string) => `${name} did not pass. ${fix}`,
   fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
-  theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
 
   /* deletion (`02 §9`): browser session, re-authenticated, the slug typed */
   /* THE ONE LINE THAT INVITED A REVERSAL WAS THE LINE THE HOST REFUSES FOR EVER. This read *"A
