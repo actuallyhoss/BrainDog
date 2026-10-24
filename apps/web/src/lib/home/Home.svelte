@@ -547,6 +547,11 @@
     const slug = declares;
     /* TODAY'S OWN BODY WAITS FOR THE LISTS' DECLARATIONS, so a record that keeps a week opens on it and is not drawn twice. */
     if (slug === null && learnt === 0) return;
+    /* NOR IS IT ASKED OVER A SHELL DRAWN FROM THE LAST COPY, which knows neither who reads nor in what words: on his
+       record a warm open asked Today's body three times, twice over the copy's shell (not the owner's, the house's words)
+       and once over the live `boot`, three bodies the record drew one after another, 5 s of its time with every other
+       read waiting behind them. The copy has drawn the screen meanwhile, and the live `boot` asks it once. */
+    if (data.stale === true) return;
     const spoken = voice;
     const held = holds;
     const key = bodyKey(slug, spoken, held);
