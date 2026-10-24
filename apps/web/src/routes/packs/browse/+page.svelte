@@ -35,6 +35,7 @@
   import { VOICE_LINES } from '$lib/voice.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -98,11 +99,21 @@
     return g === 'packs' ? null : g;
   };
 
-  onMount(() => {
+  /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN (Y9): Browse had listed the built-ins alone and said nothing. */
+  let retry = $state(false);
+  function readStore(): void {
+    kennelRefused = null;
     void readHostCatalogue(fetch).then((got) => {
       if (got.ok) kennel = got.index;
-      else kennelRefused = got.fix;
+      else {
+        kennelRefused = got.fix;
+        retry = got.retry === true;
+      }
     });
+  }
+
+  onMount(() => {
+    readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
       const chosen = await choose(createClient({ base: apiBase() }));
@@ -148,7 +159,11 @@
     </div>
   </div>
 
-  {#if kennelRefused}<Empty kind="error" title={kennelRefused} />{/if}
+  {#if kennelRefused}
+    <Empty kind="error" title={kennelRefused}>
+      {#snippet actions()}{#if retry}<Button onclick={readStore}>{copy.tryAgain}</Button>{/if}{/snippet}
+    </Empty>
+  {/if}
 
   {#if shown.length === 0}
     <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />

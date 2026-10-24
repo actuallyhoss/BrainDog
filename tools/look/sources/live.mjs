@@ -45,6 +45,9 @@ export const CANNOT = [
 
 const refusal = (fix) => ({ ok: false, refusal: { code: 'FORBIDDEN', fix } });
 
+/** The store's public catalogue: its index and its files, one plain name a part, never a dot first. */
+const STORE = /^\/api\/kennel\/v1\/[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
+
 /** Which hosts-file entry `record` names: a host address as written, or a slug matched against each entry's path. */
 function entryFor(record, hosts) {
   const entries = Object.entries(hosts.hosts);
@@ -101,6 +104,7 @@ export async function open(record, { env = process.env, now = Date.now(), send =
   /** One request from the page: `at` is its address with any `/app/<slug>` taken off, as `run.mjs` hands it. */
   async function handle(req, res, at) {
     const method = req.method ?? 'GET';
+    if (STORE.test(at.pathname)) return store(req, res, at, method);
     const name = /^\/api\/([A-Za-z][A-Za-z0-9]*)$/u.exec(at.pathname)?.[1];
     const route = name === undefined ? undefined : groupOf.get(name);
     if (route === undefined) {
@@ -140,6 +144,26 @@ export async function open(record, { env = process.env, now = Date.now(), send =
       const answer = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `${key} did not answer ${name}.` } };
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify(answer));
+    }
+  }
+
+  /**
+   * THE STORE'S CATALOGUE IS PUBLIC, SO IT IS READ AS ANYBODY READS IT (the audit of 25 October, Y9): a GET or HEAD
+   * under `/api/kennel/v1/`, with no query, sent with no token and nothing of the page's. Refused, Browse drew only the
+   * built-ins and an add-on's page said it was gone.
+   */
+  async function store(req, res, at, method) {
+    for await (const _ of req);
+    if ((method !== 'GET' && method !== 'HEAD') || at.search !== '') return refuse(res, 'outside', at.pathname, `The live look reads the store's catalogue with a plain GET, so ${method} ${at.pathname}${at.search} was not sent.`);
+    tally.forwarded += 1;
+    try {
+      const out = await send(`${url.origin}${at.pathname}`, { method, headers: { accept: 'application/json' }, redirect: 'error' });
+      const body = Buffer.from(await out.arrayBuffer());
+      res.writeHead(out.status, { 'content-type': out.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(body);
+    } catch {
+      res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `${key} did not answer for the store's catalogue.` } }));
     }
   }
 

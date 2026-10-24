@@ -23,6 +23,7 @@ import {
   KNOWN_KEYS,
   loadKnownKeys,
   readHostCatalogue,
+  STORE_UNREACHED,
   signedWords,
   standingOf,
   trustFor,
@@ -69,6 +70,21 @@ test('a host with no catalogue, or one answering the app shell, lists nothing an
   assert.deepEqual(await readHostCatalogue(async () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } })), { ok: true, index: null });
   const bad = await readHostCatalogue(async () => new Response('{"format":9}', { headers: { 'content-type': 'application/json' } }));
   assert.equal(bad.ok, false);
+});
+
+test('a catalogue that is there and refuses, fails or cannot be reached says so, and is not a host with none (Y9)', async () => {
+  const json = { 'content-type': 'application/json' };
+  for (const answer of [
+    async () => new Response('{"ok":false}', { status: 403, headers: json }),
+    async () => new Response('{"ok":false}', { status: 503, headers: json }),
+    async () => {
+      throw new TypeError('fetch failed');
+    },
+  ]) {
+    const got = await readHostCatalogue(answer);
+    assert.deepEqual(got, { ok: false, fix: STORE_UNREACHED, retry: true });
+  }
+  assert.match(STORE_UNREACHED, /^The store could not be reached/u);
 });
 
 test('a version is fetched and held to its checksum', async () => {

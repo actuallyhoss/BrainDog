@@ -264,11 +264,19 @@
     })();
   }
 
-  onMount(() => {
+  /* A STORE THAT DID NOT ANSWER IS NOT AN ADD-ON THAT IS GONE (Y9): it says so, with Try again. */
+  let storeRefused = $state<string | null>(null);
+  function readStore(): void {
+    storeRefused = null;
     void readHostCatalogue(fetch).then((got) => {
       kennel = got.ok ? got.index : null;
+      storeRefused = got.ok ? null : got.fix;
       looked = true;
     });
+  }
+
+  onMount(() => {
+    readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
       const c = createClient({ base: apiBase() });
@@ -450,7 +458,11 @@
 
 <div class="page" data-bar={doable ? '' : undefined}>
   {#if !listing}
-    {#if looked}
+    {#if looked && storeRefused}
+      <Empty kind="error" title={storeRefused}>
+        {#snippet actions()}<Button onclick={readStore}>{copy.tryAgain}</Button>{/snippet}
+      </Empty>
+    {:else if looked}
       <Empty kind="no-results" title={words.missing} body={words.missingBody}>
         {#snippet actions()}<Button href="/packs/browse">{copy.browseAll}</Button>{/snippet}
       </Empty>

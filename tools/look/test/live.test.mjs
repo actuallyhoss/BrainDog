@@ -140,6 +140,28 @@ test('a read goes on with the token and nothing else, and its answer comes back 
   assert.equal(heard[1].body, '{"register":"tasks"}');
 });
 
+test('the store catalogue is read as anybody reads it: a GET under /api/kennel/v1/, with no token and nothing of the page (Y9)', async () => {
+  heard.length = 0;
+  const said = await ask('/app/acme/api/kennel/v1/index.json', { headers: { cookie: 'bd_session=mine', 'x-page': 'secret' } });
+  assert.equal(said.status, 200);
+  assert.equal(said.cookie, null);
+  assert.equal(heard.length, 1);
+  const [sent] = heard;
+  assert.equal(sent.url, '/api/kennel/v1/index.json');
+  assert.equal(sent.method, 'GET');
+  assert.equal(sent.headers.authorization, undefined, 'the token went to the public store');
+  assert.equal(sent.headers.cookie, undefined);
+  assert.equal(sent.headers['x-page'], undefined);
+  await ask('/api/kennel/v1/packs/glaze-book/1.2.0.pack.json');
+  assert.equal(heard[1].url, '/api/kennel/v1/packs/glaze-book/1.2.0.pack.json');
+  /* NOTHING ELSE UNDER IT, AND NO OTHER VERB. */
+  const before = heard.length;
+  for (const path of ['/api/kennel/v1/../boot', '/api/kennel/v1/%2e%2e/create', '/api/kennel/v2/index.json', '/api/kennel/v1/a?b=../c', '/api/kennel/v1/'])
+    assert.equal((await ask(path)).status, 403, path);
+  assert.equal((await ask('/api/kennel/v1/index.json', { method: 'POST', body: '{}' })).status, 403);
+  assert.equal(heard.length, before, 'something outside the catalogue reached the host');
+});
+
 test('the token is in no answer and no count', async () => {
   const outputs = [JSON.stringify(source.counts()), JSON.stringify(source.cannot), source.record, source.prefix];
   for (const path of ['/api/create', '/account/usage', '/api/listTokens']) outputs.push((await ask(path)).text);

@@ -29,16 +29,24 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 /** Where the Kennel answers, from `lib/market/counts.ts`, which says why it is written out. */
 export const CATALOGUE_BASE = KENNEL_AT;
 
+/**
+ * WHAT A STORE THAT DID NOT ANSWER SAYS (Y9). A refused or failed read was taken for a host with no store, so Browse
+ * quietly listed the built-ins alone and an add-on's own page said "Nothing here by that name". A host with no store
+ * answers 404 or the app's own page, and only that is read as none.
+ */
+export const STORE_UNREACHED = 'The store could not be reached, so only what comes with BrainDog is listed.';
+
 /** The index this host serves, `null` when it serves none, or the sentence to say when one is there and does not read. */
-export async function readHostCatalogue(fetcher: Fetcher): Promise<{ ok: true; index: CatalogueIndex | null } | { ok: false; fix: string }> {
+export async function readHostCatalogue(fetcher: Fetcher): Promise<{ ok: true; index: CatalogueIndex | null } | { ok: false; fix: string; retry?: true }> {
   let res: Response;
   try {
     res = await fetcher(`${CATALOGUE_BASE}index.json`, { credentials: 'same-origin', headers: { accept: 'application/json' } });
   } catch {
-    return { ok: true, index: null };
+    return { ok: false, fix: STORE_UNREACHED, retry: true };
   }
-  if (res.status === 404 || !(res.headers.get('content-type') ?? '').includes('json')) return { ok: true, index: null };
-  if (!res.ok) return { ok: true, index: null };
+  if (res.status === 404) return { ok: true, index: null };
+  if (!res.ok) return { ok: false, fix: STORE_UNREACHED, retry: true };
+  if (!(res.headers.get('content-type') ?? '').includes('json')) return { ok: true, index: null };
   const { readCatalogue } = await import('@braindog/declare/catalogue');
   let doc: unknown;
   try {
