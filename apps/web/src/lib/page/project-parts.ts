@@ -47,13 +47,13 @@ export function partLaid(part: string, h: PartsHave): PartLaid {
       return at(h.path, h.money ? 8 : 12);
     case 'money':
       return at(h.money, h.path ? 4 : 12);
-    case 'work':
+    case 'what-is-open':
       return at(h.work, h.people ? 8 : 12);
-    case 'people':
+    case 'who-is-on-it':
       return at(h.people, h.work ? 4 : 12);
     case 'runs-on':
       return at(h.runsOn, h.today ? 6 : 12);
-    case 'agents':
+    case 'agents-here':
       /* DRAWN ONCE THE READ IS BACK, AND SEEN ONLY WITH SOMETHING TO SHOW: its runs are read unseen till one is on it. */
       return at(h.known, h.today && h.runsOn ? 6 : 12, h.today || h.band);
     default:

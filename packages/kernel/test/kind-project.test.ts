@@ -32,7 +32,7 @@ const refusalOf = (out: { ok: boolean }) => (!out.ok && 'refusal' in out ? (out 
 test('every part of the shape installs, alone or beside others, and is answered as the block with its parts', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  const rows = [['hero'], ['path', 'money'], ['work', 'people', 'runs-on', 'agents']];
+  const rows = [['hero'], ['path', 'money'], ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here']];
   assert.deepEqual(rows.flat().sort(), [...PROJECT_PARTS].sort(), 'a part of the shape is in no row');
   assert.equal(refusalOf(await k.install([pageOf(...rows.map((parts) => ({ kind: 'project', parts, heading: parts.join(' and '), span: 12 })))])), null, 'a row of the shape was refused at install');
   for (const parts of rows) {
@@ -67,7 +67,7 @@ test('a bare row installs and is refused when it is read, as every kind is', asy
 test('a row reads no list, and parts is refused on any other kind', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  assert.match(refusalOf(await k.install([pageOf({ kind: 'project', parts: ['work'], source: 'register.tasks' })]))?.at ?? '', /source$/u);
+  assert.match(refusalOf(await k.install([pageOf({ kind: 'project', parts: ['what-is-open'], source: 'register.tasks' })]))?.at ?? '', /source$/u);
   assert.equal(refusalOf(await k.install([pageOf({ kind: 'note', body: 'x', parts: ['hero'] })]))?.code, 'DECLARATION_INVALID');
   sql.close();
 });

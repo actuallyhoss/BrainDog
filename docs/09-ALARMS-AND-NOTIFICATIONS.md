@@ -319,7 +319,7 @@ prose: slash            # optional: one sentence of context. omit for a figures-
 
 `omit_when_empty: true` drops a section with no rows rather than printing a heading over nothing. A
 digest of five headings and no content is the fastest way to make a digest worthless. `as:` names one
-of the forty-two block kinds ([05-BLOCKS](05-BLOCKS-AND-THEMES.md) §2): `table` is the kind bound to a
+of the forty-three block kinds ([05-BLOCKS](05-BLOCKS-AND-THEMES.md) §2): `table` is the kind bound to a
 `source:` with `columns:`, and a column is `{ field, label?, width?, align? }` ([06-PAGES](06-PAGES.md)
 §1). *(An earlier draft wrote `empty: skip` — a keyword in a key that on a page block takes an
 interpolatable string — and `as: list`, which is a primitive, not a kind.)*

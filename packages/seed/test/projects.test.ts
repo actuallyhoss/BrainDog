@@ -389,7 +389,7 @@ test('A PROJECT PAGE KEEPS WHERE IT STANDS IN ONE COLUMN BESIDE ITS PLAN, and li
   /* WHAT IS HANDED BACK OR BLOCKED IS THE WORK TILE'S WITH YOU, SINCE founder 3.3.0 and team 2.25.0 (C28, C29): its
      tile, drawn only where the shape was not, went for the shape's parts, which the page declares. */
   assert.ok(!page.blocks.some((b) => b.heading === 'Handed back or blocked'), 'what is handed back is said twice');
-  const work = page.blocks.find((b) => b.kind === 'project' && ((b as { parts?: string[] }).parts ?? []).includes('work'));
+  const work = page.blocks.find((b) => b.kind === 'project' && ((b as unknown as { parts?: string[] }).parts ?? []).includes('what-is-open'));
   assert.ok(work && work.drawn !== false, 'the page declares no Work part');
 });
 

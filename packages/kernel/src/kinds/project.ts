@@ -28,7 +28,7 @@ import { KIND_KEYS } from './keys.ts';
 import { invalid } from './listed.ts';
 
 /** The parts of a project's shape, in the order its page lays them. */
-export const PROJECT_PARTS = ['hero', 'path', 'money', 'work', 'people', 'runs-on', 'agents'] as const;
+export const PROJECT_PARTS = ['hero', 'path', 'money', 'what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'] as const;
 export type ProjectPart = (typeof PROJECT_PARTS)[number];
 
 /* WHAT A PROJECT BLOCK DOES NOTHING WITH: it reads no list and writes no rows out, so a source, rows or columns would be drawn

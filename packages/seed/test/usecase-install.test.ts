@@ -253,7 +253,7 @@ test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and it
   assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
   /* WHAT IS HANDED BACK IS THE WORK TILE'S WITH YOU SINCE team 2.25.0 (C28, C29): the page declares the shape's parts,
      which the app draws from its read of the product, and its own tile of the same tasks went. */
-  assert.deepEqual(page.blocks.filter((b) => b.kind === 'project').map((b) => (b as { parts?: string[] }).parts), [['hero', 'path', 'money'], ['work', 'people', 'runs-on', 'agents']]);
+  assert.deepEqual(page.blocks.filter((b) => b.kind === 'project').map((b) => (b as { parts?: string[] }).parts), [['hero', 'path', 'money'], ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here']]);
   assert.ok(!headings.includes('Handed back or blocked'), 'what is handed back is said twice');
   const held = k.list({ register: 'tasks', where: `thing is things#${product.seq}, state is review or blocked` } as never);
   assert.ok(held.ok);

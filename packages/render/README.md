@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Forty-two kinds over eight primitives
+## Forty-three kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -69,7 +69,7 @@ and never a disabled field.
 
 | Primitive | Is | Kinds |
 |---|---|---|
-| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` `embed` `drawn` |
+| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` `embed` `drawn` `project` |
 | `grid` | *n* cells of label and figure | `stat` `board` `cards` `heat` `gallery` `kpis` |
 | `rows` | label · value · note, one per line | `spec` `params` `inputs` `form` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` `ring` |
@@ -145,7 +145,7 @@ inlines**. Which is why a third party can add a kind without asking a designer: 
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; forty-two kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; forty-three kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

@@ -188,7 +188,7 @@
       moneyRows={hold.moneyRows}
       {arrived}
     />
-  {:else if part === 'work' && hold.workLists}
+  {:else if part === 'what-is-open' && hold.workLists}
     {@const w = hold.workLists}
     {@const workHref = hold.workHref}
     {@const title = hold.workDecl?.name ?? HERO_WORDS.open}
@@ -227,7 +227,7 @@
         {/if}
       </div>
     </Tile>
-  {:else if part === 'people' && hold.people.length > 0}
+  {:else if part === 'who-is-on-it' && hold.people.length > 0}
     {@const people = hold.people}
     <Tile icon="user-check" title="Who is on it" count={people.length} class="t-people" id="part-people" data-part="Who is on it" data-part-icon="user-check" data-part-count={people.length}>
       <ul class="p-list">
@@ -250,7 +250,7 @@
       </ul>
       {#if runsOn.length > RUNS_ON_SHOWN}<p class="r-more">and {runsOn.length - RUNS_ON_SHOWN} more</p>{/if}
     </Tile>
-  {:else if part === 'agents' && read}
+  {:else if part === 'agents-here' && read}
     {#snippet dayBar(now: number)}
       {@const day0 = midnightOf(now)}
       <div class="day" aria-hidden="true">

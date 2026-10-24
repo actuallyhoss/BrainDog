@@ -11,30 +11,30 @@ import { moneyShown, partLaid, partsLaid, type PartsHave } from './project-parts
 const ALL: PartsHave = { hero: true, path: true, money: true, work: true, people: true, runsOn: true, today: true, band: false, known: true };
 
 test('THE ROWS AS THE SHAPE LAID THEM: the path at two thirds beside the money, the work beside who is on it, runs on beside today', () => {
-  assert.deepEqual(['hero', 'path', 'money', 'work', 'people', 'runs-on', 'agents'].map((p) => partLaid(p, ALL).span), [12, 8, 4, 8, 4, 6, 6]);
+  assert.deepEqual(['hero', 'path', 'money', 'what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'].map((p) => partLaid(p, ALL).span), [12, 8, 4, 8, 4, 6, 6]);
 });
 
 test('A PART WHOSE PARTNER HAS NOTHING TAKES THE WHOLE ROW, and the band of who is working takes it under what it runs on', () => {
   const alone = { ...ALL, money: false, people: false };
   assert.equal(partLaid('path', alone).span, 12);
-  assert.equal(partLaid('work', alone).span, 12);
+  assert.equal(partLaid('what-is-open', alone).span, 12);
   assert.equal(partLaid('money', alone).on, false);
   const band = { ...ALL, today: false, band: true };
-  assert.deepEqual([partLaid('runs-on', band).span, partLaid('agents', band).span], [12, 12]);
+  assert.deepEqual([partLaid('runs-on', band).span, partLaid('agents-here', band).span], [12, 12]);
 });
 
 test('THE AGENTS ARE DRAWN UNSEEN WITH NOTHING TO SHOW, so they hear a run arrive, and take no room', () => {
   const quiet = { ...ALL, today: false, band: false };
-  assert.deepEqual(partLaid('agents', quiet), { on: true, span: 12, seen: false });
-  assert.equal(partLaid('agents', { ...quiet, known: false }).on, false);
+  assert.deepEqual(partLaid('agents-here', quiet), { on: true, span: 12, seen: false });
+  assert.equal(partLaid('agents-here', { ...quiet, known: false }).on, false);
 });
 
 test('A BLOCK OF THE SHAPE IS DRAWN WHERE A PART OF IT HAS SOMETHING, and none is drawn on a page about no project', () => {
   const blocks = [
     { kind: 'project', parts: ['hero', 'path', 'money'] },
-    { kind: 'project', parts: ['work', 'people'] },
+    { kind: 'project', parts: ['what-is-open', 'who-is-on-it'] },
     { kind: 'note', body: 'x' },
-    { kind: 'project', parts: ['work'], drawn: false },
+    { kind: 'project', parts: ['what-is-open'], drawn: false },
   ];
   const nothing = { ...ALL, hero: false, path: false, money: false, work: false, people: false };
   assert.deepEqual(

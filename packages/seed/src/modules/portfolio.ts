@@ -1410,7 +1410,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          founder's project page held 24 already. So two blocks the page drew only where the shape was not went for them:
          Handed back or blocked (the Work tile's With you) and Money by month (the Money tile's bars). */
       { kind: 'project', parts: ['hero', 'path', 'money'], heading: 'Overview', icon: 'eye', span: 12 },
-      { kind: 'project', parts: ['work', 'people', 'runs-on', 'agents'], heading: 'Work, people and agents', icon: 'task', span: 12 },
+      { kind: 'project', parts: ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'], heading: 'Work, people and agents', icon: 'task', span: 12 },
       /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
          (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
          instead, as the launch desk's are.

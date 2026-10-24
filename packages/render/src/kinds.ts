@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the forty-two kinds, and the four intent words.
+ * The eight primitives, the forty-three kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).

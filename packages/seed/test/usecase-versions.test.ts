@@ -1603,9 +1603,9 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
-    declares: '7e0f5ba1999a7262',
+    declares: 'a900a95d321e0cdd',
     history: [
-      "The project's shape as blocks (the thinking scope of 24 October, C28 and C29): `page.project` declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two `project` blocks where they were drawn by hand; Handed back or blocked and Money by month went for them, More about is declared `fold: true`, as it was drawn, and What changed and the agents' cards are whole rows; no id added or taken away -> 7e0f5ba1999a7262",
+      "The project's shape as blocks (the thinking scope of 24 October, C28 and C29): `page.project` declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two `project` blocks where they were drawn by hand; Handed back or blocked and Money by month went for them, More about is declared `fold: true`, as it was drawn, and What changed and the agents' cards are whole rows; no id added or taken away -> a900a95d321e0cdd",
     ],
   },
   'founder@3.2.0': {
@@ -1780,9 +1780,9 @@ const DECLARED: Record<string, Version> = {
       rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day
       script.plan_follows_ticket
     `,
-    declares: '801b947efa34a789',
+    declares: 'b3cd02ed03409737',
     history: [
-      "The project's shape as blocks (the thinking scope of 24 October, C28 and C29): `page.project` declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two `project` blocks where they were drawn by hand; Handed back or blocked went for them, More about is declared `fold: true`, as it was drawn, and What changed and the agents' cards are whole rows; no id added or taken away -> 801b947efa34a789",
+      "The project's shape as blocks (the thinking scope of 24 October, C28 and C29): `page.project` declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two `project` blocks where they were drawn by hand; Handed back or blocked went for them, More about is declared `fold: true`, as it was drawn, and What changed and the agents' cards are whole rows; no id added or taken away -> b3cd02ed03409737",
     ],
   },
   'team@2.24.0': {
