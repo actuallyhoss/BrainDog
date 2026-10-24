@@ -13,6 +13,9 @@ export const words = {
      add-on, built in or from outside, as rows, then the looks. "From others" and "Built in" said where a thing came
      from, which is not what a person shops for. The chips are these sections, so a chip's count is its section's. */
   sections: { setups: 'Ready-made setups', addons: 'Add-ons', looks: 'Looks' } as const,
+  /* THE SAME THREE AS CHIPS, a word each, so the four chips sit on one line of a phone (audit C, X14). */
+  chips: { setups: 'Setups', addons: 'Add-ons', looks: 'Looks' } as const,
+  showAll: (n: number): string => `Show all ${n}`,
   sortLabel: 'Sort',
   all: 'All',
   categoriesLabel: 'Categories',

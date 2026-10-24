@@ -8,6 +8,7 @@
 
 import type { Category } from '@braindog/declare/catalogue';
 
+import type { IconName } from '../ui/icons.ts';
 import type { Listing, ListingKind } from './listing.ts';
 import { LEADING } from './listing.ts';
 import { words } from './words.ts';
@@ -47,9 +48,46 @@ export type SectionChip = { section: Section; name: string; count: number };
 export function sectionChips(listings: readonly Sorted[]): SectionChip[] {
   return SECTIONS.flatMap((section) => {
     const count = listings.filter((l) => sectionOf(l) === section).length;
-    return count === 0 ? [] : [{ section, name: words.sections[section], count }];
+    return count === 0 ? [] : [{ section, name: words.chips[section], count }];
   });
 }
 
 /** The listings in one category, or every one when none is picked. */
 export const inCategory = (listings: readonly Listing[], category: Category | null): Listing[] => (category === null ? [...listings] : listings.filter((l) => l.categories.includes(category)));
+
+/**
+ * THE GLYPH EACH ADD-ON THE STORE LISTS WEARS, by its catalogue id (audit C of 25 October, X14): past the built-ins, a
+ * dozen add-ons wore their category's one glyph, so a phone's column read as the same mark down the page. An add-on not
+ * named here still wears its category's.
+ */
+export const ADDON_GLYPHS: Readonly<Record<string, IconName>> = {
+  'agent-notes': 'learning',
+  'card-alerts': 'bell',
+  'count-cash': 'tag',
+  'fixed-dates': 'calendar',
+  'harbour-look': 'sun',
+  holdings: 'archive',
+  'job-starter': 'play',
+  'launch-desk': 'arrow',
+  mercury: 'vault',
+  'money-watch': 'eye',
+  pad: 'edit',
+  'pad-second-opinion': 'ask',
+  'portfolio-bands': 'activity',
+  'project-brief': 'doc',
+  'reading-list': 'star',
+  roadmap: 'board',
+  'slash-desk': 'slash',
+  standup: 'clock',
+  stripe: 'plug',
+  'task-tiers': 'task',
+  'week-in-money': 'observe',
+  'worked-numbers': 'grid',
+};
+
+/** How many of a section browse shows before "Show all", so a phone reads the store in about three screens. */
+export const FOLDED_MOST = 4;
+
+/** Whether a section is folded to its first few: not while searching or with a chip picked, nor once opened. */
+export const folds = (count: number, at: { searching: boolean; picked: boolean; opened: boolean }): boolean =>
+  count > FOLDED_MOST && !at.searching && !at.picked && !at.opened;

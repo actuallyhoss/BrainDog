@@ -42,7 +42,7 @@
   import { isGlyph } from '$lib/ui/icons.ts';
   import ListingCard from '$lib/market/ListingCard.svelte';
   import ListingRow from '$lib/market/ListingRow.svelte';
-  import { categoryName, sectionChips, sectionOf, SECTIONS, type Section } from '$lib/market/categories.ts';
+  import { categoryName, folds, sectionChips, sectionOf, SECTIONS, type Section } from '$lib/market/categories.ts';
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, listingsOf, ordered, searchListings, type Listing, type Order } from '$lib/market/listing.ts';
   import { words } from '$lib/market/words.ts';
@@ -74,6 +74,10 @@
   /* WITH A SEARCH, THE BEST MATCH LEADS under For you; the other orders are what a person asked for, search or not. */
   const shown = $derived(order === 'for-you' && query.trim() !== '' ? inSection(searched, picked) : ordered(inSection(searched, picked), order));
   const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
+
+  /* ON A PHONE EACH SECTION SHOWS FOUR, the rest a press away (audit C, X14): 41 entries in one column were about 6,000px.
+     A search or a chip shows them all. The fold is the phone's alone (the styles); wider, every card fits the grid. */
+  let opened = $state<Partial<Record<Section, boolean>>>({});
 
   /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered: the number Installed
      says (audit Z10), and not only the ones this catalogue lists. */
@@ -171,7 +175,8 @@
     {#each SECTIONS as section (section)}
       {@const items = shown.filter((l) => sectionOf(l) === section)}
       {#if items.length > 0}
-        <section class="part" aria-labelledby="browse-{section}">
+        {@const folded = folds(items.length, { searching: query.trim() !== '', picked: picked !== null, opened: opened[section] === true })}
+        <section class="part" aria-labelledby="browse-{section}" data-folded={folded ? '' : undefined}>
           <h2 class="part-h" id="browse-{section}">{words.sections[section]}<span class="n num">{items.length}</span></h2>
           {#if section === 'setups'}
             <!-- NO MINIATURE (E20): grey bars under a heading read as a page still loading. The card is its glyph, its
@@ -188,6 +193,9 @@
                 <ListingRow listing={l} action={states ? actionOf(l, states) : null} glyph={rowGlyph(l)} />
               {/each}
             </ul>
+          {/if}
+          {#if folded}
+            <div class="show-all"><Button weight="bare" onclick={() => (opened = { ...opened, [section]: true })}>{words.showAll(items.length)}</Button></div>
           {/if}
         </section>
       {/if}
@@ -398,6 +406,22 @@
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
+    }
+  }
+
+  .show-all {
+    display: none;
+  }
+
+  /* FOLDED ON A PHONE: the first four of a section, and Show all under them. */
+  @media (width < 640px) {
+    .part[data-folded] .cards > :global(:nth-child(n + 5)),
+    .part[data-folded] .rows > :global(:nth-child(n + 5)) {
+      display: none;
+    }
+
+    .part[data-folded] .show-all {
+      display: flex;
     }
   }
 
