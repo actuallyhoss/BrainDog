@@ -221,6 +221,14 @@ export function jobLines(rows: readonly { id: string; title: string | null; kind
   });
 }
 
+/**
+ * WHETHER A REFUSED SOURCE IS ONE THIS READER CANNOT HAVE, which is not a list cut short: a host with no such read
+ * (`ROUTE_UNKNOWN`), and a read that is not theirs, jobs above all, which are an owner's in a browser (`listJobs`, ADMIN)
+ * and so refused to every key and every member (`NEEDS_BROWSER_SESSION`, `FORBIDDEN`). Said as "Some runs could not be
+ * read", the Agents page told the live look, which reads with a key, that its list might be short (24 Oct, H26).
+ */
+export const notTheirs = (code: string): boolean => code === 'ROUTE_UNKNOWN' || code === 'NEEDS_BROWSER_SESSION' || code === 'FORBIDDEN';
+
 /** `agentRuns` is how many runs the record's list of runs holds, the count its door says, or `null` where it was not read. */
 export type AllRuns = { from: 'ready'; lines: RunLine[]; short: boolean; day: AgentDay | null; agentRuns: number | null } | { from: 'refused'; fix: string };
 
@@ -233,7 +241,7 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
   const opened = <T>(got: Awaited<ReturnType<typeof client.call<unknown>>>, value: (raw: unknown) => T): Opened<T> => {
     if (got.ok) return { first: { ok: true, value: value(got.value) }, absent: false };
     const refusal = 'refusal' in got ? got.refusal : { code: 'VERSION_STALE', fix: 'The record moved while it was read.' };
-    return { first: { ok: false, refusal }, absent: refusal.code === 'ROUTE_UNKNOWN' };
+    return { first: { ok: false, refusal }, absent: notTheirs(refusal.code) };
   };
   const rules = async (): Promise<Opened> => opened(await client.call<unknown>('automations'), rulesOf);
   const scheduled = async (): Promise<Opened<ActionRow[]>> =>
@@ -250,15 +258,17 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
   const autoRows: AutomationRow[] = autos.first.ok ? autos.first.value : [];
   const actionRows: ActionRow[] = actions.first.ok ? actions.first.value : [];
   const scriptRows: Script[] = scripts.ok ? scripts.value : [];
-  const scriptsAbsent = !scripts.ok && 'refusal' in scripts && scripts.refusal.code === 'ROUTE_UNKNOWN';
-  const jobsAbsent = !jobs.ok && 'refusal' in jobs && jobs.refusal.code === 'ROUTE_UNKNOWN';
+  const scriptsAbsent = !scripts.ok && 'refusal' in scripts && notTheirs(scripts.refusal.code);
+  const sessionsAbsent = !sessions.ok && 'refusal' in sessions && notTheirs(sessions.refusal.code);
+  const jobsAbsent = !jobs.ok && 'refusal' in jobs && notTheirs(jobs.refusal.code);
   const failed = [
     autos.first.ok || autos.absent ? null : autos.first.refusal.fix,
     actions.first.ok || actions.absent ? null : actions.first.refusal.fix,
     scripts.ok || scriptsAbsent ? null : 'refusal' in scripts ? scripts.refusal.fix : '',
-    sessions.ok ? null : 'refusal' in sessions ? sessions.refusal.fix : '',
+    sessions.ok || sessionsAbsent ? null : 'refusal' in sessions ? sessions.refusal.fix : '',
     jobs.ok || jobsAbsent ? null : 'refusal' in jobs ? jobs.refusal.fix : '',
   ].filter((f): f is string => f !== null);
+  /* EVERY SOURCE REFUSED, AND NOT ONE FOR BEING SOMEBODY ELSE'S, is a list that could not be read at all. */
   if (failed.length === 5) return { from: 'refused', fix: failed[0] ?? '' };
 
   /* A RULE THAT RAN, by its last run or by the record's count of it (`last_at`), when it keeps no last run. */

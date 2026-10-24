@@ -5,7 +5,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LANE_ROWS, agentDay, rowsOf } from './all-runs.ts';
+import { LANE_ROWS, agentDay, notTheirs, readAllRuns, rowsOf } from './all-runs.ts';
+
+/** A host answering each read as `answers` says, by method, and every other with nothing. */
+function host(answers: Record<string, { status: number; body: unknown }>): () => void {
+  const was = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    const method = new URL(String(url)).pathname.split('/').at(-1) ?? '';
+    const a = answers[method] ?? { status: 200, body: { ok: true, value: [] } };
+    return new Response(JSON.stringify(a.body), { status: a.status, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  return () => void (globalThis.fetch = was);
+}
+
+test('JOBS THAT ARE NOT THIS READER\'S ARE NOT A LIST CUT SHORT, and a source that failed still is (24 Oct, H26)', async () => {
+  /* A KEY, AS THE LIVE LOOK READS: jobs are an owner's in a browser, and refused to it. */
+  const noJobs = { status: 403, body: { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot read the jobs.' } } };
+  const list = { status: 200, body: { ok: true, value: { rows: [], matched: 0 } } };
+  let done = host({ listJobs: noJobs, list });
+  try {
+    const out = await readAllRuns('https://record.example/app/r', Date.UTC(2026, 9, 24, 18));
+    assert.equal(out.from, 'ready');
+    assert.equal(out.from === 'ready' && out.short, false, 'the page said some runs could not be read');
+  } finally {
+    done();
+  }
+  /* A SOURCE THE RECORD COULD NOT ANSWER IS STILL SAID. */
+  done = host({ listJobs: { status: 500, body: { ok: false, refusal: { code: 'INTERNAL', fix: 'internal' } } }, list });
+  try {
+    const out = await readAllRuns('https://record.example/app/r', Date.UTC(2026, 9, 24, 18));
+    assert.equal(out.from === 'ready' && out.short, true);
+  } finally {
+    done();
+  }
+  for (const code of ['ROUTE_UNKNOWN', 'NEEDS_BROWSER_SESSION', 'FORBIDDEN']) assert.equal(notTheirs(code), true, code);
+  for (const code of ['INTERNAL', 'UNREACHABLE', 'VERSION_STALE']) assert.equal(notTheirs(code), false, code);
+});
 
 test('RUNS THAT OVERLAP SIT ON ROWS OF THEIR OWN, and one that follows another shares its row', () => {
   const { spans, rows } = rowsOf([
