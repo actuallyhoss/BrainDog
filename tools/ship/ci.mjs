@@ -288,6 +288,9 @@ for (const [n, p] of plan.entries()) {
   p.timed = /run test\b|^node --test|^pnpm --filter \S+ test$/.test(p.script ?? '') || TIMED_GATES.has(p.gate);
   /* A BENCH WITH A p99 CEILING HAS THE MACHINE TO ITSELF, before anything else starts (it is 36 s). */
   p.exclusive = p.timed && /run test\b/.test(p.script) && [...p.script.matchAll(/--filter \.\/(\S+)/g)].some(([, d]) => existsSync(join(ROOT, d, 'test/bench.test.ts')));
+  /* AND SO DOES A BROWSER TEST THAT TIMES A PAINT (`*.browser.test.mjs`): a first paint is the renderer's work on a core,
+     and on a loaded machine the shell's paint from the copy read 196 to 324 ms, where a quieter one reads about 100. */
+  if (p.timed && /\.browser\.test\.mjs\b/.test(p.script ?? '')) p.exclusive = true;
   if (p.timed) p.locks.push('timed');
   if (p.timed && !p.exclusive) for (const m of builds) p.after.add(m);
   if (/^selfhost /.test(p.title)) p.locks.push('selfhost');
