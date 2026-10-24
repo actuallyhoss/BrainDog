@@ -144,3 +144,18 @@ export async function readWeek(base: string, list: string, play: readonly SideRo
     }),
   );
 }
+
+/** The record's count of open work: what Work's head and its project chips say (`modules/work.ts`). */
+export const OPEN_WORK = 'tasks-in-play';
+
+/**
+ * HOW MANY TASKS ARE OPEN, the record's own figure, for Work's row in the sidebar (`side.ts` `withOpenWork`). `null`
+ * where the record has no such figure or the read did not land, and the row then says no number.
+ */
+export async function readOpenWork(base: string): Promise<number | null> {
+  const out = await createClient({ base })
+    .metric(OPEN_WORK)
+    .catch(() => null);
+  const v = out?.ok ? (out.value as { value?: unknown } | null)?.value : undefined;
+  return typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
+}

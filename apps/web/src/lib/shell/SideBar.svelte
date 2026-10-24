@@ -19,15 +19,15 @@
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
   import { at, here as inside } from '../at.ts';
-  import { placeOf } from '../nav.ts';
+  import { WORK, placeOf } from '../nav.ts';
   import { slotStyle } from '../home/project-cards.ts';
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
   import { REGISTERS } from '../record/held.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
-  import { keptRead, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
+  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
+  import { keptRead, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
   let {
@@ -105,6 +105,8 @@
   /** The outline's rows, by how far each bar reaches. */
   const OUTLINE = ['62%', '48%', '56%'] as const;
   let week = $state.raw<Week>(new Map());
+  /* HOW MANY TASKS ARE OPEN, the record's figure, for Work's row (audit Z8): never the count of every row ever filed. */
+  let openWork = $state<number | null>(null);
   let asked = 0;
   $effect(() => {
     void version;
@@ -123,12 +125,19 @@
           if (n !== asked) return;
           read = got;
           answered = true;
-          if (got === null) return;
+          /* WORK'S OPEN COUNT ASKED WITH THE WEEK'S FIGURES, so it goes in their wave and not as a read of its own. */
+          if (got === null) {
+            const o = await readOpenWork(b);
+            if (n === asked) openWork = o;
+            return;
+          }
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
           knowProjects(b, got.rows, projects);
           const play = splitOf(got.rows, got.lanes).play;
-          const w = await readWeek(b, got.list, play);
-          if (n === asked) week = w;
+          const [w, o] = await Promise.all([readWeek(b, got.list, play), readOpenWork(b)]);
+          if (n !== asked) return;
+          week = w;
+          openWork = o;
         })
         /* NOT ANSWERED AFTER ITS TRIES (`readSide`): what is drawn stays, and the next move of the record asks again. */
         .catch(() => {
@@ -286,7 +295,7 @@
   const groups = $derived.by((): SideGroup[] => {
     if (!answered || heads === undefined) return [];
     const money = (id: string): boolean => REGISTERS[id]?.fields.some((f) => f.type === 'money') ?? false;
-    return groupsOf(places, owned.map((l) => ({ ...l, money: money(l.id) })), views, tools, heads);
+    return groupsOf(withOpenWork(places, WORK, openWork), owned.map((l) => ({ ...l, money: money(l.id) })), views, tools, heads);
   });
   const spot = $derived(placeOf(path, page.url.searchParams));
   const under = (href: string): boolean => spot === href || spot.startsWith(`${href}/`);

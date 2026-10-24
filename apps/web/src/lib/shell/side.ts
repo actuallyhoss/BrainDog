@@ -167,3 +167,13 @@ export function groupsOf(places: readonly SideLink[], lists: readonly SideList[]
     ...group('extras', [...tools]),
   ];
 }
+
+/**
+ * WORK'S ROW SAYS HOW MANY ARE OPEN (audit Z8, today-1512-light.png): it said 59, every row the tasks list holds with
+ * the finished ones among them, beside Tasks' "42 open" and the project chips' 42. The open count is the record's
+ * figure `tasks-in-play`, which Work's head and its chips count (`side-read.ts` `readOpenWork`); until it lands, or on a
+ * record with none, the row says no number rather than the wrong one.
+ */
+export function withOpenWork(places: readonly SideLink[], work: string, open: number | null): SideLink[] {
+  return places.map((p) => (p.href === work ? { ...p, count: open !== null && open > 0 ? open : undefined } : p));
+}
