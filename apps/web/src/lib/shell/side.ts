@@ -26,8 +26,8 @@ export type SideProject = {
 
 /**
  * A PROJECT'S NAME AS THE SIDEBAR SAYS IT (the scope of 24 October, E2): a name typed as a slug, all small letters with
- * hyphens or underscores ("sam-site"), is said in words with a capital ("Sam site"), as it sat beside "Studio site".
- * Any other name is kept as written, so "Otters.gg", "iOS app" and "Encore" are never recased. Only what is drawn: the
+ * hyphens or underscores ("kiln-site"), is said in words with a capital ("Kiln site"), as it sat beside "Glaze shop".
+ * Any other name is kept as written, so "Clay.co", "iOS app" and "PotBoard" are never recased. Only what is drawn: the
  * row's own title is still what a figure or an agent's run names it by.
  */
 const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$/u;

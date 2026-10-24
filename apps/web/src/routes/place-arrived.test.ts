@@ -104,7 +104,7 @@ test('a page hidden somewhere else silences nothing', () => {
 
 test('the shell hands the rule the rail as it is drawn, addresses and all', () => {
   /* `near` is `railOf`'s, so the rule reads the places and More straight off the rail and nothing is built for it. */
-  assert.match(code, /const now = \[\.\.\.rail\.places, \.\.\.rail\.more\];\s+const names = arrivedIn\(drawn, now\);/u);
+  assert.match(code, /const now = \[\.\.\.rail\.places, \.\.\.rail\.rest\];\s+const names = arrivedIn\(drawn, now\);/u);
 });
 
 test('the words: one sentence, the place by its name', () => {

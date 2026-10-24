@@ -95,10 +95,10 @@ async function record(walked: boolean): Promise<Kernel> {
     const out = k.create(list, fields, OWNER);
     assert.ok(out.ok, JSON.stringify(out));
   };
-  made('obligations', { what: 'Northwind Premiums', due: '2026-10-25', amount: money(28715), repeats: 'monthly' });
+  made('obligations', { what: 'Home insurance', due: '2026-10-25', amount: money(28715), repeats: 'monthly' });
   made('obligations', { what: 'Accountant', due: '2026-10-28', amount: money(50000), repeats: 'none' });
-  made('recurring', { what: 'Northwind Premiums', next_due: '2026-10-25', amount: money(28715) });
-  made('recurring', { what: 'Prism contractor fee', next_due: '2026-10-08', amount: money(200000), state: 'paused' });
+  made('recurring', { what: 'Home insurance', next_due: '2026-10-25', amount: money(28715) });
+  made('recurring', { what: 'Studio contractor fee', next_due: '2026-10-08', amount: money(200000), state: 'paused' });
   made('tasks', { what: 'File the return', by: '2026-10-26' });
   return k;
 }
@@ -108,7 +108,7 @@ const due = (k: Kernel): string[] =>
 
 test('A PAUSED LINE IS NOT LATE, AND A REPEATING BILL IS NAMED ONCE, ON ITS LINE, where the walk reads both lists', async () => {
   assert.deepEqual(due(await record(true)), [
-    '2026-10-25 Northwind Premiums (recurring#1)',
+    '2026-10-25 Home insurance (recurring#1)',
     '2026-10-26 File the return (tasks#1)',
     '2026-10-28 Accountant (obligations#2)',
   ]);
@@ -116,9 +116,9 @@ test('A PAUSED LINE IS NOT LATE, AND A REPEATING BILL IS NAMED ONCE, ON ITS LINE
 
 test('A RECORD THAT WALKS NOTHING KEEPS EVERY ROW THAT IS NOT FINISHED, as it did', async () => {
   assert.deepEqual(due(await record(false)), [
-    '2026-10-08 Prism contractor fee (recurring#2)',
-    '2026-10-25 Northwind Premiums (obligations#1)',
-    '2026-10-25 Northwind Premiums (recurring#1)',
+    '2026-10-08 Studio contractor fee (recurring#2)',
+    '2026-10-25 Home insurance (obligations#1)',
+    '2026-10-25 Home insurance (recurring#1)',
     '2026-10-26 File the return (tasks#1)',
     '2026-10-28 Accountant (obligations#2)',
   ]);

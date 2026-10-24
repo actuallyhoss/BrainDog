@@ -112,7 +112,7 @@ test('what the device keeps is read safely', () => {
 });
 
 test('a name typed as a slug is said in words, and any other name is kept as written (E2)', () => {
-  assert.equal(shownName('sam-site'), 'Sam site');
+  assert.equal(shownName('kiln-site'), 'Kiln site');
   assert.equal(shownName('money_core'), 'Money core');
-  for (const kept of ['Studio site', 'Otters.gg', 'Encore', 'iOS app', 'roomy', 'crumb.gg', 'Sam-site']) assert.equal(shownName(kept), kept);
+  for (const kept of ['Glaze shop', 'Clay.co', 'PotBoard', 'iOS app', 'glaze', 'kiln.gg', 'Kiln-site']) assert.equal(shownName(kept), kept);
 });
