@@ -16,7 +16,7 @@ import { TONES, parse } from 'braindog-render';
 import type { DrawOptions, Drawn } from './index.ts';
 
 /** A cell as the dialect reads it back: a `|` in a value is a pipe and not the end of the cell. */
-export const escapeCell = (c: string): string => c.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+export const escapeCell = (c: string): string => c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
 /** The list a block reads, from its `source: register.<id>`, or null for a block over no list. */
 export function listOf(result: BlockResult): string | null {

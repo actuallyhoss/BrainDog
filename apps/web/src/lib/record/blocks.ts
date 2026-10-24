@@ -591,8 +591,10 @@ export function trendCell(trend: readonly (number | null)[] | undefined, money =
   return ` | ${trend.map((v) => (v === null ? '-' : String(money ? Math.round(v / 100) : v))).join(' ')}`;
 }
 
+/* AND A VALUE'S OWN LINE BREAKS ARE SPACES: a row is one line of the dialect, so a note of two paragraphs broke its row,
+   and the rest of the note was drawn as a card of its own (the audit of 25 October, Z21). */
 const escapeCell = (c: string): string =>
-  c.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
 /**
  * A chips row over a register: GROUP AND COUNT.

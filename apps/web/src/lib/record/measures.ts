@@ -108,7 +108,7 @@ export function measuresOf(
   return measureSeries(readings, { nowMs, back, bucket: opts.bucket, tz: opts.tz ?? readerZone(), fallback, most: CHARTS_MOST });
 }
 
-const escapeCell = (c: string): string => c.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+const escapeCell = (c: string): string => c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
 /** The last value that is not a gap, and where. */
 function lastOf(values: readonly (number | null)[]): { value: number; at: number } | null {
