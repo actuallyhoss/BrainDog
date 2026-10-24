@@ -1337,6 +1337,55 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * tall, the whole of the main column, for bars of 1 and 2. What was finished this week is a figure of At a glance,
    * with how it moved as the line beside it, and the plan leads the main column. Nineteen blocks.
    */
+  /**
+   * NUMBERS, THE LIST'S OWN PAGE, SINCE portfolio 1.22.0 (E26): `list: datapoints` sends `/r/datapoints` here, where the
+   * generic list drew 2,527 readings a row each, 9,350 px of "CPU, bake" four weeks ago. Each kind of number is said once,
+   * under the project it is for (the sixth column, `thing`), with its newest value, its unit and how old it is; the two
+   * that moved most over the year are drawn as lines above them. A reading's row page opens here searched for its name
+   * (`q`, the head's search), which is its chart. The example left out, as every block over Numbers leaves it.
+   *
+   * THE ROWS AS A TABLE ARE ONE LINK AWAY, `?rows=1`, the list's own screen, for a person who wants every reading.
+   */
+  numbers: {
+    page: 'numbers',
+    title: 'Numbers',
+    icon: 'observe',
+    list: 'datapoints',
+    requires: ['register.datapoints'],
+    pack: 'portfolio',
+    header: { search: { param: 'q' } },
+    blocks: [
+      {
+        key: 'numbers-line',
+        kind: 'note',
+        lead: true,
+        span: 12,
+        body: 'Each kind of number your projects report, once, with its newest value and how old it is.',
+      },
+      {
+        key: 'numbers-by-project',
+        kind: 'lines',
+        heading: 'By project, this year',
+        icon: 'chart-line',
+        span: 12,
+        source: 'register.datapoints',
+        columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }, { field: 'amount' }, { field: 'thing' }],
+        where: 'source is not example',
+        back: 366,
+        bucket: 'week',
+        limit: 2,
+        empty: 'No project has reported a number this year.',
+      },
+      {
+        key: 'numbers-rows',
+        kind: 'link',
+        heading: 'Every reading',
+        icon: 'rows',
+        span: 12,
+        authored: [{ cells: ['Every reading, as a table', '/r/datapoints?rows=1', 'Each number on its own row, newest first'] }],
+      },
+    ],
+  },
   project: {
     page: 'project',
     title: '{{name}}',

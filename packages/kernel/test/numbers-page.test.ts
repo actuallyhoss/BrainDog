@@ -16,7 +16,7 @@ const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAE';
 const OWNER: WriteContext = { actor: 'p_1' };
 const on = (daysAgo: number): string => new Date(NOW - daysAgo * DAY).toISOString();
 
-test('GROUPED, every measure without a line is listed under its group, quiet ones too, named groups first', () => {
+test('GROUPED, every measure read in the period without a line is listed under its group, named groups first', () => {
   const readings: RawReading[] = [
     { at: on(2), name: 'Players', value: 10, group: 'Bake' },
     { at: on(1), name: 'Players', value: 12, group: 'Bake' },
@@ -25,18 +25,19 @@ test('GROUPED, every measure without a line is listed under its group, quiet one
     { at: on(5), name: 'Memory', value: 2.1, unit: 'GB', group: 'Atlas' },
   ];
   const opts = { nowMs: NOW, back: 30, tz: 'UTC', fallback: '' };
-  const plain = measureLines(readings, opts);
-  assert.deepEqual(plain.latest.map((m) => m.measure).sort(), ['Memory', 'Rows written'], 'ungrouped, a quiet measure is drawn as neither');
   const { lines, latest } = measureLines(readings, { ...opts, grouped: true });
   assert.deepEqual(lines.map((l) => [l.name, l.group]), [['Players', 'Bake']]);
   assert.deepEqual(
     latest.map((m) => [m.group ?? null, m.measure, m.value, m.unit]),
     [
       ['Atlas', 'Memory', 2.1, 'GB'],
-      ['Bake', 'CPU', 16.4, '%'],
       [null, 'Rows written', 35_000, ''],
     ],
+    'CPU, read sixty days ago, is quiet in a period of thirty',
   );
+  const past = measureLines(readings, { ...opts, grouped: true, most: 0 });
+  assert.deepEqual(past.lines, []);
+  assert.deepEqual(past.latest.map((m) => m.measure), ['Memory', 'Players', 'Rows written'], 'a measure past the lines\' most is listed, not missing');
 });
 
 const PROJECTS: Declaration = {
@@ -73,7 +74,7 @@ async function record() {
   return { k, sql };
 }
 
-test('THE SIXTH COLUMN GROUPS BY ITS PROJECT\'S NAME, and the quiet measures come back with their newest reading', async () => {
+test('THE SIXTH COLUMN GROUPS BY ITS PROJECT\'S NAME', async () => {
   const { k, sql } = await record();
   const bake = k.create('things', { name: 'Bake' }, OWNER);
   assert.ok(bake.ok);
@@ -81,16 +82,13 @@ test('THE SIXTH COLUMN GROUPS BY ITS PROJECT\'S NAME, and the quiet measures com
     ['Players', 10, 2, bake.value.id],
     ['Players', 12, 1, bake.value.id],
     ['CPU', 16.4, 60, bake.value.id],
-    ['Rows written', 35_000, 40, null],
+    ['Rows written', 35_000, 20, null],
   ] as const)
     assert.ok(k.create('datapoints', { name, value, at: on(ago), ...(thing ? { thing } : {}) }, OWNER).ok);
   const b = k.block(LINES as unknown as PageBlock);
   assert.deepEqual(b.refusals ?? [], []);
   assert.deepEqual(b.measures?.map((m) => [m.name, m.group]), [['Players', 'Bake']]);
-  assert.deepEqual(b.latest?.map((m) => [m.group ?? null, m.measure, m.value]), [
-    ['Bake', 'CPU', 16.4],
-    [null, 'Rows written', 35_000],
-  ]);
+  assert.deepEqual(b.latest?.map((m) => [m.group ?? null, m.measure, m.value]), [[null, 'Rows written', 35_000]], 'CPU went quiet sixty days ago');
   const stat = k.block({ ...LINES, kind: 'stat' } as unknown as PageBlock);
   assert.equal(stat.refusals?.[0]?.code, 'DECLARATION_INVALID', 'a stat takes no sixth column');
   sql.close();

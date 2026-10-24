@@ -74,7 +74,7 @@
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
-  import { rowHref } from '$lib/record/row-href.ts';
+  import { chartOf, rowHref } from '$lib/record/row-href.ts';
   import { dayHref } from '$lib/record/day-href.ts';
   import Hole from '$lib/page/Hole.svelte';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
@@ -680,6 +680,8 @@
   const done = $derived(tone === 'good');
   /* WHAT FINISHES IT, where it is still open and the reader may change it: the head's one primary (`finishOf`). */
   const finish = $derived(changes && !archived ? finishOf(decl, stateValue) : null);
+  /* WHERE ITS LIST DRAWS IT, on a list with a page of its own (E26): that page, searched for the row's name. */
+  const chartTo = $derived(row && decl ? chartOf(id, String(row.fields[decl.title] ?? '')) : null);
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
      a currency — it gets the room prose needs (05 §7.1). */
@@ -1264,6 +1266,11 @@
            each other at one weight, and neither was what a person opens an unpaid invoice to do. -->
       {#if finish}
         <Button weight="primary" disabled={saving} data-finish data-head-primary onclick={() => void finishRow(finish)}>{finish.said}</Button>
+      {/if}
+      <!-- A ROW OF A LIST WITH A PAGE OF ITS OWN SAYS WHERE IT IS DRAWN (E26): a reading opens its chart, the list's page
+           searched for its name, so "CPU, bake" is one press from the line it is a point on. -->
+      {#if chartTo}
+        <Button href={chartTo} data-row-chart>{copy.rowSeeChart}</Button>
       {/if}
       <!-- `Put back` STANDS IN THE HEAD for as long as this tab holds the row it just archived: see `archived` for why
            that moment is the only one it can be offered in. Archive itself is in the "…", the list's own verb on the

@@ -299,6 +299,8 @@ export const lists = {
   rowSeenByOnlyYou: 'Only you can see this.',
   rowPrivateNotDone: 'That did not save. Try again.',
   rowRestore: 'Put back',
+  /** On a row of a list with a page of its own (E26): the way to where it is drawn, a reading's chart. */
+  rowSeeChart: 'See its chart',
   rowRestored: (what: string) => `${what} is back.`,
   /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
   rowArchivedNote: 'This is archived. It is left out of every list until it is put back.',

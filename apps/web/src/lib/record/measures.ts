@@ -251,6 +251,8 @@ export function linesAndLatest(measures: readonly Measure[], latest?: readonly M
 export const measureWords = {
   /** The heading over the measures reported once, under the lines of the ones reported more often. */
   readOnce: 'Reported once',
+  /** On a grouped block (its sixth column), the heading over the measures in no group, after every named one. */
+  ungrouped: 'Everything else',
 } as const;
 
 /**
@@ -259,10 +261,34 @@ export const measureWords = {
  * and fewer things on screen), headed only where lines stand above it, so it is not taken for one of them. `beside` is
  * the lines above, so "Orders" read once for one project and charted for another is told apart.
  */
-export function latestText(latest: readonly Latest[], underLines: boolean, beside: readonly Measure[] = []): string {
+export function latestText(latest: readonly Latest[], underLines: boolean, beside: readonly Measure[] = [], age?: (at: string) => string): string {
   if (latest.length === 0) return '';
+  if (latest.some((m) => m.group !== undefined)) return groupedText(latest, underLines, age);
   const shown = latest.slice(0, CHARTS_MOST);
   const shared = sharedNames([...shown.map((m) => ({ name: m.measure, of: m.of })), ...beside.slice(0, CHARTS_MOST)]);
   const rows = shown.map((m) => `${escapeCell(measureLabel({ name: m.measure, of: m.of }, shared))} | ${escapeCell(figureOf(m.value, m.unit))} | ${escapeCell(dayLabel(m.day))}`);
   return [`\`\`\`spec${underLines ? ` | ${escapeCell(measureWords.readOnce)}` : ''}`, ...rows, '```'].join('\n');
+}
+
+/**
+ * A GROUPED BLOCK'S READINGS (its sixth column, E26): one quiet list a group, headed by the group's name, the measures in
+ * no group last, and each line a kind of number with its newest value, its unit and how old it is. Every measure the
+ * record listed is said, since a page of a list's numbers is where each one is found; the record caps how many.
+ */
+function groupedText(latest: readonly Latest[], underLines: boolean, age?: (at: string) => string): string {
+  const groups = new Map<string, Latest[]>();
+  for (const m of latest) {
+    const key = m.group ?? '';
+    groups.set(key, [...(groups.get(key) ?? []), m]);
+  }
+  /* ONE GROUP IS THE PAGE'S OWN, a project's page over its own numbers, so it is not headed by the name over it. */
+  const headed = groups.size > 1;
+  return [...groups]
+    .sort(([a], [b]) => (a === b ? 0 : a === '' ? 1 : b === '' ? -1 : 0))
+    .map(([group, rows]) => {
+      const heading = !headed ? (underLines ? measureWords.readOnce : '') : group !== '' ? group : measureWords.ungrouped;
+      const lines = rows.map((m) => `${escapeCell(m.measure)} | ${escapeCell(figureOf(m.value, m.unit))} | ${escapeCell(age ? age(m.at) : dayLabel(m.day))}`);
+      return [`\`\`\`spec${heading ? ` | ${escapeCell(heading)}` : ''}`, ...lines, '```'].join('\n');
+    })
+    .join('\n\n');
 }

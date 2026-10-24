@@ -237,11 +237,14 @@ export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts):
     .sort((a, b) => movedBy(b) - movedBy(a) || newestFirst(a, b))
     .slice(0, most)
     .map(({ ms: _ms, ...m }) => m);
-  /* GROUPED, EVERY MEASURE NOT DRAWN AS A LINE IS LISTED, the quiet ones too: a page of a list's numbers says each kind
-     once, under its group, whether it was read this month or not, so a measure is never missing for having gone quiet.
-     The lines' measures are left out, and so are the ones past the lines' `most`, which are listed instead. */
+  /* GROUPED, EVERY MEASURE READ IN THE PERIOD THAT DRAWS NO LINE IS LISTED, under its group: a page of a list's numbers
+     says each kind once, so one read twice but past the lines' `most` is listed too rather than missing. A measure with
+     no reading in the period is quiet and drawn as neither, as ungrouped. Up to `MEASURES_LISTED`, a line each. */
   const listed = opts.grouped
-    ? all.filter((m) => m.latest !== null && !lines.some((l) => sameMeasure(l, m))).sort((a, b) => byGroup(a, b) || newestFirst(a, b)).slice(0, MEASURES_LISTED)
+    ? all
+        .filter((m) => m.latest !== null && pointsIn(m) >= 1 && !lines.some((l) => sameMeasure(l, m)))
+        .sort((a, b) => byGroup(a, b) || newestFirst(a, b))
+        .slice(0, MEASURES_LISTED)
     : all.filter((m) => pointsIn(m) === 1 && m.latest !== null).sort(newestFirst).slice(0, most);
   const latest = listed.map(
     (m): MeasureLatest => ({

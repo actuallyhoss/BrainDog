@@ -21,7 +21,7 @@ import { REGISTERS } from './held.ts';
 import { hrefFor } from './metrics.ts';
 
 /** A page as `boot` lists it, as far as this file reads it: its slug and the row a template made it for. */
-export type PageAbout = { slug: string; about?: { register: string; seq: number | null } | null | undefined };
+export type PageAbout = { slug: string; about?: { register: string; seq: number | null } | null | undefined; opens?: string | undefined };
 
 /** A list and a row's number, from `tasks#241`. Nothing else is a spoken id: no path, no query, no address. */
 export function spokenOf(spoken: string): { register: string; seq: number } | null {
@@ -64,7 +64,54 @@ let byRowLearnt: ReadonlySet<string> = new Set();
 export const learnRowPages = (pages: readonly PageAbout[] | null | undefined, byRow: readonly string[] = []): void => {
   learnt = rowPagesOf(pages);
   byRowLearnt = new Set(byRow);
+  learntLists = listPagesOf(pages);
 };
+
+/* ── a list with a page of its own ────────────────────────────────────────── */
+
+/** Each list a page says it is the page of (`opens`, the page's `list:`), to that page's slug. The first one wins. */
+export function listPagesOf(pages: readonly PageAbout[] | null | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const p of pages ?? []) if (typeof p.opens === 'string' && p.opens !== '' && !out.has(p.opens)) out.set(p.opens, p.slug);
+  return out;
+}
+
+let learntLists: ReadonlyMap<string, string> = new Map();
+
+/** The word that keeps a list on its own screen, its rows as a table, whatever page the list is sent to. */
+export const ROWS = 'rows';
+
+/** The list's own screen, its rows as a table, past the page it is sent to. Record-relative. */
+export const listScreen = (register: string): string => `/r/${register}?${ROWS}=1`;
+
+/**
+ * Where a list's address sends a reader instead (E26): the page that says it is the list's page, or `null` to stay. Only
+ * the bare address goes: one that asks for anything (a row open, a view, a filter, `?rows=1`) is the list's own screen.
+ */
+export function listPageIn(register: string, search: URLSearchParams, pages: ReadonlyMap<string, string>): string | null {
+  if ([...search.keys()].length > 0) return null;
+  const slug = pages.get(register);
+  return slug === undefined ? null : `/p/${encodeURIComponent(slug)}`;
+}
+
+/** `listPageIn` on the pages the record last said. */
+export const listPage = (register: string, search: URLSearchParams): string | null => listPageIn(register, search, learntLists);
+
+/**
+ * The word a list's page searches under (its head's `search: { param }`), which a row's way to its chart fills with the
+ * row's name. The Numbers page declares it (`packages/seed` `modules/portfolio.ts`).
+ */
+export const LIST_SEARCH = 'q';
+
+/** Where a row's chart is drawn, from what it is handed: its list's page searched for its name, or `null` with none. */
+export function chartIn(register: string, title: string, pages: ReadonlyMap<string, string>): string | null {
+  const slug = pages.get(register);
+  const said = title.trim();
+  return slug === undefined || said === '' ? null : `/p/${encodeURIComponent(slug)}?${LIST_SEARCH}=${encodeURIComponent(said)}`;
+}
+
+/** `chartIn` on the pages the record last said. */
+export const chartOf = (register: string, title: string): string | null => chartIn(register, title, learntLists);
 
 /** Where a spoken id opens on the record this tab is on, or `null` where it names no row of a list the tab holds. */
 export const rowHref = (spoken: string): string | null => rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt, byRowLearnt);

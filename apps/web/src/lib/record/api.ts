@@ -1644,7 +1644,7 @@ export function walkTable(
  * `MeasureLatest` (`packages/kernel/src/measures.ts`), which its index does not export, as the page reader narrows it.
  * `value` is in major units of `unit`, as a series holds it, and `day` is the record's local day it was read on.
  */
-export type MeasureLatest = { measure: string; of?: string; value: number; unit: string; at: string; day: string };
+export type MeasureLatest = { measure: string; of?: string; group?: string; value: number; unit: string; at: string; day: string };
 
 /**
  * A grouped figure's whole and its parts, as a `bar` or a `split` draws them. A part's `label` is its name where its key
