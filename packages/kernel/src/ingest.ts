@@ -47,7 +47,7 @@ import { SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
 import { startAtDoor } from './script.ts';
-import { payeeName } from './identity-keys.ts';
+import { mayBeCut, payeeName } from './identity-keys.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -1103,7 +1103,10 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        key is the same from either (`payeeName` answers the text itself where its name would fold to another payee),
        so a payee met under the bank's words before this is the same one after. */
     const clean = printed === '' ? '' : payeeName(printed);
-    if (printed !== '') heard.counterparty = clean;
+    /* A NAME THE CARD TEXT MAY HAVE CUT IS NOBODY TO MEET (the audit of 25 October, Y2): met, it made a shop called
+       "Orbt Speciali" beside the same shop's whole name. The row still keeps the bank's words, and with them the key, so
+       a shop the record holds by it is linked by the walk over the past (`backfill.ts`), which makes none from it. */
+    if (printed !== '' && !mayBeCut(printed)) heard.counterparty = clean;
     const declaredFields = deps.schemaOf(register)?.fields;
     /* AND THE ROW KEEPS THAT NAME BESIDE THE BANK'S WORDS, only on a list that declares a text field for it and only
        where the pattern read none itself: another list's `payee` may be a link to somebody, and a name written into

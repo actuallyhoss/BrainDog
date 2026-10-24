@@ -64,7 +64,7 @@ import { no, ok } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { holderOf, holders, nameKey } from './entities.ts';
-import { keyOf, legacyBankKey, onlyAKind, registrable } from './identity-keys.ts';
+import { keyOf, legacyBankKey, mayBeCut, onlyAKind, registrable } from './identity-keys.ts';
 import type { Entry, Patch, RegisterDecl, WriteContext } from './index.ts';
 import { COUNTERPARTY } from './ingest.ts';
 import { instant } from './migrate.ts';
@@ -570,7 +570,8 @@ function ledgerSlice(
 
   /* HOW MANY LINES NAME EACH PAYEE, over the whole ledger and not the slice, and the spelling a name is made from: the
      first said as a payee, else the first description. And the keys one word shorter each payee's spellings have. */
-  type Seen = { lines: number; sure: boolean; business: boolean; said: string };
+  /* `whole`: one of its lines says its name whole, where a card text may have cut it on every other (`mayBeCut`). */
+  type Seen = { lines: number; sure: boolean; business: boolean; whole: boolean; said: string };
   const seen = new Map<string, Seen>();
   /* THE KEY EACH PAYEE HAD BEFORE ITS SHOP NAME WAS READ BY ITSELF, where it differs: `known` tries it second. */
   const oldKeys = new Map<string, string>();
@@ -586,6 +587,7 @@ function ledgerSlice(
         lines: (held?.lines ?? 0) + 1,
         sure: (held?.sure ?? false) || p.sure,
         business: (held?.business ?? false) || soundsLikeBusiness(p.said),
+        whole: (held?.whole ?? false) || !mayBeCut(p.said),
         said: held === undefined || (p.sure && !held.sure) ? p.said : held.said,
       });
       const less = shorterKey(p.said, p.key);
@@ -623,7 +625,7 @@ function ledgerSlice(
     const own = seen.get(key);
     if (!own) continue;
     const into = counted.get(base);
-    counted.set(base, into === undefined ? own : { lines: into.lines + own.lines, sure: into.sure || own.sure, business: into.business || own.business, said: into.said });
+    counted.set(base, into === undefined ? own : { lines: into.lines + own.lines, sure: into.sure || own.sure, business: into.business || own.business, whole: into.whole || own.whole, said: into.said });
   }
 
   const writes = batcher(deps);
@@ -717,7 +719,10 @@ function ledgerSlice(
         const same = service === undefined ? [] : (byName.get(keyOf('bank', service) ?? '') ?? []);
         if (same.length === 1) org = same[0]!;
         else if (service !== undefined) org = make(keys, service, true);
-        else if (count !== undefined && count.lines >= PAYEE_SEEN) {
+        /* A NAME NO LINE SAYS WHOLE MAKES NOTHING AND ASKS NOTHING (the audit of 25 October, Y2): a card text cut at its
+           field's end named "Orbt Speciali" and "Marke" as shops. The lines keep the bank's words, and are linked once
+           the record holds the shop by its key. */
+        else if (count !== undefined && count.lines >= PAYEE_SEEN && count.whole) {
           /* A PAYEE SAID AS ONE ON ANY OF ITS LINES, THAT SAYS IT IS A BUSINESS ON ANY OF THEM, IS MADE. One only ever
              cut out of a description, or one that could be a person's name, is a question, named the way the walk
              would have named it. */

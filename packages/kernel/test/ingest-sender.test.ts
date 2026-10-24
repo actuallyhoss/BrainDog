@@ -69,7 +69,7 @@ const ACCOUNTS = (over: Record<string, unknown> = {}): Declaration => ({
 });
 
 const READS = {
-  merchant: { text: { between: ['at ', ' for'] }, strip: ['GEIDEA*'] },
+  merchant: { text: { between: ['at ', ' for'] }, strip: ['GEIDEA*', 'SQ *'] },
   counterparty_text: { text: { between: ['at ', ' for'] } },
   amount: { money: { after: 'EGP ', currency: 'EGP' } },
 };
@@ -136,9 +136,10 @@ test('AN EMAIL ARRIVAL CARRIES ITS SENDER IN THREE PARTS, and the stored header 
 });
 
 test('A PAYEE A PATTERN READ IS KEPT ON THE ARRIVAL, and written to the row only where the list has a field for it', async () => {
-  /* A LIST THAT HAS NO FIELD FOR IT YET: the charge files, and the payee rides on the arrival alone. */
+  /* A LIST THAT HAS NO FIELD FOR IT YET: the charge files, and the payee rides on the arrival alone. A text short of a
+     card field's twenty characters, since one that fills it may be a name cut short and meets nobody (`payee-cut`). */
   const bare = await record(ACCOUNTS(), TRANSACTIONS(false), CARD());
-  const filed = arrive(bare.k, said('GEIDEA*Halden Coffee'), 'c1');
+  const filed = arrive(bare.k, said('SQ *Halden Coffee'), 'c1');
   assert.equal(filed.state, 'matched', filed.reason ?? '');
   assert.equal(filed.counterparty, 'Halden Coffee', 'the payee by its name');
   const row = fieldsOf(bare.sql, filed.wrote[0]!);
@@ -148,10 +149,10 @@ test('A PAYEE A PATTERN READ IS KEPT ON THE ARRIVAL, and written to the row only
 
   /* A LIST THAT DECLARES IT keeps it on the row as well. */
   const kept = await record(ACCOUNTS(), TRANSACTIONS(true), CARD());
-  const both = arrive(kept.k, said('GEIDEA*Halden Coffee'), 'c2');
+  const both = arrive(kept.k, said('SQ *Halden Coffee'), 'c2');
   assert.equal(both.state, 'matched', both.reason ?? '');
   assert.equal(both.counterparty, 'Halden Coffee');
-  assert.equal(fieldsOf(kept.sql, both.wrote[0]!).counterparty_text, 'GEIDEA*Halden Coffee');
+  assert.equal(fieldsOf(kept.sql, both.wrote[0]!).counterparty_text, 'SQ *Halden Coffee');
   kept.sql.close();
 });
 
@@ -177,10 +178,10 @@ test('A PAYEE THE TEXT DID NOT CARRY NEVER HOLDS A CHARGE on a list that has no 
 
 test('A HELD CHARGE KEEPS ITS PAYEE, and its question is joined only by charges to the same payee', async () => {
   const { k, sql } = await record(ACCOUNTS(), TRANSACTIONS(true), CARD({ writes: { register: 'transactions', confidence: 'needs-review' } }));
-  const first = arrive(k, said('GEIDEA*Halden Coffee'), 'h1');
+  const first = arrive(k, said('SQ *Halden Coffee'), 'h1');
   assert.equal(first.state, 'review');
   assert.equal(first.counterparty, 'Halden Coffee', 'a held arrival lost its payee');
-  const same = arrive(k, said('geidea*halden  coffee', '12.00'), 'h2');
+  const same = arrive(k, said('sq *halden  coffee', '12.00'), 'h2');
   assert.equal(same.suggestion, first.suggestion);
   const other = arrive(k, said('PAYMOB-Nile Books', '12.00'), 'h3');
   assert.notEqual(other.suggestion, first.suggestion);

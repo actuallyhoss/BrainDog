@@ -530,6 +530,36 @@ export function bankKey(raw: string, legacy = false): string | null {
 }
 
 /**
+ * How long a card network's text runs, its processor's prefix included, before it may have been cut: the merchant's
+ * field is twenty characters on the texts the audit of 25 October read (`FAWRY*` and fourteen), and a name whose last
+ * letter falls on its end, or a space short of it, cannot be told from one that went on.
+ */
+export const CUT_AT = 18;
+
+/** A sub-merchant's star after the first words of a card text: `NORTHWIND *NORTHWIND HA`, `UBER *TRIP`. */
+const STARRED = /^[\p{L}\p{N}][\p{L}\p{N} ]{0,11}\*/u;
+
+/**
+ * WHETHER A BANK'S TEXT MAY BE A SHOP'S NAME CUT SHORT (the audit of 25 October, Y2): a card network's text, with a
+ * processor's prefix or a sub-merchant's star, that runs to `CUT_AT` characters or more and ends on the name itself,
+ * with no place, reference or web address after it that would say the name ended first. `FAWRY*QUILLMOOR BAKE` may
+ * be cut; `GEIDEA*BRIDGE ST COFFEE 0423 LONDON GB` and `GEIDEA*PELL VINE` are whole.
+ *
+ * A CUT NAME IS STILL A KEY. The line keeps the bank's words, and a shop the record holds by that key is linked as
+ * before; only an organisation is never made from cut words alone (`ingest.ts`, `backfill.ts`), since its name would
+ * be the cut ("Quillmoor Bake") and the same shop's whole name another row.
+ */
+export function mayBeCut(raw: string): boolean {
+  const said = raw.trim().replace(/\s+/g, ' ');
+  if (said.length < CUT_AT || !(PROCESSORS.test(said) || STARRED.test(said))) return false;
+  let rest = said;
+  for (let i = 0; i < 3 && PROCESSORS.test(rest); i++) rest = rest.replace(PROCESSORS, '');
+  if (trimmedText(rest) !== rest) return false;
+  const all = lower(rest).replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean).length;
+  return payeeWords(said).words.length === all;
+}
+
+/**
  * THE KEY A PAYEE HAD BEFORE `trimmedText` (the shop name read without its `www.`, card line, page and reference), or
  * `null` when it is the key it has now. Rules, merges and organisations stored under the old form (`bank:wwwtalabat`)
  * are found by it when the new key (`bank:talabat`) misses; nothing stored is rewritten, the new key is added beside.
