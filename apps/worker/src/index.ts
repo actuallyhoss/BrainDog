@@ -118,6 +118,7 @@ import { withVaultPassphrase, type PassphraseUnlock, type VaultPassphrase } from
 import type { HeldKeys, RewrapArgs, Rewrapped } from './rewrap.ts';
 import { serveOAuth } from './oauth.ts';
 import { servesOAuth, servesOAuthMeta } from './route.ts';
+import { fetchThroughReset } from './reset-retry.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { recordOf } from './route.ts';
 import { validFromOf } from './cut-off.ts';
@@ -3793,7 +3794,8 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
   const renaming = renameAsked(inner.method, new URL(inner.url).pathname);
   const leaving = leavesAsked(inner.method, new URL(inner.url).pathname);
   const t0 = Date.now();
-  const out = await stub().fetch(inner);
+  /* A RESET UNDER A READ OR A PULSE IS ASKED ONCE MORE through a new stub (`reset-retry.ts`, the audit's Z38). */
+  const out = await fetchThroughReset(stub, inner);
   const spent = Date.now() - t0;
   if (removal !== null && out.status === 200) await leftDirectory(removal, env, record);
   if (leaving && out.status === 200) await leftWithNothing(out.clone(), env, record);
