@@ -60,6 +60,29 @@ test('A CALENDAR OVER A LIST WRITES EACH ROW\'S TITLE AS A DOOR TO IT AND ITS DA
   ]);
 });
 
+/* THE AUDIT OF 25 OCTOBER, Z14 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`): Money's calendar of the
+   next thirty days reads every list's money, as Today's Due soon does, so each line over what falls due says its amount,
+   signed by the way it goes: the premium going out and the salary coming in. */
+test('A CALENDAR OVER WHAT FALLS DUE SAYS EACH LINE\'S MONEY, signed by the way it goes', () => {
+  const due = (seq: number, list: string, title: string, day: string, amount: number, direction: 'in' | 'out') =>
+    entry('deadlines', seq, { list, row: `${list}#${seq}`, title, day, amount: { amount, currency: 'USD' }, direction });
+  const drawn = calendar.draw(
+    answer('calendar', {
+      source: 'deadlines',
+      columns: [{ field: 'title' }, { field: 'day' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+      rows: [due(1, 'recurring', 'Home insurance', '2026-09-25', 28715, 'out'), due(2, 'recurring', 'Studio salary', '2026-09-30', 401246, 'in')],
+    }),
+    OPTS,
+  );
+  const cells = cellsOf(drawn);
+  assert.deepEqual(cells.map((c) => c.slice(0, 2)), [
+    ['[Home insurance](/r/recurring/1)', '2026-09-25'],
+    ['[Studio salary](/r/recurring/2)', '2026-09-30'],
+  ]);
+  assert.match(cells[0]![2] ?? '', /^−.*287\.15/u);
+  assert.match(cells[1]![2] ?? '', /^\+.*4,038\.46/u);
+});
+
 test('an authored calendar keeps its rows and their tone, and one with nothing in it says the empty state', () => {
   const drawn = calendar.draw(answer('calendar', { authored: [{ cells: ['Launch', '2026-09-12'], tone: 'warn' }, { cells: ['Review', '2026-09-20'], tone: 'constructor' }] }), OPTS);
   const [segment] = drawn.segments;

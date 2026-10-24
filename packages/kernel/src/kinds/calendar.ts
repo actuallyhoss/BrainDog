@@ -18,9 +18,10 @@
  * the last day of the last and today, all in the record's own zone, and every row whose day falls between the first
  * two, so a phone's agenda and a desk's month grid are drawn from one read and neither needs a second.
  *
- * OVER WHAT FALLS DUE it says `source: deadlines` and `columns: [title, day]`, and reads what a table over that source
- * reads (`sources/deadlines.ts`): every list's `deadline: true` day fields, a row in one of its list's `done` states
- * left out, and a list the reader may not read left out whole. What differs is which days: a table reads from the
+ * OVER WHAT FALLS DUE it says `source: deadlines` and `columns: [title, day]`, or `[title, day, amount]` to say each
+ * line's money, and reads what a table over that source reads (`sources/deadlines.ts`): every list's `deadline: true`
+ * day fields that the record's cash walk moves, a row in one of its list's `done` states left out, and a list the reader
+ * may not read left out whole. What differs is which days: a table reads from the
  * oldest overdue row to `horizon:` days ahead, and a calendar reads its months, so it is read here and `across` tells
  * `pages.ts` not to answer the source first.
  *
@@ -39,25 +40,39 @@ import type { BlockResult, PageBlock, PageDeps } from '../pages.ts';
 import type { KindModule } from './index.ts';
 import { KIND_KEYS } from './keys.ts';
 import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
+/* A LEAF STILL: the source imports nothing of the kernel at run time, only `ports` and `where`, as this file does. */
+import { legsOf, moneyValue, moneyWayOf, walkedOf } from '../sources/deadlines.ts';
 
 /** The source that is every list's deadlines, as a page names it (`sources/deadlines.ts`). */
 const ACROSS = 'deadlines';
 
 /**
  * What a calendar over `deadlines` may name in `where:`, and its columns' types: the source's own words for one thing falling
- * due, less its money, which a calendar draws no cell for. `row` is the row's spoken id and `list` its list, so a page
- * narrows with `list is <id>` here exactly as a table over the source does.
+ * due. `row` is the row's spoken id and `list` its list, so a page narrows with `list is <id>` here exactly as a table
+ * over the source does.
+ *
+ * AND ITS MONEY, SINCE THE AUDIT OF 25 OCTOBER (Z14): the amount and the way it goes, read as the source reads them
+ * (`moneyWayOf`), so Money's calendar of the next thirty days says `amount is set` and draws what Today's Due soon draws.
  */
 const DUE: Schema = {
   register: ACROSS,
-  fields: { list: { type: 'text' }, row: { type: 'text' }, title: { type: 'text' }, day: { type: 'day' } },
+  fields: {
+    list: { type: 'text' },
+    row: { type: 'text' },
+    title: { type: 'text' },
+    day: { type: 'day' },
+    amount: { type: 'money' },
+    direction: { type: 'enum', values: ['in', 'out'] },
+  },
 };
 
 /**
- * The two columns of a calendar over `deadlines`, and no others: a day's line is drawn from the first, and `row` and
- * `list` are ids (`tasks#2`, `tasks`), which a person is never shown in place of a name. They stay words of `where:`.
+ * The columns of a calendar over `deadlines`: what falls due and its day, and its amount third if it is to say one. A
+ * day's line is drawn from the first, and `row` and `list` are ids (`tasks#2`, `tasks`), which a person is never shown
+ * in place of a name. They stay words of `where:`.
  */
-const DUE_COLUMNS = ['title', 'day'];
+const DUE_COLUMNS = ['title', 'day', 'amount'];
+const DUE_SAID = 'A calendar over deadlines names what falls due and its day, and its amount third if it is to say one, as columns: [title, day] or [title, day, amount].';
 
 const overDue = (fix: string, at: string): BlockResult['refusals'][number] => ({ code: 'OUT_OF_BOUNDS', fix, at });
 
@@ -130,6 +145,8 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
 
   const found: { day: string; list: string; seq: number; entry: Entry }[] = [];
   let counted = 0;
+  /* THE CASH WALK'S LEGS, read once, as the source reads them: which rows the walk moves, and the money on each. */
+  const legs = legsOf(deps);
   for (const list of deps.lists()) {
     if (deps.ctx.reads !== undefined && !deps.ctx.reads(list.id)) continue;
     const schema = deps.schemaOf(list.id);
@@ -138,12 +155,16 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
     if (dated.length === 0) continue;
     const title = deps.titleOf(list.id);
     const done = list.done ?? [];
+    const money = moneyWayOf(schema, legs);
     /* NOT FINISHED IS THE LIST'S OWN `done` STATES, as the source reads it. A row with no state yet is open. */
     const open: Predicate[] = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
     for (const field of dated) {
+      /* WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE, as on Due soon (the audit of 25 October, Z14): a bill that repeats
+         is drawn once, on its line, and a paused line not at all. */
+      const walked = walkedOf(schema, field, legs, deps, kit);
       const got = deps.list({
         register: list.id,
-        where: { all: [{ field, gte: window.from }, { field, lte: window.to }, ...open] },
+        where: { all: [{ field, gte: window.from }, { field, lte: window.to }, ...open, ...walked] },
         limit: CALENDAR_MOST,
         order: [{ field, dir: 'asc' }],
       });
@@ -162,6 +183,7 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
         const day = r.fields[field];
         if (typeof day !== 'string' || r.seq === null) continue;
         const named = title !== null && Object.hasOwn(r.fields, title) ? r.fields[title] : undefined;
+        const amount = money.amount !== null && Object.hasOwn(r.fields, money.amount) ? moneyValue(r.fields[money.amount]) : null;
         found.push({
           day: day.slice(0, 10),
           list: list.id,
@@ -175,6 +197,8 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
               row: `${list.id}#${r.seq}`,
               title: typeof named === 'string' ? named : typeof named === 'number' || typeof named === 'boolean' ? String(named) : '',
               day: day.slice(0, 10),
+              amount,
+              direction: amount === null ? null : money.way(r.fields),
             },
             state: r.state,
             version: r.version,
@@ -246,8 +270,7 @@ export const calendar: KindModule & { across: readonly string[] } = {
     if (shape) return shape;
     if (across) {
       const named = Array.isArray(block.columns) ? (block.columns as unknown[]).map((c) => (c !== null && typeof c === 'object' ? (c as { field?: unknown }).field : undefined)) : [];
-      if (named.length !== 2 || named[0] !== DUE_COLUMNS[0] || named[1] !== DUE_COLUMNS[1])
-        return invalid('A calendar over deadlines names two columns, what falls due and its day, as columns: [title, day].', 'columns', DUE_COLUMNS);
+      if (named.length < 2 || named.length > 3 || named.some((f, i) => f !== DUE_COLUMNS[i])) return invalid(DUE_SAID, 'columns', DUE_COLUMNS);
       if (Array.isArray(block.order) && block.order.length > 0) return invalid('A calendar over deadlines comes by day, so it takes no order:.', 'order');
       if (block.authored !== undefined) return invalid('A calendar reads deadlines or writes its rows out with authored:, and this one does both. Take one off.', 'authored');
     }

@@ -53,7 +53,7 @@ type MoneyWay = { amount: string | null; way: (fields: Record<string, Json>) => 
  * Every leg a cash walk on this record reads, as it was written: the walks on its pages, and the figures that read a
  * walk (`source: forecast.runway` with `legs:`). What `moneyWayOf` learns a list's money from.
  */
-function legsOf(deps: PageDeps): unknown[] {
+export function legsOf(deps: PageDeps): unknown[] {
   const onPages = deps.pages().flatMap((p) =>
     (Array.isArray(p.blocks) ? p.blocks : []).flatMap((b) => (b !== null && typeof b === 'object' && b.source === 'forecast.runway' && Array.isArray(b.from) ? (b.from as unknown[]) : [])),
   );
@@ -70,7 +70,7 @@ function legsOf(deps: PageDeps): unknown[] {
  * field as its amount, and says which way only by an enum of exactly `in` and `out`; any other way is `null`, never a
  * guess. A list with no money field, or several and no leg to choose, has neither.
  */
-function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
+export function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
   const money = Object.keys(schema.fields).filter((f) => schema.fields[f]!.type === 'money');
   const leg = legs.find(
     (l): l is Leg =>
@@ -114,7 +114,7 @@ function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
  * is due when ANY leg moves it, because a record walks one list in several ways (all of it, one book, the money out
  * alone), and a list no walk reads keeps every row that is not finished.
  */
-function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps: PageDeps, kit: SourceKit): Predicate[] {
+export function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps: PageDeps, kit: Pick<SourceKit, 'predicateOf'>): Predicate[] {
   /* A LEG HELD BY A HOLE IS ONE PAGE'S PART OF A WALK, NOT THE RECORD'S (the audit of 25 October, Z15): a book's page walks
      Money's legs held to that book, `book is {{name}}`, filled only on that page. Read here the hole names no book, and
      that one leg left the bill and its repeating line both due, one premium twice on Today. The walk it narrows is
@@ -139,7 +139,7 @@ function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps:
 }
 
 /** A stored money value as a reader is shown it, its amount and currency and nothing else, or `null`. */
-function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
+export function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string'
     ? { amount: v.amount, currency: v.currency }
     : null;

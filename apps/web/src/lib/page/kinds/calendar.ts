@@ -7,8 +7,9 @@
  * is said as every cell says it and opens its row; the day is written as `YYYY-MM-DD`, an instant as the day it falls
  * on where the reader is, because a meeting at 23:30 on the 12th is on the 12th for the person who has it.
  *
- * OVER WHAT FALLS DUE (`source: deadlines`) each row is the source's `{ list, row, title, day }`, and its title opens the
- * row on its own list, whose number is the one in `row` (`tasks#2`), so a person reads the name and never the id.
+ * OVER WHAT FALLS DUE (`source: deadlines`) each row is the source's `{ list, row, title, day, amount, direction }`, and
+ * its title opens the row on its own list, whose number is the one in `row` (`tasks#2`), so a person reads the name and
+ * never the id. A third column, `amount`, says each line's money (`dueAmounts`).
  *
  * AUTHORED ROWS are written as they were typed, with their tone, since a calendar takes one.
  *
@@ -21,6 +22,7 @@
  */
 
 import type { BlockResult } from '@braindog/kernel';
+import { money } from 'braindog-render';
 
 import { display } from '../../record/api.ts';
 import type { DrawOptions, Drawn, KindDrawer } from './index.ts';
@@ -57,18 +59,37 @@ function withWeeks(drawn: Drawn, weeks: number | null): Drawn {
 
 /** What falls due, a line each: its title opening its row, and its day. */
 function dueRows(result: BlockResult): string[] {
-  return entriesOf(result).flatMap((e) => {
-    const on = dayOf(e.fields.day);
-    if (on === null) return [];
+  return dueDated(result).map((e) => {
     const title = typeof e.fields.title === 'string' ? e.fields.title : '';
     const spoken = typeof e.fields.row === 'string' ? SPOKEN.exec(e.fields.row)?.groups : undefined;
-    return [`${spoken ? linked(title, spoken.list!, Number(spoken.seq)) : escapeCell(title)} | ${on}`];
+    return `${spoken ? linked(title, spoken.list!, Number(spoken.seq)) : escapeCell(title)} | ${dayOf(e.fields.day)}`;
+  });
+}
+
+/** The rows over what falls due that have a day to be drawn on. */
+const dueDated = (result: BlockResult) => entriesOf(result).filter((e) => dayOf(e.fields.day) !== null);
+
+/**
+ * WHAT FALLS DUE, WITH ITS MONEY, SINCE THE AUDIT OF 25 OCTOBER (Z14): the source's amount, `{ amount, currency }`, said
+ * as the money writer says it and signed by the way it goes where the third column says how. Money's calendar of the next
+ * thirty days reads every list, as Today's Due soon does, so a salary coming in reads `+` and a premium going out `−`.
+ * A line with no money says none.
+ */
+function dueAmounts(result: BlockResult): string[] | null {
+  const third = fieldsOf(result)[2];
+  if (third !== 'amount') return null;
+  const sign = signOf(result);
+  return dueDated(result).map((e) => {
+    const m = e.fields.amount as { amount?: unknown; currency?: unknown } | null | undefined;
+    if (!m || typeof m.amount !== 'number' || typeof m.currency !== 'string') return '';
+    const said = money(Math.abs(m.amount), m.currency);
+    return sign ? `${e.fields[sign.field] === sign.minus ? '−' : '+'}${said}` : said;
   });
 }
 
 /** The block's rows as one fence: over what falls due, over a list, or written out. */
 function drawn(result: BlockResult, opts: DrawOptions): Drawn {
-  if (result.source === ACROSS) return fenced('calendar', dueRows(result), opts);
+  if (result.source === ACROSS) return withAmounts(fenced('calendar', dueRows(result), opts), dueAmounts(result));
   const authored = authoredOf(result);
   if (authored.length)
     return fenced(

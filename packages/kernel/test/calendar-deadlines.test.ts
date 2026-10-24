@@ -145,7 +145,7 @@ test('A READER WHO MAY NOT READ A LIST SEES NONE OF ITS ROWS, and the block name
 test('where: NARROWS BY THE SOURCE\'S OWN WORDS, as a table over deadlines does', async () => {
   const k = await record();
   assert.deepEqual(drawn(read(k, { ...BLOCK, where: 'list is bills' } as PageBlock)), ['2026-09-25 Rent (bills#1)', '2026-10-03 Glaze (bills#2)']);
-  const bad = read(k, { ...BLOCK, where: 'amount is 5' } as PageBlock);
+  const bad = read(k, { ...BLOCK, where: 'what is Rent' } as PageBlock);
   assert.equal(bad.refusals.length, 1);
   assert.deepEqual(bad.rows, []);
 });
@@ -153,11 +153,11 @@ test('where: NARROWS BY THE SOURCE\'S OWN WORDS, as a table over deadlines does'
 test('WHAT IT CANNOT DRAW IS REFUSED IN ITS OWN SENTENCE, at install as at read', async () => {
   const k = await record();
   const said = (more: Record<string, unknown>): string => read(k, { ...BLOCK, ...more } as PageBlock).refusals[0]?.fix ?? '';
-  assert.equal(said({ columns: [{ field: 'what' }, { field: 'due' }] }), 'A calendar over deadlines names two columns, what falls due and its day, as columns: [title, day].');
-  assert.equal(said({ columns: undefined }), 'A calendar over deadlines names two columns, what falls due and its day, as columns: [title, day].');
+  assert.equal(said({ columns: [{ field: 'what' }, { field: 'due' }] }), 'A calendar over deadlines names what falls due and its day, and its amount third if it is to say one, as columns: [title, day] or [title, day, amount].');
+  assert.equal(said({ columns: undefined }), 'A calendar over deadlines names what falls due and its day, and its amount third if it is to say one, as columns: [title, day] or [title, day, amount].');
   /* AN ID IS NO TITLE: `row` would draw `tasks#2` on a day and `list` the list's id, where a person reads a name. */
   for (const first of ['row', 'list'])
-    assert.equal(said({ columns: [{ field: first }, { field: 'day' }] }), 'A calendar over deadlines names two columns, what falls due and its day, as columns: [title, day].');
+    assert.equal(said({ columns: [{ field: first }, { field: 'day' }] }), 'A calendar over deadlines names what falls due and its day, and its amount third if it is to say one, as columns: [title, day] or [title, day, amount].');
   assert.equal(said({ order: [{ field: 'day', dir: 'desc' }] }), 'A calendar over deadlines comes by day, so it takes no order:.');
   assert.match(said({ horizon: 30 }), /does nothing with horizon:/u);
   assert.match(said({ limit: 5 }), /takes no limit:/u);
