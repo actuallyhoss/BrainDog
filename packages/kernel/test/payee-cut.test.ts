@@ -145,3 +145,69 @@ test('the walk makes no organisation from cut names alone, and still links a lin
   assert.equal(walked.suggestions.some((s) => s.kind === 'organisation' && /quillmoor/iu.test(s.name)), false, 'and nobody is asked about a cut name');
   sql.close();
 });
+
+test('shops already made from cut names are one question: fold the one a whole name begins with, retire the rest', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  value(
+    await k.install([
+      register({
+        id: 'organisations',
+        name: 'Organisations',
+        title: 'name',
+        org: { name: 'name', keys: 'keys', merged_into: 'merged_into', retired: 'retired_on' },
+        fields: [
+          { id: 'name', type: 'text', required: true },
+          { id: 'keys', type: 'list', of: 'text' },
+          { id: 'merged_into', type: 'ref', to: 'organisations' },
+          { id: 'retired_on', type: 'day' },
+        ],
+      }),
+      register({
+        id: 'transactions',
+        name: 'Transactions',
+        title: 'what',
+        fields: [
+          { id: 'what', type: 'text', required: true },
+          { id: 'amount', type: 'money', required: true },
+          { id: 'party', type: 'ref', to: 'organisations' },
+          { id: 'counterparty_text', type: 'text' },
+          { id: 'note', type: 'text' },
+        ],
+      }),
+    ]),
+  );
+  /* AS THE WALK LEFT THEM: shops it made from the bank's words, each linked to its lines. */
+  const shop = (name: string, keys: string[]) => value<Entry>(k.create('organisations', { name, keys }, { actor: 'rule:backfill' })).id;
+  const line = (what: string, party: string, more: Record<string, unknown> = {}) => value<Entry>(k.create('transactions', { what, party, amount: { amount: -900, currency: 'EGP' }, ...more }, OWNER)).id;
+  const whole = shop('Harrow Market', ['bank:harrowmarket']);
+  const cutMarket = shop('Marke', ['bank:harrow2marke']);
+  const cutBakery = shop('Quillmoor Bake', ['bank:quillmoorbake']);
+  const fine = shop('Bridge ST Coffee', ['bank:bridgestcoffee']);
+  const byHand = value<Entry>(k.create('organisations', { name: 'Tolland Cafe', keys: ['bank:tollandcafe'] }, OWNER)).id;
+  line('Harrow Market', whole, { note: 'Payee: Harrow Market.' });
+  line('FAWRY*HARROW2 MARKE', cutMarket);
+  line('HARROW2 MARKE', cutMarket, { counterparty_text: 'FAWRY*HARROW2 MARKE' });
+  line('FAWRY*QUILLMOOR BAKE', cutBakery);
+  line('GEIDEA*BRIDGE ST COFFEE 0423 LONDON GB', fine);
+  line('KASHIER*TOLLAND CAFE', byHand);
+
+  const deps: BackfillDeps = { sql, clock, mint: ulids(() => clock.now()), transaction: k.transaction, write: k.write, registers: k.registers };
+  const asks = understandBackfill(deps).held.filter((h) => h.kind === 'cut-organisations');
+  assert.equal(asks.length, 1);
+  const ask = asks[0]!;
+  assert.equal(ask.kind, 'cut-organisations');
+  if (ask.kind !== 'cut-organisations') return;
+  assert.deepEqual(
+    ask.organisations.map((o) => [o.organisation.name, o.into?.name ?? null]),
+    [['Marke', 'Harrow Market'], ['Quillmoor Bake', null]],
+    'a shop a person made, and one a line names whole, are not asked about',
+  );
+  assert.equal(ask.question, "2 shops are names a card text cut short: Marke and Quillmoor Bake. Fold Marke into Harrow Market, and retire Quillmoor Bake? Their payments keep the bank's words, and nothing is deleted.");
+  assert.equal(ask.payments, 3);
+  assert.doesNotMatch(ask.question, /—|bank:|#\d/u);
+  /* NOTHING IS WRITTEN BY ASKING: both shops stand as they were. */
+  assert.deepEqual([k.get(cutMarket)?.fields.merged_into, k.get(cutBakery)?.fields.retired_on], [undefined, undefined]);
+  sql.close();
+});

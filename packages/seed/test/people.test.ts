@@ -171,7 +171,7 @@ test('MEETING SOMEONE MOVES THEIR LAST IN TOUCH TO TODAY, so the page stays curr
 test('ORGANISATIONS ARE PEOPLE\'S LIST, declared as the one `meet` writes a company into, and a person names theirs', () => {
   const orgs = REGISTERS.organisations as unknown as Record<string, unknown> & { fields: { id: string; values?: string[]; to?: string }[] };
   assert.equal(orgs.pack, 'people');
-  assert.deepEqual(orgs.org, { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects' });
+  assert.deepEqual(orgs.org, { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects', retired: 'retired_on' });
   assert.deepEqual(orgs.fields.find((f) => f.id === 'kind')?.values, ['company', 'employer', 'client', 'vendor', 'merchant', 'bank', 'other']);
   const people = REGISTERS.people as unknown as Record<string, unknown> & { meets: Record<string, string>; fields: { id: string; type: string; of?: string; to?: string }[] };
   for (const part of ['keys', 'org', 'self', 'aliases', 'email']) assert.equal(people.meets[part], part, `meets: names no ${part}`);

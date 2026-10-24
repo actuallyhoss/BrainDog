@@ -113,6 +113,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '3.8.0',
+      notes:
+        'An organisation can be retired: it keeps its payments and is no longer listed on People. A shop met by a name a card text cut short is asked about once in Needs you, to fold it into the shop whose whole name it is, or retire it.',
+    },
     { version: '3.7.0', notes: 'Scripts is a page like any other: every script, what starts it and where it stands, which you can change by saying how.' },
     {
       version: '3.6.0',

@@ -330,7 +330,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
     pack: 'people',
     /* THE LIST `meet` WRITES AN ORGANISATION INTO (`packages/kernel/src/roles.ts`, `org`). `projects` goes on a record
        with no Projects, as a person's does (`LINKS` in `packs/first-party.ts`). */
-    org: { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects' },
+    org: { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects', retired: 'retired_on' },
     /* A PERSON OR A PAYMENT NAMES ITS ORGANISATION, so it is not deleted out from under them, as a person is not. */
     delete: 'refuse_while_referenced',
     fields: [
@@ -353,6 +353,9 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       /* WHERE IT WAS SEEN, one dated line each with where: the evidence a match was made on. */
       { id: 'met', label: 'Seen in', type: 'list', of: 'text' },
       { id: 'merged_into', label: 'Merged into', type: 'ref', to: 'organisations' },
+      /* THE DAY IT WAS PUT AWAY, SINCE People 3.8.0 (the audit of 25 October, Y2): a shop met by a name a card text cut
+         short is retired on his yes, kept with its payments and never deleted, and People lists it no more. */
+      { id: 'retired_on', label: 'Retired on', type: 'day' },
       /* A DOCUMENT, AS FOUNDER'S WAS, so a row written under it reads the same. */
       { id: 'note', label: 'Notes', type: 'document' },
     ],
@@ -437,7 +440,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'organisations-count',
     name: 'Organisations',
     source: 'register.organisations',
-    where: 'merged_into is empty',
+    where: 'merged_into is empty, retired_on is empty',
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -620,7 +623,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         icon: 'building',
         span: 6,
         source: 'register.organisations',
-        where: 'merged_into is empty',
+        /* AND NEVER ONE RETIRED, SINCE People 3.8.0. */
+        where: 'merged_into is empty, retired_on is empty',
         when: { metric: 'organisations-count', gt: 0 },
         /* THE NAME AND WHAT KIND, in a third of the page: the website, which most shops have none of, is on the
            organisation's own page. */

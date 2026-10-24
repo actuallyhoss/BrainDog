@@ -3724,8 +3724,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   ): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
     const placeless: string[] = [];
     const rank = (one: BackfillSuggestion | HeldAsk): number =>
-      one.kind === 'run-project' ? 0 : one.kind === 'project-remote' ? 1 : one.kind === 'service-project' ? 2 : one.kind === 'organisation-key' ? 3 : 4;
-    const weight = (one: BackfillSuggestion | HeldAsk): number => (one.kind === 'run-project' ? one.runs : one.kind === 'organisation' || one.kind === 'organisation-key' ? one.payments : 0);
+      one.kind === 'run-project' ? 0 : one.kind === 'project-remote' ? 1 : one.kind === 'service-project' ? 2 : one.kind === 'organisation-key' || one.kind === 'cut-organisations' ? 3 : 4;
+    const weight = (one: BackfillSuggestion | HeldAsk): number =>
+      one.kind === 'run-project' ? one.runs : one.kind === 'organisation' || one.kind === 'organisation-key' || one.kind === 'cut-organisations' ? one.payments : 0;
     const ordered = [...asked, ...held]
       .map((one, i) => ({ one, i }))
       .sort((a, b) => rank(a.one) - rank(b.one) || weight(b.one) - weight(a.one) || a.i - b.i)
@@ -3734,6 +3735,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const offered = new Set(asked.flatMap((one) => (one.kind === 'run-project' ? placesOf(one).flatMap((w) => one.projects.map((p) => `${p.id} ${w}`)) : [])));
     const drafts = ordered.flatMap((one) => {
       if (one.kind === 'organisation-key') return heldDraft(one);
+      if (one.kind === 'cut-organisations') return cutDraft(one);
       if (one.kind === 'project-remote' && offered.has(`${one.project.id} ${keyOf('remote', one.remote) ?? ''}`)) return [];
       if (one.kind === 'run-project' && placesOf(one).length === 0) {
         placeless.push(`${one.question} was not filed: its runs say only a repository's name and not where it is, so a yes would place nothing.`);
@@ -4518,6 +4520,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (held.includes(one.bank)) return [];
     const body = { register: orgs.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [keys]: [...held, one.bank] } }], understand_key: one.key };
     return [{ draft: { key: stableKey(body), question: one.question, body_kind: 'rowset', body, by: 'rules' }, choice: null }];
+  };
+
+  /**
+   * THE SHOPS MET BY A NAME A CARD TEXT CUT SHORT, AS ONE CHANGE HE SAYS YES OR NO TO (the audit of 25 October, Y2): each
+   * the walk found another shop's whole name for is folded into it, as a merge he presses is (`merged_into`), and each
+   * other is retired on the day he answers, kept with its payments. Every row at the version it was read at, so a shop
+   * changed since is not overwritten. A list that cannot say a shop is retired asks only the folds.
+   */
+  const cutDraft = (one: Extract<HeldAsk, { kind: 'cut-organisations' }>): { draft: SlashDraft; choice: null }[] => {
+    const orgs = orgsList();
+    if (orgs === null) return [];
+    const { merged_into: into, retired } = orgs.fields;
+    const today = new Date(clock.now()).toISOString().slice(0, 10);
+    const rows = one.organisations.flatMap(({ organisation, into: whole }) => {
+      const row = kernel.get(organisation.id);
+      const kept = whole === null ? null : kernel.get(whole.id);
+      if (!row || row.register !== orgs.register) return [];
+      if (kept && into !== undefined) return [{ at: kernel.nameOf(row.id), version: row.version, patch: { [into]: kernel.nameOf(kept.id) } }];
+      return whole === null && retired !== undefined ? [{ at: kernel.nameOf(row.id), version: row.version, patch: { [retired]: today } }] : [];
+    });
+    if (rows.length === 0) return [];
+    const body = { register: orgs.register, rows, understand_key: one.key };
+    return [{ draft: { key: stableKey({ register: orgs.register, understand_key: one.key }), question: one.question, body_kind: 'rowset', body, by: 'rules' }, choice: null }];
   };
 
   /** The list projects are kept in, and its field of repositories: the one list declaring `scopes:`, as `slashProjects` reads it. */

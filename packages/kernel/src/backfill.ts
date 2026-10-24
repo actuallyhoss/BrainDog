@@ -134,7 +134,17 @@ export type BackfillSuggestion =
  * the payee's key, and the next walk links every line by it. A no leaves both as they are. Kept apart from
  * `suggestions`, whose every kind the record already files, until the record files this one too.
  */
-export type HeldAsk = { kind: 'organisation-key'; key: string; organisation: Named; payee: string; bank: string; payments: number; question: string };
+export type HeldAsk =
+  | { kind: 'organisation-key'; key: string; organisation: Named; payee: string; bank: string; payments: number; question: string }
+  | CutAsk;
+
+/**
+ * THE SHOPS ALREADY MET BY A NAME A CARD TEXT CUT SHORT, asked about once and all together (the audit of 25 October,
+ * Y2): each that another organisation's whole name begins with is folded into that one (`into`), and each other is
+ * retired, kept with its payments and the bank's words, and left off People. Nothing is folded or retired until he says
+ * yes, and a no leaves them as they are. `key` is the shops' own ids, so the same shops are asked about once.
+ */
+export type CutAsk = { kind: 'cut-organisations'; key: string; organisations: { organisation: Named; into: Named | null }[]; payments: number; question: string };
 
 export type Backfilled = {
   ledger: Slice & { organisations: number };
@@ -542,8 +552,11 @@ function ledgerSlice(
   /* THE ORGANISATIONS BY THE KEY THEIR NAME FOLDS TO, so `Fenwick Cloud` answers to `FENWICK CLOUD` before either was
      ever keyed. Folded rows are left out: their keys already point at the row they were folded into. */
   const byName = new Map<string, string[]>();
+  const put = (row: Row): boolean =>
+    (orgs.at.merged_into !== undefined && textOf(row.fields[orgs.at.merged_into]) !== undefined) || (orgs.at.retired !== undefined && textOf(row.fields[orgs.at.retired]) !== undefined);
   for (const row of allRows(sql, orgs.register)) {
-    if (orgs.at.merged_into !== undefined && textOf(row.fields[orgs.at.merged_into]) !== undefined) continue;
+    /* AND RETIRED ROWS, SINCE People 3.8.0: a shop put away is no name a payee is matched to. */
+    if (put(row)) continue;
     const key = keyOf('bank', textOf(row.fields[orgs.at.name]) ?? '');
     if (key !== null) byName.set(key, [...(byName.get(key) ?? []), row.id]);
   }
@@ -675,6 +688,9 @@ function ledgerSlice(
     return created.value.id;
   };
 
+  const cut = cutAsk(sql, orgs, ledgers, readingOf, put, madeFromWords);
+  if (cut !== null) ask(cut);
+
   const [startList = '', startId = ''] = after === '' ? [] : splitCursor(after);
   let left = limit;
   for (const ledger of ledgers) {
@@ -741,6 +757,68 @@ function ledgerSlice(
   }
   /* WHERE THE NEXT CALL STARTS: after the last line read while the slice was cut short, and the start once it was not. */
   return { batch: writes.batch(), looked, wrote, refused, next: left === 0 && last !== '' ? last : null, organisations: made };
+}
+
+/**
+ * THE ONE QUESTION ABOUT SHOPS ALREADY MET BY A NAME A CARD TEXT CUT SHORT (`CutAsk`), or `null` when there are none.
+ *
+ * A SHOP IS ONE WHEN THE BANK'S WORDS MADE IT AND EVERY LINE LINKED TO IT MAY BE CUT (`mayBeCut`): one a person or an
+ * agent made, or one a line names whole, is a shop as it stands. ONE IS FOLDED, NOT RETIRED, where exactly one other
+ * shop's whole name begins with its letters, the digits left out: the card's `FAWRY*EXPRESS3 MARKE` is the note's
+ * Express Market. Every other is retired, on a list that can say so; on one that cannot, it is not asked about.
+ */
+function cutAsk(
+  sql: Sql,
+  orgs: { register: string; at: OrgFields },
+  ledgers: readonly Ledger[],
+  readingOf: (ledger: Ledger) => Reading,
+  put: (row: Row) => boolean,
+  madeFromWords: (id: string) => boolean,
+): CutAsk | null {
+  const said = new Map<string, { cut: boolean; lines: number; stems: Set<string> }>();
+  const stemOf = (key: string): string => key.slice(key.indexOf(':') + 1).replace(/\d/gu, '');
+  for (const ledger of ledgers)
+    for (const row of allRows(sql, ledger.register)) {
+      const party = textOf(row.fields[ledger.party]);
+      if (party === undefined) continue;
+      const p = payeeOf(ledger, row.fields, readingOf(ledger));
+      const held = said.get(party) ?? { cut: true, lines: 0, stems: new Set<string>() };
+      held.lines += 1;
+      if (p === null || !mayBeCut(p.said)) held.cut = false;
+      else held.stems.add(stemOf(p.key));
+      said.set(party, held);
+    }
+  const live = allRows(sql, orgs.register).filter((row) => !put(row));
+  const nameOf = (row: Row): string => textOf(row.fields[orgs.at.name]) ?? 'a shop';
+  const isCut = (row: Row): boolean => said.get(row.id)?.cut === true && madeFromWords(row.id);
+  const whole = live.filter((row) => !isCut(row)).map((row) => ({ row, stem: stemOf(keyOf('bank', nameOf(row)) ?? ':') }));
+  const asked: { organisation: Named; into: Named | null }[] = [];
+  let payments = 0;
+  for (const row of live.filter(isCut)) {
+    const stems = [...said.get(row.id)!.stems].filter((s) => s.length >= 3);
+    const into = whole.filter((w) => w.stem !== '' && stems.some((s) => w.stem.startsWith(s) && w.stem !== s));
+    if (into.length !== 1 && orgs.at.retired === undefined) continue;
+    asked.push({ organisation: { id: row.id, name: nameOf(row) }, into: into.length === 1 ? { id: into[0]!.row.id, name: nameOf(into[0]!.row) } : null });
+    payments += said.get(row.id)!.lines;
+  }
+  if (asked.length === 0) return null;
+  const and = (xs: readonly string[]): string => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}` : (xs[0] ?? ''));
+  const folds = asked.filter((a) => a.into !== null).map((a) => `${a.organisation.name} into ${a.into!.name}`);
+  const retired = asked.filter((a) => a.into === null).map((a) => a.organisation.name);
+  const what =
+    folds.length > 0 && retired.length > 0
+      ? `Fold ${and(folds)}, and retire ${retired.length === 1 ? retired[0] : `the other ${retired.length}`}`
+      : folds.length > 0
+        ? `Fold ${and(folds)}`
+        : `Retire ${asked.length === 1 ? 'it' : 'them'}`;
+  const shops = asked.length === 1 ? `${asked[0]!.organisation.name} is a name a card text cut short` : `${asked.length} shops are names a card text cut short: ${and(asked.map((a) => a.organisation.name))}`;
+  return {
+    kind: 'cut-organisations',
+    key: `cut-organisations:${asked.map((a) => a.organisation.id).sort().join(',')}`,
+    organisations: asked,
+    payments,
+    question: `${shops}. ${what}? Their payments keep the bank's words, and nothing is deleted.`,
+  };
 }
 
 /** A ledger cursor, `register/id`. */

@@ -1866,6 +1866,20 @@ const DECLARED: Record<string, Version> = {
       "`page.scripts`, off the rail: its one line and a table of every installed script over the kernel's `scripts` source, its name, what starts it and where it stands; a page added, nothing taken away, over 3.6.0's Everyone as faces -> 1f3c19205d5f6147",
     ],
   },
+  /* THE AUDIT OF 25 OCTOBER, Y2. A VERSION AND NOT A RESET: 3.7.0 is master's. */
+  'people@3.8.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.activity page.calendar page.health page.people page.relation page.scripts page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '4fb781bce8786ad1',
+    history: [
+      "`register.organisations` gains `retired_on` (Retired on), which its `org:` names as `retired`, and `page.people`'s Organisations and `metric.organisations-count` leave a retired one out (Y2) -> 4fb781bce8786ad1",
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `

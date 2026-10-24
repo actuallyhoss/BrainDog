@@ -861,6 +861,23 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
+ * PEOPLE 3.8.0 COMES OFF FIRST (the audit of 25 October, Y2): no Retired on for an organisation, nor a `retired` part in
+ * its `org:`, and its list and count read every organisation not folded into another.
+ */
+const withoutRetired38 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => {
+    if (d.register === 'organisations' && Array.isArray(d.fields)) {
+      const { retired: _retired, ...org } = d.org as Body;
+      return { ...d, org, fields: (d.fields as Body[]).filter((f) => f.id !== 'retired_on') };
+    }
+    if (d.metric === 'organisations-count') return { ...d, where: 'merged_into is empty' };
+    if (d.page === 'people' && Array.isArray(d.blocks))
+      return { ...d, blocks: (d.blocks as Body[]).map((b) => (b.source === 'register.organisations' && b.kind === 'table' ? { ...b, where: 'merged_into is empty' } : b)) };
+    return d;
+  }),
+});
+/**
  * MONEY 3.22.0 COMES OFF FIRST (the audit of 25 October, Y1): no "Made one with" on Plans, no rule that moves a plan's
  * parts once it is made one with another, and the plans script as 3.21.0 released it, matching names letter for letter.
  */
@@ -1168,7 +1185,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
-      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity' && d.page !== 'scripts').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
+      withPage({ ...raw, declarations: (withoutRetired38(raw).declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity' && d.page !== 'scripts').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
         /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99, PGS-C18). */
         /* AND PEOPLE 3.4.0'S IN TOUCH AND WHAT AGENTS DID, with the night's save of the figure and the line's clause that
            In touch took over (services-people-five-parts-101, PGS-C18). */
