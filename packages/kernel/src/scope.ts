@@ -196,12 +196,32 @@ export type SeenRun = Whereabouts & { project?: string | null | undefined; at: s
 export const SUGGEST_AFTER = 3;
 
 /**
+ * Folders any machine has that are never a project (scope D6, "Start a project for Temp?"): a temporary or scratch
+ * folder, the home, desktop, downloads and documents folders, the folder code sits in, and a worktree an agent opened.
+ */
+const GENERIC = new Set(['temp', 'tmp', 'desktop', 'downloads', 'documents', 'developer', 'dev', 'code', 'repos', 'src', 'home', 'scratch', 'scratchpad', 'worktree', 'worktrees']);
+
+/** Whether a place's name, or the folder its run worked in, is one no person means as a project (`GENERIC`). */
+export function genericPlace(name: string, cwd?: string): boolean {
+  const said = name.trim().toLowerCase();
+  if (GENERIC.has(said) || /^(?:agent-[0-9a-f]{8,}|worktree-.+)$/u.test(said) || /^te?mp(?:[-_.]\w*|\d*)$/u.test(said)) return true;
+  if (cwd === undefined) return false;
+  const path = cwd.replace(/\\/gu, '/').toLowerCase();
+  return /\/(?:\.claude\/worktrees|\.worktrees|worktrees)\//u.test(path) || /^\/(?:private\/)?(?:tmp|var\/folders)\//u.test(path);
+}
+
+/** On how many days runs worked there: a project is a habit across days, and three runs in one afternoon a visit. */
+export const SUGGEST_DAYS = 2;
+
+/**
  * The repositories the record has seen runs in and knows no project for, as "Start a project?" suggestions, one for
  * each, with its remote and folder filled in. The caller asks once per `key`, and never again once the person says no.
  *
  * A REPOSITORY IS ITS REMOTE, and a run that names only its repository's folder name is counted with the one remote of
  * that name when there is exactly one. A run with only a folder names no repository and is never counted, nor is a
- * repository any project matches, even only by name: that one is asked about as the project it may be.
+ * repository any project matches, even only by name: that one is asked about as the project it may be. A folder no
+ * person means as a project (`genericPlace`: Temp, Downloads, a worktree) is never suggested, and a repository is asked
+ * about only once runs worked in it on two days (`SUGGEST_DAYS`).
  */
 export function suggestProjects(runs: readonly SeenRun[], projects: readonly Candidate[], least = SUGGEST_AFTER): ProjectSuggestion[] {
   const loose = runs.filter((r) => (r.project ?? '') === '' && (r.remote?.trim() || r.repo?.trim()));
@@ -222,12 +242,14 @@ export function suggestProjects(runs: readonly SeenRun[], projects: readonly Can
   const out: ProjectSuggestion[] = [];
   for (const [key, seen] of [...byRemote, ...byName]) {
     if (seen.length < least) continue;
+    if (new Set(seen.map((r) => r.at.slice(0, 10))).size < SUGGEST_DAYS) continue;
     const newest = [...seen].sort((a, b) => b.at.localeCompare(a.at));
     const remote = newest.find((r) => r.remote?.trim())?.remote?.trim() ?? null;
     const placed = matchProject(projects, { remote: remote ?? undefined, repo: newest.find((r) => r.repo?.trim())?.repo });
     if (placed.project || placed.ambiguous.length) continue;
     const spelled = remote ? lastSpelled(remote) : (newest.find((r) => r.repo?.trim())?.repo?.trim() ?? key);
     const at = newest.find((r) => r.cwd?.trim());
+    if (genericPlace(spelled, at?.cwd?.trim() || undefined)) continue;
     out.push({ key, name: spelled, remote, folder: at?.cwd ? checkout(at.cwd, at.repo?.trim() || spelled) : null, runs: seen.length });
   }
   return out.sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name));

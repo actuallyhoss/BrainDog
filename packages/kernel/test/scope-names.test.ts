@@ -109,9 +109,26 @@ test('AN UNKNOWN REPOSITORY IN THREE RUNS IS ONE "START A PROJECT?", with its re
   assert.deepEqual(suggestProjects(runs.slice(0, 2), PROJECTS), []);
 });
 
+test('A TEMP-LIKE FOLDER IS NEVER OFFERED AS A PROJECT, and a repository is offered only once runs worked in it on two days (scope D6)', () => {
+  const seen = (at: string, more: Partial<SeenRun>): SeenRun => ({ at, ...more });
+  const temp = ['01', '02', '03', '04'].map((d) => seen(`2026-10-${d}T09:00:00Z`, { repo: 'Temp', cwd: 'C:\\Users\\sam\\Temp' }));
+  assert.deepEqual(suggestProjects(temp, PROJECTS), [], '4 runs in Temp suggest nothing');
+  const worktree = ['01', '02', '03'].map((d) => seen(`2026-10-${d}T09:00:00Z`, { repo: 'agent-a8b9705fca6febb7f', cwd: '/Users/sam/Code/kiln/.claude/worktrees/agent-a8b9705fca6febb7f' }));
+  assert.deepEqual(suggestProjects(worktree, PROJECTS), [], 'nor an agent’s worktree');
+  const oneDay = ['09', '10', '11'].map((h) => seen(`2026-10-01T${h}:00:00Z`, { repo: 'marsh', cwd: '/Users/sam/Code/marsh' }));
+  assert.deepEqual(suggestProjects(oneDay, PROJECTS), [], 'three runs in one day are a visit');
+  const twoDays = [oneDay[0]!, ...oneDay.slice(1).map((r) => ({ ...r, at: r.at.replace('10-01', '10-02') }))];
+  assert.deepEqual(
+    suggestProjects(twoDays, PROJECTS).map((s) => s.name),
+    ['marsh'],
+    'three runs over two days in marsh suggest it',
+  );
+});
+
 test('THE SUGGESTION IS READ FROM THE RECORD’S RUNS, and a repository a project lists is never suggested', async () => {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
   const things: Declaration = {
     id: 'register.things',
     kind: 'register',
@@ -134,8 +151,11 @@ test('THE SUGGESTION IS READ FROM THE RECORD’S RUNS, and a repository a projec
   };
   ok(await k.install([things]));
   ok<Entry>(k.create('things', { name: 'Kiln', repos: ['github.com/studio/kiln'] }, { actor: 'p_owner' }));
-  for (const [i, remote] of ['github.com/studio/Ledger', 'github.com/studio/ledger.git', 'git@github.com:studio/ledger', 'github.com/studio/kiln'].entries())
+  for (const [i, remote] of ['github.com/studio/Ledger', 'github.com/studio/ledger.git', 'git@github.com:studio/ledger', 'github.com/studio/kiln'].entries()) {
+    /* ON TWO DAYS AT LEAST, as a habit is (`SUGGEST_DAYS`). */
+    clock.set(NOW - i * 86_400_000);
     ok(k.create('session', { client_id: `cc-${i}`, remote, cwd: 'C:\\Users\\sam\\Code\\Ledger\\src', repo: 'Ledger' }, { actor: 'p_owner' }));
+  }
 
   const registers = new Map([['things', { id: 'things', scopes: { repos: 'repos', folders: 'folders' } }]]);
   assert.deepEqual(projectSuggestions(sql, registers), [

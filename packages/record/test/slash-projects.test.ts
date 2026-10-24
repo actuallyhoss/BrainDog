@@ -44,8 +44,12 @@ async function record() {
   value(await api.kernel.install([PROJECTS]));
   value(api.kernel.create('projects', { name: 'Kiln', lane: 'earning', repos: ['github.com/studio/kiln'] }, { actor: 'p_owner' }));
   /* THREE RUNS IN LEDGER, WHICH NO PROJECT HOLDS, AND THREE IN KILN, WHICH ONE DOES. */
-  for (const [i, remote] of ['github.com/studio/Ledger', 'git@github.com:studio/ledger', 'github.com/studio/ledger.git', 'github.com/studio/kiln', 'github.com/studio/kiln', 'github.com/studio/kiln'].entries())
+  for (const [i, remote] of ['github.com/studio/Ledger', 'git@github.com:studio/ledger', 'github.com/studio/ledger.git', 'github.com/studio/kiln', 'github.com/studio/kiln', 'github.com/studio/kiln'].entries()) {
+    /* ON DAYS APART, as a habit is: three runs in one afternoon are a visit and offer nothing. */
+    clock.set(NOW - i * DAY);
     value(api.kernel.create('session', { client_id: `cc-${i}`, remote, repo: 'Ledger', cwd: '/Users/sam/Code/Ledger' }, { actor: 'p_owner' }));
+  }
+  clock.set(NOW);
   return { api, sql, day: (n: number) => clock.set(NOW + n * DAY) };
 }
 
