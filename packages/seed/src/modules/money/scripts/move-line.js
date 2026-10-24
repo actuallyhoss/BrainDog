@@ -1,13 +1,13 @@
 /**
  * A PAID BILL MOVES ITS REPEATING LINE ON, ASKED ONCE (B6 of the 24 October scope). A bill and a repeating line can be
- * the same money twice: "Encore salary" as a bill due 9 October and as a line whose Next was 9 October. The bill was
+ * the same money twice: "Studio salary" as a bill due 9 October and as a line whose Next was 9 October. The bill was
  * marked paid on 23 October and the line kept 9 October, so Today read the salary two weeks late.
  *
  * WHAT IT LOOKS FOR. Handed a bill that is paid, `twinLine` keeps the live repeating lines going the same way, in the
  * same currency, under the same name (folded, as `match_payment` folds a payee), whose Next is within ten days of the
  * bill's due day. EXACTLY ONE IS THE LINE; none or several and nothing is asked.
  *
- * IT ASKS, AND WRITES NOTHING BY ITSELF. `moveLine` is one question on Decide, "Encore salary is paid for 9 October.
+ * IT ASKS, AND WRITES NOTHING BY ITSELF. `moveLine` is one question on Decide, "Studio salary is paid for 9 October.
  * Move its repeating line on to 31 October?", whose first answer carries the one write: Next, one cycle on, the day
  * the host's `ctx.cycle` walks (Cash ahead's own step). "Leave it" writes nothing. Last paid and Last amount are a
  * payment's, and a bill marked paid by hand had none, so they are left alone, as "It went through" leaves them.

@@ -1,7 +1,7 @@
 /**
  * A PAID BILL ASKS ONCE TO MOVE ITS REPEATING LINE ON (B6 of the 24 October scope).
  *
- * "Encore salary" was a bill due 9 October and a repeating line whose Next was 9 October. The bill was marked paid on
+ * "Studio salary" was a bill due 9 October and a repeating line whose Next was 9 October. The bill was marked paid on
  * 23 October and the line kept its day, so Today read the salary two weeks late. Read here on a fresh record: a bill
  * marked paid by hand, or by a payment, with a line of the same name, way and currency whose Next is within ten days of
  * its due day, files one question whose first answer moves Next one cycle on; a line of another name asks nothing.

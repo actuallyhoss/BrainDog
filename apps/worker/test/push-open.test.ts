@@ -62,8 +62,8 @@ async function throwaway(): Promise<Vapid> {
 
 test('THE BODY IS THE PATH AND NOTHING ELSE, readable by the phone alone', async () => {
   const p = await phone();
-  const body = await encryptPush(p.keys, new TextEncoder().encode('{"open":"/app/sam/decide/sg_1"}'));
-  assert.equal(await decrypt(p, body), '{"open":"/app/sam/decide/sg_1"}');
+  const body = await encryptPush(p.keys, new TextEncoder().encode('{"open":"/app/kiln/decide/sg_1"}'));
+  assert.equal(await decrypt(p, body), '{"open":"/app/kiln/decide/sg_1"}');
   /* ANOTHER PHONE CANNOT READ IT. */
   await assert.rejects(decrypt(await phone(), body));
   await assert.rejects(encryptPush({ p256dh: 'short', auth: p.keys.auth }, new Uint8Array(1)));

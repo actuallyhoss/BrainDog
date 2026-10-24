@@ -421,12 +421,12 @@ async function worker(open: { url: string }[] = []) {
 
 test('A PUSH WITH A PATH SHOWS THE SAME LINE AND A TAP OPENS THAT PATH, never a word that came with it (E44)', async () => {
   const w = await worker();
-  await w.fire('push', { data: { json: () => ({ open: `${BASE}/sam/decide/sg_01JQ`, title: 'Invoice 41 is late' }) } });
+  await w.fire('push', { data: { json: () => ({ open: `${BASE}/kiln/decide/sg_01JQ`, title: 'Invoice 41 is late' }) } });
   assert.equal(w.shown[0]?.[0], 'Something in your BrainDog needs you');
-  assert.deepEqual(w.shown[0]?.[1], { tag: 'braindog', data: { open: `https://brain.dog${BASE}/sam/decide/sg_01JQ` } });
+  assert.deepEqual(w.shown[0]?.[1], { tag: 'braindog', data: { open: `https://brain.dog${BASE}/kiln/decide/sg_01JQ` } });
   assert.doesNotMatch(JSON.stringify(w.shown), /Invoice/u, 'a word that came with the push was drawn');
   await w.fire('notificationclick', { notification: { close: () => {}, data: w.shown[0]?.[1] && (w.shown[0][1] as { data: unknown }).data } });
-  assert.deepEqual(w.opened, [`https://brain.dog${BASE}/sam/decide/sg_01JQ`]);
+  assert.deepEqual(w.opened, [`https://brain.dog${BASE}/kiln/decide/sg_01JQ`]);
   /* A PATH OUT OF THE SCOPE OPENS HOME. */
   const other = await worker();
   await other.fire('push', { data: { json: () => ({ open: '/elsewhere/x' }) } });

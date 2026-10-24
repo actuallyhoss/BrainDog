@@ -124,8 +124,8 @@ type Sent = { endpoint: string; headers: Record<string, string> };
 
 /* THE RECORD'S HALF, FAKED: the endpoint behind whatever id the leased job names. The real one is `pushTarget` under the
    lease, and `push-deliver.test.ts` runs this whole path against it. */
-const at = (endpoint: string | null) => async () => endpoint;
 const JOB = { sub: { id: 'ps_01JZ8QK3F7R2M9V4XN6TCB5HAF' } };
+const at = (endpoint: string | null) => async () => (endpoint === null ? null : { id: JOB.sub.id, endpoint });
 
 test('A PUSH IS A POST WITH NO BODY, a TTL and the VAPID header, to the endpoint the subscription named', async () => {
   const { vapid, publicKey } = await keyed();
@@ -191,7 +191,7 @@ test('THE JOB NAMES A SUBSCRIPTION BY ID, AND AN ENDPOINT IN THE PAYLOAD IS NEVE
   const sent: string[] = [];
   const asked: string[] = [];
   const deliver = makeDeliver({
-    push: { vapid, subject: 'mailto:hello@brain.dog', send: async (e) => (sent.push(e), { status: 201 }), target: async (j) => (asked.push(j.id), ENDPOINT) },
+    push: { vapid, subject: 'mailto:hello@brain.dog', send: async (e) => (sent.push(e), { status: 201 }), target: async (j) => (asked.push(j.id), { id: JOB.sub.id, endpoint: ENDPOINT }) },
   });
   assert.match(await threw(() => deliver(job({ sub: { endpoint: 'https://push.attacker.example/x' } }))), /names the subscription it rings, by id/);
   /* AND A ROW AN OLDER BUILD QUEUED, WITH NO `sub` AT ALL, IS NOBODY TO RING, as the kernel's `pushSubOf` reads it: done,
@@ -208,7 +208,7 @@ test('THE JOB NAMES A SUBSCRIPTION BY ID, AND AN ENDPOINT IN THE PAYLOAD IS NEVE
 test('THE LEASE IS ASKED WITH THE JOB IT CAME WITH, and a refusal is the sentence the dead letter keeps', async () => {
   const asked: { outbox: string; leasedUntil: string }[] = [];
   const target = leasedTarget(async (args) => (asked.push(args), { ok: true as const, value: { id: 'ps_1', endpoint: ENDPOINT } }));
-  assert.equal(await target(job(JOB)), ENDPOINT);
+  assert.deepEqual(await target(job(JOB)), { id: 'ps_1', endpoint: ENDPOINT });
   assert.deepEqual(asked, [{ outbox: '01ABCDEFGHJKMNPQRSTVWXYZ01', leasedUntil: '2026-09-23T12:01:00.000Z' }]);
   const refusing = leasedTarget(async () => ({ ok: false as const, refusal: { code: 'PULL_LEASE_EDGE', fix: 'The lease on 01ABC ran out.' } }));
   assert.match(await threw(() => refusing(job(JOB))), /lease on 01ABC ran out/);

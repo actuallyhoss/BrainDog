@@ -79,9 +79,10 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      came to wait on two counts held together (plan-lead-one-figure-74), which made it 108, and
      book-lasts-until, the day one book's money runs out (book-lasts-until-76), made it 109, and the four counts of the Ledger by the rule that filed each entry (filing-rules-page-91) made it 113, and the same
      3.17.0's lasts-no-income, how many days the cash lasts with no income (money-lasts-no-income-95), made it 114, and portfolio's projects-lane-earning and projects-with-health, the earning lane and the projects saying
-     how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119, and portfolio 1.19.0's kpis-held and kpi-stale, the key numbers kept and the days since a measure was read, made it 121, and money-core 3.18.0's installments-late, the parts whose day has gone (the audit of 22 October, U4), made it 122, and portfolio 1.22.0's project-staged, project-plan-path and project-plan-roadmap, a project's stages and the shape its plan is kept in, made it 125. The number is
+     how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119, and portfolio 1.19.0's kpis-held and kpi-stale, the key numbers kept and the days since a measure was read, made it 121, and money-core 3.18.0's installments-late, the parts whose day has gone (the audit of 22 October, U4), made it 122, and portfolio 1.22.0's project-staged, project-plan-path and project-plan-roadmap, a project's stages and the shape its plan is kept in, made it 125, and money-core 3.20.0's card-to-pay and card-to-pay-on, what the card has
+     to pay and as of when, made it 127. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 125);
+  assert.equal(declared.length, 127);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -140,7 +141,7 @@ test('SOMEBODY INVITED TO ONE LIST IS LISTED EXACTLY THE FIGURES metric ADMITS T
   /* AND THE CONTROL, so an empty list on both sides cannot pass: she reads the accounts, and the figures over them alone.
      `cash-now` is not one since money-core 3.0.0, because it rolls the balances and transactions too, which she cannot read,
      and `cash-as-of` and `balances-stale` are not since money-core 3.16.0, which reads them off the same roll. */
-  assert.deepEqual(listed, ['cash-accounts', 'currencies-held']);
+  assert.deepEqual(listed, ['card-to-pay', 'card-to-pay-on', 'cash-accounts', 'currencies-held']);
   /* NOR HOW MANY NIGHTS CASH NOW MISSED: a kept line names the lists its figure reads (`figureLists`), so the line of a
      figure held from her is held from her too. Named here because it was listed to her while its line named none. */
   assert.ok(declared.some((d) => d.id === 'metric.nights-missed-30d') && !listed.includes('nights-missed-30d'));
@@ -173,7 +174,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 125);
+  assert.equal(listed.length, 127);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

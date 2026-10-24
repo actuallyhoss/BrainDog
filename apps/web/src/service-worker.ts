@@ -5,7 +5,7 @@
  * ONE FIXED LINE, WHATEVER CAME WITH THE PUSH. `09 §3` is that a push carries no content, because it passes through a
  * push service nobody here runs and this record holds money and credentials. THE ONE THING READ IS WHERE A TAP OPENS
  * (E44 of 24 October): the Worker encrypts `{ open }` to this phone, a path in the app such as
- * `/app/sam/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
+ * `/app/kiln/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
  * No word of it is ever drawn: the line stays fixed, and `push.test.ts` fires a push with a title in its payload and a
  * push whose payload throws when touched.
  *
