@@ -1884,6 +1884,10 @@
       'value pencil';
     column-gap: var(--sp-2);
     align-items: center;
+    /* A FACT STARTS AT ITS TOP (Y28): beside a long note in the two-column facts, a stretched fact spread its label to
+       the middle and its value to the foot, six lines apart. */
+    align-self: start;
+    align-content: start;
     min-block-size: 40px;
     padding-block: 6px;
   }
