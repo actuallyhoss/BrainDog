@@ -17,12 +17,18 @@ export const OPENED_CAP = 5;
 /** Addresses that are not a place to go back to: the way in, the start, and Today, which the bar always draws. */
 const PASSED = /^\/(?:$|signin|signup|start|invite|connect)(?:[/?#]|$)/u;
 
-/** The name a screen gave itself: the first part of its tab title, or `null` when it only said the product. */
+/**
+ * A handle and not a name: a question's `SG240`, a run's `S42`, a row's `tasks#4`. A screen whose tab still says one
+ * had not named itself yet (the audit of 25 October, Z24: Recent listed "SG240"), so it is not kept by that name.
+ */
+const HANDLE = /^(?:[A-Z]{1,3}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u;
+
+/** The name a screen gave itself: the first part of its tab title, or `null` when it only said the product or a handle. */
 export function titleIn(tab: string, product: string): string | null {
   const parts = tab.split(' · ').map((p) => p.trim()).filter(Boolean);
   if (parts.length < 2) return null;
   const first = parts[0]!;
-  return first === product ? null : first;
+  return first === product || HANDLE.test(first) ? null : first;
 }
 
 /** What was kept, read back; anything unreadable is nothing. */
@@ -32,7 +38,7 @@ export function openedKept(raw: string | null): Opened[] {
     const list: unknown = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
     return list
-      .filter((o): o is Opened => o !== null && typeof o === 'object' && typeof o.href === 'string' && typeof o.title === 'string' && typeof o.at === 'number')
+      .filter((o): o is Opened => o !== null && typeof o === 'object' && typeof o.href === 'string' && typeof o.title === 'string' && typeof o.at === 'number' && !HANDLE.test(o.title.trim()))
       .slice(0, OPENED_CAP);
   } catch {
     return [];
@@ -41,7 +47,7 @@ export function openedKept(raw: string | null): Opened[] {
 
 /** The list with `place` first, once, and at most `cap` long. A place that is no place to go back to changes nothing. */
 export function withOpened(list: readonly Opened[], place: Opened, cap: number = OPENED_CAP): Opened[] {
-  if (PASSED.test(place.href) || !place.title.trim()) return [...list];
+  if (PASSED.test(place.href) || !place.title.trim() || HANDLE.test(place.title.trim())) return [...list];
   return [place, ...list.filter((o) => o.href !== place.href)].slice(0, cap);
 }
 

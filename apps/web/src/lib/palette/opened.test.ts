@@ -32,3 +32,14 @@ test('THE NAME IS THE SCREEN\'S OWN, from its tab title, and what was kept reads
   assert.equal(openedKept(null).length, 0);
   assert.deepEqual(openedKept(JSON.stringify([{ href: '/a', title: 'A', at: 1 }, { href: 2 }])), [{ href: '/a', title: 'A', at: 1 }]);
 });
+
+/* THE AUDIT OF 25 OCTOBER, Z24 (`add-390-light.png`): Recent listed "SG240", the handle a question's tab said before
+   the question named itself. A handle is never kept as a name, and one kept before is not read back. */
+test('RECENT NEVER NAMES A PLACE BY ITS HANDLE: SG240, S42 or tasks#4', () => {
+  assert.equal(titleIn('SG240 · BrainDog', 'BrainDog'), null);
+  assert.equal(titleIn('S42 · Agent runs · BrainDog', 'BrainDog'), null);
+  assert.equal(titleIn('tasks#4 · BrainDog', 'BrainDog'), null);
+  assert.equal(titleIn('Add Profiles · BrainDog', 'BrainDog'), 'Add Profiles');
+  assert.deepEqual(withOpened([], { href: '/decide/SG240', title: 'SG240', at: 1 }), []);
+  assert.deepEqual(openedKept(JSON.stringify([{ href: '/decide/SG240', title: 'SG240', at: 1 }, { href: '/p/people', title: 'People', at: 2 }])).map((o) => o.title), ['People']);
+});
