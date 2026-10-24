@@ -65,23 +65,29 @@ export function familyName(list: string, did: readonly string[]): string {
  * they came. A row with no family, or the only one of its family, is itself.
  */
 export function families<T extends Kin>(rows: readonly T[]): Fold<T>[] {
+  /* TWO FAMILIES THAT WOULD BE CALLED THE SAME ARE ONE (the audit of 25 October, Z31): the record keys a family by the
+     body's whole shape, so rules on Ledger that set nothing a name says came as two keys, and On drew "Rules on
+     Ledger" twice, 6 rules and 58. What he reads is the name, so the name is what folds. */
+  const said = (r: T): string | null => (r.family ? familyName(r.family.list, r.family.did) : null);
   const by = new Map<string, T[]>();
   for (const r of rows) {
-    if (!r.family) continue;
-    const kin = by.get(r.family.key);
+    const name = said(r);
+    if (name === null) continue;
+    const kin = by.get(name);
     if (kin) kin.push(r);
-    else by.set(r.family.key, [r]);
+    else by.set(name, [r]);
   }
   const out: Fold<T>[] = [];
   const placed = new Set<string>();
   for (const r of rows) {
-    const kin = r.family ? by.get(r.family.key) : undefined;
-    if (!r.family || !kin || kin.length < 2) {
+    const name = said(r);
+    const kin = name === null ? undefined : by.get(name);
+    if (!r.family || name === null || !kin || kin.length < 2) {
       out.push({ kind: 'one', row: r });
       continue;
     }
-    if (placed.has(r.family.key)) continue;
-    placed.add(r.family.key);
+    if (placed.has(name)) continue;
+    placed.add(name);
     out.push({ kind: 'family', family: foldOf(r.family.key, r.family.list, r.family.did, kin) });
   }
   return out;

@@ -15,7 +15,20 @@ const kin = (key: string, fired: number | undefined, lastAt: string | null = nul
   key,
   fired,
   lastAt,
-  family: family === null ? undefined : { key: family, list: 'Parcels', did: ['Shelf'] },
+  family: family === null ? undefined : { key: family, list: 'Parcels', did: family === KEY ? ['Shelf'] : ['Tag'] },
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z31 (`automations-390-light-full.png`): "Rules on Ledger" twice in On, 6 rules and 58, two
+   record keys whose rules set nothing a name says. Two families called the same are one. */
+test('TWO FAMILIES CALLED THE SAME ARE ONE ROW, where the first of them was', () => {
+  const ledger = (key: string, family: string, fired: number): Kin => ({ key, fired, lastAt: null, family: { key: family, list: 'Ledger', did: [] } });
+  const rows = [ledger('a', 'reg_ledger/inline/a', 2), ledger('b', 'reg_ledger/inline/a', 0), kin('lonely', 1, null, null), ledger('c', 'reg_ledger/inline/b', 4), ledger('d', 'reg_ledger/inline/b', 1)];
+  const out = families(rows);
+  assert.deepEqual(out.map((f) => (f.kind === 'one' ? f.row.key : f.family.name)), ['Rules on Ledger', 'lonely']);
+  const f = out[0];
+  assert.ok(f?.kind === 'family');
+  assert.deepEqual(f.family.members.map((m) => m.key), ['a', 'b', 'c', 'd']);
+  assert.equal(f.family.fired, 7);
 });
 
 test('RULES THAT SHARE A FAMILY FOLD INTO ONE ROW WHERE THE FIRST OF THEM WAS, members in the order they came', () => {
