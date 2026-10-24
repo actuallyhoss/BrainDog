@@ -42,7 +42,25 @@ import { connect, type AgentIo } from './skills.ts';
    itself to an agent whole, exactly as `json.ts` sends it. `printable` AND NOT `oneLine`, because `fixOf` is typed
    string but hands back whatever the host put in `fix`: a `fix` of 7 made `oneLine` throw, and the refusal's code never
    reached the `--json` envelope. `printable` scrubs a string and passes anything else through, as before the scrub. */
-const refuse = (io: AgentIo, r: Result<unknown>): number => refuseAll(io, r, printable(fixOf(r)));
+const refuse = (io: AgentIo, r: Result<unknown>): number => refuseAll(io, r, unknownSaid(r) ?? printable(fixOf(r)));
+
+/* AN AUTOMATION THAT IS NOT THERE IS NAMED AS IT WAS TYPED, WITH THE WAY TO THE LIST (audit D, W5). The record names it
+   by its declaration id, "There is no automation called rule.nope.", which is a word nobody typed and a dead end. */
+function unknownSaid(r: Result<unknown>): string | null {
+  if (r.ok || !('refusal' in r) || r.refusal.code !== 'DECLARATION_UNKNOWN') return null;
+  const fix = printable(fixOf(r));
+  const named = /^There is no automation called (?:rule\.)?(.+?)\.?$/u.exec(fix);
+  return named === null ? null : `There is no automation called ${named[1]!}. braindog automations list names them.`;
+}
+
+/* A SCRIPT'S CLOCK AS A PERSON SAYS IT: "Every day", "Every 6 hours", not the declaration's `1d` and `6h` (audit D, W6). */
+const UNITS: Readonly<Record<string, [string, string]>> = { s: ['second', 'seconds'], m: ['minute', 'minutes'], h: ['hour', 'hours'], d: ['day', 'days'], w: ['week', 'weeks'] };
+function everyOf(every: string): string {
+  const m = /^([1-9][0-9]*)([smhdw])$/u.exec(every.trim());
+  if (m === null) return `Every ${every}`;
+  const [one, many] = UNITS[m[2]!]!;
+  return m[1] === '1' ? `Every ${one}` : `Every ${m[1]!} ${many}`;
+}
 
 /** `2026-09-21 14:02 UTC` from the record's ISO instant, which a person reads faster than the milliseconds and the `Z`. */
 const when = (iso: string): string => (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : iso);
@@ -50,13 +68,34 @@ const when = (iso: string): string => (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? 
 /** A sentence the record wrote, closed with a full stop only when it has none of its own. */
 const closed = (text: string): string => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 
+/** A list by the name a person reads, "Bills and invoices", for its id, "obligations"; the id where none is known. */
+type Named = (id: string) => string;
+const asIs: Named = (id) => id;
+
+/* THE LISTS BY THEIR NAMES (audit D, W7): "When a row of obligations is written" and "Reads installments, plans" said the
+   record's ids where a person reads Bills and invoices and Instalments. One read of the record's boot, and its ids where
+   that read is refused or missing, so a list is never left out. */
+async function namesOf(client: unknown): Promise<Named> {
+  try {
+    const boot = (client as { boot?: () => Promise<Result<unknown>> }).boot;
+    const got = typeof boot === 'function' ? await boot.call(client) : null;
+    const regs = got !== null && got.ok && typeof got.value === 'object' && got.value !== null ? (got.value as { registers?: unknown }).registers : null;
+    const known = new Map<string, string>();
+    for (const r of Array.isArray(regs) ? (regs as { id?: unknown; name?: unknown }[]) : [])
+      if (typeof r?.id === 'string' && typeof r.name === 'string' && r.name.trim() !== '') known.set(r.id, printable(r.name));
+    return (id) => known.get(id) ?? id;
+  } catch {
+    return asIs;
+  }
+}
+
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n === 1 ? one : many}`;
 
 /** What starts an automation, as the opening of a sentence. The record says it at length on Decide; a list needs the gist. */
-function starts(a: Pick<AutomationRow, 'trigger' | 'register' | 'path'>): string {
+function starts(a: Pick<AutomationRow, 'trigger' | 'register' | 'path'>, named: Named = asIs): string {
   const what =
     a.trigger === 'written'
-      ? `When a row of ${a.register ?? 'no list'} is written`
+      ? `When an entry in ${a.register === null ? 'no list' : named(a.register)} is written`
       : a.trigger === 'arrival'
         ? 'When something arrives'
         : a.trigger === 'every'
@@ -85,11 +124,11 @@ function month(m: AutomationRow['month']): string | null {
   return `This month ${plural(m.runs, 'run', 'runs')}${parts.length ? `: ${parts.join(', ')}` : ''}.`;
 }
 
-function listLine(a: AutomationRow): string {
+function listLine(a: AutomationRow, named: Named = asIs): string {
   const said = [
     /* The name only when somebody gave one: the record falls back to the bare id, which is already the line's first word. */
     a.name === a.rule ? null : closed(a.name),
-    starts(a),
+    starts(a, named),
     a.enabled ? null : 'Turned off.',
     origin(a),
     a.next === null ? null : `Next ${when(a.next)}.`,
@@ -172,7 +211,8 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   if (answer.value.length === 0) io.out('No automation you can read is set up on this BrainDog.');
   else {
     io.out('Automations on this BrainDog:');
-    for (const a of printable(answer.value)) io.out(listLine(a));
+    const named = await namesOf(at.client);
+    for (const a of printable(answer.value)) io.out(listLine(a, named));
   }
   io.answer?.({ value: answer.value });
   return 0;
@@ -234,12 +274,12 @@ const SCRIPTS_USAGE = 'braindog scripts takes list, or resume <id>, and --host.'
 
 /** How a script starts, as a sentence: its clock, the door that hands it an arrival, a rule's `run:`, or any of them. */
 function scriptStarts(r: ScriptRow['runs']): string {
-  const ways = [r.every === null ? null : `Every ${r.every}`, r.door === null ? null : `When ${r.door} receives an arrival`, r.rule ? 'When a rule runs it' : null].filter((w): w is string => w !== null);
+  const ways = [r.every === null ? null : everyOf(r.every), r.door === null ? null : `When ${r.door} receives an arrival`, r.rule ? 'When a rule runs it' : null].filter((w): w is string => w !== null);
   if (ways.length === 0) return 'Nothing starts it.';
   return `${ways.map((w, i) => (i === 0 ? w : w.charAt(0).toLowerCase() + w.slice(1))).join(', or ')}.`;
 }
 
-function scriptLine(s: ScriptRow): string {
+function scriptLine(s: ScriptRow, named: Named = asIs): string {
   const said = [
     s.title === s.script ? null : closed(s.title),
     scriptStarts(s.runs),
@@ -250,8 +290,8 @@ function scriptLine(s: ScriptRow): string {
     s.last === null ? 'No run yet.' : `Last run ${s.last.outcome} at ${when(s.last.at)}${s.last.say ? `: ${closed(s.last.say)}` : '.'}`,
     s.status !== 'paused' && s.refused.in_a_row > 0 ? `${plural(s.refused.in_a_row, 'refused run', 'refused runs')} in a row; ${String(s.refused.pauses_at)} pause it.` : null,
     s.month.runs === 0 ? null : `This month ${plural(s.month.runs, 'run', 'runs')}: ${String(s.month.ok)} ok, ${String(s.month.refused)} refused.`,
-    s.reads.length === 0 ? null : `Reads ${s.reads.join(', ')}.`,
-    s.writes.length === 0 ? null : `Writes ${s.writes.join(', ')}.`,
+    s.reads.length === 0 ? null : `Reads ${s.reads.map(named).join(', ')}.`,
+    s.writes.length === 0 ? null : `Writes ${s.writes.map(named).join(', ')}.`,
     s.egress.length === 0 ? null : `Fetches from ${s.egress.join(', ')}.`,
   ].filter((x): x is string => x !== null);
   return `  ${s.script}  ${said.join(' ')}`;
@@ -297,7 +337,8 @@ async function scriptList(args: string[], io: AgentIo): Promise<number> {
   if (answer.value.length === 0) io.out('No script you can read is installed on this BrainDog.');
   else {
     io.out('Scripts on this BrainDog:');
-    for (const s of printable(answer.value)) io.out(scriptLine(s));
+    const named = await namesOf(at.client);
+    for (const s of printable(answer.value)) io.out(scriptLine(s, named));
   }
   io.answer?.({ value: answer.value });
   return 0;

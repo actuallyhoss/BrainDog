@@ -203,7 +203,7 @@ test('automations list: one line each, saying what starts it, whether it is on, 
   assert.equal(await automations(['list'], h.io), 0);
   assert.deepEqual(h.out, [
     'Automations on this BrainDog:',
-    '  chase  Chase late invoices. When a row of invoices is written, as a run. Last run failed at 2026-09-21 14:02 UTC: The mail step was refused. 1 run open. This month 4 runs: 3 done, 1 failed.',
+    '  chase  Chase late invoices. When an entry in invoices is written, as a run. Last run failed at 2026-09-21 14:02 UTC: The mail step was refused. 1 run open. This month 4 runs: 3 done, 1 failed.',
     '  weekly  On a clock, as a run. Turned off. From money-core, for acme. Next 2026-09-28 09:00 UTC. No run yet.',
   ]);
   /* THE RECORD'S OWN ROWS, for an agent to branch on, and not the sentences above taken apart again. */
@@ -227,7 +227,7 @@ test('automations show: the automation, then its recent runs step by step, and t
   assert.equal(await automations(['show', 'chase'], h.io), 0);
   assert.deepEqual(h.out, [
     'rule.chase  Chase late invoices, version 3.',
-    'When a row of invoices is written, as a run. On.',
+    'When an entry in invoices is written, as a run. On.',
     'This month 4 runs: 3 done, 1 failed. 1 run open.',
     'Recent runs, newest first:',
     '  run_01J9ZZZZZZZZZZZZZZZZZZZZZZ  failed  2026-09-21 14:02 UTC, by S7 on a write. The mail step was refused.',
@@ -244,7 +244,7 @@ test('automations show: the automation, then its recent runs step by step, and t
 test('automations show: an automation the record does not know is its own sentence, exit 1', async (t) => {
   const h = await setup(t);
   assert.equal(await automations(['show', 'nowhere'], h.io), 1);
-  assert.deepEqual(h.said, ['There is no automation called rule.nowhere.']);
+  assert.deepEqual(h.said, ['There is no automation called nowhere. braindog automations list names them.']);
   assert.equal(h.answered[0]?.refusal?.code, 'DECLARATION_UNKNOWN');
 
   assert.equal(await automations(['show'], h.io), 1);
@@ -288,7 +288,7 @@ test('scripts list: one line each, saying how it starts, whether it is paused, i
   assert.equal(await scripts(['list'], h.io), 0);
   assert.deepEqual(h.out, [
     'Scripts on this BrainDog:',
-    '  gold-rate  Gold rate. Every 1h. Paused: its last 3 runs were refused, and it runs again only when somebody resumes it in the app. Last run refused at 2026-09-22 10:00 UTC: gold-rate did not finish, so it wrote nothing; its log says why. This month 4 runs: 1 ok, 3 refused. Writes gold_egp. Fetches from https://api.goldapi.io.',
+    '  gold-rate  Gold rate. Every hour. Paused: its last 3 runs were refused, and it runs again only when somebody resumes it in the app. Last run refused at 2026-09-22 10:00 UTC: gold-rate did not finish, so it wrote nothing; its log says why. This month 4 runs: 1 ok, 3 refused. Writes gold_egp. Fetches from https://api.goldapi.io.',
     '  tally  When bank-in receives an arrival, or when a rule runs it. From money-core. Next 2026-09-22 13:00 UTC. No run yet. 1 refused run in a row; 3 pause it. Reads money. Writes sums.',
   ]);
   assert.deepEqual(h.answered, [{ value: SCRIPTS }]);
