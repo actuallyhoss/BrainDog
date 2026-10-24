@@ -12,9 +12,18 @@
  *   - a plan with no part still open is paid. A plan that reads paid or cancelled stays as it reads, whatever its parts
  *     say: closing one may be a person's word, and opening it again is theirs alone.
  *
- * THE TEXT IS MATCHED AS IT IS WRITTEN, letter for letter, because Cash ahead groups parts by the same text
- * (`CASH_LEGS`, `group: 'plan'`) and a plan's name is unique the same way. "Desk" and "desk" are two plans in both
- * places until somebody writes them alike. A blank text is no plan.
+ * THE TEXT IS MATCHED WHATEVER ITS CAPITALS, ACCENTS AND SPACES, SINCE money-core 3.22.0 (the audit of 25 October,
+ * Y1). It was matched letter for letter, so parts that said "harbourview" beside a plan called "Harbourview" made a second plan
+ * of that name, and the plan's page said "1 of 39 paid" over parts numbered 2 to 40. "Desk", "desk " and "Désk" are
+ * one plan now, named as its oldest part writes it, and Cash ahead groups them the same way (`forecast.ts`). A blank
+ * text is no plan.
+ *
+ * TWO PLANS ALREADY HERE UNDER ONE SUCH NAME ARE A QUESTION, NEVER A FOLD. Their parts stay with the plan their own
+ * text names, as they did before, and nothing new is made under that name. The run over every plan asks once
+ * (`twinsAsk`): make each pair one, which closes the second plan and keeps it, linked to the first by "Made one with"
+ * (`one_with`), or keep them apart. Nothing is moved, closed or deleted until he answers. Once the second plan says
+ * which plan it was made one with, it is no plan of its own here: its parts move to the first on the next run, which
+ * his answer starts (`plan-made-one`).
  *
  * TWO CURRENCIES ARE NEVER ADDED. What is left after a part is counted in that part's own currency, from the open
  * parts in it, and a part in another is left out of the sum. A part with no amount or no day is counted nowhere and
@@ -30,8 +39,8 @@
  * written in the same run, because a plan somebody else made in between would take the number and the part with it.
  * Every change is written only where the record holds something else, at the version the part was read at.
  *
- * NOTHING OUTSIDE ITSELF IS READ BY `plansFromNames`, AND NOTHING BUT `plansFromNames` BY `run`: the two texts together
- * are the script (`PLANS_FROM_NAMES_SCRIPT.source`).
+ * NOTHING OUTSIDE THIS FILE IS READ BY `plansFromNames` OR `run`: its four functions together are the script
+ * (`PLANS_FROM_NAMES_SCRIPT.source`), `planKey` and `twinsAsk` beside the two.
  */
 
 export function plansFromNames(parts, plans) {
@@ -40,25 +49,40 @@ export function plansFromNames(parts, plans) {
   const seqOf = (r) => Number(String(r.spoken).split('#')[1]) || 0;
   const oldestFirst = (rows) => [...rows].sort((a, b) => seqOf(a) - seqOf(b));
   const open = (p) => p.fields.state !== 'paid' && p.fields.state !== 'cancelled';
+  const keyOf = planKey;
 
-  /* THE OLDEST ROW OF A NAME IS THE PLAN. The name is unique, so there is one; were there ever two, every run would
-     still pick the same one. */
+  /* A PLAN MADE ONE WITH ANOTHER IS NO PLAN OF ITS OWN while the plan it names is here: its parts are the other's. One
+     that names a plan no longer here is a plan again, so its parts are not left with nowhere to go. */
+  const ids = new Set(plans.map((p) => p.id));
+  const madeOne = (p) => typeof p.fields.one_with === 'string' && p.fields.one_with !== p.id && ids.has(p.fields.one_with);
+
+  /* THE OLDEST ROW OF A NAME IS THE PLAN. Two rows of one name are twins, asked about and never chosen between. */
   const named = new Map();
   for (const plan of oldestFirst(plans)) {
-    const name = plan.fields.name;
-    if (typeof name === 'string' && name.trim() !== '' && !named.has(name)) named.set(name, plan);
+    const key = keyOf(plan.fields.name);
+    if (key === '' || madeOne(plan)) continue;
+    if (!named.has(key)) named.set(key, []);
+    named.get(key).push(plan);
   }
+  const twinned = new Set([...named].filter(([, rows]) => rows.length > 1).map(([key]) => key));
+
+  /* A TWIN'S PARTS ARE GROUPED BY THEIR TEXT AS WRITTEN, as every part was before, so each stays with its own plan until
+     he answers. Every other name's parts are one group however they are written. */
   const groups = new Map();
   for (const part of oldestFirst(parts)) {
-    const name = part.fields.plan;
-    if (typeof name !== 'string' || name.trim() === '') continue;
-    if (!groups.has(name)) groups.set(name, []);
-    groups.get(name).push(part);
+    const text = part.fields.plan;
+    const key = keyOf(text);
+    if (key === '') continue;
+    const at = twinned.has(key) ? `${key}\u0000${text}` : key;
+    if (!groups.has(at)) groups.set(at, { key, text, parts: [] });
+    groups.get(at).parts.push(part);
   }
 
-  const out = { plans: [], writes: [], waiting: 0 };
-  for (const [name, group] of groups) {
-    const plan = named.get(name);
+  const out = { plans: [], writes: [], waiting: 0, twins: [...twinned].map((key) => ({ keep: named.get(key)[0], others: named.get(key).slice(1) })) };
+  for (const { key, text, parts: group } of groups.values()) {
+    const plan = twinned.has(key) ? named.get(key).find((p) => p.fields.name === text) : named.get(key)?.[0];
+    /* NOTHING NEW UNDER A TWIN'S NAME: a part whose text is neither twin's waits for his answer. */
+    if (!plan && twinned.has(key)) continue;
     const state = group.some(open) ? 'open' : group.some((p) => p.fields.state === 'paid') ? 'paid' : 'cancelled';
     if (!plan) {
       /* WHO AND THE ACCOUNT ONLY WHEN THE PARTS AGREE: a plan paid from two accounts names neither. */
@@ -66,7 +90,7 @@ export function plansFromNames(parts, plans) {
         const said = new Set(group.map((p) => p.fields[field]).filter((v) => typeof v === 'string' && v !== ''));
         return said.size === 1 ? { [field]: [...said][0] } : {};
       };
-      out.plans.push({ name, state, ...agreed('party'), ...agreed('account') });
+      out.plans.push({ name: text.trim().replace(/\s+/gu, ' '), state, ...agreed('party'), ...agreed('account') });
       out.waiting += group.length;
     } else if (plan.fields.state !== state && plan.fields.state !== 'paid' && plan.fields.state !== 'cancelled' && state !== 'cancelled') {
       /* A CLOSED PLAN IS NEVER OPENED HERE. No read says who closed it, and a plan somebody marked paid by hand while a
@@ -164,14 +188,22 @@ export default async function run(ctx) {
     name = row.fields.name;
     if (typeof name !== 'string' || name.trim() === '') return null;
   }
-  const parts = await every('installments', name === null ? undefined : { field: 'plan', is: name });
-  const plans = await every('plans', name === null ? undefined : { field: 'name', is: name });
+  /* ONE PLAN'S PARTS ARE ASKED FOR BY A WORD OF ITS NAME, and kept only where the whole name is that plan's however it
+     is written. The record's `contains` folds capitals and nothing else, so a name with a letter beyond them reads every
+     part. Every plan is read, since a plan written another way is still the one its parts belong to: there are few. */
+  const key = name === null ? null : planKey(name);
+  const word = key === null || !/^[\x20-\x7e\s]*$/u.test(name) ? null : key.split(' ').reduce((a, b) => (b.length > a.length ? b : a), '');
+  const read = await every('installments', word === null || word === '' ? undefined : { field: 'plan', contains: word });
+  const parts = key === null ? read : read.filter((p) => planKey(p.fields.plan) === key);
+  const plans = await every('plans');
 
   const out = plansFromNames(parts, plans);
   const made = out.plans.slice(0, MOST);
   const writes = out.writes.slice(0, MOST - made.length);
   const more = made.length < out.plans.length || writes.length < out.writes.length;
-  if (made.length === 0 && writes.length === 0) return null;
+  /* THE QUESTION ABOUT TWINS IS THE NIGHT'S, over every plan, so a part's run and the night's never ask it two ways. */
+  const ask = key === null ? twinsAsk(out.twins) : null;
+  if (made.length === 0 && writes.length === 0) return ask === null ? null : { plans: 0, parts: 0, more: false, ask };
   for (const plan of made) ctx.write('plans', plan);
   for (const w of writes) ctx.update(w.id, w.fields, w.version);
 
@@ -195,7 +227,48 @@ export default async function run(ctx) {
   for (const w of writes) if (byId.has(w.id)) sentences.push(`${byId.get(w.id)} is ${w.fields.state === 'paid' ? 'paid' : 'open'}.`);
   if (more) sentences.push('The rest waits for the next run.');
   ctx.log(sentences.join(' '));
-  return { plans: made.length, parts: ofParts.length, more };
+  return { plans: made.length, parts: ofParts.length, more, ...(ask === null ? {} : { ask }) };
+}
+
+/** A plan's name however it is written: no accents, lower case, one space between words and none at the ends. */
+export function planKey(name) {
+  return typeof name === 'string' ? name.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim() : '';
+}
+
+/**
+ * The one question about plans here twice under one name, or `null` when there are none: every pair in one question,
+ * by their names, whose yes closes each second plan and links it to the first ("Made one with"), and whose no leaves
+ * both as they are. Only the second plans are changed by the answer, so a part paid while it waits does not make the
+ * answer stale; their parts follow on the run the answer starts.
+ *
+ * ONE QUESTION A SET OF TWINS, EVER. Its cause is the plans' own numbers, so a night that finds it waiting or answered
+ * adds nothing, and a plan closed by hand is closed already and not closed again.
+ */
+export function twinsAsk(twins) {
+  if (!Array.isArray(twins) || twins.length === 0) return null;
+  const seq = (p) => String(p.spoken).split('#')[1];
+  const name = (p) => String(p.fields.name).trim();
+  const and = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}` : xs.join(''));
+  const pairs = twins.map((t) => and([t.keep, ...t.others].map(name)));
+  const one = twins.length === 1;
+  const question = one
+    ? `${pairs[0]} are one plan written ${twins[0].others.length === 1 ? 'two' : 'several'} ways. Make them one plan?`
+    : `${and(twins.map((t) => name(t.keep)))} are each one plan written more than one way (${pairs.join('; ')}). Make each one plan?`;
+  const because = one
+    ? `The parts of ${and(twins[0].others.map(name))} move to ${name(twins[0].keep)}, and ${and(twins[0].others.map(name))} is closed and kept, linked to ${name(twins[0].keep)}. Nothing is deleted.`
+    : 'The parts of each second plan move to the first, and the second is closed and kept, linked to the first. Nothing is deleted.';
+  const patches = twins.flatMap((t) =>
+    t.others.map((o) => ({ id: o.spoken, version: o.version, fields: { one_with: t.keep.id, ...(o.fields.state === 'paid' || o.fields.state === 'cancelled' ? {} : { state: 'cancelled' }) } })),
+  );
+  return {
+    cause: `plans.twins:${twins.map((t) => [t.keep, ...t.others].map(seq).join('.')).join('_')}`,
+    question,
+    about: twins.map((t) => name(t.keep)),
+    options: [
+      { id: 'one', label: 'Make them one', because, patches },
+      { id: 'apart', label: 'Keep them apart', because: 'Each plan keeps its own parts, and this is not asked again.' },
+    ],
+  };
 }
 
 /**
@@ -213,5 +286,5 @@ export const PLANS_FROM_NAMES_SCRIPT = {
   reads: ['installments', 'plans'],
   writes: ['installments', 'plans'],
   limits: { writes: 1000 },
-  source: `${plansFromNames.toString()}\nexport default ${run.toString()}`,
+  source: `${planKey.toString()}\n${twinsAsk.toString()}\n${plansFromNames.toString()}\nexport default ${run.toString()}`,
 };

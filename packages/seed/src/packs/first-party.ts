@@ -716,11 +716,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   project's tasks and its runs together, the figure Today's cards read, where it read Work's `project-last-worked`,
  *   the tasks alone. 1.25.0 is master's (Numbers' page). One column changed and no id added or taken away, so a minor
  *   step.
+ * - money-core 3.22.0 (the audit of 25 October, Y1): `plans_from_names` matches a plan's name whatever its capitals,
+ *   accents and spaces, where "harbourview" beside "Harbourview" made a second plan, and asks once about two plans already here
+ *   under one name; `register.plans` gains `one_with`, which his yes sets on the second plan as it closes it, and
+ *   `rule.plan-made-one` hands that plan's parts to the first. 3.21.0 is master's (Z14, Z18). A field and a rule added
+ *   and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.26.0',
   people: '3.7.0',
-  'money-core': '3.21.0',
+  'money-core': '3.22.0',
   estate: '2.4.0',
   work: '1.19.0',
 };

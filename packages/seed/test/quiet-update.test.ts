@@ -861,7 +861,24 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
- * MONEY 3.21.0 COMES OFF FIRST (the audit of 25 October, Z14 and Z18): the calendar of what falls due under Coming and
+ * MONEY 3.22.0 COMES OFF FIRST (the audit of 25 October, Y1): no "Made one with" on Plans, no rule that moves a plan's
+ * parts once it is made one with another, and the plans script as 3.21.0 released it, matching names letter for letter.
+ */
+const PLANS_3_21 = ((await import(new URL('./fixtures/plans-from-names-3.21.0.js', import.meta.url).href)) as { PLANS_FROM_NAMES_SCRIPT: Body }).PLANS_FROM_NAMES_SCRIPT;
+const withoutTwins22 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.rule !== 'plan-made-one')
+    .map((d) =>
+      d.register === 'plans' && Array.isArray(d.fields)
+        ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'one_with') }
+        : d.script === 'plans_from_names'
+          ? { ...d, source: PLANS_3_21.source }
+          : d,
+    ),
+});
+/**
+ * MONEY 3.21.0 COMES OFF NEXT (the audit of 25 October, Z14 and Z18): the calendar of what falls due under Coming and
  * going wears its own heading and glyph again, and reads Bills and invoices alone, while one falls due.
  */
 const withoutCalendar21 = (doc: Body): Body =>
@@ -1010,7 +1027,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(raw))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(raw)))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

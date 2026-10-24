@@ -136,3 +136,13 @@ test('THE PARTS OF ONE PLAN SAY WHICH PLAN THEY ARE, from the field the leg name
   assert.ok(counted.ok);
   assert.ok(counted.value.steps.every((s) => !('of' in s)));
 });
+
+test('ONE PLAN WRITTEN TWO WAYS IS ONE GROUP, under the spelling its oldest part wrote (the audit of 25 October, Y1)', async () => {
+  const k = await record();
+  const said = ['Pottery kiln', 'pottery kiln', ' POTTERY  KILN', 'Pottery kíln'];
+  said.forEach((plan, n) => made(k, 'installments', { what: `Kiln, ${n + 1} of 4`, plan, amount: { amount: 50_000, currency: 'GBP' }, due: `2026-1${n % 3}-0${n + 1}` }));
+  made(k, 'installments', { what: 'Lathe, 1 of 1', plan: 'Lathe', amount: { amount: 9_000, currency: 'GBP' }, due: '2026-10-09' });
+  const out = k.runway(0, [PARTS], 120);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.deepEqual([...new Set(out.value.steps.map((s) => s.of))].sort(), ['Lathe', 'Pottery kiln']);
+});

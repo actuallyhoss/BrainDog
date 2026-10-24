@@ -156,6 +156,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.22.0',
+      notes:
+        'A plan is found by its name however it is written, so parts that say "desk" join the plan called Desk and no second plan is made beside it. Two plans already here under one name are asked about once in Needs you: make them one, which closes the second and keeps it, linked to the first, or keep them apart. Nothing is moved before you answer. Cash ahead counts a plan written two ways as one.',
+    },
+    {
       version: '3.21.0',
       notes:
         'Coming and going on Money opens on its calendar of the next 30 days, with no second heading over it. The calendar now holds everything with money on it that falls due, repeating lines and parts of a plan as well as bills, the same things Today names under Due soon, and a bill that repeats once.',

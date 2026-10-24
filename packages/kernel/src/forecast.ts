@@ -342,6 +342,17 @@ export function runway(
   const refusals: Refusal[] = [];
   const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
+  /* ONE GROUP HOWEVER IT IS WRITTEN, SINCE THE AUDIT OF 25 OCTOBER (Y1): parts that said "harbourview" beside parts that said
+     "Harbourview" were two plans to count in or out, as they were two plans on Plans. A group is its name with no accents, in
+     lower case, with one space between words, said as the oldest row read wrote it, which is what Money's plans script
+     names the plan after. */
+  const spelled = new Map<string, string>();
+  const groupOf = (said: unknown): string | null => {
+    if (typeof said !== 'string' || said.trim() === '') return null;
+    const key = said.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim();
+    if (!spelled.has(key)) spelled.set(key, said.trim().replace(/\s+/gu, ' '));
+    return spelled.get(key)!;
+  };
 
   /* THE ROWS ARE READ BEFORE ANY IS WALKED, because `'last'` is a horizon only the rows can say: the walk cannot know
      where it ends until it has seen the last dated movement of every leg. Each leg's sentences still come out in the
@@ -440,7 +451,7 @@ export function runway(
         incoming: leg.incoming ? entry.fields[leg.incoming.field] === leg.incoming.is : false,
         label: String(entry.fields[title] ?? entry.id),
         spoken: entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`,
-        of: typeof part === 'string' && part.trim() !== '' ? part.trim() : null,
+        of: groupOf(part),
         named: named ?? null,
         shift: leg.weekend ? shiftOf(entry.fields[leg.weekend]) : 'leave',
       });

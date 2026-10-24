@@ -25,15 +25,18 @@ import { PLANS_REGISTER } from '../src/modules/money/lists/plans.ts';
 type Fields = Record<string, unknown>;
 type Row = { list: string; id: string; spoken: string; version: number; fields: Fields };
 type Patch = { id: string; version: number; fields: Fields };
-type Made = { plans: Fields[]; writes: Patch[]; waiting: number };
+type Twins = { keep: Row; others: Row[] };
+type Made = { plans: Fields[]; writes: Patch[]; waiting: number; twins: Twins[] };
+type Ask = { cause: string; question: string; about: string[]; options: { id: string; label: string; because: string; patches?: Patch[] }[] };
 type Script = {
   plansFromNames: (parts: Row[], plans: Row[]) => Made;
+  twinsAsk: (twins: Twins[]) => Ask | null;
   PLANS_FROM_NAMES_SCRIPT: Record<string, unknown>;
 };
 /* BY A PATH WORKED OUT HERE AND NOT WRITTEN AS A LITERAL, because the script's `.d.ts` is the integrator's to add, and
    a literal import of a `.js` with none does not typecheck under strict. */
 const at = new URL('../src/modules/money/scripts/plans-from-names.js', import.meta.url).href;
-const { plansFromNames, PLANS_FROM_NAMES_SCRIPT } = (await import(at)) as Script;
+const { plansFromNames, twinsAsk, PLANS_FROM_NAMES_SCRIPT } = (await import(at)) as Script;
 
 const usd = (minor: number) => ({ amount: minor, currency: 'USD' });
 const row = (list: string, seq: number, fields: Fields): Row => ({ list, id: `e_${list}_${seq}`, spoken: `${list}#${seq}`, version: 3, fields });
@@ -69,7 +72,7 @@ test('Plans holds a name, who, the account, a note and a status, and no amount',
   assert.equal(PLANS_REGISTER.name, 'Plans');
   assert.equal(PLANS_REGISTER.pack, 'money-core');
   assert.equal(PLANS_REGISTER.title, 'name');
-  assert.deepEqual(PLANS_REGISTER.fields.map((f) => f.id), ['name', 'party', 'account', 'note', 'state']);
+  assert.deepEqual(PLANS_REGISTER.fields.map((f) => f.id), ['name', 'party', 'account', 'note', 'state', 'one_with']);
   const field = (id: string) => PLANS_REGISTER.fields.find((f) => f.id === id) as Fields;
   assert.deepEqual(field('name'), { id: 'name', type: 'text', required: true, unique: true, search: true });
   assert.deepEqual([field('party').to, field('account').to], ['people', 'accounts']);
@@ -94,12 +97,71 @@ test('an instalment links to its plan and holds what is left after it, and the p
 test('each distinct plan text becomes one plan, named as the parts name it', () => {
   const parts = [part('Car', 5), ...desk(), part('Car', 4), part('desk', 6), part('  ', 7)];
   const out = plansFromNames(parts, []);
-  /* IN THE ORDER THEIR FIRST PARTS WERE WRITTEN. A TEXT WRITTEN ANOTHER WAY IS ANOTHER PLAN, as it is another group
-     in Cash ahead, which groups by the same text; a blank one is no plan. */
-  assert.deepEqual(out.plans, [{ name: 'Desk', state: 'open' }, { name: 'Car', state: 'open' }, { name: 'desk', state: 'open' }]);
+  /* IN THE ORDER THEIR FIRST PARTS WERE WRITTEN. A TEXT WRITTEN ANOTHER WAY IS THE SAME PLAN, named as its oldest part
+     writes it (the audit of 25 October, Y1); a blank one is no plan. */
+  assert.deepEqual(out.plans, [{ name: 'Desk', state: 'open' }, { name: 'Car', state: 'open' }]);
   /* A PLAN MADE IN THIS RUN HAS NO ID UNTIL THE RUN IS OVER, so its parts are linked by the next one. */
   assert.equal(out.waiting, 6);
   assert.equal(out.writes.some((w) => 'plan_row' in w.fields), false);
+});
+
+test('a plan is one plan whatever its capitals, accents and spaces, and its parts are linked to it', () => {
+  const parts = [part('Kiln', 1), part('kiln', 2), part(' KILN  ', 3), part('Kíln', 4)];
+  /* NO PLAN YET: one is made, named as the oldest part writes it, and no second beside it. */
+  assert.deepEqual(plansFromNames(parts, []).plans, [{ name: 'Kiln', state: 'open' }]);
+  /* A PLAN HERE: every part is its, and what is left counts all four. */
+  const out = plansFromNames(parts, [planRow(1, 'kiln')]);
+  assert.deepEqual(out.plans, []);
+  assert.deepEqual([1, 2, 3, 4].map((n) => written(out, `installments#${n}`)?.plan_row), ['e_plans_1', 'e_plans_1', 'e_plans_1', 'e_plans_1']);
+  assert.deepEqual(written(out, 'installments#1')?.left_after, gbp(30_000));
+  /* A NAME WRITTEN WITH SPACES AT ITS ENDS IS MADE WITHOUT THEM. */
+  assert.deepEqual(plansFromNames([part('  Big   Kiln ', 1)], []).plans, [{ name: 'Big Kiln', state: 'open' }]);
+});
+
+test('two plans already here under one name are a question: each keeps its own parts, and nothing new is made', () => {
+  /* THE AUDIT'S CASE, with invented names: "Loft" holds part 1, and a second run made "loft" for parts 2 and 3. */
+  const parts = [part('Loft', 1, { plan_row: 'e_plans_1' }), part('loft', 2, { plan_row: 'e_plans_2' }), part('loft', 3, { plan_row: 'e_plans_2' }), part('LOFT', 4)];
+  const plans = [planRow(1, 'Loft'), planRow(2, 'loft')];
+  const out = plansFromNames(parts, plans);
+  assert.deepEqual(out.plans, [], 'no third plan for the part written LOFT');
+  assert.equal(written(out, 'installments#4'), undefined, 'a part neither twin names waits for his answer');
+  /* EACH STAYS WITH ITS OWN, as before: no part is moved from one twin to the other without his answer. */
+  assert.equal(out.writes.some((w) => w.fields.plan_row !== undefined), false);
+  assert.deepEqual(out.twins.map((t) => [t.keep.spoken, t.others.map((o) => o.spoken)]), [['plans#1', ['plans#2']]]);
+});
+
+test('the twins question names both plans, and its yes closes and links the second, and changes no part', () => {
+  const loft = { keep: planRow(1, 'Loft'), others: [planRow(2, 'loft')] };
+  const ask = twinsAsk([loft])!;
+  assert.equal(ask.question, 'Loft and loft are one plan written two ways. Make them one plan?');
+  assert.equal(ask.cause, 'plans.twins:1.2');
+  assert.deepEqual(ask.about, ['Loft']);
+  assert.deepEqual(ask.options.map((o) => [o.id, o.label]), [['one', 'Make them one'], ['apart', 'Keep them apart']]);
+  assert.deepEqual(ask.options[0]!.patches, [{ id: 'plans#2', version: 3, fields: { one_with: 'e_plans_1', state: 'cancelled' } }]);
+  assert.equal(ask.options[0]!.because, 'The parts of loft move to Loft, and loft is closed and kept, linked to Loft. Nothing is deleted.');
+  assert.equal(ask.options[1]!.patches, undefined, 'keeping them apart changes nothing');
+  /* TWO PAIRS ARE ONE QUESTION, and a plan already closed is linked and left closed. */
+  const kiln = { keep: planRow(3, 'Kiln'), others: [planRow(4, 'kiln', { state: 'paid' })] };
+  const both = twinsAsk([loft, kiln])!;
+  assert.equal(both.question, 'Loft and Kiln are each one plan written more than one way (Loft and loft; Kiln and kiln). Make each one plan?');
+  assert.equal(both.cause, 'plans.twins:1.2_3.4');
+  assert.deepEqual(both.options[0]!.patches!.map((p) => p.fields), [{ one_with: 'e_plans_1', state: 'cancelled' }, { one_with: 'e_plans_3' }]);
+  for (const words of [both.question, ...both.options.map((o) => o.because)]) assert.doesNotMatch(words, /#\d|e_[a-z]+_\d|one_with|—/);
+  assert.equal(twinsAsk([]), null);
+});
+
+test('once the second plan is made one with the first, its parts move to the first and are counted with it', () => {
+  const parts = [part('Loft', 1, { plan_row: 'e_plans_1' }), part('loft', 2, { plan_row: 'e_plans_2' }), part('loft', 3, { plan_row: 'e_plans_2' })];
+  const plans = [planRow(1, 'Loft'), planRow(2, 'loft', { state: 'cancelled', one_with: 'e_plans_1' })];
+  const out = plansFromNames(parts, plans);
+  assert.deepEqual(out.twins, []);
+  assert.deepEqual([2, 3].map((n) => written(out, `installments#${n}`)?.plan_row), ['e_plans_1', 'e_plans_1']);
+  assert.deepEqual(written(out, 'installments#1')?.left_after, gbp(20_000));
+  /* THE CLOSED SECOND PLAN IS LEFT AS IT IS: kept, closed, and never written by a count. */
+  assert.equal(written(out, 'plans#2'), undefined);
+  /* ONE THAT NAMES A PLAN NO LONGER HERE IS A PLAN AGAIN, so its parts are not left with nowhere to go. */
+  const orphan = plansFromNames(parts.slice(1), [planRow(2, 'loft', { one_with: 'e_plans_9' })]);
+  assert.deepEqual([orphan.plans, orphan.twins], [[], []]);
 });
 
 test('a new plan takes who and the account when every part that names one names the same', () => {
@@ -162,7 +224,7 @@ test('run again on what it left, it makes nothing and changes nothing', () => {
   assert.deepEqual([second.plans, second.waiting], [[], 0]);
   assert.deepEqual(second.writes.map((w) => Object.keys(w.fields)), parts.map(() => ['plan_row']));
   const two = after(one.parts, one.plans, second);
-  assert.deepEqual(plansFromNames(two.parts, two.plans), { plans: [], writes: [], waiting: 0 });
+  assert.deepEqual(plansFromNames(two.parts, two.plans), { plans: [], writes: [], waiting: 0, twins: [] });
   assert.deepEqual(two.plans.map((p) => p.fields.name), ['Desk', 'Car']);
 });
 
@@ -207,6 +269,9 @@ function recordOf(start: Row[]) {
     const held = w.field === 'seq' ? seqOf(r) : r.fields[w.field!];
     if ('is' in w) return held === w.is;
     if ('lt' in w) return typeof held === 'number' && held < w.lt!;
+    /* AS THE RECORD READS IT: a word anywhere in the text, its capitals folded and nothing else. */
+    const ascii = (s: string) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+    if ('contains' in w) return typeof held === 'string' && ascii(held).includes(ascii(String((w as { contains: unknown }).contains)));
     throw new Error(`a filter this record does not read: ${JSON.stringify(where)}`);
   };
   const shaped = (r: Row) => ({ id: r.id, seq: seqOf(r), version: r.version, fields: r.fields });
@@ -324,6 +389,28 @@ test('handed the plan a run made, the script links that plan\'s parts and reads 
   assert.deepEqual([gone.out, gone.updates, gone.log], [null, [], ['The plan is no longer in the record, so no part was linked.']]);
 });
 
+test('handed a part written another way, the script links it to the plan and makes no second plan', async () => {
+  const record = recordOf([part('Loft', 1, { plan_row: 'e_plans_1' }), part('loft', 2), planRow(1, 'Loft')]);
+  const { out, added, updates } = await record.run({ register: 'installments', seq: 2 });
+  assert.deepEqual(added, [], 'no plan "loft" beside "Loft"');
+  assert.deepEqual(updates.find((u) => u.spoken === 'installments#2')?.patch.plan_row, 'e_plans_1');
+  assert.equal((out as { ask?: unknown }).ask, undefined, 'a part\'s run asks nothing');
+  /* A NAME WITH A LETTER BEYOND THE RECORD'S FOLDING READS EVERY PART, and still keeps only its own. */
+  const accented = recordOf([part('Kíln', 1), part('kiln', 2), part('Loft', 3), planRow(1, 'Kiln')]);
+  const handed = await accented.run({ register: 'installments', seq: 1 });
+  assert.deepEqual(handed.updates.map((u) => u.spoken).sort(), ['installments#1', 'installments#2']);
+});
+
+test('the run over every plan asks once about twins, and a part\'s run never does', async () => {
+  const record = recordOf([part('Loft', 1, { plan_row: 'e_plans_1', left_after: gbp(0) }), part('loft', 2, { plan_row: 'e_plans_2', left_after: gbp(0) }), planRow(1, 'Loft'), planRow(2, 'loft')]);
+  const night = await record.run();
+  assert.deepEqual([night.added, night.updates], [[], []]);
+  const ask = (night.out as { ask: Ask }).ask;
+  assert.equal(ask.cause, 'plans.twins:1.2');
+  assert.deepEqual(ask.options[0]!.patches, [{ id: 'plans#2', version: 3, fields: { one_with: 'e_plans_1', state: 'cancelled' } }]);
+  assert.equal(((await record.run({ register: 'installments', seq: 2 })).out as { ask?: unknown } | null)?.ask, undefined);
+});
+
 test('handed a plan no part names, the script writes nothing and says nothing', async () => {
   const record = recordOf([...desk(), planRow(1, 'Holiday')]);
   const { out, updates, added, log } = await record.run({ register: 'plans', seq: 1 });
@@ -438,13 +525,14 @@ test('on a record, a plan of sixty parts is made, linked and counted across two 
   assert.deepEqual([0, 1, 2, 59].map((i) => now[i]!.fields.left_after), [gbp(57 * 250_000), gbp(57 * 250_000), gbp(57 * 250_000), gbp(0)]);
   assert.equal(await run({ register: 'installments', seq: third.seq }), null);
 
-  /* A TEXT WITH A SPACE AFTER IT IS HELD AS THE RECORD HOLDS IT, so the plan made from it is found again by the next
-     run and is not made twice, which a unique name would refuse and the whole run with it. */
+  /* A TEXT WITH A SPACE AFTER IT, OR IN OTHER CAPITALS, IS THE ONE PLAN, made once and found again by the next run, so
+     it is never made twice, which a unique name would refuse and the whole run with it. */
   for (const plan of ['Desk ', 'desk']) value(k.create('installments', { what: `${plan}, part 1`, plan, number: 1, direction: 'out', amount: gbp(10_000), due: '2027-03-01', state: 'paid' }, OWNER));
   await run();
   await run();
   assert.equal(await run(), null);
   const made = rowsOf('plans').sort((a, b) => a.seq! - b.seq!);
-  assert.deepEqual(made.map((p) => p.fields.state), ['open', 'paid', 'paid']);
-  assert.equal(rowsOf('installments').every((p) => made.some((m) => m.id === p.fields.plan_row && m.fields.name === p.fields.plan)), true);
+  assert.deepEqual(made.map((p) => [p.fields.name, p.fields.state]), [['Flat', 'open'], ['Desk', 'paid']]);
+  const fold = (v: unknown) => String(v).trim().toLowerCase();
+  assert.equal(rowsOf('installments').every((p) => made.some((m) => m.id === p.fields.plan_row && fold(m.fields.name) === fold(p.fields.plan))), true);
 });
