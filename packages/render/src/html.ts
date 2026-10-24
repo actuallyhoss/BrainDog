@@ -39,7 +39,7 @@ import { rowsCell, timelineCell, timelineDays, timelineDetails, timelineTitle } 
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
-import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from './split.ts';
+import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
@@ -942,7 +942,8 @@ function split(b: Block, o: RenderOptions): string {
           /* A part at nought is left out of the legend (`splitListed`); the fold below still says it. */
           if (!splitListed(plan, values[i]!)) return '';
           const part = partOf(i);
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          const share = splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o)));
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${share ? `<span class="split-share num">${escape(share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';
@@ -959,7 +960,7 @@ function split(b: Block, o: RenderOptions): string {
     ? numbersFold(
         'split',
         [SPLIT_PART, SPLIT_AMOUNT, SPLIT_SHARE],
-        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || SPLIT_NONE, plan.parts.find((p) => p.at === i && !r.hole)?.share ?? SPLIT_NONE]),
+        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || SPLIT_NONE, (!r.hole && i < rows.length ? splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o))) : null) ?? SPLIT_NONE]),
       )
     : '';
   return `<div class="prop split">${track}${legend}${hole}${numbers}</div>`;

@@ -77,6 +77,18 @@ export function splitPlan(values: readonly number[], holes: readonly boolean[] =
  */
 export const splitListed = (plan: SplitPlan, value: number): boolean => plan.empty || value !== 0;
 
+/**
+ * WHAT A ROW SAYS WHERE ITS SHARE WOULD BE: its share, or for an amount of money below nought, that it is owed (the audit
+ * of 25 October, Z18). "Stripe available −$9.61 USD" stood under three accounts with their shares and said nothing of
+ * why it took none. Money below nought on an account is money owed on it. A count below nought says nothing: it is no
+ * part, and nothing is owed on it. A figure is money when it carries a currency's sign or code.
+ */
+export function splitShare(plan: SplitPlan, i: number, value: number, figure: string): string | null {
+  const part = plan.parts.find((p) => p.at === i);
+  if (part) return part.share;
+  return Number.isFinite(value) && value < 0 && /\p{Sc}|\b[A-Z]{3}\b/u.test(figure) ? SPLIT_OWED : null;
+}
+
 /** The track's accessible name: each part and its share, in order. */
 export const splitSentence = (parts: readonly { label: string; share: string }[]): string =>
   parts.map((p) => `${p.label || SPLIT_PART} ${p.share}`).join(', ');
@@ -109,3 +121,5 @@ export const SPLIT_AMOUNT = 'Amount';
 export const SPLIT_SHARE = 'Share';
 /** What the numbers under a split say for a part with no amount or no share: a word read aloud, never a dash (P12). */
 export const SPLIT_NONE = 'none';
+/** What a part of money below nought says where its share would be. */
+export const SPLIT_OWED = 'owed';

@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -67,13 +67,14 @@
     <ul class="split-legend">
       {#each rows as row, i}
         {@const part = plan.parts.find((p) => p.at === i)}
+        {@const share = splitShare(plan, i, values[i] ?? NaN, text(inline(row.cells[1] ?? '', opts)))}
         <!-- A part at nought is left out of the legend (`splitListed`); the fold below still says it. -->
         {#if splitListed(plan, values[i] ?? NaN)}
         <li class="split-item" data-intent={row.tone}>
           <span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
           <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
-          {#if part}<span class="split-share num">{part.share}</span>{/if}
+          {#if share}<span class="split-share num">{share}</span>{/if}
           <span class="split-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
           {#if row.tone}
             <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
@@ -103,7 +104,7 @@
               <th scope="row">{said(row) || SPLIT_PART}</th>
               <!-- AN EMPTY CELL IS READ AS "none", never a dash (P12): this table is for a screen reader. -->
               <td class="num">{text(inline(row.cells[1] ?? '', opts)) || SPLIT_NONE}</td>
-              <td class="num">{(!row.hole && plan.parts.find((p) => p.at === i)?.share) || SPLIT_NONE}</td>
+              <td class="num">{(!row.hole && i < rows.length && splitShare(plan, i, values[i] ?? NaN, text(inline(row.cells[1] ?? '', opts)))) || SPLIT_NONE}</td>
             </tr>
           {/each}
         </tbody>

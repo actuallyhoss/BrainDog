@@ -102,3 +102,13 @@ test('A PART TAKES ITS COLOUR FROM A FOURTH CELL: a slot by name, or a stored hu
   assert.match(html, /class="split-dot"[^>]*data-slot="pink"/u);
   assert.doesNotMatch(html, /degraded/u);
 });
+
+/* THE AUDIT OF 25 OCTOBER, Z18 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`, Accounts): "Stripe available
+   −$9.61 USD" stood under three parts with their shares and said nothing of why it took none. Money below nought on an
+   account is money owed on it, and the legend says so where a share would be. */
+test('AN AMOUNT BELOW NOUGHT SAYS IT IS OWED where a share would be; a count below nought says nothing', () => {
+  const html = toHTML(parse('```split\nHSBC | $9,074.01 USD\nStripe available | −$9.61 USD\n```'));
+  assert.match(html, /<span class="split-label">Stripe available<\/span><span class="split-value num">−[^<]*9\.61[^<]*<\/span><span class="split-share num">owed<\/span>/u);
+  assert.match(html, /<td class="num">owed<\/td>/u, 'and the fold of numbers says it too');
+  assert.doesNotMatch(toHTML(parse('```split\nOpen | 9\nMoved back | −2\n```')), /owed/u);
+});
