@@ -492,9 +492,11 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.equal(feed.cannot, undefined, 'a feed the record read was drawn as one it cannot');
   assert.deepEqual(feed.rows.map((r) => r.cells[0]), ['agent', 'seen', 'you'], 'the read mark sits under the rows newer than it');
   assert.notEqual(feed.rows[1]!.cells[1], '', 'a reader with a read mark was drawn as one who has not looked');
-  assert.equal(feed.rows[0]!.cells[2], '2');
+  /* A BURST SAYS ITS ALIKE LINES IN WORDS AFTER IT, and a note reads on from who wrote it (the audit of 25 October, Z22). */
+  assert.equal(feed.rows[0]!.cells[2], '1');
+  assert.equal(feed.rows[0]!.cells[5], 'and 1 more like this');
   assert.equal(feed.rows[0]!.cells[3], 'deleted Kiln', 'a row the record named was drawn by its id');
-  assert.equal(feed.rows[2]!.cells[3], 'Filed it');
+  assert.equal(feed.rows[2]!.cells[3], 'filed it');
   assert.deepEqual([feed.shown, feed.total], [2, 3]);
   assert.doesNotThrow(() => toSegments(feed));
 
