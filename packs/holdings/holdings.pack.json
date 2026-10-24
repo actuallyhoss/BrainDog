@@ -1,9 +1,9 @@
 {
   "pack": "holdings",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "title": "Holdings",
   "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, what each is worth now when you have a price for it, and what they come to together.",
-  "changes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost with none, and says how many stand at what they cost. A price with no day is dated the day it was written, and the page warns once the oldest price is over 30 days old. The value reads in your home currency, or the one your holdings are in. An account that counts as cash and a holding with the same name are asked about once.",
+  "changes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -135,7 +135,7 @@
     },
     {
       "script": "holdings_cost",
-      "title": "Work out what a holding cost and what it is worth, how many times what one cost and how many times its price, and date a price written with no day or said again: when any of them is written, and once a day for any holding still without a worth",
+      "title": "Count what each holding cost and is worth",
       "pack": "holdings",
       "runs": {
         "rule": true,
@@ -153,7 +153,7 @@
     },
     {
       "script": "holdings_twin",
-      "title": "Ask once about an account that counts as cash and a holding with the same name, since the same thing may be counted twice: once a day",
+      "title": "Ask once about an account counted twice",
       "pack": "holdings",
       "runs": {
         "every": "1d"
