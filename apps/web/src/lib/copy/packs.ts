@@ -96,9 +96,6 @@ export const packs = {
   shareStepPatch: 'Words, examples or small fixes',
   shareStepMinor: 'A list or a page added',
   shareLastShared: (version: string) => `Last shared as ${version}.`,
-  shareExtras: 'Also in the file',
-  shareSignals: (words: string[]) => `The words that suggest it, so a new BrainDog can recognise it: ${list(words)}`,
-  shareSkills: 'Skills, each as its name and when to use it. Their text stays here.',
   shareNoSkills: 'No skills to share yet.',
   shareRailOrder: 'The order of your pages and lists in the rail goes in too, and is used on the BrainDog that installs it.',
   /* THE CODE IS A TOOLTIP ON THE SENTENCE, never words on the screen: the sentence is what a person reads, and the code

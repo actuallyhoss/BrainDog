@@ -13,8 +13,15 @@
 export const words = {
   /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
   what: 'A file of this setup: your add-ons, pages, nav order and the names you gave things. Nothing you wrote goes in unless you pick it below.',
-  /* THE FORM'S FIRST GROUP: what the file is called, its version, and what and who it is for. */
-  about: 'The file',
+  /* TWO STEPS, SINCE the screens scope of 24 October (E22): name the file, then pick what goes in and send it. */
+  about: '1. Name the file',
+  send: '2. Pick what goes in, then send it',
+  /* THE SKILLS WAIT BEHIND ONE LINE THAT COUNTS THEM: thirty-five rows of them made the page 3,206 tall. */
+  skillsPicked: (picked: number, of: number): string => `Skills to include: ${picked} of ${of}`,
+  skillsWhy: 'Each goes as its name and when to use it. Its text stays here.',
+  /* THE WORDS THAT SUGGEST IT, the first few and how many more, never all forty in a paragraph. */
+  signals: (said: readonly string[]): string =>
+    said.length <= 4 ? `Include the words that suggest it: ${said.join(', ')}` : `Include the words that suggest it: ${said.slice(0, 4).join(', ')} and ${said.length - 4} more`,
   changesSince: (since: string): string => `What changed since ${since}`,
   sinceShared: (version: string): string => `${version}, as last shared`,
   sinceBuiltIn: (title: string): string => `${title} as BrainDog ships it`,

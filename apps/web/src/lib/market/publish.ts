@@ -52,14 +52,16 @@ export const browserSigner: Signer = async (text) => {
 };
 
 export const publishWords = {
-  publish: 'Publish to the Kennel',
+  /* THE STORE, NEVER "THE KENNEL" (E22): the Kennel is what this build calls the service, and Browse is the store a
+     person sees. */
+  publish: 'Publish to the store',
   publishing: 'Publishing',
-  listed: (title: string, version: string): string => `${title} ${version} is listed in the Kennel:`,
+  listed: (title: string, version: string): string => `${title} ${version} is in the store:`,
   review: (title: string, version: string): string => `${title} ${version} is waiting for review, and is listed once it is read:`,
   seeIt: 'see it in Browse.',
   seeBrowse: 'Browse shows it then.',
-  unreached: 'BrainDog could not reach the Kennel. Try again in a moment.',
-  unread: 'The Kennel answered in a way this version of BrainDog does not read.',
+  unreached: 'BrainDog could not reach the store. Try again in a moment.',
+  unread: 'The store answered in a way this version of BrainDog does not read.',
   unsignedBrowser: 'It went out unsigned, because this browser cannot keep a signing key.',
   unsignedEarlier: 'It went out unsigned, as its earlier versions did.',
   /* WHAT A SHARE CHANGES, read from `changesBetween` in `@braindog/declare/catalogue`. */

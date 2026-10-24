@@ -14,7 +14,7 @@
   writes the file again after each pause (`exportUseCase` writes nothing), and the screen says what it changes against
   the version it counts on from: the one last published, else the use case as BrainDog ships it, else the one installed.
   Under that, the file is drawn as browse draws a use case (`previewOf`), so the author sees the rail and Home a
-  stranger will be offered. "Publish to the Kennel" sits beside Download and sends the same file as the signed-in
+  stranger will be offered. "Publish to the store" sits beside Download and sends the same file as the signed-in
   person (`lib/market/publish.ts`); its answer is one sentence with a link.
 
   ONE COLUMN, read top to bottom, never two ragged columns. The page runs the window's width like every other; the
@@ -391,14 +391,17 @@
           </Tile>
         {/if}
 
-        <Tile class="section" data-surface="tile" title={copy.shareExtras}>
+        <Tile class="section" data-surface="tile" title={words.send}>
           <div class="section-body">
             <p class="note">{copy.shareRailOrder}</p>
             {#if signals.length > 0}
-              <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{copy.shareSignals([...signals])}</span></label>
+              <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{words.signals([...signals])}</span></label>
             {/if}
+            <!-- THE SKILLS BEHIND ONE LINE THAT COUNTS THEM (E22), shut until opened. -->
+            <details class="skills-pick">
+              <summary class="rows-h tap">{words.skillsPicked(skillsPicked.length, skillRows.length)}</summary>
             <fieldset class="rows">
-              <legend class="rows-h">{copy.shareSkills}</legend>
+              <legend class="note">{words.skillsWhy}</legend>
               {#each skillRows as skill (skill.seq)}
                 <label class="row-pick">
                   <input
@@ -415,6 +418,7 @@
                 <p class="note">{copy.shareNoSkills}</p>
               {/each}
             </fieldset>
+            </details>
           </div>
           {#if wrong}<p class="wrong" role="alert">{wrong}</p>{/if}
           {#if sent}
