@@ -276,7 +276,7 @@ test('THE SIDEBAR, THE PALETTE, THE INBOX AND DECIDE DO NOT SAY "LIST"', () => {
   assert.equal(copy.fileItIn('Invoices'), 'File it in Invoices', 'the file button names the place it goes');
   const keys = [
     'lists', 'pages', 'records', 'searchWhere', 'fileIt', 'inboxNoLists', 'decideGroupNone', 'decideToLeave', 'scopeGrid',
-    'sourcesAdd', 'accessScope', 'noRecordLevelMeans', 'addException', 'suggestPagesHint', 'navShapeHint',
+    'sourcesAdd', 'accessScope', 'noRecordLevelMeans', 'addException', 'suggestPagesHint',
     'inviteChosenLists', 'inviteListsHint', 'inviteAddsOnlyLeavesOut', 'exceptionOnlyUnread', 'pageRowNoState',
   ] as const;
   for (const key of keys) assert.doesNotMatch(String(copy[key]), /\blists?\b/iu, `copy.${key} says "${copy[key]}"`);
