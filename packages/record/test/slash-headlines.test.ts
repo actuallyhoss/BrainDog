@@ -170,6 +170,25 @@ test('THE NIGHT WRITES ONE LINE A PAGE IN ONE BACKGROUND ASK, the page read carr
   sql.close();
 });
 
+test("THE LINT ROUND COUNTS THE PAGES THAT SAY THE MODEL'S LINE NOW, and a figure that moves takes one off", async () => {
+  const { model } = writing((p) => `{{${p.figures[0]!.id}}} of {{${p.figures[1]!.id}}} steps done; the fit is next.`);
+  const { api, clock, sql } = await record(model, meterOf().meter);
+  const held = () => api.kernel.prefsOf('slash')['headlines.held'];
+  /* BEFORE ANY LINE: one page has a lead note (Plain has none), and the rules speak on it. */
+  await api.lintTick();
+  assert.deepEqual(held(), { day: '2026-09-21', written: 0, pages: 1 });
+  assert.ok((await api.slashTick()).ran);
+  clock.set(T0 + 21 * DAY);
+  await api.lintTick();
+  assert.deepEqual(held(), { day: '2026-09-22', written: 1, pages: 1 });
+  /* A FIGURE MOVES, so the line is not sent and is not counted either, until the night writes a new one. */
+  value(await api.create({ register: 'tasks', fields: { what: 'Box quote', state: 'open' } }, OWNER));
+  clock.set(T0 + 22 * DAY);
+  await api.lintTick();
+  assert.deepEqual(held(), { day: '2026-09-23', written: 0, pages: 1 });
+  sql.close();
+});
+
 test('A LINE IS KEPT ONLY WHEN IT IS SHORT, SAYS NO NUMBER IT WAS NOT HANDED, AND NAMES NONE OF THE SYSTEM’S WORDS', async () => {
   for (const [line, why] of [
     ['3 of 2 steps are done.', /typed 3, where a number is written as the hole/u],

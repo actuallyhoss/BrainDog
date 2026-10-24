@@ -175,6 +175,7 @@ import {
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
+  HEADLINES_HELD,
   HEADLINES_OWED,
   headlineBasis,
   headlineFault,
@@ -283,7 +284,7 @@ export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDe
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, atWork, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
-export { headlineAgrees, type Disagrees } from './headlines.ts';
+export { headlineAgrees, HEADLINES_HELD, heldOn, heldSaid, type Disagrees, type HeadlinesHeld } from './headlines.ts';
 export { firewall, FIREWALL_FAULT } from './sight.ts';
 /* THE RULE `pages()` DROPS A PAGE BY (PGS-A01), so a reader of the record names the kernel's rule and not a copy of it. */
 export { whollyWithheld } from '@braindog/kernel';
@@ -5007,6 +5008,39 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        keeps the line its rules wrote until the page is answered for again. */
     if (lineRefused(keptLine)) return { line: null, next: look.next };
     return { line: { at: lead.at, text: stored.text }, next: look.next };
+  };
+
+  /**
+   * HOW MANY PAGES SAY THE MODEL'S LINE NOW (`HEADLINES_HELD`), read as the system reads the whole record: every page with
+   * a lead note, and of those the ones `headlineFor` would send the model's line on, by its own tests (the basis and the
+   * facts still hold, the answer was not refused, and no headline the person fixed is over it). Kept by `lintTick`, which
+   * reads every page once a day already, so the sign the host files on every alarm reads a pref and no page.
+   */
+  const headlinesHeld = (): { written: number; pages: number } => {
+    const prefs = kernel.prefsOf(SLASH);
+    const pressing = pressingRead(slashDay());
+    let written = 0;
+    let pages = 0;
+    for (const p of kernel.pages()) {
+      if (p.nav === null || p.about !== null || p.slug === HOME_PAGE) continue;
+      const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
+      if (!read.ok) continue;
+      const lead = leadBlockOf(read.value.blocks);
+      if (lead === null) continue;
+      pages += 1;
+      const basis = headlineBasis(p.slug, lead);
+      const facts = (): string | undefined => {
+        const named = pressingOf(pressing, listsRead(read.value.blocks));
+        return factsBasis(named.items, named.question);
+      };
+      if (lookHeld(kernel, p.slug, basis, facts, read.value.blocks).ownerHeadline) continue;
+      const kept = prefs[headlineKey(p.slug)];
+      const stored = storedHeadline(kept);
+      if (stored === null || stored.basis !== basis || lineRefused(kept)) continue;
+      if (stored.facts !== undefined && facts() !== stored.facts) continue;
+      written += 1;
+    }
+    return { written, pages };
   };
 
   /**
@@ -10589,6 +10623,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const census = await censusMethods(methodDeps()).pagesCensus(undefined, { principal: { kind: 'system', id: 'signs' } });
       const suggested = penFor({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).filter((i) => i.kind === 'page').length;
       const reading = pagesCleanReading(round, census.ok ? census.value : undefined, suggested);
+      /* AND HOW MANY PAGES SAY THE MODEL'S LINE NOW, for the model sign's facts (`HEADLINES_HELD`). A count that throws
+         keeps yesterday's and costs the round nothing. */
+      try {
+        kernel.setPref(SLASH, HEADLINES_HELD, { day: today, ...headlinesHeld() });
+      } catch {
+        /* The model sign says nothing of the pages until a count is kept. */
+      }
       /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
       const filed = kernel.signRead('pages-clean', reading);
       if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);

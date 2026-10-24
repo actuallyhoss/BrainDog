@@ -35,13 +35,18 @@
  * fault's fixed `said`, a plain sentence from the kernel's table (`fault.ts` `SAID`), and the operator reads the
  * provider's words in the Worker's log line, where they always were.
  *
+ * AND WHAT THE MODEL WROTE THAT IS STILL ON THE PAGES (thinking C3): "Page headlines: 9 of 14 pages written by the model
+ * now", the count the record's daily lint round keeps (`HEADLINES_HELD`), said first in the facts while it is under two
+ * days old. Asks answered say the model spoke; this says how much of what a person reads is its line and not the rules'.
+ *
  * AND THE OTHER WORK THAT STOPPED. A dead job that is not a model's (a notification, a pull, a copy, a script) does not
  * turn this sign red, since it is not the model, but it is said in the facts in its own sentence, because no other sign
  * reads faults and a fault nobody reads is the dead job disappearing.
  */
 
-import type { SignReading } from '@braindog/kernel';
+import { SLASH, type SignReading } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
+import { HEADLINES_HELD, heldOn, heldSaid } from '@braindog/record';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -85,7 +90,20 @@ export type ModelSignKernel = {
   signRead: (id: string, reading: SignReading) => Result<{ sign: string; day: string }>;
   faults?: () => Result<{ faults: readonly ModelFault[] }>;
   identity?: () => { tz?: string | null } | null | undefined;
+  /** Where the record keeps its prefs: Slash's holds the count of page lines the model wrote (`HEADLINES_HELD`). */
+  prefsOf?: (person: string) => Record<string, unknown>;
 };
+
+/** How old the kept count of model-written lines may be and still be said as now: the lint's day and one more. */
+const HELD_FRESH_MS = 2 * DAY;
+
+/** The fact of how many pages say the model's line now, or none where no fresh count is kept. */
+function pagesWritten(kernel: ModelSignKernel, nowMs: number): string[] {
+  if (typeof kernel.prefsOf !== 'function') return [];
+  const held = heldOn(kernel.prefsOf(SLASH)[HEADLINES_HELD]);
+  if (held === null || !(Date.parse(held.day) > nowMs - HELD_FRESH_MS)) return [];
+  return [heldSaid(held)];
+}
 
 /**
  * What a host may hand beside the ledger.
@@ -251,6 +269,7 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
   const dead = faults.model.filter((f) => Date.parse(f.last_at) >= since || f.last_at === '');
   /* THE OTHER WORK, OPEN AS LONG AS ITS FAULT IS: a dead copy or notification is still dead after the week. */
   const other = sentences(faults.other).slice(0, OTHER_MOST);
+  const written = pagesWritten(kernel, nowMs);
 
   /* THE MONTH SPENT: the newest row is a budget refusal, so no answer came after it, and nothing asked since its month
      began reached the model. Once that month turns the asks are back, and the refusals stay a fact but nothing more. */
@@ -269,11 +288,11 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
   const backSaid = backMs === null ? '' : dateSaid(backMs, 'UTC');
 
   if (asks.length === 0 && dead.length === 0) {
-    if (refused === 0) return { state: 'none', value: null, said: 'No one asked the model anything this week.', facts: other };
+    if (refused === 0) return { state: 'none', value: null, said: 'No one asked the model anything this week.', facts: [...written, ...other] };
     /* REFUSALS ALONE ARE NEVER "No one asked": someone did, and the month's meter turned every ask away. */
     if (!spent) {
       const said = `No ask reached the model this week: the month's asks were spent for all ${refused}. They were back on ${backSaid}.`;
-      return { state: 'none', value: null, said, facts: other };
+      return { state: 'none', value: null, said, facts: [...written, ...other] };
     }
   }
 
@@ -284,7 +303,7 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
   const lastOk = asks.find(answered);
   const deadSaid = sentences(dead);
 
-  const facts: string[] = [];
+  const facts: string[] = [...written];
   if (asks.length > 0) facts.push(`${count(asks.length, 'ask')} this week, ${yes} answered.`);
   if (lastOk !== undefined) facts.push(`The model last answered on ${dateSaid(Date.parse(lastOk.ts), tz)}.`);
   else if (asks.length > 0) facts.push('The model has not answered once this week.');

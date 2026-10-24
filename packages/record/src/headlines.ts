@@ -83,6 +83,30 @@ export const HEADLINE_LOOK_MS = 15 * 60_000;
 /** Slash's pref counting the day's headline asks, and the basis each page was last asked at that day. Not `headline.`, so no page's slug can be it. */
 export const HEADLINES_ASKED = 'headlines.asked';
 
+/**
+ * HOW MANY PAGES SAY THE MODEL'S LINE NOW, kept by the record's daily lint round as Slash's pref (`headlinesHeld` in
+ * `index.ts`) and said in the model sign's facts (`packages/host/src/sign-model.ts`). A count of asks says the model
+ * answered; this says what it wrote is still on the pages: a kept line whose basis and facts still hold, not refused,
+ * and not under a headline the person fixed. Home is not a page here.
+ */
+export const HEADLINES_HELD = 'headlines.held';
+
+/** The count as kept: the UTC day of the round, pages whose line is the model's, and pages with a lead note at all. */
+export type HeadlinesHeld = { day: string; written: number; pages: number };
+
+/** A kept count, or `null` for anything else. */
+export function heldOn(raw: unknown): HeadlinesHeld | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const { day, written, pages } = raw as Partial<HeadlinesHeld>;
+  if (typeof day !== 'string' || !Number.isInteger(written) || !Number.isInteger(pages)) return null;
+  if (written! < 0 || pages! < written!) return null;
+  return { day, written: written!, pages: pages! };
+}
+
+/** The fact the model sign carries: `Page headlines: 9 of 14 pages written by the model now.` */
+export const heldSaid = (held: HeadlinesHeld): string =>
+  held.pages === 0 ? 'Page headlines: no page has a lead note for the model to write.' : `Page headlines: ${held.written} of ${held.pages} ${held.pages === 1 ? 'page' : 'pages'} written by the model now.`;
+
 /** The words a person never reads about their own things: the system's, not theirs. */
 export const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
 
