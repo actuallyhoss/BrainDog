@@ -23,7 +23,10 @@ import {
   kindFaultAt,
   kindId,
   kindProposal,
+  PRESETS,
+  presetOf,
   slotsOf,
+  withPreset,
   words,
   type KindDraft,
 } from './new-kind.ts';
@@ -151,4 +154,16 @@ test('a prompt holding a key-shaped string sends nothing', async () => {
   assert.equal(out.kind, 'refused');
   assert.match(out.kind === 'refused' ? out.fix : '', /looks like a key/u);
   assert.equal(calls.length, 0);
+});
+
+test('EACH OF THE THREE WAYS TO START IS A KIND THE RECORD TAKES, and a choice changed by hand is none of them', () => {
+  assert.equal(PRESETS.length, 3);
+  for (const p of PRESETS) {
+    const d = withPreset({ ...blankKind(), title: 'Read the lantern notes', prompt: 'Read the notes and say what changed.' }, p);
+    assert.equal(kindFaultAt(d), null, `${p.label}: ${kindFaultAt(d)?.fix}`);
+    assert.equal(presetOf(d), p.id);
+  }
+  const looked = withPreset(blankKind(), PRESETS[0]!);
+  assert.equal(presetOf({ ...looked, permission: 'acceptEdits' }), null);
+  assert.equal(words.send, 'Save as a job');
 });

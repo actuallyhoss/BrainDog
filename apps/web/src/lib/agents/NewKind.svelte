@@ -8,7 +8,9 @@
   THE KERNEL'S CHECK, DRAWN WHERE IT IS ABOUT. `kindFaultAt` runs the record's own `jobBody` on the body, and after the
   first press its sentence sits under the field it names. Nothing is sent while there is one.
 
-  ONE PRIMARY, "Send to Needs you", AND IT ONLY FILES. A kind is approved once by the owner in Needs you, so the press opens
+  ONE SENTENCE AND THREE WAYS TO START (24 October, U-A17): what it is called, what to do, and how far it may go, picked
+  from three presets in one column 720px wide; every tool, command and limit is under More, filled in by the preset and
+  still changeable. ONE PRIMARY AT THE END, "Save as a job", AND IT ONLY FILES. A kind is approved once by the owner in Needs you, so the press opens
   that question and the line after it links there; it is not offered twice.
 -->
 <script lang="ts">
@@ -16,11 +18,15 @@
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { AGENTS, FILE_TOOLS, PERMISSIONS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, recordToolWords, slotsOf, words, writesOf, type KindDraft } from './new-kind.ts';
+  import { AGENTS, FILE_TOOLS, PERMISSIONS, PRESETS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, presetOf, recordToolWords, slotsOf, withPreset, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
 
-  let draft = $state<KindDraft>(blankKind());
+  /* THE FIRST WAY TO START IS PICKED, so a kind written with no choice made still reads and tells, changing nothing. */
+  let draft = $state<KindDraft>(withPreset(blankKind(), PRESETS[0]!));
+  const picked = $derived(presetOf(draft));
+  /* MORE OPENS BY ITSELF where the record's check is about a field under it, so a fault is never folded away. */
+  const UNDER_MORE = ['repo', 'commands', 'turns', 'permission', 'writes', 'agent'];
   let pressed = $state(false);
   let sending = $state(false);
   let refusal = $state('');
@@ -70,8 +76,8 @@
 <div class="form">
   <Tile class="section" data-surface="tile" title={words.heading}>
     <div class="section-body">
-      <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17). -->
-      <div class="fields form-two">
+      <!-- ONE COLUMN, 720PX AT MOST (24 October): what it is, how far it may go, and the rest under More. -->
+      <div class="fields">
         <div class="column">
         <div class="item">
           <label class="label" for="kind-title">{words.title}</label>
@@ -105,6 +111,21 @@
           {/if}
         </div>
 
+        <fieldset class="item">
+          <legend class="label">{words.presets}</legend>
+          <div class="presets">
+            {#each PRESETS as p (p.id)}
+              <label class="preset" data-on={picked === p.id ? '' : undefined}>
+                <input type="radio" name="kind-preset" value={p.id} checked={picked === p.id} onchange={() => (draft = withPreset(draft, p))} />
+                <span class="preset-words"><span class="preset-name">{p.label}</span><span class="preset-said">{p.said}</span></span>
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+
+        <details class="more" open={pressed && fault !== null && UNDER_MORE.includes(fault.at) ? true : undefined}>
+        <summary class="label more-head">{words.more}</summary>
+        <div class="column">
         <div class="item">
           <label class="label" for="kind-repo">{words.repo}</label>
           <div class="field" data-wrong={faultAt('repo') ? '' : undefined}>
@@ -112,9 +133,6 @@
           </div>
           {@render help('kind-repo-help', 'repo', words.repoHelp)}
         </div>
-        </div>
-
-        <div class="column">
 
         <fieldset class="item">
           <legend class="label">{words.recordTools}</legend>
@@ -176,6 +194,8 @@
           {@render help('kind-writes-help', 'writes', forced ? words.writesForced : words.writesHelp)}
         </div>
         </div>
+        </details>
+        </div>
       </div>
 
       {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
@@ -199,6 +219,58 @@
     display: grid;
     gap: var(--sp-6);
     min-inline-size: 0;
+    max-inline-size: 720px;
+  }
+
+  /* THE THREE WAYS TO START: one a row, its name and what it does, the picked one on the tile's ink edge. */
+  .presets {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .preset {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
+    cursor: pointer;
+  }
+
+  .preset[data-on] {
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  .preset input {
+    margin-block-start: 3px;
+  }
+
+  .preset-words {
+    display: grid;
+    gap: 2px;
+  }
+
+  .preset-name {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+  }
+
+  .preset-said {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .more-head {
+    cursor: pointer;
+    min-block-size: var(--ctl-h);
+    display: flex;
+    align-items: center;
+  }
+
+  .more > .column {
+    margin-block-start: var(--sp-3);
   }
 
   .fields {

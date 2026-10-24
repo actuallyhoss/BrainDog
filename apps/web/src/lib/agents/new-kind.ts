@@ -207,7 +207,10 @@ export const words = {
   open: 'New kind',
   heading: 'New kind',
   parent: 'Agents',
-  headline: 'Write a job once, approve it in Needs you, and Run a job offers it from then on.',
+  /* ONE SENTENCE (24 October, U-A17), where the line was a riddle of three steps. */
+  headline: 'Say what the job does, pick how far it may go, and save it.',
+  presets: 'How far it may go',
+  more: 'More choices',
   title: 'Title',
   titleHelp: 'What Needs you and the list of jobs call it.',
   prompt: 'What to do',
@@ -234,10 +237,10 @@ export const words = {
   writes: 'Changes files',
   writesHelp: 'Needs you shows this in red before anybody approves the kind.',
   writesForced: 'Accept edits changes files, so this stays on.',
-  send: 'Send to Needs you',
+  send: 'Save as a job',
   busy: 'Filing',
-  sent: 'Sent to Needs you',
-  sentLine: 'Approve it there once, and Run a job offers it.',
+  sent: 'Saved for your yes',
+  sentLine: 'Say yes to it once, and Run a job offers it.',
   notSent: 'The record did not answer, so nothing was sent. Try again.',
   needTitle: 'Give it a title that starts with a letter.',
   thisKind: 'This kind',
@@ -262,3 +265,30 @@ export const recordToolWords = (tool: string): string => {
   const name = tool.slice(JOB_MCP_PREFIX.length);
   return words.toolRecord[name] ?? name.replace(/_/gu, ' ');
 };
+
+/* ── the three ways to start ─────────────────────────────────────────── */
+
+/** A way to start a kind: its words, and the tools, commands and permission it fills in. */
+export type KindPreset = { id: 'look' | 'code' | 'tidy'; label: string; said: string; tools: string[]; commands: string; permission: JobPermission; writes: boolean };
+
+const READ_RECORD = ['record_index', 'context', 'get', 'list', 'search', 'activity'].map((name) => JOB_MCP_PREFIX + name);
+
+/**
+ * THREE WAYS TO START (24 October, U-A17), so the tools are picked by what the job is and not one box at a time: one that
+ * looks and tells, changing nothing; one that works on code in its folder; and one that keeps the record tidy, asking
+ * the owner before anything changes. Each only fills in the choices under More, where every one can still be changed.
+ */
+export const PRESETS: readonly KindPreset[] = [
+  { id: 'look', label: 'Look and tell me', said: 'Reads your record and files, and changes nothing.', tools: [...READ_RECORD, ...FILE_TOOLS], commands: '', permission: 'dontAsk', writes: false },
+  { id: 'code', label: 'Work on code', said: 'Reads and changes files in its folder, and can see the changes.', tools: [...FILE_TOOLS], commands: 'git status\ngit diff', permission: 'acceptEdits', writes: true },
+  { id: 'tidy', label: 'Tidy my record', said: 'Reads your record and asks you before anything changes.', tools: [...RECORD_TOOLS], commands: '', permission: 'dontAsk', writes: false },
+];
+
+/** The draft with a preset's choices filled in, and everything a person typed kept. */
+export const withPreset = (d: KindDraft, p: KindPreset): KindDraft => ({ ...d, tools: [...p.tools], commands: p.commands, permission: p.permission, writes: p.writes });
+
+/** The preset a draft's choices match, or `null` once they were changed by hand. */
+export function presetOf(d: KindDraft): KindPreset['id'] | null {
+  const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+  return PRESETS.find((p) => same(p.tools, d.tools) && p.commands === d.commands && p.permission === d.permission && writesOf(p) === writesOf(d))?.id ?? null;
+}
