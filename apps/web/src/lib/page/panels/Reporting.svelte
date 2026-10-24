@@ -25,6 +25,7 @@
   import { getContext, untrack } from 'svelte';
   import { createClient, type ReportKeyRow } from '@braindog/client';
   import { SHAPE_KEY, type ShapeBox } from '../shape-key.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { apiBase } from '$lib/at.ts';
   import { rowsOf as tabRows } from '$lib/data/ref-rows.ts';
   import { since } from 'braindog-render';
@@ -84,7 +85,24 @@
    * are then asked together; one after another they landed a second after the page and pushed the blocks under them down.
    * While they are out the folded line's place is held (`held`), as it is drawn on a lived row.
    */
+  /*
+   * HELD OPEN AS ONE OF THE SCREEN'S CALLS (`screen.svelte.ts`), and a read that fails draws nothing: the page said it was
+   * drawn while this was still out, so a look of his record caught "Send numbers here" over an empty card on every
+   * project, and a read that threw left the held place empty for good (the audit of 25 October, Z21).
+   */
   async function load() {
+    const at = opened();
+    try {
+      await read();
+    } catch {
+      from = 'absent';
+      held = false;
+    } finally {
+      closed(true, at);
+    }
+  }
+
+  async function read() {
     origin = location.origin;
     const client = createClient({ base: apiBase() });
     const schema = await client.schema(READINGS);
