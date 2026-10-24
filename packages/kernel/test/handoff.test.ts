@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { EXPIRED_NOTE, HANDOFF_STATES, drop, expire, openHandoffs, take, type HandoffWrite } from '../src/handoff.ts';
+import { EXPIRED_NOTE, HANDOFF_STATES, PASSED_ACTIVE_MS, closePassed, drop, expire, openHandoffs, passedNote, take, type HandoffWrite } from '../src/handoff.ts';
 import { openRecord, type Declaration, type SessionHints, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -246,5 +246,36 @@ test('THIRTY DAYS: the sweep closes a step nobody took, with its note, its words
   clock.advance(1);
   assert.equal(expire(sql, clock.now(), write), 1);
   assert.deepEqual(openHandoffs(sql, HERE, s3.id, clock.now()), []);
+  sql.close();
+});
+
+test('PASSED IN THE HOUR: a later run here still at work twelve hours past a step passes it over, and the sweep closes it', async () => {
+  const { sql, clock, k, write, leave, work, row } = await record();
+  const s1 = leave('claude', 'Run full CI on master');
+  const away = leave('elsewhere', 'Fix the other repo', { repo: 'other' });
+  clock.advance(MIN);
+  const s2 = work('codex', { agent: 'codex' });
+  work('far', { repo: 'other' });
+  const marks = () => openHandoffs(sql, HERE, null, clock.now()).map((h) => [h.spoken, h.mark]);
+  /* Under twelve hours of work past the step, a run still at it was maybe handed it, so nothing closes. */
+  clock.advance(PASSED_ACTIVE_MS - 2 * MIN);
+  ok(k.create('tasks', { what: 'More work' }, as('codex', { agent: 'codex' })));
+  ok(k.create('tasks', { what: 'More work there' }, as('far', { repo: 'other' })));
+  assert.deepEqual(marks(), [[s1.spoken, 'next']]);
+  assert.equal(closePassed(sql, clock.now(), write), 0);
+
+  clock.advance(2 * MIN);
+  ok(k.create('tasks', { what: 'Still at it' }, as('codex', { agent: 'codex' })));
+  assert.deepEqual(marks(), [[s1.spoken, 'earlier']]);
+  /* THE HOURLY SWEEP closes it (`purge`), and only the step passed over here. */
+  k.purge();
+  const gone = row(s1.spoken);
+  assert.equal(gone.state, 'done');
+  assert.equal(gone.fields.closed_as, 'dropped');
+  assert.equal(gone.fields.next, 'Run full CI on master', 'the step stays on the row');
+  assert.deepEqual(lastLine(sql, s1.id), { note: passedNote(s2.spoken), actor: 'system' });
+  assert.equal(row(away.spoken).state, 'handoff', 'a run in another place passes nothing over');
+  assert.deepEqual(marks(), []);
+  assert.equal(closePassed(sql, clock.now(), write), 0, 'a second sweep closes nothing');
   sql.close();
 });

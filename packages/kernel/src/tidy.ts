@@ -23,7 +23,7 @@ import type { Sql } from '@braindog/ports';
 
 import { RECHECK_BOUND, causeFault, moot } from './cause.ts';
 import { openFaults } from './fault.ts';
-import { EXPIRE_MS } from './handoff.ts';
+import { EXPIRE_MS, passedSql } from './handoff.ts';
 import { ABANDON_MS, unheardRuns } from './presence.ts';
 import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
@@ -176,12 +176,7 @@ const stepsOld: Finder = {
       `SELECT COUNT(*) AS n FROM entry h WHERE h.register = ? AND h.deleted_at IS NULL AND h.state = 'handoff'
          AND trim(coalesce(json_extract(h.fields, '$.next'), '')) <> ''
          AND (coalesce(julianday(${leftAt('h')}), julianday(h.updated_at)) < julianday(?)
-           OR EXISTS (SELECT 1 FROM entry l WHERE l.register = h.register AND l.deleted_at IS NULL AND l.id <> h.id
-             AND l.state IN ('done', 'handoff', 'abandoned')
-             AND coalesce(json_extract(l.fields, '$.parent'), '') = ''
-             AND coalesce(json_extract(l.fields, '$.wrote'), 0) > 0
-             AND julianday(coalesce(json_extract(l.fields, '$.stretch_at'), json_extract(l.fields, '$.started'))) >= julianday(${leftAt('h')})
-             AND julianday(json_extract(l.fields, '$.last_seen')) > julianday(${leftAt('h')})
+           OR EXISTS (SELECT 1 FROM entry l WHERE ${passedSql('h', 'l')}
              AND ((${project('h')} <> '' AND ${project('l')} = ${project('h')})
                OR (${project('h')} = '' AND ${project('l')} = '' AND ${repo('h')} <> '' AND ${repo('l')} = ${repo('h')}))))`,
       SESSION,

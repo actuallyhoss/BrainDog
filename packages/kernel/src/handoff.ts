@@ -43,6 +43,26 @@ export const EXPIRE_MS = 30 * DAY_MS;
 /** The note on a step the sweep closes. */
 export const EXPIRED_NOTE = 'Nobody took this step in thirty days.';
 
+/** A later run still at work passes a step over once its stretch here, begun after the step, has lasted this long. */
+export const PASSED_ACTIVE_MS = 12 * 3_600_000;
+
+/** The note on a passed-over step the sweep closes, naming the run that worked past it. */
+export const passedNote = (by: string): string => `Passed over: ${by} worked here after this step was left.`;
+
+/**
+ * Whether run `l` passed over the step on run `h`, as SQL: it works for no other run, wrote, began its stretch once the
+ * step was there, and has ended since or, still at work, kept at it for twelve hours without taking it (scope D11). The
+ * place is the caller's to add.
+ */
+export function passedSql(h: string, l: string): string {
+  return `${l}.register = ${h}.register AND ${l}.deleted_at IS NULL AND ${l}.id <> ${h}.id
+         AND coalesce(json_extract(${l}.fields, '$.parent'), '') = ''
+         AND coalesce(json_extract(${l}.fields, '$.wrote'), 0) > 0
+         AND julianday(coalesce(json_extract(${l}.fields, '$.stretch_at'), json_extract(${l}.fields, '$.started'))) >= julianday(${leftAt(h)})
+         AND (${l}.state IN ('done', 'handoff', 'abandoned') AND julianday(json_extract(${l}.fields, '$.last_seen')) > julianday(${leftAt(h)})
+           OR julianday(json_extract(${l}.fields, '$.last_seen')) >= julianday(coalesce(json_extract(${l}.fields, '$.stretch_at'), json_extract(${l}.fields, '$.started'))) + ${PASSED_ACTIVE_MS / 86_400_000})`;
+}
+
 /** Where a step was left: the project, or with none the repository. A run naming no project but this repository is here too. */
 export type HandoffPlace = { project?: string | null | undefined; repo?: string | null | undefined };
 
@@ -128,17 +148,11 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
   if (!h || !l) return [];
   const rows = sql.all<{ id: string; seq: number | null; fields: string; left_at: string; updated_at: string; passed: number }>(
     `SELECT h.id, h.seq, h.fields, ${leftAt('h')} AS left_at, h.updated_at,
-       EXISTS (SELECT 1 FROM entry l WHERE l.register = ? AND l.deleted_at IS NULL AND l.id <> h.id
-         AND l.state IN ('done', 'handoff', 'abandoned')
-         AND coalesce(json_extract(l.fields, '$.parent'), '') = ''
-         AND coalesce(json_extract(l.fields, '$.wrote'), 0) > 0
-         AND julianday(coalesce(json_extract(l.fields, '$.stretch_at'), json_extract(l.fields, '$.started'))) >= julianday(${leftAt('h')})
-         AND julianday(json_extract(l.fields, '$.last_seen')) > julianday(${leftAt('h')})
+       EXISTS (SELECT 1 FROM entry l WHERE ${passedSql('h', 'l')}
          AND ${l.where}) AS passed
      FROM entry h WHERE h.register = ? AND h.deleted_at IS NULL AND h.state = 'handoff' AND h.id <> ?
        AND trim(coalesce(json_extract(h.fields, '$.next'), '')) <> '' AND ${h.where}${viewer === undefined ? '' : ` AND ${unprivate('h.id')}`}
      ORDER BY julianday(left_at) DESC, h.seq DESC`,
-    SESSION,
     ...l.params,
     SESSION,
     self ?? '',
@@ -319,5 +333,34 @@ export function expire(sql: Sql, nowMs: number, write: HandoffWrite, limit = 100
   let n = 0;
   for (const row of old)
     if (write(row.id, { state: 'done', stamp: { closed_as: 'expired', closed_at: now }, note: EXPIRED_NOTE, actor: 'system' }).ok) n++;
+  return n;
+}
+
+/**
+ * The hourly sweep's other part: every open step a later run in the same place passed over (`passedSql`) is closed as
+ * dropped, signed by `system`, with a note naming that run, so a stale step stops showing to every run within the hour
+ * and not after thirty days. `dropped` and not a new value: `closed_as` is an enum migration 28 declares. Answers how
+ * many closed.
+ */
+export function closePassed(sql: Sql, nowMs: number, write: HandoffWrite, limit = 100): number {
+  const project = (t: string): string => `coalesce(json_extract(${t}.fields, '$.project'), '')`;
+  const repo = (t: string): string => `coalesce(json_extract(${t}.fields, '$.repo'), '')`;
+  const passed = sql.all<{ id: string; by: number | null }>(
+    `SELECT id, by FROM (SELECT h.id, h.seq, (SELECT l.seq FROM entry l WHERE ${passedSql('h', 'l')}
+         AND ((${project('h')} <> '' AND ${project('l')} = ${project('h')})
+           OR (${project('h')} = '' AND ${project('l')} = '' AND ${repo('h')} <> '' AND ${repo('l')} = ${repo('h')}))
+         ORDER BY l.seq LIMIT 1) AS by
+     FROM entry h WHERE h.register = ? AND h.deleted_at IS NULL AND h.state = 'handoff'
+       AND trim(coalesce(json_extract(h.fields, '$.next'), '')) <> '')
+     WHERE by IS NOT NULL ORDER BY seq LIMIT ?`,
+    SESSION,
+    Math.max(0, Math.floor(limit)),
+  );
+  const now = iso(nowMs);
+  let n = 0;
+  for (const row of passed) {
+    if (row.by === null) continue;
+    if (write(row.id, { state: 'done', stamp: { closed_as: 'dropped', closed_at: now }, note: passedNote(spokenOf(row.by)), actor: 'system' }).ok) n++;
+  }
   return n;
 }

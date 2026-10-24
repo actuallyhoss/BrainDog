@@ -71,6 +71,7 @@ import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, swe
 import { openFaults, type Fault } from './fault.ts';
 import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
 import {
+  closePassed as closePassedHandoffs,
   drop as dropHandoff,
   expire as expireHandoffs,
   inPlace,
@@ -401,6 +402,8 @@ export {
   EXPIRE_MS,
   EXPIRED_NOTE,
   HANDOFF_STATES,
+  PASSED_ACTIVE_MS,
+  passedNote,
   drop as dropHandoff,
   expire as expireHandoffs,
   notOpenSaying,
@@ -8742,6 +8745,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     );
     /* A STEP NOBODY TOOK IN THIRTY DAYS is closed in the same hour, its words kept on the run (`handoff.ts`). */
     transaction(() => expireHandoffs(sql, clock.now(), handoffWrite));
+    /* AND A STEP A LATER RUN HERE PASSED OVER closes too, so it is not handed to every run for thirty days (`closePassed`). */
+    transaction(() => closePassedHandoffs(sql, clock.now(), handoffWrite));
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
        `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
