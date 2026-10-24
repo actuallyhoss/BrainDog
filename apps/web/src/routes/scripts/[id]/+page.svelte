@@ -25,6 +25,7 @@
   import ScriptCard from '../ScriptCard.svelte';
   import { readScripts } from '$lib/record/scripts.ts';
   import { listName } from '$lib/record/names.ts';
+  import Button from '$lib/ui/Button.svelte';
 
   const shell = $derived(page.data as unknown as Shell);
   const owner = $derived(shell.me.level === 'owner');
@@ -58,6 +59,11 @@
   );
 
   let held = $state<{ id: string; script: Opened } | null>(null);
+  /* A SCRIPT OPENS ON WHAT IT DOES (24 October, U-B18): its card, the sentence of where it stands and its last runs, and
+     the form folded under "Change it". A script with no card to say it, or whose code is not kept here, opens on the
+     form, since that is the one thing on the page. */
+  let changing = $state<string | null>(null);
+  const formOpen = $derived(changing === id || !mine);
   /* WHILE THE READ AFTER AN ACCEPT IS OUT, the answer on hand is the version just replaced, and holding it again would
      file the next change against a version that is no longer live. */
   let rereading = $state(false);
@@ -80,7 +86,9 @@
 <PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" />
 <div class="page">
   {#if mine}<ScriptCard s={mine} {named} onresumed={() => standing.reread()} />{/if}
-  {#if held !== null && held.id === id && opened.value !== null}
+  {#if held !== null && held.id === id && opened.value !== null && !formOpen}
+    <div class="change"><Button onclick={() => (changing = id)}>{words.change}</Button></div>
+  {:else if held !== null && held.id === id && opened.value !== null}
     {#key held}
       <ScriptForm
         start={held.script.draft}
@@ -102,6 +110,10 @@
 </div>
 
 <style>
+  .change {
+    display: flex;
+  }
+
   .page {
     display: flex;
     flex-direction: column;

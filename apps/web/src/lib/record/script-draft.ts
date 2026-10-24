@@ -119,6 +119,8 @@ export const words = {
   logNone: 'It logged nothing.',
   refused: 'The run was refused',
   held: 'Not run',
+  /* A SCRIPT OPENS ON WHAT IT DOES (24 October): its card first, and the form one press under it. */
+  change: 'Change it',
   install: 'Save and turn on',
   propose: 'Send to Needs you',
   sending: 'Sending',
@@ -195,6 +197,13 @@ export function faultsOf(d: Draft): { at: 'title' | 'starts' | 'egress' | 'sourc
   if (d.source.trim() === '') out.push({ at: 'source', say: words.needSource });
   return out;
 }
+
+/**
+ * WHETHER SAVE MAY BE PRESSED (24 October, U-B18): never while it is sending or once filed and waiting, and never while
+ * the code box is empty. It was held only while sending, so an installed script whose code is not kept here opened with
+ * an empty box and a live "Save and turn on" that would file a script of no code.
+ */
+export const canSave = (d: Pick<Draft, 'source'>, o: { sending: boolean; waiting: boolean }): boolean => !o.sending && !o.waiting && d.source.trim() !== '';
 
 /** The body the record holds, from the draft: the runs it names and nothing empty. */
 export function bodyOf(d: Draft): Record<string, unknown> {

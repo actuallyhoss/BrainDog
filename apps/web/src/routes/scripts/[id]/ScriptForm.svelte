@@ -21,7 +21,7 @@
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { humanize, listName } from '$lib/record/names.ts';
-  import { faultsOf, idFrom, indent, sendDraft, tryDraft, words, type Door, type Draft, type Tried } from '$lib/record/script-draft.ts';
+  import { canSave, faultsOf, idFrom, indent, sendDraft, tryDraft, words, type Door, type Draft, type Tried } from '$lib/record/script-draft.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -292,7 +292,7 @@
         <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST (2.A.26), AT THE FOOT OF THE TILE IT SENDS (UI pass of
              21 October, H38): under the code it saves and tries, never loose on the board under the tiles. -->
         <div class="do form-submit">
-          <Button weight="primary" disabled={sending || (filed !== null && filed.why === null)} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
+          <Button weight="primary" disabled={!canSave(draft, { sending, waiting: filed !== null && filed.why === null })} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
           <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>
         </div>
       </div>
