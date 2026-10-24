@@ -106,10 +106,11 @@ jobs:
             browser: true
           # The hosts, the CLI, the site, the uptime watchdog and the Mac shell, and the real MCP clients that greet the CLI's source
           # (`tools/client-checks`). The docs' tests ride here because `docs/` is not a
-          # workspace, so no filter reaches them.
+          # workspace, so no filter reaches them. `cards.check.mjs` draws the decision card in chromium.
           - leg: apps
             dirs: 'apps/worker apps/selfhost apps/cli apps/site apps/watchdog apps/desktop tools/client-checks'
             links: true
+            browser: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
