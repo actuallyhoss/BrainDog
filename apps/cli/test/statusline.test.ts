@@ -4,6 +4,7 @@
  * No network: the beat is handed to a function the test holds, and the record is a stub of `ask`.
  */
 
+import { spawnSync } from 'node:child_process';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ import { join } from 'node:path';
 import { keepMeters } from '../src/profile-place.ts';
 import { readBeat } from '../src/statusline-beat.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn, statuslineEntryIn } from '../src/statusline-place.ts';
-import { beatOf, parseStatus, STATUS_EVERY_MS, statusFresh, statusline, statusLine, statusStamp, type StatusBeat } from '../src/statusline.ts';
+import { BEAT_ONLY, beatOf, parseStatus, STATUS_EVERY_MS, statusFresh, statusline, statusLine, statusOut, statusStamp, type StatusBeat } from '../src/statusline.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-statusline-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -155,4 +156,24 @@ test('THE PRINT PATH LOADS NOTHING BUT NODE AND position.ts: no network, no reco
   assert.deepEqual(from.filter((f) => !f.startsWith('node:')), ['./position.ts']);
   const entry = readFileSync(new URL('../src/statusline-entry.ts', import.meta.url), 'utf8');
   assert.deepEqual([...entry.matchAll(/^import .* from '([^']+)'/gmu)].map((m) => m[1]!).filter((f) => !f.startsWith('node:')), ['./statusline.ts']);
+});
+
+test('--beat-only PRINTS NOTHING and sends the same beat, for a status line of his own that pipes its JSON', () => {
+  assert.equal(statusOut('Opus | x', []), 'Opus | x\n');
+  assert.equal(statusOut('Opus | x', [BEAT_ONLY]), '');
+  /* THE SMALL ENTRY TAKES THE WORD TOO: run as his status line would pipe to it, it writes nothing back. No figure, so no beat leaves. */
+  const home = folder();
+  const entry = new URL('../src/statusline-entry.ts', import.meta.url).pathname;
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: join(home, '.claude-work') };
+  const quiet = spawnSync(process.execPath, [entry, BEAT_ONLY], { input: JSON.stringify({ model: { display_name: 'Opus' } }), env, encoding: 'utf8' });
+  assert.equal(quiet.status, 0);
+  assert.equal(quiet.stdout, '');
+  const drawn = spawnSync(process.execPath, [entry], { input: JSON.stringify({ model: { display_name: 'Opus' } }), env, encoding: 'utf8' });
+  assert.equal(drawn.stdout, 'Opus\n');
+  /* THE BEAT UNDER --beat-only is the print path's own: one in five minutes, by profile name. */
+  const sent: StatusBeat[] = [];
+  const io = { env: { CLAUDE_CONFIG_DIR: join(home, '.claude-work') }, stdin: JSON.stringify(event), home, machine: 'bench-laptop', now: NOW, send: (b: StatusBeat) => sent.push(b) };
+  assert.equal(statusOut(statusline(io), [BEAT_ONLY]), '');
+  assert.equal(statusOut(statusline({ ...io, now: NOW + 60_000 }), [BEAT_ONLY]), '');
+  assert.deepEqual(sent.map((b) => [b.profile, b.five_hour_pct, b.seven_day_pct]), [['work', 42, 83]]);
 });

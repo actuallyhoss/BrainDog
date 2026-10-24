@@ -36,7 +36,7 @@ import { exportFile, importFile } from './brainfile.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
 import { codexSession, INBOX_ENTRY, notifyHook, runHook, watchHook } from './inbox-file.ts';
-import { statusline } from './statusline.ts';
+import { statusline, statusOut } from './statusline.ts';
 import { readBeat, sendBeat } from './statusline-beat.ts';
 import { STATUSLINE_FILE } from './statusline-place.ts';
 import { agentOf, budgetOf, clientFor, hostsPath, runnerTarget, target, type Target } from './http.ts';
@@ -394,8 +394,8 @@ const usage = () =>
     "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
     'braindog hook start|end|beat|prompt|tool|stop|watch|notify',
     '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. On a machine that has joined setup sync, end and the day\'s first start begin braindog sync push in the background and never wait for it. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh. notify is what Codex runs when a turn ends: when the run has not taken something you told it, this machine shows one notice saying so.',
-    'braindog statusline',
-    "  What Claude Code runs to draw its status line, with its status on standard input: one short line with the model, the folder's name, how much of the 5 hour and 7 day limits is used and when they reset. At most every five minutes it also sends those figures, by profile name and machine, to the Profiles add-on in the background; nothing waits on it, and nothing else leaves.",
+    'braindog statusline [--beat-only]',
+    "  What Claude Code runs to draw its status line, with its status on standard input: one short line with the model, the folder's name, how much of the 5 hour and 7 day limits is used and when they reset. At most every five minutes it also sends those figures, by profile name and machine, to the Profiles add-on in the background; nothing waits on it, and nothing else leaves. --beat-only sends the same figures and prints nothing, for a status line of your own to pipe its status to.",
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>] [--rewake]',
     "  Show the hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. --rewake also adds the watcher that wakes an idle session when you tell it something, which is off unless typed. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]',
@@ -794,7 +794,8 @@ async function statuslineCommand(args: string[]): Promise<void> {
     setTimeout(() => process.exit(0), 1_000).unref();
     return;
   }
-  process.stdout.write(`${statusline({ env: process.env, stdin })}\n`);
+  /* `--beat-only` sends the same beat and prints nothing, for a status line of his own that draws its own line. */
+  process.stdout.write(statusOut(statusline({ env: process.env, stdin }), args));
   process.exitCode = 0;
 }
 

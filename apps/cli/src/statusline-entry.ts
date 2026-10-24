@@ -6,13 +6,15 @@
  *
  * THE BEAT'S CHILD IS THE FULL COMMAND (`braindog statusline --beat`): the bundle one folder up from here, else a
  * checkout's `main.ts` beside this file. It is detached, so a slow or dead host never delays the line.
+ *
+ * `--beat-only` PRINTS NOTHING (`statusOut`): a status line of his own pipes its JSON here and draws its own line.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { statusline } from './statusline.ts';
+import { statusline, statusOut } from './statusline.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bundle = join(here, '..', 'braindog.mjs');
@@ -23,5 +25,5 @@ try {
 } catch {
   /* No event draws an empty line. */
 }
-process.stdout.write(`${statusline({ env: process.env, stdin, cli: existsSync(bundle) ? bundle : join(here, 'main.ts') })}\n`);
+process.stdout.write(statusOut(statusline({ env: process.env, stdin, cli: existsSync(bundle) ? bundle : join(here, 'main.ts') }), process.argv.slice(2)));
 process.exitCode = 0;

@@ -15,6 +15,10 @@
  * redraw through `statusline-entry.ts`, a file of its own (`STATUSLINE_FILE`). Sending the beat (the network, the
  * record's door) is `statusline-beat.ts`, which only the detached child loads.
  *
+ * `--beat-only` (`BEAT_ONLY`) IS THE SAME PATH WITH NOTHING PRINTED, for a status line of his own: his program draws the
+ * line it always drew and pipes the same JSON to `braindog statusline --beat-only` (or the small entry with that word),
+ * so his meters reach the Profiles page without BrainDog ever taking his `statusLine` (`statusline-place.ts`).
+ *
  * THE EVENT'S OWN SESSION TEXT IS NEVER READ: only `model`, `workspace` and `rate_limits` are, each defensively, since
  * any of them may be missing.
  */
@@ -25,6 +29,12 @@ import { homedir, hostname } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { profileNameOf } from './position.ts';
+
+/** The word that sends the beat and prints nothing, for a status line that draws its own line. */
+export const BEAT_ONLY = '--beat-only';
+
+/** What the command writes for these words: the line and a newline, or nothing at all under `--beat-only`. */
+export const statusOut = (line: string, args: readonly string[]): string => (args.includes(BEAT_ONLY) ? '' : `${line}\n`);
 
 /** How often a profile's beat leaves this machine at most. */
 export const STATUS_EVERY_MS = 5 * 60_000;
