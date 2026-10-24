@@ -46,6 +46,7 @@ const PLANTED = [
   ['stuck', 'Total undefined today', 'undefined'],
   ['stuck', 'Balance NaN', 'NaN'],
   ['stuck', 'The note reads [object Object] and then stops', '[object Object]'],
+  ['dashes', 'user claude \u2014 the keys', null],
 ];
 
 test('EVERY KIND FINDS WHAT THE AUDIT FOUND ON HIS SCREENS, planted in a sentence', () => {
@@ -54,7 +55,7 @@ test('EVERY KIND FINDS WHAT THE AUDIT FOUND ON HIS SCREENS, planted in a sentenc
     assert.ok(found, `${kind} in "${text}"`);
     assert.equal(found.count, 1, `${kind} in "${text}" is one`);
     if (example !== null) assert.equal(found.e[0], example, `${kind} in "${text}"`);
-    else assert.match(found.e[0], /rows|typed value|list items|entity|register/u, 'a machine word is shown with the words around it');
+    else assert.match(found.e[0], /rows|typed value|list items|entity|register|claude \u2014 the/u, 'a machine word or a dash is shown with the words around it');
   }
   assert.deepEqual(new Set(PLANTED.map(([kind]) => kind)), new Set(Object.keys(RAW)), 'a kind with no planted example is a kind nobody has seen find anything');
 });
@@ -91,6 +92,9 @@ const CLEAN = [
   'Order #12, issue #8 and a USB 0 hub',
   'Growth is up, and the rowing club is back',
   'Mon 7 Sep',
+  'Rent\t\u2014\tFriday',
+  'Paid \u2014',
+  '\u2014',
 ];
 
 test('NOTHING FIRES ON THE TEXT THE SAMPLE RECORD ITSELF PRINTS', () => {

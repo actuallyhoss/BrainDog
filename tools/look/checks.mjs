@@ -23,8 +23,7 @@ export const OLD_AFTER_DAYS = 7;
 
 /** What these checks cannot see, said with every look so a green line is not read as more than it is. */
 export const CANNOT = [
-  'text behind a press (a fold, Today’s More, a sheet, the palette): the look presses nothing',
-  'the frame’s words (rail, top bar, tab bar): only the screen itself is read for words',
+  'text behind a press other than the palette (a fold, a sheet, a menu): the look presses only the palette open',
   'the age of a figure with no date in the page: a KPI figure is dated by its sentence and a lines chart by its points; a plain figure, bar, ring or sparkline is not read',
   'any count but projects in play and what needs you',
 ];

@@ -118,6 +118,44 @@ export function crossings(boxes, share = 0.4) {
 }
 
 /**
+ * THE FRAME'S WORDS, run inside the page (`page.evaluate`): the text of everything drawn around `main`, the bar, the
+ * sidebar and the tab bar, found by climbing from `main` to the body and reading each sibling on the way. A closed
+ * dialog draws nothing and is passed over, so the palette is read only when it is pressed open (`pressPalette`).
+ */
+export function frameTextIn() {
+  const main = document.querySelector('main');
+  if (main === null) return '';
+  const out = [];
+  for (let at = main; at !== null && at !== document.body; at = at.parentElement)
+    for (const sib of at.parentElement?.children ?? [])
+      if (sib !== at && !['SCRIPT', 'STYLE', 'TEMPLATE', 'DIALOG'].includes(sib.tagName) && sib.closest('dialog') === null) out.push(sib.innerText ?? '');
+  return out.filter((t) => t.trim() !== '').join('\n');
+}
+
+/**
+ * THE ONE PRESS A SCREEN GETS: the palette opened with its own key (the bindings' `palette`, Ctrl or Cmd and K), its
+ * text read and pictured once it is open, and Escape after. `{ open, text }`; a palette that did not open says so and
+ * reads nothing. It opens a box and writes nothing, so a live look may press it.
+ */
+export async function pressPalette(page, image) {
+  const opened = async () => page.evaluate(() => document.querySelector('dialog.palette')?.open === true).catch(() => false);
+  await page.keyboard.press('ControlOrMeta+k').catch(() => {});
+  let open = await page.waitForFunction(() => document.querySelector('dialog.palette')?.open === true, null, { timeout: 2000 }).then(() => true, () => false);
+  if (!open) {
+    await page.keyboard.press('/').catch(() => {});
+    open = await page.waitForFunction(() => document.querySelector('dialog.palette')?.open === true, null, { timeout: 1000 }).then(() => true, () => false);
+  }
+  if (!open) return { open: false, text: '' };
+  await page.waitForTimeout(300);
+  const text = await page.evaluate(() => document.querySelector('dialog.palette')?.innerText ?? '').catch(() => '');
+  await page.screenshot({ path: image }).catch(() => {});
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForFunction(() => document.querySelector('dialog.palette')?.open !== true, null, { timeout: 2000 }).catch(() => {});
+  if (await opened()) await page.keyboard.press('Escape').catch(() => {});
+  return { open: true, text };
+}
+
+/**
  * THE SCREENS A SOURCE NAMES ITSELF (`source.screens`, a board's: `tools/look/board.mjs`), in place of a set's. An
  * entry is a screen as `screensOf` hands one back, `{ key, name, path, why }`, drawn as given (a board's own page), or
  * a key of the named sets, drawn as the record picks it. A key no set knows is said as missing, never dropped.
@@ -226,6 +264,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
       })),
     }))
     .catch(() => ({ overflow: 0, text: '', marked: [] }));
+  /* THE FRAME'S WORDS (U14): the bar, the sidebar and the tab bar, read for words beside the screen's own. */
+  const frame = await page.evaluate(frameTextIn).catch(() => '');
   /* WHAT THE THREE QUICK CHECKS NEED THAT TEXT DOES NOT HOLD (`checks.mjs`): the badge, the More sheet, the key numbers' sentences and the charts' points. */
   const seen = await page.evaluate(pageFactsIn).catch(() => ({ badges: [], more: [], sentences: [], charts: [], decor: [] }));
   /* TEXT THAT CROSSES TEXT, over the whole page and not only the first screen: a fault the look fails on. */
@@ -245,6 +285,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   if (viewport && tall > viewport.height) await page.setViewportSize({ width: viewport.width, height: tall });
   await page.screenshot({ path: join(out, `${base}-full.png`), fullPage: true });
   if (viewport && tall > viewport.height) await page.setViewportSize(viewport);
+  /* ONE PRESSED STATE A SCREEN, THE PALETTE OPEN (U14): its words are read and pictured, and it is closed again. */
+  const pressed = await pressPalette(page, join(out, `${base}-palette.png`));
   /* What went on is not what was refused: `forwarded` is the reads handed to the record, kept apart. */
   const { forwarded = 0, ...blocked } = since(before, source.counts());
   return {
@@ -266,7 +308,9 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     writesBlocked: blocked.writes ?? 0,
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),
-    raw: rawIn(facts.text, { all: true, slugs: known.slugs }),
+    raw: rawIn([facts.text, frame, pressed.text].join('\n'), { all: true, slugs: known.slugs }),
+    frameRaw: rawIn(frame, { all: true, slugs: known.slugs }),
+    pressed: { palette: pressed.open, ...(pressed.open ? { image: `${base}-palette.png`, raw: rawIn(pressed.text, { all: true, slugs: known.slugs }) } : {}) },
     counts: countsIn(facts.text, seen),
     ages: agesOf(seen, now),
     overlaps: { count: crossed.length, e: crossed.slice(0, 5) },

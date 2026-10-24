@@ -94,6 +94,10 @@ const KINDS = {
   machine: { label: 'machine word', re: new RegExp(`${machine}|\\btyped values?\\b`, 'giu'), ctx: true },
   /* The words a stuck value prints. */
   stuck: { label: 'stuck value', re: /\b(?:undefined|NaN|null)\b|\[object Object\]/gu },
+  /* THE LONG DASH IN A SENTENCE (the words gate's `the long dash`, `tools/gates/words.json`): one with a word beside it
+     on each side and on the same line, as record text an agent wrote reaches the screen ("user claude", the dash, "the
+     keys"). A dash alone in a cell, or after a label with nothing after it, is the drawn mark for no value. */
+  dashes: { label: 'long dash', re: new RegExp(String.raw`(?<=[\p{L}\p{N}.,;:)'"\u2019][ \u00a0]*)\u2014(?=[ \u00a0]*[\p{L}\p{N}('"\u2018])`, 'gu'), ctx: true },
 };
 
 /** The table: kind to its shape. */
