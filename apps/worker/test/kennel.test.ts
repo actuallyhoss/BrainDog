@@ -157,6 +157,8 @@ test('a yank by the signing key marks the version, which still downloads by its 
   assert.equal((await serveKennel(post('publisher', { publisher: `key:${key.key_id}`, trusted: true }, operator), deps)).status, 200);
   const listed = await read(await serveKennel(post('submit', await signedSubmission(text, key)), deps));
   assert.equal(listed.value?.state, 'listed', JSON.stringify(listed));
+  /* A NEWER VERSION STAYS, so the entry is still in the store with the yanked one marked. */
+  assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.1'), key)), deps)).status, 200);
 
   const reason = 'The shelf page drops rows.';
   const signed = await signYank(key, 'pack', 'bookshelf', '1.0.0', reason, NOW);
@@ -165,10 +167,20 @@ test('a yank by the signing key marks the version, which still downloads by its 
   assert.equal(yanked.status, 200, JSON.stringify(await yanked.clone().json()));
 
   const index = (await (await serveKennel(get('index.json'), deps)).json()) as CatalogueIndex;
-  assert.deepEqual(index.entries.find((e) => e.id === 'bookshelf')?.versions[0]?.yanked, { reason, at: NOW.toISOString() });
+  const entry = index.entries.find((e) => e.id === 'bookshelf');
+  assert.deepEqual(entry?.versions.find((v) => v.version === '1.0.0')?.yanked, { reason, at: NOW.toISOString() });
+  assert.equal(entry?.versions.find((v) => v.version === '1.0.1')?.yanked, undefined);
   const file = await serveKennel(get('packs/bookshelf/1.0.0.pack.json'), deps);
   assert.equal(file.status, 200);
   assert.equal(await file.text(), text);
+
+  /* EVERY VERSION YANKED, THE ENTRY LEAVES THE STORE (`listedEntries`), and each version still downloads by its own. */
+  const last = await signYank(key, 'pack', 'bookshelf', '1.0.1', reason, NOW);
+  assert.ok(last.ok);
+  assert.equal((await serveKennel(post('yank', { kind: 'pack', id: 'bookshelf', version: '1.0.1', reason, signature: last.value }), deps)).status, 200);
+  const after = (await (await serveKennel(get('index.json'), deps)).json()) as CatalogueIndex;
+  assert.equal(after.entries.find((e) => e.id === 'bookshelf'), undefined, 'an entry with nothing left to install is still listed');
+  for (const version of ['1.0.0', '1.0.1']) assert.equal((await serveKennel(get(`packs/bookshelf/${version}.pack.json`), deps)).status, 200);
 });
 
 test('a trusted version whose copy did not land after its listing is served from its waiting copy, byte for byte', async () => {
