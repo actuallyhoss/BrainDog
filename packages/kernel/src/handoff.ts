@@ -198,7 +198,7 @@ export type RunRow = { id: string; seq: number | null; state: string | null; fie
  * nothing of a run outside its place.
  */
 const unknownRun = (left: string): Result<never> =>
-  no<never>('ROW_UNKNOWN', `There is no run called ${left.trim()} here. Name one of the open steps.`, { at: 'left' });
+  no<never>('ROW_UNKNOWN', `There is no run called ${left.trim()} here. Name one of the open steps braindog:handoffs lists.`, { at: 'left' });
 
 /** A run by its spoken name (`S12`) or its id, live or finished, or null. */
 function runOf(sql: Sql, left: string): RunRow | null {

@@ -44,7 +44,7 @@ const PROVISION_KEY = 'inbox-reach-in-do-operator-key-not-a-secret';
 const SESSION_SECRET = 'inbox-reach-in-do-session-secret-not-a-secret-0123456789';
 const INGEST = 'bank-from-out-sms';
 const NO_REACH = 'Reading the inbox needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.';
-const TRIAGE_NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
+const TRIAGE_NO_REACH = 'Triage needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.';
 
 /** How many texts land in each state. Two states hold none, and are still counted. */
 const HELD: Record<InboxState, number> = { untriaged: 130, review: 0, skipped: 50, matched: 50, proposed: 0, ignored: 20 };

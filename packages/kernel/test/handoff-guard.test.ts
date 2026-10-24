@@ -97,7 +97,7 @@ test('ANOTHER PROJECT: a key placed in A cannot take or drop a step left in B, a
   const missing = take(sql, s2, 'S999', clock.now(), write, may);
   const took = take(sql, s2, s1.spoken, clock.now(), write, may);
   assert.equal(took.ok, false);
-  assert.deepEqual(refusal(took), { ...refusal(missing), fix: `There is no run called ${s1.spoken} here. Name one of the open steps.` });
+  assert.deepEqual(refusal(took), { ...refusal(missing), fix: `There is no run called ${s1.spoken} here. Name one of the open steps braindog:handoffs lists.` });
   assert.equal(refusal(took).code, 'ROW_UNKNOWN');
   const byId = take(sql, s2, s1.id, clock.now(), write, may);
   assert.equal(refusal(byId).code, 'ROW_UNKNOWN', 'its id reaches it no better than its name');

@@ -717,7 +717,7 @@ function forRun(sql: Sql, i: Instr, run: RunOf, nowMs: number): boolean {
 }
 
 /** The refusal for an instruction that is not there, and for one that is not the run's: the same words. */
-const unknown = (ref: string): Result<never> => no('ROW_UNKNOWN', `There is no instruction called ${ref.trim()} for this run.`, { at: 'id' });
+const unknown = (ref: string): Result<never> => no('ROW_UNKNOWN', `There is no instruction called ${ref.trim()} for this run. instructions {} lists yours.`, { at: 'id' });
 
 /** The move that takes `i` for `run`, through the write path, with the run marked as having it in hand. */
 function takeFor(d: InstructionDeps, i: Instr, run: RunOf, how: SeenHow): Result<Instr> {

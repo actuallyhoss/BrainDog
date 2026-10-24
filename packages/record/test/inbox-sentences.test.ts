@@ -112,7 +112,7 @@ test('NO REFUSAL THE INBOX OR THE TRIAGE DOOR GIVES SAYS "no token", for any cal
   assert.ok(said.size >= 15, `only ${String(said.size)} different sentences were given: ${[...said.keys()].join(' | ')}`);
   const fixes = [...said.keys()];
   assert.ok(fixes.some((f) => f.startsWith('Reading the inbox needs a token its owner gave the inbox reach.')), 'the inbox never said its own sentence');
-  assert.ok(fixes.some((f) => f === 'Triage needs a token its owner gave the inbox reach.'), 'the door never said its own sentence');
+  assert.ok(fixes.some((f) => f === 'Triage needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.'), 'the door never said its own sentence');
   const wrong = [...said].filter(([fix]) => /no token/i.test(fix)).map(([fix, where]) => `${where}: ${fix}`);
   assert.deepEqual(wrong, [], 'a refusal said "no token"');
   sql.close();

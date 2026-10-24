@@ -78,7 +78,7 @@ export type TriageArgs = { arrival: string; register?: string; fields?: Patch; i
 const TRIAGE_TAKES = ['arrival', 'register', 'fields', 'ignore', 'note', 'back', 'version'] as const;
 
 /** The sentence every token without the `inbox` reach is given, whatever else it holds. */
-const NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
+const NO_REACH = 'Triage needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.';
 
 /**
  * What `end` answers, as the kernel's `endRun` gives it: the run by its spoken id, the state it ended in, and whether

@@ -13858,7 +13858,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return no('VALUE_MALFORMED', `Sections are a list, and one of ${TRAVELS.join(', ')}.`, { at: 'sections' });
         const wrong = args.sections.find((x) => !(TRAVELS as readonly unknown[]).includes(x));
         if (wrong !== undefined)
-          return no('ENUM_VALUE_UNKNOWN', `${String(wrong)} is not a section of a .brain file.`, {
+          return no('ENUM_VALUE_UNKNOWN', `${String(wrong)} is not a section of a .brain file. The sections are ${TRAVELS.join(', ')}.`, {
             at: 'sections',
             allowed: TRAVELS,
           });

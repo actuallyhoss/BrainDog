@@ -143,12 +143,33 @@ const render = (said: Said) => ({
  * holds every `at` to the called tool. The text is drawn again from the refusal, as `index.ts` draws it, only when a
  * word changed.
  */
+/**
+ * A refusal at one field of a row, said inside the argument that carries the row: `fields.what` to `create`, `patch.what`
+ * to `update`, and `where` to `list`, or `undefined`.
+ *
+ * THE RECORD NAMES THE FIELD BARE (audit D, W12): "tasks needs what" came back at `what`, which no tool takes, so `atIn`
+ * dropped it and the agent read a refusal that named no place to correct, against the instructions' own rule.
+ */
+const ROW_ARG: Readonly<Record<string, string>> = { create: 'fields', triage: 'fields', update: 'patch' };
+/* ONLY A REFUSAL ABOUT A FIELD: a FORBIDDEN at `principal` is about the caller, and is no field of the row it sent. */
+const ABOUT_A_FIELD: ReadonlySet<string> = new Set(['FIELD_UNKNOWN', 'REQUIRED_MISSING', 'VALUE_MALFORMED', 'ENUM_VALUE_UNKNOWN', 'IMMUTABLE_FIELD', 'OUT_OF_BOUNDS', 'MATCH_OP_UNSUPPORTED']);
+function inRow(name: string, refusal: Readonly<Record<string, unknown>>, sent: Readonly<Record<string, unknown>>): string | undefined {
+  const at = refusal.at;
+  if (typeof at !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(at) || !ABOUT_A_FIELD.has(String(refusal.code))) return undefined;
+  if (name === 'list') return Object.hasOwn(sent, 'where') ? 'where' : undefined;
+  if (!Object.hasOwn(ROW_ARG, name)) return undefined;
+  const row = sent[ROW_ARG[name]!];
+  /* A FIELD IT SENT, OR ONE THE ROW NEEDS AND IT LEFT OUT. */
+  const sentIt = typeof row === 'object' && row !== null && Object.hasOwn(row, at);
+  return sentIt || refusal.code === 'REQUIRED_MISSING' ? `${ROW_ARG[name]!}.${at}` : undefined;
+}
+
 function ownWords(name: string, args: Record<string, unknown>, out: Said, sent: Record<string, unknown> = args): Said {
   if (!refused(out.result)) return out;
   const was = out.result.refusal as unknown as Record<string, unknown>;
   const tool = toolNamed(name);
   const takes = [...takesOf(name), ...(tool?.quiet ?? [])];
-  const at = tool === undefined ? (typeof was.at === 'string' ? was.at : undefined) : atIn(was.at, takes, sent);
+  const at = tool === undefined ? (typeof was.at === 'string' ? was.at : undefined) : (atIn(was.at, takes, sent) ?? inRow(name, was, sent));
   const fix = typeof was.fix === 'string' ? unsaid(was.fix, at) : was.fix;
   if (at === was.at && fix === was.fix) return out;
   const refusal = Object.fromEntries(

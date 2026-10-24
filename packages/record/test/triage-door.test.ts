@@ -34,7 +34,7 @@ const OBLIGATIONS = {
 };
 
 /** The door's own sentence for every token without the reach (`NO_REACH` in `src/methods/agents.ts`). */
-const NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
+const NO_REACH = 'Triage needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.';
 
 /** A record with three bank texts waiting, each `untriaged`. */
 async function record() {

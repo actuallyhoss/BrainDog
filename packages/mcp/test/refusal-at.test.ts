@@ -149,6 +149,26 @@ test('A WRITE THE LADDER TURNED INTO A PROPOSAL IS REFUSED AT update\'s OWN FIEL
   assert.match(lost.content[0]!.text, /^Refused, VALUE_MALFORMED: A patch changes at least one field\.$/mu);
 });
 
+test('A FIELD THE RECORD NAMES BARE IS SAID INSIDE THE ARGUMENT THAT CARRIES THE ROW (audit D, W12)', async () => {
+  const bare = (code: string, fix: string, at: string) => async (): Promise<Result<never>> => ({ ok: false, refusal: { code, fix, at } });
+  const { surface } = stub({
+    create: bare('REQUIRED_MISSING', 'tasks needs what.', 'what'),
+    update: bare('FIELD_UNKNOWN', 'tasks has no field called colour.', 'colour'),
+    list: bare('FIELD_UNKNOWN', 'tasks has no field called colour.', 'colour'),
+    triage: bare('FORBIDDEN', 'Triage needs a token its owner gave the inbox reach.', 'principal'),
+  });
+  /* A REFUSAL ABOUT THE CALLER IS NO FIELD OF THE ROW, and is not said as one. */
+  const triaged = await call(surface, { who: 'agent' }, 'triage', { arrival: '01M1KJ7RG03SVP78JJ6MK313C8', fields: { what: 'x' } });
+  assert.equal(triaged.structuredContent.at, undefined);
+  const made = await call(surface, { who: 'agent' }, 'create', { register: 'tasks', fields: {} });
+  assert.equal(made.structuredContent.at, 'fields.what');
+  assert.match(made.content[0]!.text, /^Refused, REQUIRED_MISSING at fields\.what: tasks needs what\.$/mu);
+  const changed = await call(surface, { who: 'agent' }, 'update', { spoken: 'tasks#346', patch: { colour: 'red' } });
+  assert.equal(changed.structuredContent.at, 'patch.colour');
+  const listed = await call(surface, { who: 'agent' }, 'list', { register: 'tasks', where: { field: 'colour', is: 'red' } });
+  assert.equal(listed.structuredContent.at, 'where');
+});
+
 test('A RETRY THAT ANSWERS ITS OWN QUESTION IS REFUSED AT the key it sent, wherever it sent it', async () => {
   const { surface, calls } = stub();
   for (const [args, params] of [
