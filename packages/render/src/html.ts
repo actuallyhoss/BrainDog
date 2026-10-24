@@ -2183,13 +2183,13 @@ export const describe = (b: Block, o: RenderOptions = {}): string =>
 export function filtersHTML(filters: readonly Filter[], chosen: Readonly<Record<string, string>> = {}): string {
   const plans = filtersPlan(filters, chosen);
   if (plans.length === 0) return '';
-  const choice = (label: string, on: boolean, count: number | null): string =>
-    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${escape(label)}${count === null ? '' : `<span class="filters-count num">${count}</span>`}</span>`;
+  const choice = (label: string, on: boolean, count: number | null, hue: number | null = null): string =>
+    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${hue === null ? '' : `<span class="filters-dot" style="--hue: ${hue}" aria-hidden="true"></span>`}${escape(label)}${count === null ? '' : `<span class="filters-count num">${count}</span>`}</span>`;
   const groups = plans
     .map(
       (p) =>
         `<div class="filters-group" role="group" aria-label="${escape(p.label)}" data-control="${p.control}" data-field="${escape(p.field)}">${choice(FILTERS_ALL, p.all, null)}${p.shown
-          .map((v) => choice(v.label, v.on, v.count))
+          .map((v) => choice(v.label, v.on, v.count, v.hue))
           .join('')}${p.rest.length ? `<span class="filters-more">${escape(filtersMore(p.rest.length))}</span>` : ''}</div>`,
     )
     .join('');

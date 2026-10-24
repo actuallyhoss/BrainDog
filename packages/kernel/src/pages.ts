@@ -758,7 +758,8 @@ export type PageFilter = {
   label: string;
   control: 'chips' | 'segmented';
   chosen: string | null;
-  values: { value: string; label: string; count: number }[];
+  /** `hue`, for a link to a row that holds one (a project's own colour, 0 to 359), so a chip wears its dot (E24). */
+  values: { value: string; label: string; count: number; hue?: number }[];
   /** The lists its values were counted and named from, so a host holds the filter from a reader who may not read them. */
   reads: string[];
 };
@@ -1964,7 +1965,7 @@ function readerFilters(
 
     /* A LINK IS COUNTED BY THE ROW IT POINTS AT AND OFFERED BY THAT ROW'S NUMBER AND TITLE, which is what an address
        keeps and a person reads. A row no longer there, or on a list the reader may not read, is not offered. */
-    const named = new Map<string, { value: string; label: string }>();
+    const named = new Map<string, { value: string; label: string; hue?: number }>();
     if (spec.type === 'ref' && spec.to !== undefined && readable(spec.to)) {
       reads.push(spec.to);
       const ids = [...counts.keys()].filter((k) => k !== '');
@@ -1973,10 +1974,13 @@ function readerFilters(
       for (const r of pointed?.ok ? pointed.value.rows : []) {
         if (r.seq === null) continue;
         const t = title && Object.hasOwn(r.fields, title) ? r.fields[title] : null;
-        named.set(r.id, { value: String(r.seq), label: typeof t === 'string' && t.trim() !== '' ? t : `#${r.seq}` });
+        /* AND ITS HUE, WHEN IT HOLDS ONE, so a project's chip wears the project's colour as the sidebar does (E24). */
+        const hue = r.fields['hue'];
+        const dot = typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue < 360 ? { hue } : {};
+        named.set(r.id, { value: String(r.seq), label: typeof t === 'string' && t.trim() !== '' ? t : `#${r.seq}`, ...dot });
       }
     }
-    const valueOf = (key: string): { value: string; label: string } | null => {
+    const valueOf = (key: string): { value: string; label: string; hue?: number } | null => {
       if (key === '') return { value: '', label: `No ${label.toLowerCase()}` };
       if (spec.type === 'ref') return named.get(key) ?? null;
       if (spec.type === 'bool') return { value: key, label: key === 'true' ? 'Yes' : 'No' };

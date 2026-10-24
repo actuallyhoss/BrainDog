@@ -15,7 +15,7 @@
  */
 
 /** One value a field holds: what is matched, what it is called, and how many open things hold it. */
-export type FilterValue = { value: string; label: string; count?: number | undefined };
+export type FilterValue = { value: string; label: string; count?: number | undefined; hue?: number | undefined };
 
 /** One field a page may be narrowed by, as the record answers it. `control` is the declaration's, where it said one. */
 export type Filter = { field: string; label: string; control?: 'chips' | 'segmented' | undefined; values: readonly FilterValue[] };
@@ -33,7 +33,8 @@ export const FILTER_CHIPS = 5;
 /** The most values a field may have to be drawn as a segmented control where its declaration names none. */
 export const SEGMENTED_MOST = 4;
 
-export type FilterChoice = { value: string; label: string; count: number | null; on: boolean };
+/** `hue` is the colour of the row a value points at (a project's), drawn as a dot before its name; `null` for none. */
+export type FilterChoice = { value: string; label: string; count: number | null; on: boolean; hue: number | null };
 
 export type FilterPlan = {
   field: string;
@@ -60,8 +61,9 @@ export function filtersPlan(filters: readonly Filter[], chosen: Readonly<Record<
       label: v.label || v.value,
       count: typeof v.count === 'number' && Number.isFinite(v.count) ? v.count : null,
       on: v.value === picked,
+      hue: typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? v.hue : null,
     }));
-    if (picked !== undefined && !values.some((v) => v.on)) values.push({ value: picked, label: picked, count: 0, on: true });
+    if (picked !== undefined && !values.some((v) => v.on)) values.push({ value: picked, label: picked, count: 0, on: true, hue: null });
     if (values.length < 2 && picked === undefined) continue;
     const control = f.control ?? (values.length <= SEGMENTED_MOST ? 'segmented' : 'chips');
     let shown = values.slice(0, FILTER_CHIPS);

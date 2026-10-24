@@ -934,6 +934,14 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
   assert.equal(tree(render(Filters, { props: { filters: [] } }).body), '', 'nothing to narrow by draws nothing');
 });
 
+test("A PROJECT'S CHIP WEARS ITS DOT in both renderers, and a value with no hue wears none (E24)", () => {
+  const dotted = [{ field: 'thing', label: 'Project', values: [{ value: '1', label: 'Encore', count: 46, hue: 210 }, { value: '2', label: 'BrainDog', count: 1, hue: 30 }, { value: '', label: 'No project', count: 2 }] }];
+  const svelte = tree(render(Filters, { props: { filters: dotted } }).body);
+  assert.equal(svelte, tree(filtersHTML(dotted)));
+  assert.equal((svelte.match(/class="filters-dot"/gu) ?? []).length, 2);
+  assert.match(svelte, /style="--hue: 210"/u);
+});
+
 /* ── agents in their makers' marks, where the host draws them ──────────────── */
 
 test('THE TWO RENDERERS DRAW ONE MARK FOR AN AGENT the host names, on a card, a card named for its agent, and a feed line', () => {

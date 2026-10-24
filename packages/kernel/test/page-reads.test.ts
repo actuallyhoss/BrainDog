@@ -29,7 +29,7 @@ const value = <T>(r: unknown): T => {
 const PROJECTS: Declaration = {
   id: 'register.projects',
   kind: 'register',
-  body: { id: 'projects', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never,
+  body: { id: 'projects', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'hue', type: 'int' }] } as never,
 };
 
 const TASKS: Declaration = {
@@ -97,7 +97,7 @@ async function record() {
   const k = await openRecord(sql, clock);
   value(await k.install([PROJECTS, TASKS, NOTES]));
   const made = (register: string, fields: Record<string, unknown>) => value<{ id: string; seq: number }>(k.create(register, fields, OWNER));
-  const kiln = made('projects', { name: 'Kiln' });
+  const kiln = made('projects', { name: 'Kiln', hue: 24 });
   const oxbow = made('projects', { name: 'Oxbow' });
   made('projects', { name: 'Quiet' });
   made('tasks', { what: 'Fire the glaze', state: 'open', project: kiln.id, hold: 'you' });
@@ -161,7 +161,8 @@ test('THE ANSWER SAYS WHAT EACH FILTER CAN TAKE, counting open rows only, named 
   assert.equal(project.chosen, null);
   assert.deepEqual(project.reads, ['tasks', 'notes', 'projects'], 'the lists counted and the list the names come from');
   assert.deepEqual(project.values, [
-    { value: '1', label: 'Kiln', count: 3 },
+    /* A PROJECT THAT HOLDS A HUE IS OFFERED WITH IT, so its chip wears the project's dot (E24); one without has none. */
+    { value: '1', label: 'Kiln', count: 3, hue: 24 },
     { value: '2', label: 'Oxbow', count: 1 },
     { value: '', label: 'No project', count: 1 },
   ]);

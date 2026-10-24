@@ -38,7 +38,9 @@ export function filtersOf(page: unknown): Filter[] {
       if (value === null) return [];
       const label = typeof v.label === 'string' && v.label.trim() !== '' ? v.label : value;
       if (label === '') return [];
-      return [typeof v.count === 'number' ? { value, label, count: v.count } : { value, label }];
+      /* A PROJECT'S HUE, so its chip wears the project's dot (E24). */
+      const hue = typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? { hue: v.hue } : {};
+      return [typeof v.count === 'number' ? { value, label, count: v.count, ...hue } : { value, label, ...hue }];
     });
     const control = f.control === 'chips' || f.control === 'segmented' ? f.control : undefined;
     return [{ field: f.field, label: typeof f.label === 'string' && f.label !== '' ? f.label : f.field, values, ...(control ? { control } : {}) }];

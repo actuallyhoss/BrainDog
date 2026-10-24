@@ -53,6 +53,15 @@
     background: var(--tile-2);
   }
 
+  /* A PROJECT'S DOT (E24): the row's own hue, in the mark's lightness and chroma, as the sidebar draws a project. */
+  .filters-dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue, 0));
+  }
+
   .filters-choice {
     appearance: none;
     display: inline-flex;
