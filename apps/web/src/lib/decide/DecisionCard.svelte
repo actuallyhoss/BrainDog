@@ -76,7 +76,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, inlineOf, keptWay, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, cardOf, cardWords, hardSaid, inlineOf, keptWay, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -177,6 +177,7 @@
   /* The one the row fills with the accent: the suggested answer, or the first. */
   const primary = $derived(primaryOf(card));
   /** What the filled answer does, in its own words, where it says: the line under a row of buttons. */
+  const hardLine = $derived(hardSaid(card, primary));
   const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
   /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
   const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !drawn));
@@ -616,9 +617,10 @@
       data-keeps
       aria-pressed={waiting?.key === way.key ? true : phase === 'asking' ? chosen?.key === way.key : undefined}
       aria-disabled={kept ? 'true' : undefined}
+      aria-describedby={wayTail(card, way, primary) !== '' ? `${uid}-hard` : undefined}
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
-        ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span>{wayTail(card, way, primary)}</span
+        ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span></span
       >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
     >
   {/each}
@@ -822,6 +824,8 @@
         </div>
         <!-- WHAT THE FILLED ANSWER DOES, one line under the row (U-A9), where its answers each carry one: "File them" says
              what filing does before the press, as its rectangle did. -->
+        <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW (audit Z28): on the button it wrapped to two lines at 390. -->
+        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto">{hardLine}</p>{/if}
         {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
       {/if}
       {#if phase === 'asking' && chosen}
@@ -1061,6 +1065,14 @@
 
   .dc[data-compact] > .dc-main > .dc-actions {
     margin-block-start: var(--sp-1);
+  }
+
+  /* THE CARE A HARD ANSWER ASKS FOR, quiet, under the row of answers (audit Z28). */
+  .dc-hard {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lh-body);
   }
 
   /* WHAT ACCEPTING THE LEAD DOES, one plain line in the second ink, with no rule down its side. */

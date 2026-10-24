@@ -39,6 +39,10 @@ export const queueWords = {
   hard: (verb: string) => `${verb}${HARD_TAIL}`,
   /** The same care, as the end of a button whose name is drawn on its own. */
   hardTail: HARD_TAIL,
+  /** The same care as a line of its own under a row of answers, where the filled one is the hard one (audit Z28). */
+  hardLine: 'Can’t be undone easily',
+  /** And naming the answers it is said of, where those are not the filled one alone. */
+  hardOf: (names: string) => `${names} can’t be undone easily`,
   /** Said with the suggested answer's name to a screen reader, where the eye reads the accent's fill. */
   suggestedSaid: ', suggested',
   /** A question shown outside Decide whose answers are too many for a row: its own page, where they are chosen. */

@@ -555,6 +555,18 @@ export const wayTail = (card: Pick<Card, 'cost'>, way: Pick<Way, 'key' | 'hard'>
   way.hard || (way.key === primary && hardOf(card)) ? queueWords.hardTail : '';
 
 /**
+ * THE CARE A ROW OF ANSWERS ASKS FOR, AS A LINE UNDER IT (audit Z28): "Accept, can’t be undone easily" on the red
+ * button wrapped to two lines at 390, so the button says its name and the line under the row says the care. Said of
+ * the answers `wayTail` marks: bare where the filled one is the only hard one, else naming them. `''` for none.
+ */
+export function hardSaid(card: Pick<Card, 'cost' | 'ways'>, primary: string | null): string {
+  const hard = card.ways.filter((w) => wayTail(card, w, primary) !== '');
+  if (hard.length === 0) return '';
+  if (hard.length === 1 && hard[0]!.key === primary) return queueWords.hardLine;
+  return queueWords.hardOf(hard.map((w) => w.label).join(' and '));
+}
+
+/**
  * WHETHER "WHAT IT CHANGES" HAS A LINE UNDER IT: what accepting does, the money it writes, or a change from what to
  * what. The link to the whole change is no line, so a card with the link alone draws the link and no heading over it.
  */

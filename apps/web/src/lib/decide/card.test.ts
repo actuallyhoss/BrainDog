@@ -299,8 +299,9 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
   const classic = queueOf({ id: 'SG7', title: 'Q', band: 'call', opened: '', options: [{ key: 'keep', title: 'Keep', body: '' }, { key: 'take', title: 'Take', body: '', hard: true }] });
   assert.deepEqual(classic.options.map((o) => o.hard ?? false), [false, true]);
 
-  /* AND THE CARD DRAWS IT THROUGH THOSE: the tail on each button by its own way. */
-  assert.match(src('./DecisionCard.svelte'), /<span class="dc-btn-name">\{amount !== null && way\.key === primary \? amountAnswer\(way\.label, amount\) : way\.label\}<\/span>\{wayTail\(card, way, primary\)\}/u);
+  /* AND THE CARD DRAWS IT THROUGH THOSE: each button by its own way points at the line under the row that says the care
+     (audit Z28: said inside the button it wrapped to two lines at 390). */
+  assert.match(src('./DecisionCard.svelte'), /aria-describedby=\{wayTail\(card, way, primary\) !== '' \? `\$\{uid\}-hard` : undefined\}/u);
 });
 
 test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the suggested or the first filled', () => {
