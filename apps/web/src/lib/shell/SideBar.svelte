@@ -27,7 +27,7 @@
   import { drew } from '../ui/screen.svelte.ts';
   import { REGISTERS } from '../record/held.ts';
   import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, pinsKept, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
-  import { readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
+  import { keptRead, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
   let {
@@ -91,13 +91,19 @@
     settings: 'Settings',
   } as const;
 
-  /* THE READ: the projects first, then their week. Asked again when the record's version moves, a moment after. */
-  let read = $state.raw<SideRead | null>(null);
+  /* THE READ: the projects first, then their week. Asked again when the record's version moves, a moment after. DRAWN AT
+     ONCE FROM THE LAST LIST THIS DEVICE DREW (`side-copy.ts`), so no screen shows the heading alone while it is read, and
+     kept when a read is not answered; until either, a still outline of rows (scope 2026-10-24 E1). */
+  let read = $state.raw<SideRead | null>(untrack(() => keptRead(base)));
+  /** The record the drawn list is of. */
+  let readFor = untrack(() => base);
   /* ON A PHONE THIS IS THE SCREEN, so it says it drew once its first read has answered, as a route does (`data-screen`). */
   let answered = $state(false);
   $effect(() => {
     if (phone && answered) drew('ready');
   });
+  /** The outline's rows, by how far each bar reaches. */
+  const OUTLINE = ['62%', '48%', '56%'] as const;
   let week = $state.raw<Week>(new Map());
   let asked = 0;
   $effect(() => {
@@ -105,6 +111,12 @@
     const b = base;
     const l = lists;
     const n = ++asked;
+    /* ANOTHER RECORD DRAWS ITS OWN KEPT LIST, never the last one's. */
+    if (b !== readFor) {
+      readFor = b;
+      read = keptRead(b);
+      answered = false;
+    }
     const go = (): void =>
       void readSide(b, l)
         .then(async (got) => {
@@ -118,11 +130,13 @@
           const w = await readWeek(b, got.list, play);
           if (n === asked) week = w;
         })
+        /* NOT ANSWERED AFTER ITS TRIES (`readSide`): what is drawn stays, and the next move of the record asks again. */
         .catch(() => {
           if (n === asked) answered = true;
         });
-    /* THE FIRST READ AT ONCE; a re-read waits for the page that moved the version to have its own reads out first. */
-    const t = setTimeout(go, untrack(() => read) === null ? 0 : 1200);
+    /* THE FIRST READ AT ONCE, over the kept list too; a re-read waits for the page that moved the version to have its own
+       reads out first. */
+    const t = setTimeout(go, untrack(() => answered) ? 1200 : 0);
     return () => clearTimeout(t);
   });
 
@@ -346,6 +360,16 @@
   </li>
 {/snippet}
 
+<!-- A STILL OUTLINE OF ROWS while the first read is out and this device has no list kept: no motion, nothing to read, and
+     not a wait the screen is held for (no `aria-busy`), so a screen is never drawn with the heading alone. -->
+{#snippet outline()}
+  <ul class="s-list s-still" aria-hidden="true">
+    {#each OUTLINE as w (w)}
+      <li class="s-row"><span class="s-pm"></span><span class="s-still-bar" style:inline-size={w}></span></li>
+    {/each}
+  </ul>
+{/snippet}
+
 {#snippet listed()}
   {#if groups.length > 0}
     <h2 class="s-title s-lists">{words.lists}</h2>
@@ -398,6 +422,8 @@
         {@render fold('parked', split.parked, read.label('parked'), 'archive')}
         {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
       </div>
+    {:else if !answered}
+      <div class="s-tile">{@render outline()}</div>
     {/if}
     {#if groups.length > 0}
       <div class="s-tile s-phone-lists">{@render listed()}</div>
@@ -423,6 +449,8 @@
             {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
           </div>
         {/if}
+      {:else if !answered}
+        {@render outline()}
       {/if}
       {@render listed()}
       {#if answered}{@render end()}{/if}
@@ -506,6 +534,21 @@
 
   .s-item {
     position: relative;
+  }
+
+  /* THE STILL OUTLINE: a row's mark and a bar, in the faint ink a wait draws in (`Waiting.svelte`), and no pointer. */
+  .s-still .s-row {
+    cursor: default;
+  }
+
+  .s-still .s-pm {
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+  }
+
+  .s-still-bar {
+    block-size: 10px;
+    border-radius: var(--r-xs);
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
 
   /* A ROW: 32 tall, a caret in its gutter, the mark at 20, the name at 14/500, then "late" and the dot at its end. */
