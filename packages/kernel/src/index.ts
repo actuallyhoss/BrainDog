@@ -34,6 +34,8 @@ import {
   installDeclarations,
   jcs,
   lintBatch,
+  lintTable,
+  type LintTable,
   liveTarget,
   ownId,
   homeCurrency,
@@ -3439,12 +3441,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           if (moved) return wordMoved(decl, register, reader, moved);
           continue;
         }
-        const now = unreadable([reader]) ?? lintBatch(sql, [reader], planned ?? undefined);
+        const now = unreadable([reader]) ?? lintBatch(sql, [reader], planned ?? undefined, lintTableNow());
         if (now) continue;
         /* THIS LIST ALONE BESIDE THE READER, not the whole batch. A page over two lists that both change in one batch
            was first blamed on whichever came first in it, and the sentence named the wrong list and every field it
            lost; asked one list at a time, the refusal is about the list that took the field away. */
-        const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader], planned ?? undefined);
+        const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader], planned ?? undefined, lintTableNow());
         const { called, what, list } = spoken(decl, register, reader);
         if (!then) {
           const moved = opened.length === 0 ? null : movedWord(reader, register, opened, after);
@@ -3482,8 +3484,25 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * planned record. `lintBatch` reads the plan when `againstPlan` has set one, and the others read it through the cache
    * and `heldRow`.
    */
+  /**
+   * The table's declarations as the lint reads them (`lintTable`), kept while they stand: the same revision, and the same
+   * rows by count and rowid, live and in all. A staged write the caller has not reloaded yet moves the rows, and a
+   * transaction rolled back moves them back, so neither is linted against a table it no longer is.
+   */
+  let lintKept: { key: string; table: LintTable } | null = null;
+  function lintTableNow(): LintTable {
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT count(*) AS n, max(rowid) AS m, total(rowid) AS t,
+              total(CASE WHEN superseded_at IS NULL AND retired = 0 THEN 1 ELSE 0 END) AS ln,
+              total(CASE WHEN superseded_at IS NULL AND retired = 0 THEN rowid ELSE 0 END) AS lt FROM declaration`,
+    );
+    const key = JSON.stringify([revision, at?.n, at?.m, at?.t, at?.ln, at?.lt]);
+    if (lintKept === null || lintKept.key !== key) lintKept = { key, table: lintTable(sql) };
+    return lintKept.table;
+  }
+
   function stagingFault(batch: readonly Declaration[]): Refusal | null {
-    return unreadable(batch) ?? lintBatch(sql, batch, planned ?? undefined) ?? unserved(batch) ?? keysKept(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
+    return unreadable(batch) ?? lintBatch(sql, batch, planned ?? undefined, lintTableNow()) ?? unserved(batch) ?? keysKept(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
   }
 
   /**
@@ -8692,7 +8711,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
       /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
          sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
-      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
+      const fault = unreadable(batch) ?? lintBatch(sql, batch, undefined, lintTableNow()) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         /* A SCRIPT CALLS OUT AS AN ACTION DOES, and its line is how the owner sees where it fetches and with which key. */
@@ -11726,7 +11745,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       /* THE ROWS LAST, after every check about the declarations alone, so a declaration that is wrong in itself is told that
          first rather than how many rows it would also break. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch, undefined, lintTableNow()) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       /* THE HISTORY LINE IS WRITTEN IN THE TRANSACTION THAT WRITES THE VERSION, so a change that lands always has one and a
          refused or rolled-back one never does. The wrapper sees only this call's result, which is `Result<Installed[]>`. */

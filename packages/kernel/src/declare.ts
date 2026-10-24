@@ -6184,6 +6184,49 @@ export async function installDeclarations(
 export type PlannedRecord = { known: Known; owners: Owners };
 
 /**
+ * The table's live declarations as the lint reads them, read once while they stand: what each says (parsed, and frozen,
+ * since every lint lays its batch over a copy), who put each there, and every field each list ever sealed (`sealedEver`).
+ *
+ * WHY. The lint read the whole table, parsed every body and read every version of every list again for each batch it
+ * was asked, and `boot` asks it of every offer the pen weighs: on a record his size about 120 queries and a tenth of
+ * `boot`'s time, to read the same rows four times. The kernel keeps one of these while the table's declarations stand
+ * (`lintTableNow`) and hands it in; a caller with none reads the table as before.
+ */
+export type LintTable = { known: Known; owners: Owners; held: ReadonlySet<string>; sealed: (register: string) => Map<string, SealedField> };
+
+const frozen = <T>(v: T): T => {
+  if (v !== null && typeof v === 'object' && !Object.isFrozen(v)) {
+    Object.freeze(v);
+    for (const x of Object.values(v as object)) frozen(x);
+  }
+  return v;
+};
+
+/** The table's declarations read once, as `knownTo`, `ownersTo`, `heldIn` and `sealedEver` read them. */
+export function lintTable(sql: Sql): LintTable {
+  const known = new Map<string, Record<string, Json>>();
+  const owners = new Map<string, string | null>();
+  for (const row of sql.all<{ id: string; pack_id: string | null; body: string }>('SELECT id, pack_id, body FROM declaration WHERE superseded_at IS NULL AND retired = 0')) {
+    owners.set(row.id, row.pack_id);
+    try {
+      known.set(row.id, frozen(JSON.parse(row.body) as Record<string, Json>));
+    } catch {
+      known.set(row.id, frozen({}));
+    }
+  }
+  const sealed = new Map<string, Map<string, SealedField>>();
+  return {
+    known,
+    owners,
+    held: new Set(known.keys()),
+    sealed: (register) => {
+      if (!sealed.has(register)) sealed.set(register, sealedEver(sql, register));
+      return sealed.get(register)!;
+    },
+  };
+}
+
+/**
  * Validate a batch against the record as it would be once the batch lands, and write nothing.
  *
  * FOR A PROPOSAL, which is read by a person before it is installed. A declaration the gate would accept and the install
@@ -6192,14 +6235,14 @@ export type PlannedRecord = { known: Known; owners: Owners };
  * `planned` IS THE RECORD TO LAY THE BATCH ON IN PLACE OF THE TABLE. The disabled pack is still read from the table: a
  * plan turns no pack off, and the arranger turns a disabled pack on rather than installing over it (`expand`).
  */
-export function lintBatch(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Refusal | null {
+export function lintBatch(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord, table?: LintTable): Refusal | null {
   const off = disabledPackFault(sql, batch);
   if (off) return off;
   const unplanned = unplannedHolds(batch);
   if (unplanned) return unplanned;
-  const known = knownTo(sql, batch, planned);
-  const owners = ownersTo(sql, batch, planned);
-  const held = heldIn(sql, planned);
+  const known = knownTo(sql, batch, planned, table);
+  const owners = ownersTo(sql, batch, planned, table);
+  const held = heldIn(sql, planned, table);
   for (const decl of batch) {
     const fault = validate(decl, known, owners, held);
     if (fault) return fault;
@@ -6208,14 +6251,15 @@ export function lintBatch(sql: Sql, batch: readonly Declaration[], planned?: Pla
 }
 
 /** The ids the record holds before a batch lands: the table's live declarations, or the plan's. */
-function heldIn(sql: Sql, planned?: PlannedRecord): ReadonlySet<string> {
+function heldIn(sql: Sql, planned?: PlannedRecord, table?: LintTable): ReadonlySet<string> {
   if (planned !== undefined) return new Set(planned.known.keys());
+  if (table !== undefined) return table.held;
   return new Set(sql.all<{ id: string }>('SELECT id FROM declaration WHERE superseded_at IS NULL AND retired = 0').map((r) => r.id));
 }
 
-function ownersTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Owners {
-  const owners = new Map<string, string | null>(planned?.owners ?? []);
-  if (planned === undefined)
+function ownersTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord, table?: LintTable): Owners {
+  const owners = new Map<string, string | null>(planned?.owners ?? (table?.owners ?? []));
+  if (planned === undefined && table === undefined)
     for (const row of sql.all<{ id: string; pack_id: string | null }>(
       'SELECT id, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0',
     ))
@@ -6227,9 +6271,9 @@ function ownersTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedReco
   return owners;
 }
 
-function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Known {
-  const known = new Map<string, Record<string, Json>>(planned?.known ?? []);
-  if (planned === undefined)
+function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord, table?: LintTable): Known {
+  const known = new Map<string, Record<string, Json>>(planned?.known ?? (table?.known ?? []));
+  if (planned === undefined && table === undefined)
     for (const row of sql.all<{ id: string; body: string }>(
       'SELECT id, body FROM declaration WHERE superseded_at IS NULL AND retired = 0',
     ))
@@ -6256,7 +6300,7 @@ function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecor
   for (const [id, body] of known) {
     if (!id.startsWith('register.') || !Array.isArray(body.fields)) continue;
     const fields = body.fields as { id?: unknown; type?: unknown; of?: unknown }[];
-    const missed = [...sealedEver(sql, id.slice('register.'.length)).values()].filter(
+    const missed = [...(table?.sealed ?? ((r: string) => sealedEver(sql, r)))(id.slice('register.'.length)).values()].filter(
       (was) => !fields.some((f) => f !== null && typeof f === 'object' && f.id === was.id && sealedAs(f) !== null),
     );
     if (missed.length > 0) known.set(id, { ...body, fields: [...body.fields, ...missed.map((was) => ({ ...was, retired: true }))] });
