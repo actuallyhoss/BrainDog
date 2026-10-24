@@ -43,6 +43,7 @@ import {
   HEAP_BYTES,
   isRefusal,
   LOG_BYTES,
+  NAMES,
   scriptMeta,
   WITH_CONFIG,
   type CtxHost,
@@ -490,6 +491,8 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       const config = intoVm(parse, host.config ?? {});
       const ctx = vm.unwrapResult(vm.callFunction(withConfig, vm.undefined, built, config));
       for (const h of [parse, prelude, hostObj, build, meta, built, withConfig, config]) h.dispose();
+      /* `__name` FIRST, for the reason `NAMES` gives: a source taken from a bundle calls it. */
+      vm.unwrapResult(vm.evalCode(NAMES, 'names.js')).dispose();
 
       const evaluated = vm.evalCode(decl.source, 'script.js', { type: 'module' });
       if ('error' in evaluated && evaluated.error !== undefined) return { error: errorText(vm, evaluated.error) };

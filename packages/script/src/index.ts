@@ -247,6 +247,25 @@ export const WITH_CONFIG = `(function (ctx, config) {
   return Object.freeze({ ...ctx, config: deep(settings) });
 })`;
 
+/**
+ * `__name`, set on the sandbox's `globalThis` before the source is read, on both hosts.
+ *
+ * A BUNDLER'S HELPER INSIDE A SCRIPT'S OWN TEXT. A first-party script's source is its functions' `toString()`
+ * (`MATCH_PAYMENT_SCRIPT` and the rest in `packages/seed`), taken inside whatever bundle runs. `wrangler` bundles the
+ * Worker with esbuild's `keepNames`, which wraps every named arrow as `__name(fn, "fn")` and defines `__name` once at
+ * the top of the bundle, outside any function. So the text the record installed calls a helper the sandbox never had:
+ * measured on the production bundle, `matchPayment` holds 13 such calls, and book_from_account, match_payment,
+ * settle_matched_line and the rest were refused in 13 to 16 ms with no fetch, three times each, and paused. The
+ * helper is esbuild's own, a name and nothing else.
+ */
+export const NAMES = `if (typeof globalThis.__name !== 'function')
+  Object.defineProperty(globalThis, '__name', {
+    value: (target, value) => Object.defineProperty(target, 'name', { value, configurable: true }),
+    configurable: true,
+    writable: true,
+  });
+`;
+
 /** A write the run asked for. Nothing is applied here; the host applies them after the run, together. */
 export type ScriptWrite =
   | { op: 'create'; register: string; fields: Json }

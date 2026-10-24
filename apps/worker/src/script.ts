@@ -45,6 +45,7 @@ import {
   checkDecl,
   isRefusal,
   LOG_BYTES,
+  NAMES,
   PRELUDE,
   scriptMeta,
   WITH_CONFIG,
@@ -481,6 +482,7 @@ export class ScriptRuns {
  * like the platform failing.
  */
 const MAIN = `import { WorkerEntrypoint } from 'cloudflare:workers';
+import './names.js';
 import * as source from './script.js';
 
 const prelude = ${PRELUDE};
@@ -664,7 +666,8 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     const worker = wiring.loader.load({
       compatibilityDate: COMPATIBILITY_DATE,
       mainModule: 'main.js',
-      modules: { 'main.js': MAIN, 'script.js': decl.source },
+      /* `names.js` BEFORE `script.js`, imported first by `MAIN`, for the reason `NAMES` gives. */
+      modules: { 'main.js': MAIN, 'names.js': NAMES, 'script.js': decl.source },
       env: { RECORD: wiring.exports.ScriptRecord({ props: { object: wiring.object } }) },
       globalOutbound: wiring.exports.ScriptOutbound({ props: { object: wiring.object } }),
       limits: { cpuMs: limits.cpu_ms },

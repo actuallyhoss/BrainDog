@@ -214,3 +214,23 @@ test('A SCRIPT ON THE CLOUD IS HANDED ctx.cycle, AND A MONTHLY LINE PAID ON 3 OC
   assert.deepEqual(saidOf(answer), { has: 'function', next: '2026-11-01', bad: null });
   assert.equal(open, 0, 'the run was left open behind it');
 });
+
+/* A SOURCE TAKEN FROM A BUNDLE RUNS ON THE CLOUD (`NAMES` in `@braindog/script`). `wrangler`'s esbuild keeps names, so
+   a Money script's `toString()` text wraps its arrows in `__name`, which the loaded Worker never had: measured, the five
+   Money scripts that do so were refused "threw: __name is not defined" and paused. `names.js` is imported first. */
+test('A SCRIPT WHOSE TEXT CALLS THE BUNDLER\'S __name RUNS ON THE CLOUD, as it does on the self-host', async () => {
+  const { answer, open } = await run(
+    'bundled',
+    `function tally(n) {
+  const twice = /* @__PURE__ */ __name((x) => x * 2, "twice");
+  return twice(n);
+}
+export default async function run(ctx) {
+  const named = /* @__PURE__ */ __name(async (said) => said, "named");
+  ctx.write('seen', { said: JSON.stringify({ n: tally(await named(21)), name: named.name }) });
+}`,
+  );
+  assert.equal(answer.refused, undefined, JSON.stringify(answer));
+  assert.deepEqual(saidOf(answer), { n: 42, name: 'named' });
+  assert.equal(open, 0, 'the run was left open behind it');
+});
