@@ -850,3 +850,18 @@ export function partialOf(kind: string, body: Row, fix: string): Partial | null 
   }
   return { why, done, left };
 }
+
+/**
+ * WHAT APPEARS, AS SENTENCES WHERE IT CAN BE SAID IN ONE (scope E37): a group of names under a verb ("Adds" over "Pages:
+ * Profiles", "Lists: Profiles, Places") is one sentence a kind, and a line that is already a sentence ("Profiles adds 2
+ * fields to Tools: ...") is that sentence. `null` for what has more to show than words: a page drawn, a look's colour,
+ * a script's source, a list's own lines; those stay the preview's.
+ */
+export function appearsSaid(a: Appears): string[] | null {
+  if (a.page !== undefined || a.source !== undefined || a.accent !== undefined) return null;
+  const verb = a.kind === copy.arrangeAlso ? copy.arrangeAdds : a.kind;
+  if (a.title === '' && a.lines.length > 0 && a.lines.every((l) => l.tone === undefined))
+    return a.lines.map((l) => copy.arrangeGroupSaid(l.value.split(', ').filter((n) => n !== ''), verb, copy.arrangeGroupOne(l.label), l.label.toLowerCase()));
+  if (a.title !== '' && a.lines.length === 0) return [/[.!?]$/u.test(a.title) ? a.title : `${a.title}.`];
+  return null;
+}

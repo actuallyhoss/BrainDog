@@ -17,7 +17,7 @@
   import Proposed from './Proposed.svelte';
   import KeyNeeded from './KeyNeeded.svelte';
   import { getContext } from 'svelte';
-  import { KEYS_CONTEXT, TICKS_CONTEXT, ticksOf, type Arranged, type KeysContext, type TicksContext } from './arranged.ts';
+  import { KEYS_CONTEXT, TICKS_CONTEXT, appearsSaid, ticksOf, type Arranged, type KeysContext, type TicksContext } from './arranged.ts';
 
   let { arranged, compact = false }: { arranged: Arranged; compact?: boolean } = $props();
 
@@ -181,9 +181,18 @@
           {/each}
         </section>
       {:else if p.part === 'appears'}
+        {@const said = p.appears.map(appearsSaid)}
         <section class="arr-part" aria-label={copy.proposalWillAppear}>
           <h3 class="arr-h">{copy.proposalWillAppear}</h3>
-          <Proposed proposed={{ appears: p.appears, samples: null }} />
+          <!-- WHAT CAN BE SAID IN A SENTENCE IS (scope E37); a page drawn, a look's colour or a list's lines stay the preview's. -->
+          {#if said.some((x) => x !== null)}
+            <ul class="arr-lines arr-said">
+              {#each said.flatMap((x) => x ?? []) as line, i (i)}<li>{line}</li>{/each}
+            </ul>
+          {/if}
+          {#if said.some((x) => x === null)}
+            <Proposed proposed={{ appears: p.appears.filter((_, i) => said[i] === null), samples: null }} />
+          {/if}
           {#if p.examples > 0}<p class="arr-note">{copy.arrangeExamples(p.examples)}</p>{/if}
         </section>
       {:else if p.part === 'words'}

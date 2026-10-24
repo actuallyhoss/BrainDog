@@ -273,6 +273,13 @@ export const decide = {
   /** What an arrangement changes, as one sentence on its own page (scope E37): "Adds Profiles, with 1 new page and 2 new lists." */
   arrangeSaid: (lead: string, bits: readonly string[]) =>
     bits.length === 0 ? `${lead}.` : `${lead}, with ${bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(', ')} and ${bits.at(-1)}`}.`,
+  /* EACH GROUP OF WHAT APPEARS AS ONE SENTENCE (scope E37), "Adds 2 lists, Profiles and Places.", where it was a heading
+     over a grid of labels. The names first, so `access.test.ts` can render it with the argument shapes it tries. */
+  arrangeGroupSaid: (names: readonly string[], verb: string, one: string, many: string) =>
+    names.length === 1 ? `${verb} ${one}, ${names[0]}.` : `${verb} ${names.length} ${many}, ${list([...names])}.`,
+  arrangeGroupOne: (label: string): string =>
+    ({ Pages: 'a page', Lists: 'a list', 'Rules for what comes in': 'a rule for what comes in', Looks: 'a look', Measures: 'a measure', Summaries: 'a summary', Rules: 'a rule', 'Page parts': 'a page part' })[label] ??
+    `one ${label.toLowerCase()}`,
   arrangeCountSettings: (n: number) => `${n} ${n === 1 ? 'setting' : 'settings'}`,
   arrangeApplied: 'What was applied',
   arrangeDidInstall: (names: readonly string[]) => `Installed ${list([...names])}`,
