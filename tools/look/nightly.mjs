@@ -20,18 +20,24 @@
  * `--check` judges the warm Today against `speed.todaySettleMs` and exits 1 when it is over, so a launchd job can say a
  * slow night without anyone reading the file. The file is `loop/proof/speed/<date>.json` unless `--out` names another.
  *
- * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo): `node tools/look/nightly.mjs --plist --source live:<record> >
- * ~/Library/LaunchAgents/dog.brain.speed.plist` writes it with this checkout's path and this Node, and
- * `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dog.brain.speed.plist` starts it. No path of anybody's
- * machine is kept in the repository. The job builds the app first when the build is older than the tree, and says
- * each night in `.ship/logs/speed-nightly.log`.
+ * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo), as the hourly watch is kept (`tools/watch/mac.mjs`):
+ *
+ *   node tools/look/nightly.mjs --install --source live:<record> [--root <checkout>]
+ *   node tools/look/nightly.mjs --uninstall
+ *   node tools/look/nightly.mjs --plist --source live:<record> [--root <checkout>]   print it without writing it
+ *
+ * `--install` writes ~/Library/LaunchAgents/dog.brain.speed.plist with this Node and this checkout's path (or the one
+ * `--root` names, so a worktree can install the main checkout's job) and loads it. No path of anybody's machine is kept
+ * in the repository. A Mac asleep at 04:30 runs the job once on waking. The job builds the app first when the build is
+ * older than the tree, and says each night in `.ship/logs/speed-nightly.log`.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { argv, env as processEnv, exit } from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 import { chromium } from '@playwright/test';
 
@@ -43,22 +49,47 @@ import { pick, screensOf } from './screens.mjs';
 
 /** `--flag value` and `--flag=value`; a flag this command does not take is a refusal. */
 export function parse(args) {
-  const out = { check: false, plist: false };
+  const out = { check: false, plist: false, install: false, uninstall: false };
   for (let i = 0; i < args.length; i += 1) {
-    if (args[i] === '--check' || args[i] === '--plist') {
+    if (['--check', '--plist', '--install', '--uninstall'].includes(args[i])) {
       out[args[i].slice(2)] = true;
       continue;
     }
-    const m = /^--(source|out|runs)(?:=(.*))?$/u.exec(args[i]);
-    if (m === null) throw new Error(`The night's measure takes --source, --out, --runs and --check, and not ${args[i]}.`);
+    const m = /^--(source|out|runs|root)(?:=(.*))?$/u.exec(args[i]);
+    if (m === null) throw new Error(`The night's measure takes --source, --out, --runs, --check, --plist, --install, --uninstall and --root, and not ${args[i]}.`);
     out[m[1]] = m[2] ?? args[(i += 1)];
   }
+  if (out.uninstall) return { uninstall: true };
   /* THE RECORD IS NAMED BY WHOEVER RUNS IT, and the launchd job carries the one it was written with: no record's name is
      kept in the repository. */
   const raw = out.source;
   if (raw === undefined) throw new Error("The night's measure needs --source live:<record> or --source seed.");
   const colon = raw.indexOf(':');
-  return { raw, source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, runs: Number(out.runs ?? 1) };
+  return { raw, source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, install: out.install, root: out.root === undefined ? ROOT : resolve(out.root), runs: Number(out.runs ?? 1) };
+}
+
+export const LABEL = 'dog.brain.speed';
+export const PLIST = join(homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`);
+
+const launchctl = (...args) => spawnSync('launchctl', args, { encoding: 'utf8' });
+
+/** Write the job for `root` and load it, replacing one already loaded. Exits as `launchctl bootstrap` does. */
+function install(source, root) {
+  if (!existsSync(join(root, 'tools', 'look', 'nightly.mjs'))) throw new Error(`${root} is not a BrainDog checkout with the night's measure in it.`);
+  mkdirSync(dirname(PLIST), { recursive: true });
+  mkdirSync(join(root, '.ship', 'logs'), { recursive: true });
+  writeFileSync(PLIST, plist(source, root));
+  const domain = `gui/${process.getuid()}`;
+  launchctl('bootout', `${domain}/${LABEL}`);
+  const r = launchctl('bootstrap', domain, PLIST);
+  console.log(r.status === 0 ? `  speed: ${PLIST} loaded; it measures ${source} from ${root} every night at 04:30, read-only` : `  speed: launchctl bootstrap said ${r.stderr.trim()}`);
+  return r.status ?? 1;
+}
+
+function uninstall() {
+  launchctl('bootout', `gui/${process.getuid()}/${LABEL}`);
+  rmSync(PLIST, { force: true });
+  console.log(`  speed: ${LABEL} unloaded and removed`);
 }
 
 /** The launchd job for this checkout and this Node: every night at 04:30, read-only, `--check` so a slow night exits 1. */
@@ -69,7 +100,7 @@ export function plist(source, root = ROOT, node = process.execPath) {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>dog.brain.speed</string>
+  <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array><string>${esc(node)}</string><string>${esc(join(root, 'tools', 'look', 'nightly.mjs'))}</string><string>--source</string><string>${esc(source)}</string><string>--check</string></array>
   <key>WorkingDirectory</key><string>${esc(root)}</string>
@@ -236,8 +267,13 @@ async function built() {
 
 async function main() {
   const asked = parse(argv.slice(2));
+  if (asked.uninstall) return uninstall();
+  if (asked.install) {
+    process.exitCode = install(asked.raw, asked.root);
+    return;
+  }
   if (asked.plist) {
-    process.stdout.write(plist(asked.raw));
+    process.stdout.write(plist(asked.raw, asked.root));
     return;
   }
   const source = await openSource(asked.source, { env: processEnv });

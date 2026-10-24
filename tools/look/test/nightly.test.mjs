@@ -45,3 +45,13 @@ test('THE LAUNCHD JOB RUNS THIS CHECKOUT AT 04:30 WITH --check, and names no pat
   assert.match(xml, /<key>Hour<\/key><integer>4<\/integer><key>Minute<\/key><integer>30<\/integer>/u);
   assert.match(xml, /\/repo\/.ship\/logs\/speed-nightly.log/u);
 });
+
+test('THE INSTALLER TAKES THE RECORD AND A CHECKOUT TO RUN FROM; UNINSTALL NEEDS NEITHER', () => {
+  const asked = parse(['--install', '--source', 'live:the-studio', '--root', '/repo']);
+  assert.equal(asked.install, true);
+  assert.equal(asked.raw, 'live:the-studio');
+  assert.equal(asked.root, '/repo');
+  assert.deepEqual(parse(['--uninstall']), { uninstall: true });
+  assert.throws(() => parse(['--install']), /needs --source/u);
+  assert.match(plist('live:the-studio', '/repo', '/n'), /<key>Label<\/key><string>dog.brain.speed<\/string>/u);
+});
