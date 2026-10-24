@@ -41,7 +41,7 @@ export const GRANT_FOR = 15 * 60_000;
 const PREFIX = 'ca1.';
 
 /** The kinds of question a press may answer: a choice among options, or a set of rows. Everything else installs. */
-const PRESSABLE = new Set(['options', 'rowset']);
+export const PRESSABLE = new Set(['options', 'rowset']);
 
 /** What a rowset question takes besides its own two: a merge question's answers (`mergeAnswer` in `index.ts`). */
 const ROWSET_ANSWERS = new Set(['accept', 'reject', 'merge', 'apart']);
@@ -77,6 +77,30 @@ const fromBase64url = (text: string): Uint8Array<ArrayBuffer> | null => {
 };
 
 const NONCE = 12;
+
+/**
+ * A question's version: its kind, its body and its state, hashed, so a question that moved is a different one. A card's
+ * grant holds it, and so does an order he sends that names the question (`methods/instructions.ts`).
+ */
+export async function questionVersion(row: Record<string, unknown>): Promise<string> {
+  const said = JSON.stringify([row.body_kind, row.status, row.body]);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(said)));
+  return toBase64url(hash.subarray(0, 18));
+}
+
+/**
+ * The answers a question takes, the way a press gives them: a choice's own option ids, or a set of rows' four answers.
+ * Empty for every other kind, which installs and is answered in BrainDog.
+ */
+export function answersTaken(row: Record<string, unknown>): string[] {
+  const kind = String(row.body_kind ?? '');
+  if (kind === 'rowset') return [...ROWSET_ANSWERS];
+  if (kind !== 'options') return [];
+  const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};
+  return (Array.isArray(body.options) ? body.options : []).flatMap((o) =>
+    typeof o === 'object' && o !== null && typeof (o as { id?: unknown }).id === 'string' ? [(o as { id: string }).id] : [],
+  );
+}
 
 /**
  * The chat app a key is held by, from the address the door proved for it (`token.host`, `packages/host/src/oauth.ts`
@@ -133,12 +157,7 @@ export function methods(deps: RecordDeps) {
     }
   }
 
-  /** A question's version: its kind, its body and its state, hashed, so a question that moved is a different one. */
-  async function versionOf(row: Record<string, unknown>): Promise<string> {
-    const said = JSON.stringify([row.body_kind, row.status, row.body]);
-    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(said)));
-    return toBase64url(hash.subarray(0, 18));
-  }
+  const versionOf = questionVersion;
 
   /** The key's chat app, and why not when it has none. */
   function appFor(ctx: CallContext): string | null {

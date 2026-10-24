@@ -13,6 +13,13 @@
  *
  * RECEIPTS ARE NOT STORED (§8.1). They are read from the log: the run's batches between `taken_at` and `replied_at`,
  * and the run's head before and after (`receiptsOf`).
+ *
+ * AN ORDER MAY NAME QUESTIONS AND HIS ANSWER TO EACH (D8). "Accept SG243", sent from BrainDog, where it is provably him,
+ * lets the run that takes it answer SG243 with Accept, once, and nothing else: `instructionsMine`'s `answer`. The
+ * answer is his own `decide`, made as him and said as his order's (`ordered`), so Undo takes it back as any decision,
+ * and `admin` and `vault` refuse it. Only the run that took the order, under his own key, while it holds it; only the
+ * answer he named; only a choice or a set of rows; and only the question as he saw it. A run that read outside text
+ * still files every other write as a question: the order names what it may answer, and the run chooses nothing.
  */
 
 import type { Result, Sql } from '@braindog/ports';
@@ -29,10 +36,12 @@ import {
   REPLY_STATES,
   SEEN_HOW,
   SEAT_NAME,
+  ANSWERS_MOST,
   agentOf as kindOf,
   instructionsTakenBy,
   placesHeard,
   type Instr,
+  type InstrAnswer,
   type InstructInput,
   type Kernel,
   type SeenHow,
@@ -42,6 +51,7 @@ import {
 
 import type { CallContext } from '../index.ts';
 import { readSight } from '../sight.ts';
+import { PRESSABLE, answersTaken, questionVersion } from './chat-answer.ts';
 import { tellFinished } from '../push.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -71,7 +81,10 @@ export function lineOf(i: Instr, by: string): string {
   if (i.kind === 'pause') return `${by} paused this run in BrainDog (${i.id}): "${said}". Wait; reply with instructions if you must.`;
   if (i.kind === 'resume') return `${by} resumed this run in BrainDog (${i.id}): "${said}".`;
   const answer = i.taken_by === null ? `Take it with instructions take ${i.id}.` : `Reply with instructions reply ${i.id} when it is done.`;
-  return `${by} said in BrainDog (${i.id}): "${said}". ${answer}`;
+  /* THE QUESTIONS IT NAMES, by name, with the call that answers one: the run gives his answer, never its own. */
+  const open = (i.answers ?? []).filter((a) => !(i.answered ?? []).includes(a.question)).map((a) => a.question);
+  const named = open.length === 0 ? '' : ` It lets you answer ${open.join(', ')} as he said, with instructions answer ${open[0]!}${i.taken_by === null ? ' once you take it' : ''}.`;
+  return `${by} said in BrainDog (${i.id}): "${said}". ${answer}${named}`;
 }
 
 /** An instruction as `Told`, its maker named once. */
@@ -201,13 +214,19 @@ export function inHandAt(held: readonly Instr[], ts: string, nowIso: string): In
 /* ── the doors ──────────────────────────────────────────────────────────── */
 
 /** What `instruct` takes, beside what the kernel reads (`InstructInput`). */
-const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'project', 'task', 'repo', 'machine', 'seat', 'replaces', 'waits_ms'] as const;
+const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'project', 'task', 'repo', 'machine', 'seat', 'replaces', 'waits_ms', 'answers'] as const;
 
 /** What `instructionList` takes. */
 const LIST_TAKES = ['state', 'project', 'task', 'run', 'limit', 'cursor'] as const;
 
-/** What `instructionsMine` takes: nothing (what is pending), `take`, `reply` with `said` and `state`, or `seen`. */
-const MINE_TAKES = ['take', 'reply', 'said', 'state', 'seen', 'how'] as const;
+/** What `instructionsMine` takes: nothing (what is pending), `take`, `reply` with `said` and `state`, `seen`, or `answer`. */
+const MINE_TAKES = ['take', 'reply', 'said', 'state', 'seen', 'how', 'answer'] as const;
+
+/** The words he may say a yes or a no in, each group one answer, its question's own id found among them (D8). */
+const SAME_ANSWER: readonly (readonly string[])[] = [
+  ['accept', 'approve', 'yes'],
+  ['reject', 'decline', 'no'],
+];
 
 /** At most this many instructions a minute on one record (plan §10.9). */
 export const INSTRUCT_PER_MINUTE = 30;
@@ -251,12 +270,14 @@ export type Mine = {
   /** The one it took or answered in this call, as it now stands, with its receipts after a reply. */
   instruction?: Told;
   receipts?: Receipts | null;
+  /** The question it answered on his order in this call (`answer`), and the line it says. */
+  answered?: { question: string; option: string; decision: string | null; said: string };
 };
 
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, readable, no, tail, clock } = deps;
+  const { kernel, sql, guard, readable, sightOf, spokenAs, no, tail, clock } = deps;
   const nowIso = (): string => new Date(clock.now()).toISOString();
   const sight = readSight(kernel);
 
@@ -390,6 +411,79 @@ export function methods(deps: RecordDeps) {
     return { machines, seats };
   };
 
+  /**
+   * The questions an order names, each as the kernel keys it, with his answer and the question's version as he sees it
+   * now (D8). Each is one he is shown, open, a choice or a set of rows, and answered with one of its own answers; a
+   * pack, a script or a setting installs, and is answered in BrainDog, where what it installs is shown whole.
+   */
+  const answersNamed = async (ctx: CallContext, given: unknown): Promise<Result<InstrAnswer[]>> => {
+    if (!Array.isArray(given) || given.length > ANSWERS_MOST)
+      return no('VALUE_MALFORMED', `answers is a list of at most ${String(ANSWERS_MOST)} questions, each with its answer, as [{"question":"SG243","option":"accept"}].`, { at: 'answers' });
+    const out: InstrAnswer[] = [];
+    for (const [n, x] of given.entries()) {
+      const at = `answers[${String(n)}]`;
+      const o = (typeof x === 'object' && x !== null ? x : {}) as Record<string, unknown>;
+      const said = typeof o.question === 'string' ? o.question.trim() : '';
+      const word = typeof o.option === 'string' ? o.option.trim() : '';
+      if (said === '' || word === '') return no('VALUE_MALFORMED', 'Each answer names a question and the answer to give it.', { at });
+      const id = spokenAs(said) ?? said;
+      const row = kernel.governanceRow('suggestion', id);
+      /* A QUESTION HE IS NOT SHOWN IS ONE THAT IS NOT THERE, as `decide` answers it. */
+      if (row === null || sightOf(ctx, `suggestion:${id}`) === null) return no('OUT_OF_BOUNDS', `There is no question called ${said}.`, { at });
+      if (row.status !== 'open') return no('TRANSITION_ILLEGAL', `${said} is already answered.`, { at });
+      if (!PRESSABLE.has(String(row.body_kind ?? '')))
+        return no('FORBIDDEN', `${said} changes what this record is, so it is answered in BrainDog, where that is shown whole.`, { at });
+      const takes = answersTaken(row);
+      /* HIS WORD AS HE SAYS IT: "approve" or "yes" is the yes this question takes, "decline" or "no" its no. */
+      const same = SAME_ANSWER.find((g) => g.includes(word.toLowerCase()));
+      const option = takes.includes(word) ? word : (same?.find((w) => takes.includes(w)) ?? word);
+      if (!takes.includes(option)) return no('ENUM_VALUE_UNKNOWN', `${said} is answered with one of ${takes.join(', ')}.`, { at, allowed: takes });
+      if (out.some((y) => y.question === id)) return no('VALUE_MALFORMED', `${said} is named twice. Give it one answer.`, { at });
+      out.push({ question: id, option, version: await questionVersion(row) });
+    }
+    return ok(out);
+  };
+
+  /**
+   * A run answers a question his order named (D8): the order it took and holds, which names that question, and his
+   * answer to it, given as his own `decide`. Every check is the order's, not the run's: the run's key is his, the order
+   * is his and he is an owner still, the question is the one he saw and is open, and it is answered once.
+   */
+  const orderAnswer = async (run: string, given: string, ctx: CallContext): Promise<Result<Mine>> => {
+    const id = spokenAs(given) ?? given;
+    const held = instructionsTakenBy(sql, run).filter((i) => i.state === 'working' && i.answers.some((x) => x.question === id));
+    const i = held.at(-1);
+    if (i === undefined) return no('LEVEL_REQUIRED', `No order you hold names ${given}. Only he answers it, in BrainDog.`, { at: 'answer' });
+    const named = i.answers.find((x) => x.question === id)!;
+    if (i.answered.includes(id)) return no('TRANSITION_ILLEGAL', `You already answered ${given} on ${i.id}.`, { at: 'answer' });
+    /* HIS ORDER, UNDER HIS OWN KEY: a run on somebody else's key never answers as him, whatever it took. */
+    const by = i.by;
+    if (by === null || !by.startsWith('p_') || ctx.principal.kind !== 'token' || ctx.principal.person !== by)
+      return no('FORBIDDEN', `${i.id} is not an order to this key, so it answers nothing.`, { at: 'answer' });
+    if (kernel.access(by)?.level !== 'owner') return no('FORBIDDEN', `${i.id} was sent by somebody who no longer owns this record.`, { at: 'answer' });
+    const row = kernel.governanceRow('suggestion', id);
+    if (row === null || row.status !== 'open') return no('TRANSITION_ILLEGAL', `${given} is already answered.`, { at: 'answer' });
+    if ((await questionVersion(row)) !== named.version)
+      return no('VERSION_STALE', `${given} changed since he sent ${i.id}, so his answer is not given. Reply needs_you and he answers it in BrainDog.`, { at: 'answer' });
+    if (deps.decideAs === undefined) return no('NOT_IN_THIS_BUILD', 'Answering on an order is not in this build.', { at: 'answer' });
+    const byName = personNamed(sql, by);
+    const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, ordered: i.id };
+    const said = i.said.replace(/\s+/gu, ' ').trim();
+    const out = await deps.decideAs({ id, decide: { option: named.option, reason: `${byName} said in BrainDog (${i.id}): "${said}"` } }, as);
+    if (!out.ok) return out as Result<never>;
+    const decided = (typeof out.value === 'object' && out.value !== null ? out.value : {}) as { decision?: unknown; batch?: unknown };
+    const decision = typeof decided.decision === 'string' ? decided.decision : null;
+    if (decision !== null)
+      kernel.keepOrderAnswer({ instruction: i, question: id, run, decision, by, byName, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
+    const now = kernel.instruction(i.row) ?? i;
+    return ok(
+      mineOf(run, ctx, {
+        instruction: toldOf(sql, now),
+        answered: { question: given, option: named.option, decision, said: `Answered ${given} with ${named.option}, on ${byName}'s order (${i.id}).` },
+      }),
+    );
+  };
+
   /** What a run is answered with: its stamp, what is pending, what stops it, and the lines in his voice. */
   const mineOf = (run: string, ctx: CallContext, extra: Partial<Mine> = {}): Mine => {
     const pending = pendingFor(run, ctx);
@@ -471,6 +565,11 @@ export function methods(deps: RecordDeps) {
           const at = projectOfRow(ctx, row.register, row.fields);
           if (at !== null) input.project = at;
         }
+      }
+      if (a.answers !== undefined && a.answers !== null) {
+        const named = await answersNamed(ctx, a.answers);
+        if (!named.ok) return named as Result<never>;
+        if (named.value.length > 0) input.answers = named.value;
       }
       const made = kernel.instruct(personOf(ctx), input);
       return tail(made.ok ? ok(toldOf(sql, made.value)) : made);
@@ -569,7 +668,7 @@ export function methods(deps: RecordDeps) {
      * run's instructions. A STOPPED OR PAUSED RUN STILL REACHES THIS DOOR: answering is what it is asked to do.
      */
     async instructionsMine(
-      args: { take?: string; reply?: string; said?: string; state?: string; seen?: string[]; how?: string } | undefined,
+      args: { take?: string; reply?: string; said?: string; state?: string; seen?: string[]; how?: string; answer?: string } | undefined,
       ctx: CallContext,
     ): Promise<Result<Mine>> {
       const stop = guard(ctx, 'propose', OWN_RUN);
@@ -579,10 +678,10 @@ export function methods(deps: RecordDeps) {
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = strayOf('instructions', a, MINE_TAKES);
       if (stray) return stray;
-      const asked = ['take', 'reply', 'seen'].filter((k) => a[k] !== undefined && a[k] !== null);
-      if (asked.length > 1) return no('VALUE_MALFORMED', `Send one of take, reply or seen in a call, not ${asked.join(' and ')}.`, { at: asked[1]! });
-      for (const key of ['take', 'reply', 'said'] as const)
-        if (a[key] !== undefined && a[key] !== null && typeof a[key] !== 'string') return no('VALUE_MALFORMED', `${key} is text${key === 'said' ? '' : ', as IN4'}.`, { at: key });
+      const asked = ['take', 'reply', 'seen', 'answer'].filter((k) => a[k] !== undefined && a[k] !== null);
+      if (asked.length > 1) return no('VALUE_MALFORMED', `Send one of take, reply, seen or answer in a call, not ${asked.join(' and ')}.`, { at: asked[1]! });
+      for (const key of ['take', 'reply', 'said', 'answer'] as const)
+        if (a[key] !== undefined && a[key] !== null && typeof a[key] !== 'string') return no('VALUE_MALFORMED', `${key} is text${key === 'said' ? '' : key === 'answer' ? ', as SG243' : ', as IN4'}.`, { at: key });
       if ((a.said !== undefined || a.state !== undefined) && a.reply === undefined)
         return no('VALUE_MALFORMED', 'said and state go with reply, the instruction they answer.', { at: a.said !== undefined ? 'said' : 'state' });
       if (a.state !== undefined && !(REPLY_STATES as readonly unknown[]).includes(a.state))
@@ -595,6 +694,8 @@ export function methods(deps: RecordDeps) {
 
       const run = runOfCaller(ctx, 'opened: instructions');
       if (!run.ok) return tail(run as Result<never>);
+      /* A QUESTION HIS ORDER NAMED, answered as he said (D8). */
+      if (typeof a.answer === 'string') return tail(await orderAnswer(run.value, a.answer.trim(), ctx));
       if (typeof a.take === 'string') {
         /* ONLY ONE IT IS HANDED (`toldTo`): an agent that may not read his instructions guessed `IN4` and took it whole. The
            sentence is the kernel's for an instruction that is not this run's to take. */

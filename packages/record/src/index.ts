@@ -621,6 +621,16 @@ export type CallContext = {
   pressedIn?: string | undefined;
 
   /**
+   * The instruction a question is answered on, when a run answers one his order named (`IN4`, D8,
+   * `methods/instructions.ts`): `principal` is then the person who sent the order, at the level they hold now.
+   *
+   * SET ONLY BY `instructionsMine`, AFTER IT HAS FOUND THE ORDER THE CALLING RUN TOOK, NAMING THAT QUESTION AND THAT
+   * ANSWER, and for one `decide` and nothing else. `admin` and `vault` refuse it as they refuse `pressedIn`, so an order
+   * never installs, changes what runs unattended, or opens a key.
+   */
+  ordered?: string | undefined;
+
+  /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
    *
    * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The vault
@@ -2861,8 +2871,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     at: 'principal',
   };
 
+  /** What `admin` and `vault` say to an answer given on his order: the order answers its questions and nothing more. */
+  const orderedNot: Refusal = {
+    code: 'NEEDS_BROWSER_SESSION',
+    fix: 'An order sent from BrainDog answers the questions it names and nothing more. Open this one in BrainDog.',
+    at: 'principal',
+  };
+
   const vault = (ctx: CallContext): Refusal | null => {
     if (ctx.pressedIn !== undefined) return pressedNot;
+    if (ctx.ordered !== undefined) return orderedNot;
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
@@ -2895,6 +2913,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const admin = (ctx: CallContext, reads?: string, method?: string): Refusal | null => {
     /* A PRESS IN A CHAT ANSWERS A QUESTION AND REACHES NOTHING AN OWNER DOES IN A BROWSER (`pressedIn`). */
     if (ctx.pressedIn !== undefined) return pressedNot;
+    if (ctx.ordered !== undefined) return orderedNot;
     if (ctx.operation !== undefined) {
       if (method === undefined || ctx.operation !== method || ctx.principal.kind !== 'person') return allows(ctx, 'owner', listName);
       const { operation: _spent, ...approver } = ctx;
