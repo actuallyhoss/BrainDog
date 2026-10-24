@@ -115,8 +115,6 @@ export const words = {
   more: (name: string): string => `More for ${name}`,
   versionOf: (version: string): string => `Version ${version}`,
   /* A CARD'S COUNTS, "1 list · 1 page · 1 rule", each beside its glyph. */
-  countLists: (n: number): string => (n === 1 ? '1 list' : `${n} lists`),
-  countPages: (n: number): string => (n === 1 ? '1 page' : `${n} pages`),
   countRules: (n: number): string => (n === 1 ? '1 rule' : `${n} rules`),
   countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
   /* THE BROWSE TITLE ROW'S SENTENCE: how many there are, and how many this record holds already. */

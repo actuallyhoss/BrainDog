@@ -17,10 +17,8 @@
   THE LOOK (the UI pass of 20 October, agents F8, F22): the name, the sentence saying how many are installed and how
   many have an update (in ink: an update is never urgent), then Installed | Browse under it, full width on a phone. Any
   updates lead in their own tile; then the add-ons themselves as rows in one tile, each with its own place's glyph
-  (`glyph.ts`), its line, what it holds counted ("12 lists, 4 pages, 9 rules"), its "…" and its switch. The counts are
-  read from each add-on's own document (`$lib/market/adds.ts`), the reader the plan sheet's summary uses, and a list is
-  counted from what the record says the add-on holds. The one tile that summed lists, pages and rules into one bar is
-  gone: three units do not add.
+  (`glyph.ts`), its line, what it holds ("12 lists and 4 pages"), its "…" and its switch. What it holds is said by
+  `$lib/market/describe.ts`, as the add-on's own page and the store say it (E21).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -29,7 +27,6 @@
   import { createClient } from '@braindog/client';
   import type { CatalogueEntry, CatalogueIndex, CatalogueUpdate, Trust } from '@braindog/declare/catalogue';
   import { useCase } from '@braindog/seed/usecases';
-  import { builtInFile } from '@braindog/seed/usecases/share';
   import { moduleName } from '@braindog/seed/usecases/names';
   /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
      was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
@@ -41,10 +38,10 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { blocked, choose, packDocument, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { blocked, choose, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
-  import { addsOf } from '$lib/market/adds.ts';
-  import type { ListingKind } from '$lib/market/listing.ts';
+  import { describe, listingHolds, moduleHolds } from '$lib/market/describe.ts';
+  import { listingsOf, type ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
@@ -559,46 +556,16 @@
   /* ── what they hold ────────────────────────────────────────────────────── */
 
   /**
-   * What each installed add-on holds: its lists as the record counts them (`registers`), and its pages and rules read
-   * from its own document by `addsOf`, the reader the plan sheet's summary uses. A module's document is the seed's,
-   * loaded here after the list is drawn; a built-in use case's is its own file; an add-on from the Kennel is read off the
-   * catalogue's reach for the version installed. One with no document to read counts its lists and nothing else, so the
-   * row never says a page or a rule it cannot see.
+   * WHAT EACH INSTALLED ADD-ON HOLDS, SAID AS ITS OWN PAGE AND THE STORE SAY IT (E21): a built-in from its module, a use
+   * case or an add-on from outside from its listing, the one `ListingRow` reads, so the three screens never disagree.
    */
-  type Holds = { id: string; lists: number; pages: number; rules: number };
-  let holds = $state.raw<Holds[] | null>(null);
-
-  $effect(() => {
-    const held = states;
-    const index = kennel;
-    if (!held || !looked) return;
-    void holdsOf(held, index).then((found) => {
-      if (states === held) holds = found;
-    });
-  });
-
-  const documentOf = async (id: string): Promise<unknown> =>
-    byId.has(id) ? packDocument(id) : id.startsWith('usecase-') ? builtInFile(id.slice('usecase-'.length)) : null;
-
-  async function holdsOf(held: readonly PackState[], index: CatalogueIndex | null): Promise<Holds[]> {
-    return Promise.all(
-      held.map(async (s): Promise<Holds> => {
-        const doc = await documentOf(s.id).catch(() => null);
-        if (doc) {
-          const a = addsOf(doc);
-          return { id: s.id, lists: s.registers.length, pages: a.pages.length, rules: a.rules.length };
-        }
-        const entry = index?.entries.find((e) => e.kind === 'pack' && e.id === s.id);
-        const reach = (entry?.versions.find((v) => v.version === s.version) ?? entry?.versions[0])?.reach;
-        return { id: s.id, lists: s.registers.length, pages: reach?.pages.length ?? 0, rules: reach?.rules.length ?? 0 };
-      }),
-    );
-  }
-
-  /** What one add-on holds, said on its row, or nothing until its document has been read. */
+  const listed = $derived(listingsOf({ kennel, counts: null }));
   const holdsOn = (id: string): string => {
-    const h = holds?.find((x) => x.id === id);
-    return h ? words.holds(h) : '';
+    const m = byId.get(id);
+    if (m) return describe(moduleHolds(m));
+    const key = id.startsWith('usecase-') ? `usecase:${id.slice('usecase-'.length)}` : `pack:${id}`;
+    const l = listed.find((x) => x.key === key);
+    return l ? describe(listingHolds(l, [])) : '';
   };
 
   /* ── reading ───────────────────────────────────────────────────────────── */
@@ -634,7 +601,8 @@
 
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.packs} count={live ? installed.length : undefined} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
+<!-- NO COUNT BESIDE THE NAME (E21): the sentence under it says how many are installed, and once is enough. -->
+<PageHead icon="packs" title={copy.packs} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
   {#snippet actions()}
     <!-- THE PAGE'S "⋯", ALWAYS DRAWN: installing from a file or a link, and sharing this setup. -->
     <Menu label={words.more} align="end">

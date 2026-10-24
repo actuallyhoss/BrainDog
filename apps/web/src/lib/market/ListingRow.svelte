@@ -11,19 +11,17 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
+  import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { glyphOf } from './ListingCard.svelte';
+  import { describe, listingHolds } from './describe.ts';
   import { latestOf, listingHref, type Action, type Listing } from './listing.ts';
   import { words } from './words.ts';
 
   let { listing, action = null, glyph = null }: { listing: Listing; action?: Action | null; glyph?: IconName | null } = $props();
 
   const reach = $derived(latestOf(listing)?.reach ?? null);
-  /* WHAT IT ADDS, COUNTED, as the second half of its line: "4 lists, 4 pages". */
-  const counts = $derived(
-    reach
-      ? [words.countLists(reach.lists.length), words.countPages(reach.pages.length)].filter((_, i) => [reach.lists.length, reach.pages.length][i]! > 0).join(', ')
-      : '',
-  );
+  /* WHAT IT ADDS, SAID AS EVERY SCREEN SAYS IT (E21): "4 lists and 4 pages", the add-on's page and Installed alike. */
+  const counts = $derived(describe(listingHolds(listing, firstPartyModules())));
   const maker = $derived(listing.publisher?.kind === 'braindog' ? null : words.by(listing.publisher?.name ?? listing.author));
   const cue = $derived(
     action?.kind === 'installed'

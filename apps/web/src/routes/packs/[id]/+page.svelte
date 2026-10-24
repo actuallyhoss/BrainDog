@@ -30,6 +30,7 @@
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   /* THE GLYPH OF THE PLACE IT BRINGS, as its row on /packs wears it (agents F25). */
   import { glyphOf } from '../glyph.ts';
+  import { describe, moduleHolds } from '$lib/market/describe.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -691,7 +692,8 @@
       </Tile>
     {/if}
     {#if pack && (pack.registers.length || shownPages.length)}
-      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + shownPages.length) || undefined}>
+      <!-- WHAT IT HOLDS AS INSTALLED AND THE STORE SAY IT (E21), "3 lists and 2 pages", never the two summed into one. -->
+      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} meta={describe(moduleHolds(pack)) || undefined}>
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
           <ul class="ledger">

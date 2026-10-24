@@ -30,16 +30,6 @@ export const words = {
     if (updates === 0) return installed === 1 ? `${head}, and it is up to date.` : `${head}, and every one is up to date.`;
     return `${head}, and ${updates.toLocaleString('en-GB')} ${updates === 1 ? 'has an update' : 'have an update'}.`;
   },
-  /* WHAT ONE ADD-ON HOLDS, on its own row (agents F22): "12 lists, 4 pages, 9 rules", each kind it holds none of left
-     out. It was one bar summing lists, pages and rules, three units that do not add. */
-  holds: (h: { lists: number; pages: number; rules: number }): string =>
-    [
-      h.lists > 0 ? counted(h.lists, 'list', 'lists') : '',
-      h.pages > 0 ? counted(h.pages, 'page', 'pages') : '',
-      h.rules > 0 ? counted(h.rules, 'rule', 'rules') : '',
-    ]
-      .filter((p) => p !== '')
-      .join(', '),
   /* THE LIST'S OWN HEADING, and the updates' when that tab is open. */
   installedTitle: 'Installed',
   updatesTitle: 'Updates',
