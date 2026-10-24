@@ -78,10 +78,14 @@ export function landedOf(
   own: ReadonlySet<string> = new Set(),
 ): Landed[] {
   const out: Landed[] = [];
+  /* THE READER FILED UNDER HER OWN NAME IS HER, NOT NEWS (audit C of 25 October, X5): sign-up files the owner as a
+     person of her own record, and "Arrivals 1, Mariam, You, People" was the only thing on her first Today. */
+  const mine = me === null ? '' : (names.get(me) ?? '').trim();
   for (const l of lines) {
     if (!ARRIVED.has(l.kind) || (l.register !== null && own.has(l.register))) continue;
     const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
+    if (mine !== '' && l.actor === me && name === mine) continue;
     const who = actor(l.actor, me, names, l.run_by ?? null);
     const note = (l.note ?? '').replaceAll(/\s*—\s*/gu, ', ').trim();
     out.push({
