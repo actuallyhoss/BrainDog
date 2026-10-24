@@ -424,6 +424,12 @@ const MAPPING_SCHEMA = {
  * `llama-3.2-1b` DRAFTS NO PREDICATE. The table's own note: it is too weak for the grammar, and a
  * predicate that does not validate costs a second projection and a fallback to keyword search.
  */
+/**
+ * The least ceiling a row on `glm-5.3-flash` is sent: it always reasons, at `low` here (`apps/worker/src/inference.ts`
+ * `Effort`), and that thinking is spent from the same ceiling, so 200 tokens left a short answer cut off before it began.
+ */
+export const LOW_THINKING_ROOM = 600;
+
 /** A template `core.run` takes, which says its purpose. */
 export type Routed = PromptTemplate & { purpose: TemplatePurpose };
 
@@ -435,7 +441,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   predicate: {
     purpose: 'ask',
     model: 'glm-5.3-flash',
-    maxTokens: 200,
+    maxTokens: LOW_THINKING_ROOM,
     capIn: 1200,
     system: SYSTEM,
     user: PREDICATE_USER,
@@ -462,13 +468,13 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
     schema: PATTERN_SCHEMA,
     slots: ['%N%', '%OLDEST%', '%SAMPLES%', '%INDEX%'],
   },
-  /* 200 TOKENS OUT IS A SENTENCE OF A FEW HUNDRED CHARACTERS AND ITS JSON, which is the most this job may say. 3,000 IN
+  /* A SENTENCE OF A FEW HUNDRED CHARACTERS AND ITS JSON is the most this job may say, and the ceiling holds the thinking before it too. 3,000 IN
      holds the kernel's longest question (4,096 characters, `VAR_BYTES`) with room for the fields, and the fields are
      what comes off the end when a row's are longer than that. */
   answer: {
     purpose: 'automation',
     model: 'glm-5.3-flash',
-    maxTokens: 200,
+    maxTokens: LOW_THINKING_ROOM,
     capIn: 3000,
     system: ANSWER_SYSTEM,
     user: ANSWER_USER,

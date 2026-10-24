@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import { codeOf } from '@braindog/ports';
 
 import { createSlash, type Inference } from '../src/index.ts';
+import { PROMPTS } from '../src/prompts.ts';
 import { canned, fakeRecord, fixedClock, NOW, OWNER, openSqlite } from './double.ts';
 
 const PREDICATE = JSON.stringify({
@@ -109,14 +110,14 @@ test('TEN PROPOSES WITH NO ASK_ID SENT TOGETHER AT A CAP OF 2 make the two calls
     /* A REPLY BY SHAPE, NOT BY QUEUE ORDER. Two admitted proposes now run concurrently (only the drafting `read`
        counts against the cap, `asksUsed`), and their four model calls interleave across two `await`s each, so a
        FIFO queue answered call 1's proposal with call 2's draft as often as its own. `maxTokens` tells the two
-       templates apart (`prompts.ts`'s `predicate: 200` and `propose: 1500`) without caring which call reaches
+       templates apart (`prompts.ts`'s `predicate` and `propose` ceilings) without caring which call reaches
        which first. */
     const seen: { maxTokens: number }[] = [];
     const inference: Inference = {
       complete: async (call) => {
         seen.push({ maxTokens: call.maxTokens });
         await new Promise((resolve) => setTimeout(resolve, 20));
-        return { text: call.maxTokens === 200 ? PREDICATE : PROPOSAL, usage: { in: 100, out: 20 } };
+        return { text: call.maxTokens === PROMPTS.predicate.maxTokens ? PREDICATE : PROPOSAL, usage: { in: 100, out: 20 } };
       },
     };
     const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record: fakeRecord() });

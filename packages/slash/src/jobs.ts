@@ -41,7 +41,7 @@ import { no, ok, refused, type Result } from '@braindog/ports';
 import { thrownRaw, type CallStatus, type Charge, type Core } from './call.ts';
 import { LAST_ROWS_SQL, NOT_SERVED, PASSED_WORDS, pausedFor, type LastRow } from './paused.ts';
 import { anchorFault, checkSchema, isRecord, tokens } from './project.ts';
-import { fenced, fill, type PromptTemplate } from './prompts.ts';
+import { fenced, fill, LOW_THINKING_ROOM, type PromptTemplate } from './prompts.ts';
 import { indexLines, nameIn, SLASH_CTX } from './propose.ts';
 import type { CallContext, Embedding, Inference, InferenceReply, Proposal, RawPayload, ReadTrace, RecordApi, SlashCandidate } from './types.ts';
 
@@ -442,7 +442,8 @@ const PROSE_SCHEMA = {
 export const PROSE: PromptTemplate = {
   purpose: 'prose',
   model: 'glm-5.3-flash',
-  maxTokens: 120,
+  /* Two sentences and the low thinking before them: 120 left the reasoning model no room to think first. */
+  maxTokens: LOW_THINKING_ROOM,
   capIn: 4000,
   system: PROSE_SYSTEM,
   user: PROSE_USER,
