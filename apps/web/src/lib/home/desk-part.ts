@@ -38,8 +38,13 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !
 
 /**
  * THE RUNS AT WORK, AS `boot` WOULD NAME THEM, off a block of `sessions.working`: the agent, what it says it is doing,
- * the project it is placed in by name (the cell the record said the run's scope in), and when it began. A row with no
- * number is left out, since the face and the sheet are keyed by the run.
+ * and the project it is placed in by name (the cell the record said the run's scope in). A row with no number is left
+ * out, since the face and the sheet are keyed by the run.
+ *
+ * NO LENGTH UNTIL `presence` SAYS IT (the audit of 25 October, Z6): the block knows when the run opened, and the Agents
+ * page says how long this stretch has gone (`for_s`: since it opened, came back or began writing again). Today said
+ * "since 22 Oct" from the one while Agents said "2 h 54 min" from the other, so the time is left out here and Working
+ * now says the length `presence` gives, the same as Agents.
  */
 export function runsOf(b: Pick<LiveBlock, 'entries' | 'rows' | 'columns'>): Working[] {
   const at = (b.columns ?? []).findIndex((c) => c.field === 'project');
@@ -47,7 +52,7 @@ export function runsOf(b: Pick<LiveBlock, 'entries' | 'rows' | 'columns'>): Work
     if (typeof e.seq !== 'number' || e.seq <= 0) return [];
     const agent = text(e.fields.agent) ?? 'other';
     const cell = at >= 0 ? b.rows?.[n]?.cells[at] : null;
-    return [{ seq: e.seq, agent, kind: agentKindOf(agent), project: text(cell), doing: text(e.fields.doing), since: text(e.created) ?? null, quiet: false }];
+    return [{ seq: e.seq, agent, kind: agentKindOf(agent), project: text(cell), doing: text(e.fields.doing), since: null, quiet: false }];
   });
 }
 
