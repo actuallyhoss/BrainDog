@@ -75,7 +75,7 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the search', bare: false },
-  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Open the search, caret in the query', bare: true },
+  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Search from anywhere', bare: true },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
      it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
      thing under the launcher"* — which was true while the palette was the only search, and which
@@ -87,17 +87,17 @@ export const BINDINGS: Binding[] = [
      prints every place's letter. The seven here lead that list and keep their letters. */
   { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Today, Needs you, Inbox, Search, Vault, Add-ons, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'Go to page 1 to 9 of your nav', bare: true },
-  { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Show or hide the side rail', bare: false },
+  { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Show or hide the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },
-  { id: 'commit', scope: 'document', key: '⌘↵', label: 'Do the main thing on what is open', bare: false },
-  { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
-  { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },
+  { id: 'commit', scope: 'document', key: '⌘↵', label: 'Do the main thing', bare: false },
+  { id: 'close', scope: 'document', key: 'Esc', label: 'Close what is on top', bare: false },
+  { id: 'help', scope: 'document', key: '?', label: 'These keys', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The menu of what has focus', bare: false },
 
   /* A HOME (`lib/page`, PageBody in PageView mode=home: the declared Today, or any declared page a person opens on, and
      `lib/home/Today.svelte` at `/?classic`): what needs you, worked from the keyboard. They stand down while a box has
      the caret, while anything is open over the page, and after `g`. */
-  { id: 'today-move', scope: 'today', key: 'j  k', label: 'The next or the previous thing that needs you', bare: true },
+  { id: 'today-move', scope: 'today', key: 'j  k', label: 'Next or previous', bare: true },
   { id: 'today-tick', scope: 'today', key: 'x', label: 'Mark it done, with an undo', bare: true },
   { id: 'today-open', scope: 'today', key: '↵', label: 'Open it', bare: false },
   { id: 'today-answer', scope: 'today', key: '1–9', label: 'Answer the question with that option', bare: true },
@@ -188,12 +188,12 @@ export const BINDINGS: Binding[] = [
   /* THE TWO QUEUES, which bound nothing. A number answers the question under the cursor, as a press on
      its button does; the gate above is where one is examined, and the queue is where one already thought about is cleared. */
   { id: 'decide-move', scope: 'decide', key: 'j  k', label: 'The next or the previous question', bare: true },
-  { id: 'decide-open', scope: 'decide', key: '↵', label: 'Accept it, or give the suggested answer. One that costs something opens', bare: false },
+  { id: 'decide-open', scope: 'decide', key: '↵', label: 'Accept, or give the suggested answer', bare: false },
   { id: 'decide-decline', scope: 'decide', key: '⌫', label: 'Decline it', bare: false },
   { id: 'decide-edit', scope: 'decide', key: 'e', label: 'Open it to change what accepting takes', bare: true },
   { id: 'decide-answer', scope: 'decide', key: '1–9', label: 'Answer with that option', bare: true },
   { id: 'decide-approve', scope: 'decide', key: 'a', label: 'Answer with the suggested option, or accept the change', bare: true },
-  { id: 'decide-defer', scope: 'decide', key: 'd', label: 'Defer it: a reason and a wake date', bare: true },
+  { id: 'decide-defer', scope: 'decide', key: 'd', label: 'Ask me later, with a reason', bare: true },
   { id: 'decide-select', scope: 'decide', key: 'x', label: 'Select it, to answer several at once', bare: true },
   { id: 'decide-send', scope: 'decide', key: '⌘↵  Esc', label: 'From inside a reason: send it, or go back', bare: false },
 

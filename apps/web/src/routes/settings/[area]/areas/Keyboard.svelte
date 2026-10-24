@@ -17,7 +17,39 @@
   let props: AreaProps = $props();
 
   /* THE GROUP'S NAME, so the row inside it can be called what the switch is called without the heading saying it too. */
-  const words = { shortcuts: 'Shortcuts', every: 'Every shortcut' };
+  const words = {
+    shortcuts: 'Shortcuts',
+    every: 'The keys used most',
+    find: 'Find a key',
+    findHint: 'Type what it does, or the key',
+    found: 'Keys that match',
+  };
+
+  /* THE TWENTY USED MOST, BY ID (U-C7): getting about, opening, undoing and closing, then answering and ticking where
+     he works. Every other key is one search away, so the sheet is a page and not a manual. */
+  const MOST = [
+    'palette',
+    'palette-slash-key',
+    'goto',
+    'sidebar',
+    'undo',
+    'commit',
+    'close',
+    'help',
+    'today-move',
+    'today-tick',
+    'today-new',
+    'work-tick',
+    'work-new',
+    'decide-move',
+    'decide-open',
+    'decide-decline',
+    'decide-approve',
+    'decide-defer',
+    'inbox-file',
+    'inbox-archive',
+  ];
+  let query = $state('');
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the switch shows the state the keyboard is already in. */
   const held = pref.read();
@@ -65,6 +97,19 @@
   cookie is written by the effect in the script: reading the cookie would show the previous
   answer until the page reloaded.
 -->
-<Tile icon="rows" title={words.every}>
-  <Keymap silenced={!chars} />
+<Tile icon="rows" title={query.trim() === '' ? words.every : words.found}>
+  <div class="find">
+    <input class="field-input" type="search" aria-label={words.find} placeholder={words.findHint} autocomplete="off" spellcheck="false" bind:value={query} />
+  </div>
+  <Keymap silenced={!chars} only={MOST} {query} />
 </Tile>
+
+<style>
+  .find {
+    margin-block-end: var(--sp-4);
+  }
+
+  .find input {
+    inline-size: 100%;
+  }
+</style>

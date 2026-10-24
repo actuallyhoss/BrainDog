@@ -25,7 +25,9 @@
      under the control, where the reader is pressing On and Off: reading the cookie there would show
      the previous answer until the page reloaded. The sheet in `?` has no such control beside it, so
      the cookie is the right default. */
-  let { silenced = pref.read().chars === false }: { silenced?: boolean } = $props();
+  /* `only` NARROWS THE SHEET TO THE KEYS NAMED, and `query` TO THE KEYS WHOSE WORDS, KEY, PLACE OR ID HOLD IT (U-C7): the
+     Keyboard area draws the twenty used most and finds the rest by typing. A query wins over `only`. */
+  let { silenced = pref.read().chars === false, only, query = '' }: { silenced?: boolean; only?: readonly string[] | undefined; query?: string } = $props();
 
   const TITLE: Record<Scope, string> = {
     document: copy.scopeDocument,
@@ -56,7 +58,12 @@
     nav: 'settings',
   } as const;
 
-  const groups = SCOPE_ORDER.map((scope) => [scope, BINDINGS.filter((b) => b.scope === scope)] as const);
+  const asked = $derived(query.trim().toLowerCase());
+  const shown = (b: { id: string; scope: Scope; key: string; label: string }): boolean =>
+    asked !== ''
+      ? `${b.id} ${b.label} ${b.key} ${TITLE[b.scope]}`.toLowerCase().includes(asked)
+      : only === undefined || only.includes(b.id);
+  const groups = $derived(SCOPE_ORDER.map((scope) => [scope, BINDINGS.filter((b) => b.scope === scope && shown(b))] as const).filter(([, bs]) => bs.length > 0));
 
   /**
    * ONE ROW PER PLACE FOR THE `g` CHORD (UI pass 20 Oct, agents F27). "g then h d i s v p ," was one key cap beside
