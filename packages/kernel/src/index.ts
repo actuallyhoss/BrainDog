@@ -176,7 +176,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, fill, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -7414,6 +7414,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * is the declaration whole without its live target, since a target names no list.
    */
   let declKept: { revision: number; deps: PageDeps } | null = null;
+  /* THE PAGES OF ROWS AS `pages()` LAST FILLED THEM, and the lists each page reads, for the declaration revision they
+     were made under (`pages`). */
+  let pagesKept: { revision: number; filled: Map<string, PageDecl>; lists: Map<string, string[]> } | null = null;
   const declaredKept = (): PageDeps => {
     if (declKept !== null && declKept.revision === revision) return declKept.deps;
     /* EVERY FIGURE'S BODY AND EVERY DECLARATION'S PACK READ IN ONE QUERY EACH, the first time one is asked: a record that
@@ -9750,10 +9753,34 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          (`declaredKept`), as `blockRegisters` asks: each filled page read every figure's row and live target again. */
       const kept = declaredKept();
       const near = { ...beside(kept), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) };
-      return resolvePages(deps).map((p) => ({
+      /* A ROW'S PAGE IS FILLED AND ITS LISTS NAMED ONCE WHILE THE ROW AND THE DECLARATIONS STAND (`pagesKept`): every
+         write moved the record's version and every page of every run, person and skill was filled and read again, most
+         of what a `boot` after a write cost. Kept by the declaration revision and, for a row's page, by the template and
+         everything the fill reads of the row, so a row that changed is filled again and one that did not is the copy. A
+         host's own sources name lists of their own, so a call that hands them keeps nothing. */
+      const memo = opts.hostSources ? null : pagesKept?.revision === revision ? pagesKept : (pagesKept = { revision, filled: new Map(), lists: new Map() });
+      const filled = new Map<string, PageDecl>();
+      const lists = new Map<string, string[]>();
+      const keyOf = (decl: PageDecl, row: Entry): string => `${decl.page}\u0000${row.register}#${row.seq ?? ''}\u0000${JSON.stringify(row.fields)}`;
+      const fillRow = (decl: PageDecl, row: Entry): PageDecl => {
+        if (memo === null) return fill(decl, row) as PageDecl;
+        const key = keyOf(decl, row);
+        const made = memo.filled.get(key) ?? (fill(decl, row) as PageDecl);
+        filled.set(key, made);
+        return made;
+      };
+      const listsOf = (p: { decl: PageDecl; row?: Entry }): string[] => {
+        if (memo === null) return registersOf(p.decl, kept.metric, near);
+        const key = p.row === undefined ? `\u0001${p.decl.page}` : keyOf(p.decl, p.row);
+        const named = memo.lists.get(key) ?? registersOf(p.decl, kept.metric, near);
+        lists.set(key, named);
+        return named;
+      };
+      const resolved = resolvePages(deps, fillRow);
+      const out = resolved.map((p) => ({
         slug: p.slug,
         title: p.decl.title,
-        registers: registersOf(p.decl, kept.metric, near),
+        registers: listsOf(p),
         /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
         nav: navOf(p.decl.nav),
         /* AND WHICH ROW IT IS A PAGE OF, which is not one of the registers above: those are the
@@ -9777,6 +9804,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            never on a page a template made, which is one row's. `null` for every other page. */
         opens: !p.row && typeof p.decl.list === 'string' && registers.has(p.decl.list) ? p.decl.list : null,
       }));
+      /* ONLY WHAT THIS CALL FILLED IS KEPT, so the rows gone and the versions a row moved past are let go. */
+      if (memo !== null) {
+        memo.filled = filled;
+        memo.lists = lists;
+      }
+      return out;
     },
 
     /**

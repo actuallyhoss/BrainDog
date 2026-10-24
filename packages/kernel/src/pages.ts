@@ -1343,7 +1343,12 @@ export function claimRank(decl: PageDecl): 0 | 1 | 2 {
   return decl.for.register === SESSION || decl.for.fleeting === true ? 2 : 1;
 }
 
-export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
+/* `fillRow` FILLS A TEMPLATE FROM ONE OF ITS ROWS, `fill` unless the caller keeps the pages it filled before (`pages()` in
+   the kernel), which must answer what `fill` would. */
+export function resolvePages(
+  deps: PageDeps,
+  fillRow: (decl: PageDecl, row: Entry) => PageDecl = (decl, row) => fill(decl, row) as PageDecl,
+): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
   type Resolved = { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal };
   const taken = new Set<string>();
 
@@ -1486,7 +1491,9 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
     const keyed: PageDecl = Array.isArray(decl.blocks) ? { ...decl, blocks: keyedBlocks(decl.blocks) } : decl;
     const slugs = new Map<Entry, string>();
     const shared = [...counts.values()].some((n) => n > 1);
-    const everywhereFirst = shared ? [...rows].sort((x, y) => Number(placeOf(x) !== null) - Number(placeOf(y) !== null)) : rows;
+    /* EACH ROW'S PLACE ASKED ONCE, not twice for every comparison the sort makes. */
+    const placedAt = shared ? new Map(rows.map((row) => [row, Number(placeOf(row) !== null)])) : null;
+    const everywhereFirst = placedAt ? [...rows].sort((x, y) => placedAt.get(x)! - placedAt.get(y)!) : rows;
     everywhereFirst.forEach((row, nth) => {
       const name = String(row.fields[title] ?? '');
       const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
@@ -1494,7 +1501,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
     });
     /* The pages come out in the template's own order once every row has its address. */
     filled.push(() => {
-      for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(keyed, row) as PageDecl, row });
+      for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fillRow(keyed, row), row });
     });
   });
 
