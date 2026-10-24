@@ -988,12 +988,14 @@ export function handedBrief(task: Record<string, unknown>, done: boolean): strin
  * What `instructions` says (plan §2.3 F, §6.1): what waits in his voice, the record's own lines; after a take, the one
  * in hand and the reply that closes it; after a reply, how it stands and what the run changed while it held it.
  */
-export function instructionsBrief(v: Record<string, unknown>, did: 'read' | 'take' | 'reply', look?: Look): string {
+export function instructionsBrief(v: Record<string, unknown>, did: 'read' | 'take' | 'reply' | 'answer', look?: Look): string {
   const lines = (Array.isArray(v.lines) ? v.lines : []).filter((l): l is string => typeof l === 'string');
   const one = isObject(v.instruction) ? v.instruction : null;
   const id = one !== null && typeof one.id === 'string' ? one.id : null;
   /* THE REST OF WHAT WAITS, without the one this call took or answered, and without "Nothing new" after a take or reply. */
   const rest = lines.filter((l) => (id === null || !l.includes(`(${id})`)) && !(did !== 'read' && /^Nothing new/u.test(l)));
+  /* A QUESTION ANSWERED ON HIS ORDER (D8): the record's own line, then what still waits. */
+  if (did === 'answer' && isObject(v.answered) && typeof v.answered.said === 'string') return [v.answered.said, ...rest.filter((l) => !/^Nothing new/u.test(l))].join('\n');
   if (did === 'take' && one !== null && id !== null) {
     const said = typeof one.said === 'string' ? clip(oneLine(one.said), 200) : '';
     return [`You have ${id}: "${said}". When it is done: instructions {reply:"${id}", said:"what you did", state:"done"}.`, ...rest].join('\n');

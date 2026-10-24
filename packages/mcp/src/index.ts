@@ -495,11 +495,13 @@ export const TOOLS: readonly Tool[] = [
     /* WHAT HE TELLS AN AGENT FROM THE APP (plan §2, §6.1), the one new tool, paid for by folding `history` and `schema`.
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     description: 'What the person told you: {} reads, {take:"IN4"} takes, {reply:"IN4",said,state} answers.',
+    /* AND `answer`, A QUESTION HIS ORDER NAMED (D8), given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
       reply: { type: 'string' },
       said: { type: 'string' },
       state: { enum: ['done', 'needs_you', 'declined'] },
+      answer: { type: 'string' },
     }),
     /* WHAT A CLIENT SHOWED IT AND HOW, which the bridge says for its hooks; an agent reading with `{}` marks them itself. */
     quiet: ['seen', 'how'],
@@ -2502,7 +2504,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     instructions: async (args, ctx, turn) => {
       if (!surface.instructionsMine) return { result: unbuilt('instructions', 'Call context: what you were told is its first line.') };
       const sent = Object.fromEntries(
-        (['take', 'reply', 'said', 'state', 'seen', 'how'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
+        (['take', 'reply', 'said', 'state', 'seen', 'how', 'answer'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
       );
       const out = await surface.instructionsMine(sent as never, ctx);
       /* THE KERNEL SAYS `id`, the instruction, and this tool calls it `take` or `reply`. */
@@ -2512,6 +2514,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const v = out.value;
       const one = isObject(v.instruction) ? v.instruction : null;
       const receipts = isObject(v.receipts) ? v.receipts : null;
+      const answered = isObject(v.answered) ? v.answered : null;
       const value = bare({
         run: v.run,
         stamp: v.stamp,
@@ -2519,11 +2522,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         stop: v.stop ?? null,
         ...(one === null ? {} : { instruction: { id: one.id, state: one.state, said: one.said, ...(one.reply ? { reply: one.reply } : {}) } }),
         ...(receipts === null ? {} : { receipts }),
+        ...(answered === null ? {} : { answered: { question: answered.question, option: answered.option } }),
       }) as Record<string, unknown>;
       /* THE ROWS THE RUN CHANGED ARE SAID BY THEIR WORDS, read in one go per list. */
       const touched = receipts !== null && Array.isArray(receipts.batches) ? receipts.batches.filter(isObject).flatMap((b) => (Array.isArray(b.rows) ? b.rows.filter((r): r is string => typeof r === 'string') : [])) : [];
       if (turn.text && touched.length > 0) await handlesNamed(touched.slice(0, 5), ctx, turn);
-      return { result: { ok: true, value }, say: (look) => instructionsBrief(v, typeof sent.take === 'string' ? 'take' : typeof sent.reply === 'string' ? 'reply' : 'read', look) };
+      return {
+        result: { ok: true, value },
+        say: (look) =>
+          instructionsBrief(v, typeof sent.take === 'string' ? 'take' : typeof sent.reply === 'string' ? 'reply' : typeof sent.answer === 'string' ? 'answer' : 'read', look),
+      };
     },
 
     schema: async (args, ctx) => {
