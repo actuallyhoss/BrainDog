@@ -278,6 +278,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.17.0',
+      notes: 'Agents reads like a list of runs now. One line says how many are at work and how many steps are up next. At work, Up next and Recent runs each take the whole width, one line a run or a step, and a run quiet for hours is no longer at work. The questions your agents asked live in Needs you only, and the folded tiles at the foot are one line of links.',
+    },
+    {
       version: '1.16.0',
       notes: 'Agents opens on who is at work and on what, such as Claude on Lanternfish, where it counted the machines they were on. Under it, how many runs are waiting for your reply.',
     },

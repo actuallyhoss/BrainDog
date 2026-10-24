@@ -19,6 +19,10 @@
   project and how long it has run at its end, and Tell, Pause and Stop behind one "More" press that the host opens as
   its own menu (`onmenu`) at the button. The honest line is then the host's to say once under the list, not once a row,
   and the menu's Pause or Stop asks here, in place, as a press on the row always did (`ask`).
+
+  WHAT IT IS DOING LEADS WHERE THE HOST SAYS HOW IT STANDS (`stands`, the Agents page of 23 October): the row is the
+  agent's mark, what it is doing, then its project as a chip, how long it has run and how it stands, and the agent's name
+  is said to a screen reader only, since the mark says it and "Claude  Claude in BrainDog" said it twice.
 -->
 <script lang="ts">
   import { agentMarkFill } from '../src/index.ts';
@@ -99,16 +103,23 @@
       <li class="pres-row" data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
         {@render face(r, m)}
         <div class="pres-body">
-          <p class="pres-head">
-            {#if r.href}<a class="pres-name" href={r.href}>{r.name}</a>{:else}<span class="pres-name">{r.name}</span>{/if}{#if r.doing}<span class="pres-doing">{r.doing}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}
-          </p>
+          {#if r.stands !== undefined}
+            <!-- WHAT IT IS DOING LEADS THE ROW, the agent said by its mark and to a screen reader by name, never twice. -->
+            <p class="pres-head" title={r.doing ?? r.name}>
+              <span class="pres-who">{r.name}: </span>{#if r.href}<a class="pres-what" href={r.href}>{r.doing ?? r.name}</a>{:else}<span class="pres-what">{r.doing ?? r.name}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}
+            </p>
+          {:else}
+            <p class="pres-head">
+              {#if r.href}<a class="pres-name" href={r.href}>{r.name}</a>{:else}<span class="pres-name">{r.name}</span>{/if}{#if r.doing}<span class="pres-doing">{r.doing}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}
+            </p>
+          {/if}
           {#if r.holds}<p class="pres-holds">{r.holds}</p>{/if}
           {#if open}{@render askForm(r, open)}{/if}
         </div>
         <p class="pres-where">
-          {#if r.project}<span class="pres-proj"><span class="pres-pdot" data-slot={r.project.slot}></span>{r.project.name}</span>{/if}<span class="pres-time num"
+          {#if r.project}<span class="pres-proj" data-chip={r.stands !== undefined ? '' : undefined}><span class="pres-pdot" data-slot={r.project.slot}></span>{r.project.name}</span>{/if}{#if r.stands !== undefined}{#if r.time}<span class="pres-time num">{r.time}</span>{/if}<span class="pres-stands" data-live={r.stopped ? 'held' : r.live}>{r.stands}</span>{:else}<span class="pres-time num"
             >{r.stopped === 'stop' ? 'Stopped by you' : r.stopped === 'pause' ? 'Paused by you' : (r.time ?? LIVE[r.live])}</span
-          >
+          >{/if}
         </p>
         {#if onmenu}
           <button type="button" class="pres-more" aria-haspopup="menu" aria-label="Tell, pause or stop {r.name}" disabled={r.busy} onclick={(e) => onmenu(r.key, rectOf(e))}

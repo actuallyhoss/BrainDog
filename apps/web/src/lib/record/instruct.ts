@@ -53,6 +53,8 @@ export type LiveRun = {
   parent: string | null;
   for_s: number;
   heard_s: number;
+  /** Seconds since its last call; absent from a host older than the Agents page of 23 October, `null` before any call. */
+  quiet_s?: number | null;
   reach: 'hooks' | 'next_call';
 };
 
@@ -129,6 +131,7 @@ export const controlWords = {
   anyMachine: 'Any machine',
   anyProfile: 'Any profile',
   aRun: 'An agent',
+  saidNothing: 'Has not said what it is doing',
   aTask: 'A task',
   now: 'now',
   next: 'next start',
@@ -237,6 +240,47 @@ export function atWorkOf(rows: readonly LiveRun[]): LiveRun[] {
 export function waitingOf(rows: readonly LiveRun[]): LiveRun[] {
   const open = new Set(rows.map((r) => r.run));
   return rows.filter((r) => r.state === 'waiting' && (r.parent === null || !open.has(r.parent)));
+}
+
+/** A run waiting on him this long is no longer at work in any sense: the Agents page lists it under Recent runs instead. */
+export const QUIET_DROP_S = 3 * 3600;
+
+/**
+ * THE RUNS THE AGENTS PAGE LISTS UNDER At work: the ones at work, then the ones waiting on him that called inside the
+ * last three hours (`QUIET_DROP_S`), each a lead run. A run quiet longer, or one whose quiet the host does not say, is
+ * left to Recent runs, so a session open and silent for two days is not "at work".
+ */
+export function onDeskOf(rows: readonly LiveRun[]): LiveRun[] {
+  const waiting = waitingOf(rows).filter((r) => typeof r.quiet_s === 'number' && r.quiet_s <= QUIET_DROP_S);
+  return [...atWorkOf(rows), ...waiting];
+}
+
+const escaped = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+/**
+ * WHAT A RUN IS DOING, IN PLAIN WORDS, for the one line At work gives it: what it said, unless that is the name the
+ * record gave it ("Claude Code in BrainDog", "Claude run", its repository), then where it works ("In braindog, on
+ * master"), and else that it has not said. Never the agent's name again, which its mark already says.
+ */
+export function doingSaid(r: Pick<LiveRun, 'doing' | 'agent' | 'repo' | 'branch' | 'name'>): string {
+  const doing = (r.doing ?? r.name ?? '').replace(/\s+/gu, ' ').trim();
+  const who = agentNamed(r.agent);
+  const own =
+    doing === '' ||
+    /^(?:an? )?agent run\b/iu.test(doing) ||
+    (who !== null && new RegExp(`^${escaped(who)}(?: [A-Z][A-Za-z]*)? (?:run\\b|in \\S+$)`, 'u').test(doing)) ||
+    (r.repo !== null && (doing === r.repo || doing.startsWith(`${r.repo} on `)));
+  if (!own) return doing;
+  if (r.repo) return r.branch ? `In ${r.repo}, on ${r.branch}` : `In ${r.repo}`;
+  return controlWords.saidNothing;
+}
+
+/** How a run on At work stands, in a few words: working now, quiet for 40 min, or held by him. */
+export function standsSaid(r: Pick<LiveRun, 'state' | 'stopped' | 'quiet_s'>): string {
+  if (r.stopped === 'stop') return 'Stopped by you';
+  if (r.stopped === 'pause') return 'Paused by you';
+  if (r.state === 'working' || r.state === 'thinking') return 'Working now';
+  return typeof r.quiet_s === 'number' ? `Quiet for ${spanSaid(r.quiet_s * 1000)}` : 'Waiting on you';
 }
 
 /** The runs at work grouped by the machine each is on, the busiest first, a run naming none under `null`. */

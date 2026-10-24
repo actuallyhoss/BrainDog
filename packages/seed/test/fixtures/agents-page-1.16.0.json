@@ -1,0 +1,279 @@
+[
+  {
+    "kind": "note",
+    "lead": true,
+    "span": 12,
+    "when": {
+      "metric": "runs-working",
+      "gt": 0
+    },
+    "body": "{{runs-working.names}} is at work. {{runs-waiting}} run(s) are waiting for your reply, {{handoffs-open}} step(s) left for the next run"
+  },
+  {
+    "kind": "note",
+    "lead": true,
+    "span": 12,
+    "when": {
+      "metric": "runs-working",
+      "is": 0
+    },
+    "body": "No agent is at work right now. {{runs-waiting}} run(s) are waiting for your reply, {{handoffs-open}} step(s) left for the next run"
+  },
+  {
+    "kind": "queue",
+    "heading": "Your agents asked",
+    "icon": "ask",
+    "span": 12,
+    "source": "governance.open",
+    "where": {
+      "any": [
+        {
+          "field": "who",
+          "starts": "agent:"
+        },
+        {
+          "field": "who",
+          "starts": "s1"
+        },
+        {
+          "field": "who",
+          "starts": "s2"
+        },
+        {
+          "field": "who",
+          "starts": "s3"
+        },
+        {
+          "field": "who",
+          "starts": "s4"
+        },
+        {
+          "field": "who",
+          "starts": "s5"
+        },
+        {
+          "field": "who",
+          "starts": "s6"
+        },
+        {
+          "field": "who",
+          "starts": "s7"
+        },
+        {
+          "field": "who",
+          "starts": "s8"
+        },
+        {
+          "field": "who",
+          "starts": "s9"
+        }
+      ]
+    },
+    "limit": 3,
+    "when": {
+      "metric": "questions-open",
+      "gt": 0
+    }
+  },
+  {
+    "kind": "section",
+    "heading": "Tell an agent",
+    "icon": "edit",
+    "span": 12,
+    "panel": "instruct"
+  },
+  {
+    "kind": "section",
+    "heading": "At work",
+    "icon": "session",
+    "span": 7,
+    "panel": "presence"
+  },
+  {
+    "kind": "section",
+    "heading": "Left for the next run",
+    "icon": "arrow",
+    "span": 5,
+    "panel": "left-steps"
+  },
+  {
+    "kind": "section",
+    "heading": "Today’s runs",
+    "icon": "clock",
+    "span": 12,
+    "panel": "run-list"
+  },
+  {
+    "kind": "section",
+    "heading": "Needs a look",
+    "icon": "circle-alert",
+    "span": 12,
+    "box": true
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "keys-nowhere",
+      "is": 1
+    },
+    "body": "1 key has no value. [Add it in the vault](/vault)"
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "keys-nowhere",
+      "gt": 1
+    },
+    "body": "{{keys-nowhere}} keys have no value. [Add them in the vault](/vault)"
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "keys-expired",
+      "gt": 0
+    },
+    "body": "Keys past their day: {{keys-expired}}. Renew or retire each."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "tools-unseen",
+      "gt": 0
+    },
+    "body": "Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "keys-in-text",
+      "is": 1
+    },
+    "body": "A key is written in plain text in 1 place. Move it to the vault."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "keys-in-text",
+      "gt": 1
+    },
+    "body": "Keys are written in plain text in {{keys-in-text}} places. Move each to the vault."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "tidied-week",
+      "gt": 0
+    },
+    "body": "Tidied this week: {{tidied-week.names}}."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "gone-stale",
+      "gt": 0
+    },
+    "body": "Still stale: {{gone-stale.names}}."
+  },
+  {
+    "kind": "note",
+    "tone": "warn",
+    "span": 12,
+    "when": {
+      "metric": "stale-rows-same",
+      "gt": 0
+    },
+    "body": "Things here twice: {{stale-rows-same}}. Fold them on [Skills](/r/skills?twice=1), [Tools](/r/tools?twice=1), [Keys](/r/credentials?twice=1) or [Learnings](/r/learnings?twice=1)."
+  },
+  {
+    "kind": "section",
+    "heading": "Earlier",
+    "icon": "history",
+    "span": 12,
+    "fold": true,
+    "source": "register.session",
+    "where": "last_seen before today, parent is empty, wrote is not 0",
+    "limit": 1,
+    "when": {
+      "metric": "runs-earlier",
+      "gt": 0
+    }
+  },
+  {
+    "kind": "cards",
+    "span": 12,
+    "source": "register.session",
+    "where": "last_seen before today, parent is empty, wrote is not 0",
+    "columns": [
+      {
+        "field": "agent",
+        "as": "who"
+      },
+      {
+        "field": "doing_said",
+        "as": "reply"
+      },
+      {
+        "field": "project",
+        "as": "scope"
+      },
+      {
+        "field": "last_seen",
+        "as": "when"
+      }
+    ],
+    "order": [
+      {
+        "field": "last_seen",
+        "dir": "desc"
+      }
+    ],
+    "limit": 6,
+    "when": {
+      "metric": "runs-earlier",
+      "gt": 0
+    }
+  },
+  {
+    "kind": "section",
+    "heading": "What the brain learned",
+    "icon": "learning",
+    "span": 12,
+    "fold": true
+  },
+  {
+    "kind": "note",
+    "key": "brain-link",
+    "span": 12,
+    "body": "[How the brain changed](/p/brain)"
+  },
+  {
+    "kind": "agents",
+    "span": 12,
+    "source": "activity",
+    "where": "list is learnings or skills or credentials or tools",
+    "first": 3
+  },
+  {
+    "kind": "section",
+    "heading": "Machines and profiles",
+    "icon": "monitor",
+    "span": 12,
+    "panel": "machines"
+  }
+]

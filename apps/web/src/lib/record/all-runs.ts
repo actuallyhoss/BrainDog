@@ -40,6 +40,10 @@ export const runsWords = {
   agentEnded: (when: string) => `finished ${when}`,
   agentStopped: (when: string) => `stopped ${when}`,
   agentName: 'An agent',
+  /* HOW AN AGENT RUN STANDS, WITHOUT WHEN, for a row that says when in a column of its own (the Agents page's Recent runs). */
+  outcome: { working: 'At work', left: 'Left a step', ended: 'Finished', stopped: 'Stopped', open: 'Open' },
+  /** A run that said nothing of what it did, where it worked. */
+  agentIn: (who: string, repo: string) => `${who} in ${repo}`,
   /** A run that said nothing of what it did: its agent's run. */
   agentRun: (who: string) => `${who} run`,
   jobSaid: (word: string, when: string) => `${word} ${when}.`,
@@ -94,7 +98,22 @@ export function agentLines(rows: readonly unknown[], now: number): RunLine[] {
     const who = runWho(f) ?? runsWords.agentName;
     const did = didOf(f);
     const agent = text(f.agent);
-    out.push({ key: `r:${r.seq}`, kind: 'agent', name: did ?? runsWords.agentRun(who), at, said: did ? `${who}, ${stands}` : stands, bad: false, path: `/r/session/${r.seq}`, ...(agent ? { agent } : {}) });
+    const project = text(f.project);
+    const repo = text(f.repo);
+    const outcome = where === 'working' || where === 'left' || where === 'ended' || where === 'stopped' ? runsWords.outcome[where] : runsWords.outcome.open;
+    out.push({
+      key: `r:${r.seq}`,
+      kind: 'agent',
+      name: did ?? (repo ? runsWords.agentIn(who, repo) : runsWords.agentRun(who)),
+      at,
+      said: did ? `${who}, ${stands}` : stands,
+      bad: false,
+      path: `/r/session/${r.seq}`,
+      outcome,
+      live: where === 'working',
+      ...(agent ? { agent } : {}),
+      ...(project ? { project } : {}),
+    });
   }
   return out;
 }
@@ -199,7 +218,8 @@ export function jobLines(rows: readonly { id: string; title: string | null; kind
   });
 }
 
-export type AllRuns = { from: 'ready'; lines: RunLine[]; short: boolean; day: AgentDay | null } | { from: 'refused'; fix: string };
+/** `agentRuns` is how many runs the record's list of runs holds, the count its door says, or `null` where it was not read. */
+export type AllRuns = { from: 'ready'; lines: RunLine[]; short: boolean; day: AgentDay | null; agentRuns: number | null } | { from: 'refused'; fix: string };
 
 /** Reads every source side by side and merges them, newest first. */
 export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
@@ -245,5 +265,6 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
   const agents = agentLines(sessionRows, now);
   const jobRows = jobs.ok ? jobLines(jobs.value.jobs, now) : [];
   const lines = [...runLines(autoRows, runs, actionRows, scriptRows, now), ...agents, ...jobRows].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  return { from: 'ready', lines, short: failed.length > 0, day: agentDay(sessionRows, now) };
+  const agentRuns = sessions.ok && isBag(sessions.value) && typeof sessions.value.matched === 'number' ? sessions.value.matched : null;
+  return { from: 'ready', lines, short: failed.length > 0, day: agentDay(sessionRows, now), agentRuns };
 }

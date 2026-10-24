@@ -11,12 +11,15 @@ import {
   ageSaid,
   agoSaid,
   composerOf,
+  doingSaid,
   instructArgs,
   leadsOf,
+  onDeskOf,
   presenceOf,
   runsOf,
   sendingOf,
   spanSaid,
+  standsSaid,
   threadOf,
   threadOrder,
   unknownRuns,
@@ -263,4 +266,27 @@ test('TIME IN WORDS', () => {
   assert.deepEqual([spanSaid(20_000), spanSaid(9 * 60_000), spanSaid(200 * 60_000), spanSaid(3 * 86_400_000)], ['under a minute', '9 min', '3 h 20 min', '3 days']);
   assert.deepEqual([ageSaid(20), ageSaid(9 * 60), ageSaid(200 * 60), ageSaid(3 * 86_400)], ['just now', 'for 9 min', 'for 3 h', 'for 3 days']);
   assert.deepEqual([agoSaid(10), agoSaid(180), agoSaid(7200)], ['just now', '3 min ago', '2 h ago']);
+});
+
+/* THE AGENTS PAGE OF 23 OCTOBER: At work leads each row with what the run is doing in plain words, never the record's own
+   name for it, and lists a run waiting on him only while it called inside three hours. */
+test('WHAT A RUN IS DOING IS ITS OWN WORDS, else where it works, and never the name the record gave it', () => {
+  assert.equal(doingSaid(CLAUDE), 'Variable axis QA, instances 3 of 9');
+  for (const own of ['Claude run', 'Claude Code in BrainDog', 'Claude in kiln-type', 'kiln-type', 'kiln-type on axis-qa', ''])
+    assert.equal(doingSaid(run({ doing: own })), 'In kiln-type, on axis-qa', own);
+  assert.equal(doingSaid(run({ doing: 'Claude run', repo: null, branch: null })), 'Has not said what it is doing');
+  /* WORDS AN AGENT WROTE THAT ONLY START LIKE A NAME ARE ITS OWN. */
+  assert.equal(doingSaid(run({ doing: 'Claude in the loop again' })), 'Claude in the loop again');
+});
+
+test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones quiet under three hours, never one quiet longer', () => {
+  assert.equal(standsSaid(CLAUDE), 'Working now');
+  assert.equal(standsSaid(CODEX), 'Working now');
+  assert.equal(standsSaid(run({ state: 'waiting', quiet_s: 40 * 60 })), 'Quiet for 40 min');
+  assert.equal(standsSaid(run({ state: 'waiting' })), 'Waiting on you');
+  assert.equal(standsSaid(run({ stopped: 'pause' })), 'Paused by you');
+  const quiet = run({ run: 'S4', state: 'waiting', quiet_s: 2 * 3600 });
+  const silent = run({ run: 'S5', state: 'waiting', quiet_s: 42 * 3600 });
+  const unsaid = run({ run: 'S6', state: 'waiting' });
+  assert.deepEqual(onDeskOf([...ROWS, quiet, silent, unsaid]).map((r) => r.run), ['S1', 'S2', 'S4']);
 });

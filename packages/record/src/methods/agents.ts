@@ -138,6 +138,8 @@ export type PresenceRow = {
   parent: string | null;
   for_s: number;
   heard_s: number;
+  /** Seconds since its last call, `null` when it has made none: how long a run that waits on him has been quiet. */
+  quiet_s: number | null;
   /** `hooks`: a stop halts its next tool call. `next_call`: it is told at its next BrainDog call, and keeps editing till then. */
   reach: 'hooks' | 'next_call';
 };
@@ -434,6 +436,7 @@ export function methods(deps: RecordDeps) {
             parent: of(f, 'parent'),
             for_s: secs(of(f, 'started') ?? r.created_at),
             heard_s: secs(heard),
+            quiet_s: of(f, 'last_seen') === null ? null : secs(of(f, 'last_seen')),
             reach: agent === 'claude' && profile.enforce.hooks ? 'hooks' : 'next_call',
           };
         });

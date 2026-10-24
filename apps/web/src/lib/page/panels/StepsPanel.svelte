@@ -1,16 +1,17 @@
 <!--
-  Left for the next run, on the Agents page (`panel: left-steps`): the steps runs left that nobody has taken, from the
-  record's own `handoffs.open`, the read a new run is handed its step from, so the page never lists a step the briefing
-  would not offer.
+  Up next, on the Agents page (`panel: left-steps`): the steps runs left that nobody has taken, from the record's own
+  `handoffs.open`, the read a new run is handed its step from, so the page never lists a step the briefing would not
+  offer.
 
-  ONE LINE A STEP, AND A STEP LEFT THREE TIMES IS ONE LINE (the audit's "the same step 3 times"): the step in its own
-  words, then who left it, when, and how many times, with no Status and Next columns. The newest three are drawn and the
-  rest are folded under a count, so the tile never grows past what a glance takes in.
+  ONE ROW A STEP, THE WHOLE WIDTH, AND A STEP LEFT THREE TIMES IS ONE ROW (the audit's "the same step 3 times"): the step in
+  its own words first, then under it the project it was left in as a chip, who left it, when, and how many times. The
+  newest three are drawn and the rest are folded under a count, so the tile never grows past what a glance takes in. It
+  was a narrow column beside At work, where a step wrapped to six lines and left a hole under the runs.
 
-  TAKE AND DROP, FOR HIM. A step is work for a run, and only an agent takes one in the record (`handoff` with `take`), so
-  Take hands it on: the composer above takes its words, to whoever is next at their next start, for him to send or
-  change (`fill`). Drop closes it, every run that left it, with his reason in words (`handoff` with `drop`), and the
-  others on the page read again (`told`).
+  TAKE AND DROP, FOR HIM, quiet at the row's end (under the words on a narrow tile). A step is work for a run, and only an
+  agent takes one in the record (`handoff` with `take`), so Take hands it on: the composer above takes its words, to
+  whoever is next at their next start, for him to send or change (`fill`). Drop closes it, every run that left it, with
+  his reason in words (`handoff` with `drop`), and the others on the page read again (`told`).
 
   A HOST PANEL loaded by `import()` from `BlockSlot.svelte` only. With no step left the tile is left out whole.
 -->
@@ -31,6 +32,8 @@
     take: 'Take',
     drop: 'Drop',
     takeSaid: (step: string) => `Take the step left for the next run: ${step}`,
+    takeLabel: (step: string) => `Take: ${step}`,
+    dropLabel: (step: string) => `Drop: ${step}`,
     why: 'Why drop it? The record keeps your words.',
     dropIt: 'Drop it',
     keep: 'Keep it',
@@ -101,15 +104,18 @@
 </script>
 
 {#if drew !== true}
-  <!-- NOTHING LEFT, OR NOT READ YET: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew nothing). -->
-  <span data-seen-none hidden></span>
+  <!-- NOTHING LEFT, OR NOT READ YET: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew nothing),
+       and says it is still reading while it is. -->
+  <span data-seen-none hidden aria-busy={drew === null ? 'true' : undefined}></span>
 {:else}
   <div class="steps">
     <ol class="steps-list">
       {#each shown as s (s.key)}
         <li class="step" data-earlier={s.earlier ? '' : undefined}>
           <p class="step-next">{s.next}</p>
-          <p class="step-meta">{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</p>
+          <p class="step-meta">
+            {#if s.project}<span class="step-proj">{s.project}</span>{/if}<span>{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</span>
+          </p>
           {#if owner}
             {#if asking === s.key}
               <form class="step-ask" aria-label={words.drop} onsubmit={(e) => (e.preventDefault(), void drop(s))}>
@@ -121,9 +127,9 @@
                 </div>
               </form>
             {:else}
-              <div class="step-do">
-                <button type="button" class="step-btn" onclick={() => fill.say(words.takeSaid(s.next))}>{words.take}</button>
-                <button type="button" class="step-btn" onclick={() => ((asking = s.key), (why = ''))}>{words.drop}</button>
+              <div class="step-do step-acts">
+                <button type="button" class="step-btn" aria-label={words.takeLabel(s.next)} onclick={() => fill.say(words.takeSaid(s.next))}>{words.take}</button>
+                <button type="button" class="step-btn" aria-label={words.dropLabel(s.next)} onclick={() => ((asking = s.key), (why = ''))}>{words.drop}</button>
               </div>
             {/if}
           {/if}
@@ -141,6 +147,7 @@
     display: grid;
     gap: var(--sp-2);
     min-inline-size: 0;
+    container-type: inline-size;
   }
 
   .steps-list {
@@ -150,18 +157,23 @@
     list-style: none;
   }
 
-  /* ONE STEP: its words at the body size, who left it under them, the two quiet presses at the row's end. */
+  /* ONE STEP: its words at the body size, the project and who left it under them, the two quiet presses at the end. */
   .step {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--sp-3);
-    padding-block: var(--sp-2);
+    align-items: center;
+    gap: 2px var(--sp-4);
+    padding-block: var(--sp-3);
     border-block-start: 1px solid var(--rule);
   }
 
   .step:first-child {
     border-block-start: 0;
     padding-block-start: 0;
+  }
+
+  .step:last-child {
+    padding-block-end: 0;
   }
 
   .step-next {
@@ -178,6 +190,10 @@
   }
 
   .step-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-2);
     grid-column: 1;
     margin: 0;
     color: var(--ink-3);
@@ -185,10 +201,17 @@
     line-height: 18px;
   }
 
-  .step > .step-do {
+  /* THE PROJECT AS A QUIET CHIP, as At work says a run's. */
+  .step-proj {
+    padding: 1px var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink-2);
+  }
+
+  .step > .step-acts {
     grid-column: 2;
     grid-row: 1 / span 2;
-    align-self: center;
   }
 
   .step-do {
@@ -196,6 +219,7 @@
     gap: var(--sp-1);
   }
 
+  /* QUIET PRESSES: no fill until the pointer is on one; the confirm's second press is the one red fill. */
   .step-btn {
     display: inline-flex;
     align-items: center;
@@ -204,8 +228,8 @@
     padding: 0 var(--sp-2);
     border: 0;
     border-radius: var(--r-ctl);
-    background: var(--tile-2);
-    color: var(--ink);
+    background: transparent;
+    color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -228,6 +252,7 @@
   @media (hover: hover) and (pointer: fine) {
     .step-btn:not([data-weight='primary']):hover {
       background: var(--hover);
+      color: var(--ink);
     }
   }
 
@@ -239,6 +264,11 @@
     padding: var(--sp-3);
     border-radius: var(--r-ctl);
     background: var(--tile-2);
+  }
+
+  .step-ask .step-btn:not([data-weight='primary']) {
+    background: var(--tile);
+    color: var(--ink);
   }
 
   .step-why {
@@ -260,24 +290,41 @@
     font-size: var(--fs-body);
   }
 
-  .step-ask .step-btn:not([data-weight='primary']) {
-    background: var(--tile);
-  }
-
   .steps-more {
     justify-self: start;
+    min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
     padding: 0;
     border: 0;
     background: none;
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
-    text-decoration: underline;
-    text-underline-offset: 3px;
     cursor: pointer;
   }
 
-  /* UNDER A THUMB every press is 44 tall, and the presses go under the words. */
+  @media (hover: hover) and (pointer: fine) {
+    .steps-more:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* ON A NARROW TILE the presses go under the words, at the start, so the step keeps the width to read in. */
+  @container (width < 520px) {
+    .step {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .step > .step-acts {
+      grid-column: 1;
+      grid-row: auto;
+      margin-block-start: var(--sp-1);
+      margin-inline-start: calc(-1 * var(--sp-2));
+    }
+  }
+
+  /* UNDER A THUMB every press is 44 tall. */
   @media (pointer: coarse) {
     .step-btn,
     .steps-more {
@@ -285,14 +332,8 @@
       padding-inline: var(--sp-3);
     }
 
-    .step {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .step > .step-do {
-      grid-column: 1;
-      grid-row: auto;
-      margin-block-start: var(--sp-1);
+    .steps-more {
+      padding-inline: 0;
     }
   }
 </style>

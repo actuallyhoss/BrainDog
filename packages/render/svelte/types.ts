@@ -299,4 +299,6 @@ export type PresenceView = {
   busy: boolean;
   /** How long it has run, for a row drawn on one line: "1 h 08 min". */
   time?: string;
+  /** How it stands, for a row drawn on one line: "Working now", "Quiet for 40 min". */
+  stands?: string;
 };

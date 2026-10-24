@@ -27,3 +27,14 @@ test('A ROW WITH NO STEP, OR NO RUN THAT LEFT IT, IS NOT DRAWN', () => {
   assert.deepEqual(stepsOf({ rows: [row('', 'A step'), row('S3', '  '), { fields: null }, 'odd'] }), []);
   assert.deepEqual(stepsOf(null), []);
 });
+
+test('A STEP SAYS THE PROJECT IT WAS LEFT IN, by the name the block gives its row, and none where it gives none', () => {
+  const steps = stepsOf({ rows: [row('S4', 'Ship the page'), row('S5', 'Write the note')], scopes: ['Kiln', null] });
+  assert.deepEqual(
+    steps.map((s) => [s.next, s.project]),
+    [
+      ['Ship the page', 'Kiln'],
+      ['Write the note', null],
+    ],
+  );
+});

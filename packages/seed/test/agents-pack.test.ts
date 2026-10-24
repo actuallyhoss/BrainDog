@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { normalise, type Pack } from '@braindog/declare';
 import { KEYS_IN_TEXT, openRecord, type Kernel, type WriteContext } from '@braindog/kernel';
@@ -50,27 +51,36 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.16.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.17.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.16.0');
+  assert.equal(pack.manifest.version, '1.17.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.16.0, and it says the page opens on who is at work on what', () => {
+test('THE NEWEST CHANGE NOTE IS 1.17.0, and it says the page reads like a list of runs', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.16.0');
+  assert.equal(newest.version, '1.17.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
+  assert.match(newest.notes, /At work, Up next and Recent runs/);
+  assert.match(newest.notes, /Needs you only/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
+});
+
+test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
+  const newest = MODULE_CHANGES.agents[1]!;
+  assert.equal(newest.version, '1.16.0');
   assert.match(newest.notes, /who is at work and on what/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
 
 test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
-  const newest = MODULE_CHANGES.agents[1]!;
+  const newest = MODULE_CHANGES.agents[2]!;
   assert.equal(newest.version, '1.15.0');
   assert.match(newest.notes, /Your agents asked/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -78,7 +88,7 @@ test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
 });
 
 test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () => {
-  const newest = MODULE_CHANGES.agents[2]!;
+  const newest = MODULE_CHANGES.agents[3]!;
   assert.equal(newest.version, '1.14.0');
   assert.match(newest.notes, /how many are at work, on how many machines and how many wait on you/);
   assert.match(newest.notes, /At work/);
@@ -93,22 +103,22 @@ test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () 
    1.13.0's as they were written too. */
 test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 8), ['1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 9), ['1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
-    MODULE_CHANGES.agents[3]!.notes,
+    MODULE_CHANGES.agents[4]!.notes,
     'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[4]!.notes,
+    MODULE_CHANGES.agents[5]!.notes,
     'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[5]!.notes,
+    MODULE_CHANGES.agents[6]!.notes,
     'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[6]!.notes,
+    MODULE_CHANGES.agents[7]!.notes,
     'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
   );
 });
@@ -152,7 +162,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.16.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.17.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -286,71 +296,62 @@ test('NO KEY ROW HOLDS A VALUE, in the seed or in the record', async () => {
 type Drawn = { heading?: string; kind: string; rows: { fields: Record<string, unknown> }[]; matched: number; refusals: unknown[]; scopes?: (string | null)[]; inherited?: number; history?: { text: string }[]; body?: string };
 
 const opened = (k: Kernel, slug: string): Drawn[] => value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
+
+/**
+ * THE AGENTS PAGE AS 1.16.0 DECLARED IT, to the letter, kept as a file (`fixtures/agents-page-1.16.0.json`, written off
+ * the module as 1.16.0 was released). 1.17.0 made the page a runs console and took most of its blocks away, so the
+ * versions under it are read off this, and the cards Earlier drew are still read by the record in the test of what a
+ * card says.
+ */
+const BLOCKS_16 = JSON.parse(readFileSync(new URL('./fixtures/agents-page-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
+
+/** The two lines 1.17.0 declares, one drawn: how many are at work and how many steps are up next, or nobody. */
+const LINES_17 = ['{{runs-working}} at work, {{handoffs-open}} step(s) up next', 'Nobody at work. {{handoffs-open}} step(s) up next'];
 const headed = (blocks: Drawn[], heading: string): Drawn => {
   const found = blocks.find((b) => b.heading === heading);
   assert.ok(found, `no block headed ${heading}`);
   return found;
 };
 
-test('/p/agents: the runs grouped, what a run asked first, then at work, today and earlier, and what they added', async () => {
+test('/p/agents: a runs console, the line, Tell an agent, At work, Up next and Recent runs, then a foot of doors', async () => {
   const { k, sql } = await seeded();
-  /* A RUN THAT STOPPED YESTERDAY WITH A NEXT STEP, and one still marked active that nobody closed, both Earlier, beside
-     the seed's two that finished yesterday (a finished run is listed since 1.12.0); and a question a run asked beside
-     one a rule put, so Needs you is the run's alone. */
+  /* A RUN THAT STOPPED YESTERDAY WITH A NEXT STEP, one still marked active that nobody closed, and questions a run and a
+     rule asked: none of them is a block of the page since 1.17.0. The runs are the host's rows, and each question lives
+     in Needs you only. */
   const yesterday = new Date(NOW - 26 * 3_600_000).toISOString();
   value(k.create('session', { doing: 'Stopped yesterday', agent: 'codex', state: 'idle', next: 'Pick the review up again.' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
   value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
   const OPTIONS = { options: [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'It is not' }] };
   value(k.propose({ question: 'Retire the old Fenwick key?', body_kind: 'options', body: OPTIONS }, 'S1'));
-  value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'agent:codex'));
   value(k.propose({ question: 'A rule asks about a bill', body_kind: 'options', body: OPTIONS }, 'rule:bills'));
-  value(k.propose({ question: 'Slash asks about a page', body_kind: 'options', body: OPTIONS }, 'slash'));
   const all = opened(k, 'agents');
   for (const b of all) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
-  /* THE GROUPS OF RUNS. The page declares no lanes since 1.14.0: the day is the host's, under Today’s runs. */
-  const blocks = all;
-  assert.equal(all.filter((b) => b.kind === 'lanes').length, 0, 'the page still declares lanes of its own');
 
-  const groups = blocks.filter((b) => ['Your agents asked', 'At work', 'Today’s runs', 'Earlier'].includes(String(b.heading))).map((b) => b.heading);
-  assert.deepEqual(groups, ['Your agents asked', 'At work', 'Today’s runs', 'Earlier'], 'the runs are not grouped in the order the direction gives');
+  /* THE PARTS, IN THIS ORDER, each the whole row, each the host's panel. */
+  const sections = (AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; panel?: string; span?: number; box?: boolean; fold?: boolean }[]).filter((b) => b.kind === 'section');
+  assert.deepEqual(
+    sections.map((b) => [b.heading, b.panel, b.span]),
+    [
+      ['Tell an agent', 'instruct', 12],
+      ['At work', 'presence', 12],
+      ['Up next', 'left-steps', 12],
+      ['Recent runs', 'run-list', 12],
+    ],
+    'the page is not the line, the box and the three lists, in that order',
+  );
+  assert.ok(!sections.some((b) => b.box === true || b.fold === true), 'a part is boxed or folded');
 
-  const asked = (headed(blocks, 'Your agents asked') as Drawn & { queue?: { question?: string }[] }).queue ?? [];
-  assert.deepEqual(asked.map((q) => q.question).sort(), ['Raise the retainer?', 'Retire the old Fenwick key?'], 'Your agents asked holds a question no run asked');
-
-  const seen = (a: (typeof RUNS)[number], z: (typeof RUNS)[number]) => String(z.last_seen).localeCompare(String(a.last_seen));
-  const today = (r: (typeof RUNS)[number]) => String(r.last_seen).slice(0, 10) === new Date(NOW).toISOString().slice(0, 10);
-  const working = RUNS.filter((r) => r.state === 'active' && today(r)).sort(seen);
-  /* AT WORK IS THE HOST'S LIVE PART SINCE THE CONTROL ROOM (`panel: presence`, agents and MCP plan §7.1): the runs open
-     now are read from the record's `presence`, not drawn as rows of the page, and the line counts the runs at work. */
-  assert.equal((headed(blocks, 'At work') as Drawn & { panel?: string }).panel, 'presence', 'At work is not the runs open now');
-  assert.equal(reading(k, 'runs-working'), working.length, 'a stopped run is counted as working');
-  /* THE RUNS OF TODAY ARE THE HOST'S, SINCE 1.14.0 (`panel: run-list`): the day as lanes a kind of agent and every run
-     under it, so no declared block stands under the heading to draw them a second time. */
-  const day = headed(all, 'Today’s runs') as Drawn & { panel?: string };
-  assert.equal(day.panel, 'run-list', 'Today’s runs is not the host’s list of runs');
-  assert.equal(all[all.indexOf(day) + 1]!.kind, 'section', 'a block stands under Today’s runs');
-  /* EARLIER IS A FOLD SINCE 1.11.0: its heading counts the runs and the cards right under it are the runs. */
-  const fold = headed(blocks, 'Earlier');
-  const earlier = blocks[blocks.indexOf(fold) + 1]!;
-  const before = RUNS.filter((r) => !today(r)).map((r) => String(r.doing));
-  assert.ok(before.length > 0, 'the seed has no run that finished before today');
-  assert.deepEqual([fold.kind, fold.matched, earlier.kind, earlier.heading], ['section', 2 + before.length, 'cards', undefined], 'Earlier is not a counted heading over its cards');
-  assert.deepEqual([...earlier.rows.map((r) => String(r.fields.doing))].sort(), ['Left open since yesterday', 'Stopped yesterday', ...before].sort(), 'a run last heard from yesterday is not under Earlier');
-  /* EVERY RUN UNDER EXACTLY ONE HEADING, the finished ones too. */
-  const drawn = [earlier].flatMap((b) => b.rows.map((r) => String(r.fields.doing)));
-  assert.equal(new Set(drawn).size, drawn.length, `a run is under two headings: ${drawn.join(', ')}`);
-  /* THE NEXT STEP A RUN LEFT IS SAID ONCE, under Left for the next run, and on no run's card since 1.12.0. */
-  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; source?: string; columns?: { field: string }[] }[];
-  for (const b of declared.filter((d) => d.kind === 'cards' && d.source !== 'handoffs.open'))
-    assert.ok(!(b.columns ?? []).some((c) => c.field === 'next'), 'a run\'s card carries a next step');
-  assert.ok(blocks.some((b) => b.kind === 'agents'), 'the page lost what the brain learned');
-
-  /* THE RUNS AND NOTHING ELSE: what the brain holds is four lists with pages of their own, and Where they left off is
-     Today and Earlier. */
-  const headings = blocks.map((b) => b.heading);
-  for (const gone of ['Waiting on you', 'Working now', 'Where they left off', 'What the brain holds', 'Growth', 'Learnings', 'Skills'])
+  /* NO QUEUE, NO CARDS, NO LANES AND NO LOG: what runs asked is Needs you's, and the runs are the host's rows. */
+  for (const kind of ['queue', 'cards', 'lanes', 'agents', 'feed']) assert.equal(all.filter((b) => b.kind === kind).length, 0, `the page still draws a ${kind} block`);
+  const headings = all.map((b) => b.heading);
+  for (const gone of ['Your agents asked', 'Needs you', 'Needs a look', 'Earlier', 'What the brain learned', 'Machines and profiles', 'Left for the next run', 'Today’s runs', 'Working now', 'Waiting on you'])
     assert.ok(!headings.includes(gone), `${gone} is still on the agents page`);
-  /* AND NO PART SAYS IT IS EMPTY: the line is the one place the page says what is quiet. */
+
+  /* THE LINE COUNTS THE RUNS AT WORK BY THE RAIL'S CLOCK. */
+  const today = (r: (typeof RUNS)[number]) => String(r.last_seen).slice(0, 10) === new Date(NOW).toISOString().slice(0, 10);
+  assert.equal(reading(k, 'runs-working'), RUNS.filter((r) => r.state === 'active' && today(r)).length, 'a stopped run is counted as working');
+
+  /* AND NO PART SAYS IT IS EMPTY OF ITS OWN: the line and the host's panels say what is quiet. */
   const said = (AGENTS_PAGES.agents!.blocks as { lead?: boolean; empty?: string; heading?: string }[]).filter((b) => !b.lead && b.empty !== undefined);
   assert.deepEqual(said.map((b) => b.heading), [], 'a block on the agents page draws its own empty line');
   /* THE WORD ON SCREEN IS RUN, never session. */
@@ -364,11 +365,12 @@ test('/p/agents: the runs grouped, what a run asked first, then at work, today a
  * of agent over the list (`agentDay` in `apps/web/src/lib/record/all-runs.ts`), and the page declares none. The figure
  * the lanes were drawn on stays, for an agent that reads it, and counts the runs heard from today.
  */
-test("TODAY'S RUNS IS THE HOST'S, OVER NO LANES OF THE PAGE'S OWN, and the runs heard from today are still counted", async () => {
+test("RECENT RUNS IS THE HOST'S, OVER NO LANES OF THE PAGE'S OWN, and the runs heard from today are still counted", async () => {
   const declared = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; when?: unknown; box?: boolean }[];
   assert.equal(declared.filter((b) => b.kind === 'lanes').length, 0, 'the page still declares lanes');
-  assert.deepEqual(declared.find((b) => b.heading === 'Today’s runs'), { kind: 'section', heading: 'Today’s runs', icon: 'clock', span: 12, panel: 'run-list' });
-  assert.equal(declared.filter((b) => b.heading === 'Today').length, 0, 'a second tile is headed Today');
+  /* HEADED Today’s runs FROM 1.14.0 TO 1.16.0; RECENT RUNS SINCE 1.17.0, the host's rows of the last runs of every day. */
+  assert.deepEqual(declared.find((b) => b.heading === 'Recent runs'), { kind: 'section', heading: 'Recent runs', icon: 'clock', span: 12, panel: 'run-list' });
+  assert.equal(declared.filter((b) => b.heading === 'Today' || b.heading === 'Today’s runs').length, 0, 'a second tile is headed Today');
   const { k, sql } = await seeded();
   const today = new Date(NOW).toISOString().slice(0, 10);
   const read = k.metric(k.metricDecl('runs-heard-today')!);
@@ -407,22 +409,24 @@ test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` 
   assert.equal(working?.where, undefined, 'the working source takes no clause');
   assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
   const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
-  /* TWO SINCE 1.16.0, ON THE RUNS AT WORK, so exactly one is drawn: who is at work on what, or nobody. */
+  /* TWO SINCE 1.16.0, ON THE RUNS AT WORK, so exactly one is drawn: how many are at work, or nobody. */
   assert.equal(lines.length, 2);
   assert.deepEqual(lines.map((l) => l.when), [
     { metric: 'runs-working', gt: 0 },
     { metric: 'runs-working', is: 0 },
   ]);
-  /* EVERY NUMBER THE RECORD'S: at work and waiting by the rail's clock, and what was left the steps nobody has taken. */
-  assert.deepEqual(lines.map((l) => l.body), LINES_16);
+  /* EVERY NUMBER THE RECORD'S: at work by the rail's clock, and up next the steps nobody has taken. NO NAME SINCE 1.17.0:
+     "Claude on BrainDog and Claude are at work" said Claude twice, and the rows say who. */
+  assert.deepEqual(lines.map((l) => l.body), LINES_17);
+  for (const l of lines) assert.doesNotMatch(String(l.body), /\.names\}\}|run\(s\)/u, 'the line names agents or counts runs waiting');
 });
 
 /**
  * LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12 job c): the steps runs left and nobody has taken, read from the record's
  * own `handoffs.open`, the read a new run is handed its step from. The line counts the same steps (`handoffs-open`).
- * As 1.13.0 declared it, cards a step; the host's since 1.14.0 (`panel: left-steps`), one line a step, beside At work.
+ * As 1.13.0 declared it, cards a step; the host's since 1.14.0 (`panel: left-steps`), one line a step, beside At work
+ * (as `BLOCKS_16` holds it); headed Up next and the whole row since 1.17.0.
  */
-const STEPS_14 = { kind: 'section', heading: 'Left for the next run', icon: 'arrow', span: 5, panel: 'left-steps' };
 const STEPS = {
   kind: 'cards',
   heading: 'Left for the next run',
@@ -439,15 +443,16 @@ const STEPS = {
   when: { metric: 'handoffs-open', gt: 0 },
 };
 
-test('LEFT FOR THE NEXT RUN IS THE HOST’S over the steps nobody has taken, beside At work and before Today’s runs', () => {
+/* UP NEXT SINCE 1.17.0: the same panel the whole row, under At work, where five twelfths beside it wrapped a step to six lines. */
+const STEPS_17 = { kind: 'section', heading: 'Up next', icon: 'arrow', span: 12, panel: 'left-steps' };
+
+test('UP NEXT IS THE HOST’S over the steps nobody has taken, the whole row under At work and over Recent runs', () => {
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; span?: number }[];
-  const at = blocks.findIndex((b) => b.heading === 'Left for the next run');
-  assert.ok(at > 0, 'no block is headed Left for the next run');
-  assert.deepEqual(blocks[at], STEPS_14);
-  /* BESIDE AT WORK: seven parts of the row and five, so the two read as one row. */
-  assert.equal(blocks[at - 1]!.heading, 'At work', 'the steps are not right after At work');
-  assert.equal(blocks[at - 1]!.span! + blocks[at]!.span!, 12, 'At work and the steps are not one row');
-  assert.deepEqual([blocks[at + 1]!.kind, blocks[at + 1]!.heading], ['section', 'Today’s runs'], 'the steps are not right over the day’s runs');
+  const at = blocks.findIndex((b) => b.heading === 'Up next');
+  assert.ok(at > 0, 'no block is headed Up next');
+  assert.deepEqual(blocks[at], STEPS_17);
+  assert.deepEqual([blocks[at - 1]!.heading, blocks[at - 1]!.span], ['At work', 12], 'the steps are not right under At work, the whole row');
+  assert.deepEqual([blocks[at + 1]!.kind, blocks[at + 1]!.heading], ['section', 'Recent runs'], 'the steps are not right over the runs');
   /* THE PANEL READS THE STEPS ITSELF, so no declared block reads them a second time. */
   assert.equal(blocks.filter((b) => b.source === 'handoffs.open').length, 0);
 });
@@ -510,7 +515,7 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
   const [working, quiet] = lines();
   assert.equal(working!.drawn, false);
   assert.notEqual(quiet!.drawn, false);
-  assert.equal(quiet!.body, LINES_16[1]);
+  assert.equal(quiet!.body, LINES_17[1]);
   assert.equal(quiet!.values?.['handoffs-open'], 2);
   sql.close();
 });
@@ -526,7 +531,7 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
 /** What reads as a file path, a host, a workflow's handle, a run's handle or a row's id: nothing a card may print. */
 const NOT_FOR_A_CARD = /[/\\]|\.(?:ts|js|mjs|md|json)\b|\bwf_\w+|\b[0-9A-HJKMNP-TV-Z]{26}\b|^S\d+$|\b[\w-]+\.(?:local|internal|dev|com)\b/u;
 
-test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Earlier, a helper and an empty run under neither, and no card prints a path', async () => {
+test('A RUN IS SAID BY WHAT IT DID: the page draws no card of one, a finished run is counted, a helper and an empty run are not, and no card prints a path', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install(declarations().filter((d) => d.id === 'register.things')));
@@ -551,32 +556,27 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   type Card = Drawn & { drawn?: boolean; where?: string; columns?: { field: string; as?: string }[] };
   const page = opened(k, 'agents') as Card[];
   for (const b of page) assert.deepEqual(b.refusals, [], `${String(b.heading)}: ${JSON.stringify(b.refusals)}`);
-  const cards = page.filter((b) => b.kind === 'cards');
-  const group = (heading: string) => cards.find((b) => b.heading === heading)!;
   const role = (b: Card, as: string) => (b.columns ?? []).filter((c) => c.as === as).map((c) => c.field);
 
-  /* AT WORK IS NO CARD SINCE THE CONTROL ROOM: the runs open now are the host's live part (`panel: presence`), which
-     words each run from the record's `presence` (`apps/web/src/lib/record/instruct.ts`). */
-  assert.equal(group('At work'), undefined, 'At work is drawn as cards');
+  /* NO CARD OF A RUN ON THE PAGE SINCE 1.17.0: At work is the host's live part (`panel: presence`) and the runs that
+     stopped are the host's rows under Recent runs (`panel: run-list`), which title a run by what it did as these cards did. */
+  assert.equal(page.filter((b) => b.kind === 'cards').length, 0, 'the page still draws cards of runs');
   assert.equal((page.find((b) => b.heading === 'At work') as Card & { panel?: string }).panel, 'presence');
 
-  /* TODAY IS THE LANES SINCE THE UI PASS OF 20 OCTOBER: no card of a run that stopped today, and the figure still
-     counts the run that ended today and wrote, not the one that wrote nothing, nor the helper, nor a working run. */
-  assert.ok(!cards.some((b) => b.where === AGENTS_MODULE.RUNS_TODAY), 'a card of the runs that stopped today is still drawn');
+  /* THE FIGURE STILL COUNTS THE RUN THAT ENDED TODAY AND WROTE, not the one that wrote nothing, nor the helper, nor a working run. */
   assert.equal(reading(k, 'runs-today'), 1, 'the figure of the runs that stopped today counts other runs');
 
-  /* EARLIER: the eight that ended last week, six drawn, the latest first, and all eight counted on the fold. */
-  const fold = page.findIndex((b) => b.kind === 'section' && b.heading === 'Earlier');
-  const earlier = page[fold + 1]!;
+  /* THE CARDS 1.16.0 DREW UNDER EARLIER, read as the record reads them still: the eight that ended last week, six drawn,
+     the latest first, all eight counted, and what each said with nothing where the words are a path. */
+  const earlier = k.block(BLOCKS_16.find((b) => b.kind === 'cards' && b.where === AGENTS_MODULE.RUNS_EARLIER) as never) as unknown as Card;
   assert.deepEqual(role(earlier, 'who'), ['agent']);
   assert.deepEqual([role(earlier, 'reply'), role(earlier, 'scope')], [['doing_said'], ['project']]);
   assert.deepEqual(earlier.rows.map((r) => r.fields.doing), week.slice(0, 6));
-  /* What it said, and nothing where the words are a path: the fourth of them. */
   assert.deepEqual(earlier.rows.map((r) => r.fields.doing_said), week.slice(0, 6).map((d) => (d.includes('/') ? '' : d)));
-  assert.deepEqual([page[fold]!.matched, earlier.matched, reading(k, 'runs-earlier')], [8, 8, 8], 'Earlier does not count the runs it leaves undrawn');
+  assert.deepEqual([earlier.matched, reading(k, 'runs-earlier')], [8, 8], 'the runs of other days are not counted');
 
-  /* AND NOTHING A CARD DRAWS IS A PATH OR AN ID: every cell of every card on the page, as the columns name them. */
-  const drawn = cards.flatMap((b) => b.rows.flatMap((r) => (b.columns ?? []).map((c) => String(r.fields[c.field] ?? ''))));
+  /* AND NOTHING A CARD DRAWS IS A PATH OR AN ID, as the columns name them. */
+  const drawn = [earlier].flatMap((b) => b.rows.flatMap((r) => (b.columns ?? []).map((c) => String(r.fields[c.field] ?? ''))));
   assert.ok(drawn.length > 20, 'the cards drew nothing to read');
   for (const text of drawn) assert.doesNotMatch(text, NOT_FOR_A_CARD, `a card prints ${text}`);
   sql.close();
@@ -768,8 +768,18 @@ const LINES_15: Loose[] = [
   { kind: 'note', lead: true, span: 12, when: { metric: 'machines-working', is: 1 }, body: '{{runs-working}} at work on one machine, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run' },
   { kind: 'note', lead: true, span: 12, when: { metric: 'machines-working', is: 0 }, body: 'No agent is at work right now, {{runs-waiting}} waiting on you, {{handoffs-open}} step(s) left for the next run' },
 ];
+/**
+ * AND 1.16.0 AS IT WAS CUT, put back first of all: 1.17.0 took most of the page's blocks away and renamed two more, so the
+ * page is put back whole from the file it was written to (`BLOCKS_16`), and only the page: no list, field or figure moved.
+ */
+const back17 = (blocks: Loose[]): Loose[] => {
+  assert.ok(blocks.some((b) => b.heading === 'Up next'), 'back17 was handed a page that is not 1.17.0');
+  return structuredClone(BLOCKS_16);
+};
+const as16 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
+  declarations.map((d) => (d.page === 'agents' ? { ...d, blocks: back17(d.blocks as Loose[]) } : d));
 const back16 = (blocks: Loose[]): Loose[] =>
-  blocks.flatMap((b) => (b.lead === true && (b.when as { metric?: string } | undefined)?.metric === 'runs-working' ? ((b.when as { gt?: number }).gt === 0 ? LINES_15 : []) : [b]));
+  (blocks.some((b) => b.heading === 'Up next') ? back17(blocks) : blocks).flatMap((b) => (b.lead === true && (b.when as { metric?: string } | undefined)?.metric === 'runs-working' ? ((b.when as { gt?: number }).gt === 0 ? LINES_15 : []) : [b]));
 const as15 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
   declarations.map((d) => (d.page === 'agents' ? { ...d, blocks: back16(d.blocks as Loose[]) } : d));
 /** AND 1.14.0 AS IT WAS CUT: the queue of what runs asked headed Needs you, where 1.15.0 heads it Your agents asked. */
@@ -865,36 +875,31 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
 });
 
 /**
- * EARLIER UNDER A FOLD OF ITS OWN, SINCE 1.11.0: Left for the next run was a seventh tile before the fold and a page
- * shows six (`calm-pages.test.ts`), so the runs of other days are folded, a press away, with how many on the heading.
- * What each of them left is said above, by the steps themselves. OVER THE LIST OF RUNS SINCE 1.12.0, so a run that
- * finished is counted and drawn, the latest first.
+ * EARLIER WAS A FOLD OF ITS OWN FROM 1.11.0 TO 1.16.0, and What the brain learned another: three folded tiles of one
+ * weight at the foot. Since 1.17.0 nothing is folded: the runs of other days are Recent runs' rows and door, and the
+ * foot is one line of doors that is drawn on a quiet record too.
  */
-test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left for the next run stays above every fold', async () => {
-  const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; icon?: string; fold?: boolean; source?: string; where?: string; order?: unknown; limit?: number; when?: unknown }[];
-  const at = blocks.findIndex((b) => b.heading === 'Earlier');
-  assert.deepEqual(blocks[at], { kind: 'section', heading: 'Earlier', icon: 'history', span: 12, fold: true, source: 'register.session', where: AGENTS_MODULE.RUNS_EARLIER, limit: 1, when: { metric: 'runs-earlier', gt: 0 } });
-  /* THE CARDS UNDER IT ARE THE SAME RUNS, with no heading of their own, and the next section ends the fold. */
-  const cards = blocks[at + 1]!;
-  assert.deepEqual([cards.kind, cards.heading, cards.icon, cards.source, cards.where, cards.limit], ['cards', undefined, undefined, 'register.session', AGENTS_MODULE.RUNS_EARLIER, 6]);
-  assert.deepEqual(cards.order, [{ field: 'last_seen', dir: 'desc' }]);
-  assert.deepEqual(cards.when, { metric: 'runs-earlier', gt: 0 });
-  assert.deepEqual([blocks[at + 2]!.kind, blocks[at + 2]!.heading], ['section', 'What the brain learned']);
-  assert.equal(blocks.filter((b) => b.heading === 'Earlier').length, 1, 'Earlier is headed twice');
-  /* NOTHING IS FOLDED ABOVE IT, so the steps, the day and the runs of today are read as the page opens. */
-  const first = blocks.findIndex((b) => b.kind === 'section' && b.fold === true);
-  assert.equal(first, at, 'a fold comes before Earlier');
-  for (const open of ['Your agents asked', 'At work', 'Left for the next run', 'Today’s runs', 'Needs a look']) {
-    const i = blocks.findIndex((b) => b.heading === open);
-    assert.ok(i >= 0 && i < at, `${open} is under a fold`);
-  }
-  /* A RECORD WITH NO RUN FROM ANOTHER DAY DRAWS NEITHER THE HEADING NOR THE CARDS. */
+test('NOTHING IS FOLDED SINCE 1.17.0, and the foot is one line of doors, How the brain changed first', async () => {
+  const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; key?: string; heading?: string; fold?: boolean; box?: boolean; body?: string; when?: unknown }[];
+  assert.equal(blocks.filter((b) => b.fold === true || b.box === true).length, 0, 'a part of the page is folded or boxed');
+  /* THE FOOT: right after Recent runs, one line, drawn on a quiet record too, its first door How the brain changed. */
+  const runs = blocks.findIndex((b) => b.heading === 'Recent runs');
+  const foot = blocks[runs + 1]!;
+  assert.deepEqual([foot.kind, foot.key, foot.when], ['note', 'brain-link', undefined]);
+  assert.deepEqual(
+    [...String(foot.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
+    ['/p/brain', '/r/learnings', '/r/skills', '/r/tools', '/r/credentials'],
+  );
+  /* AFTER IT ONLY THE KEY AND TOOL LINES, each drawn only while its figure is above nought. */
+  for (const b of blocks.slice(runs + 2)) assert.deepEqual([b.kind, typeof b.when], ['note', 'object'], 'something but a warning line follows the foot');
+  /* A FRESH RECORD DRAWS THE FOOT AND NO WARNING. */
   const fresh = await empty();
   value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
   value(await installAgentsPack(fresh.k));
-  const page = opened(fresh.k, 'agents') as (Drawn & { drawn?: boolean })[];
-  const fold = page.findIndex((b) => b.heading === 'Earlier');
-  assert.deepEqual([page[fold]!.drawn, page[fold + 1]!.drawn], [false, false], 'Earlier is drawn over no run');
+  const page = opened(fresh.k, 'agents') as (Drawn & { drawn?: boolean; key?: string })[];
+  const drawnFoot = page.find((b) => b.key === 'brain-link');
+  assert.ok(drawnFoot && drawnFoot.drawn !== false, 'the foot is not drawn on a quiet record');
+  assert.deepEqual(page.filter((b) => b.kind === 'note' && !(b as { lead?: boolean }).lead && b.key !== 'brain-link' && b.drawn !== false), [], 'a warning is drawn on a fresh record');
   fresh.sql.close();
 });
 
@@ -946,14 +951,25 @@ test('AGENTS 1.15.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, fie
   assert.equal(as14(doc.declarations).length, doc.declarations.length, '1.15.0 put in or took out a declaration');
 });
 
-/* WHAT 1.16.0 DECLARES, AS ONE MARK: 1.15.0 with the line naming who is at work on what (`back16`). */
+/* WHAT 1.16.0 DECLARES, AS ONE MARK: 1.15.0 with the line naming who is at work on what (`back16`), read with the page
+   1.17.0 took apart put back (`back17`). */
 const MARK_16 = 'ba20285de8c8400c';
 test('AGENTS 1.16.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
-  assert.equal(doc.version, '1.16.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), MARK_16, 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(as16(doc.declarations)), MARK_16, 'something 1.16.0 declared is changed beside what 1.17.0 moved');
   assert.equal(as15(doc.declarations).length, doc.declarations.length, '1.16.0 put in or took out a declaration');
   for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as15(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
+});
+
+/* WHAT 1.17.0 DECLARES, AS ONE MARK: the runs console (`back17` puts 1.16.0's page back). A change before 1.17.0 is
+   released sets the mark again and says what moved; one after it is a version with a mark of its own. */
+const MARK_17 = 'aee177d1b677edf3';
+test('AGENTS 1.17.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.17.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_17, 'the Agents add-on changed what it declares with no new version');
+  assert.equal(as16(doc.declarations).length, doc.declarations.length, '1.17.0 put in or took out a declaration');
+  for (const [i, d] of doc.declarations.entries()) if (d.page !== 'agents') assert.equal(mark(d), mark(as16(doc.declarations)[i]), `${String(d.id ?? d.metric ?? d.page)} changed`);
 });
 
 /* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a
@@ -1170,23 +1186,16 @@ const noteOn = (blocks: Drawn[], metric: string): Note | undefined => {
  * nought, closed by the folded section after it, so the page still shows six tiles before its fold. That section was
  * What the brain learned until 1.11.0, when Earlier was folded under one of its own between the two.
  */
-test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only while its figure is above nought', async () => {
-  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; box?: boolean; fold?: boolean; tone?: string; when?: { metric?: string }; body?: string }[];
-  const box = declared.findIndex((b) => b.kind === 'section' && b.heading === 'Needs a look');
-  assert.ok(box > 0 && declared[box]!.box === true, 'Needs a look is not a boxed section');
-  assert.ok(box > declared.findIndex((b) => b.kind === 'section' && b.heading === 'Today’s runs'), 'Needs a look is above the runs of today');
-  /* THE FOUR OF 1.10.0, then the stale line 1.11.0 put under them, two lines since 1.13.0 (their own test is below),
-     then 1.13.0's line of what is here twice, with the way to fold it on each list that says what makes two of its rows one. */
-  const BOX = [...NOTES, 'tidied-week', 'gone-stale', 'stale-rows-same'];
-  assert.deepEqual(
-    [...String(noteOn(declared as Drawn[], 'stale-rows-same')?.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
-    ['/r/skills?twice=1', '/r/tools?twice=1', '/r/credentials?twice=1', '/r/learnings?twice=1'],
-  );
+test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only while its figure is above nought', async () => {
+  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; key?: string; heading?: string; box?: boolean; fold?: boolean; tone?: string; when?: { metric?: string }; body?: string }[];
+  /* NO TILE HEADED Needs a look SINCE 1.17.0: the four lines of 1.10.0 are loose at the foot, under the doors, and the
+     lines of what the record tidies on its own (tidied, stale, here twice) are off the page. */
+  assert.equal(declared.filter((b) => b.heading === 'Needs a look').length, 0, 'Needs a look is still a tile');
+  const foot = declared.findIndex((b) => b.key === 'brain-link');
   /* THE KEY LINES ARE A PAIR EACH SINCE THE UI PASS OF 20 OCTOBER (SF12): one for one and one for many. */
-  const LINES = BOX.flatMap((m) => (m === 'keys-nowhere' || m === 'keys-in-text' ? [m, m] : [m]));
-  assert.deepEqual(declared.slice(box + 1, box + 1 + LINES.length).map((b) => b.when?.metric), LINES, 'the lines are not in the box, or not in order');
-  const closer = declared[box + 1 + LINES.length]!;
-  assert.deepEqual([closer.kind, closer.heading, closer.fold], ['section', 'Earlier', true], 'nothing closes the box, so it swallows what follows');
+  const LINES = NOTES.flatMap((m) => (m === 'keys-nowhere' || m === 'keys-in-text' ? [m, m] : [m]));
+  assert.deepEqual(declared.slice(foot + 1).map((b) => b.when?.metric), LINES, 'the lines are not at the foot, or not in order');
+  for (const gone of ['tidied-week', 'gone-stale', 'stale-rows-same']) assert.equal(noteOn(declared as Drawn[], gone), undefined, `${gone} still nags on the page`);
   for (const metric of NOTES) {
     const pair = metric === 'keys-nowhere' || metric === 'keys-in-text';
     const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric && !(b.when as { is?: number }).is)!;
@@ -1225,11 +1234,6 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   /* THE PAGE HANDS THE SENTENCE WITH THE FIGURE'S READING BESIDE IT, and the host fills one into the other. */
   assert.deepEqual(nowhere.values, { 'keys-nowhere': reading(k, 'keys-nowhere') });
   for (const quiet of ['keys-expired', 'tools-unseen', 'keys-in-text']) assert.equal(noteOn(blocks, quiet)?.drawn, false, `${quiet} is drawn at nought`);
-  assert.ok(blocks.some((b) => b.kind === 'agents'), 'what the brain learned left the page rather than folding');
-  /* AS THE RECORD MARKS IT FOR EVERY READER (`markDrawn`): the box is drawn over the one true line, and a section over
-     nothing goes with its lines. */
-  const boxOf = (page: Drawn[]) => (page as Note[]).find((b) => b.kind === 'section' && b.heading === 'Needs a look');
-  assert.ok(boxOf(blocks) && boxOf(blocks)!.drawn !== false, 'Needs a look is hidden over a line that is true');
   sql.close();
 
   /* A RECORD WITH PROJECTS, THE ADD-ON AND ONE RUN draws none of them, and reads each red figure as nought. */
@@ -1243,7 +1247,6 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
     assert.equal(reading(fresh.k, metric), metric === 'keys-in-text' ? null : 0, `${metric} is not nought on a fresh record`);
     assert.equal(noteOn(quietPage, metric)?.drawn, false, `${metric}'s line is drawn on a fresh record`);
   }
-  assert.equal(boxOf(quietPage)?.drawn, false, 'Needs a look is drawn over nothing on a fresh record');
   fresh.sql.close();
 });
 
@@ -1252,30 +1255,21 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
  * cleared this week and what is still stale, each finder by finder (`.names`), over the record's own `tidied-week` and
  * `gone-stale`, and each line is drawn only while its own figure is above nought.
  */
-test('NEEDS A LOOK SAYS WHAT WAS TIDIED THIS WEEK AND WHAT IS STILL STALE, in words, each over its own figure', async () => {
-  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; tone?: string; span?: number; when?: unknown; body?: string }[];
-  const lines = declared.filter((b) => b.kind === 'note' && /"(?:gone-stale|tidied-week)"/u.test(JSON.stringify(b.when ?? {})));
-  assert.deepEqual(lines, [
-    { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tidied-week', gt: 0 }, body: 'Tidied this week: {{tidied-week.names}}.' },
-    { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Still stale: {{gone-stale.names}}.' },
-  ]);
-  /* BOTH ARE THE RECORD'S FIGURES, declared by no add-on. */
+test('WHAT WAS TIDIED AND WHAT IS STALE ARE THE RECORD’S FIGURES, said finder by finder, and no line of the Agents page since 1.17.0', async () => {
+  /* ON THE PAGE FROM 1.11.0 TO 1.16.0 under Needs a look; off it since 1.17.0, where on his record they were the record
+     tidying itself and read as nagging. The figures stay, for Today's tidy line and any agent that reads them. */
+  assert.ok(!JSON.stringify(AGENTS_PAGES.agents!.blocks).includes('tidied-week'), 'the page still says what was tidied');
+  assert.ok(!JSON.stringify(AGENTS_PAGES.agents!.blocks).includes('gone-stale'), 'the page still says what is stale');
   for (const id of ['gone-stale', 'tidied-week']) {
     assert.ok(Object.hasOwn(BUILT_IN_FIGURES, id), `${id} is not a figure the record holds`);
     assert.equal(AGENTS_MODULE.AGENTS_METRICS[id], undefined, `${id} is declared twice`);
   }
-  for (const line of lines) assert.doesNotMatch(String(line.body), /—|\(s\)|\brow\b|session/iu);
 
-  /* A FRESH RECORD HAS NOTHING STALE AND NOTHING TIDIED: neither line is drawn, and neither figure names anything. */
+  /* A FRESH RECORD HAS NOTHING STALE AND NOTHING TIDIED: neither figure names anything. */
   const fresh = await empty();
   value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
   value(await installAgentsPack(fresh.k));
-  const page = opened(fresh.k, 'agents');
-  for (const id of ['tidied-week', 'gone-stale']) {
-    assert.equal(noteOn(page, id)?.drawn, false, `${id}'s line is drawn on a fresh record`);
-    assert.deepEqual(noteOn(page, id)?.refusals, []);
-    assert.equal(named(fresh.k, id), undefined, `${id} names something on a fresh record`);
-  }
+  for (const id of ['tidied-week', 'gone-stale']) assert.equal(named(fresh.k, id), undefined, `${id} names something on a fresh record`);
   fresh.sql.close();
 });
 
@@ -1301,13 +1295,7 @@ test('A WEEK THAT CLEARED STEPS AND EMPTY RUNS DRAWS THE TIDIED LINE ALONE, the 
   keep('runs-empty', 2, 41);
   assert.equal(reading(k, 'tidied-week'), 44);
   assert.equal(named(k, 'tidied-week'), '41 empty runs hidden and 3 steps nobody took closed');
-  const page = opened(k, 'agents');
-  const tidiedLine = noteOn(page, 'tidied-week')!;
-  assert.notEqual(tidiedLine.drawn, false, 'a week that cleared something does not say so');
-  assert.deepEqual(tidiedLine.refusals, []);
-  assert.equal(tidiedLine.values?.['tidied-week.names'], '41 empty runs hidden and 3 steps nobody took closed');
   assert.equal(reading(k, 'gone-stale'), 0);
-  assert.equal(noteOn(page, 'gone-stale')?.drawn, false, 'the stale line is drawn over nothing stale');
   sql.close();
 });
 
@@ -1326,10 +1314,6 @@ test('A STEP NOBODY TOOK IN A MONTH DRAWS THE STALE LINE, with its count', async
   clock.advance(31 * DAY_MS);
   assert.equal(reading(k, 'gone-stale'), 1);
   assert.equal(named(k, 'gone-stale'), '1 step nobody took');
-  const line = noteOn(opened(k, 'agents'), 'gone-stale')!;
-  assert.notEqual(line.drawn, false, 'a step a month old is stale and the line is not drawn');
-  assert.deepEqual(line.refusals, []);
-  assert.equal((line as { unnamed?: string[] }).unnamed, undefined, 'the line names a figure the record does not hold');
   sql.close();
 });
 

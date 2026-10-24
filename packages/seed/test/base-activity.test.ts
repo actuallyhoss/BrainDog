@@ -12,6 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BLOCK_KEY, openRecord, validateDeclaration, type BlockResult, type Declaration, type Kernel } from '@braindog/kernel';
 import { sayOf } from '@braindog/ports';
@@ -115,10 +116,14 @@ test('WHAT AN AGENT ASKED IS A QUEUE DRAWN ONLY WHILE SOMETHING IS ASKED, and it
   assert.deepEqual([queue.kind, queue.source], ['queue', 'governance.open']);
   assert.deepEqual(queue.when, { metric: 'questions-open', gt: 0 });
   assert.equal(queue.where, ASKED_BY_AN_AGENT);
-  /* ONE MEANING OF "AN AGENT ASKED" ON A RECORD: the Agents page's Needs you holds the same questions. */
-  const theirs = (AGENTS_PAGES.agents!.blocks as Record<string, unknown>[]).find((b) => b.kind === 'queue' && b.source === 'governance.open');
-  assert.ok(theirs, 'the Agents page has no queue to compare with');
+  /* ONE MEANING OF "AN AGENT ASKED" ON A RECORD: the Agents page's queue held the same questions until Agents 1.17.0,
+     which left each question to Needs you alone; its clause is read off that page as it was released. */
+  const page16 = JSON.parse(readFileSync(new URL('./fixtures/agents-page-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
+  const theirs = page16.find((b) => b.kind === 'queue' && b.source === 'governance.open');
+  assert.ok(theirs, 'the Agents page had no queue to compare with');
   assert.deepEqual(queue.where, theirs.where);
+  /* AND THE AGENTS PAGE DRAWS NO QUEUE OF ITS OWN NOW, so the questions are counted in one place. */
+  assert.equal((AGENTS_PAGES.agents!.blocks as Record<string, unknown>[]).filter((b) => b.kind === 'queue').length, 0);
 });
 
 test('EVERY BLOCK HAS A KEY OF ITS OWN, so a tile moved in Edit layout, or by a proposal, is found again', () => {

@@ -645,6 +645,12 @@ export type RunLine = {
   run?: string;
   /** An agent run's agent as the record names it (`claude`), so the line wears that agent's mark. */
   agent?: string;
+  /** An agent run's project by its handle (`things#21`), which the Agents page says by name. */
+  project?: string;
+  /** How an agent run ended or stands, without when: "finished", "left a step". */
+  outcome?: string;
+  /** Whether the agent run is at work now, which the Agents page lists under At work and not again. */
+  live?: boolean;
 };
 
 const BAD = new Set(['failed', 'refused']);

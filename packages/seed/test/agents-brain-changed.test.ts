@@ -73,17 +73,17 @@ test('THE PAGE IS DECLARED: How the brain changed, with no place in the rail, an
   assert.ok(major! > 1 || minor! >= 13, `the page came with 1.13.0 and the add-on is ${AGENTS_PACK.manifest.version}`);
 });
 
-test('THE AGENTS PAGE LINKS TO IT FROM What the brain learned', () => {
+/* UNDER What the brain learned FROM 1.13.0 TO 1.16.0; THE FIRST DOOR OF THE PAGE'S FOOT SINCE 1.17.0, which is no fold. */
+test('THE AGENTS PAGE LINKS TO IT FROM ITS FOOT, first of the doors and always drawn', () => {
   const blocks = AGENTS_PAGES.agents!.blocks as Declared[];
-  const at = blocks.findIndex((b) => b.kind === 'section' && b.heading === 'What the brain learned');
-  assert.ok(at > 0, 'What the brain learned is gone');
-  const link = blocks.slice(at + 1).find((b) => b.kind === 'note' && String(b.body).includes('(/p/brain)'));
-  assert.ok(link, 'nothing under What the brain learned opens the page');
-  assert.equal(link.body, '[How the brain changed](/p/brain)');
+  const link = blocks.find((b) => b.kind === 'note' && String(b.body).includes('(/p/brain)'));
+  assert.ok(link, 'nothing on the Agents page opens the page');
+  assert.ok(String(link.body).startsWith('[How the brain changed](/p/brain)'), 'How the brain changed is not the first door');
   assert.equal(link.key, 'brain-link');
   assert.equal(link.when, undefined, 'the link is drawn only some of the time');
-  /* NO SECTION BETWEEN THEM; Machines and profiles closes the fold after it, since Agents 1.14.0. */
-  assert.ok(!blocks.slice(at + 1, blocks.indexOf(link)).some((b) => b.kind === 'section'), 'a section parts the link from What the brain learned');
+  /* NOTHING FOLDS IT AWAY: no section after it, and none of the page's sections is a fold. */
+  assert.ok(!blocks.slice(blocks.indexOf(link) + 1).some((b) => b.kind === 'section'), 'a section follows the foot');
+  assert.ok(!blocks.some((b) => b.fold === true), 'a part of the Agents page is folded');
 });
 
 test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out', () => {

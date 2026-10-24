@@ -115,6 +115,15 @@
       position: relative;
     }
 
+    /* WHAT IT IS DOING CUTS WITH AN ELLIPSIS, which clips a grown `::before`, so its own box is 44 tall instead and the
+       margin takes the growth back. */
+    a.pres-what {
+      display: block;
+      min-block-size: var(--tap, 44px);
+      margin-block: calc((22px - var(--tap, 44px)) / 2);
+      line-height: var(--tap, 44px);
+    }
+
     a.pres-name::before,
     .pres-btn::before {
       content: '';
@@ -339,6 +348,83 @@
     overflow-wrap: normal;
   }
 
+  /* ── what it is doing first (the Agents page of 23 October, `stands`) ─────
+     The row leads with what the run is doing, in the ink, cut with an ellipsis; the agent is its mark, and its name is
+     said to a screen reader only. At the end the project as a quiet chip, how long it has run, and how it stands: the
+     live ink while it works, the third ink once it is quiet. */
+  .pres-who {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .pres-what {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  a.pres-what:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  a.pres-what:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .pres-proj[data-chip] {
+    align-items: center;
+    gap: 6px;
+    padding: 2px var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    line-height: 18px;
+  }
+
+  .pres-proj[data-chip] .pres-pdot {
+    inline-size: 6px;
+    block-size: 6px;
+  }
+
+  .pres-stands {
+    min-inline-size: 7.5em;
+    color: var(--ink-3);
+    text-align: end;
+  }
+
+  .pres-stands[data-live='working'],
+  .pres-stands[data-live='thinking'] {
+    color: var(--ink-2);
+  }
+
+  .pres-row[data-stopped] .pres-stands {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  /* MORE WAITS FOR THE POINTER: on a row a mouse reaches it fades in on hover or focus, so a list of runs reads as a
+     list and not as a column of dots. Under a thumb there is no hover, so it is always there. */
+  @media (hover: hover) and (pointer: fine) {
+    .pres[data-line] .pres-more {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .pres[data-line] .pres-row:is(:hover, :focus-within) .pres-more,
+    .pres[data-line] .pres-more[aria-expanded='true'] {
+      opacity: 1;
+    }
+  }
+
   .pres-helpers {
     flex: none;
     color: var(--ink-3);
@@ -415,6 +501,13 @@
     .pres[data-line] .pres-where {
       grid-column: 2;
       grid-row: 2;
+      flex-wrap: wrap;
+      gap: var(--sp-1) var(--sp-2);
+    }
+
+    .pres[data-line] .pres-stands {
+      min-inline-size: 0;
+      text-align: start;
     }
 
     .pres[data-line] .pres-more {

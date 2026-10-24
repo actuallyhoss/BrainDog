@@ -1,20 +1,21 @@
 <!--
   The agents working now on the Agents page (`panel: presence`, agents and MCP plan §4.4, §7.1): one run row each, a
-  helper folded under the run it works for, and for the owner Tell, Pause and Stop with the honest line about what
-  reaches each run.
+  helper folded under the run it works for, and for the owner Tell, Pause and Stop.
 
   THE HOST'S HALF ONLY. braindog-render's `Presence` draws; `$lib/record/instruct.ts` words each row and makes the
   writes. Tell aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once,
   and the other panel is told to read again (`told`).
 
-  ON THE AGENTS PAGE, ONE LINE A RUN, BY MACHINE (the board's At work tile). Only the agents at work are listed, the
-  rail's count of them (`atWorkOf`), under the machine each is on once they are on two or more; Tell, Pause and Stop are
-  behind one More press, the app's own menu; what Pause and Stop reach is said once under the list and not once a row;
-  and the runs that are open and waiting on him are folded at the foot, counted, out of the list of who is at work.
+  ON THE AGENTS PAGE, ONE LINE A RUN (the Agents page of 23 October): what the run is doing in plain words leads the row
+  (`doingSaid`, never "Claude run" or the agent's name twice), then its project as a chip, how long it has run and how
+  it stands (`standsSaid`: working now, or quiet for 40 min). The runs at work come first, then the ones waiting on him
+  that called inside three hours (`onDeskOf`); a run quiet longer is left to Recent runs, so a session open and silent
+  for two days is not at work. Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each
+  reaches is said in the ask before it is sent. The machines they are on are one quiet line at the foot, and under two
+  or more machines each heads its own runs. With nothing at work the tile says so in one line.
 
   READ BY ANYONE WHO READS THE RUNS (`level: read`); the presses are drawn for the owner alone, since only a person
-  signed in as the owner can instruct. With nothing open the tile is left out, heading and all, so it never stands over
-  nothing: the page's line says nobody is working.
+  signed in as the owner can instruct.
 
   SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2): `run` draws that one run (Today's run sheet), `project` the runs on
   that project (a project's "Working here now"), and `oncount` tells the host how many it draws, for its heading. Both
@@ -30,7 +31,26 @@
   import Menu from '$lib/ui/Menu.svelte';
   import { listen } from '../listen.svelte.ts';
   import { machineSaid } from '$lib/record/machine-name.ts';
-  import { aim, atWorkOf, byMachine, control, presenceOf, reachLine, scopedLeads, told, waitingOf, type LiveRun, type Project, type Thread } from '$lib/record/instruct.ts';
+  import {
+    NO_PLACES,
+    aim,
+    atWorkOf,
+    byMachine,
+    control,
+    doingSaid,
+    onDeskOf,
+    presenceOf,
+    scopedLeads,
+    spanSaid,
+    standsSaid,
+    told,
+    waitingOf,
+    type LiveRun,
+    type Places,
+    type Project,
+    type Thread,
+  } from '$lib/record/instruct.ts';
+  import { machinesOf } from './machines.ts';
 
   let {
     owner = false,
@@ -49,23 +69,27 @@
 
   const words = {
     machine: (name: string | null, among: readonly string[]) => (name ? machineSaid(name, among) : 'A machine not named'),
-    atWork: (n: number) => `${n.toLocaleString('en')} at work`,
-    waiting: (n: number) => `${n.toLocaleString('en')} open and waiting on you`,
+    atWork: (n: number) => `${n.toLocaleString('en')} here`,
     menu: (name: string) => `Tell, pause or stop ${name}`,
     tell: 'Tell it something',
     pause: 'Pause',
     stop: 'Stop',
     resume: 'Resume',
     open: 'Open its page',
+    none: 'No agent is at work right now.',
+    on: (said: string) => `On ${said}`,
+    idle: (names: string) => `nothing open on ${names}`,
   } as const;
 
   const io = control(apiBase());
   let rows = $state.raw<LiveRun[]>([]);
   let threads = $state.raw<Thread[]>([]);
+  let places = $state.raw<Places>(NO_PLACES);
   let projects = $state.raw<Map<string, Project>>(new Map());
   let pressing = $state.raw<Set<string>>(new Set());
+  let read = $state(false);
 
-  /* THE AGENTS PAGE'S OWN FORM: one line a run, by machine, the presses behind More. A scoped panel keeps the full row. */
+  /* THE AGENTS PAGE'S OWN FORM: one line a run, the presses behind More. A scoped panel keeps the full row. */
   const line = $derived(run === null && project === null);
 
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
@@ -73,7 +97,12 @@
   async function load(): Promise<void> {
     const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20, run ?? undefined) : Promise.resolve({ ok: false as const, fix: '' })]);
     if (p.ok) rows = p.value;
-    if (t.ok) threads = t.value;
+    if (t.ok) {
+      threads = t.value;
+      places = ('places' in t ? t.places : undefined) ?? NO_PLACES;
+    }
+    /* THE ROWS DRAW ONCE PRESENCE IS READ; their projects' names follow, a read of their own. */
+    read = true;
     if (projects.size === 0 || rows.some((r) => r.project !== null && !projects.has(r.project))) projects = await io.projects(rows);
   }
 
@@ -95,18 +124,27 @@
     return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
-  /* WHO IS AT WORK, AND WHO WAITS: the rail's count and the line's, never the runs merely open. */
-  const working = $derived(line ? atWorkOf(rows) : []);
-  const waiting = $derived(line ? waitingOf(rows) : []);
+  /* THE ONE-LINE ROW: what it is doing, how long it has run, and how it stands. */
+  const lineOf = (r: LiveRun): PresenceView => ({ ...viewOf(r), doing: doingSaid(r), time: spanSaid(r.for_s * 1000), stands: standsSaid(r) });
+
+  /* WHO IS AT WORK, AND WHO WAITS ON HIM BUT CALLED LATELY: the rail's count first, never the runs merely open. */
+  const desk = $derived(line ? onDeskOf(rows) : []);
   /* A MACHINE IS SAID AS A PERSON SAYS IT (`machineSaid`), its own name kept for the hover. */
   const machineNames = $derived([...new Set(rows.map((r) => r.machine).filter((m): m is string => m !== null))]);
-  const groups = $derived(byMachine(working).map((g) => ({ ...g, said: words.machine(g.machine, machineNames), views: g.rows.map(viewOf) })));
-  const waitingViews = $derived(waiting.map(viewOf));
-  const reach = $derived(owner && line ? reachLine([...working, ...waiting]) : null);
+  const groups = $derived(byMachine(desk).map((g) => ({ ...g, said: words.machine(g.machine, machineNames), views: g.rows.map(lineOf) })));
+  /* THE MACHINES IN ONE QUIET LINE, where one machine holds them all: "On MacBook Pro, as work". */
+  const foot = $derived.by((): string | null => {
+    if (!line || groups.length > 1) return null;
+    const m = machinesOf(atWorkOf(rows), waitingOf(rows), places);
+    const open = m.lines.filter((l) => !l.quiet || l.said !== 'Nothing open').map((l) => `${l.name}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
+    const idle = m.lines.filter((l) => l.said === 'Nothing open').map((l) => l.name);
+    const parts = [open.length > 0 ? words.on(open.join(' and ')) : null, idle.length > 0 ? words.idle(idle.join(' and ')) : null].filter((x): x is string => x !== null);
+    return parts.length === 0 ? null : `${parts.join('; ')}.`;
+  });
   const views = $derived(line ? [] : scopedLeads(rows, { run, project }).map(viewOf));
-  const drawn = $derived(line ? working.length + waiting.length : views.length);
+  const drawn = $derived(line ? desk.length : views.length);
 
-  $effect(() => oncount?.(line ? working.length : views.length));
+  $effect(() => oncount?.(line ? atWorkOf(rows).length : views.length));
 
   async function hold(run: string, kind: 'stop' | 'pause' | 'resume', why: string): Promise<void> {
     pressing = new Set([...pressing, run]);
@@ -149,30 +187,27 @@
   />
 {/snippet}
 
-{#if drawn === 0}
-  <!-- NOTHING OPEN, OR NOT READ YET: the tile is left out whole, heading and all (`BlockSlot.svelte`'s rule for a panel
-       that drew nothing), since the page's line already says nobody is working. -->
-  <span data-seen-none hidden></span>
-{:else if line}
-  <div class="at-work">
-    {#each groups as g (g.machine ?? '')}
-      <section class="machine" aria-label={g.said}>
-        {#if groups.length > 1}
-          <h3 class="machine-head"><Icon name="monitor" size="s" /><span class="machine-name" title={g.machine ?? undefined}>{g.said}</span><span class="machine-n num">{words.atWork(g.rows.length)}</span></h3>
-        {/if}
-        {@render list(g.machine ?? '', g.views)}
-      </section>
-    {/each}
-    {#if waitingViews.length > 0}
-      <details class="waiting" open={working.length === 0 ? true : undefined}>
-        <summary class="waiting-head"><Icon name="chevron-right" size="s" /><span>{words.waiting(waitingViews.length)}</span></summary>
-        {@render list('\u0000waiting', waitingViews)}
-      </details>
-    {/if}
-    {#if reach}<p class="reach">{reach}</p>{/if}
-  </div>
+{#if line}
+  {#if !read}
+    <!-- NOT READ YET: nothing but the mark that it is reading, rather than a line that may be wrong a moment later. -->
+    <span class="at-work-busy" aria-busy="true"></span>
+  {:else if drawn === 0}
+    <p class="at-work-none">{words.none}</p>
+  {:else}
+    <div class="at-work">
+      {#each groups as g (g.machine ?? '')}
+        <section class="machine" aria-label={g.said}>
+          {#if groups.length > 1}
+            <h3 class="machine-head"><Icon name="monitor" size="s" /><span class="machine-name" title={g.machine ?? undefined}>{g.said}</span><span class="machine-n num">{words.atWork(g.rows.length)}</span></h3>
+          {/if}
+          {@render list(g.machine ?? '', g.views)}
+        </section>
+      {/each}
+      {#if foot}<p class="at-work-foot">{foot}</p>{/if}
+    </div>
+  {/if}
   {#if menuView && menuRun}
-    <Menu label={words.menu(menuView.name)} bind:open={menuOpen} at={menu?.at ?? null} >
+    <Menu label={words.menu(menuView.name)} bind:open={menuOpen} at={menu?.at ?? null}>
       {#if menuRun.stopped}
         <button type="button" role="menuitem" onclick={() => void hold(menuRun.run, 'resume', '')}><Icon name="play" size="m" /><span class="mi-name">{words.resume}</span></button>
         {#if menuRun.stopped === 'pause'}<button type="button" role="menuitem" onclick={() => ask('stop')}><Icon name="square" size="m" /><span class="mi-name">{words.stop}</span></button>{/if}
@@ -184,6 +219,10 @@
       {#if menuView.href}<a role="menuitem" href={at(menuView.href)}><Icon name="arrow-right" size="m" /><span class="mi-name">{words.open}</span></a>{/if}
     </Menu>
   {/if}
+{:else if drawn === 0}
+  <!-- NOTHING OPEN, OR NOT READ YET: the tile is left out whole, heading and all (`BlockSlot.svelte`'s rule for a panel
+       that drew nothing). -->
+  <span data-seen-none hidden></span>
 {:else}
   <Presence
     rows={views}
@@ -197,9 +236,8 @@
 <style>
   .at-work {
     display: grid;
-    gap: var(--sp-4);
+    gap: var(--sp-3);
     min-inline-size: 0;
-    padding-block-start: var(--sp-1);
     container-type: inline-size;
   }
 
@@ -233,57 +271,17 @@
     font-weight: var(--fw-regular, 400);
   }
 
-  .waiting {
-    min-inline-size: 0;
-    border-block-start: 1px solid var(--rule);
-    padding-block-start: var(--sp-2);
-  }
-
-  .waiting-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: 32px;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .waiting-head::-webkit-details-marker {
-    display: none;
-  }
-
-  .waiting-head :global(svg) {
-    transition: rotate var(--d-state) var(--ease-out);
-  }
-
-  .waiting[open] > .waiting-head :global(svg) {
-    rotate: 90deg;
-  }
-
-  .waiting-head:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-    border-radius: var(--r-xs);
-  }
-
-  @media (pointer: coarse) {
-    .waiting-head {
-      min-block-size: var(--tap, 44px);
-    }
-  }
-
-  .reach {
+  .at-work-none,
+  .at-work-foot {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .waiting-head :global(svg) {
-      transition: none;
-    }
+  .at-work-none {
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 </style>

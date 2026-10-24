@@ -1,17 +1,18 @@
 /**
- * The steps left for the next run, as the Agents page's Left for the next run draws them (`StepsPanel.svelte`), read off
- * the record's `handoffs.open` cards and folded: A STEP LEFT THREE TIMES IS ONE LINE, with every run that left it, so
- * Drop closes all of them and the line says how many times it was left.
+ * The steps left for the next run, as the Agents page's Up next draws them (`StepsPanel.svelte`), read off the record's
+ * `handoffs.open` cards and folded: A STEP LEFT THREE TIMES IS ONE LINE, with every run that left it, so Drop closes
+ * all of them and the line says how many times it was left.
  *
  * WHAT A ROW CARRIES is the record's (`sources/handoffs-open.ts` in the kernel): the run that left it by its spoken name
  * (`run`, a key and never a word on screen), the agent by name, the step in its words and in the words a card prints
- * (`next_said`), when it was left, and whether it is the next one or one left earlier.
+ * (`next_said`), when it was left, and whether it is the next one or one left earlier. The project it was left in is
+ * the block's `scopes`, one a row, by name, as every block that reads a list of projects says it.
  *
  * PURE, AND NODE LOADS IT.
  */
 
-/** One step as the panel draws it: its words, who left it last and when, every run that left it, and whether it is old. */
-export type Step = { key: string; next: string; agent: string; at: string; runs: string[]; earlier: boolean };
+/** One step as the panel draws it: its words, its project, who left it last and when, every run that left it, and whether it is old. */
+export type Step = { key: string; next: string; project: string | null; agent: string; at: string; runs: string[]; earlier: boolean };
 
 const isBag = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -21,20 +22,21 @@ const foldOf = (said: string): string => said.toLowerCase().replace(/\s+/gu, ' '
 /** The steps a `handoffs.open` cards block answered, newest first as it came, each step once. */
 export function stepsOf(block: unknown): Step[] {
   const rows = isBag(block) && Array.isArray(block.rows) ? block.rows : [];
+  const scopes = isBag(block) && Array.isArray(block.scopes) ? block.scopes : [];
   const out = new Map<string, Step>();
-  for (const r of rows) {
-    if (!isBag(r) || !isBag(r.fields)) continue;
+  rows.forEach((r, i) => {
+    if (!isBag(r) || !isBag(r.fields)) return;
     const f = r.fields;
     const next = text(f.next_said) || text(f.next);
     const run = text(f.run);
-    if (next === '' || !/^S[1-9][0-9]*$/u.test(run)) continue;
+    if (next === '' || !/^S[1-9][0-9]*$/u.test(run)) return;
     const key = foldOf(next);
     const had = out.get(key);
     if (had) {
       had.runs.push(run);
-      continue;
+      return;
     }
-    out.set(key, { key, next, agent: text(f.agent), at: text(f.left_at), runs: [run], earlier: text(f.mark) === 'earlier' });
-  }
+    out.set(key, { key, next, project: text(scopes[i]) || null, agent: text(f.agent), at: text(f.left_at), runs: [run], earlier: text(f.mark) === 'earlier' });
+  });
   return [...out.values()];
 }
