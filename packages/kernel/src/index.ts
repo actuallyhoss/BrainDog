@@ -7416,7 +7416,22 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   let declKept: { revision: number; deps: PageDeps } | null = null;
   const declaredKept = (): PageDeps => {
     if (declKept !== null && declKept.revision === revision) return declKept.deps;
-    const base = pageDeps();
+    /* EVERY FIGURE'S BODY AND EVERY DECLARATION'S PACK READ IN ONE QUERY EACH, the first time one is asked: a record that
+       woke read them one a query, about 320 of the 800 its first `boot` asked. */
+    let bodies: Map<string, string> | undefined;
+    let packed: Map<string, string | null> | undefined;
+    const base = pageDeps(undefined, undefined, {
+      bodies: () =>
+        (bodies ??= new Map(
+          sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0").map((r) => [r.id, r.body]),
+        )),
+      packs: () =>
+        (packed ??= new Map(
+          sql
+            .all<{ id: string; pack: string | null }>("SELECT id, coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE superseded_at IS NULL AND retired = 0")
+            .map((r) => [r.id, r.pack]),
+        )),
+    });
     const { packOf } = base;
     let figures: readonly MetricDecl[] | undefined;
     const packs = new Map<string, string | null>();
@@ -7446,7 +7461,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* `sees` IS THE READER'S LENS OVER WHAT READS ACROSS THE RECORD (`PageSees`): the log's lines, the questions and the
      lists what went quiet is read over, each left out when the host says she is not shown it. */
-  const pageDeps = (viewer?: string, sees?: PageSees): PageDeps => {
+  /* `held` IS THE FIGURES' AND PACKS' DECLARATIONS ALREADY READ WHOLE, for the deps kept a revision (`declaredKept`), so
+     each figure and each declaration's pack asked of them is one lookup and not one query. */
+  const pageDeps = (viewer?: string, sees?: PageSees, held?: { bodies: () => ReadonlyMap<string, string>; packs: () => ReadonlyMap<string, string | null> }): PageDeps => {
     /* A WALK AHEAD IS WORKED OUT ONCE FOR A READ: every figure and block over the same legs walked the rows again, one
        row at a time, and a page of figures read the same walk some thirty times. These deps last one read, so the rows
        cannot change under it. */
@@ -7462,10 +7479,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0")
         .map((r) => JSON.parse(r.body) as PageDecl),
     metric: (id) => {
-      const row = sql.one<{ body: string }>(
-        "SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0",
-        `metric.${id}`,
-      );
+      const row = held
+        ? ((body) => (body === undefined ? undefined : { body }))(held.bodies().get(`metric.${id}`))
+        : sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
       /* A DECLARED FIGURE FIRST, and the record's own figures after (`built-in-figures.ts`), so a page can gate on
          how many questions are waiting without a pack declaring the count. */
       return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl, here) : builtInFigure(id);
@@ -7614,7 +7630,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
         .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl, ctx));
     },
-    packOf: (id) => sql.one<{ pack: string | null }>("SELECT coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0", id)?.pack ?? null,
+    packOf: (id) =>
+      held
+        ? (held.packs().get(id) ?? null)
+        : (sql.one<{ pack: string | null }>("SELECT coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0", id)?.pack ?? null),
     inScope: (register, project, opts) => inScope(register, project, opts),
     stepsOf: (register) =>
       [...registers.values()].flatMap((r) => {
