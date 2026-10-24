@@ -28,6 +28,7 @@ cargo tauri icon icons/icon.png   # makes the full icon set from the web app's 5
 cargo tauri dev                   # opens the window on brain.dog/app
 BRAINDOG_URL=http://localhost:5173/app cargo tauri dev   # a debug build only: against a local web app
 cargo tauri build --target universal-apple-darwin        # Apple silicon and Intel; needs both rust targets
+# Build outside the tree (CARGO_TARGET_DIR): an in-tree target/ is 1.6 GB the repo's gates would read file by file.
 ```
 
 Add the targets once with `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.

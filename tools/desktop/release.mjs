@@ -36,6 +36,11 @@ const SIGNING_ENV = join(TAURI_DIR, 'signing.env');
 /** Where the update archive is fetched from, the same folder `latest.json` is read from (`plugins.updater.endpoints`). */
 const PUBLIC = 'https://brain.dog/desktop';
 const CARGO = join(process.env.HOME ?? '', '.cargo/bin');
+/**
+ * WHERE CARGO BUILDS, OUTSIDE THE TREE: a release build is 1.6 GB of objects, and the gates that read every file of the
+ * tree (`nul-bytes` among them) walked it for their whole ceiling. `CARGO_TARGET_DIR` set by the caller wins.
+ */
+export const TARGET = process.env.CARGO_TARGET_DIR || join(process.env.HOME ?? '', 'Library/Caches/braindog/desktop-target');
 
 const args = new Set(process.argv.slice(2));
 const DRY = args.has('--dry-run');
@@ -96,6 +101,7 @@ function main() {
   const env = {
     ...process.env,
     PATH: `${CARGO}:${process.env.PATH ?? ''}`,
+    CARGO_TARGET_DIR: TARGET,
     /* NO FINDER WINDOW DRESSING: Tauri's dmg script lays out the window through AppleScript, which a shell without
        Finder's automation permission fails at; `CI` makes it skip that step and build the same dmg, plainly laid out. */
     CI: 'true',
@@ -111,7 +117,7 @@ function main() {
   });
   if (built.status !== 0) stop(`the build failed (exit ${built.status}).`);
 
-  const bundle = join(TAURI_DIR, 'target', ...(UNIVERSAL ? ['universal-apple-darwin'] : []), 'release/bundle');
+  const bundle = join(TARGET, ...(UNIVERSAL ? ['universal-apple-darwin'] : []), 'release/bundle');
   const dmg = found(join(bundle, 'dmg'), '.dmg');
   const archive = found(join(bundle, 'macos'), '.app.tar.gz');
   const app = found(join(bundle, 'macos'), '.app');
