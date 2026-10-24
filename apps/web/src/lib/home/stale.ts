@@ -44,6 +44,8 @@ export type StaleRow = {
   said: string;
   count: number;
   href: string | null;
+  /** A list's things held twice (the record's `rows-same`): its own heading, never counted as gone stale. */
+  twice?: true;
   pair?: Pair;
   keep?: () => Promise<Kept>;
 };
@@ -64,6 +66,19 @@ export type Kept = { ok: true; href: string } | { ok: false; said: string; gone:
 const PLACE: Readonly<Record<string, string>> = { steps: '/p/agents', questions: '/decide' };
 
 /**
+ * THINGS HERE TWICE ARE NOT THINGS GONE STALE (audit 25 October, Y4). The record says each list holding twins as a line
+ * of its own, all under the one kind `rows-same`; Settings counted them as stale ("32 things went stale" over "32 keys
+ * are here twice") beside a Health page that said 9. They are drawn under their own heading, each list a line.
+ */
+export const TWICE_KIND = 'rows-same';
+
+/**
+ * WHERE A LIST'S TWINS FOLD, read off the end of the line's call: `/r/<list>?twice=1`, the place the record names, and
+ * nothing else. A call that names no such place leaves the line as words.
+ */
+const TWICE_AT = /\s(\/r\/[A-Za-z0-9_%-]+\?twice=1)\.?$/u;
+
+/**
  * The record's answer as the kinds to draw, in its order.
  *
  * A LINE THE SCREEN CANNOT SAY IS DROPPED: one with no sentence, no kind, or a count that is not a whole number above
@@ -82,16 +97,38 @@ export function staleRows(answer: unknown): StaleRow[] {
     const kind = typeof l.kind === 'string' ? l.kind.trim() : '';
     const said = typeof l.said === 'string' ? l.said.trim() : '';
     const count = typeof l.count === 'number' && Number.isInteger(l.count) ? l.count : 0;
-    if (kind === '' || said === '' || count <= 0 || seen.has(kind)) continue;
-    seen.add(kind);
+    /* A LIST HELD TWICE IS A LINE A LIST, so its key is the kind and the list's own sentence. */
+    const twice = kind === TWICE_KIND;
+    const key = twice ? `${kind}:${said}` : kind;
+    if (kind === '' || said === '' || count <= 0 || seen.has(key)) continue;
+    seen.add(key);
+    if (twice) {
+      const clear = (line as { clear?: unknown }).clear;
+      rows.push({ key, said, count, href: typeof clear === 'string' ? (TWICE_AT.exec(clear)?.[1] ?? null) : null, twice: true });
+      continue;
+    }
     rows.push({ key: kind, said, count, href: Object.hasOwn(PLACE, kind) ? PLACE[kind]! : null });
   }
   return rows;
 }
 
-/** The first six kinds to list, and how many things are in the kinds after them. */
+/** What went stale, without the lists held twice. */
+export const goneStale = (rows: readonly StaleRow[]): StaleRow[] => rows.filter((r) => r.twice !== true);
+
+/** The lists holding things twice, each a line. */
+export const twiceOf = (rows: readonly StaleRow[]): StaleRow[] => rows.filter((r) => r.twice === true);
+
+/** The twins' heading: "13 things are here twice", and `null` for none, which draws nothing. */
+export function twiceHeading(rows: readonly StaleRow[]): string | null {
+  const n = twiceOf(rows).reduce((sum, r) => sum + r.count, 0);
+  if (n <= 0) return null;
+  return n === 1 ? '1 thing is here twice' : `${String(n)} things are here twice`;
+}
+
+/** The first six kinds gone stale to list, and how many things are in the kinds after them. */
 export function staleShown(rows: readonly StaleRow[]): { shown: StaleRow[]; more: number } {
-  return { shown: rows.slice(0, STALE_SHOWN), more: rows.slice(STALE_SHOWN).reduce((n, r) => n + r.count, 0) };
+  const stale = goneStale(rows);
+  return { shown: stale.slice(0, STALE_SHOWN), more: stale.slice(STALE_SHOWN).reduce((n, r) => n + r.count, 0) };
 }
 
 /**
@@ -99,7 +136,7 @@ export function staleShown(rows: readonly StaleRow[]): { shown: StaleRow[]; more
  * draws nothing. It counts the things and not the kinds, every kind and not only the six listed.
  */
 export function staleLine(rows: readonly StaleRow[]): string | null {
-  const n = rows.reduce((sum, r) => sum + r.count, 0);
+  const n = goneStale(rows).reduce((sum, r) => sum + r.count, 0);
   if (n <= 0) return null;
   return n === 1 ? '1 thing went stale' : `${String(n)} things went stale`;
 }

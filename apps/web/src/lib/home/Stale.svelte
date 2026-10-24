@@ -19,6 +19,10 @@
   week". It is read only once this part is drawn, by `import()` of `tidy-week.ts`, so Home's own read is never held for
   it. It is words alone: nothing in the fold tidies, asks or files, and a finder the record refused is not in it.
 
+  AND WHAT IS HERE TWICE, IN A TILE OF ITS OWN (audit 25 October, Y4): a list's twins are not things gone stale, so they
+  are never counted in the stale heading. Their heading says what they are, "32 things are here twice", and each list is
+  a line that opens where its twins fold.
+
   NOTHING IS DRAWN FOR NOTHING: not a heading, not an empty state. Six lines are listed and the rest are counted.
 
   QUIET: no red and no accent. Stale is not late, and nothing here waits on a day. The count is a pill, said aloud by
@@ -31,7 +35,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { staleLine, staleShown, type StaleRow } from './stale.ts';
+  import { staleLine, staleShown, twiceHeading, twiceOf, type StaleRow } from './stale.ts';
 
   let { rows }: { rows: readonly StaleRow[] } = $props();
 
@@ -43,6 +47,8 @@
 
   const line = $derived(staleLine(rows));
   const list = $derived(staleShown(rows));
+  const twice = $derived(twiceOf(rows));
+  const twiceSaid = $derived(twiceHeading(rows));
 
   /* THE LINE WHOSE PRESS IS ON ITS WAY, what each refusal said, and the presses a host cannot answer at all. */
   let waiting = $state<string | null>(null);
@@ -125,6 +131,33 @@
         </ul>
       </details>
     {/if}
+  </section>
+{/if}
+
+{#if twiceSaid}
+  <section class="stale" aria-labelledby="twice-h" data-stale-twice>
+    <div class="s-head">
+      <IconWell name="copy" />
+      <h2 class="s-said" id="twice-h">{twiceSaid}</h2>
+    </div>
+    <ul class="s-list">
+      {#each twice as row (row.key)}
+        <li>
+          {#if row.href}
+            <a class="s-line" href={at(row.href)}>
+              <span class="s-text" dir="auto">{row.said}</span>
+              <span class="s-count" aria-hidden="true">{row.count}</span>
+              <span class="s-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
+            </a>
+          {:else}
+            <p class="s-line">
+              <span class="s-text" dir="auto">{row.said}</span>
+              <span class="s-count" aria-hidden="true">{row.count}</span>
+            </p>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   </section>
 {/if}
 
