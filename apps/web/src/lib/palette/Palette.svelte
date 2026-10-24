@@ -81,6 +81,7 @@
   import { said as voiced } from '../voice.svelte.ts';
   import { spineOf, type SpineCounts } from '../spine.ts';
   import type { List, Recent } from '../record/palette.ts';
+  import { opened as openedHere, questionsOf, type Opened } from './opened.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
@@ -417,6 +418,11 @@
 
   /** The rows changed last and the figures, read once each time a live palette opens. */
   let extra = $state<{ recent: Recent[]; figures: Metric[] } | null>(null);
+  /** The places opened last on this device (`opened.ts`), read each time the palette opens. */
+  let openedList = $state<Opened[]>([]);
+  $effect(() => {
+    if (open) openedList = openedHere();
+  });
 
   /** Which register `@` narrows to. Named once, so the filter and the overflow row's door cannot drift. */
   const PEOPLE = 'people';
@@ -437,6 +443,8 @@
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
   const RECENT = 'Recent';
+  /* THE EMPTY PALETTE'S QUESTIONS, over everything else (E55). */
+  const QUESTIONS = 'Ask';
   /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
   const GO_TO = copy.destinations;
   const BEST = 'Best match';
@@ -478,6 +486,7 @@
     /* AND THE CUSTOMISE ROWS WITH IT, for the same reason: "dark" or "hide inbox" is a thing to do, typed out. */
     [copy.customise.group]: -1,
     [BEST]: -0.5,
+    [QUESTIONS]: -3,
     [copy.records]: 0,
     /* WHAT THE NAME IS, OVER THE LISTS THAT HOLD THE WORD: the one thing meant comes before every row that mentions it. */
     [aboutWords.group]: 0.5,
@@ -633,10 +642,11 @@
     let gone = false;
     const known = lists;
     reader()
-      .then((r) => Promise.all([r.recent(known, RECENT_CAP), r.figures(known)]))
+      /* NOT THE ROWS ANYONE CHANGED LAST (E55): on his record that was an import's rows. Recent is what he opened. */
+      .then((r) => r.figures(known))
       .then(
-        ([recent, figures]) => {
-          if (!gone) extra = { recent, figures };
+        (figures) => {
+          if (!gone) extra = { recent: [], figures };
         },
         () => {},
       );
@@ -711,10 +721,17 @@
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
     const out: Row[] = [...about];
-    /* NOTHING TYPED IS TWO GROUPS: where to go, and what changed last. Commands, pages, lists, figures and questions
-       wait for a word. */
+    /* NOTHING TYPED IS THREE QUESTIONS AND WHERE HE WAS (E55): asked of the record when a model is behind the ask, else
+       the place that answers each; then the places opened last on this device. "Go to" repeats the bar, so it is drawn
+       only on a device that has opened nothing yet. Commands, pages, lists, figures and questions wait for a word. */
     const blank = prefix === null && text.trim() === '';
     if (blank)
+      for (const [i, asked] of questionsOf(slashHere, goPlaces).entries())
+        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: QUESTIONS, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
+    if (blank)
+      for (const place of openedList)
+        out.push({ id: `o-${place.href}`, title: place.title, detail: since(new Date(place.at).toISOString(), shell.now ?? Date.now()), href: place.href, group: RECENT, icon: 'arrow', complete: place.title });
+    if (blank && openedList.length === 0)
       for (const place of goPlaces)
         out.push({ id: `g-${place.key}`, title: place.label, href: place.href, group: GO_TO, icon: place.icon as IconName, complete: place.label });
 

@@ -92,6 +92,8 @@
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { tick, untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
+  import { noteOpened } from '$lib/palette/opened.ts';
+  import { PRODUCT } from '$lib/title.ts';
   import { navigating, page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
   $effect(() => onShell('goto', (to) => {
@@ -634,6 +636,11 @@
     if (nav.to && nav.type === 'link') remember(leftBy, from, placeKey(nav.to.url));
     fromPalette = document.activeElement?.closest('dialog.palette') != null;
   }
+
+  /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent (E55). The first screen counts too. */
+  afterNavigate((nav) => {
+    if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
+  });
 
   afterNavigate((nav) => {
     if (nav.type === 'enter' || nav.to === null || nav.from === null) return;
