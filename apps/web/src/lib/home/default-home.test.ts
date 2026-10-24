@@ -126,7 +126,8 @@ test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its 
   assert.equal(peopleOf([people], null), undefined);
   assert.equal(peopleOf([], 'folk'), undefined);
   const p = peopleOf([people], 'folk')!;
-  assert.deepEqual(p, { register: 'folk', name: 'Folk', icon: 'users', title: 'name', fact: 'org' });
+  /* AND LEAVES OUT WHO IS FOLDED INTO ANOTHER, as People counts them (audit Z9). */
+  assert.deepEqual(p, { register: 'folk', name: 'Folk', icon: 'users', title: 'name', fact: 'org', where: 'merged_into is empty' });
   assert.equal(peopleOf([{ ...people, icon: 'heart' } as never], 'folk')?.icon, 'heart');
   const tile = todayHome({ tasks: true, adds: true, money: true, people: p }).blocks.find((b) => b.source === 'register.folk') as unknown as { key: string; span: number; heading: string; columns: { field: string; as: string }[]; limit: number };
   assert.equal(tile.key, 'faces');
@@ -134,6 +135,29 @@ test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its 
   assert.equal(tile.heading, 'Folk');
   assert.deepEqual(tile.columns.map((c) => [c.field, c.as]), [['name', 'who'], ['org', 'fact']]);
   assert.equal(tile.limit, PEOPLE_LIMIT);
+});
+
+/* AUDIT Z9 (today-390-light-full.png, people-390-light.png): Today said "People 8" over every row of the list, the
+   record's own person and those merged into another among them, while People said "7 contacts". */
+test('Today counts the people People counts: never the reader, never one merged into another (audit Z9)', () => {
+  const people: WeekDecl = {
+    id: 'folk',
+    name: 'Folk',
+    one: 'Person',
+    title: 'name',
+    meets: { name: 'name', merged_into: 'folded', self: 'me' },
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'folded', type: 'ref', to: 'folk' },
+      { id: 'me', type: 'bool' },
+    ],
+  } as never;
+  const p = peopleOf([people], 'folk')!;
+  const tile = todayHome({ tasks: true, adds: true, money: true, people: p }).blocks.find((b) => b.source === 'register.folk') as unknown as { where?: string };
+  assert.equal(tile.where, 'folded is empty, me is not true');
+  /* A LIST THAT MARKS NEITHER keeps every row, and asks of no field it lacks. */
+  const plain = peopleOf([{ ...people, meets: undefined, fields: [{ id: 'name', type: 'text' }] } as never], 'folk')!;
+  assert.equal((todayHome({ tasks: true, adds: true, money: true, people: plain }).blocks.find((b) => b.source === 'register.folk') as { where?: string }).where, undefined);
 });
 
 test('LATE MONEY IS A LINE A THING, oldest first, saying how late it is rather than the day it was due', () => {

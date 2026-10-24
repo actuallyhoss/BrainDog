@@ -265,7 +265,7 @@ export function weekOf(decls: readonly WeekDecl[], people: string | null): Week 
  * field each is named by, and one fact beside the name (the first link to another list, such as who they are with).
  * NEVER BY A LIST'S NAME (§27), and `undefined` where the record keeps no such list or its declaration is not learnt.
  */
-export type People = { register: string; name: string; icon: string; title: string; fact: string | null };
+export type People = { register: string; name: string; icon: string; title: string; fact: string | null; where?: string | undefined };
 
 /** The glyph a tile of people wears where the list declares none of its own. */
 const FACES = 'users';
@@ -275,7 +275,28 @@ export function peopleOf(decls: readonly (WeekDecl & { icon?: string | undefined
   const d = decls.find((x) => x.id === people);
   if (!d || !d.title) return undefined;
   const fact = d.fields.find((f) => live(f) && f.type === 'ref' && f.to !== people && f.id !== d.title);
-  return { register: d.id, name: d.name, icon: d.icon || FACES, title: d.title, fact: fact?.id ?? null };
+  const where = everyoneWhere(d);
+  return { register: d.id, name: d.name, icon: d.icon || FACES, title: d.title, fact: fact?.id ?? null, ...(where ? { where } : {}) };
+}
+
+/**
+ * THE PEOPLE EVERY SCREEN COUNTS (audit Z9, today-390-light-full.png): Today said "People 8" over every row of the list,
+ * the record's own person and those folded into another among them, while People said "7 contacts". So the tile leaves
+ * out who the list's `meets:` role marks as the reader (`self`) and as merged (`merged_into`, a link to the list
+ * itself), as People's own count does. A list with neither keeps every row. Read off the declaration, never a name.
+ */
+function everyoneWhere(d: WeekDecl): string | undefined {
+  const role = (d as { meets?: unknown }).meets;
+  const field = (part: string, fits: (f: FieldDecl) => boolean): string | undefined => {
+    const named = role !== null && typeof role === 'object' && !Array.isArray(role) ? (role as Record<string, unknown>)[part] : undefined;
+    const id = typeof named === 'string' ? named : part;
+    const f = d.fields.find((x) => x.id === id && live(x));
+    return f && fits(f) ? f.id : undefined;
+  };
+  const merged = field('merged_into', (f) => f.type === 'ref' && (f as { to?: unknown }).to === d.id);
+  const self = field('self', (f) => f.type === 'bool');
+  const clauses = [...(merged ? [`${merged} is empty`] : []), ...(self ? [`${self} is not true`] : [])];
+  return clauses.length > 0 ? clauses.join(', ') : undefined;
 }
 
 /** The people tile's empty line, which Home leaves undrawn as it does every empty block. */
@@ -293,6 +314,7 @@ function peopleTile(p: People): PageBlock {
     icon: p.icon,
     span: 3,
     source: `register.${p.register}`,
+    ...(p.where ? { where: p.where } : {}),
     columns: [{ field: p.title, as: 'who' }, ...(p.fact ? [{ field: p.fact, as: 'fact' as const }] : [])],
     order: [{ field: 'seq', dir: 'desc' }],
     limit: PEOPLE_LIMIT,
