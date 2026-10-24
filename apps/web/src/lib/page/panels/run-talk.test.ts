@@ -219,6 +219,40 @@ test('readRunParts reads the questions, the helpers and the run it took from', a
   assert.deepEqual(section(FULL, parts, 'took')?.lines, ['Took the step Codex left 2h earlier']);
 });
 
+/* THE AUDIT OF 25 OCTOBER, Z24 (`-more/run-904-390-dark-full.png`, What it noted): "SG242 overlaps SG286/SG287" and
+   "Record tidy filed for Sam: SG262, SG263, SG278, SG280-SG284, plus SG273-SG275 (new people)." A question is said
+   by its words, and handles side by side by how many they are. */
+test('A RUN\'S NOTES SAY A QUESTION BY ITS WORDS AND A RUN OF THEM BY HOW MANY, never SG242', async () => {
+  const s904 = row({
+    agent: 'claude',
+    notes: [
+      'Money tidy filed as decisions, not written. SG242 overlaps SG286/SG287.',
+      'Record tidy filed for Sam: SG262, SG263, SG278, SG280-SG284, plus SG273-SG275 (new people).',
+    ],
+    tried: ['Answering SG999 before it was open'],
+  });
+  const asked: string[] = [];
+  const io = (async (input: string | URL | Request) => {
+    const url = new URL(String(input));
+    const name = url.pathname.split('/').pop() ?? '';
+    if (name === 'governance' && url.searchParams.get('id')) {
+      asked.push(url.searchParams.get('id')!);
+      return url.searchParams.get('id') === 'SG242' ? json({ id: 'SG242', status: 'open', opened_by: 'S904', body_kind: 'change' }) : json(null);
+    }
+    if (name === 'boot') return json({ waiting: [{ id: 'SG242', question: 'Tidy the accounts: plain Mercury names in the Quartz book, and close the empty Column one?' }] });
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+  const parts = await readRunParts('https://record.test', s904, io);
+  assert.deepEqual(asked.sort(), ['SG242', 'SG999'], 'only the handles said one at a time are read');
+  const lines = section(s904, parts, 'noted')?.lines ?? [];
+  assert.deepEqual(lines, [
+    'Record tidy filed for Sam: 8 questions, plus 3 questions (new people).',
+    'Money tidy filed as decisions, not written. “Tidy the accounts: plain Mercury names in the Quartz book,…” overlaps 2 questions.',
+  ]);
+  assert.deepEqual(section(s904, parts, 'tried')?.lines, ['Answering a question before it was open']);
+  for (const line of [...lines, ...(section(s904, {}, 'noted')?.lines ?? [])]) assert.doesNotMatch(line, /SG\d/u);
+});
+
 test('readRunParts answers nothing where every read fails', async () => {
   const io = (async () => new Response('{}', { status: 500 })) as typeof fetch;
   const parts = await readRunParts('https://record.test', FULL, io);

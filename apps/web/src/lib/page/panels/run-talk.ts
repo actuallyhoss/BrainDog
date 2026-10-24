@@ -38,6 +38,8 @@ export type RunParts = {
   helpersInAll?: number;
   /** The run whose step it took. */
   took?: { fields: Readonly<Record<string, unknown>> } | null;
+  /** The words of the questions its notes name by handle (`SG242`), where they could be read. */
+  questions?: ReadonlyMap<string, string>;
 };
 
 export type TalkKey = 'who' | 'stretches' | 'doing' | 'asked' | 'tried' | 'noted' | 'helpers' | 'took';
@@ -85,6 +87,7 @@ export const talkWords = {
   more: (count: number) => `and ${n(count)} more`,
   took: (who: string, gap: string | null) => `Took the step ${who} left${gap === null ? '' : ` ${gap} earlier`}`,
   anotherRun: 'another run',
+  aQuestion: 'a question',
 } as const;
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -191,12 +194,48 @@ function lastPlainWords(path: string): string {
   return '';
 }
 
+/** One question by handle, or a run of them: `SG280-SG284` or `SG280-284`. */
+const REF = String.raw`SG[1-9][0-9]*(?:\s*[-–]\s*(?:SG)?[1-9][0-9]*)?`;
+/** Handles side by side, joined by commas, slashes or "and": one group, said as how many questions it names. */
+const REFS = new RegExp(String.raw`\b${REF}(?:\s*(?:,\s*(?:and\s+)?|\/|\s+and\s+)${REF})*\b`, 'gu');
+/** The longest a question's words run in a note before they are cut. */
+const ASKED_MOST = 60;
+
+/** How many questions one group of handles names: a run counts each in it, and a run that reads backwards counts one. */
+function refCount(group: string): number {
+  return [...group.matchAll(new RegExp(REF, 'gu'))].reduce((sum, m) => {
+    const [from, to] = [...m[0].matchAll(/[1-9][0-9]*/gu)].map((x) => Number(x[0]));
+    return sum + (to !== undefined && to > from! && to - from! < 100 ? to - from! + 1 : 1);
+  }, 0);
+}
+
+/** The handles a note names one at a time, which are the ones said by their words. */
+export function refsIn(note: string): string[] {
+  return [...note.matchAll(REFS)].filter((m) => refCount(m[0]) === 1 && !/[-–]/u.test(m[0])).map((m) => m[0]);
+}
+
+/**
+ * QUESTIONS BY THEIR WORDS, NEVER THEIR HANDLES (the audit of 25 October, Z24): a run's notes said "SG242 overlaps
+ * SG286/SG287" and "SG262, SG263, SG278, SG280-SG284". One handle is its question's words in quotes, cut, or "a
+ * question" where they could not be read; handles side by side are counted, "2 questions".
+ */
+export function refsSaid(note: string, questions?: ReadonlyMap<string, string>): string {
+  return note.replace(REFS, (group) => {
+    const count = refCount(group);
+    if (count > 1) return talkWords.questions(count);
+    const words = questions?.get(group.trim());
+    if (!words) return talkWords.aQuestion;
+    const cut = words.length > ASKED_MOST ? `${words.slice(0, ASKED_MOST - 1).trimEnd()}…` : words;
+    return `“${cut.replace(/[?.]$/u, '')}”`;
+  });
+}
+
 /**
  * A NOTE AS A PERSON READS IT: a path in it is said by its last plain words and a handle is left out, so a note that is
  * only a path reads "run notes and words" and one that is only an id says nothing and is not drawn.
  */
-const noteSaid = (note: string): string =>
-  note
+const noteSaid = (note: string, questions?: ReadonlyMap<string, string>): string =>
+  refsSaid(note, questions)
     .split(/\s+/u)
     .map((word) => {
       const bare = word.replace(/^[("'`]+|[)"'`,.;:]+$/gu, '');
@@ -268,9 +307,9 @@ function tookLines(row: RunRow, parts: RunParts): string[] {
  * the reader's, in which a time is said.
  */
 export function runTalk(row: RunRow, parts: RunParts, now: number = Date.now(), zone?: string): TalkSection[] {
-  const tried = said(row.fields.tried);
+  const tried = said(row.fields.tried).map((t) => refsSaid(t, parts.questions));
   /* NEWEST FIRST: a run adds its notes at the end. */
-  const notes = said(row.fields.notes).map(noteSaid).filter((t) => t !== '').reverse();
+  const notes = said(row.fields.notes).map((t) => noteSaid(t, parts.questions)).filter((t) => t !== '').reverse();
   const lines: Record<TalkKey, string[]> = {
     who: whoLines(row, parts),
     stretches: stretchLines(row, parts, now, zone),
@@ -295,6 +334,8 @@ const isBag = (v: unknown): v is Bag => typeof v === 'object' && v !== null && !
 const ASKED_PAGE = 200;
 const ASKED_PAGES = 3;
 const HELPERS_PAGE = 50;
+/** The most questions a run's notes name one by one that are read for their words. */
+const NAMED_MOST = 8;
 
 /** A run's handle as its row says it, `S42`, or nothing. Never drawn. */
 const seqOf = (handle: unknown): number | null => {
@@ -360,24 +401,43 @@ export async function readRunParts(base: string, row: RunRow, io?: Io): Promise<
   });
 
   /* A QUESTION BY ITS WORDS: an open one as the record lists what waits, a closed one as its decision kept it. */
-  async function wordsFor(own: readonly Bag[]): Promise<RunParts['asked']> {
-    if (own.length === 0) return [];
-    const waiting = own.some((r) => r.status === 'open')
+  async function wordsOf(rows: readonly Bag[]): Promise<(r: Bag) => Promise<string | null>> {
+    const waiting = rows.some((r) => r.status === 'open')
       ? await quiet(async () => {
           const booted = await client.boot();
           return booted.ok ? new Map((booted.value.waiting ?? []).map((w) => [w.id, w.question])) : undefined;
         })
       : undefined;
-    const words = async (r: Bag): Promise<string | null> => {
+    return async (r: Bag): Promise<string | null> => {
       if (r.status === 'open') return text(waiting?.get(String(r.id))) || null;
       if (typeof r.decision !== 'string' || r.decision === '') return null;
       const id = r.decision;
       const got = await quiet(async () => client.governance({ register: 'decision', id }));
       return got?.ok && isBag(got.value) ? text(got.value.question) || null : null;
     };
+  }
+
+  async function wordsFor(own: readonly Bag[]): Promise<RunParts['asked']> {
+    if (own.length === 0) return [];
+    const words = await wordsOf(own);
     /* OLDEST FIRST, as it asked them: the record lists the newest first. */
     return Promise.all([...own].reverse().map(async (r) => ({ words: await words(r), status: statusOf(r) })));
   }
+
+  /* THE QUESTIONS ITS NOTES NAME ONE BY ONE, by their words (Z24), at most `NAMED_MOST` of them. */
+  const questions = quiet(async () => {
+    const named = [...new Set([...said(row.fields.notes), ...said(row.fields.tried)].flatMap(refsIn))].slice(0, NAMED_MOST);
+    if (named.length === 0) return undefined;
+    const got = await Promise.all(named.map((id) => quiet(async () => client.governance({ register: 'suggestion', id }))));
+    const rows = got.map((g) => (g?.ok && isBag(g.value) ? g.value : null));
+    const words = await wordsOf(rows.filter((r): r is Bag => r !== null));
+    const out = new Map<string, string>();
+    for (const [i, r] of rows.entries()) {
+      const w = r === null ? null : await words(r);
+      if (w) out.set(named[i]!, w);
+    }
+    return out;
+  });
 
   const helpers = quiet(async () => {
     const out = await client.list({ register: 'session', where: { field: 'parent', is: handle }, limit: HELPERS_PAGE });
@@ -393,8 +453,9 @@ export async function readRunParts(base: string, row: RunRow, io?: Io): Promise<
     return out.ok && isBag(out.value) && isBag(out.value.fields) ? { fields: out.value.fields } : undefined;
   });
 
-  const [h, p, a, hs, t] = await Promise.all([history, project, asked, helpers, took]);
+  const [h, p, a, hs, t, q] = await Promise.all([history, project, asked, helpers, took, questions]);
   return {
+    ...(q === undefined ? {} : { questions: q }),
     ...(h === undefined ? {} : { history: h }),
     ...(p === undefined ? {} : { project: p }),
     ...(a === undefined ? {} : { asked: a }),
