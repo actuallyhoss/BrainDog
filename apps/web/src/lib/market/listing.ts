@@ -155,9 +155,10 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
   });
 
   const taken = new Set<string>([...modules, ...usecases].map((l) => l.key));
-  /* AN UNLISTED ENTRY INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING. */
+  /* AN UNLISTED ENTRY INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING, and so is one with every version yanked, which
+     offers nothing to install (`listedEntries` in the catalogue, the scope of 24 October, E17). */
   const kennel = (input.kennel?.entries ?? [])
-    .filter((e) => e.unlisted !== true && !taken.has(listingKey(e.kind, e.id)))
+    .filter((e) => e.unlisted !== true && e.versions.some((v) => v.yanked === undefined) && !taken.has(listingKey(e.kind, e.id)))
     .map((e): Listing => ({
       key: listingKey(e.kind, e.id),
       kind: e.kind,
@@ -175,7 +176,17 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
       count: counted(listingKey(e.kind, e.id)),
     }));
 
-  return [...modules, ...usecases, ...kennel];
+  /* ONE LISTING PER THING (the scope of 24 October, E19): a use case and the add-on it stands on shared a title
+     ("Landlord" twice), and two add-ons were both "Mercury". The first of a title is kept, a module before a use case
+     before an add-on, so the thing is offered once, by the door that installs all of it. Each kind keeps its order. */
+  const seen = new Set<string>();
+  const kinds = [...kennel.filter((l) => l.kind !== 'pack'), ...kennel.filter((l) => l.kind === 'pack')];
+  return [...modules, ...usecases, ...kinds].filter((l) => {
+    const said = l.title.trim().toLowerCase();
+    if (seen.has(said)) return false;
+    seen.add(said);
+    return true;
+  });
 }
 
 /** The Kennel's entry behind a listing, for the trust and file reads only a catalogue entry has. */

@@ -45,6 +45,20 @@ test('a record on an older Solo founder is offered the update with the note of e
   assert.deepEqual(behind?.notes, [notes[0]!.notes]);
 });
 
+test('ONE LISTING PER THING (E19): a pack titled as a use case, a second Mercury and an add-on with every version yanked are left out', () => {
+  const v = (version: string, yanked = false) => ({ version, checksum: '0', bytes: 1, published_at: '2026-10-01T00:00:00.000Z', bump: null, reach: {}, ...(yanked ? { yanked: { reason: 'r', at: 'x' } } : {}) });
+  const entry = (id: string, title: string, versions: unknown[]) => ({ kind: 'pack', id, title, summary: 's', author: 'a', license: 'MIT', audience: 'addon', latest: '1.0.0', versions });
+  const kennel = {
+    format: 1,
+    name: 'k',
+    entries: [entry('team-board', 'Team task list', [v('1.0.0')]), { ...entry('team-board', 'Team task list', [v('1.0.0')]), kind: 'usecase' }, entry('mercury', 'Mercury', [v('1.0.0')]), entry('mercury-company', 'Mercury', [v('1.0.0')]), entry('feed-example', 'feed-example', [v('1.0.0', true)])],
+  } as never;
+  const all = listingsOf({ kennel, counts: null });
+  const titles = all.map((l) => l.title.toLowerCase());
+  assert.equal(new Set(titles).size, titles.length, 'each title once');
+  assert.deepEqual(all.filter((l) => l.source === 'kennel').map((l) => `${l.kind}:${l.id}`), ['usecase:team-board', 'pack:mercury']);
+});
+
 /* THE PLAN SHEET SAYS A CALL OUT AS THE KERNEL'S SENTENCE, and never as the record's own `CALLS OUT` line. */
 const stripe = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   ingest: 'ingest.stripe-charges',
