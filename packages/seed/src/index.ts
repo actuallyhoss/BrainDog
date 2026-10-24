@@ -30,7 +30,7 @@ export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashPoints, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, SAMPLE_KPIS, SAMPLE_READINGS, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
-/* Each project's key numbers offered from Numbers (the KPI plan's K2-C), not yet in Portfolio's document: a host installs it. */
+/* Each project's key numbers offered from Numbers (the KPI plan's K2-C), in Portfolio's document since 1.22.0. */
 export { KPI_BACKFILL_SCRIPT } from './modules/portfolio/kpi-backfill.js';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
@@ -56,7 +56,7 @@ import { STARTER_CATEGORIES } from './modules/money/lists/categories.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
-import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
+import { PORTFOLIO_AUTOMATIONS, PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
 import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 import { HEALTH_PAGES } from './modules/health.ts';
@@ -220,7 +220,7 @@ export const ruleDeclarations = (): Declaration[] =>
  * document held 93 declarations where the seed's own lists count 89, and the record the pack made held
  * `rule.close_follow_ups`, `rule.start_with_parent` and their two scripts where the one the seed made did not.
  */
-export const AUTOMATIONS: readonly Record<string, unknown>[] = [...WORK_AUTOMATIONS, ...MONEY_AUTOMATIONS, ...ESTATE_AUTOMATIONS, ...PEOPLE_AUTOMATIONS];
+export const AUTOMATIONS: readonly Record<string, unknown>[] = [...WORK_AUTOMATIONS, ...MONEY_AUTOMATIONS, ...ESTATE_AUTOMATIONS, ...PEOPLE_AUTOMATIONS, ...PORTFOLIO_AUTOMATIONS];
 
 export const automationDeclarations = (): Declaration[] =>
   AUTOMATIONS.map((body) =>

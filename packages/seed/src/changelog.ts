@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.22.0',
+      notes: 'Projects offers each project its key numbers from what you already keep in Numbers, once a project, as a question on Decide. Nothing is added until you say yes.',
+    },
+    {
       version: '1.21.0',
       notes: 'Projects draws a card for every project in play or parked, where it drew the first twelve by name, so In play over the cards says the same number as Today and the sidebar.',
     },

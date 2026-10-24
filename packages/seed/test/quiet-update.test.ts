@@ -938,10 +938,11 @@ const peopleBefore6 = (b: Body): Body => (b.heading === 'Everyone' ? EVERYONE_CA
  */
 const KPI_LISTS: ReadonlySet<string> = new Set(['datapoints', 'kpis']);
 const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale']);
+/* AND portfolio 1.22.0'S SCRIPT THAT OFFERS THE KEY NUMBERS (`kpi_backfill`) goes with them. */
 const beforeKpis = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
-    .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)))
+    .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)) && d.script !== 'kpi_backfill')
     .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind') } : d)),
 });
 

@@ -201,7 +201,7 @@ function drawn(doc: File): { metric: string; when: unknown }[] {
   return out;
 }
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, three lists, one page, twenty-two figures over them, one rule', () => {
+test('THE FILE IS ITS OWN: three lists, one page, twenty-two figures over them, one rule and one script that only asks', () => {
   const doc = file();
   assert.equal(doc.pack, 'portfolio');
   const kinds = doc.declarations.map(kindOf);
@@ -213,8 +213,17 @@ test('THE FILE IS DATA AND ONLY ITS OWN: no script, three lists, one page, twent
     { register: 3, page: 1, metric: 22, rule: 1 },
     'three lists, one page, twenty-two figures and one rule',
   );
-  assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
-  assert.doesNotMatch(JSON.stringify(doc.declarations), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
+  /* ONE SCRIPT SINCE 1.22.0, the key-numbers backfill: it reads Projects' own lists, reaches nothing outside and holds no
+     key, and it files questions rather than rows. Nothing else in the file runs a script or reaches out. */
+  assert.ok(!kinds.includes('something else'), 'the file declares something that is none of the five');
+  const scripts = doc.declarations.filter((d) => typeof d.script === 'string');
+  assert.deepEqual(
+    scripts.map((d) => [d.script, d.egress, d.keys, d.reads, d.writes]),
+    [['kpi_backfill', [], [], ['things', 'kpis', 'datapoints'], ['kpis']]],
+    'the one script reaches out, holds a key or touches a list that is not Projects\'',
+  );
+  const rest = doc.declarations.filter((d) => typeof d.script !== 'string');
+  assert.doesNotMatch(JSON.stringify(rest), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
 
   /* NO FIGURE OVER A LIST IT DOES NOT OWN, and the rule is on the projects: a project past the day it aims for. */
   for (const d of doc.declarations)
@@ -236,9 +245,9 @@ test('THE FILE IS DATA AND ONLY ITS OWN: no script, three lists, one page, twent
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.21.0');
+  assert.equal(doc.version, '1.22.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -333,14 +342,14 @@ function project(api: Api, name: string): string {
 }
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-seven parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-eight parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const parts = await ours();
-    assert.equal(parts.length, 27);
+    assert.equal(parts.length, 28);
     for (const id of parts) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));
