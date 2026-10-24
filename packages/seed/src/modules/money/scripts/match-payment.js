@@ -115,6 +115,10 @@ export function matchPayment(payment, items, opts) {
     const expected = { amount: left, currency: due.currency };
     found.push({ item, name, day, gap, label, writes, agrees: !off(paid.amount, left), expected });
   }
+  /* A BILL AND A REPEATING LINE UNDER ONE NAME ARE THE SAME MONEY TWICE (B6 of 24 October): the bill takes the payment,
+     and the bill being paid asks to move the line on (`move-line.js`), so the line is no second answer here. */
+  const billKeys = found.filter((c) => c.item.list === 'obligations').flatMap((c) => keysOf([c.item.fields.what]));
+  for (let i = found.length - 1; i >= 0; i--) if (found[i].item.list === 'recurring' && keysOf([found[i].item.fields.what]).some((k) => billKeys.includes(k))) found.splice(i, 1);
   if (found.length === 0) return { nothing: `Nothing open ${whom} falls within ten days of ${dayWords(on)}, so the ${words(paid)} was left as it is.` };
 
   /* THE SAME MONEY FIRST, THEN THE NEAREST DAY, and a label said twice is numbered so each answer is its own. */

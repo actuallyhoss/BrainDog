@@ -64,10 +64,14 @@ test('an amount within 2% is the same payment, and one further off is a question
   assert.deepEqual(ask.options.map((o) => o.label), ['Northgate Estates, a bill of GBP 4,000 due 1 October', 'None of these']);
 });
 
+/* TWO NAMES, so the bill and the line are not one money twice (B6 of 24 October, the test after these). */
+const other = { what: 'Northgate rent' };
+const both = { payee: 'Northgate rent' };
+
 test('two candidates are a question with both as answers, and neither is linked', () => {
-  const ask = asked(matchPayment(payment(400_000), [bill(), rent()]));
+  const ask = asked(matchPayment(payment(400_000, '2026-10-01', both), [bill(other), rent()]));
   assert.deepEqual(ask.options.map((o) => o.label), [
-    'Northgate Estates, a bill of GBP 4,000 due 1 October',
+    'Northgate rent, a bill of GBP 4,000 due 1 October',
     'Northgate Estates, repeating at GBP 4,000, next 1 October',
     'None of these',
   ]);
@@ -77,9 +81,14 @@ test('two candidates are a question with both as answers, and neither is linked'
 });
 
 test('the answer picked is the link, and "None of these" links nothing', () => {
-  const picked = linked(matchPayment(payment(400_000), [bill(), rent()], { answer: 'Northgate Estates, repeating at GBP 4,000, next 1 October' }));
+  const picked = linked(matchPayment(payment(400_000, '2026-10-01', both), [bill(other), rent()], { answer: 'Northgate Estates, repeating at GBP 4,000, next 1 October' }));
   assert.equal(picked.link.item, 'recurring#7');
-  nothing(matchPayment(payment(400_000), [bill(), rent()], { answer: 'None of these' }));
+  nothing(matchPayment(payment(400_000, '2026-10-01', both), [bill(other), rent()], { answer: 'None of these' }));
+});
+
+test('a bill and a line under one name are one money twice: the bill is linked, and the line is no second answer', () => {
+  const out = linked(matchPayment(payment(400_000), [bill(), rent()]));
+  assert.equal(out.link.item, 'obligations#4');
 });
 
 test('another currency, another payee, the other way, a day too far or a thing already paid is no match', () => {
@@ -201,7 +210,7 @@ test('handed the payment by its id, or as its list and number, the script finds 
 });
 
 test('two things it could pay end the run with the question, and nothing is written', async () => {
-  const { out, writes } = await ran([bill(), rent(), payment(400_000)], { payment: 'transactions#12' });
+  const { out, writes } = await ran([bill(other), rent(), payment(400_000, '2026-10-01', both)], { payment: 'transactions#12' });
   assert.deepEqual(writes, []);
   assert.equal((out as { ask: { options: unknown[] } }).ask.options.length, 3);
 });

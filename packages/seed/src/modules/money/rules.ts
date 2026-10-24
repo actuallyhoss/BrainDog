@@ -17,6 +17,7 @@ import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
 import matchRun, { MATCH_PAYMENT_SCRIPT, matchPayment } from './scripts/match-payment.js';
+import { MOVE_LINE_RULE, MOVE_LINE_SCRIPT } from './scripts/move-line.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
 import { SETTLE_SCRIPT, settle } from './scripts/settle.js';
 import { UNSETTLE_RULE, UNSETTLE_SCRIPT } from './scripts/unsettle.js';
@@ -239,12 +240,9 @@ const LINE_LEG = (({ on, every, ends, days, weekend }) => ({ on, every, ends, da
  * A REPEATING LINE MARKED PAID BY ITS PAYMENT (repeating-settle-79-80), HELD SINCE repeat-next-80b-82 AND BACK SINCE
  * money-next-moves-100: `payment-matches` starts it second, and "It went through" starts it on the line.
  *
- * IT WAS HELD because it wrote "Last paid" and "Last amount" and left "Next", the walk's arithmetic, where it was: the
- * line read late though paid, and next month's payment fell out of `match_payment`'s ten days. IT IS BACK because the
- * host now hands the walk's own step, `ctx.cycle(day, line)` over the kernel's `cycleAfter`, in this same sandbox. So
- * it writes all three or nothing, as the held note said: "Next" one cycle on from the day the line names, "Last paid"
- * and "Last amount", in one write through `settle`. No `ctx.cycle`, or no later day, writes nothing and says so, and
- * `settle` is never handed `null`, the one way it keeps a payment on a line it does not move.
+ * IT WRITES ALL THREE OR NOTHING, by the host's `ctx.cycle(day, line)` (the kernel's `cycleAfter`): "Next" one cycle
+ * on from the day the line names, "Last paid" and "Last amount", in one write through `settle`. No `ctx.cycle`, or no
+ * later day, writes nothing and says so. A paid bill moves its twin line through `scripts/move-line.js` (B6).
  *
  * IT FINDS THE LINE AGAIN, since a step is handed the id of the job before it and never its answer: `match_payment`'s
  * own search, its writes and words held back, then `settle` for that one repeating line. A bill or an instalment is
@@ -398,6 +396,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   /* A DELETED PAYMENT REOPENS WHAT IT PAID (unsettle-92): `payment-unsettles` recounts the bill without it. */
   UNSETTLE_RULE,
   UNSETTLE_SCRIPT,
+  MOVE_LINE_RULE,
+  MOVE_LINE_SCRIPT,
   /**
    * A PAYMENT THAT NAMES NOTHING FINDS WHAT IT PAID (REC-B11 step 3, match-payment-78): a cleared Ledger entry with
    * nothing in "Settles" starts `script.match_payment`, which looks among the open bills, instalments and repeating

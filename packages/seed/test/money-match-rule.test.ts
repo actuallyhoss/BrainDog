@@ -177,9 +177,10 @@ test('a bill is marked by its link alone', async () => {
 
 test('a line among several that fit is still left as it is: nothing asked, nothing marked', async () => {
   const m = await money();
-  m.bill();
+  /* NOT ONE MONEY TWICE: the bill and the line go by two names, and the payment names both. */
+  m.bill({ what: 'Northgate rent' });
   const line = m.made('recurring', LINE);
-  m.paid(400_000, '2026-09-28');
+  m.paid(400_000, '2026-09-28', { payee: 'Northgate rent' });
   await m.turn();
   assert.deepEqual(m.asked(), []);
   assert.equal(m.k.get(line.id)!.fields.last_paid ?? null, null);
@@ -203,9 +204,9 @@ test('an answer that names a bill writes Settles through the gate, and the bill 
 
 test('a repeating line among several that fit is no question: picking it would write nothing, so the run says why and asks nothing', async () => {
   const m = await money();
-  const theBill = m.bill();
+  const theBill = m.bill({ what: 'Northgate rent' });
   m.made('recurring', { what: 'Northgate Estates', direction: 'out', amount: gbp(400_000), every: 'monthly', next_due: '2026-10-01', state: 'live' });
-  const pay = m.paid(400_000, '2026-09-28');
+  const pay = m.paid(400_000, '2026-09-28', { payee: 'Northgate rent' });
   await m.turn();
   assert.deepEqual(m.asked(), []);
   assert.ok(m.log.some((l) => l.includes('so nothing was asked')), m.log.join(' | '));
@@ -213,4 +214,17 @@ test('a repeating line among several that fit is no question: picking it would w
   assert.equal(m.k.get(theBill.id)!.fields.state, 'open');
   /* THE RULE SAYS SO ITSELF: the script handed no such word asks every question it finds. */
   assert.equal(RULE!.steps[0]!.script.input.asks, 'linked');
+});
+
+test('a bill and a repeating line under one name are one money twice: the bill takes the payment, and its being paid asks once to move the line on (B6)', async () => {
+  const m = await money();
+  const theBill = m.bill();
+  const line = m.made('recurring', LINE);
+  const pay = m.paid(400_000, '2026-09-28');
+  await m.turn();
+  const f = m.k.get(theBill.id)!.fields;
+  assert.deepEqual([m.k.get(pay.id)!.fields.settles, f.state], [theBill.id, 'paid'], m.log.join(' | '));
+  /* THIS SANDBOX HANDS NO NEXT DAY, so the line is found and nothing is asked: the question is the next file's. */
+  assert.ok(m.log.some((l) => l.includes('The host hands no next day')), m.log.join(' | '));
+  assert.equal(m.k.get(line.id)!.fields.next_due, '2026-10-01');
 });
