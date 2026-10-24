@@ -290,7 +290,10 @@ export function runWords(fields: Readonly<Record<string, unknown>>): string | nu
 
 /** Who a run is, as a person reads it: the app it ran in ("Claude Code"), else its agent's name, else `null`. */
 export function runWho(fields: Readonly<Record<string, unknown>>): string | null {
-  const app = typeof fields.client === 'string' && fields.client.trim() !== '' && !/[/\\:@]/u.test(fields.client) ? fields.client.trim() : null;
+  const raw = typeof fields.client === 'string' && fields.client.trim() !== '' && !/[/\\:@]/u.test(fields.client) ? fields.client.trim() : null;
+  /* AN APP'S OWN SLUG IS SAID AS ITS NAME (the audit of 25 October, Z23): MCP's `clientInfo` names Claude Code
+     `claude-code`, and a run's page said "claude-code, in braindog on master". */
+  const app = raw !== null && /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/u.test(raw) ? raw.split(/[-_]/u).map((w) => (w === 'cli' ? 'CLI' : `${w[0]!.toUpperCase()}${w.slice(1)}`)).join(' ') : raw;
   const agent = typeof fields.agent === 'string' && fields.agent !== '' && fields.agent !== 'other' ? actor(fields.agent).name : null;
   return app ?? agent;
 }

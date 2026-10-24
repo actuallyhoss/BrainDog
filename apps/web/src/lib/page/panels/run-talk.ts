@@ -213,7 +213,10 @@ function whoLines(row: RunRow, parts: RunParts): string[] {
   const who = runWho(row.fields) ?? talkWords.anAgent;
   const repo = repoName(row.fields.repo);
   const branch = branchName(row.fields.branch);
-  const place = repo !== '' ? (branch !== '' ? talkWords.onBranch(repo, branch) : repo) : text(parts.project);
+  /* THE PROJECT BY ITS NAME WHERE THE PAGE READ IT, before the repository's folder name (the audit of 25 October, Z23:
+     "in braindog on master" for a run on BrainDog). */
+  const where = text(parts.project) || repo;
+  const place = where !== '' ? (branch !== '' && repo !== '' ? talkWords.onBranch(where, branch) : where) : '';
   return [place === '' ? who : talkWords.place(who, place)];
 }
 

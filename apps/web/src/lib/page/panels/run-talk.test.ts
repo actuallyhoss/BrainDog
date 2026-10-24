@@ -56,7 +56,7 @@ test('the sections come in one fixed order', () => {
 });
 
 test('who says the app and where, never a path in full or an id', () => {
-  assert.deepEqual(section(FULL, PARTS, 'who')?.lines, ['Claude Code, in braindog on main']);
+  assert.deepEqual(section(FULL, PARTS, 'who')?.lines, ['Claude Code, in BrainDog on main']);
   const pathy = row({ agent: 'claude', repo: '/Users/someone/Developer/braindog', branch: 'main', started: '2026-10-14T09:12:00.000Z' });
   assert.deepEqual(section(pathy, {}, 'who')?.lines, ['Claude, in braindog on main']);
   const placed = row({ agent: 'codex', project: 'projects#3', started: '2026-10-14T09:12:00.000Z' });
@@ -64,6 +64,14 @@ test('who says the app and where, never a path in full or an id', () => {
   /* A PROJECT NOBODY COULD NAME is not said by its handle. */
   assert.deepEqual(section(placed, {}, 'who')?.lines, ['Codex']);
   for (const s of runTalk(FULL, PARTS, NOW, UTC)) for (const line of s.lines) assert.doesNotMatch(line, /\/Users|projects#|S4[12]\b/u);
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z23 (`-more/run-904-390-dark-full.png`): "Who and where: claude-code, in braindog on
+   master". The app by its name and the project by its name. */
+test('WHO SAYS Claude Code IN BrainDog, never the app\'s slug or the folder', () => {
+  const s904 = row({ agent: 'claude', client: 'claude-code', repo: 'braindog', branch: 'master', project: 'things#2', started: '2026-10-22T19:21:00.000Z' });
+  assert.deepEqual(section(s904, { project: 'BrainDog' }, 'who')?.lines, ['Claude Code, in BrainDog on master']);
+  assert.deepEqual(section(s904, {}, 'who')?.lines, ['Claude Code, in braindog on master'], 'a project nobody could name gives way to the folder');
 });
 
 test('stretches read the row and its history', () => {
