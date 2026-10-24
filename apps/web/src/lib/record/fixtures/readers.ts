@@ -766,7 +766,7 @@ export function boot() {
        * put down, every time they look at the rail. Counting every declared register is the count that
        * made a busy list unreachable, so only the lists that hold something are drawn.
        *
-       * HERE AND NOT IN THE RAIL, because the rail is not the only reader. The phone's More sheet
+       * HERE AND NOT IN THE RAIL, because the rail is not the only reader. The phone's sidebar
        * draws this same list, and the last time a rail rule lived in one of the two surfaces rather
        * than in the list they share, the phone and the desktop showed different navigation and the
        * bundle baseline had to be re-recorded to put it right. One list, one rule.

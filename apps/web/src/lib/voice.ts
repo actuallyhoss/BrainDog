@@ -23,7 +23,7 @@ import { words as homeWords } from './home/words.ts';
  * voice on every record, so a key is only heard once its screen asks `said()` for it.
  */
 export const VOICE_LINES = {
-  /* THE SPINE'S NAMES: the rail, the top bar, the phone's tab bar and its More sheet. */
+  /* THE SPINE'S NAMES: the rail, the top bar, the phone's tab bar and the sidebar. */
   home: copy.home,
   decide: copy.decide,
   inbox: copy.inbox,

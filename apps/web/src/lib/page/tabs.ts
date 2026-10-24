@@ -39,7 +39,7 @@ export const TABS_SHOWN = 12;
  * THE CURRENT PAGE STAYS WHERE ITS ORDER PUTS IT, behind More if that is where it falls. Pulling it forward would move
  * every tab after it each time somebody opened one, and a strip whose tabs change places is not a strip of places.
  *
- * A PAGE THE READER HID FROM THE RAIL IS NOT A TAB EITHER, the root layout's rule for the top bar and the More sheet
+ * A PAGE THE READER HID FROM THE RAIL IS NOT A TAB EITHER, the root layout's rule for the top bar and the sidebar
  * ("one nav, not two"), except the page they are on, which they reached by its address and are reading.
  */
 export function tabsOf(

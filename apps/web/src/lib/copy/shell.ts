@@ -59,7 +59,7 @@ const notReached = 'Nothing was saved. Check your connection, then try again.';
 export const SUPPORT_EMAIL = 'support@brain.dog';
 
 export const shell = {
-  /* THE ONE ASK, WORD FOR WORD (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
+  /* THE ONE ASK, WORD FOR WORD (19 October): the top bar's field, the rail's, the sidebar's and the palette's
      own field say the same five words. Here and not in palette.ts because the frame draws it before the palette loads. */
   palettePlaceholder: 'Ask or change anything',
   /* the product */
@@ -78,7 +78,7 @@ export const shell = {
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',
   automations: 'Automations',
-  /* The Jobs screen, named in the rail and in the phone's More sheet. */
+  /* The Jobs screen, named in the rail and in the sidebar's tools. */
   jobs: 'Jobs',
   more: 'More',
   close: 'Close',
@@ -459,7 +459,7 @@ export const shell = {
 
   /* ── WORDS THE FRAME DRAWS FROM OTHER AREAS, kept here so the frame's copy (`frame.ts`) is this file and not theirs ── */
 
-  /* The account's: the rail, the More sheet and the record switcher say them on every screen. */
+  /* The account's: the rail, the sidebar and the record switcher say them on every screen. */
   recordOpenSignIn: 'Sign in again to open another record.',
   signOut: 'Sign out',
   signingOut: 'Signing out',
@@ -467,7 +467,7 @@ export const shell = {
   /* Decide's, which the record's voice (`voice.ts`) names on every screen. */
   noQuestions: 'Nothing needs you',
   inboxClear: 'The inbox is clear',
-  /* `/search?q=`, `19 §2`'s spine screen; the More sheet's search row says it, and so does the palette. */
+  /* `/search?q=`, `19 §2`'s spine screen; the top bar's field says it, and so does the palette. */
   searchRecord: 'Search the record',
   /* The lists', which the record's voice names. */
   newRow: 'New',

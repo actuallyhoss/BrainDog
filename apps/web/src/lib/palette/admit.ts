@@ -283,7 +283,7 @@ export const COMMANDS: readonly Command[] = [
      and the palette is `19 §4`'s primary way to reach one. */
   { id: 'c-signin', title: copy.signIn, href: '/signin', group: copy.destinations, icon: 'lock', aliases: ['login', 'log in', 'signin'] },
   /* THE ROUTE THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet advertised it, and
-     `/search` appeared in no nav, no tab bar, no More sheet and not here, so typing `sear` found
+     `/search` appeared in no nav, no tab bar, no sidebar and not here, so typing `sear` found
      nothing, and on a phone the route was reachable only from the palette's overflow row, which is
      to say only from inside the cap it exists to relieve. */
   { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, icon: 'search', aliases: ['find', 'lookup'] },

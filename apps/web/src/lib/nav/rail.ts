@@ -11,7 +11,7 @@
  * so the rail does not draw them as places too: no place is in the rail twice.
  *
  * A VIEW IS DRAWN UNDER ITS PLACE, WHILE THAT PLACE IS HERE, as a saved view is under its list. Left out altogether,
- * Board and a section's second page (Team's Agent work) had no way in from the rail or the phone's More sheet. The Work
+ * Board and a section's second page (Team's Agent work) had no way in from the rail or the sidebar. The Work
  * screen's own page (`WORK_PAGE`) is the screen it opens, so it is no view of it, and a tabbed section's strip already
  * switches between its pages (`lib/page/tabs.ts`).
  *
@@ -39,8 +39,8 @@ export type Rail<T> = {
   places: FlatItem[];
   /** Each section's own rows (a project's page per project), under the section's name. */
   things: [string, T[]][];
-  /** The places past seven, then Activity, drawn under More at the foot. */
-  more: FlatItem[];
+  /** The places past seven, then Activity, drawn under More at the rail's foot. */
+  rest: FlatItem[];
   /** Each place's views by its key (Board under Work), drawn under the place while it is here. */
   views: Readonly<Record<string, T[]>>;
 };
@@ -85,14 +85,14 @@ export function railOf<T extends { href: string; row?: boolean | undefined; tabs
   const lead = [...(today ? [today] : []), decide];
   const room = Math.max(0, RAIL_MOST - lead.length);
   const places = [...lead, ...sections.slice(0, room).map(placed)];
-  const more = [...sections.slice(room).map(placed), ...(activity ? [activity] : [])];
+  const rest = [...sections.slice(room).map(placed), ...(activity ? [activity] : [])];
   const drawn = Object.fromEntries(
     sections.flatMap((item): [string, T[]][] => {
       const list = (views.get(item.label) ?? []).filter((e) => e.tabs !== true && !(item.key === 'work' && e.href === `/p/${WORK_PAGE}`));
       return list.length > 0 ? [[item.key, list]] : [];
     }),
   );
-  return { places, things, more, views: drawn };
+  return { places, things, rest, views: drawn };
 }
 
 /** Where the agents work is read, when the record has no Agents place: the page the agents pack declares. */

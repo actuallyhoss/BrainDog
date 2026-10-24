@@ -12,7 +12,7 @@ const HEADS = {
 };
 const list = (id: string, o: Partial<SideList> = {}): SideList => ({ id, name: id.toUpperCase(), icon: 'rows', count: 1, views: [], kernel: false, money: false, ...o });
 
-test('lists group as the More sheet read them: places, money, the agents, the rest, views, tools', () => {
+test('lists group in the order the phone read them: places, money, the agents, the rest, views, tools', () => {
   const groups = groupsOf(
     [{ href: '/?work', label: 'Work', icon: 'work', count: 27 }],
     [list('a1', { money: true }), list('r1', { kernel: true, count: 5 }), list('n1', { views: [{ name: 'Mine', href: '/p/mine' }] }), list('a2', { money: true })],

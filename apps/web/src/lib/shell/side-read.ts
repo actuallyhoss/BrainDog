@@ -38,7 +38,7 @@ const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 type StateField = { id: string; values?: readonly string[]; labels?: Readonly<Record<string, string>> };
 
-/** A read still on its way, by the record it asks, so the sidebar and the More sheet opening together ask once. */
+/** A read still on its way, by the record it asks, so the sidebar and the phone's Projects opening together ask once. */
 const flying = new Map<string, Promise<SideRead | null>>();
 
 /** The record's projects, or `null` where it keeps no projects list or the list could not be read. */

@@ -2,7 +2,7 @@
   The one filled badge in the product, and the one pill ("pills only for counts"; 2.A.2): a red capsule
   with a count in it, for what needs the reader.
 
-  EVERY NEEDS-YOU COUNT IS THIS ONE: the top bar's, the tab bar's, the rail's and the More sheet's. It was drawn four
+  EVERY NEEDS-YOU COUNT IS THIS ONE: the top bar's, the tab bar's, the rail's and the sidebar's. It was drawn four
   ways (a red square, a red circle with the ground's colour as its figure, a pink pill with red words, a plain grey
   number), so one count read as four things. Every other count is a plain number in `--ink-3` beside its word.
 

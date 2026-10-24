@@ -316,7 +316,7 @@
   const tabs = $derived(withThings(tabsOf(rail.places, 5, navPrefs.tabs)));
   /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
      phone. Agents may sit past the rail's seven, so the places under More are read too. */
-  const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.more])));
+  const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.rest])));
   /* READ AT ONCE, so a phone's first draw is already a phone's (the Projects tab draws the list, not the desk page). */
   let narrow = $state(typeof matchMedia === 'function' && matchMedia('(width < 900px)').matches);
   $effect(() => {
@@ -374,7 +374,7 @@
    */
   const onBar = $derived(new Set((narrow ? tabs : barPlaces).map((i) => i.key)));
   const sidePlaces = $derived<SideLink[]>(
-    [...rail.places, ...rail.more]
+    [...rail.places, ...rail.rest]
       .filter((i) => !onBar.has(i.key) && i.key !== 'decide' && (narrow || i.key !== 'activity'))
       .map((i) => ({ href: i.href, label: i.label, icon: i.icon, count: i.href === WORK ? data.index.registers.find((r) => r.id === TASKS)?.count : i.count })),
   );
@@ -396,7 +396,7 @@
   /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the bar's five places, and Settings (2.A.15). */
   const goPlaces = $derived([...barPlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings' }]);
   /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
-  const agentsAt = $derived(agentsHref([...rail.places, ...rail.more]));
+  const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest]));
 
   /**
    * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day
@@ -420,7 +420,7 @@
   let drawn: { keys: ReadonlySet<string>; hidden: readonly string[] } | null = null;
   $effect(() => {
     if (bare || data.refused) return void (drawn = null);
-    const now = [...rail.places, ...rail.more];
+    const now = [...rail.places, ...rail.rest];
     const names = arrivedIn(drawn, now);
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
     if (names.length > 0) toasts.push(copy.placeArrived(names));
@@ -1042,7 +1042,7 @@
   let lead: typeof import('$lib/a11y/goto.ts') | undefined;
   let sheetSays = $state(0);
   const leadIn = () => import('$lib/a11y/goto.ts').then((m) => (lead = m));
-  const railRows = () => [...rail.places, ...rail.more].map((i) => ({ href: i.href, name: i.label }));
+  const railRows = () => [...rail.places, ...rail.rest].map((i) => ({ href: i.href, name: i.label }));
 
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
@@ -1200,7 +1200,7 @@
           ontoggle={toggleRail}
           places={rail.places}
           things={rail.things}
-          more={rail.more}
+          more={rail.rest}
           views={rail.views}
           hidden={hiddenCount}
           pen={data.pen}

@@ -27,7 +27,7 @@
   Written by CSS alone (`:root:has(...)`), as `--dock-w` is, so nothing has to be cleaned up.
 -->
 <script module lang="ts">
-  /** THE HOLDING PEN'S ROW: how many offers wait. The phone's More sheet says it in the same words (`design/pen.ts`). */
+  /** THE HOLDING PEN'S ROW: how many offers wait. The frame's sidebar says it in the same words (`design/pen.ts`). */
   import { suggested } from '../design/pen.ts';
   export { suggested };
 

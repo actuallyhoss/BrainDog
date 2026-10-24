@@ -527,5 +527,5 @@ export class NavPrefs {
   }
 }
 
-/** The tab's one copy, read by the rail, the top bar, the phone's More sheet, the shell's shape and Settings. */
+/** The tab's one copy, read by the rail, the top bar, the sidebar, the shell's shape and Settings. */
 export const navPrefs = new NavPrefs();

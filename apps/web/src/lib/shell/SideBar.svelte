@@ -4,7 +4,7 @@
   A head ("Projects", how many are in play, and "+" to add one), then each project in play as a row, by this week (pins
   on top, then late, then an agent at work, then money in), with its own colour and one mark: a red "late" or a green
   working dot. The open project shows its parts under it, the tiles its page draws (`data-part`), the one in view
-  marked. Parked and Finished fold under them. Then Lists, grouped as the More sheet read them and each group folded
+  marked. Parked and Finished fold under them. Then Lists, grouped as the phone's old sheet read them and each group folded
   until opened, with counts (`groupsOf`); at the foot suggested changes when any, then Settings.
 
   GENERIC: whatever projects the record holds (`side-read.ts`), found by what its list declares; nothing here names one.

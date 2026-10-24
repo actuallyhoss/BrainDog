@@ -144,7 +144,7 @@ export function waiting(shape: ShapeOffer | null, record: readonly PenItem[], go
   return out;
 }
 
-/** THE HOLDING PEN'S ROW: how many offers wait, in the rail's words and the phone's More sheet's alike. */
+/** THE HOLDING PEN'S ROW: how many offers wait, in the rail's words and the sidebar's alike. */
 export const suggested = (n: number): string => `${n} suggested`;
 
 /**

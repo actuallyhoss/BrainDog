@@ -1,7 +1,7 @@
 <!--
   "BrainDog ▾" (frame A, 23 October): the mark and the product's name, and under them the record you are in and the
-  others to switch to. On the desk's bar and the phone's head alike; it moved here from the More sheet, the one place
-  that held it.
+  others to switch to. On the desk's bar and the phone's head alike; it moved here from the phone's old sheet of places,
+  the one place that held it.
 -->
 <script lang="ts">
   import { at } from '../at.ts';
