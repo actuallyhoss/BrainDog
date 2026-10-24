@@ -48,6 +48,7 @@ import {
   RECORD_SIGNS,
   RECORD_TIDY,
   RECORD_VITALS,
+  RECORD_WORKED,
   SESSIONS_WORKING,
   readActivity,
   readDeadPaths,
@@ -64,6 +65,7 @@ import {
   readSign,
   readTidy,
   readVitals,
+  readWorked,
 } from './built-in-figures.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { RECORD_KEY_SCAN, readKeysInText } from './key-scan.ts';
@@ -1307,6 +1309,7 @@ export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (read
   [RECORD_LISTS]: readListsShrunk,
   [RECORD_PATHS]: readDeadPaths,
   [RECORD_ACTIVITY]: readActivity,
+  [RECORD_WORKED]: readWorked,
 });
 
 /**

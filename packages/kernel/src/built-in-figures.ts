@@ -950,6 +950,39 @@ const DOCUMENTS_DEAD_PATHS: MetricDecl = {
   format: 'int',
 };
 
+/* ── when a project was last worked on (the audit of 25 October, Z7) ─────── */
+
+/** The source of `project-worked`: a project's work list and its runs, read together. */
+export const RECORD_WORKED = 'record.worked';
+
+/** A figure over when a project was last worked on, and the project it reads when `about` is filled: its name or spoken id. */
+export type WorkedDecl = MetricDecl & { about?: string | undefined };
+
+/**
+ * When a project was last worked on: the days, and beside them the moment itself (`at`) and the agent whose run it was
+ * (`by`), or `null` where the newest sign of work was a task written.
+ */
+export type WorkedReading = Reading & { at?: string; by?: string | null };
+
+/**
+ * HOW LONG SINCE ANYBODY WORKED ON A PROJECT, ITS TASKS AND ITS RUNS TOGETHER (the audit of 25 October, Z7): Projects
+ * said "Worked on 4 days ago" from the tasks alone while Today said "Claude worked on it 20 minutes ago" from the runs,
+ * of the same project in the same minute. One figure now reads both, the newest stamp on a task of the project and the
+ * newest a run in it was heard from, so every screen says one time. Quiet past thirty days, as Work's tasks-only
+ * `project-last-worked` is. A project with no task and no run reads nothing, never nought.
+ */
+const PROJECT_WORKED: WorkedDecl = {
+  metric: 'project-worked',
+  name: 'Last worked',
+  source: RECORD_WORKED,
+  value: { count: 'id' },
+  target: { lte: 30 },
+  window: '30d',
+  compare: 'none',
+  format: 'days',
+  about: PARAM,
+};
+
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
@@ -981,6 +1014,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'activity-by-who': activity('activity-by-who', 'Who worked', 'who'),
   'activity-by-kind': activity('activity-by-kind', 'What changed', 'kind'),
   'activity-by-hour': activity('activity-by-hour', 'Busy hours', 'hour'),
+  'project-worked': PROJECT_WORKED,
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
@@ -1307,6 +1341,97 @@ export function readProjectsUnplaced(sql: Sql, _ctx: unknown, decl: MetricDecl):
     JSON.stringify(places.done),
   )?.n;
   return judged(decl, Number(n ?? 0), 'projects with no repository and no folder');
+}
+
+/** A field's JSON path, quoted, for a field name a declaration gave. */
+const pathOf = (field: string): string => `$."${field.replaceAll('"', '""')}"`;
+
+/** The local day of an instant in the record's zone, `YYYY-MM-DD`. */
+function dayIn(ms: number, tz: string | undefined): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz ?? 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * `project-worked:<project>`: the newest of two stamps, the last write on a task of the project and the last a run in it
+ * was heard from (`last_seen`). THE TASKS ARE THE LISTS THAT HAND WORK OUT (`hand:`) and point at the projects list (the
+ * one that declares `scopes:`), found by what they declare and never by a name. A RUN NAMES ITS PROJECT by its spoken id,
+ * its row id or its name, as Today's cards read it. On a read of a past day nothing after it counts. NOTHING, NEVER
+ * NOUGHT, for a project with neither, or a name no project has.
+ */
+export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'viewer'>, decl: MetricDecl): Result<Reading> {
+  const about = (decl as WorkedDecl).about;
+  const said = typeof about === 'string' && about !== PARAM ? about.trim() : '';
+  const none = (why: string): Result<Reading> => judged(decl, null, why);
+  if (said === '') return none('no project named');
+  const head = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.scopes') IS NOT NULL ORDER BY id LIMIT 1",
+  );
+  const projects = head === undefined ? null : (JSON.parse(head.body) as { id?: unknown; title?: unknown });
+  if (projects === null || typeof projects.id !== 'string') return none('no list on this record holds projects');
+  const list = projects.id;
+  const title = typeof projects.title === 'string' ? projects.title : 'name';
+  const spoken = SPOKEN_ROW_AT.exec(said);
+  const bySeq = spoken !== null && spoken[1] === list;
+  const project = sql.one<{ id: string; seq: number; title: string | null }>(
+    `SELECT id, seq, json_extract(fields, ?) AS title FROM entry WHERE register = ? AND deleted_at IS NULL
+       AND (${bySeq ? 'seq = ?' : 'id = ? OR lower(trim(json_extract(fields, ?))) = lower(?)'}) ORDER BY seq LIMIT 1`,
+    pathOf(title),
+    list,
+    ...(bySeq ? [Number(spoken[2])] : [said, pathOf(title), said]),
+  );
+  if (project === undefined) return none(`no project is called ${said}`);
+  const viewer = ctx.viewer === undefined ? '' : ` AND ${unprivate()}`;
+  const seen = ctx.viewer === undefined ? [] : [ctx.viewer];
+  const until = ctx.asOfMs === undefined ? null : new Date(ctx.asOfMs).toISOString();
+  const before = until === null ? '' : ' AND at <= ?';
+  const upTo = until === null ? [] : [until];
+  const stamps: { at: string; agent: string | null }[] = [];
+
+  /* THE TASKS: each list that hands work out and points at the projects, its newest write on a row of this one. */
+  const works = sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.hand') IS NOT NULL")
+    .map((r) => JSON.parse(r.body) as { id?: unknown; fields?: unknown });
+  for (const work of works) {
+    if (typeof work.id !== 'string' || !Array.isArray(work.fields)) continue;
+    for (const f of work.fields as { id?: unknown; type?: unknown; to?: unknown }[]) {
+      if (f.type !== 'ref' || f.to !== list || typeof f.id !== 'string') continue;
+      const got = sql.one<{ at: string | null }>(
+        `SELECT max(at) AS at FROM (SELECT updated_at AS at, id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) = ?${viewer}) WHERE at IS NOT NULL${before}`,
+        work.id,
+        pathOf(f.id),
+        project.id,
+        ...seen,
+        ...upTo,
+      )?.at;
+      if (typeof got === 'string') stamps.push({ at: got, agent: null });
+    }
+  }
+
+  /* THE RUNS: the newest heard from in this project, by any of the three ways a run names it. */
+  const names = [`${list}#${project.seq}`, project.id, ...(typeof project.title === 'string' && project.title.trim() !== '' ? [project.title.trim()] : [])].map((n) => n.toLowerCase());
+  const run = sql.one<{ at: string | null; agent: string | null }>(
+    `SELECT at, agent FROM (SELECT coalesce(json_extract(fields, '$.last_seen'), updated_at) AS at, json_extract(fields, '$.agent') AS agent, id
+       FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, '$.project'))) IN (SELECT value FROM json_each(?))${viewer})
+     WHERE at IS NOT NULL${before} ORDER BY at DESC LIMIT 1`,
+    SESSION,
+    JSON.stringify(names),
+    ...seen,
+    ...upTo,
+  );
+  if (typeof run?.at === 'string') stamps.push({ at: run.at, agent: typeof run.agent === 'string' && run.agent.trim() !== '' ? run.agent.trim() : 'other' });
+
+  const newest = stamps.filter((s) => Number.isFinite(Date.parse(s.at))).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+  if (newest === undefined) return none(`nothing on ${said} was worked on`);
+  const atMs = Date.parse(newest.at);
+  const days = Math.max(0, Math.round((Date.parse(`${dayOfRead(ctx)}T00:00:00Z`) - Date.parse(`${dayIn(atMs, ctx.tz)}T00:00:00Z`)) / 86_400_000));
+  const read = judged(decl, days, newest.agent === null ? 'the newest write on its tasks' : 'the newest run in it');
+  if (!read.ok) return read;
+  const out: WorkedReading = { ...read.value, at: new Date(atMs).toISOString(), by: newest.agent };
+  return ok(out);
 }
 
 /**

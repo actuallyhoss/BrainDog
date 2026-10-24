@@ -424,7 +424,7 @@ export type BlockResult = PageBlock & {
    * A `cards` block's with a column `{ metric, as: when }`: that figure for each card, its one number and whether it
    * met its target, aligned with `rows`. `null` for a card whose figure reads nothing, which draws no line.
    */
-  whens?: ({ value: number; met: boolean | null } | null)[];
+  whens?: ({ value: number; met: boolean | null; at?: string; by?: string | null } | null)[];
   /**
    * A `cards` block's with columns `{ metric, as: fact, label }`: one entry a card, one fact a figure column in column
    * order, aligned with `rows`. `null` for a fact that reads nothing, which draws no fact.
@@ -3520,7 +3520,7 @@ function whenColumnFault(deps: PageDeps, block: PageBlock): Refusal | null {
  * read once a card as the project page's own tile reads it, so "2 days" on a card and "Last worked 2 days" on the
  * project's page are one reading. A card whose figure reads nothing, or is refused, draws no line, never nought.
  */
-function whensOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { whens?: ({ value: number; met: boolean | null } | null)[] } {
+function whensOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): Pick<BlockResult, 'whens'> {
   const col = whenColumn(block);
   if (!col) return {};
   return {
@@ -3532,7 +3532,10 @@ function whensOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { wh
       if (!decl) return null;
       const read = deps.read(param === null ? decl : (fill(decl, null, param) as MetricDecl));
       if (!read.ok || typeof read.value.value !== 'number' || !Number.isFinite(read.value.value)) return null;
-      return { value: read.value.value, met: read.value.met };
+      /* AND THE MOMENT AND WHOSE RUN IT WAS, where the figure says them (`project-worked`, Z7 of 25 October), so a card
+         says "20 minutes ago" and who, as Today does, and not only the day. */
+      const { at, by } = read.value as { at?: unknown; by?: unknown };
+      return { value: read.value.value, met: read.value.met, ...(typeof at === 'string' ? { at, by: typeof by === 'string' ? by : null } : {}) };
     }),
   };
 }
