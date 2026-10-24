@@ -151,11 +151,14 @@ test('a live look writes only under loop/proof/looks', () => {
   assert.throws(() => outFor(source, join(tmpdir(), 'elsewhere')), /writes only under loop\/proof\/looks/u);
 });
 
-test('a read sent as a POST goes on, and the three write-marked routes that are reads are the only ones that do', () => {
+test('a read sent as a POST goes on, and the write-marked routes that are reads are the only ones that do', () => {
   const posts = ROUTES.filter((r) => r.writes && r.postRead && READING.has(r.group)).map((r) => r.name);
   /* `reads` IS SEVERAL READS IN ONE POST (scope 2026-10-24 A6), and the host refuses any write inside it, so it goes on. */
   /* `today` IS TODAY'S TILES IN ONE READ (scope 2026-10-24 A12), each part asked as its own method would be, so it goes on. */
-  assert.deepEqual(posts.sort(), ['previewPage', 'reads', 'today']);
+  /* `checkAutomation` AND `automationSentence` KEEP NOTHING (the audit of 25 October, Z37): an automation's page checks
+     its body, and the look blocked that three times as a write. */
+  assert.deepEqual(posts.sort(), ['automationSentence', 'checkAutomation', 'previewPage', 'reads', 'today']);
+  assert.ok(allowed().has('checkAutomation'));
   assert.ok(allowed().has('previewPage'));
   assert.ok(allowed().has('reads'));
   assert.ok(allowed().has('today'));
