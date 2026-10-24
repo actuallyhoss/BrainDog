@@ -111,7 +111,7 @@ const MUTANTS: Record<string, Rewrite> = {
   'mcp-own-card': { file: /[\\/]packages[\\/]mcp[\\/]src[\\/]briefing\.ts$/, from: '  if (told !== null) said = told;\n', to: '\n' },
   'stale-step': {
     file: /[\\/]packages[\\/]record[\\/]src[\\/]index\.ts$/,
-    from: "const first = open.find((h) => h.mark === 'next');\n    const handoff: Context['handoff'] = first",
+    from: "const first = nextOf(open, aheadOf(hints));\n    const handoff: Context['handoff'] = first",
     to: "const first = open[0];\n    const handoff: Context['handoff'] = first",
   },
   uncapped: { file: /[\\/]packages[\\/]record[\\/]src[\\/]card\.ts$/, from: 'export const CARD_MOST = 130;', to: 'export const CARD_MOST = Number.POSITIVE_INFINITY;' },
@@ -327,27 +327,27 @@ test('THE START HOOK AND context PRINT ONE CARD: line one names the run, the app
   assert.ok(!told.hook.includes('Sams-MacBook-Pro') && !told.hook.includes('/Users/'), told.hook);
 });
 
-test('A STEP MORE THAN SEVEN DAYS OLD IS NO NEXT LINE, and one six days old still is', async () => {
+test('A STEP MORE THAN A DAY OLD IS NO NEXT LINE, and one twelve hours old still is', async () => {
   const h = await record(aged!);
-  await leaves(run(h, 'run-a', -8), 'run-a', STEP);
+  await leaves(run(h, 'run-a', -2), 'run-a', STEP);
   const stale = await starts(run(h, 'run-b'), 'run-b');
   assert.equal(stale.mcp.card, stale.hook);
   assert.equal(stale.api.card, stale.hook);
-  assert.equal(stale.api.handoff, null, `a step eight days old was handed over: ${JSON.stringify(stale.api.handoff)}`);
-  assert.ok(!stale.hook.split('\n').some((line) => /^Next\s/u.test(line)), `a Next line for a step eight days old:\n${stale.hook}`);
+  assert.equal(stale.api.handoff, null, `a step two days old was handed over: ${JSON.stringify(stale.api.handoff)}`);
+  assert.ok(!stale.hook.split('\n').some((line) => /^Next\s/u.test(line)), `a Next line for a step two days old:\n${stale.hook}`);
   assert.equal(stale.mcp.card_next, undefined);
-  assert.equal(nextLine(stale.attached, undefined), null, 'a compaction would print a step eight days old');
+  assert.equal(nextLine(stale.attached, undefined), null, 'a compaction would print a step two days old');
   assert.ok(wordCount(stale.hook) <= 150, stale.hook);
 
-  /* AND THE CLOCK WAS MOVED, NOT THE STEP LOST: the same record, a step left six days ago, is the Next line. Without this
+  /* AND THE CLOCK WAS MOVED, NOT THE STEP LOST: the same record, a step left twelve hours ago, is the Next line. Without this
      the case would hold for a seam that dropped every step. */
   const fresher = 'Ship the Kiln installer to the two testers.';
-  const by = await leaves(run(h, 'run-c', -6), 'run-c', fresher);
+  const by = await leaves(run(h, 'run-c', -0.5), 'run-c', fresher);
   const told = await starts(run(h, 'run-d'), 'run-d');
   assert.equal(told.mcp.card, told.hook);
   const next = told.hook.split('\n').find((line) => /^Next\s/u.test(line));
-  assert.ok(next?.includes(fresher) && next.endsWith('Left by Claude 6 days ago. Check before acting.') && !next.includes(by), told.hook);
-  assert.ok(!told.hook.includes(STEP), `the eight-day step came back beside the six-day one:\n${told.hook}`);
+  assert.ok(next?.includes(fresher) && next.endsWith('Left by Claude 12h ago. Check before acting.') && !next.includes(by), told.hook);
+  assert.ok(!told.hook.includes(STEP), `the two-day step came back beside the twelve-hour one:\n${told.hook}`);
 });
 
 test('A LONG STEP AND THREE QUESTIONS STILL MAKE A BRIEF OF FIVE SHORT LINES, one question said and the step cut to a line', async () => {
