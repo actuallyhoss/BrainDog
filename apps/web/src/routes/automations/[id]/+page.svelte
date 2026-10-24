@@ -261,8 +261,13 @@
   $effect(() => {
     untrack(() => void readDeclared());
   });
+  /* READY ONCE IT IS PAINTED, NOT ONCE IT IS DECIDED (the scope of 24 October, E35): said from the effect, the look caught
+     an empty main already marked ready. Two frames is the first one after the screen has been drawn, and a screen left
+     before then says nothing for the next one. */
   $effect(() => {
-    if (from === 'ready') drew('ready');
+    if (from !== 'ready') return;
+    let frame = requestAnimationFrame(() => (frame = requestAnimationFrame(() => drew('ready'))));
+    return () => cancelAnimationFrame(frame);
   });
 
   /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever the editor was drawn over the sample. */
