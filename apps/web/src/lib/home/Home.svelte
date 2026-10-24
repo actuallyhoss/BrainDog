@@ -95,8 +95,6 @@
   import TellOne from '$lib/home/TellOne.svelte';
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
-  import Landed from '$lib/home/Landed.svelte';
-  import { landedOf } from '$lib/home/landed.ts';
   import { desked as deskedOf, type Desked } from '$lib/home/desk-part.ts';
   import WantMore from '$lib/home/WantMore.svelte';
   import { read as readPref } from '$lib/pref.ts';
@@ -836,9 +834,17 @@
      read mark is stamped from. ENOUGH LINES TO GROUP (`arrivalsOf`), which then shows the newest few. THE KERNEL'S OWN
      LISTS (runs, what he told them) are nothing he filed, by their declaration (`kernel`). */
   const LANDED_READ = 40;
+  /* ITS CODE LOADS ONCE A LINE IS NEW, as it did inside the desk before the desk's tiles were blocks: a first open with
+     nothing new waits for none of it, and Arrivals draws nothing for nothing anyway. */
+  let landedKit = $state.raw<{ Part: typeof import('./Landed.svelte').default; landedOf: typeof import('./landed.ts').landedOf } | null>(null);
+  $effect(() => {
+    if (newLines.length > 0 && landedKit === null)
+      void Promise.all([import('./Landed.svelte'), import('./landed.ts')]).then(([c, m]) => (landedKit = { Part: c.default, landedOf: m.landedOf }), () => undefined);
+  });
   const landed = $derived.by(() => {
+    if (landedKit === null) return [];
     const own = new Set(data.lists.filter((l) => (l as { kernel?: true }).kernel === true).map((l) => l.id));
-    return landedOf(newLines, new Map(data.lists.map((l) => [l.id, l.name])), data.me?.person ?? null, data.now, new Map(Object.entries(data.names ?? {})), LANDED_READ, own);
+    return landedKit.landedOf(newLines, new Map(data.lists.map((l) => [l.id, l.name])), data.me?.person ?? null, data.now, new Map(Object.entries(data.names ?? {})), LANDED_READ, own);
   });
   const selfName = $derived(data.me?.person && data.names && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? null) : null);
 
@@ -980,7 +986,10 @@
 
 <!-- ARRIVALS, what landed since the reader last looked, left out where nothing did. -->
 {#snippet landedPart()}
-  <Landed rows={landed} review={waits?.inbox ?? 0} self={selfName} />
+  {#if landedKit}
+    {@const Landed = landedKit.Part}
+    <Landed rows={landed} review={waits?.inbox ?? 0} self={selfName} />
+  {/if}
 {/snippet}
 
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
