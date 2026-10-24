@@ -3724,9 +3724,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   ): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
     const placeless: string[] = [];
     const rank = (one: BackfillSuggestion | HeldAsk): number =>
-      one.kind === 'run-project' ? 0 : one.kind === 'project-remote' ? 1 : one.kind === 'service-project' ? 2 : one.kind === 'organisation-key' || one.kind === 'cut-organisations' ? 3 : 4;
+      one.kind === 'run-project' ? 0 : one.kind === 'project-remote' ? 1 : one.kind === 'service-project' ? 2 : one.kind === 'organisation-key' || one.kind === 'cut-shops' ? 3 : 4;
     const weight = (one: BackfillSuggestion | HeldAsk): number =>
-      one.kind === 'run-project' ? one.runs : one.kind === 'organisation' || one.kind === 'organisation-key' || one.kind === 'cut-organisations' ? one.payments : 0;
+      one.kind === 'run-project' ? one.runs : one.kind === 'organisation' || one.kind === 'organisation-key' || one.kind === 'cut-shops' ? one.payments : 0;
     const ordered = [...asked, ...held]
       .map((one, i) => ({ one, i }))
       .sort((a, b) => rank(a.one) - rank(b.one) || weight(b.one) - weight(a.one) || a.i - b.i)
@@ -3735,7 +3735,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const offered = new Set(asked.flatMap((one) => (one.kind === 'run-project' ? placesOf(one).flatMap((w) => one.projects.map((p) => `${p.id} ${w}`)) : [])));
     const drafts = ordered.flatMap((one) => {
       if (one.kind === 'organisation-key') return heldDraft(one);
-      if (one.kind === 'cut-organisations') return cutDraft(one);
+      if (one.kind === 'cut-shops') return cutDraft(one);
       if (one.kind === 'project-remote' && offered.has(`${one.project.id} ${keyOf('remote', one.remote) ?? ''}`)) return [];
       if (one.kind === 'run-project' && placesOf(one).length === 0) {
         placeless.push(`${one.question} was not filed: its runs say only a repository's name and not where it is, so a yes would place nothing.`);
@@ -4511,7 +4511,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the organisation the payee's bank key: a yes, and the next walk links every line by it; a no, and both stay as they
    * are. Nothing when Organisations keeps no keys, the organisation is gone, or it holds the key already.
    */
-  const heldDraft = (one: HeldAsk): { draft: SlashDraft; choice: null }[] => {
+  const heldDraft = (one: Extract<HeldAsk, { kind: 'organisation-key' }>): { draft: SlashDraft; choice: null }[] => {
     const orgs = orgsList();
     const keys = orgs?.fields.keys;
     const row = kernel.get(one.organisation.id);
@@ -4525,20 +4525,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * THE SHOPS MET BY A NAME A CARD TEXT CUT SHORT, AS ONE CHANGE HE SAYS YES OR NO TO (the audit of 25 October, Y2): each
    * the walk found another shop's whole name for is folded into it, as a merge he presses is (`merged_into`), and each
-   * other is retired on the day he answers, kept with its payments. Every row at the version it was read at, so a shop
-   * changed since is not overwritten. A list that cannot say a shop is retired asks only the folds.
+   * other is retired on the day he answers, kept with its payments. Every row at the version the walk read it at, so a
+   * shop changed since is not overwritten and the gate refuses the stale answer. A list that cannot say a shop is
+   * retired asks only the folds. Nothing here reads a row: the walk handed each shop's id and version.
    */
-  const cutDraft = (one: Extract<HeldAsk, { kind: 'cut-organisations' }>): { draft: SlashDraft; choice: null }[] => {
+  const cutDraft = (one: Extract<HeldAsk, { kind: 'cut-shops' }>): { draft: SlashDraft; choice: null }[] => {
     const orgs = orgsList();
     if (orgs === null) return [];
     const { merged_into: into, retired } = orgs.fields;
     const today = new Date(clock.now()).toISOString().slice(0, 10);
-    const rows = one.organisations.flatMap(({ organisation, into: whole }) => {
-      const row = kernel.get(organisation.id);
-      const kept = whole === null ? null : kernel.get(whole.id);
-      if (!row || row.register !== orgs.register) return [];
-      if (kept && into !== undefined) return [{ at: kernel.nameOf(row.id), version: row.version, patch: { [into]: kernel.nameOf(kept.id) } }];
-      return whole === null && retired !== undefined ? [{ at: kernel.nameOf(row.id), version: row.version, patch: { [retired]: today } }] : [];
+    const rows = one.shops.flatMap(({ organisation, into: whole }) => {
+      const at = kernel.nameOf(organisation.id);
+      if (whole !== null && into !== undefined) return [{ at, version: organisation.version, patch: { [into]: kernel.nameOf(whole.id) } }];
+      return whole === null && retired !== undefined ? [{ at, version: organisation.version, patch: { [retired]: today } }] : [];
     });
     if (rows.length === 0) return [];
     const body = { register: orgs.register, rows, understand_key: one.key };

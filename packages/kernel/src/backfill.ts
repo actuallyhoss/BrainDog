@@ -144,7 +144,7 @@ export type HeldAsk =
  * retired, kept with its payments and the bank's words, and left off People. Nothing is folded or retired until he says
  * yes, and a no leaves them as they are. `key` is the shops' own ids, so the same shops are asked about once.
  */
-export type CutAsk = { kind: 'cut-organisations'; key: string; organisations: { organisation: Named; into: Named | null }[]; payments: number; question: string };
+export type CutAsk = { kind: 'cut-shops'; key: string; shops: { organisation: Named & { version: number }; into: Named | null }[]; payments: number; question: string };
 
 export type Backfilled = {
   ledger: Slice & { organisations: number };
@@ -792,13 +792,13 @@ function cutAsk(
   const nameOf = (row: Row): string => textOf(row.fields[orgs.at.name]) ?? 'a shop';
   const isCut = (row: Row): boolean => said.get(row.id)?.cut === true && madeFromWords(row.id);
   const whole = live.filter((row) => !isCut(row)).map((row) => ({ row, stem: stemOf(keyOf('bank', nameOf(row)) ?? ':') }));
-  const asked: { organisation: Named; into: Named | null }[] = [];
+  const asked: CutAsk['shops'] = [];
   let payments = 0;
   for (const row of live.filter(isCut)) {
     const stems = [...said.get(row.id)!.stems].filter((s) => s.length >= 3);
     const into = whole.filter((w) => w.stem !== '' && stems.some((s) => w.stem.startsWith(s) && w.stem !== s));
     if (into.length !== 1 && orgs.at.retired === undefined) continue;
-    asked.push({ organisation: { id: row.id, name: nameOf(row) }, into: into.length === 1 ? { id: into[0]!.row.id, name: nameOf(into[0]!.row) } : null });
+    asked.push({ organisation: { id: row.id, name: nameOf(row), version: row.version }, into: into.length === 1 ? { id: into[0]!.row.id, name: nameOf(into[0]!.row) } : null });
     payments += said.get(row.id)!.lines;
   }
   if (asked.length === 0) return null;
@@ -813,9 +813,9 @@ function cutAsk(
         : `Retire ${asked.length === 1 ? 'it' : 'them'}`;
   const shops = asked.length === 1 ? `${asked[0]!.organisation.name} is a name a card text cut short` : `${asked.length} shops are names a card text cut short: ${and(asked.map((a) => a.organisation.name))}`;
   return {
-    kind: 'cut-organisations',
-    key: `cut-organisations:${asked.map((a) => a.organisation.id).sort().join(',')}`,
-    organisations: asked,
+    kind: 'cut-shops',
+    key: `cut-shops:${asked.map((a) => a.organisation.id).sort().join(',')}`,
+    shops: asked,
     payments,
     question: `${shops}. ${what}? Their payments keep the bank's words, and nothing is deleted.`,
   };

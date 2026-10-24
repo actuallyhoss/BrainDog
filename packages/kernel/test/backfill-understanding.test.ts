@@ -139,6 +139,8 @@ test('A HELD ORGANISATION A PAYEE ONLY EXTENDS IS ASKED ABOUT, never keyed and n
   assert.equal(orgs(k).length, 1, 'nor is a second one made');
   assert.equal(done.held.length, 1);
   const [asked] = done.held;
+  assert.equal(asked!.kind, 'organisation-key');
+  if (asked!.kind !== 'organisation-key') return;
   assert.deepEqual([asked!.organisation, asked!.bank, asked!.payee, asked!.payments], [{ id: amazon, name: 'Amazon' }, 'bank:amazonprime', 'Amazon Prime', 2]);
   assert.equal(asked!.question, 'Are the 2 payments to Amazon Prime with Amazon?');
   assert.ok(!done.suggestions.some((s) => s.kind === 'organisation'), 'and it is not asked as a company of its own');

@@ -194,13 +194,13 @@ test('shops already made from cut names are one question: fold the one a whole n
   line('KASHIER*TOLLAND CAFE', byHand);
 
   const deps: BackfillDeps = { sql, clock, mint: ulids(() => clock.now()), transaction: k.transaction, write: k.write, registers: k.registers };
-  const asks = understandBackfill(deps).held.filter((h) => h.kind === 'cut-organisations');
+  const asks = understandBackfill(deps).held.filter((h) => h.kind === 'cut-shops');
   assert.equal(asks.length, 1);
   const ask = asks[0]!;
-  assert.equal(ask.kind, 'cut-organisations');
-  if (ask.kind !== 'cut-organisations') return;
+  assert.equal(ask.kind, 'cut-shops');
+  if (ask.kind !== 'cut-shops') return;
   assert.deepEqual(
-    ask.organisations.map((o) => [o.organisation.name, o.into?.name ?? null]),
+    ask.shops.map((o) => [o.organisation.name, o.into?.name ?? null]),
     [['Marke', 'Harrow Market'], ['Quillmoor Bake', null]],
     'a shop a person made, and one a line names whole, are not asked about',
   );
