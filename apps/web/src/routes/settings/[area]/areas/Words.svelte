@@ -102,7 +102,7 @@
     more: (n: number) => (n === 1 ? 'Show 1 more line' : `Show ${n} more lines`),
     fewer: 'Show fewer',
     saved: 'Saved',
-    saving: 'Saving',
+    sending: 'Keeping your words',
     oneOf: (one: string) => `One is called ${one}`,
     /* SAID BEFORE THE CURRENCY MOVES, with the limits typed in the old one, by their own names. The record holds them in
        the new one at the day's rate (`declare.ts` `liveTarget`), and with no home currency it has nothing to hold them in. */
@@ -306,12 +306,12 @@
 
   /* SAVED AS YOU TYPE (U-C8): a pause of most of a second sends what changed, and the line under the lists says Saved,
      with Undo for the last save. There is no Save button to forget. */
-  let saveSaid = $state<'' | 'saving' | 'saved'>('');
+  let saveSaid = $state<'' | 'pending' | 'saved'>('');
   let undoLast = $state<(() => void) | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
   function soon(): void {
     clearTimeout(timer);
-    saveSaid = 'saving';
+    saveSaid = 'pending';
     timer = setTimeout(() => {
       if (dirty) void sendWords({ ...pending });
       else saveSaid = '';
@@ -445,7 +445,7 @@
         {/if}
 
         <p class="save" role="status">
-          {#if saveSaid === 'saving'}{words.saving}{:else if saveSaid === 'saved'}{words.saved}{#if undoLast}{' '}<Button weight="bare" size="sm" onclick={() => (undoLast?.(), (undoLast = null), (saveSaid = ''))}>{copy.undo}</Button>{/if}{/if}
+          {#if saveSaid === 'pending'}{words.sending}{:else if saveSaid === 'saved'}{words.saved}{#if undoLast}{' '}<Button weight="bare" size="sm" onclick={() => (undoLast?.(), (undoLast = null), (saveSaid = ''))}>{copy.undo}</Button>{/if}{/if}
         </p>
       </form>
     {:else}

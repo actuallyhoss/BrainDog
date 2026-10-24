@@ -384,7 +384,6 @@ export const shell = {
   copyLine: 'Copy',
   lineCopied: 'Line copied',
   connectDone: 'Done',
-  suggested: 'Waiting for you',
   /* WHAT THE TOP BAR IS HIDING, SAID AS A NUMBER. `19 §3` makes this the condition that stops a
      chosen top bar becoming the rejected default: it "states how many entries sit behind More
      rather than quietly swallowing them". */

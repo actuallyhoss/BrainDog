@@ -22,19 +22,11 @@ test('Appearance says the look is kept per record, and where it waits when the r
   assert.match(src, /pref\.whereKept\(\)/u);
 });
 
-test("Notifications names Today's feed, by the record's own words, and no digest", () => {
+test('NOTIFICATIONS SENDS THE RULES THAT TELL YOU TO AUTOMATIONS (U-C7), says no digest, and reads no rule to settle', () => {
   const src = area('Notifications');
   assert.doesNotMatch(wordsOf(src), /digest/u, 'a muted rule is still said to leave a digest that carries no rule notices');
-  assert.match(src, /words\.tellersWhy\(said\('since_away'\), said\('home'\)\)/u);
-});
-
-test("Notifications says a muted rule's notices leave Today's feed and its urgent ones still show", () => {
-  const words = wordsOf(area('Notifications'));
-  const why = /tellersWhy: \(feed: string, home: string\) => `([^`]*)`/u.exec(words)?.[1];
-  assert.ok(why, 'the line under the switches is where it was');
-  const said = why.replace('${feed}', 'Since you were away').replace('${home}', 'Today');
-  assert.equal(said, 'Turn one off and its notices leave “Since you were away” on Today, for you alone. Its urgent ones still show there.');
-  assert.doesNotMatch(said, /—|reaches you/u, 'urgent notices are said to still show, where they show');
+  assert.match(src, /<Button weight="quiet" href="\/automations">\{words\.openRules\}<\/Button>/u);
+  assert.doesNotMatch(src, /openAutomations|\.automation\(/u, 'the area reads every rule again before it settles');
 });
 
 test('Words asks for a singular without "a" or "an", titles the lists "Your lists", and names the limits a currency strands', () => {

@@ -428,20 +428,12 @@ export const account = {
   /* The shape of the navigation — `19 §3`'s table, in the words a reader would use for each one.
      The labels name the THING and not the setting: somebody choosing between these is picking
      where their navigation lives, so "Top bar" and "Side rail" are the answer and "Rail" alone is ours. */
-  navShape: 'Where your navigation lives',
-  navShapeHint: 'The top bar holds your five places in one strip, your projects in the sidebar under it, and the rest behind More. Hide the sidebar with its button or [. The menu keeps nothing on screen and opens all of them when you ask.',
   navShapeRail: 'Side rail',
   navShapeBar: 'Top bar',
   navShapeMenu: 'Menu',
-  /* AND THE ONE CONDITION THAT IS NOT A TASTE. A narrow screen keeps the tab bar whatever this
-     says, and a reader who picks a top bar and then opens their phone deserves to have been told
-     rather than to find out. It says what happens and not why the software does it. */
-  navShapeOnPhone: 'On a phone, BrainDog uses the tab bar.',
-
   /* THE DESIGN AGENT'S OWN RECOMMENDATION, `19 §3`: the design agent reads the record and answers
      with one shape and one sentence of why. The sentence itself comes from `design/nav-shape.ts`;
      these are the verbs around it, never applied on their own and Dismiss is terminal. */
-  navShapeRecommend: 'A shape that might suit this record better',
   navShapeRecommendAccept: (label: string) => `Switch to ${label}`,
 
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */

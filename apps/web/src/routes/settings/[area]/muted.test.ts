@@ -33,8 +33,8 @@ test('a switch keeps the muted rules newest last, each once, and takes an empty 
   assert.deepEqual(mutedOf(undefined), []);
 });
 
-test('the area writes the person\'s own pref, through setPref, and draws no section when no rule tells them anything', () => {
-  const src = readFileSync(new URL('./areas/Notifications.svelte', import.meta.url), 'utf8');
+test("A RULE'S OWN PAGE WRITES THE PERSON'S OWN PREF, through setPref, and offers it only on a rule that tells them something", () => {
+  const src = readFileSync(new URL('../../automations/[id]/+page.svelte', import.meta.url), 'utf8');
   assert.match(src, /\.setPref\('notify\.muted', next\)/u);
-  assert.match(src, /\{#if tellers\.length > 0\}/u);
+  assert.match(src, /\{#if tellsQuietly\(row\.body\)\}/u);
 });
