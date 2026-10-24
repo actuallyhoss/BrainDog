@@ -14,9 +14,12 @@
  */
 
 import { createClient, type ClientOptions, type Cursor } from '@braindog/client';
+import { datesIn } from 'braindog-render';
 
 import { display, labelOf } from './api.ts';
-import { REGISTERS } from './held.ts';
+import { REGISTERS, TITLES } from './held.ts';
+import type { Names } from './remote.ts';
+import type { FieldDecl } from './schema.ts';
 import { readBoot } from './boot-live.ts';
 import { moneyInText } from './money.ts';
 import { actor as actorSaid, listName } from './names.ts';
@@ -29,8 +32,12 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  * it ("Slash suggested · Mara accepted"), on a line an answered suggestion of Slash's made, where `linesOf` was handed
  * the names to say it with, and "Slash did this without asking" on one Slash's rung let land (`slashDidSaid`).
  */
-/** `field` and `to` say which field a line changed and what to, where it changed one: "parked since" is read off them. */
-export type Line = { by: string; note: string; at: string; settled?: string; field?: string; to?: unknown };
+/**
+ * `field` and `to` say which field a line changed and what to, where it changed one: "parked since" is read off them.
+ * `from` is what it held before, on a line the record left no note on, so the page can word it again once the row's
+ * read has named its links (`namedLines`).
+ */
+export type Line = { by: string; note: string; at: string; settled?: string; field?: string; to?: unknown; from?: unknown };
 
 /** `now` is the clock `since` reads against: the reader's, since every line is the record's. */
 export type Told = { from: 'live'; lines: Line[]; now: number } | { from: 'refused'; fix: string };
@@ -51,25 +58,118 @@ export type Event = {
  *
  * THE SAMPLE'S SHAPE, "state from open to done", because the page draws both and one register on
  * one screen reads better than two. A value is drawn the way the row's own fields draw it.
+ *
+ * `names` ARE THE NAMES THE ROW'S READ HANDED THE PAGE, with the walk's ids (`remote.ts`), so a list of links says the
+ * rows it gained and lost: "added this to Tidewell". Without them it says how many, never the ids it holds.
  */
-export function noteOf(register: string, e: Event): string {
+export function noteOf(register: string, e: Event, names?: Names): string {
   if (e.note) return e.note;
   if (e.kind === 'create') return 'created';
-  if (!e.field) return e.kind.replace(/[._]/g, ' ');
+  /* AN EDIT THAT NAMES NO FIELD (the audit of 25 October, Y3): a person's Activity read "An agent edit". */
+  if (!e.field) return e.kind === 'edit' ? 'changed this' : e.kind.replace(/[._]/g, ' ');
   const f = REGISTERS[register]?.fields.find((x) => x.id === e.field);
   const name = f ? labelOf(f).toLowerCase() : e.field.replace(/_/g, ' ');
-  /* A LINK IS HELD AS THE ROW'S ID, which names nothing to a reader: Home read "cycle set to cycles#01M2PAZ…" once a use
-     case's examples were linked. The event does not carry the row's title, so a link is said without its value. */
-  const id = (v: unknown): boolean => typeof v === 'string' && /^(?:[a-z][a-z0-9_]*#)?[0-9A-HJKMNP-TV-Z]{26}$/u.test(v);
   /* A VALUE THE HISTORY WITHHOLDS (every money amount and key, `--redacted--`) or lost (`--erased--`) is not a value:
      "paid so far cleared" was said of a change whose new amount was only withheld. It is said without its value. */
   const kept = (v: unknown): boolean => typeof v === 'string' && /^--(?:redacted|erased)--$/u.test(v);
   if (kept(e.to) || kept(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
-  if (f?.type === 'ref' || id(e.to) || id(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
-  const was = display(register, e.field, e.from);
-  const now = display(register, e.field, e.to);
-  if (now === null) return `${name} cleared`;
-  return was === null ? `${name} set to ${now}` : `${name} from ${was} to ${now}`;
+  /* A LIST IS SAID BY WHAT IT GAINED AND LOST, and never as the whole list twice: a person's history read "projects
+     from 01M3MV… to 01M3MV…, 01M4TW…" and "met set to 2026-10-24 · commit 891072f in larkspur" (Y3). */
+  const was = listOf(e.from);
+  const now = listOf(e.to);
+  if ((was !== null || now !== null) && (f === undefined || f.type === 'list')) {
+    const listed = listChange(f, name, was ?? [], now ?? [], names);
+    if (listed !== null) return listed;
+  }
+  /* A LINK IS HELD AS THE ROW'S ID, which names nothing to a reader: Home read "cycle set to cycles#01M2PAZ…" once a use
+     case's examples were linked. The event does not carry the row's title, so a link is said without its value. */
+  if (f?.type === 'ref' || isId(e.to) || isId(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
+  const before = display(register, e.field, e.from);
+  const after = display(register, e.field, e.to);
+  if (after === null) return `${name} cleared`;
+  return before === null ? `${name} set to ${lineSaid(after)}` : `${name} from ${lineSaid(before)} to ${lineSaid(after)}`;
+}
+
+/** A row's id, bare or as `<list>#<id>`. */
+const ROW_ID = /^(?:[a-z][a-z0-9_]*#)?[0-9A-HJKMNP-TV-Z]{26}$/u;
+const isId = (v: unknown): boolean => typeof v === 'string' && ROW_ID.test(v);
+
+/** A list value as the record sent it, an array or the JSON text of one, or `null` for anything else. */
+function listOf(v: unknown): unknown[] | null {
+  if (Array.isArray(v)) return v;
+  if (typeof v !== 'string' || !v.startsWith('[')) return null;
+  try {
+    const held: unknown = JSON.parse(v);
+    return Array.isArray(held) ? held : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A LINE OF A LIST, OR A VALUE, AS A PERSON SAYS IT: a day the record keeps ("2026-10-24") as the day, a commit as a
+ * commit and not its hash, and the record's " · " as a comma. "24 Oct, a commit in larkspur".
+ */
+function lineSaid(text: string): string {
+  return datesIn(text)
+    .replace(/\bcommits? ([0-9a-f]{7,40})\b/giu, 'a commit')
+    .replace(/ · /gu, ', ');
+}
+
+/**
+ * The name of a row a list of links holds, from the names the row's read handed the page, or `null` while nobody has
+ * named it. The record holds a link as the row's id, the walk's `ids` turn it into its number, and the number names it.
+ */
+function linkName(to: string | undefined, v: unknown, names: Names | undefined): string | null {
+  const said = (list: string, n: number): string | null => (names ? names.get(`${list}#${n}`) : TITLES.get(list)?.get(n))?.trim() || null;
+  if (typeof v === 'number' || (typeof v === 'string' && /^[1-9]\d*$/u.test(v))) return to ? said(to, Number(v)) : null;
+  if (typeof v !== 'string' || !ROW_ID.test(v)) return null;
+  const hashed = /^([a-z][a-z0-9_]*)#(.+)$/u.exec(v);
+  const list = hashed?.[1] ?? to;
+  const id = hashed?.[2] ?? v;
+  const ids = names?.ids;
+  if (!ids) return null;
+  if (list) {
+    const n = ids.get(`${list} ${id}`);
+    return n === undefined ? null : said(list, n);
+  }
+  for (const [key, n] of ids) if (key.endsWith(` ${id}`)) return said(key.slice(0, -id.length - 1), n);
+  return null;
+}
+
+/** "a", "a and b", "a, b and c". */
+const listed = (words: readonly string[]): string =>
+  words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+
+/**
+ * WHAT A LIST GAINED AND LOST, in words, or `null` where it holds neither links nor lines (a list of numbers, say), which
+ * keeps the words it had. A list of links: "added this to Tidewell", "took this off Larkspur", or "added this to 2 more"
+ * while the rows are unnamed. A list of lines: "added to met: 24 Oct, a commit in larkspur".
+ */
+function listChange(f: FieldDecl | undefined, name: string, was: readonly unknown[], now: readonly unknown[], names: Names | undefined): string | null {
+  const key = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
+  const had = new Set(was.map(key));
+  const has = new Set(now.map(key));
+  const added = now.filter((v) => !had.has(key(v)));
+  const gone = was.filter((v) => !has.has(key(v)));
+  if (added.length === 0 && gone.length === 0) return `${name} changed`;
+  const links = f ? f.of === 'ref' : [...added, ...gone].some(isId);
+  if (links) {
+    const said = (vs: readonly unknown[]): string => {
+      const named = vs.map((v) => linkName(f?.to, v, names)).filter((n): n is string => n !== null);
+      const rest = vs.length - named.length;
+      if (rest === 0) return listed(named);
+      return named.length === 0 ? (rest === 1 ? 'one more' : `${rest} more`) : listed([...named, rest === 1 ? 'one more' : `${rest} more`]);
+    };
+    if (gone.length === 0) return `added this to ${said(added)}`;
+    if (added.length === 0) return `took this off ${said(gone)}`;
+    return `added this to ${said(added)} and took it off ${said(gone)}`;
+  }
+  if (![...added, ...gone].every((v) => typeof v === 'string' || typeof v === 'number')) return null;
+  const said = (vs: readonly unknown[]): string => listed(vs.map((v) => lineSaid(String(v))));
+  if (gone.length === 0) return `added to ${name}: ${said(added)}`;
+  if (added.length === 0) return `took off ${name}: ${said(gone)}`;
+  return `added to ${name}: ${said(added)}, and took off ${said(gone)}`;
 }
 
 /**
@@ -86,10 +186,6 @@ function fieldWords(register: string, id: string): string {
   const f = REGISTERS[register]?.fields.find((x) => x.id === id);
   return f ? labelOf(f).toLowerCase() : id.replace(/[_-]/gu, ' ');
 }
-
-/** "a", "a and b", "a, b and c". */
-const listed = (words: readonly string[]): string =>
-  words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
 
 /**
  * A list's fields added or taken off, in words, from a `declare` line's target and note: "Added domain to Projects",
@@ -296,9 +392,28 @@ export const linesOf = (register: string, events: readonly (Event & Suggested)[]
     .map((e) => {
       /* WHAT SLASH DID ALONE FIRST, so a change the ladder let land is never "Slash suggested · Ladder accepted". */
       const settled = say === undefined ? null : (slashDidBy(e, say) ?? settledBy(e, say));
-      return { by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts, ...(settled === null ? {} : { settled }), ...(e.field ? { field: e.field, to: e.to } : {}) };
+      return {
+        by: actor(e.actor),
+        note: moneyInText(noteOf(register, e)),
+        at: e.ts,
+        ...(settled === null ? {} : { settled }),
+        ...(e.field ? { field: e.field, to: e.to } : {}),
+        ...(e.field && !e.note ? { from: e.from ?? null } : {}),
+      };
     })
     .reverse();
+
+/**
+ * THE LINES WORDED AGAIN WITH THE NAMES THE ROW'S READ HANDED THE PAGE, which arrive beside the history and not before
+ * it: a list of links then says the rows it gained, "added this to Tidewell", where it could only count them. A line
+ * with a note of its own keeps it, and without names the lines are the lines.
+ */
+export function namedLines(register: string, lines: readonly Line[], names: Names | undefined): Line[] {
+  if (names === undefined) return [...lines];
+  return lines.map((l) =>
+    l.field === undefined || !('from' in l) ? l : { ...l, note: moneyInText(noteOf(register, { ts: l.at, actor: l.by, kind: 'edit', field: l.field, from: l.from, to: l.to }, names)) },
+  );
+}
 
 /**
  * The names of the people on this record, by id, for saying who did what. `boot` sends them to the owner and to a member

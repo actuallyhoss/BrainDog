@@ -70,7 +70,7 @@
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
-  import { readHistory, readNames, type Say, type SettledWords, type Told } from '$lib/record/history-live.ts';
+  import { namedLines, readHistory, readNames, type Say, type SettledWords, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
@@ -625,8 +625,9 @@
     void refreshHistory(id, seq);
   }
 
-  /* WHAT HAPPENED TO THE ROW, newest first, which the timeline merges with what was said about it. */
-  const history = $derived(told && told.from !== 'refused' ? told.lines : []);
+  /* WHAT HAPPENED TO THE ROW, newest first, which the timeline merges with what was said about it. Worded again with
+     the names the row's read handed the page, so a list of links says the rows it gained, never their ids (Y3). */
+  const history = $derived(told && told.from !== 'refused' ? namedLines(id, told.lines, names) : []);
 
   /* WHO, BY NAME: the reader is You, and the record's members are asked for once, only when somebody else is in the
      history or has commented, so a row only you have touched costs no read. */

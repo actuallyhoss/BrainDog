@@ -48,8 +48,9 @@ test("the record's events are drawn newest first, each with who and what", async
   const label = (REGISTERS.services!.fields.find((f) => f.id === state)!.label ?? state).toLowerCase();
   assert.deepEqual(out.lines, [
     { by: 'agent:claude', note: 'Chased twice', at: '2026-09-12T09:00:00.000Z' },
-    /* A LINE THAT SET A FIELD SAYS WHICH, AND TO WHAT, so a page can say since when a row has been parked. */
-    { by: 'rule.renewal', note: `${label} from ${display('services', state, 'live')} to ${display('services', state, 'lapsing')}`, at: '2026-09-10T09:00:00.000Z', field: state, to: 'lapsing' },
+    /* A LINE THAT SET A FIELD SAYS WHICH, AND TO WHAT, so a page can say since when a row has been parked, and from
+       what, so the page can word it again once the row has named its links. */
+    { by: 'rule.renewal', note: `${label} from ${display('services', state, 'live')} to ${display('services', state, 'lapsing')}`, at: '2026-09-10T09:00:00.000Z', field: state, to: 'lapsing', from: 'live' },
     { by: 'S42', note: 'created', at: '2026-09-01T09:00:00.000Z' },
   ]);
   assert.ok(out.now >= before, 'a live history is read against the reader\'s clock');
