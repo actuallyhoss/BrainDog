@@ -21,6 +21,7 @@ import {
   pruneInboxes,
   readInbox,
   readState,
+  readyPath,
   seedInbox,
   sessionsDir,
   STALE_MS,
@@ -218,4 +219,50 @@ test('TIMINGS: the shell path with no word, and the Node path with one, each und
   process.stdout.write(`# hook prompt, shell path (nothing to do): median ${median(quiet).toFixed(1)} ms; Node path (one instruction): median ${median(loud).toFixed(1)} ms\n`);
   assert.ok(median(quiet) < 50, `the shell path took ${String(median(quiet))} ms`);
   assert.ok(median(loud) < 1_000, `the Node path took ${String(median(loud))} ms`);
+});
+
+/* ── a hook with something to say, answered by the shell (H23) ─────────── */
+
+test('A HOOK WITH SOMETHING TO SAY IS ANSWERED BY THE SHELL, with no Node on the path, once, and under 50 ms', { skip: process.platform === 'win32' }, () => {
+  const env = envFor();
+  /* NO NODE ON THE PATH: only the shell's own tools, so an answer printed here was printed without Node. */
+  const bare = { ...env, PATH: '/usr/bin:/bin' };
+  const event = JSON.stringify({ session_id: 'ready-1', cwd: scratch, hook_event_name: 'UserPromptSubmit', prompt: 'go on' });
+  const busy = inbox({ at: new Date().toISOString(), pending: [toldOf(told('IN5'))!] });
+  writeInbox(inboxPath(env, 'ready-1'), busy);
+  writeFlags(env, 'ready-1', Date.now(), busy, NO_STATE);
+  assert.ok(existsSync(readyPath(env, 'ready-1', 'prompt')), 'no answer was made ready');
+  const got = runScript('prompt', bare, event);
+  assert.match(got.stdout, /"additionalContext":"Mara said in BrainDog \(IN5\)/u);
+  /* SHOWN ONCE: the state after it is in place, so the next prompt says nothing and starts nothing. */
+  assert.equal(readState(statePath(env, 'ready-1')).shown.IN5, 'prompt');
+  assert.equal(runScript('prompt', bare, event).stdout, '');
+
+  /* A STOPPED RUN: every tool but BrainDog's own is denied by the shell, each time. */
+  const stopped = inbox({ at: new Date().toISOString(), stop: { kind: 'stop', id: 'IN8', said: 'wait' }, stop_line: 'Mara stopped this run in BrainDog (IN8): "wait". Reply with instructions, then end.' });
+  writeInbox(inboxPath(env, 'ready-2'), stopped);
+  writeFlags(env, 'ready-2', Date.now(), stopped, NO_STATE);
+  const tool = JSON.stringify({ session_id: 'ready-2', cwd: scratch, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } });
+  const times: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    const denied = runScript('tool', bare, tool);
+    assert.match(denied.stdout, /"permissionDecision":"deny"/u);
+    times.push(denied.ms);
+  }
+  assert.equal(runScript('tool', bare, tool.replace('"Bash"', '"mcp__braindog__instructions"')).stdout, '');
+  const median = [...times].sort((a, b) => a - b)[2]!;
+  process.stdout.write(`# hook tool with something to say, shell path: median ${median.toFixed(1)} ms\n`);
+  assert.ok(median < 50, `the shell path took ${String(median)} ms`);
+});
+
+test('NOTHING IS MADE READY THAT AN EVENT WOULD CHANGE, and a stale inbox leaves no answer behind', () => {
+  const env = envFor();
+  const redirect = inbox({ at: new Date().toISOString(), pending: [toldOf(told('IN9', 'redirect'))!] });
+  writeFlags(env, 'ready-3', Date.now(), redirect, NO_STATE);
+  /* A REDIRECT IS SAID TO THE LEAD ALONE, which only the event says: Node's to judge. */
+  assert.equal(existsSync(readyPath(env, 'ready-3', 'tool')), false);
+  const busy = inbox({ at: new Date(Date.now() - STALE_MS - 1000).toISOString(), pending: [toldOf(told('IN6'))!] });
+  writeFlags(env, 'ready-4', Date.now() - STALE_MS, inbox({ ...busy, at: new Date(Date.now() - STALE_MS).toISOString() }), NO_STATE);
+  writeFlags(env, 'ready-4', Date.now(), busy, NO_STATE);
+  assert.equal(existsSync(readyPath(env, 'ready-4', 'prompt')), false);
 });

@@ -94,6 +94,8 @@ export const inboxEntryIn = (scripts: string): string => (existsSync(join(script
 export const inboxPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.json`);
 export const flagsPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.flags`);
 export const statePath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.hooks.json`);
+/** What a hook with work prints, made ready before it runs (H23): `.ready`, and beside it `.ready.state` and `.ready.flags`. */
+export const readyPath = (env: Env, id: string, which: 'prompt' | 'tool' | 'stop'): string => join(sessionsDir(env), `${fileId(id)}.inbox.${which}.ready`);
 
 /* ── what the files hold ───────────────────────────────────────────────── */
 
@@ -346,6 +348,53 @@ export function writeFlags(env: Env, id: string, now: number = Date.now(), inbox
   } catch {
     /* The scripts then start Node for every call, which decides the same, slower. */
   }
+  writeReady(env, id, now, inbox, state);
+}
+
+/**
+ * WHAT A HOOK WITH WORK WILL PRINT, WRITTEN BEFORE IT RUNS (H23 of 24 October): a hook that had something to say started
+ * Node, 98 to 113 ms, where one with nothing cost 15. So wherever the flags are written the answer is worked out too,
+ * for the three cases no event changes: a prompt's lines, the stop's turn held open for the lead, and a stopped or
+ * paused run's denial of every tool but BrainDog's own. The hook script prints the `.ready` file with `cat`, puts the
+ * state and the flags after it in place with `mv`, and starts no Node (`hooks/braindog-hook.sh`). A case it cannot
+ * judge by itself (a subagent, a turn a Stop hook already continued, a tool named by its server, a redirect) has no file,
+ * and Node decides it as before. Each `.ready` is written last, so its two companions are there when it is. Never throws.
+ */
+export function writeReady(env: Env, id: string, now: number, inbox: Inbox | null, state: HookState): void {
+  const lead: HookEvent = { session: id, tool: '', server: undefined, agent: null, continued: false };
+  for (const which of HOOKS) {
+    const file = readyPath(env, id, which);
+    try {
+      const out =
+        inbox === null || stale(inbox, now)
+          ? null
+          : which === 'prompt'
+            ? promptFor(inbox, state)
+            : which === 'stop'
+              ? stopFor(inbox, state, lead)
+              : inbox.hooks && stopSaid(inbox) !== null
+                ? toolFor(inbox, state, lead)
+                : null;
+      if (out === null) {
+        for (const f of [file, `${file}.state`, `${file}.flags`]) if (existsSync(f)) unlinkSync(f);
+        continue;
+      }
+      if (which !== 'tool') {
+        writeWhole(`${file}.state`, `${JSON.stringify(out.state)}\n`);
+        writeWhole(`${file}.flags`, `${flagsOf(inbox, out.state, now).join(' ')}\n`);
+      }
+      writeWhole(file, `${printed(which, out)}\n`);
+    } catch {
+      /* No file is Node deciding, as before. */
+    }
+  }
+}
+
+/** The JSON Claude Code reads for one hook's answer, as `runHook` prints it. */
+function printed(which: Which, out: { context: string } | { reason: string }): string {
+  if (which === 'prompt') return JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: (out as { context: string }).context } });
+  if (which === 'tool') return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: (out as { reason: string }).reason } });
+  return JSON.stringify({ decision: 'block', reason: (out as { reason: string }).reason });
 }
 
 /** Files of sessions not written to in twelve hours, removed so the folder stays small. Never throws. */
@@ -353,7 +402,7 @@ export function pruneInboxes(env: Env, now: number = Date.now()): void {
   try {
     const dir = sessionsDir(env);
     for (const name of readdirSync(dir)) {
-      if (!/\.(?:inbox\.json|inbox\.flags|hooks\.json)$/u.test(name)) continue;
+      if (!/\.(?:inbox\.json|inbox\.flags|hooks\.json|inbox\.(?:prompt|tool|stop)\.ready(?:\.state|\.flags)?)$/u.test(name)) continue;
       const file = join(dir, name);
       if (now - statSync(file).mtimeMs > KEEP_MS) unlinkSync(file);
     }
@@ -469,10 +518,7 @@ export function runHook(which: Which, stdin: string, env: Env, now: number = Dat
       /* A state not kept says the same thing again next time, which is the safe side. */
     }
     writeFlags(env, event.session, now, inbox, out.state);
-    if (which === 'prompt') return JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: (out as { context: string }).context } });
-    if (which === 'tool')
-      return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: (out as { reason: string }).reason } });
-    return JSON.stringify({ decision: 'block', reason: (out as { reason: string }).reason });
+    return printed(which, out);
   } catch {
     return '';
   }

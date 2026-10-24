@@ -62,6 +62,32 @@ case "$which" in
     words=''
     [ -f "$flags" ] && IFS= read -r words < "$flags"
     case " $words " in *" $which "*) ;; *) exit 0 ;; esac
+    # AN ANSWER MADE READY BEFORE THE HOOK RAN (inbox-file.ts, writeReady), younger than the two minutes a file is
+    # good for: printed with cat, the state and flags after it put in place with mv, and no Node started, so a hook with
+    # something to say costs what one with nothing does. A subagent, a turn a Stop hook already continued, and a tool
+    # named by its server are Node's to judge; a stopped run's own BrainDog tools and ToolSearch go on.
+    ready="${XDG_CONFIG_HOME:-$HOME/.config}/braindog/sessions/${id}.inbox.${which}.ready"
+    if [ -f "$ready" ] && [ -n "$(find "$ready" -mmin -2 2>/dev/null)" ]; then
+      case "$which:$raw" in
+        stop:*'"agent_id"'* | stop:*'"stop_hook_active":true'* | stop:*'"stop_hook_active": true'* | tool:*'"mcp_server"'*) ready='' ;;
+      esac
+      if [ "$which" = tool ] && [ -n "$ready" ]; then
+        after=${raw#*\"tool_name\"}
+        rest=${after#*\"}
+        tool=${rest%%\"*}
+        [ "$after" = "$raw" ] && tool=''
+        case "$tool" in mcp__braindog__* | mcp__plugin_*_braindog__* | ToolSearch) exit 0 ;; '') ready='' ;; esac
+      fi
+      if [ -n "$ready" ]; then
+        cat "$ready"
+        if [ "$which" != tool ]; then
+          mv -f "$ready.state" "${ready%.inbox.*}.hooks.json" 2>/dev/null
+          mv -f "$ready.flags" "$flags" 2>/dev/null
+          rm -f "$ready"
+        fi
+        exit 0
+      fi
+    fi
     printf '%s' "$raw" | node "$dir/../src/inbox-file.ts" "$which" 2>/dev/null
     exit 0
     ;;
