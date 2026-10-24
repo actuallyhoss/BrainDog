@@ -108,7 +108,7 @@ async function stubHost(
       };
       const row = { id: 'e_7', seq: 7, state: 'active', version: 2, fields: {} };
       if (method === 'attach')
-        return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: carded(undefined) } });
+        return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: carded(req.headers['x-braindog-ahead']) } });
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
       if (method === 'end' && o.endSays !== undefined) {
         res.writeHead(o.endSays === 'ROUTE_UNKNOWN' ? 404 : o.endSays === 'NOT_IN_THIS_BUILD' ? 501 : 403, { 'content-type': 'application/json' });
@@ -318,12 +318,64 @@ test('THE COMMITS SINCE THE HANDOFF GO TO THE RECORD after the attach, as x-brai
   const compact = await run(['hook', 'start'], env, event(repo.dir, { session_id: 'claude-run-11', source: 'compact' }), repo.dir);
   assert.equal(compact.stdout, 'Next     Kern the lowercase pairs. · 2 commits since\n');
 
+  /* THE NEXT START HERE COUNTS FROM THE STEP THIS ONE WAS HANDED, before its attach, and sends the count with it: the
+     same card, word for word, from one round trip. */
+  const before = host.seen.length;
+  const next = await run(['hook', 'start'], env, event(repo.dir, { session_id: 'claude-run-13', source: 'startup' }), repo.dir);
+  assert.equal(next.stdout, start.stdout);
+  assert.deepEqual(
+    host.seen.slice(before).map((s) => [s.method, s.headers['x-braindog-ahead']]),
+    [['attach', '2']],
+  );
+
   /* HEAD where the handoff left it: nothing moved, so nothing more is asked. */
   const still = repository(folder('kiln-still'));
   const here = await stubHost(t, false, true, card, { head: still.commit() });
   const quiet = await run(['hook', 'start'], { ...env, BRAINDOG_HOST: here.base }, event(still.dir, { session_id: 'claude-run-12', source: 'startup' }), still.dir);
   assert.equal(quiet.stdout, `${card}\n`);
   assert.equal(here.seen.filter((s) => s.method === 'context').length, 0);
+});
+
+test('A COUNT SENT FOR ANOTHER STEP IS READ AGAIN for the step the attach handed, so the card says that step’s commits or none', async (t) => {
+  const repo = repository(folder('kiln-other'));
+  const old = repo.commit();
+  const from = repo.commit();
+  repo.commit();
+  const card = 'BrainDog · run S7 · project Kiln · Claude Code on MacBook\nNext     Kern the lowercase pairs.\nMore     call context';
+  const host = await stubHost(t, false, true, card, { head: from });
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  /* The last start here was handed a step two commits further back. */
+  writeSession(sessionPath(env, repo.dir), { host: host.base, spoken: 'S5', client_id: 'claude-run-20', head_at_start: old, at: new Date().toISOString(), handoff_head: old });
+
+  const start = await run(['hook', 'start'], env, event(repo.dir, { session_id: 'claude-run-21', source: 'startup' }), repo.dir);
+  assert.equal(start.code, 0, start.stderr);
+  assert.match(start.stdout, /^Next {5}Kern the lowercase pairs\. · 1 commits since$/mu);
+  assert.deepEqual(
+    host.seen.map((s) => [s.method, s.headers['x-braindog-ahead']]),
+    [
+      ['attach', '2'],
+      ['context', '1'],
+    ],
+  );
+  /* And remembers the step it was handed, for the start after it. */
+  assert.equal(readSession(sessionPath(env, repo.dir))?.handoff_head, from);
+
+  /* HEAD where the handed step was left: the count sent is withdrawn, read again with none. */
+  const still = repository(folder('kiln-other-still'));
+  const back = still.commit();
+  const at = still.commit();
+  const here = await stubHost(t, false, true, card, { head: at });
+  const hereEnv = { ...env, BRAINDOG_HOST: here.base };
+  writeSession(sessionPath(hereEnv, still.dir), { host: here.base, spoken: 'S5', head_at_start: back, at: new Date().toISOString(), handoff_head: back });
+  const quiet = await run(['hook', 'start'], hereEnv, event(still.dir, { session_id: 'claude-run-22', source: 'startup' }), still.dir);
+  assert.equal(quiet.stdout, `${card}\n`);
+  assert.deepEqual(
+    here.seen.map((s) => [s.method, s.headers['x-braindog-ahead']]),
+    [
+      ['attach', '1'],
+      ['context', undefined],
+    ],
+  );
 });
 
 test('THE START HOOK’S OWN TIME RIDES THE NEXT CALL of the same session, as a hook mark against its run, and is sent once', async (t) => {

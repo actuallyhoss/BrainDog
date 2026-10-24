@@ -75,6 +75,8 @@ export const unreachable = (ms: number): string =>
  * reads the commits of every one that moved. `hook_ms` is how long the start hook that wrote it took, until a later hook
  * of the same session sends it as the door's `hook` mark (`owedMark`). `commands` is the list of the project's command
  * lines the end hook last sent, by name only, and when, so the same list goes once a day for a folder (`sendCommands`).
+ * `handoff_head` is the commit the step the attach handed this run was left at, so the next start here can count the
+ * commits since it before its attach and send them with it (`hookStart`).
  */
 export type SessionFile = {
   host: string;
@@ -90,6 +92,7 @@ export type SessionFile = {
   heads?: Record<string, string>;
   hook_ms?: number;
   commands?: SentCommands;
+  handoff_head?: string;
 };
 
 const SPOKEN = /^S[1-9][0-9]*$/;
@@ -143,6 +146,7 @@ export function readSession(file: string): SessionFile | null {
     ...(isObject(x.heads) ? { heads: headsOf(x.heads) } : {}),
     ...(typeof x.hook_ms === 'number' && Number.isInteger(x.hook_ms) && x.hook_ms >= 0 && x.hook_ms <= HOOK_MARK_MAX_MS ? { hook_ms: x.hook_ms } : {}),
     ...(sentOf(x.commands) === undefined ? {} : { commands: sentOf(x.commands)! }),
+    ...(typeof x.handoff_head === 'string' && SHA.test(x.handoff_head) ? { handoff_head: x.handoff_head } : {}),
   };
 }
 
@@ -482,10 +486,25 @@ function reach(env: Env): Target | string {
  * disagree about what "moved" counts.
  */
 export async function movedSince(cwd: string, from: string | null, head: string | null): Promise<Moved> {
-  if (!from || !head || !SHA.test(from) || head.startsWith(from) || from.startsWith(head)) return undefined;
-  const count = Number(await git(cwd, 'rev-list', '--count', `${from}..HEAD`));
-  return Number.isInteger(count) && count > 0 ? count : null;
+  if (!comparable(from, head)) return undefined;
+  return countOf(await git(cwd, 'rev-list', '--count', `${from}..HEAD`));
 }
+
+/* Whether git is asked at all, and what its count says: the two halves of `movedSince`, so the start hook can ask git
+   beside its other reads and still say exactly what `movedSince` would. */
+const comparable = (from: string | null, head: string | null): from is string =>
+  !!from && !!head && SHA.test(from) && !head.startsWith(from) && !from.startsWith(head);
+const countOf = (said: string | null): Moved => {
+  const count = Number(said);
+  return Number.isInteger(count) && count > 0 ? count : null;
+};
+
+/**
+ * The commits past a step at which the record hands a starting session the step before it instead (`FAR_BEHIND` in
+ * `packages/record/src/index.ts`, held equal by `test/hook-start.test.ts`). A count this high changes which step
+ * the attach answers with, so the start hook never sends one with its attach.
+ */
+export const FAR_BEHIND = 50;
 
 /**
  * THE RECORD'S CARD, DRAWN AGAIN WITH THE COMMITS SINCE THE HANDOFF (AGT-B07). The attach answers before anything here
@@ -494,8 +513,15 @@ export async function movedSince(cwd: string, from: string | null, head: string 
  * attach, so it opens nothing; one that fails, runs out of time or comes back without a card leaves the attach's card.
  * A host that draws no card is not asked again, because this command composes that card and counts the commits itself.
  */
-export async function aheadCard(c: Context | undefined, moved: Moved, read: () => Promise<Awaited<ReturnType<Client['context']>>>): Promise<Context | undefined> {
-  if (c === undefined || cardOf(c) === null || typeof moved !== 'number' || moved < 1) return c;
+export async function aheadCard(
+  c: Context | undefined,
+  moved: Moved,
+  read: () => Promise<Awaited<ReturnType<Client['context']>>>,
+  again = false,
+): Promise<Context | undefined> {
+  /* `again`: the card was drawn with a count for another commit than the one it handed (`hookStart`), so it is read
+     once more whatever moved, with the count for its own commit or none. */
+  if (c === undefined || cardOf(c) === null || (!again && (typeof moved !== 'number' || moved < 1))) return c;
   try {
     const again = await read();
     return again.ok && cardOf(again.value) !== null ? again.value : c;
@@ -551,7 +577,18 @@ export async function hookStart(io: Io): Promise<void> {
 
   const ms = hookBudget(io.env);
   const signal = AbortSignal.timeout(ms);
-  const [at, device] = await Promise.all([positionOf(event.cwd), io.device ?? deviceName(io.env, to.key)]);
+  /*
+   * THE COMMITS SINCE THE STEP THE LAST START HERE WAS HANDED, counted beside the other reads and sent with the attach,
+   * so its card already says them. Before, the attach was answered first and its card read once more with the count
+   * (`aheadCard`), a second round trip on every start in a repository whose HEAD had moved, which is most of them. When
+   * the attach hands the same step, its card is the one the second read would have drawn; when it hands another, that
+   * read is still made, with the count for its own commit.
+   */
+  const guessed = before !== null && before.host === to.key && before.handoff_head !== undefined ? before.handoff_head : null;
+  const counting = guessed === null ? Promise.resolve(null) : git(event.cwd, 'rev-list', '--count', `${guessed}..HEAD`);
+  const [at, device, counted] = await Promise.all([positionOf(event.cwd), io.device ?? deviceName(io.env, to.key), counting]);
+  const early: Moved = comparable(guessed, at.head) ? countOf(counted) : undefined;
+  const sent = typeof early === 'number' && early < FAR_BEHIND ? early : undefined;
   mark('position');
   /* A FOLDER THAT IS NOT A REPOSITORY: the HEAD of each one under it, read beside the attach, so the end hook reads the
      commits of every one that moved. 28 of the 32 runs in the owner's ~/Developer started there. */
@@ -561,7 +598,7 @@ export async function hookStart(io: Io): Promise<void> {
   const parent = child ? parentOf(io.env, to.key) : null;
   /* NO RUN NAMED, AND THE SESSION'S OWN ID: attaching finds the run by it, so an old run named in a file is never sent. */
   const mine = event.client_id === undefined ? undefined : { client_id: event.client_id };
-  const client = clientFor(to, async () => sessionHeaders(at, 'claude', mine, { env: io.env, parent }), signal);
+  const client = clientFor(to, async () => sessionHeaders(at, 'claude', mine, { env: io.env, parent, ahead: sent }), signal);
   /* THE LAST START HOOK'S TIME RIDES BESIDE THIS ATTACH, when it was this same session's (a compaction, a resume). NOT
      WAITED FOR HERE, so a slow mark never holds the card or eats the sync's budget: it is waited for last, once the card
      is written, and a path that returns early leaves it to the process, which stays open while it is in flight. */
@@ -581,6 +618,8 @@ export async function hookStart(io: Io): Promise<void> {
   }
 
   const run = out.value;
+  /* The commit of the step the attach handed this run, which the next start here counts from. */
+  const handed = run.context?.handoff?.head ?? null;
   /* The window this hook ran under, so the MCP server that window started knows a clear's new run is its own. */
   const pid = hostPidOf(io.env);
   /* The same run going on keeps the commits it started from, so what it did is still counted from there. */
@@ -599,6 +638,7 @@ export async function hookStart(io: Io): Promise<void> {
     ...(same && before.heads !== undefined ? { heads: before.heads } : Object.keys(fresh).length > 0 ? { heads: fresh } : {}),
     /* WHAT THE FOLDER'S COMMAND LINES LAST SENT carries over, to the same host, so a new session does not send them again. */
     ...(before !== null && before.host === to.key && before.commands !== undefined ? { commands: before.commands } : {}),
+    ...(typeof handed === 'string' && SHA.test(handed) ? { handoff_head: handed } : {}),
   };
   /* THE SESSION'S OWN FILE, THE FOLDER'S, AND THE WINDOW'S. A subagent's run is never its window's. */
   const files = [...(id === null ? [] : [sessionPath(io.env, event.cwd, id)]), sessionPath(io.env, event.cwd), ...(pid === null || child ? [] : [windowPath(io.env, pid)])];
@@ -620,12 +660,22 @@ export async function hookStart(io: Io): Promise<void> {
     /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
     if (soon && before.host === to.key && before.spoken === run.spoken) return seed([]);
 
-    const moved = await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head);
+    /* The same step as the last start here: counted already, before the attach. */
+    const kept = guessed !== null && handed === guessed;
+    const moved = kept ? early : await movedSince(event.cwd, handed, at.head);
     const named = { spoken: run.spoken, ...mine };
     const left = () => Math.max(1, Math.min(NAME_MS, began + ms - Date.now()));
-    const told = await aheadCard(run.context, moved, () =>
-      clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env, parent, ahead: moved }), AbortSignal.timeout(left())).context(),
-    );
+    /* Its card counted the commits for its own step, or none were sent: read again only as `aheadCard` says, and
+       always when a count went with the attach for another step than the one it handed. */
+    const told =
+      kept && sent !== undefined
+        ? run.context
+        : await aheadCard(
+            run.context,
+            moved,
+            () => clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env, parent, ahead: moved }), AbortSignal.timeout(left())).context(),
+            sent !== undefined,
+          );
     const shown = told === undefined || told === run.context ? run : { ...run, context: told };
     mark('ahead');
     /* THE STOP, THEN EVERY OPEN INSTRUCTION, NEVER CUT, each in his voice (`toldAtStart`), and the ids they name. */

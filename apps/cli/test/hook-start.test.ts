@@ -1,8 +1,10 @@
 /**
- * What the start hook reads without a process, held to what git says.
+ * What the start hook reads without a process or a second round trip, held to what git and the record say.
  *
  * `headOnDisk` answers what `git rev-parse HEAD` answers, from git's files, in every shape a repository on his Mac
- * takes: a branch, packed refs, a detached HEAD, a worktree, and an unborn branch (none, so git is asked).
+ * takes: a branch, packed refs, a detached HEAD, a worktree, and an unborn branch (none, so git is asked). And the count
+ * the hook sends with its attach stays under the record's own `FAR_BEHIND`, so the step the attach hands is the one it
+ * would hand with no count at all.
  */
 
 import { test } from 'node:test';
@@ -12,6 +14,8 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { FAR_BEHIND as RECORD_FAR_BEHIND } from '../../../packages/record/src/index.ts';
+import { FAR_BEHIND } from '../src/hooks.ts';
 import { childHeads, headOnDisk } from '../src/people.ts';
 
 const gitIn = (dir: string, ...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true }).trim();
@@ -27,6 +31,10 @@ function repository(dir: string): (message: string) => string {
     return gitIn(dir, 'rev-parse', 'HEAD');
   };
 }
+
+test('THE START HOOK NEVER SENDS A COUNT THE RECORD WOULD HAND ANOTHER STEP FOR: its line is the record’s own', () => {
+  assert.equal(FAR_BEHIND, RECORD_FAR_BEHIND);
+});
 
 test('A HEAD READ FROM GIT’S FILES IS THE ONE GIT SAYS: a branch, packed refs, detached, a worktree, and none when unborn', (t) => {
   const top = mkdtempSync(join(tmpdir(), 'braindog-head-'));
