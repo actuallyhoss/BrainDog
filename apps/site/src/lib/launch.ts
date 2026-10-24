@@ -1,4 +1,5 @@
 import { cases } from './copy/cases.ts';
+import { DESKTOP_NOTARIZED } from './desktop.ts';
 
 /**
  * The one page written for one kind of person that a visitor reaches (D5); the rest are in `HELD`. /for/teams IS HELD
@@ -48,7 +49,8 @@ export const HELD: readonly string[] = [
   '/changelog',
   '/changelog.xml',
   '/packs',
-  '/download',
+  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS STAGED (E52, `desktop.ts`, set by `tools/desktop/release.mjs --stage`). */
+  ...(DESKTOP_NOTARIZED ? [] : ['/download']),
   ...Object.values(cases.drawn.moreFor)
     .map((more) => more.href)
     .filter((href) => !FOR_SHOWN.includes(href)),

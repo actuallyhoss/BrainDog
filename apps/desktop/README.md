@@ -52,9 +52,21 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
   update. `plugins.updater.pubkey` in `tauri.conf.json` is a placeholder until the key is made (see
   `signing.example.env`). The download page `/download` on the site is held until `LAUNCH.public`.
 
+## Releasing (E50 to E52)
+
+- **The updater key** is made once with `node tools/desktop/updater-key.mjs`: the private half and its password are in
+  this Mac's keychain (`braindog-desktop-updater-key`, `braindog-desktop-updater-password`), the public half is in
+  `tauri.conf.json`. `--check` says whether both are in place. Never make a second pair: installed apps trust this one.
+- **The build** is `node tools/desktop/release.mjs` (`--universal` for Apple silicon and Intel). It signs and notarises
+  when the keychain holds a "Developer ID Application" identity and `signing.env` (or the shell) holds the notarisation
+  account; with none it builds an UNSIGNED `apps/desktop/dist/BrainDog.dmg` that runs on this Mac only, and says so.
+  The update archive and `latest.json` are always signed with the updater key.
+- **The download** opens with `--stage`, which only a build Gatekeeper accepts as notarised reaches: it lays the dmg and
+  the feed in `apps/site/static/desktop/` and sets `DESKTOP_NOTARIZED` (`apps/site/src/lib/desktop.ts`), which takes
+  `/download` out of the site's held list. Commit that with a changelog entry, then deploy the site.
+
 ## Not done yet
 
-- **The signing sitting.** Generate the updater key, put its public half in `tauri.conf.json`, build signed and notarised,
-  publish the DMG and `latest.json` under `brain.dog/desktop/`, and fill the real file name into the site's download page.
+- **The signing sitting** (E49): the Apple Developer Program and a Developer ID Application certificate on this Mac.
 - **Deep link in dev.** macOS registers `braindog://` only for a built, installed app, not `cargo tauri dev`.
-- Nothing here has been compiled yet: the first `cargo tauri dev` may need small fixes.
+- Compiled and bundled on 24 October (an unsigned dmg); not yet opened and walked against a record.
