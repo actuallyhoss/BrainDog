@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createSlash, engineHealth, engineSaid } from '@braindog/slash';
+import { LOW_THINKING_ROOM } from '@braindog/slash/prompts';
 
 import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { EMBED_MODEL } from '../src/inference.ts';
@@ -22,12 +23,12 @@ const answer = (text: string) => ({ choices: [{ message: { role: 'assistant', co
 
 /** A binding on an account with no gateway: any call that names one throws, and a call that does not goes to `direct`. */
 const account = (direct: () => unknown) => {
-  const runs: { model: string; gateway: boolean }[] = [];
+  const runs: { model: string; gateway: boolean; inputs: Record<string, unknown> }[] = [];
   return {
     runs,
     AI: {
-      run: async (model: string, _inputs: unknown, options?: { gateway?: unknown }) => {
-        runs.push({ model, gateway: options?.gateway !== undefined });
+      run: async (model: string, inputs: unknown, options?: { gateway?: unknown }) => {
+        runs.push({ model, gateway: options?.gateway !== undefined, inputs: (inputs ?? {}) as Record<string, unknown> });
         if (options?.gateway !== undefined) throw new Error(GATEWAY);
         return model === EMBED_MODEL ? { data: [[0.1, 0.2, 0.3]] } : direct();
       },
@@ -82,4 +83,19 @@ test('WHERE THE BINDING FAILS WITHOUT THE GATEWAY TOO, THE LEDGER AND HEALTH SAY
   assert.equal(h.answeredBy, undefined);
   assert.match(h.lastWords ?? '', /^AiError: 5016: this model needs its terms agreed on the account \[cut\]/);
   assert.match(engineSaid(h, T0).text, /^Slash's model has not answered since 22 October\./);
+});
+
+/* THE DIGEST'S ASK AS THE BINDING HEARS IT (B29). `glm-5.3-flash` reasons and spends its thinking from `max_tokens`, so
+   the digest is sent the low effort and the room for it (`LOW_THINKING_ROOM`): at 120 tokens the thinking ran the
+   ceiling out before the two sentences began. */
+test('A DIGEST IS ASKED OF THE FLASH MODEL WITH reasoning_effort LOW AND ROOM TO THINK, as the binding hears it', async () => {
+  const ai = account(() => answer('A quiet week.'));
+  const { slash } = engine(ai);
+  const out = await slash.digestProse(DIGEST);
+  assert.ok(out.ok, JSON.stringify(out));
+  const sent = ai.runs.filter((r) => !r.gateway);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]!.model, '@cf/zai-org/glm-5.3-flash');
+  assert.equal(sent[0]!.inputs['reasoning_effort'], 'low');
+  assert.equal(sent[0]!.inputs['max_tokens'], LOW_THINKING_ROOM);
 });
