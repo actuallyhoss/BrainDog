@@ -1108,8 +1108,36 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
           .filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks') && b.heading !== 'Needs a project' && b.heading !== 'With no project')
           .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
       );
+      /* AND THE BOARD'S READ, ITS LINE AND ITS LIST (audit B of 25 October, Y8), inside the unreleased 1.19.0: the board
+         read by tier and day, fifty at most, the line said nothing of Later, and Everything open stood under it. */
+      const boardBefore = (b: Body): Body => {
+        const { limit: _limit, ...rest } = b;
+        return { ...rest, order: [{ field: 'priority', dir: 'asc' }, { field: 'by', dir: 'asc' }] };
+      };
+      const EVERYTHING_OPEN: Body = {
+        kind: 'table',
+        heading: 'Everything open',
+        icon: 'rows',
+        span: 12,
+        source: 'register.tasks',
+        where: 'state is not backlog or done or dropped',
+        columns: [
+          { field: 'what', width: 'minmax(20ch,1fr)' },
+          { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
+          { field: 'owner', label: 'Owner', width: 'minmax(8ch,14ch)' },
+          { field: 'agent', label: 'Agent', width: '10ch' },
+          { field: 'state', label: 'Status', width: '12ch' },
+          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        when: { metric: 'open-tasks', gt: 0 },
+        limit: 50,
+      };
       return withPage(asked, 'work-board', (now) =>
-        now.filter((b) => b.kind !== 'capture').map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
+        [...now, EVERYTHING_OPEN]
+          .filter((b) => b.kind !== 'capture')
+          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{tasks-later}} for later, ', '') } : b))
+          .map((b) => (b.kind === 'board' ? { ...boardBefore(b), columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
       );
     },
   },
