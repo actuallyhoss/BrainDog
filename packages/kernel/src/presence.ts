@@ -317,6 +317,26 @@ export function presentRuns(sql: Sql, nowMs: number): RunRow[] {
 }
 
 /**
+ * When each of the runs `ids` last came back, from an end or a rest to `active`: its newest `state` event out of idle,
+ * handoff, done or abandoned (the ladder's `REVIVED`). One read over the history, the ids bound as one array; a run
+ * that never came back is not in the map.
+ *
+ * HOW LONG A RUN HAS BEEN AT IT COUNTS FROM HERE, not from when it first opened: a session resumed after two days read
+ * "for 2 days" on the Agents page beside its first five minutes of work.
+ */
+export function revivedAt(sql: Sql, ids: readonly string[]): Map<string, string> {
+  if (ids.length === 0) return new Map();
+  const rows = sql.all<{ target: string; ts: string }>(
+    `SELECT target, max(ts) AS ts FROM event
+      WHERE kind = 'state' AND to_v = '"active"' AND from_v IN ('"idle"', '"handoff"', '"done"', '"abandoned"')
+        AND target IN (SELECT 'entry:' || value FROM json_each(?))
+      GROUP BY target`,
+    JSON.stringify(ids),
+  );
+  return new Map(rows.map((r) => [r.target.slice('entry:'.length), r.ts]));
+}
+
+/**
  * The machines and profiles runs were heard on inside the last `withinMs`, newest heard first and at most `most`: where
  * the composer offers to send an instruction. A run that names neither is left out, and every run is a row, so the caller
  * holds each to what its reader may see.

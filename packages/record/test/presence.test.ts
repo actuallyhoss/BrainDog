@@ -156,3 +156,19 @@ test('PRESENCE READS WHO IS HERE NOW: place, worktree, helpers, the live word an
   assert.equal(refusal(await api.presence({}, { ...lead, registers: ['tasks'] })).code, 'FORBIDDEN');
   sql.close();
 });
+
+test('A RESUMED RUN COUNTS ITS TIME FROM THE RESUME: twelve hours after it stopped, it is at it for minutes', async () => {
+  const { api, sql, clock } = await record();
+  const ctx = agent('c-resume');
+  const run = await opened(api, ctx);
+  clock.advance(20 * MIN);
+  value(await api.handoff({ state: 'idle', doing: 'Working' }, ctx));
+  clock.advance(12 * 60 * MIN);
+  value(await api.attach({ source: 'resume' }, ctx));
+  clock.advance(5 * MIN);
+  value(await api.pulse({}, ctx));
+  const row = value<PresenceRow[]>(await api.presence({}, owner)).find((r) => r.run === run);
+  assert.ok(row, 'the resumed run is not a row');
+  assert.equal(row.for_s, 5 * 60, `for ${String(row.for_s)} s, counted from when it first opened`);
+  sql.close();
+});

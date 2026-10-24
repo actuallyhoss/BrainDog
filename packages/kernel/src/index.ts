@@ -286,7 +286,7 @@ import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
-import { beatRun, presentRuns, pulseRun, seatRun, workingRuns } from './presence.ts';
+import { beatRun, presentRuns, pulseRun, revivedAt, seatRun, workingRuns } from './presence.ts';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */
 import {
   INSTRUCTIONS,
@@ -12524,6 +12524,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     changedSince: (runId: string, stamp: string): Delta => instructionsChangedSince(sql, runId, typeof stamp === 'string' ? stamp : '', clock.now()),
     /** The sessions open now, for `presence` (plan §4.4), newest heard from first. */
     presentRuns: () => presentRuns(sql, clock.now()),
+    /** When each of the runs `ids` last came back to `active` from an end or a rest: `revivedAt(ids) → Map<id, iso>`. */
+    revivedAt: (ids: readonly string[]): Map<string, string> => revivedAt(sql, ids),
     /** The settings row an agent works under: `profileFor({kind, token, host, seat}) → Profile`. */
     profileFor: (who: ProfileWho): Profile => profileMatching(sql, who ?? {}),
     /** Every live settings row, Defaults first; retired ones too when asked. */

@@ -136,6 +136,7 @@ export type PresenceRow = {
   stopped: 'stop' | 'pause' | null;
   helpers: string[];
   parent: string | null;
+  /** Seconds it has been at it this stretch: since it opened, came back, or began writing again, whichever is latest. */
   for_s: number;
   heard_s: number;
   /** Seconds since its last call, `null` when it has made none: how long a run that waits on him has been quiet. */
@@ -409,6 +410,15 @@ export function methods(deps: RecordDeps) {
         if (parent !== null) helpersOf.set(parent, [...(helpersOf.get(parent) ?? []), spoken(r)]);
       }
       const secs = (iso: string | null): number => (iso === null ? 0 : Math.max(0, Math.floor((now - Date.parse(iso)) / 1000)));
+      /* HOW LONG IT HAS BEEN AT IT, FROM THIS STRETCH: the latest of when it opened, when it last came back from an end
+         or a rest (`revivedAt`), and when its current stretch of writes began (`stretch_at`). A session resumed after
+         two days is "for 5 min", not "for 2 days". */
+      const back = kernel.revivedAt(rows.map((r) => r.id));
+      const began = (r: (typeof rows)[number]): string => {
+        const f = r.fields as Record<string, unknown>;
+        const at = [of(f, 'started') ?? r.created_at, back.get(r.id) ?? null, of(f, 'stretch_at')].filter((v): v is string => v !== null && Number.isFinite(Date.parse(v)));
+        return at.reduce((a, z) => (Date.parse(z) > Date.parse(a) ? z : a), at[0] ?? r.created_at);
+      };
       const out: PresenceRow[] = rows
         .filter((r) => (projectSaid === null || of(r.fields, 'project') === projectSaid) && (repoSaid === null || of(r.fields, 'repo') === repoSaid))
         .map((r) => {
@@ -434,7 +444,7 @@ export function methods(deps: RecordDeps) {
             stopped,
             helpers: helpersOf.get(spoken(r)) ?? [],
             parent: of(f, 'parent'),
-            for_s: secs(of(f, 'started') ?? r.created_at),
+            for_s: secs(began(r)),
             heard_s: secs(heard),
             quiet_s: of(f, 'last_seen') === null ? null : secs(of(f, 'last_seen')),
             reach: agent === 'claude' && profile.enforce.hooks ? 'hooks' : 'next_call',
