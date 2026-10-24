@@ -306,7 +306,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the (thirty-nine|forty|forty-one|forty-two) kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the (thirty-nine|forty|forty-one|forty-two|forty-three) kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
