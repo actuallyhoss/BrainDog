@@ -212,7 +212,7 @@
     if (!known) return undefined;
     const named = labelIn(groups, known.id) ?? known.label;
     /* DELETE SAYS WHAT GOES (Y22): "Delete this record", where the index left its own words. The record's name read as
-       its owner's ("Delete Sam"), so the name stays in the sentence under it. */
+       its owner's ("Delete Marta"), so the name stays in the sentence under it. */
     return known.id === 'delete' && named === areaOf('delete')?.label ? copy.deleteRecord : named;
   });
 

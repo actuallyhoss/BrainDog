@@ -58,7 +58,7 @@ export const account = {
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
      the two disagreeing about what the record is called. */
-  /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE (Y22): a record named after its owner read "Delete Sam". */
+  /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE (Y22): a record named after its owner read "Delete Marta". */
   deleteWhat: (record: string): string =>
     `Deleting the record named ${record} removes every list and page, and everything they hold. It cannot be undone.`,
   deleteRecord: 'Delete this record',
