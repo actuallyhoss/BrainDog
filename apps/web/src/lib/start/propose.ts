@@ -153,12 +153,27 @@ function todayIn(zone: string | null): string | null {
 const overlaps = (a: { at: number; text: string }, b: { at: number; text: string }): boolean => a.at < b.at + b.text.length && b.at < a.at + a.text.length;
 
 /**
- * WHAT A USE CASE CLAIMS OF A SENTENCE (`claimedBy`), and for a shop the person's own trade too (audit C, X1): "I run a
- * small ceramics studio" said to Shop is the shop, and it asked for an empty Projects because "studio" is a Projects word.
+ * THE LIST A USE CASE KEEPS ITS ORDERS IN, read off its declarations and never by a name: one with somebody in People
+ * it is for, how many, and the day it is due. `null` for a use case that takes no orders.
+ */
+function ordersOf(u: UseCase): { id: string; name: string } | null {
+  for (const d of (u.pack?.declarations ?? []) as Record<string, unknown>[]) {
+    if (typeof d.register !== 'string' || !Array.isArray(d.fields)) continue;
+    const f = d.fields as { type?: unknown; deadline?: unknown; to?: unknown }[];
+    if (f.some((x) => x.type === 'day' && x.deadline === true) && f.some((x) => x.type === 'ref' && x.to === PEOPLE) && f.some((x) => x.type === 'int'))
+      return { id: d.register, name: u.labels[d.register] ?? (typeof d.name === 'string' ? d.name : d.register) };
+  }
+  return null;
+}
+
+/**
+ * WHAT A USE CASE CLAIMS OF A SENTENCE (`claimedBy`), and for one that takes orders the person's own trade too (audit C,
+ * X1): "I run a small ceramics studio" said to a shop is the shop, and it asked for an empty Projects because "studio"
+ * is a Projects word.
  */
 function claimsOf(c: UseCase, said: string): (span: Said) => boolean {
   const own = claimedBy(c, said);
-  const trade = c.usecase === 'shop' ? TRADE.exec(said)?.indices?.[1] : undefined;
+  const trade = ordersOf(c) !== null ? TRADE.exec(said)?.indices?.[1] : undefined;
   return (span) => own(span) || (trade !== undefined && span.at >= trade[0] && span.at + span.text.length <= trade[1]);
 }
 
@@ -839,21 +854,19 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
 }
 
 /*
- * A BARE WORD FOR MONEY BESIDE A BUSINESS IS THE BUSINESS'S MONEY (audit C, X1): "who owes me money", said by a ceramics
- * studio, took Personal beside the shop and promised it Savings goals, Goals, Log, Put by and Project steps. Personal is
- * taken beside a shop, a small business, a founder or a team only where it heard more than these words.
+ * A BARE WORD FOR MONEY IS MONEY, NEVER A USE CASE BESIDE (audit C, X1): "who owes me money", said by a ceramics studio,
+ * took Personal beside the shop and promised it Savings goals, Goals, Log, Put by and Project steps. A use case taken
+ * beside the one proposed comes only where it heard more than these words; the money itself is kept (`modulesOf`).
  */
-const BUSINESS_READINGS: ReadonlySet<string> = new Set(['shop', 'business', 'founder', 'team']);
 const MONEY_WORDS: ReadonlySet<string> = new Set(['money', 'my money', 'finances', 'bills']);
-function moneyAlone(u: UseCase, beside: UseCase, arranged: ReturnType<typeof arrangeTurns>): boolean {
-  if (beside.usecase !== 'personal' || !BUSINESS_READINGS.has(u.usecase)) return false;
+function moneyAlone(beside: UseCase, arranged: ReturnType<typeof arrangeTurns>): boolean {
   const why = arranged.ranked.find((r) => r.usecase === beside)?.why ?? [];
-  return why.every((w) => MONEY_WORDS.has(w.text.toLowerCase()));
+  return why.length > 0 && why.every((w) => MONEY_WORDS.has(w.text.toLowerCase()));
 }
 
 /*
  * A THING A SHOP DOES ON A DAY (audit C, X1): "kiln firings", "bookings", "deliveries". The orders a shop keeps carry the
- * day each is due, so a dated thing said beside a shop is said as its Orders by day, where it was not heard at all and
+ * day each is due (`ordersOf`), so a dated thing said beside one is said as its orders by day, where it was not heard at all and
  * the one thing she said she loses track of went unsaid. At most one word before it, never a joining word.
  */
 const DATED = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?!${JOIN}\\s)[\\p{L}'’-]+\\s+)?(?:firings|bookings|deliveries|fittings|collections|pickups|pick-ups)(?![\\p{L}\\p{N}])`, 'giu');
@@ -883,7 +896,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const read = unrefused(all, no);
   const arranged = unrefusedCases(turns, no);
   const u = read.declined === 'language' ? null : arranged.pick;
-  const beside = u ? alongside(arranged, u).filter((b) => !moneyAlone(u, b, arranged)) : [];
+  const beside = u ? alongside(arranged, u).filter((b) => !moneyAlone(b, arranged)) : [];
   const modules = modulesOf(read, said, name.name !== null, u, beside, offers);
 
   const where = heardAt(sentence);
@@ -906,10 +919,9 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   /* A PHRASE A USE CASE HEARD COUNTS AS HEARD, where no phrase already said covers it: "orders" became Orders. */
   for (const { c, why } of cases) for (const w of why) if (!heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, w))) heard.push(line(w.at, w.text, caseBecame(c, w.text)));
   /* A DATED THING SAID BESIDE A SHOP IS ITS ORDERS BY DAY (`DATED`), where nothing else heard it and it was not refused. */
-  const shop = cases.find((x) => x.c.usecase === 'shop')?.c;
-  const orders = shop ? caseLists(shop).find((l) => l.id === 'orders') : undefined;
-  if (shop && orders && read.declined === null)
-    for (const d of datedIn(said)) if (!no(d) && !heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, d))) heard.push(line(d.at, d.text, firstRun.heardByDay(shop.labels.orders ?? orders.name)));
+  const orders = cases.map((x) => ordersOf(x.c)).find((l) => l !== null) ?? null;
+  if (orders && read.declined === null)
+    for (const d of datedIn(said)) if (!no(d) && !heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, d))) heard.push(line(d.at, d.text, firstRun.heardByDay(orders.name)));
   heard.sort((a, b) => a.at - b.at);
   /* A PHRASE IS LIT WHOLE (`WHOLE`): "shop" heard inside "a small candle shop" is said as the phrase the person wrote,
      and "freelance" inside "freelance as a designer" as their Clients and Invoices, People then called Clients. */

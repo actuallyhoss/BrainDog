@@ -26,6 +26,9 @@
  * carries it. Nobody types a code.
  */
 
+import { USE_CASES } from '@braindog/seed/usecases';
+
+import { GREETINGS } from './who.ts';
 import { playedBy } from './start/parts.ts';
 import type { Reply } from './first-run.ts';
 import type { Asked as Answered, FirstAsked, SetupAsked, SetupReply } from './start/ask.ts';
@@ -218,10 +221,13 @@ function wholeName(typed: string): string | null {
   return HANDABLE.test(n) && !SPOKEN.test(n) ? n : null;
 }
 
-/* The words that name a mailbox and never a person: "info@", "hello@", "studio@". */
+/* The words that name a mailbox and never a person: "info@", "hello@", "studio@". With them, a greeting (`GREETINGS`)
+   and any word a use case this build ships listens for (its `signals`, read off it), so "shop@" is nobody either. */
 const MAILBOXES: ReadonlySet<string> = new Set([
-  'info', 'hello', 'hi', 'hey', 'admin', 'contact', 'mail', 'email', 'office', 'team', 'sales', 'support', 'help', 'studio', 'shop',
-  'store', 'orders', 'billing', 'accounts', 'enquiries', 'inquiries', 'noreply', 'test', 'user', 'me', 'home', 'work', 'design',
+  'info', 'admin', 'contact', 'mail', 'email', 'office', 'sales', 'support', 'help', 'studio', 'store', 'billing',
+  'enquiries', 'inquiries', 'noreply', 'test', 'user', 'me', 'home', 'design',
+  ...GREETINGS,
+  ...USE_CASES.flatMap((u) => u.signals),
 ]);
 
 /**

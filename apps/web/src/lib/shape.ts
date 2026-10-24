@@ -97,7 +97,9 @@ const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4
 const COUNT = `(\\d{1,3}|${Object.keys(NUMBER_WORDS).join('|')})`;
 /* AND A COUNT OF PEOPLE BY THEIR WORK after "with", "have" or "employ" (audit C, X1): "a ceramics studio with two
    potters" went unheard. A word that ends as a worker's does, never one of the things a shop counts ("two orders"). */
-const WORKERS = `(?!(?:orders|others|numbers|letters|papers|posters|stickers|flyers|covers|layers|markers|containers|folders|filters|shoulders|answers)(?![\\p{L}]))[\\p{L}]+(?:ers|ors|ists|ians)`;
+/* A thing a shop counts that ends as a worker's word does, by its stem: "two orders", "two others", "two posters". */
+const THINGS_COUNTED = ['ord', 'oth', 'numb', 'lett', 'pap', 'post', 'stick', 'fly', 'cov', 'lay', 'mark', 'contain', 'fold', 'filt', 'should', 'answ'];
+const WORKERS = `(?!(?:${THINGS_COUNTED.join('|')})ers(?![\\p{L}]))[\\p{L}]+(?:ers|ors|ists|ians)`;
 const TEAM = new RegExp(`\\b(?:${COUNT}[- ](?:person|people|of us)|team of ${COUNT}|(?<=\\b(?:with|have|employ|hired?)\\s+)${COUNT}\\s+${WORKERS})\\b`, 'giu');
 const SOLO = /\b(?:just me|on my own|solo)\b/iu;
 
