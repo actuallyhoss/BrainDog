@@ -101,6 +101,33 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
 export const answerQuestion = (base: string, id: string, option: string, reason?: string, io?: Fetch, rows?: number[], parts?: string[]): Promise<Written> =>
   writeDecision(base, id, { decide: { option, ...(reason !== undefined ? { reason } : {}), ...(rows ? { rows } : {}), ...(parts ? { parts } : {}) } }, io);
 
+/**
+ * What a group answer came back as: how many were written, the decision one Undo takes back (any of them, since they
+ * share one batch), and each member the record refused with its own sentence.
+ */
+export type WrittenMany =
+  | { from: 'written'; done: number; decision: string | null; refused: { id: string; fix: string }[] }
+  | { from: 'refused'; fix: string }
+  | { from: 'conflict'; fix: string };
+
+/** Answer several the same way in one call (`decide { ids }`), so the record moves once and one Undo puts all back. */
+export async function answerMany(base: string, ids: readonly string[], option: string, reason?: string, io?: Fetch): Promise<WrittenMany> {
+  if (ids.length === 0 || option === '' || (reason !== undefined && reason.trim() === '')) return { from: 'refused', fix: copy.reasonRequired };
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ decided?: unknown; refused?: unknown }>('decide', { ids: [...ids], decide: { option, ...(reason !== undefined ? { reason: reason.trim() } : {}) } });
+  if (out.ok) {
+    forget();
+    const decided = Array.isArray(out.value?.decided) ? (out.value.decided as { decision?: unknown }[]) : [];
+    const refused = Array.isArray(out.value?.refused)
+      ? (out.value.refused as { id?: unknown; fix?: unknown }[]).flatMap((r) => (typeof r.id === 'string' && typeof r.fix === 'string' ? [{ id: r.id, fix: r.fix }] : []))
+      : [];
+    const first = decided.find((d) => typeof d.decision === 'string')?.decision;
+    return { from: 'written', done: decided.length, decision: typeof first === 'string' ? first : null, refused };
+  }
+  if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
+  return { from: 'refused', fix: out.refusal.fix };
+}
+
 /** Park one until a day, with why it can wait. */
 export const parkQuestion = (base: string, id: string, until: string, why: string, io?: Fetch): Promise<Written> =>
   writeDecision(base, id, { defer: { until, why } }, io);

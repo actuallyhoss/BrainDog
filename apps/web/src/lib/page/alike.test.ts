@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { alikeOf, memberLines, sharedOptions } from './alike.ts';
+import { alikeOf, alikeWords, memberLines, runFamily, sharedOptions, sharedWays } from './alike.ts';
 
 const opt = (key: string) => ({ key, label: key, because: '', recommended: false });
 const q = (id: string, cause: string | undefined, alike: number, keys = ['accept', 'dismiss']): QueueQuestion =>
@@ -78,4 +78,40 @@ test('bank texts matched to another account, or from another ingest, are another
 
 test("a cause's overflow question is the cause it overflowed", () => {
   assert.deepEqual(alikeOf([q('a', 'rule#c1', 1), q('b', 'rule#c1#2', 1)]).map((e) => e.kind), ['many']);
+});
+
+/* ONE RUN'S CLEANUP, as S904 left his record on 24 October: rowsets, each its own cause, and two calls asked as options. */
+const ran = (id: string, kind: 'rowset' | 'options', run = 'S904'): QueueQuestion =>
+  ({
+    id,
+    who: run,
+    at: '2026-10-23T20:00:00.000Z',
+    kind,
+    body_kind: kind,
+    question: `Change ${id}?`,
+    why: '',
+    cost: 'undo',
+    options: kind === 'options' ? ['yes', 'no'].map(opt) : [],
+    cause: `rowset#${id}`,
+    alike: 1,
+    run: { id: run, name: 'Tidy projects, tasks, handoffs, tools, services and people', app: 'Claude Code' },
+  }) as unknown as QueueQuestion;
+
+test("one run's 24 rowsets fold into one card, and its two options questions stay apart", () => {
+  const queue = [ran('SG281', 'options'), ...Array.from({ length: 24 }, (_, i) => ran(`SG${300 + i}`, 'rowset')), ran('SG288', 'options'), q('SG9', 'c9', 1)];
+  const out = alikeOf(queue);
+  assert.deepEqual(out.map((e) => e.kind), ['one', 'many', 'one', 'one']);
+  const many = out[1]!;
+  assert.ok(many.kind === 'many');
+  assert.equal(many.rest.length + 1, 24);
+  assert.deepEqual(runFamily(many.lead, many.rest), { id: 'S904', name: 'Tidy projects, tasks, handoffs, tools, services and people' });
+  /* A rowset lists no options, and the card still offers Accept and Decline on all of them. */
+  assert.deepEqual(sharedWays(many.lead, many.rest).map((w) => w.key), ['accept', 'reject']);
+  assert.equal(alikeWords.fromRun(24, 'Tidy projects'), 'Approve all 24 from Tidy projects?');
+});
+
+test('two rowsets from one run are not a run family, and two runs are two families', () => {
+  assert.deepEqual(alikeOf([ran('a', 'rowset'), ran('b', 'rowset')]).map((e) => e.kind), ['one', 'one']);
+  const two = alikeOf([ran('a', 'rowset'), ran('b', 'rowset'), ran('c', 'rowset'), ran('x', 'rowset', 'S905'), ran('y', 'rowset', 'S905'), ran('z', 'rowset', 'S905')]);
+  assert.deepEqual(two.map((e) => (e.kind === 'many' ? e.lead.id : e.q.id)), ['a', 'x']);
 });

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
-import { answerQuestion, parkQuestion } from './decide-write.ts';
+import { answerMany, answerQuestion, parkQuestion } from './decide-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -90,4 +90,15 @@ test('accepting some rows of several sends their places beside the option, and a
   assert.deepEqual(sent[0]!.body, { id: 'SG6', decide: { option: 'accept', reason: 'Only the two I use.', rows: [0, 2] } });
   await answerQuestion(BASE, 'SG7', 'accept', 'All of them.', io);
   assert.deepEqual(sent[1]!.body, { id: 'SG7', decide: { option: 'accept', reason: 'All of them.' } });
+});
+
+test('a group is one decide call with its ids, and says what was written, the decision to undo, and who was refused', async () => {
+  const fix = 'SG3 is resolved, and a decision is made once.';
+  const { io, sent } = host(() =>
+    json(200, { ok: true, value: { batch: 'b1', decided: [{ id: 'SG1', decision: 'D4' }, { id: 'SG2', decision: 'D5' }], refused: [{ id: 'SG3', fix }] } }),
+  );
+  const out = await answerMany(BASE, ['SG1', 'SG2', 'SG3'], 'accept', undefined, io);
+  assert.deepEqual(out, { from: 'written', done: 2, decision: 'D4', refused: [{ id: 'SG3', fix }] });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0]!.body, { ids: ['SG1', 'SG2', 'SG3'], decide: { option: 'accept' } });
 });
