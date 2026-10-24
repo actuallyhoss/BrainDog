@@ -454,7 +454,7 @@ test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN TH
   assert.ok(k.create('tasks', { what: 'Left since the spring', state: 'open' }, { actor: 'p_1' }).ok);
   now = NOW;
   const page = opened(k, 'work');
-  const whose = (page.filters ?? []).find((f) => f.field === 'whose');
+  const whose = ((page.filters ?? []) as { field: string; values: { label: string; count: number }[] }[]).find((f) => f.field === 'whose');
   assert.ok(whose, 'Work has no filter by whose work it is');
   assert.deepEqual(whose.values.map((v) => v.label), ['Yours', 'Agents']);
   assert.ok(whose.values.every((v) => v.count > 0), 'the sample holds work of both');

@@ -24,11 +24,11 @@ const working = (entries: LiveBlock['entries'], cells: string[][] = []): LiveBlo
   }) as unknown as LiveBlock;
 
 test('THE RUNS AT WORK ARE READ OFF THE BLOCK: the agent, what it is doing, the project by its cell and when it began', () => {
-  const b = working([{ seq: 7, fields: { agent: 'claude', doing: 'Fix the hero' }, created: '2026-10-24T11:30:00Z' }] as never, [['Claude', 'Fix the hero', 'Encore', '']]);
+  const b = working([{ seq: 7, fields: { agent: 'claude', doing: 'Fix the hero' }, created: '2026-10-24T11:30:00Z' }] as never, [['Claude', 'Fix the hero', 'Kiln', '']]);
   const [run] = runsOf(b);
   assert.equal(run?.seq, 7);
   assert.equal(run?.doing, 'Fix the hero');
-  assert.equal(run?.project, 'Encore');
+  assert.equal(run?.project, 'Kiln');
   assert.equal(run?.since, '2026-10-24T11:30:00Z');
 });
 
