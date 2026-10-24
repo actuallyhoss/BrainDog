@@ -154,11 +154,17 @@ function statusSaid(status: number | null, outcome: string | null): string {
   return 'its last run did not finish';
 }
 
+/**
+ * NOTHING HERE CALLS OUT ON A CLOCK. An action is a web call a record makes on a schedule (`ACTION_KINDS`), and "no
+ * action runs on a schedule" stood beside scripts and digests that run daily (audit 25 October, Y5), so it says which.
+ */
+const NO_WEB_CALL = 'No web call runs on a schedule on this record.';
+
 /* ── actions-paused ────────────────────────────────────────────────────── */
 
 function readActionsPaused(sql: Sql, nowMs: number, tz: string): SignReading {
   const actions = listActions(sql, nowMs);
-  if (actions.length === 0) return reading('none', null, 'No action runs on a schedule on this record.');
+  if (actions.length === 0) return reading('none', null, NO_WEB_CALL);
   const paused = actions.filter((a) => a.state === 'paused');
   const facts = [`${count(actions.length, 'action')} on a schedule, ${paused.length} paused.`];
   if (paused.length <= ACTIONS_PAUSED_MOST) return reading('green', paused.length, 'No action that runs on a schedule is paused.', facts);
@@ -171,7 +177,7 @@ function readActionsPaused(sql: Sql, nowMs: number, tz: string): SignReading {
 
 function readActionsHeld(sql: Sql, nowMs: number): SignReading {
   const actions = listActions(sql, nowMs);
-  if (actions.length === 0) return reading('none', null, 'No action runs on a schedule on this record.');
+  if (actions.length === 0) return reading('none', null, NO_WEB_CALL);
   const held = actions.filter((a) => a.month.held > 0).sort((a, b) => b.month.held - a.month.held);
   const total = held.reduce((n, a) => n + a.month.held, 0);
   if (total <= ACTIONS_HELD_MOST) return reading('green', total, "The plan's limit held no run this month.", [`${count(actions.length, 'action')} on a schedule.`]);

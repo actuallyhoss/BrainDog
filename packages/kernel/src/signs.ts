@@ -370,6 +370,13 @@ const DECLARED = `WITH declared AS MATERIALIZED (SELECT json_extract(body, '$.me
     WHERE NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source) AND mp.source NOT LIKE 'night.%')`;
 const ARRIVED = '(mp.series, mp.source) IN (SELECT series, source FROM arrived)';
 
+/**
+ * NOTHING BRINGS NUMBERS IN ON A SCHEDULE, said as that. A record whose numbers were typed or imported holds thousands
+ * of them, and "No numbers come in on this record yet" stood over 2,527 (audit 25 October, Y5). The sign judges what
+ * arrives on a clock, so that is what it says is missing.
+ */
+const NO_NUMBER_FEED = 'No number arrives on a schedule on this record, so there is nothing to judge by.';
+
 function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   const feeds = feedsOn(sql);
   const late = feeds.filter((f) => nowMs - f.lastGoodMs > FEED_LATE_PERIODS * f.everyMs);
@@ -393,7 +400,7 @@ function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
     const every = intervalMs(String(y.every ?? ''));
     return every === null ? [] : [{ series: y.series, newest: y.newest, every }];
   });
-  if (feeds.length === 0 && series.length === 0 && young.length === 0) return reading('none', null, 'No numbers come in on this record yet.');
+  if (feeds.length === 0 && series.length === 0 && young.length === 0) return reading('none', null, NO_NUMBER_FEED);
   const stale: { name: string; newestMs: number }[] = [];
   const judged: { series: string; newest: string; every?: number }[] = [...series, ...young];
   /* EACH SERIES' LAST THIRTY TIMES IN ONE READ, newest first. A read a series made the figures' declarations again for

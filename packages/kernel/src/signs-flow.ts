@@ -126,7 +126,24 @@ function readPaused(sql: Sql): SignReading {
   return reading('red', paused.length, `${count(paused.length, 'script is', 'scripts are')} paused: ${names(paused.map((s) => s.name))}.`, facts);
 }
 
-function readRefused(sql: Sql, _nowMs: number, tz: string): SignReading {
+/**
+ * THE FIRST OF THIS CALENDAR MONTH, UTC, as Automations counts its month (`record/src/automations.ts`), so a green sign
+ * and the screen it watches count the same runs (audit 25 October, Y5).
+ */
+const monthFrom = (nowMs: number): string => `${new Date(nowMs).toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+
+/**
+ * THE MONTH'S FAILURES SAID AFTER A GREEN SENTENCE: " 2 runs were refused earlier this month: Gold price." A sign
+ * judges the last run or the last week, and it said "every script finished" under a month Automations counted four
+ * failures in. What is judged does not move; the sentence says the rest. Nothing to say says nothing.
+ */
+function earlier(who: readonly string[], verb: 'refused' | 'failed'): string {
+  if (who.length === 0) return '';
+  const runs = verb === 'refused' ? count(who.length, 'run was', 'runs were') : count(who.length, 'run');
+  return ` ${runs} ${verb} earlier this month: ${names(tally(who).map(([n]) => n))}.`;
+}
+
+function readRefused(sql: Sql, nowMs: number, tz: string): SignReading {
   const scripts = installedScripts(sql);
   if (scripts.length === 0) return reading('none', null, 'No script is installed on this record.');
   /* THE LAST RUN THAT RAN THE SOURCE NOW INSTALLED, as the pause reads it: `ok` or `refused`, signed by this version.
@@ -144,7 +161,18 @@ function readRefused(sql: Sql, _nowMs: number, tz: string): SignReading {
   if (last.length === 0) return reading('none', null, 'No installed script has run yet.');
   const refused = last.filter((r) => r.outcome === 'refused');
   const facts = [`${count(last.length, 'script has', 'scripts have')} run, ${refused.length} refused on the last run.`];
-  if (refused.length <= SCRIPTS_REFUSED_MOST) return reading('green', refused.length, 'Every script that ran finished its last run.', facts);
+  if (refused.length <= SCRIPTS_REFUSED_MOST) {
+    /* EVERY REFUSAL OF AN INSTALLED SCRIPT THIS MONTH, whichever version ran: the runs Scripts counts on its page. */
+    const before = sql
+      .all<{ target: string }>(
+        `SELECT target FROM event WHERE kind = 'pull' AND target IN (SELECT value FROM json_each(?)) AND ts >= ? AND json_valid(to_v)
+          AND json_extract(to_v, '$.outcome') = 'refused' ORDER BY rowid`,
+        JSON.stringify(scripts.map((s) => `declaration:script.${s.bare}`)),
+        monthFrom(nowMs),
+      )
+      .map((e) => scripts.find((s) => `declaration:script.${s.bare}` === e.target)!.name);
+    return reading('green', refused.length, `Every script that ran finished its last run.${earlier(before, 'refused')}`, facts);
+  }
   facts.push(...refused.map((r) => `${r.name} was refused on ${daySaid(r.ts, tz)}: it ${whyRefused(r.note, r.log)}.`));
   if (refused.length === 1) return reading('red', 1, `${refused[0]!.name} did not finish its last run: it ${whyRefused(refused[0]!.note, refused[0]!.log)}.`, facts);
   return reading('red', refused.length, `${refused.length} scripts did not finish their last run: ${names(refused.map((r) => `${r.name} ${whyRefused(r.note, r.log)}`))}.`, facts);
@@ -236,7 +264,12 @@ function readFailed(sql: Sql, nowMs: number): SignReading {
   if (runs.length === 0) return reading('none', null, `No automation has run in ${FLOW_WINDOW_DAYS} days.`);
   const failed = runs.filter((r) => r.state === 'failed');
   const facts = [`${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days, ${failed.length} failed.`];
-  if (failed.length <= AUTOMATIONS_FAILED_MOST) return reading('green', 0, `None of ${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days failed.`, facts);
+  if (failed.length <= AUTOMATIONS_FAILED_MOST) {
+    const before = sql
+      .all<{ rule: string }>("SELECT rule FROM automation_run WHERE state = 'failed' AND started_at >= ? AND coalesce(finished_at, started_at) < ? ORDER BY rowid", monthFrom(nowMs), since)
+      .map((r) => ruleName(sql, r.rule));
+    return reading('green', 0, `None of ${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days failed.${earlier(before, 'failed')}`, facts);
+  }
   const who = tally(failed.map((r) => ruleName(sql, r.rule)));
   facts.push(...who.map(([name, n]) => `${name} failed ${n === 1 ? 'once' : `${n} times`}.`));
   return reading('red', failed.length, `${count(failed.length, 'automation run')} failed in ${FLOW_WINDOW_DAYS} days: ${names(who.map(([name]) => name))}.`, facts);
