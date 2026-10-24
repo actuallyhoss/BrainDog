@@ -314,7 +314,7 @@ const opened = (k: Kernel, slug: string): Drawn[] => value<{ blocks: Drawn[] }>(
 const BLOCKS_16 = JSON.parse(readFileSync(new URL('./fixtures/agents-page-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
 
 /** The two lines 1.17.0 declares, one drawn: how many are at work and how many steps are up next, or nobody. */
-const LINES_17 = ['{{runs-working}} at work, {{handoffs-open}} step(s) up next', 'Nobody at work. {{handoffs-open}} step(s) up next'];
+const LINES_17 = ['{{runs-working}} at work, {{handoffs-open}} step(s) up next', 'Nobody working right now. {{handoffs-open}} step(s) up next'];
 const headed = (blocks: Drawn[], heading: string): Drawn => {
   const found = blocks.find((b) => b.heading === heading);
   assert.ok(found, `no block headed ${heading}`);
@@ -976,8 +976,10 @@ test('AGENTS 1.16.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, fie
 });
 
 /* WHAT 1.17.0 DECLARES, AS ONE MARK: the runs console (`back17` puts 1.16.0's page back). A change before 1.17.0 is
-   released sets the mark again and says what moved; one after it is a version with a mark of its own. */
-const MARK_17 = 'aee177d1b677edf3';
+   released sets the mark again and says what moved; one after it is a version with a mark of its own. SET AGAIN ON 24
+   OCTOBER (H26, the look on his record): the line with nobody working says "Nobody working right now." where it said
+   "Nobody at work." over a tile called At work holding quiet runs; words only. */
+const MARK_17 = 'f08de1ee6253fda3';
 test('AGENTS 1.17.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and moved no list, field or figure', () => {
   const doc = doc17() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.17.0', 'a new version takes a mark of its own beside this one');

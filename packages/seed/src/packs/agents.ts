@@ -436,7 +436,12 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          for the next run, and nothing else. "Claude on BrainDog and Claude are at work. 5 steps left for the next run"
          said Claude twice and named nothing the rows under it did not say better, so the line is two numbers and the
          rows name who and what. A clause whose figure is nought is left out by the writer, so a record where nothing is
-         working and nothing was left says "Nobody at work." and stops.
+         working and nothing was left says "Nobody working right now." and stops.
+
+         "NOBODY WORKING RIGHT NOW", WHERE IT SAID "Nobody at work." (H26, the look on his record of 24 October): At work
+         also lists the runs waiting on him that called inside three hours, each saying how long it has been quiet, so
+         the page opened on "Nobody at work." over a tile called At work with two runs in it. Nobody is working; those
+         runs are open and quiet, and their rows say so.
 
          EVERY NUMBER IS THE RECORD'S OWN, by the one clock the rail's count is (`runs-working`), and the steps are
          `handoffs-open`, the ones Up next draws, so the line and the rows cannot say two numbers. Exactly one is drawn. */
@@ -452,7 +457,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         lead: true,
         span: 12,
         when: { metric: 'runs-working', is: 0 },
-        body: 'Nobody at work. {{handoffs-open}} step(s) up next',
+        body: 'Nobody working right now. {{handoffs-open}} step(s) up next',
       },
       /* THE CONTROL ROOM'S BOX (agents and MCP plan §2.1, §7.1): one field to tell an agent, to a named run, a kind of
          agent or whoever is next, on a project, now or at its next start, with what happens next said in words; and

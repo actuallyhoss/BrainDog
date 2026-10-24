@@ -112,7 +112,7 @@ test('the decision: four a kind, the first leads, and none for a project with ke
     assert.equal(out.body.rows.length, 4);
     assert.deepEqual(out.body.rows.map((r) => r.headline), [true, false, false, false]);
     assert.ok(out.question.length <= 280);
-    assert.doesNotMatch(out.question, /—/u);
+    assert.doesNotMatch(out.question, /\u2014/u);
   }
   assert.ok('nothing' in kindDrafts(project(), []));
   assert.ok('nothing' in kindDrafts(project('client'), [{ id: 'e_kpis_1', fields: { thing: 'e_things_1' } }]));
