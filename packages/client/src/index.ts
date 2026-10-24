@@ -1348,8 +1348,11 @@ let METRIC_BATCHING = false;
 export function batchMetrics(on: boolean): void {
   METRIC_BATCHING = on;
 }
-/** How long a wave of figures waits for more to join it: a page's own reads land within it, a click never does. */
-export const METRIC_WAVE_MS = 40;
+/**
+ * How long a wave of figures waits for more to join it: a page's own reads land within it, a click never does. A revisit
+ * pays it too, so it is short: 40 ms put a project revisit over its 100 ms budget.
+ */
+export const METRIC_WAVE_MS = 8;
 /** The most figures one `metrics` names, as the record takes them (`METRICS_MOST`). */
 const METRICS_WAVE_MOST = 50;
 type MetricWave = { asked: Map<string, ((r: Result<unknown>) => void)[]>; send: (name: string, args: Record<string, unknown>) => Promise<Result<unknown>> };
