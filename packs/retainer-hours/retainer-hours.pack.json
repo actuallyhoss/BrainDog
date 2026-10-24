@@ -1,9 +1,10 @@
 {
   "pack": "retainer-hours",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Agency",
   "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
-  "changes": "The first version.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <4.0.0" } },

@@ -222,7 +222,10 @@ export function readPreview(doc: unknown): Result<Preview> {
 }
 
 /** The entries a marketplace may list: every one but those whose file says `unlisted`. Installing by id reads `entries` whole. */
-export const listedEntries = (index: CatalogueIndex): CatalogueEntry[] => index.entries.filter((e) => e.unlisted !== true);
+/* AND AN ENTRY WITH NO VERSION LEFT TO INSTALL IS NOT LISTED (the scope of 24 October, E17): `feed-example` and
+   `rates-open-er-api-com` had every version yanked and still stood in the store under their ids, offering nothing. A
+   record that holds one still reads it by id, as an unlisted one is read. */
+export const listedEntries = (index: CatalogueIndex): CatalogueEntry[] => index.entries.filter((e) => e.unlisted !== true && e.versions.some((v) => v.yanked === undefined));
 
 /** The version an entry offers to install or update to: its newest that is not yanked, or `null` when every one is. */
 export const offeredVersion = (entry: Pick<CatalogueEntry, 'versions'>): CatalogueVersion | null => entry.versions.find((v) => v.yanked === undefined) ?? null;

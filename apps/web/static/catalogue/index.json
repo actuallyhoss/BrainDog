@@ -788,8 +788,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "05d64a8fbf7d069739142ff85dd3c2bb3544e2c7f8f4285dd1a5516c4d4b381b",
+          "bytes": 2316,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Items"
+            ],
+            "pages": [
+              "Hello"
+            ],
+            "rules": [],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "21b6bdbe1b58df1ac7edb36fb8d862a792e54e4f71a14ff1eff51fced7bd3877",
@@ -821,7 +843,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -991,8 +1014,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "b814b6dffe9ca038b19d7c8bcb75785117ee0e4775a62c758df211f351e874c3",
+          "bytes": 14463,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Properties",
+              "Tenancies",
+              "Rent received",
+              "Repairs"
+            ],
+            "pages": [
+              "Lettings",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "b13b97e1261fbfb24a4efe190a325f0a45c39187c4615fb49dfe6acfe0cfa2c4",
@@ -1030,7 +1081,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -1788,8 +1840,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "f06b6b3366f7d775e6afac2b4abac4659457f0df65b484831f776d95eb9bb8aa",
+          "bytes": 17502,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Projects",
+              "Next steps",
+              "Decisions",
+              "Weekly notes"
+            ],
+            "pages": [
+              "Your project",
+              "This week"
+            ],
+            "rules": [
+              "Ask what comes next when a step is ticked"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "6c7eceaec568afc19afc8554ec8d4b45f96c0a0dd5573b1a7fb148d0dabe3391",
@@ -1827,7 +1907,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -1967,8 +2048,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "306af229058f3c8062a92333bcff89921e5c58568218f6d8b9c1b29d5b80d772",
+          "bytes": 11023,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Shoots",
+              "Deliverables",
+              "Gear"
+            ],
+            "pages": [
+              "Shoots",
+              "Due",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "84fbac31b6cf6e57069b367bc630c036feb3626d6d04a70e8fd49659d9e37f8c",
@@ -2006,7 +2115,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -2129,8 +2239,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "946a474747dac436b6608d3a55d642855ab5fc66956081b75e19d03e6acb5f8b",
+          "bytes": 12192,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed."
+        },
         {
           "version": "1.2.0",
           "checksum": "f6d0a77ad5e38c2708fb3a98431f01b8cf12c9b8769ae529f3388d0e1dcd7169",
@@ -2223,7 +2361,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -2530,8 +2669,38 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "780b5daaf3ad93a1c255f28b4cf2207ec30d927446528d51ed5145079a2ef109",
+          "bytes": 11998,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "fcdc838297f0f018ff9dbe2002d37272eb8f243f5b0fb950dc682c29c0a2c4cd",
@@ -2571,7 +2740,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -2645,8 +2815,45 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "d1edfb3525667f31be9d058b51f8d846873ddbcf26f00691b05903d5436d8cf1",
+          "bytes": 16821,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work",
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Values",
+              "Blocks",
+              "Counts",
+              "Layout",
+              "Tab 5",
+              "Tab 6",
+              "Tab 7",
+              "Tab 8",
+              "Tab 9",
+              "Tab 10",
+              "Tab 11",
+              "Tab 12",
+              "Tab 13",
+              "Tab 14",
+              "Counts on {{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "b9901cbc3b2a3cd7e2d3876a681655a34e6b665a091c8e3d54abcb91f1063a2b",
@@ -2730,7 +2937,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -2740,8 +2948,37 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "2bac7b433fd9a02d7a4976a9d1928c6dae172b83b1355ec9d87988cc2198090c",
+          "bytes": 15110,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed."
+        },
         {
           "version": "1.0.0",
           "checksum": "c9ffc28cec772297ac9a9213775cda8f7fb433102b07214b45c9eb94b878c33c",
@@ -2780,7 +3017,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -3035,8 +3273,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "7d03694a62b61f47b81c71854b96ef5887d1b3f61c342c2c9519a7e260c7c0b4",
+          "bytes": 16430,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Reading list",
+              "Study sessions"
+            ],
+            "pages": [
+              "Studies"
+            ],
+            "rules": [
+              "Ask whether to plan study for a new assignment"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "6fca0ee3daf192521944445c5a17034c9cdb37ca58bc065a391adc514bc0db8c",
@@ -3073,7 +3338,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",
@@ -3125,8 +3391,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "bbbb6adb0413cd66bbf9b4a2083c7dfd0662283b0c39af6e0fc8d6fd66dc2d6a",
+          "bytes": 11830,
+          "published_at": "2026-10-24T05:00:19.246Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Team",
+              "Team tasks"
+            ],
+            "pages": [
+              "Board",
+              "Who is doing what"
+            ],
+            "rules": [
+              "Ask what unblocks a blocked task"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "59bdde9310548e35e5aa403f861c761113fb1ebac3e6bbd4ab5aa314276482e7",
@@ -3162,7 +3454,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",

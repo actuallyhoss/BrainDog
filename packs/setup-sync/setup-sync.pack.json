@@ -1,9 +1,10 @@
 {
   "pack": "setup-sync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Setup sync",
   "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, sealed on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
-  "changes": "The first version.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

@@ -1,9 +1,10 @@
 {
   "pack": "team-board",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Team task list",
   "summary": "Tasks with an owner, a person or an agent, a status and a priority, a board to move them across, and a page that says who is doing what right now, fed by agent sessions.",
-  "changes": "The first version.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

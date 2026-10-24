@@ -1,9 +1,10 @@
 {
   "pack": "hello",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Hello",
   "summary": "A list of things to do and a page showing what is still open: the smallest useful add-on, in the shape braindog pack new starts every one.",
-  "changes": "A record with seeds and no tags field refused its own rule with FIELD_UNKNOWN, like the CLI starter this pack copies; items now declares tags.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "made_at": "2026-10-24T05:00:19.246Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Item",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "due",
+              "label": "Due",
+              "width": "14ch"
+            }
+          ],
+          "empty": "Nothing is open.",
+          "heading": "Open",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.items",
+          "span": 12,
+          "where": "state is open",
+          "key": "k19cc20o",
+          "rows": [
+            {
+              "id": "01M5P4FYXEC65EMBY5M4JHGDVM",
+              "register": "items",
+              "seq": 1,
+              "fields": {
+                "state": "open",
+                "name": "Write the first real item",
+                "due": "2026-10-01",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-10-24T05:00:19.246Z",
+              "updated_at": "2026-10-24T05:00:19.246Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 10,
+        "section": "Hello"
+      },
+      "page": "hello",
+      "requires": [
+        "register.items"
+      ],
+      "title": "Hello",
+      "read_at": "2026-10-24T05:00:19.246Z",
+      "zone": "UTC",
+      "look": {
+        "look": "hello",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

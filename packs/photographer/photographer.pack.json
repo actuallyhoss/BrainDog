@@ -1,9 +1,10 @@
 {
   "pack": "photographer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Photographer",
   "summary": "Shoots from the first enquiry to the fee paid, what each one still owes the client and by when, and the gear with the day its cover ends.",
-  "changes": "The first version.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <4.0.0" } },

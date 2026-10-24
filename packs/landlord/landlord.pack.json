@@ -1,9 +1,10 @@
 {
   "pack": "landlord",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Landlord",
   "summary": "The flats and houses you rent out, each tenancy with its rent, deposit and end day, the rent that came in and the repairs. Says what is due this month, what arrived, who has not paid, what is empty and which tenancy ends next.",
-  "changes": "The first version.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <4.0.0" } },

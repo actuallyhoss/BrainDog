@@ -1,0 +1,486 @@
+{
+  "pack": "rule-sheet",
+  "version": "1.1.1",
+  "title": "Rule sheet",
+  "summary": "Fourteen pages that draw every rule of a value, a block and a layout on your own record, so a check can read each rule where a person sees it.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "work": "^1.0.0",
+      "portfolio": "^1.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "page": "rule-sheet-values",
+      "title": "Values",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 10,
+        "tabs": true
+      },
+      "icon": "notebook-pen",
+      "requires": [
+        "register.tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "document": true,
+          "heading": "Values in text",
+          "span": 12,
+          "body": "Each line below names one rule of a value written in text, then shows the value itself, so a reader can check the two agree.\n\n## Values read from the record\n\nA figure by its name: {{open-tasks}} tasks are open.\n\nHow far that figure moved: {{open-tasks.change}}.\n\nThe first task that figure counts: {{open-tasks.first}}.\n\nHow many tasks the record holds, a count and never the tasks themselves: {{tasks.count}}. How many of them are open: {{tasks.open}}.\n\nA field of one task, named by its list and number: {{tasks#1.what}}.\n\nA long field is never pulled into text, so the notes of that task show a dash: {{tasks#1.note}}.\n\nA name that points at nothing is shown as written, marked: {{no-such-figure}}.\n\nA value inside backticks is left exactly as typed: `{{open-tasks}}`.\n\n## Typed values\n\nA day ahead, with how far off it is: {{date:2030-12-24}}.\n\nA day behind, with no link: {{day:2020-04-10}}.\n\nThe time left to a day: {{until:2030-01-01}}. The time left to the first task's due day: {{until:tasks#1.by}}.\n\nThe time since a day: {{ago:2020-01-01}}.\n\nMoney in minor units with its currency: {{money:129900 EGP}}. Money below nought: {{money:-4200 GBP}}.\n\nA currency with four decimals: {{money:1000000 CLF}} and {{money:123456 UYW}}.\n\nAn amount longer than sixteen digits keeps every digit: {{money:900719925474099312 JPY}}.\n\nA number with its unit: {{quantity:1.4 m}}. A quantity below nought: {{quantity:-2.5 kg}}. A whole number below nought: {{quantity:-1299}}.\n\nA percentage: {{pct:-46.3}}. A percentage written loosely stays as typed, marked: {{pct:12 %}}.\n\nA task named by reference: {{ref:tasks#1}}.\n\nA typed value that does not parse stays as typed, marked: {{money:12.50 GBP}} and {{date:2026-13-45}}.\n\n## Icons and evidence\n\nAn icon set inside a sentence: {{icon:rocket}} launched.\n\nChecked once against a source: {verified} and {verified: the bank statement}.\n\nWorked out from other facts: {inferred} and {inferred: two invoices}.\n\nA careful guess: {estimate} and {estimate: last quarter's pace}.\n\nNot known yet, something to find out: {unknown} and {unknown: nobody has asked}."
+        },
+        {
+          "kind": "note",
+          "document": true,
+          "heading": "A day in two zones",
+          "span": 12,
+          "body": "A day is counted from the reader's own today, never from Greenwich time. At half past ten at night Greenwich time on 14 October it is already the 15th in Cairo, so at that moment the day below is today in Cairo and still a day off in Greenwich time: {{day:2026-10-15}}."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-blocks",
+      "title": "Blocks",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 20,
+        "tabs": true
+      },
+      "icon": "rows",
+      "requires": [
+        "register.tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "document": true,
+          "heading": "Blocks in text",
+          "span": 12,
+          "body": "Each block below is written to test one rule of how a block is drawn. A block written wrongly is still shown, as the text that was typed with a line saying what is wrong.\n\n## A stat takes six figures\n\n```stat | Six figures\nOpen | 12 | in play\nLate | 3 | past their day | bad\nDone this week | 9 | five more than last week | good\nWaiting on you | 2 | to check\nWith an agent | 4 | taken today\nLater | 21 | kept for later\n```\n\n```stat | Seven figures\nOpen | 12 | in play\nLate | 3 | past their day | bad\nDone this week | 9 | five more than last week | good\nWaiting on you | 2 | to check\nWith an agent | 4 | taken today\nLater | 21 | kept for later\nDropped | 5 | let go this month\n```\n\n## Chips need a number and a word\n\n```chips | Chips\nrocket | 4 | launched\nzap |  | shipped\nstar | 7 | \ncheck | 3 | done\n```\n\n## A bar with no number draws no bar\n\n```bar | Hours by project\nKiln | 12 | this week\nPortage | 7 | this week\nSomeday | not measured yet | no figure to draw\n```\n\n## Tone words a colour name stands for\n\n```chips | Tone aliases\ncheck | 1 | written earn | earn\nx | 2 | written danger | danger\ninfo | 3 | written accent | accent\nalert | 4 | written risk | risk\n```\n\n## A block inside a note ends the note\n\n```note | A note\nThis note opens here.\n```stat | Inside the note\nOpen | 12 | in play\n```\n\nThis line is outside the note: the first closing marks after the note opened ended it, and a block cannot sit inside another.\n\n## A ring takes five parts\n\n```ring | Five parts\nRent | 600 | a month\nFood | 300 | a month\nTravel | 120 | a month\nPhone | 40 | a month\nBooks | 30 | a month\n```\n\n```ring | Six parts\nRent | 600 | a month\nFood | 300 | a month\nTravel | 120 | a month\nPhone | 40 | a month\nBooks | 30 | a month\nGifts | 20 | a month\n```"
+        },
+        {
+          "kind": "table",
+          "heading": "A filter that cannot be read",
+          "span": 6,
+          "source": "register.tasks",
+          "where": "state is {{nothing-here}}",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "12ch"
+            }
+          ],
+          "limit": 5,
+          "empty": "No task matches a filter that cannot be read."
+        },
+        {
+          "kind": "table",
+          "heading": "A quote mark written twice",
+          "span": 6,
+          "source": "register.tasks",
+          "where": "what is not \"The \"\"rule sheet\"\" check\", state is not dropped",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "12ch"
+            }
+          ],
+          "limit": 5,
+          "empty": "No task is on the record yet."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-counts",
+      "title": "Counts",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 30,
+        "tabs": true
+      },
+      "icon": "gauge",
+      "requires": [
+        "register.tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "ring",
+          "heading": "Tasks done",
+          "icon": "circle-check",
+          "source": "register.tasks",
+          "where": "state is done",
+          "empty": "No task is on the record yet.",
+          "span": 4
+        },
+        {
+          "kind": "ring",
+          "heading": "Done of the dated",
+          "icon": "calendar",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is done",
+          "of": "by is set",
+          "empty": "No task has a due day yet."
+        },
+        {
+          "kind": "heat",
+          "heading": "Finished, by day",
+          "icon": "calendar",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "done_on after -84d",
+          "columns": [
+            {
+              "field": "done_on"
+            }
+          ],
+          "empty": "Nothing was finished in the last twelve weeks."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-layout",
+      "title": "Layout",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 40,
+        "tabs": true
+      },
+      "icon": "board",
+      "requires": [
+        "register.tasks"
+      ],
+      "layout": {
+        "rail": 4
+      },
+      "blocks": [
+        {
+          "kind": "note",
+          "heading": "Only in the rail",
+          "area": "rail",
+          "span": 12,
+          "when": {
+            "metric": "open-tasks",
+            "lt": 0
+          },
+          "body": "This line is never drawn, so the page has no side column and the main column takes the whole width."
+        },
+        {
+          "kind": "ring",
+          "heading": "Three wide",
+          "icon": "circle-check",
+          "source": "register.tasks",
+          "where": "state is done",
+          "empty": "No task is on the record yet.",
+          "span": 3
+        },
+        {
+          "kind": "stat",
+          "heading": "Four wide",
+          "icon": "gauge",
+          "span": 4,
+          "cells": [
+            {
+              "metric": "open-tasks",
+              "label": "Open",
+              "note": "Every task in play, the ones kept for later left out"
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "heading": "Five wide",
+          "span": 5,
+          "body": "Three, four and five twelfths fill one line."
+        },
+        {
+          "kind": "note",
+          "heading": "Six wide",
+          "span": 6,
+          "body": "Two blocks six wide share one line."
+        },
+        {
+          "kind": "note",
+          "heading": "Six wide beside it",
+          "span": 6,
+          "body": "This is the second of the two."
+        },
+        {
+          "kind": "note",
+          "heading": "Eight wide",
+          "span": 8,
+          "body": "Eight twelfths, with four beside it, make a whole line."
+        },
+        {
+          "kind": "note",
+          "heading": "Four wide beside it",
+          "span": 4,
+          "body": "This is the four."
+        },
+        {
+          "kind": "section",
+          "heading": "Cards inside a tile",
+          "icon": "rows",
+          "span": 12,
+          "box": true
+        },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is not done or dropped",
+          "columns": [
+            {
+              "field": "what",
+              "as": "title"
+            },
+            {
+              "field": "by",
+              "as": "fact"
+            }
+          ],
+          "limit": 4,
+          "empty": "No task is in play."
+        },
+        {
+          "kind": "section",
+          "heading": "The whole width",
+          "icon": "rows",
+          "span": 12
+        },
+        {
+          "kind": "note",
+          "heading": "Twelve wide",
+          "span": 12,
+          "body": "This note takes the whole width of the page."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-5",
+      "title": "Tab 5",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 50,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 5 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-6",
+      "title": "Tab 6",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 60,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 6 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-7",
+      "title": "Tab 7",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 70,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 7 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-8",
+      "title": "Tab 8",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 80,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 8 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-9",
+      "title": "Tab 9",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 90,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 9 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-10",
+      "title": "Tab 10",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 100,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 10 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-11",
+      "title": "Tab 11",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 110,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 11 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-12",
+      "title": "Tab 12",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 120,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 12 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-13",
+      "title": "Tab 13",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 130,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 13 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-tab-14",
+      "title": "Tab 14",
+      "nav": {
+        "section": "Rule sheet",
+        "order": 140,
+        "tabs": true
+      },
+      "icon": "board",
+      "blocks": [
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Tab 14 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More."
+        }
+      ]
+    },
+    {
+      "page": "rule-sheet-project",
+      "title": "Counts on {{name}}",
+      "for": {
+        "register": "things",
+        "where": "name is Rule sheet"
+      },
+      "icon": "gauge",
+      "requires": [
+        "register.things",
+        "register.tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "ring",
+          "heading": "Tasks done here",
+          "icon": "circle-check",
+          "source": "register.tasks",
+          "where": "thing is {{name}}, state is done",
+          "empty": "No task is on the record yet.",
+          "span": 4,
+          "inherit": true
+        },
+        {
+          "kind": "note",
+          "span": 8,
+          "body": "The ring beside this line is the one on Counts, set against the tasks of {{name}} and the tasks on no project."
+        },
+        {
+          "kind": "note",
+          "document": true,
+          "heading": "Its own values",
+          "span": 12,
+          "body": "Each value below is a field of {{name}}, read on its own page and never a figure of the same name.\n\nIts next step: {{next}}.\n\nHow many domains it holds, a count and never the domains: {{domains.count}}. How many repositories: {{repos.count}}.\n\nThe day it aims for: {{day:aim}}."
+        }
+      ]
+    }
+  ]
+}

@@ -341,7 +341,7 @@ const drawn = (body: string, values: Record<string, unknown>, now = NOW, zone?: 
 test('AN UPDATE FROM 1.0.0 INSTALLS WITH NO REFUSAL AND KEEPS EVERY ROW, and the project page gains its own values', async () => {
   const was = JSON.parse(readFileSync(RELEASED, 'utf8')) as Pack & { version: string };
   assert.equal(was.version, '1.0.0');
-  assert.equal((pack() as Pack & { version: string }).version, '1.1.0');
+  assert.equal((pack() as Pack & { version: string }).version, '1.1.1');
   const { api, close } = await fresh();
   said(await put(api, was));
   seed(api);

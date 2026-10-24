@@ -1,0 +1,281 @@
+{
+  "format": 1,
+  "made_at": "2026-10-24T05:00:19.246Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{retainer-income}} a month from live retainers, and {{billed-share-month}} of this month's hours billed.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "retainer-income": 0
+          },
+          "read_as": {
+            "retainer-income": "figure"
+          }
+        },
+        {
+          "body": "Add a client's retainer, with its fee and the hours it buys a month, and how much of them this month has used shows here.",
+          "heading": "No retainer yet",
+          "icon": "handshake",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "retainers-live"
+          },
+          "key": "k17zl7eg",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "hours_bought"
+            }
+          ],
+          "empty": "No live retainer.",
+          "heading": "Hours used this month",
+          "icon": "gauge",
+          "kind": "progress",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.client_retainers",
+          "span": 12,
+          "toward": "hours-by-retainer-month",
+          "when": {
+            "gt": 0,
+            "metric": "retainers-live"
+          },
+          "where": "state is live",
+          "key": "k0ad8tbi",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Retainer",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "org",
+              "label": "Client",
+              "width": "minmax(12ch,18ch)"
+            },
+            {
+              "align": "end",
+              "field": "fee",
+              "label": "Fee a month",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "hours_bought",
+              "label": "Hours",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "renew",
+              "label": "Renews",
+              "width": "15ch"
+            }
+          ],
+          "empty": "No retainers yet.",
+          "heading": "Every retainer",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "renew"
+            }
+          ],
+          "source": "register.client_retainers",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "retainers-live"
+          },
+          "key": "k1eac2s8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "handshake",
+      "nav": {
+        "order": 10,
+        "section": "Clients"
+      },
+      "pack": "retainer-hours",
+      "page": "clients",
+      "requires": [
+        "register.client_retainers"
+      ],
+      "title": "Clients",
+      "read_at": "2026-10-24T05:00:19.246Z",
+      "zone": "UTC",
+      "look": {
+        "look": "clients",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "{{hours-week}} hours worked in the last seven days, by {{people-logging-week}} people.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "hours-week": 0,
+            "people-logging-week": 0
+          },
+          "read_as": {
+            "hours-week": "figure",
+            "people-logging-week": "figure"
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "13ch"
+            },
+            {
+              "field": "who",
+              "label": "Person",
+              "width": "minmax(12ch,16ch)"
+            },
+            {
+              "field": "deal",
+              "label": "Retainer",
+              "width": "minmax(12ch,18ch)"
+            },
+            {
+              "field": "what",
+              "label": "What was done",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "hours",
+              "label": "Hours",
+              "width": "8ch"
+            },
+            {
+              "field": "kind",
+              "label": "Billable or not",
+              "width": "14ch"
+            }
+          ],
+          "empty": "No hours logged in the last seven days.",
+          "heading": "The last seven days",
+          "icon": "calendar",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "day"
+            }
+          ],
+          "source": "register.timesheets",
+          "span": 12,
+          "where": "day after -8d",
+          "key": "k11c896q",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "empty": "Nothing billed this month yet.",
+          "heading": "Hours billed this month, by person",
+          "icon": "people",
+          "kind": "split",
+          "limit": 6,
+          "source": "metric.billed-hours-by-person-month",
+          "span": 12,
+          "key": "k1g6mo39",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "billed-hours-by-person-month",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        }
+      ],
+      "icon": "clock",
+      "nav": {
+        "order": 20,
+        "section": "Clients"
+      },
+      "pack": "retainer-hours",
+      "page": "timesheets-week",
+      "requires": [
+        "register.timesheets"
+      ],
+      "title": "Timesheets",
+      "read_at": "2026-10-24T05:00:19.246Z",
+      "zone": "UTC",
+      "look": {
+        "look": "timesheets-week",
+        "basis": "r14gti5c",
+        "by": "rule",
+        "hide": [
+          "k11c896q"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}
