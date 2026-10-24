@@ -9,11 +9,11 @@ import { parse, type Block } from './parse.ts';
 import { toHTML } from './html.ts';
 
 const LONG =
-  'Review the Encore payout batch before Friday. Check the three refunds Stripe flagged, then write back to the two creators who asked where their money went and say when it lands.';
+  'Review the Kiln payout batch before Friday. Check the three refunds Stripe flagged, then write back to the two creators who asked where their money went and say when it lands.';
 
 test('A LONG TITLE IS ITS FIRST CLAUSE, and the rest is kept, quiet, after it', () => {
   assert.deepEqual(todoTitle(LONG), {
-    head: 'Review the Encore payout batch before Friday.',
+    head: 'Review the Kiln payout batch before Friday.',
     rest: 'Check the three refunds Stripe flagged, then write back to the two creators who asked where their money went and say when it lands.',
   });
   /* A SHORT TITLE IS LEFT WHOLE, whatever its stops. */
@@ -31,6 +31,6 @@ test('A LONG TITLE IS ITS FIRST CLAUSE, and the rest is kept, quiet, after it', 
 test('BOTH RENDERERS DRAW THE REST IN ITS QUIET SPAN, and a short title as it was', () => {
   const [seg] = parse(`\`\`\`todo\n[ ] ${LONG}\n[ ] Short one\n\`\`\``);
   const html = toHTML([seg as Block]);
-  assert.match(html, /<span class="item-words">Review the Encore payout batch before Friday\.<span class="item-title-rest"> Check the three/u);
+  assert.match(html, /<span class="item-words">Review the Kiln payout batch before Friday\.<span class="item-title-rest"> Check the three/u);
   assert.match(html, /<span class="item-title">Short one<\/span>/u);
 });

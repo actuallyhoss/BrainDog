@@ -443,8 +443,8 @@
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
   const RECENT = 'Recent';
-  /* THE EMPTY PALETTE'S QUESTIONS, over everything else (E55). */
-  const QUESTIONS = 'Ask';
+  /* THE EMPTY PALETTE'S THREE ASKS, over everything else (E55). */
+  const ASK_TODAY = 'Ask';
   /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
   const GO_TO = copy.destinations;
   const BEST = 'Best match';
@@ -486,7 +486,7 @@
     /* AND THE CUSTOMISE ROWS WITH IT, for the same reason: "dark" or "hide inbox" is a thing to do, typed out. */
     [copy.customise.group]: -1,
     [BEST]: -0.5,
-    [QUESTIONS]: -3,
+    [ASK_TODAY]: -3,
     [copy.records]: 0,
     /* WHAT THE NAME IS, OVER THE LISTS THAT HOLD THE WORD: the one thing meant comes before every row that mentions it. */
     [aboutWords.group]: 0.5,
@@ -721,13 +721,13 @@
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
     const out: Row[] = [...about];
-    /* NOTHING TYPED IS THREE QUESTIONS AND WHERE HE WAS (E55): asked of the record when a model is behind the ask, else
+    /* NOTHING TYPED IS THREE ASKS AND WHERE HE WAS (E55): asked of the record when a model is behind the ask, else
        the place that answers each; then the places opened last on this device. "Go to" repeats the bar, so it is drawn
        only on a device that has opened nothing yet. Commands, pages, lists, figures and questions wait for a word. */
     const blank = prefix === null && text.trim() === '';
     if (blank)
-      for (const [i, asked] of questionsOf(slashHere, goPlaces).entries())
-        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: QUESTIONS, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
+      for (const [i, asked] of questionsOf(slashHere).entries())
+        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
     if (blank)
       for (const place of openedList)
         out.push({ id: `o-${place.href}`, title: place.title, detail: since(new Date(place.at).toISOString(), shell.now ?? Date.now()), href: place.href, group: RECENT, icon: 'arrow', complete: place.title });

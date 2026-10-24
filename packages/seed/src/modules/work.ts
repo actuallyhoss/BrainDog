@@ -861,7 +861,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     /* NO SEARCH BOX, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line
        with no field round it, and the frame's own search is one press away on every screen. */
     /* THE HEAD COUNTS WHAT THE CHIPS COUNT, SINCE the screens scope of 24 October (E24): every task not finished, the
-       folded Later among them, so Open equals the project chips added up. It read Open 39 beside Encore 46. */
+       folded Later among them, so Open equals the project chips added up. It read Open 39 beside one project's chip of 46. */
     header: {
       count: { metric: 'tasks-in-play' },
       action: { verb: 'row.create', label: 'Add' },

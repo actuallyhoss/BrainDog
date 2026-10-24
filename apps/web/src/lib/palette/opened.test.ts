@@ -3,31 +3,22 @@ import assert from 'node:assert/strict';
 
 import { openedKept, questionsOf, titleIn, withOpened, TODAY_QUESTIONS } from './opened.ts';
 
-const BAR = [
-  { key: 'today', href: '/', label: 'Today' },
-  { key: 'work', href: '/p/work', label: 'Work' },
-  { key: 's-money', href: '/s/money', label: 'Money' },
-  { key: 's-agents', href: '/agents', label: 'Agents' },
-];
-
-test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the place that answers each (E55)', () => {
-  const asked = questionsOf(true, BAR);
+test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the shell screen that answers each (E55)', () => {
+  const asked = questionsOf(true);
   assert.equal(asked.length, 3);
   assert.deepEqual(asked.map((a) => a.ask), TODAY_QUESTIONS.map((q) => q.title));
-  const opened = questionsOf(false, BAR);
-  assert.deepEqual(opened.map((a) => a.href), ['/p/work', '/agents', '/s/money']);
+  const opened = questionsOf(false);
+  assert.deepEqual(opened.map((a) => a.href), ['/decide', '/agents', '/audit']);
   assert.ok(opened.every((a) => a.ask === null));
-  /* A PLACE THE BAR DOES NOT DRAW IS NO ANSWER, so its question is not offered. */
-  assert.equal(questionsOf(false, BAR.slice(0, 2)).length, 1);
 });
 
 test('RECENT IS WHERE HE WENT, newest first, once each, and never the way in or Today', () => {
-  const a = { href: '/p/encore', title: 'Encore', at: 1 };
+  const a = { href: '/p/kiln', title: 'Kiln', at: 1 };
   const b = { href: '/s/money', title: 'Money', at: 2 };
   let list = withOpened([], a);
   list = withOpened(list, b);
   list = withOpened(list, { ...a, at: 3 });
-  assert.deepEqual(list.map((o) => o.href), ['/p/encore', '/s/money']);
+  assert.deepEqual(list.map((o) => o.href), ['/p/kiln', '/s/money']);
   for (const href of ['/', '/signin', '/start?x=1', '/invite/abc']) assert.equal(withOpened(list, { href, title: 'X', at: 4 }).length, 2, href);
   const many = Array.from({ length: 9 }, (_, i) => ({ href: `/r/tasks/${i}`, title: `Task ${i}`, at: i })).reduce((l, o) => withOpened(l, o), [] as ReturnType<typeof withOpened>);
   assert.equal(many.length, 5);

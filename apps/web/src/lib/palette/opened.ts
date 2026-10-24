@@ -76,25 +76,15 @@ export function noteOpened(href: string, product: string, wait = 800): void {
 export type Asked = { title: string; href: string | null; ask: string | null };
 
 /**
- * THE THREE QUESTIONS THE EMPTY PALETTE OPENS ON (E55), for today: what is late, what the agents did, how long the cash
- * lasts. With a model behind the ask each one is asked. Without one, each opens the place in the bar that answers it,
- * found by its key or its name, and a question whose place is not drawn is not offered.
+ * THE THREE QUESTIONS THE EMPTY PALETTE OPENS ON (E55), for today: what needs him, what the agents did, what changed.
+ * With a model behind the ask each one is asked. Without one, each opens the screen of the shell that answers it, which
+ * every record has whatever it installed: Needs you, Agents and the log. None names an add-on's place.
  */
 export const TODAY_QUESTIONS = [
-  { title: 'What’s late?', place: 'work' },
-  { title: 'What did my agents do today?', place: 'agents' },
-  { title: 'How long does the cash last?', place: 'money' },
+  { title: 'What needs me today?', href: '/decide' },
+  { title: 'What did my agents do today?', href: '/agents' },
+  { title: 'What changed today?', href: '/audit' },
 ] as const;
 
-export function questionsOf(slash: boolean, places: readonly { key: string; href: string; label: string }[]): Asked[] {
-  const out: Asked[] = [];
-  for (const q of TODAY_QUESTIONS) {
-    if (slash) {
-      out.push({ title: q.title, href: null, ask: q.title });
-      continue;
-    }
-    const at = places.find((p) => p.key === q.place || p.label.trim().toLowerCase() === q.place);
-    if (at) out.push({ title: q.title, href: at.href, ask: null });
-  }
-  return out;
-}
+export const questionsOf = (slash: boolean): Asked[] =>
+  TODAY_QUESTIONS.map((q) => (slash ? { title: q.title, href: null, ask: q.title } : { title: q.title, href: q.href, ask: null }));

@@ -129,7 +129,7 @@ const SHAPES: Record<string, string> = {
   'a todo with an agent working on one of its rows': '```todo\n[ ] ●︎ Draft the September issue | due Friday\n[x] Send the quote | done\n```',
   /* A TITLE LONG ENOUGH TO BE A NAME AND A QUIET REST (E23), with the working dot in front of it. */
   'a todo whose title runs on past its first clause':
-    '```todo\n[ ] ●︎ Review the Encore payout batch before Friday. Check the three refunds Stripe flagged, then write back to both creators | due Friday\n```',
+    '```todo\n[ ] ●︎ Review the Kiln payout batch before Friday. Check the three refunds Stripe flagged, then write back to both creators | due Friday\n```',
   /* A TODO'S THIRD AND FOURTH CELLS ARE ONE LINE, and a row with them blank draws no line at all: the
      blank row is what a page writes for every two-column todo, so the two sides disagreeing about it
      would be a difference on every task the product shows. */
@@ -938,7 +938,7 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
 });
 
 test("A PROJECT'S CHIP WEARS ITS DOT in both renderers, and a value with no hue wears none (E24)", () => {
-  const dotted = [{ field: 'thing', label: 'Project', values: [{ value: '1', label: 'Encore', count: 46, hue: 210 }, { value: '2', label: 'BrainDog', count: 1, hue: 30 }, { value: '', label: 'No project', count: 2 }] }];
+  const dotted = [{ field: 'thing', label: 'Project', values: [{ value: '1', label: 'Kiln', count: 46, hue: 210 }, { value: '2', label: 'BrainDog', count: 1, hue: 30 }, { value: '', label: 'No project', count: 2 }] }];
   const svelte = tree(render(Filters, { props: { filters: dotted } }).body);
   assert.equal(svelte, tree(filtersHTML(dotted)));
   assert.equal((svelte.match(/class="filters-dot"/gu) ?? []).length, 2);
