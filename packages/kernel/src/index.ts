@@ -298,6 +298,7 @@ import {
   instruct as instructRun,
   instructionFor as instructionsFor,
   instructionOf,
+  keepOrderAnswer,
   replyInstruction as replyToInstruction,
   runOf as instructedRun,
   seenBy as instructionSeenBy,
@@ -472,6 +473,8 @@ export {
   MACHINE_NAME,
   OPEN_STATES as INSTRUCTION_OPEN_STATES,
   REPLY_STATES,
+  ANSWERS_MOST,
+  ORDERED_FIELD,
   SAID_MOST,
   SEAT_NAME,
   SEEN_HOW,
@@ -480,6 +483,7 @@ export {
   instructionsTakenBy,
   openInstructions,
   type Delta,
+  type InstrAnswer,
   type InstrKind,
   type InstrState,
   type InstrTo,
@@ -8870,6 +8874,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return done.ok ? ok({ id: done.value.id }) : done;
       },
       runWrite: (id, stamp, actor, note) => writing(SESSION, id, {}, { actor, cascade: false, stamp, ...(note === null ? {} : { note }) }),
+      mint,
     };
   }
 
@@ -12652,6 +12657,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     instructionSeen: (id: string) => instructionSeenBy(sql, id),
     /** One instruction by `IN4` or its row id, or null. */
     instruction: (id: string): Instr | null => instructionOf(sql, id),
+    /**
+     * A question answered on his order (D8): the answer spent on the instruction, by the run, and the decision said as
+     * his order's, by him. The record answered the question as him first; this keeps the two lines, in one go.
+     */
+    keepOrderAnswer: (k: { instruction: Instr; question: string; run: string; decision: string; by: string; byName: string; batch?: string | undefined }): void =>
+      transaction(() => keepOrderAnswer({ sql, now: clock.now(), mint }, k)),
     /**
      * The bridge says run `runId`'s session is open: `pulseRun(runId, at, seat)`, `at` in milliseconds and the record's
      * clock when left out. Moves `pulse_at` in place, no version and no event; answers whether it moved (`presence.ts`).

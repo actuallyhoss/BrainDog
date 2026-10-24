@@ -135,12 +135,35 @@ export type Instr = {
   reply: string | null;
   replied_at: string | null;
   job: string | null;
+  /**
+   * The questions he named for the run that takes it to answer, each with the answer he gave (`InstrAnswer`), and the
+   * ones it already answered (`answered`, by question). Empty for nearly every instruction.
+   */
+  answers: InstrAnswer[];
+  answered: string[];
   /** Who made it: the actor of its `create` line, a person's id. */
   by: string | null;
   /** When he said it. */
   at: string;
   updated_at: string;
 };
+
+/**
+ * One question an instruction lets the run that takes it answer (D8): the question as the kernel keys it (`SG243`), the
+ * answer he gave, and the question's version as he saw it when he sent it, so a question that moved since is not
+ * answered with his word on the old one.
+ */
+export type InstrAnswer = { question: string; option: string; version: string };
+
+/** The most questions one instruction may name. */
+export const ANSWERS_MOST = 10;
+
+/** The line on an instruction that names its questions (`field`), and the line on it that spends one. */
+export const ANSWERS_FIELD = 'answers';
+export const ANSWERED_FIELD = 'answered';
+
+/** The line on a decision made on his order (`field`), the instruction in `to_v`. */
+export const ORDERED_FIELD = 'answered_on';
 
 /** What stops a run: a stop or a pause he sent it (or its parent), by instruction. `null` from `stopOf` when none. */
 export type Stop = { kind: 'stop' | 'pause'; id: string; said: string };
@@ -184,6 +207,8 @@ export type InstructInput = {
   replaces?: string | undefined;
   /** How long it waits for a run, in milliseconds; `WAIT_MS` when absent. */
   waits_ms?: number | undefined;
+  /** The questions the run that takes it may answer, each with his answer (D8). Only on a tell. */
+  answers?: InstrAnswer[] | undefined;
 };
 
 /* ── the writes, wired by the record ─────────────────────────────────────── */
@@ -199,7 +224,7 @@ export type InstructionWrite = (id: string | null, change: InstructionChange) =>
 export type RunStampWrite = (id: string, stamp: Record<string, Json>, actor: string, note: string | null) => Result<unknown>;
 
 /** What the functions below read and write through. `now` is the record's clock, in milliseconds. */
-export type InstructionDeps = { sql: Sql; now: number; write: InstructionWrite; runWrite: RunStampWrite };
+export type InstructionDeps = { sql: Sql; now: number; write: InstructionWrite; runWrite: RunStampWrite; mint: () => string };
 
 /* ── reading ─────────────────────────────────────────────────────────────── */
 
@@ -208,10 +233,46 @@ const text = (v: Json | undefined): string | null => (typeof v === 'string' && v
 const ofList = <T extends string>(list: readonly T[], v: Json | undefined, fallback: T): T =>
   typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : fallback;
 
-type Row = { id: string; seq: number | null; state: string | null; fields: string; created_at: string; updated_at: string; by: string | null };
+type Row = {
+  id: string;
+  seq: number | null;
+  state: string | null;
+  fields: string;
+  created_at: string;
+  updated_at: string;
+  by: string | null;
+  answers?: string | null;
+  answered?: string | null;
+};
 
+/** A line's JSON, or `null` when it is not what it should be. */
+const parsed = (v: string | null | undefined): unknown => {
+  if (typeof v !== 'string') return null;
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+/** The questions an instruction names, as its line holds them; anything not of the shape is passed over. */
+function answersIn(v: string | null | undefined): InstrAnswer[] {
+  const list = parsed(v);
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((a): InstrAnswer[] => {
+    const o = (typeof a === 'object' && a !== null ? a : {}) as Record<string, unknown>;
+    return typeof o.question === 'string' && typeof o.option === 'string' && typeof o.version === 'string'
+      ? [{ question: o.question, option: o.option, version: o.version }]
+      : [];
+  });
+}
+
+/* THE QUESTIONS IT NAMES AND THE ONES SPENT ARE LINES ON THE ROW, `note`s with their own `field`, so they need no
+   migration and no caller's patch can write them. */
 const COLUMNS = `e.id, e.seq, e.state, e.fields, e.created_at, e.updated_at,
-  (SELECT actor FROM event WHERE target = 'entry:' || e.id AND kind = 'create' ORDER BY ts LIMIT 1) AS by`;
+  (SELECT actor FROM event WHERE target = 'entry:' || e.id AND kind = 'create' ORDER BY ts LIMIT 1) AS by,
+  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERS_FIELD}' ORDER BY rowid DESC LIMIT 1) AS answers,
+  (SELECT json_group_array(to_v) FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERED_FIELD}') AS answered`;
 
 function instrOf(row: Row): Instr {
   const f = JSON.parse(row.fields) as Record<string, Json>;
@@ -240,6 +301,8 @@ function instrOf(row: Row): Instr {
     reply: text(f.reply),
     replied_at: text(f.replied_at),
     job: text(f.job),
+    answers: answersIn(row.answers),
+    answered: ((v) => (Array.isArray(v) ? v.filter((q): q is string => typeof q === 'string') : []))(parsed(row.answered)),
     by: row.by,
     at: row.created_at,
     updated_at: row.updated_at,
@@ -502,6 +565,22 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
   const waits = input.waits_ms ?? WAIT_MS;
   if (!Number.isFinite(waits) || waits < 60_000 || waits > 90 * DAY_MS)
     return no('OUT_OF_BOUNDS', 'An instruction waits between a minute and ninety days for a run.', { at: 'waits_ms' });
+  /* THE QUESTIONS IT NAMES (D8), each once, on a tell alone: a stop, a pause or a redirect asks nothing of a question. */
+  const answers: InstrAnswer[] = [];
+  if (input.answers !== undefined) {
+    if (!Array.isArray(input.answers) || input.answers.length > ANSWERS_MOST)
+      return no('VALUE_MALFORMED', `answers is a list of at most ${String(ANSWERS_MOST)} questions, each with its answer.`, { at: 'answers' });
+    if (input.answers.length > 0 && kind !== 'tell') return no('VALUE_MALFORMED', 'Only an instruction to do something names questions to answer.', { at: 'answers' });
+    for (const [n, a] of input.answers.entries()) {
+      const o = (typeof a === 'object' && a !== null ? a : {}) as Record<string, unknown>;
+      const q = typeof o.question === 'string' ? o.question.trim() : '';
+      const option = typeof o.option === 'string' ? o.option.trim() : '';
+      if (q === '' || option === '' || typeof o.version !== 'string' || o.version === '')
+        return no('VALUE_MALFORMED', 'Each answer names a question and the answer to give it.', { at: `answers[${String(n)}]` });
+      if (answers.some((x) => x.question === q)) return no('VALUE_MALFORMED', `${q} is named twice. Give it one answer.`, { at: `answers[${String(n)}]` });
+      answers.push({ question: q, option, version: o.version });
+    }
+  }
   const place: { machine?: string; seat?: string } = {};
   for (const [key, grammar, fix] of [
     ['machine', MACHINE_NAME, 'Name the machine as its runs name it, like Adas-MacBook-Pro.local.'],
@@ -567,6 +646,18 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
     const made = d.write(null, { patch, stamp: {}, note: null, actor });
     if (!made.ok) return made;
     const i = instructionOf(d.sql, made.value.id)!;
+    /* WHAT IT LETS THE RUN ANSWER, one line on the row in his name, beside the line that made it. */
+    if (answers.length > 0)
+      d.sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note) VALUES (?, ?, ?, 'note', ?, 'entry', ?, ?, ?)",
+        d.mint(),
+        iso(d.now),
+        actor,
+        `entry:${i.row}`,
+        ANSWERS_FIELD,
+        JSON.stringify(answers),
+        `Lets the run that takes it answer ${answers.map((a) => a.question).join(', ')}.`,
+      );
 
     if (replaced) {
       const closed = d.write(replaced.row, { patch: { state: 'declined' }, stamp: {}, note: `Redirected: ${i.id}.`, actor });
@@ -728,6 +819,33 @@ export function replyInstruction(d: InstructionDeps, ref: string, runRef: string
     }
     return ok(instructionOf(d.sql, i.row)!);
   });
+}
+
+/**
+ * A question answered on his order (D8): the answer is spent on the instruction, signed by the run that gave it, and the
+ * decision says whose order it was, signed by him, both in the decision's batch. The record has already answered the
+ * question as him (`orderAnswer` in `packages/record/src/methods/instructions.ts`); this keeps the two lines that say
+ * so, and that make the answer one the run cannot give twice.
+ */
+export function keepOrderAnswer(
+  d: Pick<InstructionDeps, 'sql' | 'now' | 'mint'>,
+  k: { instruction: Instr; question: string; run: string; decision: string; by: string; byName: string; batch?: string | undefined },
+): void {
+  const at = iso(d.now);
+  const line = "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note, batch) VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?)";
+  d.sql.exec(line, d.mint(), at, k.run, `entry:${k.instruction.row}`, 'entry', ANSWERED_FIELD, k.question, `${k.run} answered ${k.question} as told.`, k.batch ?? null);
+  d.sql.exec(
+    line,
+    d.mint(),
+    at,
+    k.by,
+    `decision:${k.decision}`,
+    'decision',
+    ORDERED_FIELD,
+    k.instruction.id,
+    `Answered by ${k.run} on ${k.byName}'s order (${k.instruction.id}).`,
+    k.batch ?? null,
+  );
 }
 
 /** The runs shown an instruction, and how: "Seen by S883 and S884" (`instruction_seen`). */
