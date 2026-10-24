@@ -11,9 +11,10 @@
  * and a founder's project page was already at the ceiling: one part, or several side by side, the way the shape laid
  * them.
  *
- * IT READS NOTHING YET. What a part draws is read for the row the page is about, by the host, from the project's work,
- * runs, money and key number (`apps/web/src/lib/page/shape-read.ts`); the answer is the block and its `when:`. A host
- * that does not draw the parts draws nothing for them.
+ * THE KIND READS NOTHING. What a part draws is answered for the row the page is about by the record, beside the
+ * page's blocks, when the page is asked with `shape` (`packages/record/src/project-shape.ts`): the project's row, its
+ * history, its links, its work, its runs, its key number and its money. The block's answer is the block and its
+ * `when:`. A host that does not draw the parts draws nothing for them.
  *
  * A BARE BLOCK INSTALLS AND IS REFUSED WHEN IT IS READ, as every kind is (`kinds/listed.ts`): whether a key is required
  * is not decided at install. A part the shape does not have is refused at both.

@@ -153,9 +153,10 @@ const CORE_ROUTES: readonly Route[] = [
   /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
      GET it is `?filter={"project":"oxbow"}`. What it may name is the record's question (`kernel.page`), not this table's.
      `walk` IS HOW FAR A FORECAST LOOKS when the reader asks past the two years walked unasked: `?walk=1825` or
-     `?walk=last`. It is text because one answer is a word; the record turns a digit string into days. */
-  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup. A filter narrows it to what you chose.',
-    takes: { slug: 'text', filter: 'json', walk: 'text' } },
+     `?walk=last`. It is text because one answer is a word; the record turns a digit string into days. `shape` (`?shape=1`)
+     asks a project's page to carry what its shape's parts draw, each its own method's answer (`project-shape.ts`). */
+  { name: 'page', group: 'READ+', writes: false, what: "One page, with every block run: rows and figures, never markup. A filter narrows it to what you chose, and shape carries a project's own parts.",
+    takes: { slug: 'text', filter: 'json', walk: 'text', shape: 'text' } },
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
   /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE. `metric` reads an id already known and `page`

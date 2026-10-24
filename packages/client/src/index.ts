@@ -2557,13 +2557,14 @@ export function createClient(options: ClientOptions) {
     /**
      * One page, narrowed by the reader's own filter choices (a field to the value chosen). An empty filter is no filter.
      * `walk` is how far a forecast looks past the two years walked unasked, in days or to the `last` bill; it goes as
-     * text, which the record turns back into days.
+     * text, which the record turns back into days. `shape` asks a project's page to carry what its shape's parts draw.
      */
-    page: (slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: number | 'last' } = {}) =>
+    page: (slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: number | 'last'; shape?: boolean } = {}) =>
       call<unknown>('page', {
         slug,
         ...(filter && Object.keys(filter).length ? { filter } : {}),
         ...(opts.walk === undefined ? {} : { walk: String(opts.walk) }),
+        ...(opts.shape === true ? { shape: '1' } : {}),
       }),
     metric: (metric: string) => call<unknown>('metric', { metric }, { wave: METRIC_BATCHING && !NO_METRICS.has(`${base} ${options.token ?? ''}`) }),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */

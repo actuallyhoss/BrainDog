@@ -243,6 +243,7 @@ import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
+import { drawsShape, shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -10164,8 +10165,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** The methods `today` asks for each tile's part (`today.ts`); set once `api` and its wrappers are. */
   let todayAsks: TodayAsks | null = null;
+  /** The methods a project's page asks for its shape (`project-shape.ts`); set once `api` and its wrappers are. */
+  let shapeAsks: ShapeAsks | null = null;
   /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
-  let pageAgain: (args: { slug: string; filter?: unknown; walk?: unknown }, ctx: CallContext) => Promise<Result<unknown>> = () =>
+  let pageAgain: (args: { slug: string; filter?: unknown; walk?: unknown; shape?: unknown }, ctx: CallContext) => Promise<Result<unknown>> = () =>
     Promise.resolve(no('INTERNAL', 'The record is still starting.'));
   const api = {
     /**
@@ -11096,7 +11099,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * walks it in full only where a block offers it (`walkReach` in `packages/kernel/src/pages.ts`). Unasked, a walk
      * reaches past what it opens on to `WALK_UNASKED` at most, so the longest lengths are a press away, not every load.
      */
-    async page(args: { slug: string; filter?: unknown; walk?: unknown }, ctx: CallContext) {
+    async page(args: { slug: string; filter?: unknown; walk?: unknown; shape?: unknown }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       /* THE OTHER HALF OF "never read, never rendered" (24 §4.2). One row per page per day, and the
@@ -11223,16 +11226,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               'SELECT created_at AS at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
               `look.${typeof look.look === 'string' ? look.look : args.slug}`,
             )?.at;
-      /* THE ROWS A BLOCK SHE IS SHOWN DRAWS COME LESS THE FIELDS HIDDEN FROM HER (`sight.mask`). */
-      return ok(
-        sight.mask(ctx, {
+      /* A PROJECT'S SHAPE, ASKED WITH `shape`, on a page about a project's row that draws a part of it (`project-shape.ts`):
+         what its parts draw, each its own method's answer to this caller, so the host reads none of it for itself. */
+      const param = (out.value as { param?: { register?: unknown; seq?: unknown } }).param;
+      const shape =
+        (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && drawsShape(blocks) && typeof param?.register === 'string' && typeof param.seq === 'number'
+          ? await shapeAnswerOf(shapeAsks, param.register, param.seq, [...kernel.registers()].map(([, decl]) => decl as never), ctx)
+          : null;
+      /* THE ROWS A BLOCK SHE IS SHOWN DRAWS COME LESS THE FIELDS HIDDEN FROM HER (`sight.mask`). The shape's parts were
+         each held by their own method already. */
+      return ok({
+        ...sight.mask(ctx, {
           ...out.value,
           ...(declared ? { declared_version: declared.version } : {}),
           ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
           ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
           blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
         }),
-      );
+        ...(shape === null ? {} : { shape }),
+      });
     },
 
     /**
@@ -14983,6 +14995,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   }
   /* TODAY ASKS EACH PART AS IT IS ASKED ALONE, wrappers and all (`today.ts`). */
   todayAsks = { previewPage: api.previewPage as never, handled: api.handled as never, sharedOut: api.sharedOut as never, list: api.list as never };
+  /* AND A PROJECT'S PAGE ASKS EACH PART OF ITS SHAPE THE SAME WAY (`project-shape.ts`). */
+  shapeAsks = {
+    get: api.get as never,
+    history: api.history as never,
+    backlinks: api.backlinks as never,
+    list: api.list as never,
+    metric: api.metric as never,
+    previewPage: api.previewPage as never,
+  };
   return api;
 }
 
