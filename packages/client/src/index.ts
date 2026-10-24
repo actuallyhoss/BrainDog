@@ -1350,9 +1350,10 @@ export function batchMetrics(on: boolean): void {
 }
 /**
  * How long a wave of figures waits for more to join it: a page's own reads land within it, a click never does. A revisit
- * pays it too, so it is short: 40 ms put a project revisit over its 100 ms budget.
+ * never pays it: a figure kept at this version is answered from the kept copy before any wave (`call`, `wave`). At 8 ms
+ * the sidebar's figures and a project page's, asked a moment apart, went as two `metrics`.
  */
-export const METRIC_WAVE_MS = 8;
+export const METRIC_WAVE_MS = 40;
 /** The most figures one `metrics` names, as the record takes them (`METRICS_MOST`). */
 const METRICS_WAVE_MOST = 50;
 type MetricWave = { asked: Map<string, ((r: Result<unknown>) => void)[]>; send: (name: string, args: Record<string, unknown>) => Promise<Result<unknown>> };
@@ -1783,7 +1784,8 @@ export function createClient(options: ClientOptions) {
     return new Promise((done) => {
       let wave = METRIC_WAVES.get(key);
       if (wave === undefined) {
-        const made: MetricWave = { asked: new Map(), send: (name, args) => call<unknown>(name, args) };
+        /* `bare`: a figure sent by itself is not asked through the kept store, where its own wave already waits. */
+        const made: MetricWave = { asked: new Map(), send: (name, args) => call<unknown>(name, args, name === 'metric' ? { bare: true } : {}) };
         METRIC_WAVES.set(key, (wave = made));
         setTimeout(() => {
           if (METRIC_WAVES.get(key) === made) METRIC_WAVES.delete(key);
@@ -1841,8 +1843,16 @@ export function createClient(options: ClientOptions) {
    * ASKS, because it is the one call a screen makes as it is left: a plain fetch of a closing page is cancelled, and
    * the reader's mark was lost with it, so what was new stayed new. It is not an option of the client, and a body
    * at or over the ceiling goes plain, since a browser refuses that one rather than sending it late.
+   *
+   * `wave` sends a figure with the others asked beside it (`inMetricWave`) only when it is not already kept: a revisit's
+   * figures are answered from the kept copy at once, as they were before the waves, and never wait for one. `bare` skips
+   * the kept store, for the wave's own figure sent by itself.
    */
-  async function call<T>(name: string, args: Record<string, unknown> = {}, how: { outlive?: boolean } = {}): Promise<Result<T>> {
+  async function call<T>(
+    name: string,
+    args: Record<string, unknown> = {},
+    how: { outlive?: boolean; wave?: boolean; bare?: boolean } = {},
+  ): Promise<Result<T>> {
     if (!NAMES.has(name))
       return {
         ok: false,
@@ -1882,13 +1892,15 @@ export function createClient(options: ClientOptions) {
 
     /* A READ KEPT AT THIS VERSION IS ANSWERED FROM WHAT IT WAS ANSWERED (`KEEPS`), and one asked now is kept once it
        lands, if nothing moved while it was out. */
-    if (KEEPING && KEEPS.has(name) && (!WRITES.has(name) || POST_READS.has(name)) && !outlives) {
-      const ask = () => (sent === undefined ? shared<T>(name, url, writes, sent, outlives) : send<T>(name, url, writes, sent, outlives));
+    const waved = how.wave === true && typeof args.metric === 'string' ? () => inMetricWave(args.metric as string) as Promise<Result<T>> : null;
+    if (KEEPING && KEEPS.has(name) && (!WRITES.has(name) || POST_READS.has(name)) && !outlives && how.bare !== true) {
+      const ask = waved ?? (() => (sent === undefined ? shared<T>(name, url, writes, sent, outlives) : send<T>(name, url, writes, sent, outlives)));
       return keptOr<T>(`${base} ${options.token ?? ''}`, `${url.toString()} ${options.token ?? ''} ${sent ?? ''}`, MARKED.has(name), ask);
     }
 
     /* A READ ALREADY OUT IS NOT SENT TWICE (`FLYING`). The first caller gets the answer itself and every other one its
        own copy, so a reader that sorts or trims the rows it was handed cannot reach into another's. */
+    if (waved !== null) return waved();
     if (sent === undefined) return shared<T>(name, url, writes, sent, outlives);
     /* A WRITE GOING OUT ENDS THE SHARING: a read asked after it must not be handed one sent before it. */
     if (WRITES.has(name) && !POST_READS.has(name)) {
@@ -2355,7 +2367,7 @@ export function createClient(options: ClientOptions) {
         ...(filter && Object.keys(filter).length ? { filter } : {}),
         ...(opts.walk === undefined ? {} : { walk: String(opts.walk) }),
       }),
-    metric: (metric: string) => (METRIC_BATCHING && !NO_METRICS.has(`${base} ${options.token ?? ''}`) ? inMetricWave(metric) : call<unknown>('metric', { metric })),
+    metric: (metric: string) => call<unknown>('metric', { metric }, { wave: METRIC_BATCHING && !NO_METRICS.has(`${base} ${options.token ?? ''}`) }),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
     figures: () => call<FigureEntry[]>('figures'),
     /** What the caller may read, in one read: the fixed addresses, lists, pages, figures and skills by name. READ+. */

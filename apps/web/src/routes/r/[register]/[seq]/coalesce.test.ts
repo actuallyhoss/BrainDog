@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { batchMetrics, batchSchemas, createClient, forgetSchemas } from '@braindog/client';
+import { batchMetrics, batchSchemas, createClient, forgetSchemas, keepReads, METRIC_WAVE_MS } from '@braindog/client';
 
 import { figureReader, type Fetch } from './figures.ts';
 
@@ -77,6 +77,25 @@ test('A PROJECT PAGE: the sidebar\'s figures and the page\'s own, asked a moment
     const page = Promise.all([...['project-in-month', 'project-out-month', 'project-owed'].map((m) => shape.scalar(m, NAMED[0])), shape.moneyIn(NAMED[0]), shape.moneyOut(NAMED[0])]);
     await Promise.all([sidebar, page]);
     assert.deepEqual(r.asked, ['metrics']);
+  }));
+
+test('A REVISIT: figures kept at this version are answered from the kept copy, never waiting for a wave', () =>
+  firstOpen(async () => {
+    keepReads(true);
+    try {
+      const r = record();
+      const page = figureReader('https://brain.example', r.fetch);
+      const ask = () => Promise.all([...['project-in-month', 'project-owed'].map((m) => page.scalar(m, NAMED[0])), page.moneyIn(NAMED[0])]);
+      const first = await ask();
+      assert.deepEqual(r.asked, ['metrics']);
+      const t0 = performance.now();
+      const again = await ask();
+      assert.ok(performance.now() - t0 < METRIC_WAVE_MS, 'the kept figures do not wait out a wave');
+      assert.deepEqual(again, first);
+      assert.deepEqual(r.asked, ['metrics'], 'and nothing is asked again');
+    } finally {
+      keepReads(false);
+    }
   }));
 
 test('A HOST WITHOUT metrics IS ASKED ONCE A FIGURE, and from then on without trying it again', () =>
