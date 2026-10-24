@@ -535,7 +535,7 @@ test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line
   assert.match(html, /<path class="forecast-walk" [^>]*style="stroke:url\(#[^)]+-under\)"/u, 'the line is cut at zero: ink above, red under');
 });
 
-test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS WHEN IT RUNS OUT, the flag kept, and back once a knob moves the walk', () => {
+test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS HOW LONG IT LASTS, the flag kept, and back once a knob moves the walk', () => {
   const plain = model();
   assert.equal(forecastPlan(plain, scenario(plain, baseKnobs(plain)), null).legend, true, 'no headline row, the sentence stays');
   const m = forecastModel([...ROWS, ['headline', 'under', '', '']])!;
@@ -547,7 +547,8 @@ test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS WHEN IT RUNS OUT, the fla
   assert.match(plan.sentence, /Goes under on 20 Oct/u, 'and the chart\'s name still says it');
   assert.equal(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).legend, true, 'a moved walk is not the one the headline read');
   const above = forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00'], ['horizon', '30', '', ''], ['headline', 'under', '', '']])!;
-  assert.equal(forecastPlan(above, scenario(above, baseKnobs(above)), null).legend, true, 'a walk that never goes under still says so');
+  assert.equal(forecastPlan(above, scenario(above, baseKnobs(above)), null).legend, false, 'a walk that never goes under leaves the horizon to the page');
+  assert.equal(forecastPlan(above, scenario(above, { ...baseKnobs(above), late: 5 }), scenario(above, baseKnobs(above))).legend, true, 'until a knob moves it');
   const html = toHTML(parse(['```forecast', ...ROWS.map((r) => r.join(' | ')), 'headline | under |  | ', '```'].join('\n'), { page: true }));
   assert.doesNotMatch(html, /forecast-said/u);
   assert.match(html, /class="forecast-pin"/u);

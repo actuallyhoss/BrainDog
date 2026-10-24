@@ -1146,7 +1146,11 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   return {
     said,
     warn: c !== null,
-    legend: !(c && model.headline && base === null),
+    /* NO SENTENCE WHILE THE PAGE'S HEADLINE SAYS HOW LONG THE MONEY LASTS, whether this walk goes under or not (the scope
+       of 24 October, B7). Over Money's Lasts saying "Lasts past 23 Oct 2027" from its year's walk, this chart said
+       "Stays above zero to 1 Jan 2027, as far as the chart goes": true, and a second day for one question. The page
+       names one horizon, the tile's, and the chart's own end is on its axis. A knob that moves the walk brings it back. */
+    legend: !(model.headline && base === null),
     past,
     walk: drawn(shown.days.filter((p) => p.day <= known)),
     future: drawn(shown.days.filter((p) => p.day >= known)),
