@@ -16,7 +16,7 @@ import { day, shortDay } from 'braindog-render';
 
 /**
  * WHETHER A LIST OF TAGS IS ONLY THE KEYS AN IMPORT LEFT, which say where a row came from to the importer and nothing to
- * a person: "sambrain:servicereading:oracle-a1:cpu:2026-09-28" (the audit of 25 October, Z23, `row-390-light.png`).
+ * a person: "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" (the audit of 25 October, Z23, `row-390-light.png`).
  * Such a field is not listed as a fact. A tag a person wrote has a space or fewer than three parts, and keeps its place.
  */
 export function importKeysOnly(v: unknown): boolean {
