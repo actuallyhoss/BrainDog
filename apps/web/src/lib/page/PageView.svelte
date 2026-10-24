@@ -681,10 +681,10 @@
     <Waiting head={mode === 'page'} />
   {/if}
 {:else if got.from === 'refused'}
+  <!-- A REFUSAL IN A PERSON'S WORDS (U-A14): what happened and one Try again; the record's own sentence waits behind
+       Read details. Offline says so, since the record's sentence about a read that never left is no help. -->
+  {@const said = typeof navigator !== 'undefined' && navigator.onLine === false ? copy.errorPage.offline : copy.errorPage.broken}
   <div class="said">
-    <!-- A REFUSAL IN A PERSON'S WORDS (U-A14): what happened and one Try again; the record's own sentence waits behind
-         Read details. Offline says so, since the record's sentence about a read that never left is no help. -->
-    {@const said = navigator.onLine === false ? copy.errorPage.offline : copy.errorPage.broken}
     <Empty kind="error" heading title={said.title} body={said.body} detail={got.fix}>
       {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>{/snippet}
     </Empty>

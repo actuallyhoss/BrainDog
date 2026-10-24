@@ -95,8 +95,32 @@
   } from '$lib/flow/source.ts';
   import { canvasWords, lastRunReading, pageSentence, runDurations, runMark, runParts, triggerIcon } from '../hub.ts';
   import { contestLines, contestOf, fieldOf, nameFor } from './run-again.ts';
+  import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../../settings/[area]/muted.ts';
 
   const flow = new FlowDraft({ slash: () => page.data.slash === true });
+
+  /* WHETHER THIS RULE TELLS HIM, ON ITS OWN PAGE (U-C7): Settings > Notifications listed every rule that tells you, one
+     read each, and now sends here. Off puts the rule in his own `notify.muted` (`../../settings/[area]/muted.ts`), so its
+     notices leave his Today feed and nobody else's; an urgent one still shows. */
+  const tellWords = { stop: 'Stop telling me', start: 'Tell me again', stopped: 'It no longer tells you', started: 'It tells you again' };
+  let mutedNow = $state<string[] | null>(null);
+  const mutedList = $derived(mutedNow ?? mutedOf((page.data.me as { prefs?: Record<string, unknown> } | undefined)?.prefs?.['notify.muted']));
+  let telling = $state(false);
+  async function flipTell(id: string): Promise<void> {
+    if (telling) return;
+    const actor = actorOf(id);
+    const was = mutedList;
+    const next = mutedAfter(was, actor, was.includes(actor));
+    telling = true;
+    mutedNow = next ?? [];
+    const out = await createClient({ base: apiBase() })
+      .setPref('notify.muted', next)
+      .catch(() => null);
+    telling = false;
+    if (out?.ok) return void toasts.push(was.includes(actor) ? tellWords.started : tellWords.stopped);
+    mutedNow = was;
+    toasts.push(out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached);
+  }
 
   const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice(1));
 
@@ -673,6 +697,11 @@
             {/if}
             {#if owner}
               <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
+            {/if}
+            {#if tellsQuietly(row.body)}
+              <button type="button" class="mi" role="menuitem" disabled={telling} onclick={() => ((menuOpen = false), void flipTell(row!.id))}
+                >{mutedList.includes(actorOf(row.id)) ? tellWords.start : tellWords.stop}</button
+              >
             {/if}
             <button type="button" class="mi" role="menuitem" onclick={duplicate}>{editWords.duplicate}</button>
             {#if owner}

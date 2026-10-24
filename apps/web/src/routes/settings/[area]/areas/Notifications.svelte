@@ -18,11 +18,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { untrack } from 'svelte';
-  import { forget } from '$lib/record/boot-live.ts';
-  import { said } from '$lib/voice.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
-  import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../muted.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
 
@@ -35,11 +31,8 @@
     notHereYet: 'Not on this record yet',
     urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',
     tellers: 'Rules that tell you',
-    /* WHERE A MUTED RULE'S NOTICES STOP SHOWING, BY THE NAMES THIS RECORD GIVES THEM: Today's feed, which the record now
-       reads without them (`unmuted` in `packages/record`). It said "your digest", and no digest carries a rule's notices. */
-    tellersWhy: (feed: string, home: string) => `Turn one off and its notices leave “${feed}” on ${home}, for you alone. Its urgent ones still show there.`,
-    tells: (name: string) => `${name} tells you`,
-    muted: 'Off for you',
+    tellersWhere: 'Each rule turns its notices off for you on its own page, in Automations',
+    openRules: 'Open Automations',
     /* WHAT INTERRUPTS, AS ONE SENTENCE (agents F20): three rows that looked like settings and changed nothing were three
        facts, so they are said once, as the facts they are. */
     interrupts: 'Only urgent things interrupt you, at most once an hour: keys about to expire, runs held back, and anything a rule marks urgent. The rest waits for your summary.',
@@ -118,63 +111,6 @@
   /* ON PUTS THE DEFAULT BACK rather than inventing a window: 21:00 to 08:00 is what a record holds until somebody sets one. */
   const flip = (): void => void put(on ? 'off' : null);
 
-  /* ── the rules that tell you ─────────────────────────────────────────────
-     ONE QUIET SWITCH A RULE, AND ONLY FOR A RULE THAT TELLS YOU SOMETHING: a rule with a `notify` step that is not
-     urgent, read off the automations this person may read (`lib/flow/source.ts`), each body asked for once. Off puts the
-     rule in this person's `notify.muted`, through the same `setPref` Navigation writes, so its notices leave their
-     Today feed and nobody else's (`unmuted` in `packages/record`); an urgent one still shows there. A record with no such rule draws no section. */
-  type Teller = { actor: string; name: string };
-  let tellers = $state<Teller[]>([]);
-  /** This person's muted rules: the shell's answer, then what the last switch kept. */
-  let switched = $state<string[] | null>(null);
-  const muted = $derived(switched ?? mutedOf((props.shell.me as { prefs?: Record<string, unknown> }).prefs?.['notify.muted']));
-  let muting = $state(false);
-  let muteRefusal = $state('');
-
-  async function readTellers(): Promise<void> {
-    const m = await import('$lib/flow/source.ts');
-    const at = opened();
-    const out = await m.openAutomations((url, init) => fetch(url, init), apiBase()).catch(() => null);
-    const rows = out?.first.ok ? out.first.value.filter((r) => r.enabled) : [];
-    const read = await Promise.all(
-      rows.map(async (r) => {
-        const one = await out!.source.automation(r.id).catch(() => null);
-        return one?.ok && tellsQuietly(one.value.body) ? [{ actor: actorOf(r.id), name: r.name }] : [];
-      }),
-    );
-    /* A READ THAT FAILS DRAWS NO SWITCH AND REFUSES NOTHING: the switches are an extra, and the rest of the area stands. */
-    closed(true, at);
-    tellers = read.flat();
-  }
-
-  /* ASKED ONCE FOR THIS VISIT, whatever shell comes after. */
-  let toldAsked = false;
-  $effect(() => {
-    if (toldAsked || props.shell.refused) return;
-    toldAsked = true;
-    untrack(() => void readTellers());
-  });
-
-  async function mute(t: Teller): Promise<void> {
-    if (muting) return;
-    const was = muted;
-    const next = mutedAfter(was, t.actor, was.includes(t.actor));
-    muting = true;
-    muteRefusal = '';
-    switched = next ?? [];
-    const out = await clientOf()
-      .setPref('notify.muted', next)
-      .catch(() => null);
-    muting = false;
-    if (out?.ok) {
-      /* THE SHELL KEEPS THE PREFS IT BOOTED WITH, so the next screen asks the record again. */
-      forget();
-      return;
-    }
-    switched = was;
-    muteRefusal = out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
-  }
-
   /* SEND A TEST (REC-A15): a person proves their phone rings, on their own press, so a dead subscription is found now
      and not when a real notice never arrives. The record rings every device of theirs and says how many; a press
      inside a minute is its `RATE_LIMITED`, whose `fix` already says when the next may go.
@@ -213,30 +149,12 @@
   <p class="said-once">{words.interrupts}</p>
 </Tile>
 
-{#if tellers.length > 0}
-  <Tile icon="refresh" title={words.tellers}>
-    <p class="hint">{words.tellersWhy(said('since_away'), said('home'))}</p>
-    {#each tellers as t (t.actor)}
-      {@const tells = !muted.includes(t.actor)}
-      <StateRow icon="bell" title={t.name} line={tells ? undefined : words.muted}>
-        {#snippet action()}
-          <button
-            type="button"
-            class="switch"
-            role="switch"
-            aria-checked={tells}
-            aria-label={words.tells(t.name)}
-            disabled={muting}
-            onclick={() => void mute(t)}><span class="switch-track"></span></button
-          >
-        {/snippet}
-      </StateRow>
-    {/each}
-    {#if muteRefusal}
-      <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {muteRefusal}</p>
-    {/if}
-  </Tile>
-{/if}
+<!-- THE RULES THAT TELL YOU ARE AUTOMATIONS' (U-C7): one row to them, where each rule's own page turns its notices off for
+     you. Listing them here read every rule, one by one, before the screen settled. -->
+{#snippet toRules()}<Button weight="quiet" href="/automations">{words.openRules}</Button>{/snippet}
+<Tile>
+  <StateRow icon="refresh" title={words.tellers} line={words.tellersWhere} action={toRules} />
+</Tile>
 
 <Tile icon="moon" title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
