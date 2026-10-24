@@ -34,6 +34,16 @@ type Block = {
 /** The heading the dated plan takes inside More about. */
 export const PLAN_BY_DATE = 'Plan by date';
 
+/**
+ * THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October, C4), which the hero says in place of its rules'
+ * line (`ProjectPart.svelte`): the lead note the record sent with the line it kept (`modelLine`, `page-live.ts`), drawn,
+ * with words in it. `null` where the rules speak: no lead, a lead the rules wrote, or one not drawn.
+ */
+export function modelLineOf(blocks: readonly { kind: string; lead?: unknown; drawn?: boolean | undefined; modelLine?: unknown; body?: unknown }[]): string | null {
+  const lead = blocks.find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false);
+  return lead?.modelLine === true && typeof lead.body === 'string' && lead.body.trim() !== '' ? lead.body : null;
+}
+
 const isRuns = (register: string | undefined): boolean => !!register && (REGISTERS[register] as { seq_prefix?: unknown } | undefined)?.seq_prefix !== undefined;
 const said = <T extends Block>(b: T): T => (b.drawn === false ? b : ({ ...b, drawn: false, why: 'empty' } as T));
 const main = (b: Block): boolean => b.area !== 'rail';

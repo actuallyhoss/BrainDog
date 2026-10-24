@@ -59,7 +59,7 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import { rowScreen } from '$lib/record/row-href.ts';
   import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
-  import { onProject, moreSaid } from './project-page.ts';
+  import { onProject, moreSaid, modelLineOf } from './project-page.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -600,10 +600,7 @@
    */
   /* THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October, C4), which the hero says in place of its rules'
      line: the declared lead is not drawn under the hero (`project-page.ts`), so the hero is where a kept line is read. */
-  const modelLine = $derived.by(() => {
-    const lead = (live?.page.blocks ?? []).find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false);
-    return lead?.modelLine === true && typeof lead.body === 'string' && lead.body.trim() !== '' ? lead.body : null;
-  });
+  const modelLine = $derived(modelLineOf(live?.page.blocks ?? []));
   const all = $derived<LiveBlock[]>(arrangement.editing || arrangement.slots !== null ? own : [...own, ...feet]);
 
   /* ── the line a page opens on ──────────────────────────────────────────────
