@@ -242,7 +242,8 @@ export function stopSaid(inbox: Inbox): string | null {
   if (own !== undefined) return own.line;
   const why = inbox.stop.said.trim() === '' ? '' : `: "${inbox.stop.said.replace(/\s+/gu, ' ').trim()}"`;
   const id = inbox.stop.id === '' ? '' : ` (${inbox.stop.id})`;
-  return inbox.stop.kind === 'stop' ? `He stopped this run in BrainDog${id}${why}. Reply with instructions, then end.` : `He paused this run in BrainDog${id}${why}. Wait until it is resumed.`;
+  /* "THE PERSON", NOT "HE" (audit D, W17): the record is anybody's, and these lines go to every agent on every record. */
+  return inbox.stop.kind === 'stop' ? `The person stopped this run in BrainDog${id}${why}. Reply with instructions, then end.` : `The person paused this run in BrainDog${id}${why}. Wait until it is resumed.`;
 }
 
 /** What a prompt has not yet been shown: instructions no hook or start showed, and the stop when a prompt has not said it. */
@@ -271,7 +272,7 @@ export function promptFor(inbox: Inbox, state: HookState): { context: string; st
   for (const t of told) if (lines.includes(t.line)) shown[t.id] = 'prompt';
   if (stop !== null && inbox.stop!.id !== '' && shown[inbox.stop!.id] === undefined) shown[inbox.stop!.id] = 'prompt';
   const left = told.length - told.filter((t) => lines.includes(t.line)).length;
-  if (left > 0) lines.push(`And ${String(left)} more from him: call instructions to read them.`);
+  if (left > 0) lines.push(`And ${String(left)} more from the person: call instructions to read them.`);
   return { context: lines.join('\n'), state: { ...state, shown, said_stop: stop === null ? state.said_stop : inbox.stop!.id || inbox.stop!.kind } };
 }
 
@@ -283,7 +284,7 @@ export function stillAllowed(tool: string, server: unknown): boolean {
 }
 
 /** The sentence a denied call ends with, saying what still works. */
-export const ONLY_BRAINDOG = "This call was not run. Only BrainDog's own tools work until he resumes the run.";
+export const ONLY_BRAINDOG = "This call was not run. Only BrainDog's own tools work until the person resumes the run.";
 
 /** PreToolUse: the reason to deny with and the state after, or `null` to let the call go on. */
 export function toolFor(inbox: Inbox, state: HookState, event: HookEvent): { reason: string; state: HookState } | null {
@@ -295,7 +296,7 @@ export function toolFor(inbox: Inbox, state: HookState, event: HookEvent): { rea
   const next = inbox.pending.find((t) => t.kind === 'redirect' && !state.redirected.includes(t.id));
   if (next === undefined) return null;
   const shown = { ...state.shown, ...(state.shown[next.id] === undefined ? { [next.id]: 'tool' as SeenHow } : {}) };
-  return { reason: `${next.line} He redirected this run, so this call was not run. Do that instead.`, state: { ...state, shown, redirected: [...state.redirected, next.id] } };
+  return { reason: `${next.line} The person redirected this run, so this call was not run. Do that instead.`, state: { ...state, shown, redirected: [...state.redirected, next.id] } };
 }
 
 /**
@@ -325,7 +326,7 @@ export function stopFor(inbox: Inbox, state: HookState, event: HookEvent): { rea
   const said = first.said.replace(/\s+/gu, ' ').trim();
   const what = due.length === 1 ? `Reply to ${first.id} with instructions before you stop` : `Reply to ${names.join(' and ')} with instructions before you stop`;
   return {
-    reason: `${what}: say what you did, or that it needs him${said === '' ? '' : `. He said: "${said.length > 300 ? `${said.slice(0, 300)}...` : said}"`}.`,
+    reason: `${what}: say what you did, or that it needs the person${said === '' ? '' : `. They said: "${said.length > 300 ? `${said.slice(0, 300)}...` : said}"`}.`,
     state: { ...state, blocked: [...state.blocked, ...names] },
   };
 }

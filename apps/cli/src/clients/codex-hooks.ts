@@ -50,9 +50,9 @@ export const AGENTS_BLOCK = [
   '',
   "BrainDog is the person's record of their work, served to you as the `braindog` MCP server.",
   '',
-  "- Start each task with BrainDog's `context` tool. It names your run, the project, the next step and anything he told you.",
-  '- At the start of each turn, call `instructions`. When he told you something, take it, do it, and reply with what you did, or that it needs him.',
-  '- A BrainDog answer can end with a line from him. Act on it first. When he stopped this run, reply and end; when he paused it, wait.',
+  "- Start each task with BrainDog's `context` tool. It names your run, the project, the next step and anything they told you.",
+  '- At the start of each turn, call `instructions`. When they told you something, take it, do it, and reply with what you did, or that it needs them.',
+  '- A BrainDog answer can end with a line from them. Act on it first. When they stopped this run, reply and end; when they paused it, wait.',
   '- A key or a token never goes in a BrainDog call. A key goes into the vault with `braindog keys put <label>`, which reads standard input.',
 ].join('\n');
 

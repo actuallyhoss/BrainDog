@@ -62,7 +62,7 @@ test('A LONG LIST IS CUT, and says how many more and where they are', () => {
   const many = Array.from({ length: 40 }, (_, i) => tell(`IN${String(100 + i)}`, { line: `Mara said in BrainDog (IN${String(100 + i)}): "${'x'.repeat(200)}". Take it.` }));
   const out = promptFor(fresh({ pending: many }), NO_STATE)!;
   assert.ok(out.context.length <= PROMPT_MOST + 80, String(out.context.length));
-  assert.match(out.context, /\nAnd \d+ more from him: call instructions to read them\.$/u);
+  assert.match(out.context, /\nAnd \d+ more from the person: call instructions to read them\.$/u);
   const left = Number(/And (\d+) more/u.exec(out.context)![1]);
   assert.equal(Object.keys(out.state.shown).length, 40 - left, 'an instruction cut off was marked shown');
 });
@@ -83,7 +83,7 @@ test('A TURN THAT OWES A REPLY IS HELD ONCE, per instruction, and let go when a 
   assert.equal(taken.taken, true);
   const inbox = fresh({ pending: [taken] });
   const held = stopFor(inbox, NO_STATE, turn())!;
-  assert.match(held.reason, /^Reply to IN4 with instructions before you stop: say what you did, or that it needs him\. He said: "Merge"\.$/u);
+  assert.match(held.reason, /^Reply to IN4 with instructions before you stop: say what you did, or that it needs the person\. They said: "Merge"\.$/u);
   assert.equal(stopFor(inbox, held.state, turn()), null, 'held twice for one instruction');
   assert.equal(stopFor(inbox, NO_STATE, turn({ continued: true })), null, 'stop_hook_active was not respected');
   assert.equal(stopFor(inbox, NO_STATE, turn({ agent: 'a1' })), null);

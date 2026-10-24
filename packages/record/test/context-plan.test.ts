@@ -238,8 +238,8 @@ test('A WORKTREE BUILDER: its lead first, with what the lead was told, and not t
 });
 
 test('NO PROJECT HERE: the card says so and names the projects worked on last', () => {
-  const plan = planContext(his({ who: who({ who: 'Claude Code on MacBook, no project yet: say which with handoff', placed: false, next: null }), recent: ['Lanternfish', 'Copperleaf', 'Quietcart'], lane: [] }));
-  assert.equal(lines(plan.card)[0], 'Claude Code on MacBook. No project here. Lately: Lanternfish, Copperleaf and Quietcart; say which with handoff.');
+  const plan = planContext(his({ who: who({ who: 'Claude Code on MacBook, no project yet: name it to context as project', placed: false, next: null }), recent: ['Lanternfish', 'Copperleaf', 'Quietcart'], lane: [] }));
+  assert.equal(lines(plan.card)[0], 'Claude Code on MacBook. No project here. Lately: Lanternfish, Copperleaf and Quietcart; name one to context as project.');
 });
 
 test('A SCRIPT KEY is told only what it was told and what it may do', () => {

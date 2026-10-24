@@ -247,8 +247,8 @@ function whoLine(c: Context, at: CardAt): string {
     const name = words(plainly(c.project.name.replace(ADDRESS, ' '), c, true), 40);
     return name ? `${app}, working on ${name}` : `${app}, working in a project with no name`;
   }
-  if (c.ambiguous.length > 0) return `${app}, no project yet: ${String(c.ambiguous.length)} match this folder, say which with handoff`;
-  return `${app}, no project yet: say which with handoff`;
+  if (c.ambiguous.length > 0) return `${app}, no project yet: ${String(c.ambiguous.length)} match this folder, name one to context as project`;
+  return `${app}, no project yet: name it to context as project`;
 }
 
 /* ── the slots ─────────────────────────────────────────────────────────── */

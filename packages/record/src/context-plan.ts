@@ -253,7 +253,7 @@ const voice = (who: string, id: string, said: string, verb = 'said'): string => 
 export function stopLine(stop: Stop, by: string): string {
   return stop.kind === 'stop'
     ? `${voice(by, stop.id, stop.said, 'stopped you')}. Stop now: reply with instructions, leave a handoff, then end.`
-    : `${voice(by, stop.id, stop.said, 'paused you')}. Wait: only instructions, handoff and log on your run go through until he resumes you.`;
+    : `${voice(by, stop.id, stop.said, 'paused you')}. Wait: only instructions, handoff and log on your run go through until they resume you.`;
 }
 
 /** One instruction as "Told you" says it: who, when, what, and how to take or answer it. */
@@ -276,7 +276,7 @@ export function mayLine(may: MayFact | string): string {
   const on = may.on && oneLine(may.on) ? ` on ${words(may.on, 40)}` : '';
   const off = may.off && may.off.length > 0 ? ` Off for you: ${and(may.off.map((t) => words(t, 24)))}.` : '';
   if (may.ceiling === 'read') return `You only read${on}: ask for any change with propose.${off}`;
-  if (may.ceiling === 'propose') return `You suggest${on}: every change goes to him with propose, and he decides in BrainDog.${off}`;
+  if (may.ceiling === 'propose') return `You suggest${on}: every change goes to the person with propose, and they decide in BrainDog.${off}`;
   const lists = may.lists === null || may.lists === undefined ? 'every list you read' : and(may.lists.map((l) => words(l, 30)));
   return `You write ${lists}${on}; ${and(asked)} are asked.${off}`;
 }
@@ -342,7 +342,7 @@ function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clas
   const recent = (f.recent ?? []).map((r) => words(r, 30)).filter(Boolean).slice(0, 3);
   const first = who.placed
     ? who.who
-    : `${who.who.replace(/, no project yet:.*$/u, '')}. No project here.${recent.length > 0 ? ` Lately: ${and(recent)}; say which with handoff.` : ' Say which with handoff.'}`;
+    : `${who.who.replace(/, no project yet:.*$/u, '')}. No project here.${recent.length > 0 ? ` Lately: ${and(recent)}; name one to context as project.` : ' Name it to context as project.'}`;
   const inHand = f.told.find((t) => t.taken_by && f.run && t.taken_by === f.run && t.kind !== 'stop' && t.kind !== 'pause');
   const top = f.lane.find((t) => t.mine);
   const next = inHand

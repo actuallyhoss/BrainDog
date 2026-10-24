@@ -59,7 +59,7 @@ test('A PAUSE DENIES THE SAME, and its line says to wait; a subagent is held by 
   assert.match(out.reason, /^Mara paused this run in BrainDog \(IN8\)/u, 'the record\'s own line, from the instruction');
   assert.ok(toolFor(fresh(), NO_STATE, call('Bash', { agent: 'agent-1' })) !== null, 'a helper kept working through a stop');
   /* WITH NO LINE AT ALL, ONE IS MADE FROM THE STOP. */
-  assert.match(toolFor(fresh({ stop_line: null }), NO_STATE, call('Bash'))!.reason, /^He stopped this run in BrainDog \(IN7\): "Wait for me"\./u);
+  assert.match(toolFor(fresh({ stop_line: null }), NO_STATE, call('Bash'))!.reason, /^The person stopped this run in BrainDog \(IN7\): "Wait for me"\./u);
 });
 
 test('A REDIRECT IS ONE DENIAL WITH THE NEW INSTRUCTION, to the lead only, and never again', () => {

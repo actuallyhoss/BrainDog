@@ -77,7 +77,7 @@ function shaped(said: string): Map<string, string> {
 
 test('A FRESH RECORD IS LINE ONE AND MORE, and every line with nothing to say is left out', () => {
   const fresh = card(ctx(), {}, NOW);
-  assert.equal(fresh.card, `This session, no project yet: say which with handoff\nMore     ${MORE}`);
+  assert.equal(fresh.card, `This session, no project yet: name it to context as project\nMore     ${MORE}`);
   assert.equal(fresh.next, null);
   assert.equal(fresh.words, wordCount(fresh.card));
   assert.equal(draw(ctx({ session: run, project: project('Kiln') })), `This session, working on Kiln\nMore     ${MORE}`);
@@ -86,8 +86,8 @@ test('A FRESH RECORD IS LINE ONE AND MORE, and every line with nothing to say is
 test('LINE ONE SAYS WHO AND WHERE BY NAME: the app on the machine as a person names it, then the project, no run, no branch', () => {
   const at: CardAt = { agent: 'claude', host: 'Adas-MacBook-Pro.local', branch: 'feature/specimen' };
   assert.equal(draw(ctx({ session: run, project: project('Kiln') }), at).split('\n')[0], 'Claude Code on MacBook, working on Kiln');
-  assert.equal(draw(ctx({ session: run }), { device: 'Studio Mac' }).split('\n')[0], 'This session on Studio Mac, no project yet: say which with handoff');
-  assert.equal(draw(ctx({ session: run, ambiguous: ['things#1', 'things#2'] }), at).split('\n')[0], 'Claude Code on MacBook, no project yet: 2 match this folder, say which with handoff');
+  assert.equal(draw(ctx({ session: run }), { device: 'Studio Mac' }).split('\n')[0], 'This session on Studio Mac, no project yet: name it to context as project');
+  assert.equal(draw(ctx({ session: run, ambiguous: ['things#1', 'things#2'] }), at).split('\n')[0], 'Claude Code on MacBook, no project yet: 2 match this folder, name one to context as project');
   assert.doesNotMatch(draw(ctx({ session: run }), at), /Adas-MacBook-Pro|S6|branch/u, 'a machine, a run id or a branch was said');
 });
 
@@ -161,7 +161,7 @@ test('ANOTHER RUN WORKING IN THIS TREE is one line after line one with the sente
   const live = { same_repo: [other('S6'), other('S5', { doing: 'Kerning pass' }), other('S4', { quiet: true })], elsewhere: [] };
   const slots = shaped(draw(ctx({ session: run, live, handoff: step('S5', HOUR) })));
   assert.equal(slots.get('Also'), `Kerning pass (S5, Claude Code, 5m ago) is working in this repository too. ${TWO_SESSIONS}`);
-  assert.equal(draw(ctx({ session: run, live: { same_repo: [other('S6')], elsewhere: [] } })), `This session, no project yet: say which with handoff\nMore     ${MORE}`);
+  assert.equal(draw(ctx({ session: run, live: { same_repo: [other('S6')], elsewhere: [] } })), `This session, no project yet: name it to context as project\nMore     ${MORE}`);
 });
 
 test('A RED SIGN IS A LINE ONLY WHEN IT NAMES THIS PROJECT, and none when it is about the whole record', () => {

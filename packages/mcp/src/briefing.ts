@@ -140,7 +140,7 @@ export function teach(c: { session: string | null; project: string | null; tasks
           `A task's lane is its agent field, and the person's own lane is where it is empty: list tasks where "agent is empty".`,
           /* NO EXAMPLE ID WHEN THE CALLER IS IN NO PROJECT: `things#1` was taught here once, and on the seed it is Kiln, so a
              copied sentence read 14 of Kiln's tasks as the project asked about. */
-          `One project's tasks: list tasks where {"field":"thing","is":"${c.project ?? "<the project's spoken id>"}"}.`,
+          `One project's tasks: list tasks where {"field":"thing","is":"${c.project ?? "<the project's name>"}"}.`,
           `To add a note to a task, log on it, which keeps each line in its history and leaves the note field alone; an update that patches note replaces the whole note.`,
         ]
       : []),
