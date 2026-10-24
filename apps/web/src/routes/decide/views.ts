@@ -335,10 +335,12 @@ function amountIn(q: QueueQuestion): { minor: number; currency: string } | null 
  * IT LEADS WITH THE COUNT, IN RED, SINCE THE AUDIT OF 22 OCTOBER (U-A7): "3 quick ones." was a category's label and not
  * a sentence. Now "8 need you: 3 about money, £7,239 in all, and 5 quick ones.", or "6 need you, all quick ones."
  */
-export function groupSentence(money: readonly QueueQuestion[], quick: readonly QueueQuestion[], quickCount = quick.length): { text: string; needs: string } {
+export function groupSentence(money: readonly QueueQuestion[], quick: readonly QueueQuestion[], quickCount = quick.length, cards?: number): { text: string; needs: string } {
   const total = money.length + Math.max(0, quickCount);
   if (total === 0) return { text: '', needs: '' };
-  const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you`;
+  /* AND HOW MANY CARDS, WHEN ALIKE ONES FOLD (scope D9): "22 need you" over six cards read as a count that disagreed. */
+  const folded = cards !== undefined && cards > 0 && cards < total ? `, as ${cards.toLocaleString('en-GB')} ${cards === 1 ? 'card' : 'cards'}` : '';
+  const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you${folded}`;
   let sum = '';
   if (money.length > 0) {
     const amounts = money.map(amountIn);
@@ -438,7 +440,9 @@ export function decideDrawn(
   if (waits) open = waits.questions;
   /* THE QUICK ONES ARE EVERY OPEN QUESTION THAT IS NOT ABOUT MONEY, by the record's count where it says more than the
      queue held. */
-  const waiting = pool.length > 0 ? groupSentence(money, quick, Math.max(quick.length, open - money.length)) : null;
+  /* THE CARDS ARE COUNTED ONLY WHEN EVERY QUESTION WAITING WAS DRAWN, so a fold of some is never said of all. */
+  const cards = pool.length >= open ? groups.money + groups.quick : undefined;
+  const waiting = pool.length > 0 ? groupSentence(money, quick, Math.max(quick.length, open - money.length), cards) : null;
   /* WHAT WAS PUT OFF, BY HOW MANY AND THE SOONEST BACK, said on its fold's own line. */
   const laterAt = blocks.findIndex((b) => b.kind === 'queue' && b.source === 'governance.later');
   if (laterAt > 0 && blocks[laterAt - 1]?.kind === 'section') {

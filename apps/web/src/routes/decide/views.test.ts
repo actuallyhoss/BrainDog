@@ -175,6 +175,17 @@ const question = (id: string, cost: QueueQuestion['cost'] = 'call', recommended 
 const queueBlock = (queue: QueueQuestion[], total: number, lead = false): LiveBlock =>
   decideBlockOf({ kind: 'queue', source: 'governance.open', ...(lead ? { lead: true } : {}), queue, matched: total } as never, CLOCK);
 
+/* ONE RUN'S CLEANUP FOLDS INTO ONE CARD (scope D1), so the head says both numbers (D9): the questions and the cards. */
+test('the head says how many questions and, when alike ones fold, how many cards they are', () => {
+  const ran = (id: string): QueueQuestion => ({ ...question(id), kind: 'rowset', body_kind: 'rowset', options: [], run: { id: 'S904', name: 'Tidy projects' } }) as QueueQuestion;
+  const qs = [ran('r1'), ran('r2'), ran('r3'), ran('r4'), question('q1')];
+  const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK);
+  assert.equal(shaped.sentence.text, '5 need you, as 2 cards, all quick ones.');
+  assert.equal(shaped.groups.quick, 2);
+  /* A QUEUE THAT DREW SOME OF THEM says no cards, since a fold of some is not one of all. */
+  assert.equal(decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 9, true), queueBlock(qs, 9)], CLOCK).sentence.text, '9 need you, all quick ones.');
+});
+
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
 test('the head says how many need you, then the two groups in digits (today F12, U-A7): about money and what they come to, then the quick ones', () => {

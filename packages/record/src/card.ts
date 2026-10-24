@@ -457,7 +457,7 @@ function questionOf(said: string): string {
 
 /**
  * Waiting as a count and the top one in plain words. The count is this project's when the record gave it (the questions
- * this agent can act on), else all of them; the questions come project first, so the top one is the nearest.
+ * this agent can act on), said beside all of them when fewer; the questions come project first, so the top one is the nearest.
  */
 function waitingBrief(c: Context, at: CardAt): string | null {
   const asks = asked(c.waiting);
@@ -465,7 +465,8 @@ function waitingBrief(c: Context, at: CardAt): string | null {
   const total = asks.length + Math.max(0, (at.waiting ?? 0) - c.waiting.length);
   const n = typeof c.waiting_here === 'number' && c.waiting_here > 0 ? c.waiting_here : total;
   const who = at.decider && oneLine(at.decider) ? words(at.decider, 24) : 'the owner';
-  const lead = `${String(n)} on ${who}, first: `;
+  /* BOTH NUMBERS WHEN THEY DIFFER (scope D9): "1 on the owner" beside a badge of 8 read as a count that disagreed. */
+  const lead = n < total ? `${String(n)} here of ${String(total)} on ${who}, first: ` : `${String(n)} on ${who}, first: `;
   return `${lead}${words(questionOf(tidy(plainly(asks[0]!.question, c, true, at))), ROOM - lead.length)}`;
 }
 

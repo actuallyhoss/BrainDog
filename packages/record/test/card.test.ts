@@ -136,6 +136,9 @@ test('WAITING IS A COUNT AND THE TOP ONE IN PLAIN WORDS: questions that read the
   const here = shaped(draw(ctx({ session: run, waiting: [waiting[3]!], waiting_here: 2, registers: [reg('tools', [], 'Tools')] }))).get('Waiting') ?? '';
   assert.equal(here, '2 on the owner, first: Change one of Tools to how fly is set up in .claude.json on MacBook?');
   assert.doesNotMatch(here, /tools#8|~\/|Adas-|SG\d/u, 'an id, a path or a network name reached a question');
+  /* FEWER HERE THAN IN ALL, both are said, so the card agrees with the badge's count. */
+  const both = shaped(draw(ctx({ session: run, waiting: [waiting[3]!], waiting_here: 1, registers: [reg('tools', [], 'Tools')] }), { waiting: 8 })).get('Waiting') ?? '';
+  assert.match(both, /^1 here of 8 on the owner, first: /u);
 });
 
 test('LEARNED IS THE ONE SHORTEST LEARNING, and More is the one call for the rest, naming no key and no skill', () => {

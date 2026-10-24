@@ -156,7 +156,7 @@ import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
-import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
+import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
@@ -6790,9 +6790,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * token an owner gave the `inbox` reach (`counts.inbox`'s rule), and runs only to a reader who may read them. `null`
    * is the record itself (Slash's nightly look), which reads everything.
    */
-  const waitsFor = (ctx: CallContext | null): WaitingNow => {
+  /**
+   * THE OPEN QUESTIONS THAT WAIT ON A READER, the one list every count of them is taken from (scope D9): `boot`'s
+   * `counts.decide` and `waits.questions`, the start card's Waiting line, and so `governance`'s `matched`. `null` is the
+   * record itself, which reads every one.
+   */
+  const waitingRows = (ctx: CallContext | null): Record<string, unknown>[] => {
     const open = openNow();
-    const rows = open.ok ? open.value.filter((row) => ctx === null || !heldBack(ctx, row)) : [];
+    return open.ok ? waitingOn(open.value, ctx === null ? null : (row) => heldBack(ctx, row)) : [];
+  };
+
+  const waitsFor = (ctx: CallContext | null): WaitingNow => {
+    const rows = waitingRows(ctx);
     const told = ctx === null || allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx));
     return waitingOf({
       nowMs: clock.now(),
@@ -8285,8 +8294,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
-    /* EVERY OPEN QUESTION, NOT A PAGE OF THEM: a count read off two hundred rows said 200 to a queue of 206. */
-    const open = openNow();
     /* THE PERSON'S OWN PREFERENCES, READ ONCE. `me.prefs` answers them to the person, and the pen reads a token's person's
        too, because a dismissal is the person's whichever door they came in by. */
     const prefs: Prefs = person === null ? {} : (kernel.prefsOf(person) as Prefs);
@@ -8354,7 +8361,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       computed: computedSet(),
       home,
       counts: {
-        decide: open.ok ? open.value.filter((row) => !heldBack(ctx, row)).length : 0,
+        /* EVERY OPEN QUESTION, NOT A PAGE OF THEM: a count read off two hundred rows said 200 to a queue of 206. */
+        decide: waitingRows(ctx).length,
         /* AN OWNER, AND A TOKEN AN OWNER GAVE THE `inbox` REACH, held to the whole record as `inbox` itself is: the agent
            set up to triage the arrivals was told `null` about how many there were. */
         inbox: allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx)) ? kernel.inboxWaiting() : null,
@@ -8529,10 +8537,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** How many questions wait on this caller in all, by the rule `waitsFor` counts with: `context` sends only the newest. */
-  const questionsFor = (ctx: CallContext): number => {
-    const open = openNow();
-    return open.ok ? open.value.filter((row) => !heldBack(ctx, row)).length : 0;
-  };
+  const questionsFor = (ctx: CallContext): number => waitingRows(ctx).length;
 
   /**
    * The title of the Home page the record declares, the one `braindog:page/home` reads, for the card's More line: the

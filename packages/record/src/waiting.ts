@@ -69,6 +69,14 @@ export type WaitingReader = {
   held?: ((register: string) => boolean) | undefined;
 };
 
+/**
+ * THE QUESTIONS THAT WAIT ON ONE READER, the one rule every count of them reads (scope D9): the open ones, less those
+ * held back from the reader (`held`). The record hands it its open questions and its `holds`.
+ */
+export function waitingOn<R>(open: readonly R[], held: ((row: R) => boolean) | null): R[] {
+  return held === null ? [...open] : open.filter((row) => !held(row));
+}
+
 /** Whether a question opened at `at` has waited past `LATE_DAYS` by `nowMs`. An instant that cannot be read has not. */
 export function lateAt(at: string, nowMs: number): boolean {
   const ms = Date.parse(at);
