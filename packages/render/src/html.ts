@@ -1428,12 +1428,16 @@ function agents(b: Block, o: RenderOptions): string {
   const body = plan.groups
     .map((g) => {
       const face = initialOf(said(g.who));
+      /* AS A FEED'S LINE SAYS IT (24 October): who did it in words, then what, "Claude added Archie", the maker's mark
+         where the host draws one, and a count only for a burst. "1 C added Archie" read a number and a letter. */
+      const mark = markFor(o, said(g.who));
+      const who = said(g.who) ? `<span class="feed-who">${drawn(g.who)}</span> ` : '';
       const rows = g.rows
         .map((r) => {
-          const what = (r.cells[2] ?? '').trim() === '' ? escape(AGENTS_EARLIER) : drawn(r.cells[2]);
+          const what = (r.cells[2] ?? '').trim() === '' ? escape(AGENTS_EARLIER) : who + drawn(r.cells[2]);
           return `<li class="feed-row"${toneAttrs(r.tone)}><span class="feed-count num">${
-            counted(said(r.cells[1])) ? drawn(r.cells[1]) : ''
-          }</span><span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span><span class="feed-what">${what}${toneGlyph(r.tone)}</span><span class="feed-when">${drawn(r.cells[3])}</span></li>`;
+            feedBurst(said(r.cells[1])) ? drawn(r.cells[1]) : ''
+          }</span>${mark ? agentFaceHtml(mark, 'feed-face') : `<span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span>`}<span class="feed-what">${what}${toneGlyph(r.tone)}</span><span class="feed-when">${drawn(r.cells[3])}</span></li>`;
         })
         .join('');
       return `<div class="feed-group" data-by="agent"><h3 class="feed-head">${drawn(g.who)}<span class="feed-tally num">${g.total}</span></h3><ul class="feed-rows">${rows}</ul></div>`;

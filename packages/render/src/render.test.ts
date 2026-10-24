@@ -1251,7 +1251,9 @@ test('AGENTS GROUPS BY WHO DID IT, one head per agent in the order they first ap
   const html = toHTML(onPage(src));
   const heads = [...html.matchAll(/<h3 class="feed-head">([^<]+)<span class="feed-tally num">(\d+)<\/span>/gu)].map((m) => `${m[1]} ${m[2]}`);
   assert.deepEqual(heads, ['Claude 12', 'Codex 1']);
-  assert.match(html, /<span class="feed-what">changed <a href="\/r\/tickets\/2">Write the notes<\/a><\/span>/u);
+  /* WHO DID IT IN WORDS ON THE LINE, as a feed says it ("Claude changed ..."), and a count only for a burst. */
+  assert.match(html, /<span class="feed-what"><span class="feed-who">Claude<\/span> changed <a href="\/r\/tickets\/2">Write the notes<\/a><\/span>/u);
+  assert.match(html, /<span class="feed-count num"><\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Codex<\/span> added Fix login/u, 'a lone change says no 1');
   assert.match(html, /<span class="feed-what">earlier<\/span><span class="feed-when">1d ago<\/span>/u);
   assert.match(html, /<li class="feed-row" data-intent="warn">/u);
   assert.match(toHTML(onPage('```agents\n```')), /<p class="feed-empty">No agent has done anything here yet\.<\/p>/u);
