@@ -46,24 +46,28 @@ export function rowPagesOf(pages: readonly PageAbout[] | null | undefined): Map<
  * The address, from what it is handed: `held` says whether the tab holds a list, `pages` is `rowPagesOf`.
  * `null` for words that are not a spoken id and for a list the tab does not hold, and the renderer draws those plain.
  */
-export function rowHrefIn(spoken: string, held: (register: string) => boolean, pages: ReadonlyMap<string, string>): string | null {
+export function rowHrefIn(spoken: string, held: (register: string) => boolean, pages: ReadonlyMap<string, string>, byRow: ReadonlySet<string> = new Set()): string | null {
   const row = spokenOf(spoken);
   if (row === null || !held(row.register)) return null;
-  const slug = pages.get(keyOf(row.register, row.seq));
+  const slug = pages.get(keyOf(row.register, row.seq)) ?? (byRow.has(row.register) ? keyOf(row.register, row.seq) : undefined);
   return slug === undefined ? `/r/${row.register}/${row.seq}` : `/p/${encodeURIComponent(slug)}`;
 }
 
 /* THE PAGES THE RECORD LAST SAID, kept as `learnMoney` keeps its currencies (`api.ts`): a shell over a refusal sends
    none, so the last record's pages are forgotten with it. */
 let learnt: ReadonlyMap<string, string> = new Map();
+/* AND THE LISTS WHOSE ROWS' PAGES OPEN BY THE ROW (`pagesByRow`): a run's page is `/p/session%23904`, which the record
+   answers as the run's own page, so `boot` need not list 900 of them. */
+let byRowLearnt: ReadonlySet<string> = new Set();
 
-/** `boot`'s pages, as the shell reads them. Called with nothing, every row opens on its screen. */
-export const learnRowPages = (pages: readonly PageAbout[] | null | undefined): void => {
+/** `boot`'s pages, as the shell reads them, and the lists whose rows open by the row. Called with nothing, every row opens on its screen. */
+export const learnRowPages = (pages: readonly PageAbout[] | null | undefined, byRow: readonly string[] = []): void => {
   learnt = rowPagesOf(pages);
+  byRowLearnt = new Set(byRow);
 };
 
 /** Where a spoken id opens on the record this tab is on, or `null` where it names no row of a list the tab holds. */
-export const rowHref = (spoken: string): string | null => rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt);
+export const rowHref = (spoken: string): string | null => rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt, byRowLearnt);
 
 /* ── a row with a page of its own ─────────────────────────────────────────── */
 
@@ -80,14 +84,14 @@ export const rowScreen = (register: string, seq: number): string => `/r/${regist
  * Where the row's screen sends a reader instead (the plan of 20 October, batch 3d): the page its list made for it, or
  * `null` to stay, for a row with no page and for an address that asks for the row's fields. Record-relative.
  */
-export function ownPageIn(register: string, seq: number, search: URLSearchParams, pages: ReadonlyMap<string, string>): string | null {
+export function ownPageIn(register: string, seq: number, search: URLSearchParams, pages: ReadonlyMap<string, string>, byRow: ReadonlySet<string> = new Set()): string | null {
   if (search.has(FIELDS) || !Number.isInteger(seq) || seq < 1) return null;
-  const slug = pages.get(keyOf(register, seq));
+  const slug = pages.get(keyOf(register, seq)) ?? (byRow.has(register) ? keyOf(register, seq) : undefined);
   return slug === undefined ? null : `/p/${encodeURIComponent(slug)}`;
 }
 
 /** `ownPageIn` on the pages the record last said. */
-export const ownPage = (register: string, seq: number, search: URLSearchParams): string | null => ownPageIn(register, seq, search, learnt);
+export const ownPage = (register: string, seq: number, search: URLSearchParams): string | null => ownPageIn(register, seq, search, learnt, byRowLearnt);
 
 /* ── a hole ──────────────────────────────────────────────────────────────── */
 

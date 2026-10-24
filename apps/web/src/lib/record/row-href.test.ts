@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { REGISTERS } from './held.ts';
-import { holePlace, holePlaceIn, holeSentence, learnRowPages, rowHref, rowHrefIn, rowPagesOf, spokenOf } from './row-href.ts';
+import { holePlace, holePlaceIn, holeSentence, learnRowPages, ownPageIn, rowHref, rowHrefIn, rowPagesOf, spokenOf } from './row-href.ts';
 /* THE SAMPLE'S DECLARATIONS, which a live tab learns from the record. */
 import './fixtures/fill.ts';
 
@@ -63,6 +63,15 @@ test('the address is worked out from what it is handed, so a host can ask for an
   assert.equal(rowHrefIn('tasks#241', held, pages), null);
   /* A SLUG IS ONE SEGMENT OF AN ADDRESS, whatever a row was named. */
   assert.equal(rowHrefIn('things#9', held, rowPagesOf([{ slug: 'a b/c', about: { register: 'things', seq: 9 } }])), '/p/a%20b%2Fc');
+});
+
+test("a run's page opens by the run itself where boot names its list as opened by the row", () => {
+  const held = (list: string) => list === 'session' || list === 'things';
+  const byRow = new Set(['session']);
+  assert.equal(rowHrefIn('session#904', held, new Map(), byRow), '/p/session%23904');
+  assert.equal(rowHrefIn('things#3', held, new Map(), byRow), '/r/things/3');
+  assert.equal(ownPageIn('session', 904, new URLSearchParams(), new Map(), byRow), '/p/session%23904');
+  assert.equal(ownPageIn('session', 904, new URLSearchParams('fields=1'), new Map(), byRow), null);
 });
 
 /* ── a hole ──────────────────────────────────────────────────────────────── */

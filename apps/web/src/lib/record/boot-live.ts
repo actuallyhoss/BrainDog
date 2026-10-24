@@ -941,8 +941,12 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
      them all; a shell over a refusal holds none, so the last record's are forgotten. */
   learnMoney(drawn ? (drawn.money ?? implied?.held ?? []) : []);
   /* AND THE PAGES A TEMPLATE MADE FOR A ROW, so a `ref:` opens the row's own page where it has one (`row-href.ts`). */
-  /* AND THE RUNS' PAGES, WHICH `boot` SENDS BY THEIR ADDRESS ALONE (`rowPages`). */
-  learnRowPages(drawn ? [...(b.pages ?? []), ...(b.rowPages ?? []).flatMap((l) => l.rows.map(([seq, slug]) => ({ slug, about: { register: l.register, seq } })))] : []);
+  /* AND THE RUNS' PAGES, WHICH AN OLDER `boot` SENDS BY THEIR ADDRESS ALONE (`rowPages`), and a newer one opens by the
+     row (`pagesByRow`). */
+  learnRowPages(
+    drawn ? [...(b.pages ?? []), ...(b.rowPages ?? []).flatMap((l) => l.rows.map(([seq, slug]) => ({ slug, about: { register: l.register, seq } })))] : [],
+    drawn ? (b.pagesByRow ?? []) : [],
+  );
   const waits = waitsOf(b);
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';

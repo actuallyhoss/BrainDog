@@ -1289,6 +1289,11 @@ export type Boot = {
    * and `pages` lists them no more. Absent from an older host, which lists them in `pages`.
    */
   rowPages?: { register: string; rows: [seq: number, slug: string][] }[];
+  /**
+   * THE LISTS WHOSE ROWS' PAGES ARE OPENED BY THE ROW (scope 2026-10-24 H17), in place of `rowPages`: a run's page is
+   * `page` asked for `session#904`, and `boot` lists none of them, not even by address. Absent from an older host.
+   */
+  pagesByRow?: string[];
   /** The rail's places in order, the frame's two first, `PLACES_MOST` drawn and the rest under More (`places.ts`). */
   places: { places: Place[]; more: Place[] };
   /** The figures the engine computes, by the source each draws as (`computed-set.ts`). */
@@ -6769,11 +6774,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      the version that listed it: `page` hands it to the kernel, which reads that row alone and checks it still holds the
      address (`rowPageAt`), so opening one run's page never resolves every run's. */
   const rowAt = new Map<string, { register: string; seq: number }>();
+  /* AND THE OTHER WAY, the address each such row's page was last seen at, by the row's spoken id (`session#904`), which is
+     how a reader opens one: `boot` names those lists (`pagesByRow`) and lists none of their pages. */
+  const slugAt = new Map<string, string>();
   const pagesNow = (): ReturnType<Kernel['pages']> =>
     heldFor(pagesHeld, '', () => {
       const every = kernel.pages();
       rowAt.clear();
-      for (const p of every) if (p.fleeting && p.about !== null && p.about.seq !== null) rowAt.set(p.slug, { register: p.about.register, seq: p.about.seq });
+      slugAt.clear();
+      for (const p of every)
+        if (p.fleeting && p.about !== null && p.about.seq !== null) {
+          rowAt.set(p.slug, { register: p.about.register, seq: p.about.seq });
+          if (!slugAt.has(`${p.about.register}#${p.about.seq}`)) slugAt.set(`${p.about.register}#${p.about.seq}`, p.slug);
+        }
       return every;
     });
 
@@ -7464,6 +7477,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const WALK = 5_000;
   /** How many lines `whatsNew` answers with: a screen's worth, `45 §5.3`. */
   const NEWS = 60;
+  /** The most characters of a line's old or new value `boot` carries (`newsCut`). */
+  const NEWS_WORDS = 160;
+  /** The most items of a list inside a line's value `boot` carries (`newsCut`). */
+  const NEWS_ITEMS = 3;
 
   /**
    * The writes to a row that leave every older line as `lineOf` found it, which is what lets `versionFor` keep an answer
@@ -8215,6 +8232,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * AND LESS THE RECORD'S OWN BOOKKEEPING, which is news to nobody: the sweep writing quiet runs off and an agent's
    * stamp of when it last saw a tool (`kernel.bookkeeping`). Each run's history still holds its lines.
    */
+  /**
+   * WHAT WAS NEW, AS `boot` CARRIES IT: each line's old and new value cut, its text to the first `NEWS_WORDS` characters
+   * and its lists to the first `NEWS_ITEMS`, as a line draws them (scope 2026-10-24, boot under 30 KB). A note written whole is a line of its own on the bell
+   * and on Today, never its text; on his record six notes' text was 26 KB of every `boot`. `whatsNew` still says them whole.
+   */
+  const newsCut = (news: WhatsNew): WhatsNew => {
+    /* AND INSIDE A VALUE THAT HOLDS OTHERS, as a new row's line says its fields and a visual its forty pictures: a list
+       keeps its first `NEWS_ITEMS`, each cut the same way. */
+    const cut = (v: unknown): unknown => {
+      if (typeof v === 'string') return v.length > NEWS_WORDS ? `${v.slice(0, NEWS_WORDS).trimEnd()}…` : v;
+      if (Array.isArray(v)) return v.slice(0, NEWS_ITEMS).map(cut);
+      if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cut(x)]));
+      return v;
+    };
+    const line = (e: EventLine): EventLine => ({
+      ...e,
+      ...('from' in e ? { from: cut(e.from) as EventLine['from'] } : {}),
+      ...('to' in e ? { to: cut(e.to) as EventLine['to'] } : {}),
+      ...(e.steps ? { steps: e.steps.map(line) } : {}),
+    });
+    return { ...news, events: news.events.map(line) };
+  };
+
   const newsFor = (ctx: CallContext, cursor?: number, everything = false): WhatsNew => {
     const reader = readerOf(ctx);
     const muted = mutesOf(ctx);
@@ -8444,7 +8484,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      of the day's observation raised, not a row. One read over a table of a line a kind, a subject and a day. */
   const usedNow = (): unknown => sql.one('SELECT count(*) AS lines, total(n) AS uses FROM observation') ?? null;
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'rowPages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -8467,15 +8507,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        planted row they changed, and it is theirs. Asked of the whole list, as the planted rows are counted. */
     const planted = plantedRows();
     const theirs = (id: string): boolean => planted[id] === undefined || planted[id] < kernel.count(id);
-    /* A PAGE OF A ROW THAT COMES AND GOES, WITH NO PLACE IN THE RAIL, GOES BY ITS ADDRESS ALONE (`rowPages`). */
+    /* A PAGE OF A ROW THAT COMES AND GOES, WITH NO PLACE IN THE RAIL, IS NOT LISTED AT ALL (`pagesByRow`): sent whole, 908
+       runs' pages were 207 KB of a 278 KB `boot`, and by address alone still 27 KB. A link to one opens it by the row's
+       spoken id, which `page` answers; `boot` names the lists whose rows open so. */
     const fleeting = (page: (typeof opens)[number]): boolean => page.fleeting === true && page.nav === null && page.about !== null && page.about.seq !== null;
-    const byList = new Map<string, [number, string][]>();
-    for (const page of opens.filter(fleeting)) {
-      const rows = byList.get(page.about!.register) ?? [];
-      byList.set(page.about!.register, rows);
-      rows.push([page.about!.seq!, page.slug]);
-    }
-    const rowPages: NonNullable<Boot['rowPages']> = [...byList].map(([register, rows]) => ({ register, rows }));
+    const pagesByRow: NonNullable<Boot['pagesByRow']> = [...new Set(opens.filter(fleeting).map((page) => page.about!.register))];
     /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
     const pages: Boot['pages'] = opens
       .filter((page) => !fleeting(page))
@@ -8520,7 +8556,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       pages,
-      rowPages,
+      pagesByRow,
       /* THE RAIL'S PLACES IN ORDER (`places.ts`), and which figures the engine computes. */
       places: railPlaces({ pages, navs: addonNavs() }),
       computed: computedSet(),
@@ -8557,7 +8593,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
             }))
           : [],
-      whatsNew: newsFor(ctx),
+      /* WITH EACH LINE'S LONG WORDS CUT (`newsCut`): a note's whole text was 26 KB of his `boot`'s 49 KB of news. */
+      whatsNew: newsCut(newsFor(ctx)),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
     };
   };
@@ -9968,6 +10005,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The methods a read is counted for (`seenWhat`), each wrapped once the record is built. */
   const SEEN_METHODS = ['list', 'get', 'history', 'backlinks', 'search', 'page'] as const;
 
+  /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
+  let pageAgain: (args: { slug: string; filter?: unknown; walk?: unknown }, ctx: CallContext) => Promise<Result<unknown>> = () =>
+    Promise.resolve(no('INTERNAL', 'The record is still starting.'));
   const api = {
     /**
      * What this record is: its registers, and how many rows each holds.
@@ -10895,6 +10935,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          not, and the exception did not even reach the client: the request simply hung. */
       if (typeof args?.slug !== 'string' || !args.slug)
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
+      /* A ROW'S PAGE ASKED BY THE ROW'S SPOKEN ID (`session#904`, `pagesByRow` in `boot`): the address it was last seen at,
+         and the address as every page now resolves when that one is gone or was never seen. No slug holds a `#`. */
+      const spoken = /^([a-z][a-z0-9_]*)#([1-9]\d*)$/u.exec(args.slug);
+      if (spoken !== null) {
+        const key = args.slug;
+        const was = slugAt.get(key);
+        const at = { register: spoken[1]!, seq: Number(spoken[2]) };
+        const tried = was === undefined ? null : await pageAgain({ ...args, slug: was }, ctx);
+        /* THE ANSWER IS THIS ROW'S PAGE, not the page of another row that took the address since. */
+        const param = tried !== null && tried.ok ? (tried.value as { param?: { register?: string; seq?: number } }).param : undefined;
+        if (tried !== null && tried.ok && param?.register === at.register && param.seq === at.seq) return tried as never;
+        if (was !== undefined) pagesHeld.clear();
+        pagesNow();
+        const now = slugAt.get(key) ?? pagesNow().find((p) => p.about !== null && p.about.register === at.register && p.about.seq === at.seq)?.slug;
+        if (now === undefined) return no('PAGE_UNKNOWN', `There is no page for ${key}. pages lists every page you can open.`, { at: 'slug' });
+        return pageAgain({ ...args, slug: now }, ctx) as never;
+      }
       const filter = filterOf(args.filter);
       if (filter === false) return no('VALUE_MALFORMED', 'filter is a value by field the page filters on, such as {"project":"12"}.', { at: 'filter' });
       /* A QUERY STRING SAYS A LENGTH AS TEXT, so `"365"` is 365 days. Anything else is refused here rather than walked. */
@@ -14708,6 +14765,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList, seesFor },
     ),
   };
+  pageAgain = api.page;
 
   /* THE SEEN-WRAPPER (§2.10): each counted read answers as it did, and is then counted for whoever is not an owner. */
   for (const name of SEEN_METHODS) {

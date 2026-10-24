@@ -1,7 +1,7 @@
 /**
- * `boot` sends a run's page by its address alone (scope 2026-10-24 A8): on his record 908 of 990 pages were runs, 207 KB
- * of a 278 KB `boot` sent on every open and every move of the record. Each run's page is in `rowPages`, its row's number
- * and its slug by list, so a link to the run still opens it; `pages`, the rail's and the palette's, holds none of them.
+ * `boot` lists no run's page (scope 2026-10-24 A8, H17): on his record 908 of 990 pages were runs, 207 KB
+ * of a 278 KB `boot` sent on every open and every move of the record, and by address alone 27 KB. `pagesByRow` names
+ * the list, a run opens by its spoken id, and `pages`, the rail's and the palette's, holds none of them.
  * And the holding pen is held between reads, as the pages are, until the record or its use moves.
  */
 
@@ -28,22 +28,25 @@ async function record() {
   return { sql, api };
 }
 
-type BootSaid = { pages: { slug: string; about: { register: string; seq: number | null } | null }[]; rowPages?: { register: string; rows: [number, string][] }[] };
+type BootSaid = { pages: { slug: string; about: { register: string; seq: number | null } | null }[]; rowPages?: unknown; pagesByRow?: string[] };
 
-test("A RUN'S PAGE IS IN rowPages BY ITS ADDRESS, and pages holds none of them", async () => {
+test("A RUN'S PAGE IS NOT IN boot AT ALL, and opens by the run's spoken id", async () => {
   const { sql, api } = await record();
   const out = await api.boot(owner as never);
   assert.ok(out.ok, JSON.stringify(out));
   const b = out.value as unknown as BootSaid;
   assert.equal(b.pages.filter((p) => p.about?.register === 'session').length, 0, 'a run page was still listed whole');
-  const runs = b.rowPages?.find((l) => l.register === 'session')?.rows ?? [];
-  /* EACH ADDRESS IS THE ONE THE RECORD OPENS: the run's page, read by its slug. The seed's own runs are among them. */
+  assert.equal(b.rowPages, undefined, 'the runs were still listed by address');
+  assert.deepEqual(b.pagesByRow, ['session']);
+  /* EACH RUN OPENS AS THE PAGE THE RECORD RESOLVES FOR IT. The seed's own runs are among them. */
   const every = api.kernel.pages().filter((p) => p.about?.register === 'session');
-  assert.ok(runs.length >= RUNS);
-  assert.equal(runs.length, every.length);
-  for (const [seq, slug] of runs) assert.equal(every.find((p) => p.about?.seq === seq)?.slug, slug, `session#${seq}`);
-  const read = await api.page({ slug: runs[0]![1] }, owner);
-  assert.ok((read as { ok: boolean }).ok, JSON.stringify(read).slice(0, 300));
+  assert.ok(every.length >= RUNS);
+  for (const p of [...every.slice(0, 2), ...every.slice(-3)]) {
+    const read = (await api.page({ slug: `session#${p.about!.seq}` }, owner)) as { ok: boolean; value: { page: string; param?: { seq: number } } };
+    assert.ok(read.ok, JSON.stringify(read).slice(0, 300));
+    assert.equal(read.value.page, p.slug);
+    assert.equal(read.value.param?.seq, p.about!.seq);
+  }
   sql.close();
 });
 

@@ -129,6 +129,11 @@ export type Boot = {
    */
   rowPages?: { register: string; rows: [seq: number, slug: string][] }[];
   /**
+   * The lists whose rows' pages open by the row's spoken id, `page` asked for `session#904`: `boot` lists none of those
+   * pages, not even by address. Absent from an older host, which sends `rowPages`.
+   */
+  pagesByRow?: string[];
+  /**
    * The pages the caller may open, each with its place in the rail when it has one.
    *
    * `about` IS THE ROW THE PAGE CAME OUT OF, and `null` for a page somebody wrote. A declaration

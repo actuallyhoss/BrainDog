@@ -50,15 +50,16 @@ async function record(runs: number) {
   return { sql, api, count, reset };
 }
 
-type BootSaid = { rowPages?: { register: string; rows: [number, string][] }[] };
+/** Each run's number and the address its page holds, as the kernel resolves them all. */
+const runPages = (api: Awaited<ReturnType<typeof record>>['api']): [number, string][] =>
+  api.kernel.pages().flatMap((p) => (p.about?.register === 'session' && p.about.seq !== null ? [[p.about.seq, p.slug] as [number, string]] : []));
 
 async function oneRunPage(runs: number) {
   const r = await record(runs);
-  const boot = ((await r.api.boot(owner as never)) as { value: BootSaid }).value;
-  const listed = boot.rowPages?.find((l) => l.register === 'session')?.rows ?? [];
-  const [seq, slug] = listed.find(([, s]) => s.startsWith('mending-the-gate-number-1'))!;
+  await r.api.boot(owner as never);
+  const [seq, slug] = runPages(r.api).find(([, s]) => s.startsWith('mending-the-gate-number-1'))!;
   r.reset();
-  const read = await r.api.page({ slug }, owner);
+  const read = await r.api.page({ slug: `session#${seq}` }, owner);
   const spent = r.count();
   return { r, seq, slug, read, spent };
 }
@@ -69,6 +70,7 @@ test("ONE RUN'S PAGE READS ROWS THAT DO NOT GROW WITH THE RUNS", async () => {
   assert.ok((few.read as { ok: boolean }).ok, JSON.stringify(few.read).slice(0, 300));
   assert.ok((many.read as { ok: boolean }).ok, JSON.stringify(many.read).slice(0, 300));
   assert.ok(many.spent.rows - few.spent.rows < 20, `rows read grew from ${few.spent.rows} to ${many.spent.rows} with 110 more runs`);
+  assert.ok(many.spent.statements <= few.spent.statements, `statements grew from ${few.spent.statements} to ${many.spent.statements}`);
   few.r.sql.close();
   many.r.sql.close();
 });
@@ -76,18 +78,35 @@ test("ONE RUN'S PAGE READS ROWS THAT DO NOT GROW WITH THE RUNS", async () => {
 test('THE PAGE READ BY ITS ROW IS THE PAGE EVERY PAGE RESOLVED ANSWERS, and two runs of one name keep their own', async () => {
   const { sql, api } = await record(3);
   for (const doing of ['Sweeping the yard', 'Sweeping the yard']) assert.ok(((await api.create({ register: 'session', fields: { doing, state: 'done' } }, owner)) as { ok: boolean }).ok);
-  const boot = ((await api.boot(owner as never)) as { value: BootSaid }).value;
-  const listed = boot.rowPages?.find((l) => l.register === 'session')?.rows ?? [];
+  await api.boot(owner as never);
+  const listed = runPages(api);
   const yard = listed.filter(([, s]) => s.startsWith('sweeping-the-yard'));
   assert.equal(yard.length, 2, JSON.stringify(listed));
   for (const [seq, slug] of [...yard, ...listed.slice(0, 2)]) {
-    const read = (await api.page({ slug }, owner)) as { ok: boolean; value: { about?: { seq: number }; blocks: unknown[] } };
+    const read = (await api.page({ slug: `session#${seq}` }, owner)) as { ok: boolean; value: { page: string; param?: { seq: number }; blocks: unknown[] } };
     assert.ok(read.ok, JSON.stringify(read).slice(0, 300));
     const whole = api.kernel.page(slug);
     assert.ok(whole.ok);
+    assert.equal(read.value.page, slug);
+    assert.equal(read.value.param?.seq, seq, `${slug} is not session#${seq}'s page`);
     assert.equal(JSON.stringify(read.value.blocks), JSON.stringify(whole.value.blocks), `${slug} read by its row differs from the page resolved whole`);
-    assert.equal(JSON.stringify(read.value.about ?? null), JSON.stringify(whole.value.about ?? null), slug);
-    assert.ok(JSON.stringify(read.value).includes(String(seq)), `${slug} is not session#${seq}'s page`);
   }
+  sql.close();
+});
+
+test('A RENAMED RUN STILL OPENS BY ITS SPOKEN ID, at the address it holds now', async () => {
+  const { sql, api } = await record(3);
+  await api.boot(owner as never);
+  const [seq] = runPages(api).at(-1)!;
+  assert.ok(((await api.page({ slug: `session#${seq}` }, owner)) as { ok: boolean }).ok);
+  const row = (await api.get({ spoken: `session#${seq}` }, owner)) as { ok: boolean; value: { version: number } };
+  const moved = await api.update({ register: 'session', seq, patch: { doing: 'Painting the shed door' }, version: row.value.version } as never, owner);
+  assert.ok((moved as { ok: boolean }).ok, JSON.stringify(moved).slice(0, 300));
+  const after = (await api.page({ slug: `session#${seq}` }, owner)) as { ok: boolean; value: { page: string; param?: { seq: number } } };
+  assert.ok(after.ok, JSON.stringify(after).slice(0, 300));
+  assert.equal(after.value.page, 'painting-the-shed-door');
+  assert.equal(after.value.param?.seq, seq);
+  const none = (await api.page({ slug: 'session#99999' }, owner)) as { ok: boolean; refusal?: { code: string } };
+  assert.equal(none.refusal?.code, 'PAGE_UNKNOWN');
   sql.close();
 });
