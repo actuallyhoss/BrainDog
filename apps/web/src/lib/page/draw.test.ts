@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { DRAWN_EXAMPLE } from 'braindog-render';
 
-import { drawAsk, drawnBlock, drawnDraft, previewRows, startFields } from './draw.ts';
+import { designFix, drawAsk, drawnBlock, drawnDraft, previewRows, startFields } from './draw.ts';
 import { drawnOf } from './kinds/drawn.ts';
 
 const BILLS = {
@@ -44,6 +44,16 @@ test('a draft is handed back like a composed one, and code that reaches off the 
   assert.ok('fix' in bad);
   assert.match(bad.fix, /^This component cannot be drawn because /u);
   assert.ok('fix' in drawnDraft({ name: 'Strip', list: BILLS, fields: [], code: '  ' }));
+});
+
+test('a draft that scrolls sideways at 390 or paints its own colour is not drawn, in the design check’s sentence', () => {
+  const wide = drawnDraft({ name: 'Strip', list: BILLS, fields: ['what'], code: '<div style="width:700px"></div><script>braindog.on(function (d) { if (d.rows.length === 0) return; });</script>' });
+  assert.ok('fix' in wide);
+  assert.match(wide.fix, /^This design is not shown, because it is 700 px wide/u);
+  const painted = drawnDraft({ name: 'Strip', list: BILLS, fields: ['what'], code: '<p style="color:#123456">x</p>' });
+  assert.ok('fix' in painted);
+  assert.match(painted.fix, /would not read in both light and dark/u);
+  assert.equal(designFix({ kind: 'calendar', source: 'register.bills', empty: 'Nothing due.' }), null);
 });
 
 test('the preview asks previewPage for the block and is handed only the fields named', async () => {

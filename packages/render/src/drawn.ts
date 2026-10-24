@@ -205,7 +205,7 @@ export const DRAWN_EXAMPLE = `<div id="bars"></div>
     var size = data.columns[1] && data.columns[1].field;
     var most = Math.max.apply(null, data.rows.map(function (r) { return Number(r.fields[size]) || 0; }).concat([1]));
     var bars = document.getElementById('bars');
-    bars.textContent = '';
+    bars.textContent = data.rows.length === 0 ? 'Nothing to draw yet.' : '';
     data.rows.forEach(function (r) {
       var b = document.createElement('button');
       b.className = 'bar';

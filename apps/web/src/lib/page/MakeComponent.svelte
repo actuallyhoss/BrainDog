@@ -26,7 +26,7 @@
   import AskPage from './AskPage.svelte';
   import DrawnFrame from './DrawnFrame.svelte';
   import { composeOf, composeWords as words, type Composed, type ComposeList } from './compose.ts';
-  import { DRAW_FIELDS_MOST, drawAsk, drawnBlock, drawnDraft, drawWords, previewRows, startCode, startFields } from './draw.ts';
+  import { DRAW_FIELDS_MOST, designFix, drawAsk, drawnBlock, drawnDraft, drawWords, previewRows, startCode, startFields } from './draw.ts';
 
   let {
     open = $bindable(false),
@@ -73,7 +73,10 @@
     fix = '';
     if (lists.length === 0) return void (fix = words.noLists);
     const got = composeOf({ text: line, lists, current, now: page.data.now ?? Date.now() });
-    if (got) {
+    /* A COMPOSED BLOCK PASSES THE DESIGN CHECK BEFORE IT IS DRAWN ON THE PAGE, as a drawn one does (`designFix`). */
+    const design = got ? designFix(got.block) : null;
+    if (design) fix = design;
+    else if (got) {
       ondraft(got);
       open = false;
     } else if (model) {

@@ -17,6 +17,7 @@ import { KINDS, type Kind } from './kinds.ts';
 import { KIND_LINES, REACH_FOR } from './kind-lines.ts';
 import { SHEET_KINDS, specimenFor } from './sheet.ts';
 import { DRAWN_CODE_MOST, DRAWN_HEIGHT, DRAWN_ROWS_MOST, DRAWN_TOKENS } from './drawn.ts';
+import { DESIGN_BUDGET, PHONE_PX } from './design-check.ts';
 
 export type BookToken = { name: string; light: string; dark: string; role: string };
 export type BookStep = { name: string; value: string };
@@ -46,6 +47,8 @@ export type DesignBook = {
   compose: readonly string[];
   /** How to write a `drawn` block, the second way to design, when no kind fits. */
   draw: readonly string[];
+  /** The check every design passes before it is shown (`design-check.ts`), one line a rule. */
+  check: readonly string[];
 };
 
 /** What each named colour is for. Only the ones a design reaches for; the rest follow from these. */
@@ -188,6 +191,15 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       `The theme's colours are CSS variables of the same names: ${DRAWN_TOKENS.map((t) => `--${t}`).join(', ')} and --font. Use them, never a colour of your own, and it reads in light and dark.`,
       `braindog.open(ref) opens one of the entries it was handed. Its height follows its content, from ${DRAWN_HEIGHT.least} to ${DRAWN_HEIGHT.most} pixels; height: on the block is where it starts.`,
       'It fits a 390 px phone with nothing scrolling sideways, says its empty state in words, and names things, never ids.',
+    ],
+    check: [
+      'Every design passes this check before it is shown. One that fails is mended by the model, or it is not shown.',
+      'It reads only the lists it may read.',
+      `It fits a ${PHONE_PX} px phone and a laptop with nothing scrolling sideways, and a whole-page kind never sits inside a decision, a task or a card.`,
+      "It uses only the book's colours, so it reads in light and dark.",
+      'It says what it shows when it has nothing, and its loading state is the picture drawn first.',
+      'It uses his words: names, never ids, no em dash, and no heading that says row, register, block or entity.',
+      `It draws in budget: under ${DESIGN_BUDGET.composedMs} ms composed, and a drawn one alive within ${DESIGN_BUDGET.aliveMs} ms of its picture.`,
     ],
   };
 }

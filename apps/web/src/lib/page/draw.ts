@@ -16,7 +16,7 @@
  */
 
 import { createClient } from '@braindog/client';
-import { DRAWN_EXAMPLE, drawnData, drawnFault, type DrawnData } from 'braindog-render';
+import { DRAWN_EXAMPLE, designCheck, designSentence, drawnData, drawnFault, type DesignWhere, type DrawnData } from 'braindog-render';
 
 import type { Composed, ComposeList } from './compose.ts';
 
@@ -65,12 +65,20 @@ export function drawnBlock(i: { name: string; list: string | null; fields: reado
   };
 }
 
+/**
+ * THE DESIGN CHECK EVERY DRAFT PASSES BEFORE IT IS SHOWN (§45, `design-check.ts`): the sentence that keeps a block off
+ * the page, or `null` when it may be drawn there. A composed block and a drawn one are held to the same rules.
+ */
+export const designFix = (block: Composed['block'], where: DesignWhere = 'page'): string | null => designSentence(designCheck({ blocks: [block], where }));
+
 /** The draft arranging is handed, or the sentence that says why there is none. */
 export function drawnDraft(i: { name: string; list: ComposeList | null; fields: readonly string[]; code: string }): Composed | { fix: string } {
   if (i.code.trim() === '') return { fix: drawWords.previewNone };
   const fault = drawnFault(i.code);
   if (fault) return { fix: drawWords.bad(fault) };
   const block = drawnBlock({ name: i.name, list: i.list?.id ?? null, fields: i.fields, code: i.code });
+  const design = designFix(block);
+  if (design) return { fix: design };
   const name = String(block.heading);
   return { block, list: i.list?.id ?? '', name, said: drawWords.said(name, i.list?.name ?? null) };
 }

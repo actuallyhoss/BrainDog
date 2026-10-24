@@ -29,7 +29,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, MayPropose, Tried } from '@braindog/kernel';
 import { SLASH, coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
-import { KINDS, isKind } from 'braindog-render';
+import { KINDS, designCheck, isKind, type DesignBlock } from 'braindog-render';
 import type { BriefInput } from './briefing.ts';
 import type { WrittenInput } from './written-brief.ts';
 import type { HeadlineInput } from './headlines.ts';
@@ -2400,6 +2400,31 @@ function faultsOf(seen: Result<SlashPreview>, built?: { id: string; blocks: read
   const kindOf = (fix: string): string => fix.replace(/"[^"]*"/gu, '').replace(/\d+/gu, '#');
   const stood = built === undefined ? new Set<string>() : new Set(calmFaults([{ id: built.id, blocks: built.blocks as SlashPreviewedPage['blocks'] }]).map((f) => kindOf(f.fix)));
   faults.push(...calmFaults(seen.value.pages).filter((f) => built === undefined || !f.at.startsWith(`${built.id}.`) || !stood.has(kindOf(f.fix))));
+  /* AND THE DESIGN CHECK EVERY DRAFT PASSES BEFORE IT IS SHOWN (§45), so a drawn part that scrolls sideways on a phone or
+     paints a colour of its own is mended by the model, or dropped, and never drawn for the owner to find. */
+  /* A BUILT BODY'S OWN DESIGN FAULTS ARE ITS OWN, as its calm faults are: only what the draft added is this draft's. */
+  const stoodDesign = built === undefined ? new Set<string>() : new Set(designFaults([{ id: built.id, blocks: built.blocks as SlashPreviewedPage['blocks'] }]).map((f) => f.fix));
+  faults.push(...designFaults(seen.value.pages).filter((f) => built === undefined || !f.at.startsWith(`${built.id}.`) || !stoodDesign.has(f.fix)));
+  return faults;
+}
+
+/**
+ * The design check over every page a draft draws (`design-check.ts`), each fault with the path the model mends it by.
+ * A PAGE THAT ALREADY STOOD IS HELD ONLY TO WHAT THE DRAFT MADE WORSE, as `calmFaults` holds it: a fault the page had
+ * before (`was`) is not this draft's.
+ */
+export function designFaults(pages: readonly SlashPreviewedPage[]): { at: string; fix: string }[] {
+  const faults: { at: string; fix: string }[] = [];
+  for (const page of pages) {
+    const sentence = (said: string): string => `This design is not shown, because ${said}`;
+    const before = Array.isArray(page.was) ? new Set(designCheck({ blocks: page.was as DesignBlock[] }).map((f) => sentence(f.said))) : new Set<string>();
+    for (const f of designCheck({ blocks: page.blocks as readonly DesignBlock[] })) {
+      /* WHAT `calmFaults` ALREADY SAYS IS NOT SAID TWICE: a part with no empty words, and a heading in the system's word. */
+      if (f.rule === 'empty' || (f.rule === 'words' && f.said.includes("the system's word"))) continue;
+      const fix = sentence(f.said);
+      if (!before.has(fix)) faults.push({ at: `${page.id}.blocks[${f.at}]`, fix });
+    }
+  }
   return faults;
 }
 

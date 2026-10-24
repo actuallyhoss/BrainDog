@@ -32,6 +32,7 @@
     kinds: 'Blocks and charts',
     compose: 'Composing',
     draw: 'Drawing a component',
+    check: 'The design check',
     group: { say: 'To say something', figure: 'To show a figure', list: 'To list', plan: 'To plan', media: 'To show a picture or a link' },
     cells: 'Cells',
     reads: 'Reads',
@@ -98,6 +99,10 @@
 
   <Tile title={words.draw}>
     <ul class="plain">{#each book.draw as line (line)}<li>{line}</li>{/each}</ul>
+  </Tile>
+
+  <Tile title={words.check}>
+    <ul class="plain">{#each book.check as line (line)}<li>{line}</li>{/each}</ul>
   </Tile>
 
   <h2 class="book-h">{words.kinds}</h2>

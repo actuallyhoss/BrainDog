@@ -282,6 +282,18 @@ export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, t
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
 /* The design book: every kind, the tokens and the layout rules, generated from the tables and the skin. */
 export { designBook, type BookKind, type BookStep, type BookToken, type DesignBook } from './design-book.ts';
+/* The design check (§45): one check every draft passes before it is shown, with the sentence that refuses one. */
+export {
+  DESIGN_BUDGET,
+  PHONE_PX,
+  designCheck,
+  designSentence,
+  type DesignBlock,
+  type DesignDraft,
+  type DesignFinding,
+  type DesignRule,
+  type DesignWhere,
+} from './design-check.ts';
 /* A declared block's actions (PGS-A12): the plan Block.svelte draws them by, and the quiet line of labels without a host. */
 export * from './actions.ts';
 /* A form block (`form`): the plan Form.svelte draws by, what a press sends, and the lines without a host. */
