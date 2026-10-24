@@ -144,7 +144,7 @@ test('A BAD TIME: a step whose next_at does not parse reads earlier, never next,
 
   const open = openHandoffs(sql, { repo: REPO }, s2.id, clock.now());
   assert.deepEqual(open.map((h) => [h.spoken, h.mark]), [[s1.spoken, 'earlier']]);
-  assert.ok(open[0]!.age_s >= 7 * 86_400, 'its age is never under seven days');
+  assert.ok(open[0]!.age_s >= 86_400, 'its age is never under a day');
 
   clock.advance(29 * DAY);
   assert.equal(expire(sql, clock.now(), write), 0, 'under thirty days from its last change it stays open');

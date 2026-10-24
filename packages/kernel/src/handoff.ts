@@ -8,7 +8,7 @@
  * session was given the newest step left here at any age, whether or not it had shipped: on the owner's record a
  * working card carried a step from a batch that went live hours earlier, and one run sat in `handoff` for two days.
  *
- * NEXT OR EARLIER. Of the open steps in a place, one under seven days old that no later run has passed over is `next`:
+ * NEXT OR EARLIER. Of the open steps in a place, one under a day old that no later run has passed over is `next`:
  * the step a new session is handed. Passed over means a later run, working for no other, that wrote something has
  * ended in that place since the step was left: it worked here and quit, so whatever it was handed is behind it. Later
  * is its stretch of work (`stretch_at`, else `started`) beginning once the step was there: a run working alongside
@@ -35,8 +35,12 @@ import { SESSION, SESSION_PREFIX } from './session.ts';
 export const HANDOFF_STATES = ['idle', 'handoff', 'done'] as const;
 
 const DAY_MS = 86_400_000;
-/** A step older than this reads `earlier`, never `next`. */
-export const EARLIER_MS = 7 * DAY_MS;
+/**
+ * A step older than this reads `earlier`, never `next`. A DAY, NOT A WEEK: on the owner's record a 39-hour-old step to
+ * "run full CI on master" led every card and the Agents page while master moved a hundred commits past it. A step that
+ * old is one to check, which `earlier` says, not the one thing to do.
+ */
+export const EARLIER_MS = DAY_MS;
 /** A step nobody took in this long is closed by the sweep. */
 export const EXPIRE_MS = 30 * DAY_MS;
 
@@ -79,7 +83,7 @@ export type OpenHandoff = {
   /** When the step was left. */
   left_at: string;
   age_s: number;
-  /** `next`: the one a new session is handed. `earlier`: older than seven days, or passed over since. */
+  /** `next`: the one a new session is handed. `earlier`: older than a day, or passed over since. */
   mark: 'next' | 'earlier';
 };
 
@@ -163,7 +167,7 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
   return rows.map((row) => {
     const fields = JSON.parse(row.fields) as Record<string, Json>;
     /* A time that does not parse reads as old, never as just now: such a step would otherwise be `next` for good. Its
-       age is then since its last change, and never under seven days. */
+       age is then since its last change, and never under a day. */
     const at = Date.parse(row.left_at);
     const changed = Date.parse(row.updated_at);
     const age = Number.isFinite(at)

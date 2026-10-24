@@ -163,16 +163,16 @@ test('DROPPED: a step is closed with a reason in words, and with none it is refu
   sql.close();
 });
 
-test('SEVEN DAYS: a step under a week old is next, and one a day older reads earlier, still open to take', async () => {
+test('ONE DAY: a step under a day old is next, and one a minute older reads earlier, still open to take', async () => {
   const { sql, clock, write, leave, work, row } = await record();
   const s1 = leave('claude', 'Finish the import');
-  clock.advance(7 * DAY - MIN);
+  clock.advance(DAY - MIN);
   const s2 = work('codex', { agent: 'codex' });
   assert.deepEqual(openHandoffs(sql, HERE, s2.id, clock.now()).map((h) => h.mark), ['next']);
   clock.advance(2 * MIN);
   const [old] = openHandoffs(sql, HERE, s2.id, clock.now());
   assert.equal(old?.mark, 'earlier');
-  assert.equal(old?.age_s, 7 * 86_400 + 60);
+  assert.equal(old?.age_s, 86_400 + 60);
   ok(take(sql, s2, s1.spoken, clock.now(), write));
   assert.equal(row(s1.spoken).fields.closed_as, 'taken', 'an earlier step can still be taken');
   sql.close();

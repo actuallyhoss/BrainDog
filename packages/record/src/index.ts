@@ -1382,6 +1382,9 @@ export const BOOT_SHAPE = 4;
 /** The most working runs `boot` sends. The rail says how many, so past this it says the ceiling. */
 export const WORKING_MOST = 50;
 
+/** Commits HEAD may move past a step before the step is an older one and no longer Next (`nextOf`). */
+export const FAR_BEHIND = 50;
+
 /** One agent at work, as `boot` sends it: its handle beside its name, what it is doing, where, and for how long. */
 export type WorkingRun = {
   /** The run's handle (`S42`), never shown alone: a screen says the agent and what it does. */
@@ -1678,8 +1681,8 @@ export type Context = {
   ambiguous: string[];
   /**
    * The step another run left open here that a starting session is handed (`openHandoffs`, marked `next`): who left it,
-   * the kind of agent, when, and how many more steps are open here besides (`earlier`), each of them older than seven
-   * days or passed over since. `null` when none is under a week old and still waiting. The three the briefing added in
+   * the kind of agent, when, and how many more steps are open here besides (`earlier`), each of them older than a day,
+   * passed over since, or `FAR_BEHIND` commits behind HEAD. `null` when none is under a day old and still waiting. The three the briefing added in
    * AGT-C05 are optional on the type only, so a context drawn by hand (a test, a card) still reads; `briefing` sends all.
    */
   handoff: {
@@ -8487,13 +8490,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The open step a starting session is handed: the one `openHandoffs` marks `next`, unless HEAD has moved `FAR_BEHIND`
+   * commits or more past it, when it is one more older step. A step that far behind was left against a tree that is gone.
+   */
+  const nextOf = (open: OpenHandoff[], ahead: number | null): OpenHandoff | undefined =>
+    ahead !== null && ahead >= FAR_BEHIND ? undefined : open.find((h) => h.mark === 'next');
+
+  /**
    * What the Next lines say beside the open step (`nextLines`): the step itself; else a step taken here that its taker is
    * still working on, "Claude Code (S815) took this 3 min ago"; else the newest run here that ended, so a session starts
    * knowing where the last one stopped. `here` is the briefing's place; the caller's own run is never any of them. With
    * only older steps open, it says nothing: "Nothing was handed over" would not be true, and they are counted elsewhere.
    */
   const stepOf = (ctx: CallContext, here: unknown, open: OpenHandoff[], others: LiveRun[], own: Entry | null, ahead: number | null): [LeftStep | null, LastHere | null] => {
-    const first = open.find((h) => h.mark === 'next');
+    const first = nextOf(open, ahead);
     if (first) {
       const by: TreeRun = { spoken: first.spoken, fields: first.agent === null ? {} : { agent: first.agent } };
       return [{ by, step: first.next, at: first.left_at, tried: first.tried, commits: ahead, mine: false }, null];
@@ -8906,7 +8916,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ? { field: 'repo', is: repo }
         : null;
     /* THE STEP LEFT HERE IS AN OBJECT THAT CLOSES (`openHandoffs`, AGT-C05). Of the runs here waiting in `handoff`, the
-       caller's own set aside, the newest under seven days old that no later run passed over is the one handed over, and
+       caller's own set aside, the newest under a day old that no later run passed over is the one handed over, and
        the rest are counted as `earlier`. It replaced three reads that handed over the newest step here in any state and
        at any age, so on the owner's record a starting session was told to begin a batch that had shipped hours before. A
        run still working has handed nothing over yet, and a finished run's step is its history, not anybody's next step. */
@@ -8915,7 +8925,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const got = kernel.openHandoffs({ project: project?.spoken ?? null, repo: repo ?? null }, run?.id ?? null);
       return got.ok ? got.value.handoffs : [];
     })();
-    const first = open.find((h) => h.mark === 'next');
+    const first = nextOf(open, aheadOf(hints));
     const handoff: Context['handoff'] = first
       ? { from: first.spoken, agent: first.agent, left_at: first.left_at, age_s: first.age_s, next: first.next, tried: first.tried, head: first.head, earlier: open.length - 1 }
       : null;
