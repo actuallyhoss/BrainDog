@@ -351,6 +351,10 @@ const TABLE = {
      block's `code:` and the host draws it in a sandboxed frame, handed the block's rows and the theme. Page-only, because
      only a host with the frame can draw it; on the panel for `embed`'s reason, one bounded thing. */
   drawn: { primitive: 'panel', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'media' },
+  /* Parts of a project's own shape on the page about its row (C28, C29: the kernel's `kinds/project.ts`): its hero,
+     path, money, work, people, what it runs on or its agents, `parts:` saying which, side by side.
+     Page-only, because what a part draws is read for the row the page is about; on the panel for `embed`'s reason. */
+  project: { primitive: 'panel', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'figure' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

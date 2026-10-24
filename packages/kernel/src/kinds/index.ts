@@ -37,6 +37,7 @@ import { form } from './form.ts';
 import { gallery } from './gallery.ts';
 import { lanes } from './lanes.ts';
 import { link } from './link.ts';
+import { project } from './project.ts';
 
 /**
  * When a module's `validate` is asked: at install, before the page is written, or at read, for a page written under
@@ -93,6 +94,7 @@ export const BLOCK_KIND_MODULES: Record<string, KindModule> = {
   lanes,
   form,
   drawn,
+  project,
 };
 
 /** The module that reads `kind`, or `undefined` for a kind `pages.ts` reads itself. */

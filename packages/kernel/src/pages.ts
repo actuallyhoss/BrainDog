@@ -232,6 +232,8 @@ export type PageBlock = {
    */
   code?: string;
   height?: number;
+  /** A `project` block's (`kinds/project.ts`): the row of the project's shape it draws, one part or two. */
+  parts?: readonly string[];
   /** A `stat` or `lines` over readings: whether a point is a day or a week. A day when absent. */
   bucket?: string;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */

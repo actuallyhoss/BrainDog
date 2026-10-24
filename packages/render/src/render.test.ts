@@ -21,7 +21,7 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
    always has: the number below moves when a kind lands, and the words beside it do not. So the count
    lives in one place now, and the title says what the test is for rather than how many there are. */
 test('every kind sits on a primitive that exists, and a new one is a deliberate edit here', () => {
-  assert.equal(Object.keys(KINDS).length, 42);
+  assert.equal(Object.keys(KINDS).length, 43);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))

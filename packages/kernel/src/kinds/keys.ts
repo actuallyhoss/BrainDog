@@ -16,6 +16,7 @@ export const KIND_KEYS = {
   lanes: ['hours', 'tones'],
   form: ['verb', 'register', 'fields', 'submit', 'after'],
   drawn: ['code', 'height'],
+  project: ['parts'],
 } as const satisfies Readonly<Record<string, readonly string[]>>;
 
 /** Whether `kind` is one a module of its own reads (`index.ts`), never a name `Object.prototype` lends the table. */

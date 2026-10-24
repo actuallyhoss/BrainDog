@@ -115,11 +115,17 @@ export const RANK = { late: 4, needs: 3, changed: 2, figures: 1, none: 0 } as co
 /** The kinds that are a figure or a chart, which lead a group over a plain list once something in it moves. */
 const FIGURE_KINDS: ReadonlySet<string> = new Set(['stat', 'lines', 'series', 'forecast', 'ring', 'gauge', 'bar', 'split', 'progress', 'heat', 'chips']);
 
-/** The kinds that read no rows, so having none says nothing: words, the line a row is typed into, a form, a heading. */
-const ROWLESS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section', 'forecast']);
+/**
+ * The kinds that read no rows, so having none says nothing: words, the line a row is typed into, a form, a heading, and
+ * a project's shape, which its host reads for itself (`kinds/project.ts`).
+ */
+const ROWLESS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section', 'forecast', 'project']);
 
-/** The kinds a rule never moves: they are where the author put them because of what is around them. */
-const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section']);
+/**
+ * The kinds a rule never moves: they are where the author put them because of what is around them. A PROJECT'S SHAPE
+ * OPENS ITS PAGE (C28, C29), so nothing is led over it, as nothing was over the shape drawn by hand.
+ */
+const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section', 'project']);
 
 /** The computed sources whose rows are a list the reader could be shown, so none read is a block with nothing in it. */
 const LISTED: ReadonlySet<string> = new Set([

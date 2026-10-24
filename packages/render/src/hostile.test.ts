@@ -128,10 +128,11 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
 };
 
 /**
- * `table`, `form` and `kpis` are bound to the record rather than to authored rows, and `drawn` is code the host draws in
- * a sandboxed frame and never through a fence, so none has a fence to be hostile in.
+ * `table`, `form` and `kpis` are bound to the record rather than to authored rows, `drawn` is code the host draws in
+ * a sandboxed frame and never through a fence, and `project` is a part of a project's shape the host reads for the row
+ * its page is about, so none has a fence to be hostile in.
  */
-const NO_FENCE = new Set(['table', 'form', 'kpis', 'drawn']);
+const NO_FENCE = new Set(['table', 'form', 'kpis', 'drawn', 'project']);
 
 /**
  * THE SWEEP IS THE POINT, not any one kind. A hole in this package is one drawer that forgot

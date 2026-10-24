@@ -481,6 +481,7 @@ export const NOT_OFFERED: Readonly<Record<string, string>> = {
   inputs: 'Boxes to type into change one item, so they belong on that item’s own page.',
   kpis: 'Key numbers are each project’s own, drawn on its page and on Today, not fields of one list.',
   drawn: 'A drawn component is written, not picked: Make a component draws one, from code or from a line you say.',
+  project: 'A project’s overview and its work are its own page’s, drawn from the project and not from the fields of one list.',
 };
 
 /** What a hard slot wants, said as the thing a list lacks. */

@@ -61,6 +61,7 @@ export const KIND_LINES: Readonly<Record<Kind, KindLine>> = {
   form: { for: 'a few questions a person answers, then one button that adds the answers to a list', cells: 'its fields, each a question and its box, said in the page', reads: 'a list' },
   kpis: { for: "a project's key numbers, or the few that lead Today", cells: 'for: project, today or cards', reads: 'kpis' },
   drawn: { for: 'a small visual of your own when no kind fits, drawn in a sandbox', cells: 'code: its HTML, CSS and script; columns: what it is handed', reads: 'a list' },
+  project: { for: "parts of a project's own shape on its page: its hero, path, money, work, people, what it runs on or its agents", cells: 'parts: one or more of them, side by side', reads: 'the project the page is about' },
 };
 
 /** The ten lines of what to reach for, in the order a page is usually built. */

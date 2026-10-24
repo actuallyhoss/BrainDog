@@ -34,6 +34,7 @@ import { embed } from './embed.ts';
 import { lanes } from './lanes.ts';
 import { form } from './form.ts';
 import { drawn } from './drawn.ts';
+import { project } from './project.ts';
 
 /** What `draw` hands a kind besides its answer. */
 export type DrawOptions = {
@@ -68,6 +69,7 @@ export const BLOCK_KIND_DRAWERS: Record<string, KindDrawer> = {
   lanes,
   form,
   drawn,
+  project,
 };
 
 /** The drawer for `kind`, or `undefined` for a kind `blocks.ts` draws itself. */
