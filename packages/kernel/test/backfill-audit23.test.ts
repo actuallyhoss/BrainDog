@@ -16,6 +16,8 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 const NOW = Date.UTC(2026, 9, 7, 2);
 const HOUR = 3_600_000;
 const OWNER = { actor: 'p_owner' };
+/** When a run the hooks opened was last heard, long before the walk: an import writes none. */
+const SEEN = '2000-01-01T00:00:00.000Z';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -49,7 +51,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; deps: BackfillDeps; 
 }
 
 const run = (k: Kernel, fields: Record<string, unknown>): string =>
-  value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '', last_seen: SEEN } })).id;
 const runQuestions = (s: readonly BackfillSuggestion[]) => s.filter((x): x is Extract<BackfillSuggestion, { kind: 'run-project' }> => x.kind === 'run-project');
 
 test('TWO OWNERS’ REPOSITORIES OF ONE NAME ARE TWO QUESTIONS, each with its own place, and said by whose it is', async () => {
@@ -85,11 +87,33 @@ test('ONE PLACE OF A NAME IS STILL SAID BY ITS NAME, and two folders of one name
     .map((s) => s.question)
     .sort();
 
-  assert.deepEqual(asked, [
-    'A run worked in kiln. Is that Kiln?',
-    'A run worked in lantern in Clients. Is that Lantern?',
-    'A run worked in lantern in Code. Is that Lantern?',
-  ]);
+  /* A folder called exactly what the project is called places its runs and asks nothing (scope D5); a remote still asks. */
+  assert.deepEqual(asked, ['A run worked in kiln. Is that Kiln?']);
   assert.ok(!asked.some((q) => q.includes('/Users') || q.includes('github.com')), 'never a path or a host');
+  sql.close();
+});
+
+test('A FOLDER CALLED EXACTLY WHAT A PROJECT IS CALLED PLACES ITS RUNS UNASKED; a part of a name asks once; an import asks nothing (scope D5)', async () => {
+  const { k, sql, deps, clock } = await record();
+  const braindog = value<Entry>(k.create('things', { name: 'BrainDog' }, OWNER));
+  value(k.create('things', { name: 'The Sam Brain', repos: ['github.com/sam/brain'] }, OWNER));
+  clock.set(NOW - 2 * HOUR);
+  const placed = [run(k, { cwd: '/Users/sam/Repos/braindog' }), run(k, { cwd: '/Users/sam/Repos/Brain-Dog' })];
+  run(k, { repo: 'brain', cwd: '/Users/sam/Developer/brain' });
+  run(k, { repo: 'brain', cwd: '/Users/sam/Developer/brain' });
+  /* AN IMPORT'S RUN: no `last_seen`, as no hook ever heard it. */
+  const imported = value<Entry>(k.create('session', { doing: 'Old work', agent: 'claude', state: 'done', cwd: '/Users/sam/Old/brain' }, { ...OWNER, stamp: { project: '' } })).id;
+  clock.set(NOW);
+  const done = understandBackfill(deps);
+
+  for (const id of placed) assert.equal(k.get(id)?.fields.project, k.nameOf(braindog.id), 'case and punctuation folded');
+  assert.equal(done.runs.wrote, 2);
+  assert.ok(done.runs.batch, 'one batch, which Undo takes back whole');
+  assert.deepEqual(
+    runQuestions(done.suggestions).map((s) => s.question),
+    ['2 runs worked in brain. Is that The Sam Brain?'],
+    'a part of a name is still a question, once',
+  );
+  assert.equal(k.get(imported)?.fields.project, '', 'an imported run is left as it was');
   sql.close();
 });

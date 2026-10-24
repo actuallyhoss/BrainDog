@@ -35,7 +35,10 @@
  *      folder ("acme/Lantern", "lantern in Code"). A run whose place guesses nothing better, in a repository whose owner
  *      on its host holds the repositories of exactly one project, is one question per owner ("Is that Oxbow.gg?"). Each
  *      question carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and
- *      never a run already placed, nor one still working, which the ladder places itself.
+ *      never a run already placed, nor one still working, which the ladder places itself. A run with no remote whose
+ *      own folder is called exactly what one project is called, or a bare repository it lists, case and punctuation
+ *      folded, is that project's and is placed (`exactFolder`, scope D5); a run an import wrote, which no hook heard
+ *      (no `last_seen`), is never a question.
  *   3. A service with no project is linked when its name, the first word of its name, its domain, or the label of its
  *      domain matches exactly one project's name (with any domain ending left off) or domain. Linked, a domain of it
  *      that spells the project's name is written into the project's domains, so mail from it is matched later.
@@ -953,6 +956,23 @@ function placeAt(where: Whereabouts, place: string): string | undefined {
   return parent === undefined ? undefined : `${place} in ${parent}`;
 }
 
+/** A name with case and punctuation folded away: `Brain-Dog`, `braindog` and `BrainDog` are one. */
+const folded = (said: string): string => said.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * The one project whose name, or a bare repository it lists, the run's own folder is called, case and punctuation
+ * folded; `null` when the run says a remote or a repository name of another spelling, or when none or two match.
+ */
+function exactFolder(projects: ProjectsList, where: Whereabouts): Candidate | null {
+  if (where.remote !== undefined || where.cwd === undefined) return null;
+  const last = folded(lastSpelled(where.cwd));
+  if (last === '' || (where.repo !== undefined && folded(where.repo) !== last)) return null;
+  const hits = projects.candidates.filter(
+    (c) => folded(projects.names.get(c.id) ?? '') === last || c.repos.some((r) => !/[\\/:]/u.test(r.trim()) && folded(r.replace(/\.git$/iu, '')) === last),
+  );
+  return hits.length === 1 ? hits[0]! : null;
+}
+
 function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion, long?: string) => void): Slice {
   const { sql } = deps;
   const projects = projectsOf(sql, lists);
@@ -983,6 +1003,19 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
       else refused++;
       continue;
     }
+    /* A FOLDER CALLED EXACTLY WHAT ONE PROJECT IS CALLED, or a bare repository it lists, is that project's, and no
+       operator should be asked "Is braindog BrainDog?" (scope D5). Only for a run with no remote and no other
+       repository name, which is where `sam/lantern` and somebody else's `lantern` would part; case and punctuation
+       folded, never a part of a name ("brain" beside "The Sam Brain" still asks). */
+    const exact = exactFolder(projects, where);
+    if (exact !== null && (ids.length === 0 || (ids.length === 1 && ids[0] === exact.id))) {
+      const placed = deps.write(SESSION, row.id, {}, { ...writes.w(), version: row.version, stamp: { project: exact.spoken } });
+      if (placed.ok) wrote++;
+      else refused++;
+      continue;
+    }
+    /* A RUN AN IMPORT WROTE, which never said when it was last seen, is history, never a question for him (scope D5). */
+    if (textOf(row.fields.last_seen) === undefined) continue;
     const at = whereKey(where);
     const wheres = at === null ? [] : [at];
     /* A PLACE THAT GUESSES NOTHING BETTER THAN A BROAD FOLDER, in a repository whose owner's repositories one project

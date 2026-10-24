@@ -18,6 +18,8 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 const NOW = Date.UTC(2026, 9, 6, 2);
 const HOUR = 3_600_000;
 const OWNER = { actor: 'p_owner' };
+/** When a run the hooks opened was last heard, long before the walk: an import writes none. */
+const SEEN = '2000-01-01T00:00:00.000Z';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -166,7 +168,7 @@ test('A RUN UNDER AN OWNER WHOSE REPOSITORIES ONE PROJECT HOLDS IS ONE QUESTION 
   project({ name: 'Inkwell', repos: ['inkwell'] });
   const braindog = project({ name: 'BrainDog', repos: ['/Users/sam/Code/braindog'] });
   clock.set(NOW - 2 * HOUR);
-  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '', last_seen: SEEN } })).id;
   run({ remote: 'https://github.com/OxbowGame/oxbow-site', repo: 'oxbow-site', cwd: '/Users/sam/Code/oxbow/site' });
   run({ remote: 'https://github.com/OxbowGame/bot', repo: 'bot', cwd: '/Users/sam/Code/oxbow/bot' });
   run({ remote: 'git@github.com:OxbowGame/oxbow-health.git', repo: 'oxbow-health', cwd: '/Users/sam/Code/oxbow/health' });

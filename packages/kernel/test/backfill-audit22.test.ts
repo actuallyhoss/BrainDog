@@ -20,6 +20,8 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 const NOW = Date.UTC(2026, 9, 6, 2);
 const HOUR = 3_600_000;
 const OWNER = { actor: 'p_owner' };
+/** When a run the hooks opened was last heard, long before the walk: an import writes none. */
+const SEEN = '2000-01-01T00:00:00.000Z';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -82,7 +84,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; deps: BackfillDeps; 
 
 const project = (k: Kernel, fields: Record<string, unknown>): string => value<Entry>(k.create('things', fields, OWNER)).id;
 const run = (k: Kernel, fields: Record<string, unknown>): string =>
-  value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '', last_seen: SEEN } })).id;
 const line = (k: Kernel, what: string, more: Record<string, unknown> = {}): string => value<Entry>(k.create('transactions', { what, amount: gbp(-1_000), ...more }, OWNER)).id;
 const runQuestions = (s: readonly BackfillSuggestion[]) => s.filter((x): x is Extract<BackfillSuggestion, { kind: 'run-project' }> => x.kind === 'run-project');
 const organisationQuestions = (s: readonly BackfillSuggestion[]) => s.filter((x): x is Extract<BackfillSuggestion, { kind: 'organisation' }> => x.kind === 'organisation');
@@ -93,7 +95,7 @@ test('A FOLDER IS SURE ONLY WHERE THE RUN WORKED IN IT, OR WHERE ITS PROJECT NAM
   const workbench = project(k, { name: 'Workbench', folders: ['~/Developer'] });
   const kiln = project(k, { name: 'Kiln', folders: ['~/Code/Kiln'] });
   const marlow = project(k, { name: 'Marlow', folders: ['/Users/sam/Clients/marlow'], repos: ['marlow-site'] });
-  project(k, { name: 'Box', folders: ['/home/sam/box'] });
+  project(k, { name: 'Crate', folders: ['/home/sam/box'] });
   clock.set(NOW - 2 * HOUR);
   const unknown = run(k, { repo: 'stranger', cwd: '/Users/sam/Developer/stranger' });
   const atKiln = run(k, { cwd: '/Users/sam/code/kiln' });
@@ -110,7 +112,7 @@ test('A FOLDER IS SURE ONLY WHERE THE RUN WORKED IN IT, OR WHERE ITS PROJECT NAM
   assert.equal(k.get(linux)?.fields.project, '', 'a Linux folder keeps its case');
 
   const asked = runQuestions(done.suggestions).map((s) => s.question).sort();
-  assert.deepEqual(asked, ['A run worked in Box. Is that Box?', 'A run worked in drafts. Is that Marlow?', 'A run worked in stranger. Is that Workbench?']);
+  assert.deepEqual(asked, ['A run worked in Box. Is that Crate?', 'A run worked in drafts. Is that Marlow?', 'A run worked in stranger. Is that Workbench?']);
   assert.ok(workbench);
   sql.close();
 });

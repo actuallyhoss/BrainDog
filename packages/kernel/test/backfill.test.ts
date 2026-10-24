@@ -16,6 +16,8 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 const NOW = Date.UTC(2026, 9, 6, 2);
 const HOUR = 3_600_000;
 const OWNER = { actor: 'p_owner' };
+/** When a run the hooks opened was last heard, long before the walk: an import writes none. */
+const SEEN = '2000-01-01T00:00:00.000Z';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -103,7 +105,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; deps: BackfillDeps; 
   value(await k.install([PROJECTS, ORGS, PEOPLE, LEDGER, SERVICES]));
 
   /* THE RUNS, from before the projects were written down, so none was placed when it opened. */
-  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, OWNER));
+  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { last_seen: SEEN } }));
   run({ remote: 'git@github.com:acme/quarry.git', repo: 'quarry', cwd: '/Users/sam/Code/quarry' });
   run({ repo: 'lantern', cwd: '/Users/sam/Code/lantern' });
   run({ cwd: '/Users/sam/Clients/brightside' });
@@ -221,19 +223,18 @@ test('A RUN IS PLACED BY ITS REMOTE OR ITS FOLDER, AND A BARE NAME OR TWO PROJEC
   const placed = Object.fromEntries(runs(k).map((r) => [r.seq, r.fields.project ?? null]));
   const spoken = (id: string) => k.nameOf(id);
   assert.equal(placed[1], spoken(ids.quarry!), 'by its remote');
-  assert.equal(placed[2], null, 'a bare name Lantern lists is only a name');
+  assert.equal(placed[2], spoken(ids.lantern!), 'a folder called what the project is called, with no remote (scope D5)');
   assert.equal(placed[3], spoken(ids.brightside!), 'by its folder');
   assert.equal(placed[4], null, 'tallow is two projects’ name');
   assert.equal(placed[9], null, 'a scratch folder is in no project');
-  assert.equal(done.runs.wrote, 2);
+  assert.equal(done.runs.wrote, 3);
 
   /* One question for each whole place and guess, counting every run that worked there: the remote and the folder that
      says no remote are two places, each said with its owner or its folder since they share a name. */
   const asked = kinds(done.suggestions, 'run-project').map((s) => s.question).sort();
   assert.deepEqual(asked, [
     '2 runs worked in tallow. Is that Tallow or Tallow Site?',
-    '3 runs worked in acme/Lantern. Is that Lantern?',
-    'A run worked in lantern in Code. Is that Lantern?',
+    '3 runs worked in lantern. Is that Lantern?',
   ]);
   sql.close();
 });
@@ -448,7 +449,7 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
   project({ name: 'Tern', folders: ['C:\\Repos\\tern'] });
   project({ name: 'Coinfish', repos: ['coinfish'] });
   clock.set(NOW - 2 * HOUR);
-  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '', last_seen: SEEN } })).id;
   const notes = run({ cwd: '/Users/sam/Code/notes' });
   const scratch = run({ cwd: 'c:\\repos\\scratch' });
   const atKiln = run({ cwd: '/Users/sam/Code/kiln' });
