@@ -19,6 +19,7 @@
  */
 
 import { createClient } from '@braindog/client';
+import { sinceWords } from 'braindog-render';
 import type { Fetch } from '../record/boot-live.ts';
 import { copy } from '../copy.ts';
 
@@ -210,6 +211,22 @@ export function lastLine(door: Pick<Door, 'lastArrival' | 'arrivals'>, now: numb
   if (door.lastArrival === null) return 'Nothing has arrived yet.';
   const week = door.arrivals === 0 ? 'none in the last 7 days' : `${door.arrivals} in the last 7 days`;
   return `Last arrival ${dayWords(door.lastArrival, now, tz)}, ${week}.`;
+}
+
+/** One web address that has fed this record, as What comes in lists it beside the scheduled fetches. */
+export type Feed = { id: string; name: string; said: string };
+
+/**
+ * THE ADDRESSES THAT FEED THIS RECORD, newest arrival first, each with how long ago its last one came ("Last arrival 5
+ * hours ago"). What comes in listed only the scheduled fetches under "Where new items come in from", and said "Nothing
+ * feeds this record yet" while card texts were posted to a door every hour (the audit of 25 October, Z19). A door that
+ * has never been posted to feeds nothing, and is left to the doors' own tile.
+ */
+export function feedsOf(doors: readonly Pick<Door, 'id' | 'name' | 'lastArrival'>[], now: number): Feed[] {
+  return doors
+    .filter((d): d is typeof d & { lastArrival: string } => d.lastArrival !== null)
+    .sort((a, b) => Date.parse(b.lastArrival) - Date.parse(a.lastArrival))
+    .map((d) => ({ id: d.id, name: d.name, said: `Last arrival ${sinceWords(d.lastArrival, now)}` }));
 }
 
 /**

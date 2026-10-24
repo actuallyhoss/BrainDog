@@ -35,7 +35,10 @@
   /* THE ROW THE PAGE IS DRAWN FOR, by its spoken id and title, which the record's own resolution of each action's
      project is matched against (`forProject`). `null` lists every action, for Settings, ingest, and says so when
      there are none. */
-  let { project }: { project: ForProject | null } = $props();
+  /* `others` IS WHETHER SOMETHING ELSE FEEDS THE RECORD, or may, as far as the screen beside this can tell: Settings,
+     ingest lists the web addresses that were posted to (`feedsOf`), and a reader who cannot read them is not told that
+     nothing feeds the record. Either way an empty list of scheduled fetches says nothing (the audit of 25 October, Z19). */
+  let { project, others = false }: { project: ForProject | null; others?: boolean } = $props();
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<ActionRow[]>([]);
@@ -151,7 +154,7 @@
   </section>
 {:else if from === 'refused'}
   <!-- Refused to a reader held to some lists: nothing drawn. -->
-{:else if from === 'ready' && project === null && rows.length === 0}
+{:else if from === 'ready' && project === null && rows.length === 0 && !others}
   <Empty kind="no-data-yet" title={copy.noSources} body={copy.noSourcesWhy} agentPrompt={copy.ingestPrompt} />
 {:else if from === 'ready' && split.own.length + split.everywhere.length > 0}
   <section class="actions" aria-labelledby="actions-h">

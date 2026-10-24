@@ -17,7 +17,7 @@
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
-  import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
+  import { callerAt, feedsOf, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -166,6 +166,8 @@
   }
   const doors = read(() => (anOwner ? `doors ${apiBase()}` : null), doorsNow);
   const doorList = $derived(doors.value ?? []);
+  /* WHAT HAS FED THE RECORD THROUGH THOSE DOORS, newest first, on the reader's clock (Z19). */
+  const feeds = $derived(feedsOf(doorList, Date.now()));
 
   /**
    * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds. The
@@ -221,8 +223,17 @@
          connectors nobody set up, one of them paused on a credential nobody holds, with
          Reconnect and Retry now buttons that only said what would have happened. The shell's
          own refusal is already on the screen, so nothing here repeats it. -->
+    <!-- AND EVERY WEB ADDRESS THAT FED IT, with its last arrival (`feedsOf`): card texts posted every hour are a source,
+         and the tile said nothing fed the record (Z19). A reader who cannot read the doors is not told nothing does. -->
+    {#if feeds.length > 0}
+      <ul class="feeds">
+        {#each feeds as feed (feed.id)}
+          <li class="feed"><span class="feed-name" dir="auto">{feed.name}</span><span class="feed-said">{feed.said}</span></li>
+        {/each}
+      </ul>
+    {/if}
     {#if shell.live}
-      <Actions project={null} />
+      <Actions project={null} others={feeds.length > 0 || !anOwner || doors.value === undefined} />
     {/if}
     <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
          shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
@@ -458,6 +469,37 @@
 
   /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word,
      with a hairline between each. */
+  /* WHAT FED THE RECORD: its name, and under it when it last did, a hairline between. */
+  .feeds {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .feed {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+    padding-block: var(--sp-2);
+  }
+
+  .feed + .feed {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .feed-name {
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .feed-said {
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+  }
+
   .doors {
     display: flex;
     flex-direction: column;
