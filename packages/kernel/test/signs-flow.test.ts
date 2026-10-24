@@ -74,7 +74,8 @@ const USAGE = { fetches: 0, bytes: 0, wall_ms: 1, cpu_ms: 1 };
 
 /** What the stand-in sandbox does for each script: refuse, write nothing, or make a new item every run. */
 const BODIES: Record<string, (input: { seq: number }) => ScriptAnswer> = {
-  broken: () => ({ refused: { code: null, why: 'TypeError: price is undefined' }, log: '', usage: USAGE }),
+  broken: () => ({ refused: { code: null, why: 'broken threw: price is undefined' }, log: '', usage: USAGE }),
+  slow: () => ({ refused: { code: 'OUT_OF_BOUNDS', why: 'slow ran past its wall_ms of 15000.' }, log: 'asked the bank', usage: USAGE }),
   quiet: () => ({ writes: [], log: '', usage: USAGE }),
   spawn: (input) => ({ writes: [{ op: 'create', register: 'items', fields: { what: `echo of ${input.seq}` } } as ScriptWrite], log: '', usage: USAGE }),
 };
@@ -157,10 +158,21 @@ test('SCRIPTS REFUSED: red on one refused last run, with its name; green where t
   const red = sign(r.sql, 'scripts-refused');
   assert.equal(red.state, 'red');
   assert.equal(red.value, 1);
-  assert.equal(red.said, 'Gold price did not finish its last run.');
-  assert.ok(red.facts?.includes('Gold price was refused on 8 October; its log says why.'), red.facts?.join(' | '));
+  assert.equal(red.said, 'Gold price did not finish its last run: it hit an error in its own code.');
+  assert.ok(red.facts?.includes('Gold price was refused on 8 October: it hit an error in its own code.'), red.facts?.join(' | '));
+  /* SORTED, NEVER QUOTED: what the script threw stays in its log. */
+  assert.ok(![red.said, ...(red.facts ?? [])].some((l) => l.includes('price is undefined')), red.said);
   noIds(red);
   r.sql.close();
+
+  const two = await record(script('broken', 'Gold price'), kick('broken'), script('slow', 'Rates'), kick('slow'));
+  item(two, 'One');
+  await settle(two);
+  const both = sign(two.sql, 'scripts-refused');
+  assert.equal(both.said, '2 scripts did not finish their last run: Gold price hit an error in its own code and Rates ran out of time.');
+  assert.ok(both.facts?.includes('Rates was refused on 8 October: it ran out of time.'), both.facts?.join(' | '));
+  noIds(both);
+  two.sql.close();
 
   const g = await record(script('quiet', 'Tidy items'), kick('quiet'));
   item(g, 'One');

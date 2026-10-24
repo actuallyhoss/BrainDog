@@ -132,8 +132,8 @@ function readRefused(sql: Sql, _nowMs: number, tz: string): SignReading {
   /* THE LAST RUN THAT RAN THE SOURCE NOW INSTALLED, as the pause reads it: `ok` or `refused`, signed by this version.
      A run held, dropped or failed by the host never ran the source, and a fixed version starts with a clean slate. */
   const last = scripts.flatMap((s) => {
-    const run = sql.one<{ ts: string; outcome: string }>(
-      `SELECT ts, json_extract(to_v, '$.outcome') AS outcome FROM event
+    const run = sql.one<{ ts: string; outcome: string; note: string | null; log: string | null }>(
+      `SELECT ts, json_extract(to_v, '$.outcome') AS outcome, note, json_extract(to_v, '$.log') AS log FROM event
         WHERE kind = 'pull' AND target = ? AND actor = ? AND json_valid(to_v) AND json_extract(to_v, '$.outcome') IN ('ok', 'refused')
         ORDER BY rowid DESC LIMIT 1`,
       `declaration:script.${s.bare}`,
@@ -145,8 +145,39 @@ function readRefused(sql: Sql, _nowMs: number, tz: string): SignReading {
   const refused = last.filter((r) => r.outcome === 'refused');
   const facts = [`${count(last.length, 'script has', 'scripts have')} run, ${refused.length} refused on the last run.`];
   if (refused.length <= SCRIPTS_REFUSED_MOST) return reading('green', refused.length, 'Every script that ran finished its last run.', facts);
-  facts.push(...refused.map((r) => `${r.name} was refused on ${daySaid(r.ts, tz)}; its log says why.`));
-  return reading('red', refused.length, `${names(refused.map((r) => r.name))} did not finish ${refused.length === 1 ? 'its' : 'their'} last run.`, facts);
+  facts.push(...refused.map((r) => `${r.name} was refused on ${daySaid(r.ts, tz)}: it ${whyRefused(r.note, r.log)}.`));
+  if (refused.length === 1) return reading('red', 1, `${refused[0]!.name} did not finish its last run: it ${whyRefused(refused[0]!.note, refused[0]!.log)}.`, facts);
+  return reading('red', refused.length, `${refused.length} scripts did not finish their last run: ${names(refused.map((r) => `${r.name} ${whyRefused(r.note, r.log)}`))}.`, facts);
+}
+
+/**
+ * Why a run was refused, as one clause after the script's name: `ran out of time`.
+ *
+ * SORTED, NEVER QUOTED. The reason is the first line of the run's log (`finishScript` puts the why there) or the
+ * record's own note, and a why can quote what the script chose: its thrown message, a value the write path read back.
+ * The log is held to an owner who reads every list the script touched (`lineOf` in `@braindog/record`), and a sign is
+ * read by more people than that, so the sign says which kind of stop it was in words of its own, and the log keeps
+ * the rest. The patterns are the sentences both hosts write (`@braindog/script`, `apps/worker/src/script.ts`,
+ * `script-run.ts`); one this does not know is said as a stop its log explains.
+ */
+function whyRefused(note: string | null, log: string | null): string {
+  const said = note ?? '';
+  if (/ asked to write outside what it may write/u.test(said)) return 'wrote outside the lists it may write';
+  if (/ asked nothing: /u.test(said)) return 'asked a question the record would not take';
+  if (/ wrote nothing: write \d+ of \d+ was refused/u.test(said)) return 'had a write the record refused';
+  const why = typeof log === 'string' && log !== '--redacted--' ? (log.split('\n')[0] ?? '') : '';
+  if (/ ran past its wall_ms /u.test(why)) return 'ran out of time';
+  if (/ spent more than its cpu_ms |exceeded CPU/iu.test(why)) return 'ran out of processing time';
+  if (/out of (its \d+ MB of )?memory|exceeded memory/iu.test(why)) return 'ran out of memory';
+  if (/ threw: /u.test(why)) return 'hit an error in its own code';
+  if (/ fetched /u.test(why)) return 'fetched an address it may not';
+  if (/ made more than its \d+ fetches/u.test(why)) return 'made more fetches than it may';
+  if (/ asked for the key /u.test(why)) return 'asked for a key it does not declare';
+  if (/, which is not in its (reads|writes)| declares no reads/u.test(why)) return 'reached a list it does not declare';
+  if (/ queued more than its \d+ writes/u.test(why)) return 'asked for more writes than it may';
+  if (/'s limits\.|'s source |'s egress | handed back /u.test(why)) return 'is declared in a way it cannot run';
+  if (/ stopped: /u.test(why)) return 'was stopped by the host';
+  return 'stopped for a reason its log gives';
 }
 
 function readSourceless(sql: Sql): SignReading {
