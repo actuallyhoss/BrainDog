@@ -231,7 +231,8 @@ test('and every column a block draws is a field the register declares', async ()
 
 test('EVERY `stat` CELL NAMES A METRIC THE RECORD DECLARES', async () => {
   // A tile whose metric does not exist renders as an em dash, which is indistinguishable from a
-  // metric that read nothing — and one of those is a bug and the other is Tuesday.
+  // metric that read nothing — and one of those is a bug and the other is Tuesday. A figure the record has of its own
+  // (`built-in-figures.ts`), `project-worked` since the audit of 25 October (Z7), is declared by the record.
   const { sql } = await seeded();
   const missing: string[] = [];
 
@@ -240,7 +241,7 @@ test('EVERY `stat` CELL NAMES A METRIC THE RECORD DECLARES', async () => {
       for (const cell of block.cells ?? []) {
         if (!cell.metric) continue;
         const id = cell.metric.split(':')[0]!;
-        if (!METRICS[id] && !COMPUTED_FIGURES.has(id)) missing.push(`${slug}: ${cell.metric}`);
+        if (!METRICS[id] && !COMPUTED_FIGURES.has(id) && !Object.hasOwn(BUILT_IN_FIGURES, id)) missing.push(`${slug}: ${cell.metric}`);
       }
 
   assert.deepEqual(missing, []);

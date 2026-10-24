@@ -275,6 +275,9 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
       }
       const all = (b.when as { all?: unknown[] } | undefined)?.all;
       if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
+      /* AND FOUNDER 3.4.0 (Z7 of 25 October): Last worked read the tasks alone, laid back here as 2.6.0 drew it. */
+      if (b.kind === 'stat' && Array.isArray(b.cells))
+        return [{ ...b, cells: (b.cells as { metric?: string }[]).map((c) => (c.metric === 'project-worked:{{name}}' ? { ...c, metric: 'project-last-worked:{{name}}' } : c)) }];
       return [b];
     });
   /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */

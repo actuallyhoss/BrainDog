@@ -710,9 +710,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   it reads `source: deadlines` with money on it, as Today's Due soon does, where it read Bills and invoices alone.
  *   3.20.0 is master's (B6, B8 and B24). One block changed, nothing added or taken away, so a minor step that reaches a
  *   record on its own.
+ * - portfolio 1.26.0 (the audit of 25 October, Z7): the In play cards' when reads the record's own `project-worked`, a
+ *   project's tasks and its runs together, the figure Today's cards read, where it read Work's `project-last-worked`,
+ *   the tasks alone. 1.25.0 is master's (Numbers' page). One column changed and no id added or taken away, so a minor
+ *   step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.25.0',
+  portfolio: '1.26.0',
   people: '3.7.0',
   'money-core': '3.21.0',
   estate: '2.4.0',

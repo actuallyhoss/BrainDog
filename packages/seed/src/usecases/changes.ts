@@ -28,6 +28,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
     {
+      version: '3.4.0',
+      notes: "A project page says when it was last worked on from its tasks and its agents' runs together, the time Projects and Today say.",
+    },
+    {
       version: '3.3.0',
       notes: "A project page says what its own picture is made of: its overview with its path and money, and its work, who is on it, what it runs on and the agents on it, each a part of the page that can be moved or hidden like any other. Two tiles that only repeated it went.",
     },
@@ -60,6 +64,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    {
+      version: '2.26.0',
+      notes: "A project page says when it was last worked on from its tasks and its agents' runs together, the time Projects and Today say.",
+    },
     {
       version: '2.25.0',
       notes: "A project page says what its own picture is made of: its overview with its path and money, and its work, who is on it, what it runs on and the agents on it, each a part of the page that can be moved or hidden like any other. Two tiles that only repeated it went.",

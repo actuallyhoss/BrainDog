@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.26.0',
+      notes: "A project's card on Projects says when it was last worked on from its tasks and its agents' runs together, the same time its card on Today says.",
+    },
+    {
       version: '1.25.0',
       notes: 'Numbers has a page of its own: each kind of number once, under the project it is for, with its newest value and how old it is, and the two that moved most this year as lines. A number opens its chart from its own page.',
     },

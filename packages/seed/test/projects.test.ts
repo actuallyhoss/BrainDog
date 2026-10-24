@@ -493,10 +493,14 @@ test('A PROJECT’S CARD DRAWS ITS FINISHED WORK BY THE WEEK, and a record witho
   assert.equal(cards.trends?.length, cards.rows.length, 'one line a card, or none');
   assert.ok(cards.trends.some((t) => Array.isArray(t) && t.some((v) => (v ?? 0) > 0)), 'no project on the sample finished anything in these weeks');
 
-  const trendOf = (holds: string[]) =>
-    ((firstPartyDocument('portfolio', { holds })!.declarations as { page?: string; blocks?: { heading?: string; columns?: { metric?: string }[] }[] }[])
+  const columnsOf = (holds: string[]) =>
+    (firstPartyDocument('portfolio', { holds })!.declarations as { page?: string; blocks?: { heading?: string; columns?: { metric?: string; as?: string }[] }[] }[])
       .find((d) => d.page === 'portfolio')!
-      .blocks!.find((b) => b.heading === 'In play')!.columns ?? []).some((c) => c.metric !== undefined);
+      .blocks!.find((b) => b.heading === 'In play')!.columns ?? [];
+  const trendOf = (holds: string[]) => columnsOf(holds).some((c) => c.metric !== undefined && c.as === 'trend');
   assert.equal(trendOf(['things', 'tasks']), true);
   assert.equal(trendOf(['things']), false, 'Projects alone is given a line over a figure it will not hold');
+  /* THE WHEN IS THE RECORD'S OWN FIGURE SINCE portfolio 1.26.0 (Z7 of 25 October), its tasks and its runs together, so
+     Projects alone keeps it: a record with no tasks still has runs. */
+  assert.ok(columnsOf(['things']).some((c) => c.metric === 'project-worked:{{name}}' && c.as === 'when'));
 });

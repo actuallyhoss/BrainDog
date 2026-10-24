@@ -71,6 +71,7 @@ const numbers = (where: string | null, when?: Record<string, unknown>): Record<s
   ...(when ? { when } : {}),
 });
 
+
 /**
  * THE TEMPLATE'S WHERE IT STANDS FIGURES WITH THE NUMBERS THIS WEEK AFTER THEM, SINCE 2.5.0 (REC-C16 part b): a founder's
  * project says "2 changed this week, last worked 2 days ago, 6 numbers this week" while nobody has said where it stands.
@@ -450,8 +451,12 @@ export const FOUNDER = {
      declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two
      `project` blocks where they were drawn by hand over the page; Handed back or blocked and Money by month, which the
      page drew only where the shape was not, went for them, and More about is declared folded, as it was drawn. No id
-     added or taken away, and 3.2.0 is live, so a minor step of its own. */
-  version: '3.3.0',
+     added or taken away, and 3.2.0 is live, so a minor step of its own.
+
+     3.4.0, THE AUDIT OF 25 OCTOBER (Z7): the project page's Where it stands says Last worked from the record's own
+     `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads. No id added or
+     taken away, and 3.3.0 is master's, so a minor step of its own. */
+  version: '3.4.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

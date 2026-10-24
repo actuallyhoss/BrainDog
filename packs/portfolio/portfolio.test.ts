@@ -30,6 +30,7 @@ import { createRecordApi, type CallContext } from '../../packages/record/src/ind
 import { rulesLine } from '../../packages/record/src/headlines.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, firstPartyManifest } from '../../packages/seed/src/index.ts';
+import { BUILT_IN_FIGURES } from '../../packages/kernel/src/built-in-figures.ts';
 
 const NOW = Date.UTC(2026, 2, 10, 9);
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -236,8 +237,11 @@ test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them,
     if (typeof d.metric === 'string') assert.ok(LISTS.some((l) => d.source === `register.${l}`), `${String(d.name)} reads a list that is not Projects'`);
   assert.deepEqual(doc.declarations.filter((d) => typeof d.rule === 'string').map((d) => [d.rule, d.register ?? ((d.on as Body | undefined)?.written as Body | undefined)?.register]), [['project-past-aim', OWN[0]], ['kind-offers-kpis', OWN[0]]]);
 
-  /* A FIGURE DRAWN HERE THAT THE FILE DOES NOT DECLARE IS WORK'S, and its line waits for the list that figure reads. */
-  const mine = new Set(doc.declarations.flatMap((d) => (typeof d.metric === 'string' ? [d.metric] : [])));
+  /* A FIGURE DRAWN HERE THAT THE FILE DOES NOT DECLARE IS WORK'S, and its line waits for the list that figure reads. OR
+     THE RECORD'S OWN (`built-in-figures.ts`), which every record has and nothing waits for: since 1.26.0 the card's when
+     is `project-worked`, a project's tasks and its runs together (Z7 of 25 October). */
+  const mine = new Set([...doc.declarations.flatMap((d) => (typeof d.metric === 'string' ? [d.metric] : [])), ...Object.keys(BUILT_IN_FIGURES)]);
+  assert.ok(drawn(doc).some((m) => m.metric === 'project-worked' && m.when === undefined), 'the card\'s when is not the record\'s own figure');
   const work = (firstPartyDocument('work') as { declarations: Body[] }).declarations;
   for (const { metric, when } of drawn(doc).filter((m) => !mine.has(m.metric))) {
     const theirs = work.find((d) => d.metric === metric);
@@ -251,9 +255,9 @@ test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them,
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own, 1.26.0 since the card's when reads the runs too. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.25.0');
+  assert.equal(doc.version, '1.26.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -266,14 +270,13 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   assert.equal(doc.config, undefined);
 });
 
-test('WORK IS ASKED FOR ONLY WHERE IT IS READ: two lines on a card wait, and nothing else', () => {
+test('WORK IS ASKED FOR ONLY WHERE IT IS READ: one line on a card waits, and nothing else', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Projects installs on a record with no other add-on');
-  /* The work finished each week and, since 1.17.0, how long since anybody worked on it (projects-last-worked-96): both Work's figures. */
-  assert.deepEqual(waits(doc), [
-    { at: '"Projects", "In play", "project-done-by-week:{{name}}"', holds: [WORK] },
-    { at: '"Projects", "In play", "Worked on"', holds: [WORK] },
-  ]);
+  /* The work finished each week, Work's figure. HOW LONG SINCE ANYBODY WORKED ON IT WAITED TOO from 1.17.0 to 1.25.0
+     (projects-last-worked-96); since 1.26.0 it is the record's own `project-worked` (Z7 of 25 October), which reads the
+     runs where there are no tasks, so it waits for nothing. */
+  assert.deepEqual(waits(doc), [{ at: '"Projects", "In play", "project-done-by-week:{{name}}"', holds: [WORK] }]);
   /* AND NOTHING POINTS OUT OF THE FILE: Projects' one list links to no other. */
   const fields = doc.declarations.find((d) => d.register === OWN[0] && d.rule === undefined)!.fields as Body[];
   assert.deepEqual(fields.filter((f) => f.to !== undefined && f.to !== OWN[0]).map((f) => f.id), []);
@@ -297,7 +300,7 @@ async function waitingParts(holds: readonly string[]): Promise<Waiting[]> {
   const blocks = pack.declarations.find((d) => d.id === 'page.portfolio')!.body.blocks as Body[];
   const cards = blocks.findIndex((b) => b.heading === 'In play' && b.kind === 'cards');
   const columns = blocks[cards]!.columns as Body[];
-  const lines = ['project-done-by-week', 'project-last-worked'].map((m) => columns.findIndex((c) => String(c.metric).startsWith(m)));
+  const lines = ['project-done-by-week'].map((m) => columns.findIndex((c) => String(c.metric).startsWith(m)));
   const all: Waiting[] = lines.map((line) => ({ at: `page.portfolio.blocks[${cards}].columns[${line}]`, holds: [WORK] }));
   return all.filter((w) => !w.holds.every((n) => holds.includes(n)));
 }

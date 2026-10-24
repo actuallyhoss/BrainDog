@@ -1880,6 +1880,25 @@ const DECLARED: Record<string, Version> = {
   },
   /* NUMBERS HAS A PAGE OF ITS OWN (E26). 1.23.0 is master's and 1.24.0 another lane's, so a version of its own. One page
      added and nothing taken away. */
+  /* THE AUDIT OF 25 OCTOBER (Z7): 1.25.0 IS MASTER'S, so a version of its own. One column changed, no id added. */
+  'portfolio@1.26.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: '940be95b94881f88',
+    history: [
+      "Portfolio 1.26.0 (the audit of 25 October, Z7): `page.portfolio`'s In play cards read their when off the record's own `project-worked`, a project's tasks and its runs together, where they read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 940be95b94881f88",
+    ],
+  },
   'portfolio@1.25.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

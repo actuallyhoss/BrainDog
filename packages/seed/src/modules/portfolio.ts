@@ -1242,8 +1242,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0 (W096, REC-C16): Work's `project-last-worked` for the
              card's own project, the reading the project page's Where it stands draws, said in the card's head as "Worked on 2
              days ago", or "Quiet for 40 days" in the late tone once it misses its thirty days. A project with no task reads
-             nothing and the card draws no line. So a quiet project is seen on the list. */
-          { metric: 'project-last-worked:{{name}}', as: 'when', label: 'Worked on' },
+             nothing and the card draws no line. So a quiet project is seen on the list.
+             ITS TASKS AND ITS RUNS TOGETHER, SINCE portfolio 1.26.0 (the audit of 25 October, Z7): the record's own
+             `project-worked`, the figure Today's cards read, so a card here says "Claude worked on it 20 minutes ago"
+             where Today does, and never "4 days ago" from the tasks alone. */
+          { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
         /* EVERY PROJECT IN PLAY OR PARKED, SINCE portfolio 1.21.0 (batch 4's look on his record): twelve by name, parked
@@ -1533,7 +1536,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            was worked on this week, from the day the record stamps each task it writes. What is open is At a glance's
            first figure straight above, so it is not said twice. How long since anybody worked on it beside that, from the
            same stamps (`project-last-worked`), so a project that went quiet a month ago reads "30 days" and not only a
-           nought for this week. A use case that keeps more adds its own cell (founder's numbers this week). */
+           nought for this week. A use case that keeps more adds its own cell (founder's numbers this week).
+           LAST WORKED READS ITS RUNS TOO, SINCE founder 3.4.0 and team 2.26.0 (the audit of 25 October, Z7): the
+           record's own `project-worked`, the figure its card on Projects and on Today reads. */
         kind: 'stat',
         heading: 'Where it stands',
         icon: 'target',
@@ -1542,7 +1547,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         key: 'stands-figures',
         cells: [
           { metric: 'project-moved-7d:{{name}}', label: 'Changed this week' },
-          { metric: 'project-last-worked:{{name}}', label: 'Last worked' },
+          { metric: 'project-worked:{{name}}', label: 'Last worked' },
         ],
         when: { metric: 'project-said:{{name}}', is: 0 },
       },

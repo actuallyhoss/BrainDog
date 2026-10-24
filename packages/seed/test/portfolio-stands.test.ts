@@ -102,7 +102,7 @@ test('THE FIGURES ARE WHAT CHANGED THIS WEEK AND HOW LONG SINCE IT WAS LAST WORK
   const figures = blocks.find((b) => b.key === 'stands-figures');
   assert.deepEqual(figures?.cells?.map((c) => [c.metric, c.label]), [
     ['project-moved-7d:{{name}}', 'Changed this week'],
-    ['project-last-worked:{{name}}', 'Last worked'],
+    ['project-worked:{{name}}', 'Last worked'],
   ]);
 });
 
@@ -123,8 +123,14 @@ test('LAST WORKED IS THE DAYS SINCE THE NEWEST WRITE ON ANY OF ITS TASKS, read o
   const figures = headed(opened(k, pageOf(k, 'Harbour')), 'Where it stands')[1]!;
   assert.notEqual(figures.drawn, false);
   assert.deepEqual(figures.refusals, [], JSON.stringify(figures.refusals));
-  assert.equal(reading(figures, 'project-last-worked'), 4, 'the newest write on its tasks was four days ago');
+  assert.equal(reading(figures, 'project-worked'), 4, 'the newest write on its tasks was four days ago');
   assert.equal(reading(figures, 'project-moved-7d'), 1, 'and one task was written this week');
+
+  /* AND A RUN IN IT HEARD FROM TWENTY MINUTES AGO IS NEWER (the audit of 25 October, Z7): Last worked read the tasks
+     alone and said four days while Today said twenty minutes. */
+  assert.ok(k.create('session', { doing: 'Work', agent: 'claude', state: 'idle' }, { ...PERSON, stamp: { last_seen: new Date(NOW - 20 * 60_000).toISOString(), project: spoken } }).ok);
+  const after = headed(opened(k, pageOf(k, 'Harbour')), 'Where it stands')[1]!;
+  assert.equal(reading(after, 'project-worked'), 0, 'a run in it twenty minutes ago was left out');
 });
 
 test('A PROJECT WITH NO TASK HAS NO LAST WORKED, never a nought that reads as worked on today', async () => {
@@ -132,7 +138,7 @@ test('A PROJECT WITH NO TASK HAS NO LAST WORKED, never a nought that reads as wo
   assert.ok(k.create('things', { name: 'Harbour', lane: 'building' }, PERSON).ok);
   const figures = headed(opened(k, pageOf(k, 'Harbour')), 'Where it stands')[1]!;
   assert.deepEqual(figures.refusals, [], JSON.stringify(figures.refusals));
-  assert.equal(reading(figures, 'project-last-worked') ?? null, null);
+  assert.equal(reading(figures, 'project-worked') ?? null, null);
   assert.equal(reading(figures, 'project-moved-7d'), 0);
 });
 

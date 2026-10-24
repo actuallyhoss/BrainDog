@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.25.0",
+  "version": "1.26.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Numbers has a page of its own: each kind of number once, under the project it is for, with its newest value and how old it is, and the two that moved most this year as lines. A number opens its chart from its own page.",
+  "changes": "A project's card on Projects says when it was last worked on from its tasks and its agents' runs together, the same time its card on Today says.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -270,7 +270,7 @@
             { "field": "next", "label": "Next step", "as": "fact" },
             { "field": "agent", "label": "Agent", "as": "who" },
             { "metric": "project-done-by-week:{{name}}", "kpi": "headline", "as": "trend", "when": { "holds": [ "tasks" ] } },
-            { "metric": "project-last-worked:{{name}}", "as": "when", "label": "Worked on", "when": { "holds": [ "tasks" ] } }
+            { "metric": "project-worked:{{name}}", "as": "when", "label": "Worked on" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ],
           "limit": 100,

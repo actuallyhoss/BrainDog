@@ -89,7 +89,7 @@ type Drawn = PageResult['blocks'][number] & { key?: string; body?: string; value
 
 test('A FOUNDER PROJECT SAYS THE NUMBERS IT SENT THIS WEEK under Where it stands, the example and last week left out', async () => {
   const cells = ((declared('project').blocks as { key?: string; cells?: { metric: string }[] }[]).find((b) => b.key === 'stands-figures')?.cells ?? []).map((c) => c.metric);
-  assert.deepEqual(cells, ['project-moved-7d:{{name}}', 'project-last-worked:{{name}}', 'project-numbers-7d:{{name}}']);
+  assert.deepEqual(cells, ['project-moved-7d:{{name}}', 'project-worked:{{name}}', 'project-numbers-7d:{{name}}']);
 
   const k = await founder();
   const harbour = value<{ id: string }>(k.create('things', { name: 'Harbour', lane: 'building' }, OWNER));
@@ -105,7 +105,7 @@ test('A FOUNDER PROJECT SAYS THE NUMBERS IT SENT THIS WEEK under Where it stands
   assert.deepEqual(figures.refusals ?? [], [], JSON.stringify(figures.refusals));
   const read = (m: string) => figures.readings?.find((r) => r.metric.startsWith(m))?.reading?.value;
   assert.equal(read('project-numbers-7d'), 3, 'three numbers sent this week');
-  assert.equal(read('project-last-worked'), 0, 'its task was written today');
+  assert.equal(read('project-worked'), 0, 'its task was written today');
 });
 
 test('AN EARNING PROJECT WITH NO MONEY IN AND NO NUMBER IN 90 DAYS IS SILENT, and Projects names it', async () => {
