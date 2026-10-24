@@ -102,8 +102,9 @@ test("AN AGENT'S FIRST QUESTION OF A CAUSE IS ONE ACTIVE NOTICE, naming its proj
   const by = openedBy(sql, first.id);
   assert.match(by, /^S\d+$/u, 'the question was not opened by a run');
 
-  /* ONE PUSH TO THE ONE PHONE, and no mail: an active notice is a push that says how many wait, never what. */
-  assert.deepEqual(sounded(sql), [{ kind: 'notify.push', payload: { sub: { id: 'ps_1' } } }]);
+  /* ONE PUSH TO THE ONE PHONE, and no mail: an active notice is a push that says how many wait, never what. AND WHERE A
+     TAP OPENS, SINCE E44 OF 24 OCTOBER: the question itself in Decide, a path and never a word. */
+  assert.deepEqual(sounded(sql), [{ kind: 'notify.push', payload: { sub: { id: 'ps_1' }, open: `/decide/${first.id}` } }]);
   assert.deepEqual(notes(sql), [{ actor: `suggestion:${first.id}`, field: null, note: `${PROJECT}'s agent asks you something` }]);
   assert.doesNotMatch(notes(sql)[0]!.note, /S\d|tasks#|\//u, 'the line carries a handle');
   /* THE RUN WROTE NO NOTE, so its history says it asked and nothing more. */
@@ -151,8 +152,8 @@ test("AT 22:00 IN THE RECORD'S OWN ZONE NOTHING SOUNDS: the notice is kept, and 
   assert.deepEqual(notes(sql).map((n) => n.field), [null, 'urgent']);
 
   clock.set(MORNING);
-  value(k.propose(done('tasks#2', 'Mark the test task done?'), CLAUDE));
-  assert.deepEqual(sounded(sql), [{ kind: 'notify.push', payload: { sub: { id: 'ps_1' } } }]);
+  const morning = value<{ id: string }>(k.propose(done('tasks#2', 'Mark the test task done?'), CLAUDE));
+  assert.deepEqual(sounded(sql), [{ kind: 'notify.push', payload: { sub: { id: 'ps_1' }, open: `/decide/${morning.id}` } }]);
   sql.close();
 });
 

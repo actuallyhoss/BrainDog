@@ -19,8 +19,20 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-/** One subscription as a deliverer posts to it. The keys are left out: a content-free push encrypts nothing. */
-export type PushTarget = { id: string; endpoint: string };
+/**
+ * One subscription as a deliverer posts to it. THE KEYS AND `open` COME ONLY WITH A JOB THAT NAMES WHERE IT OPENS (E44 of
+ * 24 October): a path in this record, a handle and never a word ("/decide/sg_..."), which the deliverer encrypts to the
+ * phone's keys (RFC 8291) so a tap opens the thing that needs him. A job with none is still a push with no body.
+ */
+export type PushTarget = { id: string; endpoint: string; open?: string; keys?: { p256dh: string; auth: string } };
+
+/**
+ * A path a push may open: one of the app's own screens in this record (Decide, Agents, Inbox, a list), made of handle
+ * characters, and short. Anything else is no path, so a push that names one opens the record's home, as every push did
+ * before: a digest's `/digest/<id>` is no screen of the app. `/decide/sg_01J...`, `/agents`, `/r/tasks/e_9`.
+ */
+export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
+export const pushOpenOf = (url: unknown): string | null => (typeof url === 'string' && PUSH_OPEN.test(url) ? url : null);
 
 /** What one delivery found: the ids the service accepted, and the ids it answered 404 or 410 for. */
 export type PushSettled = { sent?: readonly string[]; gone?: readonly string[] };
@@ -110,7 +122,18 @@ export function leasedPushTarget(sql: Sql, nowMs: number, args: { outbox: string
   if (Date.parse(job.leased_until) <= nowMs)
     return no('PULL_LEASE_EDGE', `The lease on ${args.outbox} ran out at ${job.leased_until}. Take it again before sending it.`, { at: 'leasedUntil' });
   const id = pushSubOf(job.payload);
-  return ok(id === null ? null : (pushTargets(sql, [id])[0] ?? null));
+  if (id === null) return ok(null);
+  const target = pushTargets(sql, [id])[0] ?? null;
+  if (target === null) return ok(null);
+  let open: string | null = null;
+  try {
+    open = pushOpenOf((JSON.parse(job.payload) as { open?: unknown } | null)?.open);
+  } catch {
+    open = null;
+  }
+  if (open === null) return ok(target);
+  const keys = sql.one<{ p256dh: string; auth: string }>('SELECT p256dh, auth FROM push_sub WHERE id = ?', id);
+  return ok(keys ? { ...target, open, keys: { p256dh: keys.p256dh, auth: keys.auth } } : target);
 }
 
 /**

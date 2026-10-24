@@ -260,3 +260,17 @@ test('A STALE ACK SAYING gone DELETES NOTHING: the fence is checked before the r
   assert.deepEqual(pushSubsOf(sql, ['p_ada']), ['ps_ada_laptop', 'ps_ada_phone'], 'an ack about a lease that is over dropped a phone');
   sql.close();
 });
+
+test('A PUSH THAT NAMES WHERE IT OPENS HANDS THE PATH AND THE PHONE\'S KEYS UNDER THE LEASE, and a path that is not one is dropped (E44)', async () => {
+  const { k, sql } = await interrupting(true);
+  const id = k.outbox('notify.push', { sub: { id: 'ps_ada_phone' }, open: '/decide/sg_01JABCDEF' });
+  const bad = k.outbox('notify.push', { sub: { id: 'ps_ada_laptop' }, open: 'https://elsewhere.test/x' });
+  const jobs = k.leaseOutbox(['notify.push'], 2);
+  const job = jobs.find((j) => j.id === id)!;
+  const other = jobs.find((j) => j.id === bad)!;
+  const target = value<{ open?: string; keys?: { p256dh: string; auth: string } }>(k.pushTarget({ outbox: id, leasedUntil: job.leasedUntil }));
+  assert.equal(target.open, '/decide/sg_01JABCDEF');
+  assert.deepEqual(Object.keys(target.keys ?? {}).sort(), ['auth', 'p256dh']);
+  assert.deepEqual(value(k.pushTarget({ outbox: bad, leasedUntil: other.leasedUntil })), { id: 'ps_ada_laptop', endpoint: ADA_LAPTOP });
+  sql.close();
+});

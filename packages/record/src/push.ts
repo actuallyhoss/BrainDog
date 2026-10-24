@@ -161,8 +161,9 @@ export const finishCause = (i: Pick<Instr, 'row' | 'state'>): string => `instruc
  *   - QUIET HOURS HOLD IT, the row's own or else the record's, as every notice is held. Nothing is queued to go later.
  *   - ONCE PER INSTRUCTION STATE. The cause rides the queued row, a handle as `asked.<cause>` is, and a row already
  *     carrying it, sent or not, answers `told`.
- *   - CONTENT-FREE. The payload is `{ sub: { id }, cause }` and nothing else: no instruction text, reply, project or
- *     name reaches the outbox, which travels in every backup. The Worker sends a push with no body.
+ *   - CONTENT-FREE. The payload is `{ sub: { id }, cause, open }` and nothing else, `open` being a path in the record:
+ *     no instruction text, reply, project or name reaches the outbox, which travels in every backup. The Worker
+ *     encrypts only that path to the phone (E44), so a tap opens Decide or Agents.
  *   - A RECORD NOBODY SUBSCRIBED A PHONE ON queues nothing.
  *
  * It never fails the reply: the caller keeps the instruction's answer whatever this says.
@@ -182,6 +183,8 @@ export function tellFinished(deps: FinishDeps, i: Pick<Instr, 'row' | 'state' | 
   const cause = finishCause(i);
   const told = deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND json_extract(payload, '$.cause') = ?", cause)?.n ?? 0;
   if (Number(told) > 0) return 'told';
-  for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause });
+  /* AND WHERE IT OPENS (E44): Needs you is answered in Decide, and Done is read on Agents. A path, never a word. */
+  const open = i.state === 'needs_you' ? '/decide' : '/agents';
+  for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause, open });
   return 'sent';
 }

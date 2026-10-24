@@ -102,7 +102,7 @@ import {
 import { ack, enqueue, lease, retryDead, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
-import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
+import { leasedPushTarget, ownersPushSubs, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
@@ -547,7 +547,7 @@ export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
-export { ownersPushSubs } from './push.ts';
+export { PUSH_OPEN, ownersPushSubs, pushOpenOf } from './push.ts';
 export type { PushJob, PushSettled, PushTarget } from './push.ts';
 export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
@@ -7945,7 +7945,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* AND THE CAUSE OF A TIME-SENSITIVE NOTICE THAT NAMES ONE (`notify`), a handle and never a word, so `told`
            below can say it was already told. A push that names no cause is its phone's id and nothing else, as before. */
         const cause = (payload as { cause?: unknown } | null)?.cause;
-        const marked = typeof cause === 'string' && cause !== '' ? { cause } : {};
+        /* AND WHERE IT OPENS (E44 of 24 October): the notice's path in this record, a handle and never a word, so a tap
+           opens the question that needs him (`pushOpenOf`). A url that is not such a path is left out. */
+        const open = pushOpenOf((payload as { url?: unknown } | null)?.url);
+        const marked = { ...(typeof cause === 'string' && cause !== '' ? { cause } : {}), ...(open ? { open } : {}) };
         for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id }, ...marked });
       },
       note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent),

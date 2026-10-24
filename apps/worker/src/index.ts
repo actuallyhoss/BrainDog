@@ -81,7 +81,7 @@ import { cloudSealed } from './sealed.ts';
 import { cloudVisuals } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
-import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
+import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the front doors' own limiter can import the same two functions under their own
@@ -2060,12 +2060,24 @@ export class Record$ extends DurableObject<Env> {
    * file, so the endpoint stays in `push_sub` and comes out here, to the Worker holding the job's lease and to nobody
    * else, under the same three lease checks (`packages/kernel/src/push.ts`).
    */
-  async pushTargetFor(args: { outbox: string; leasedUntil: string }): Promise<Result<{ id: string; endpoint: string } | null>> {
+  async pushTargetFor(args: { outbox: string; leasedUntil: string }): Promise<Result<PushAddress | null>> {
     if (this.#gone) return { ok: false, refusal: DELETED };
     const api = await this.#record();
     const broken = api.kernel.refused();
     if (broken) return { ok: false, refusal: broken };
-    return api.kernel.pushTarget(args);
+    const out = api.kernel.pushTarget(args);
+    /* WHERE A TAP OPENS IS UNDER THIS RECORD'S NAME (E44): `/app/<slug>` before the record's own path. A record whose
+       name cannot be read rings with no body, as every push did before. */
+    if (!out.ok || out.value === null || out.value.open === undefined) return out;
+    const { open, keys, ...bare } = out.value;
+    const record = api.kernel.identity()?.id;
+    let slug: string | null = null;
+    try {
+      slug = record ? await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).slugOf(record) : null;
+    } catch {
+      slug = null;
+    }
+    return { ok: true, value: slug && keys ? { ...bare, keys, open: `/app/${slug}${open}` } : bare };
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -2767,7 +2779,7 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
             vapid: await vapidKeys(env.VAPID_PUBLIC ?? '', env.VAPID_PRIVATE ?? ''),
             subject: `mailto:${env.MAIL_FROM || env.AUTH_MAIL_FROM || ''}`,
             send: fetchPush,
-            target: leasedTarget(async (args) => (await record.pushTargetFor(args)) as unknown as Result<{ id: string; endpoint: string } | null>),
+            target: leasedTarget(async (args) => (await record.pushTargetFor(args)) as unknown as Result<PushAddress | null>),
           },
         }
       : {}),

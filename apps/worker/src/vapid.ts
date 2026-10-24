@@ -27,7 +27,7 @@ type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
 export type Vapid = { publicKey: string; key: Key };
 
 /** What a push service answered. The status is the whole answer, because a push has no response body worth reading. */
-export type PushSend = (endpoint: string, headers: Record<string, string>) => Promise<{ status: number }>;
+export type PushSend = (endpoint: string, headers: Record<string, string>, body?: Uint8Array) => Promise<{ status: number }>;
 
 const EC = { name: 'ECDSA', namedCurve: 'P-256' } as const;
 const ES256 = { name: 'ECDSA', hash: 'SHA-256' } as const;
@@ -133,6 +133,49 @@ export async function pushHeaders(vapid: Vapid, endpoint: string, subject: strin
   return { Authorization: `vapid t=${await vapidJwt(vapid, endpoint, subject, now)}, k=${vapid.publicKey}`, TTL: String(TTL_S) };
 }
 
+/**
+ * WHERE A TAP OPENS, AND NOTHING ELSE, ENCRYPTED TO THE PHONE (E44 of 24 October; RFC 8291 over RFC 8188's aes128gcm).
+ * The one thing a push now carries is `{ open }`, a path in the app such as `/app/sam/decide/sg_01J...`: a handle and
+ * never a word, so the push service that relays it learns nothing, and the service worker opens it on a tap.
+ *
+ * ONE RECORD, AS RFC 8291 §4 SAYS: a fresh P-256 pair for each message, the shared secret with the phone's `p256dh`,
+ * mixed with its 16-byte `auth` secret into the key, a random salt, one AES-128-GCM record ended by the 0x02 delimiter,
+ * and the header salt, record size, and the sender's public key. WebCrypto alone, in workerd and in Node alike.
+ */
+export async function encryptPush(keys: { p256dh: string; auth: string }, plain: Uint8Array): Promise<Uint8Array> {
+  const ua = bytes(keys.p256dh);
+  const secret = bytes(keys.auth);
+  if (!ua || ua.length !== 65 || ua[0] !== 4 || !secret || secret.length !== 16) throw new Error("a push opens nothing without the phone's two keys, and these are not them");
+  const hmac = async (key: Uint8Array, data: Uint8Array): Promise<Uint8Array> => {
+    const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return new Uint8Array(await crypto.subtle.sign('HMAC', k, data));
+  };
+  const join = (...parts: Uint8Array[]): Uint8Array => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) out.set(p, (at += p.length) - p.length);
+    return out;
+  };
+  const pair = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])) as { publicKey: Key; privateKey: Key };
+  const as = new Uint8Array((await crypto.subtle.exportKey('raw', pair.publicKey)) as ArrayBuffer);
+  const phone = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: phone } as never, pair.privateKey, 256));
+  /* RFC 8291 §3.4: IKM from the auth secret and the two public keys, then RFC 8188 §2.2's key and nonce from the salt. */
+  const ikm = await hmac(await hmac(secret, shared), join(utf8('WebPush: info\0'), ua, as, Uint8Array.of(1)));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hmac(salt, ikm);
+  const cek = (await hmac(prk, utf8('Content-Encoding: aes128gcm\0\x01'))).slice(0, 16);
+  const nonce = (await hmac(prk, utf8('Content-Encoding: nonce\0\x01'))).slice(0, 12);
+  const aes = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aes, join(plain, Uint8Array.of(2))));
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096);
+  return join(salt, rs, Uint8Array.of(as.length), as, sealed);
+}
+
+/** The headers an encrypted push adds to `pushHeaders`': its encoding, and the type of a body nobody but the phone reads. */
+export const PUSH_BODY_HEADERS = { 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream' } as const;
+
 /** `/api/push/key`: the key a browser subscribes with. Asked of a path already moved to the root, as every method is. */
 export const servesPushKey = (pathname: string): boolean => /^\/+api\/+push\/+key\/*$/.test(pathname);
 
@@ -159,7 +202,7 @@ export async function pushKeyOf(env: { VAPID_PUBLIC?: string | undefined; VAPID_
  * subscribed, so a 3xx is answered as itself and fails; and a request that never returns outlives its sixty-second
  * lease, so it is cut at twenty.
  */
-export const fetchPush: PushSend = async (endpoint, headers) => {
-  const out = await fetch(endpoint, { method: 'POST', headers, redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+export const fetchPush: PushSend = async (endpoint, headers, body) => {
+  const out = await fetch(endpoint, { method: 'POST', headers, ...(body ? { body } : {}), redirect: 'manual', signal: AbortSignal.timeout(20_000) });
   return { status: out.status };
 };

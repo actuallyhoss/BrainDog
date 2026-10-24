@@ -27,7 +27,7 @@ import { fixOf, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
 import { recordLetter } from './mail.ts';
-import { pushHeaders, type PushSend, type Vapid } from './vapid.ts';
+import { PUSH_BODY_HEADERS, encryptPush, pushHeaders, type PushSend, type Vapid } from './vapid.ts';
 
 /**
  * One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. The text and the
@@ -283,10 +283,13 @@ export function leasedOpener(ask: SealAsk, store: () => Promise<KeyStore | null>
  * person has since unsubscribed. Over RPC on the Worker, as `Record$.pushTargetFor`, because the record holds the lease
  * and `push_sub`, and the endpoint never travels in the job (`packages/kernel/src/push.ts`).
  */
-export type PushTargetAsk = (args: { outbox: string; leasedUntil: string }) => Promise<Result<{ id: string; endpoint: string } | null>>;
+export type PushTargetAsk = (args: { outbox: string; leasedUntil: string }) => Promise<Result<PushAddress | null>>;
 
-/** The endpoint one leased push rings, or `null` for nobody. A refusal throws its sentence, which is the dead letter's. */
-export type PushTargetOf = (job: OutboxRow) => Promise<string | null>;
+/** One subscription as the record hands it under the lease, and, where the job names one, the app path a tap opens. */
+export type PushAddress = { id: string; endpoint: string; open?: string; keys?: { p256dh: string; auth: string } };
+
+/** The address one leased push rings, or `null` for nobody. A refusal throws its sentence, which is the dead letter's. */
+export type PushTargetOf = (job: OutboxRow) => Promise<PushAddress | null>;
 
 /**
  * An addresser over the record's `pushTarget`, which checks the lease as `sealedGrant` checks it for a key.
@@ -299,7 +302,7 @@ export function leasedTarget(ask: PushTargetAsk): PushTargetOf {
   return async (job) => {
     const out = await ask({ outbox: job.id, leasedUntil: job.leasedUntil });
     if (!out.ok) throw new Error(fixOf(out));
-    return out.value?.endpoint ?? null;
+    return out.value ?? null;
   };
 }
 
@@ -394,14 +397,21 @@ export function makeDeliver(transports: Transports): Deliver {
       const id = sub && typeof sub === 'object' ? text((sub as Record<string, unknown>).id) : '';
       if (id === '') throw new Error('a notify.push names the subscription it rings, by id, and this one names none');
       /* NOBODY LEFT TO RING IS DELIVERED. The person unsubscribed, or was erased, after the job was queued. */
-      const address = await target(job);
-      if (address === null) return;
+      const found = await target(job);
+      if (found === null) return;
+      const address = found.endpoint;
       /* The endpoint was written by a browser and stored by the record, so it is data somebody else supplied, and it
          goes through the same `postable()` as a webhook: a push to the metadata service is still a request to it. */
       const endpoint = postable(address);
       if (!endpoint) throw new Error('a push goes to an https address on a public host');
-      /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS: the push has no body (`vapid.ts`). */
-      const { status } = await send(endpoint, await pushHeaders(vapid, endpoint, subject));
+      /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS, AND WHERE A TAP OPENS (E44): an
+         app path the record checked (`pushOpenOf`), encrypted to the phone's keys. A job that names none has no body. */
+      const headers = await pushHeaders(vapid, endpoint, subject);
+      const open = found.open && found.keys && /^\/app\/[a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_/-]{0,200}$/u.test(found.open) ? found.open : null;
+      const { status } =
+        open && found.keys
+          ? await send(endpoint, { ...headers, ...PUSH_BODY_HEADERS }, await encryptPush(found.keys, new TextEncoder().encode(JSON.stringify({ open }))))
+          : await send(endpoint, headers);
       if (status >= 200 && status < 300) {
         await count(transports, job);
         return;

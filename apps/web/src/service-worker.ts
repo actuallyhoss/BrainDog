@@ -3,9 +3,11 @@
  * `lib/data/offline.ts`, which the page shares.
  *
  * ONE FIXED LINE, WHATEVER CAME WITH THE PUSH. `09 §3` is that a push carries no content, because it passes through a
- * push service nobody here runs and this record holds money and credentials. The Worker sends no body at all,
- * and the kernel's `notify.push` job still writes `{ title, url }`, so this file is the place that guarantees it: the
- * payload is never read, and `push.test.ts` fires a push whose payload throws when touched.
+ * push service nobody here runs and this record holds money and credentials. THE ONE THING READ IS WHERE A TAP OPENS
+ * (E44 of 24 October): the Worker encrypts `{ open }` to this phone, a path in the app such as
+ * `/app/sam/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
+ * No word of it is ever drawn: the line stays fixed, and `push.test.ts` fires a push with a title in its payload and a
+ * push whose payload throws when touched.
  *
  * THE NETWORK FIRST FOR EVERY READ AND FILE, AND THE COPY ONLY WHEN IT FAILS. Every read and every file of the app goes
  * to the network as it did before this file cached anything, and what answers is what is drawn; the copy is written on
@@ -48,7 +50,7 @@ type Waits = { waitUntil(p: Promise<unknown>): void };
 type Opened = { url: string; focus(): Promise<unknown> };
 type Fetched = Waits & { request: Request; clientId: string; respondWith(r: Promise<Response>): void };
 type Scope = {
-  registration: { scope: string; showNotification(title: string, options?: { tag?: string }): Promise<void> };
+  registration: { scope: string; showNotification(title: string, options?: { tag?: string; data?: { open: string } }): Promise<void> };
   clients: {
     matchAll(o: { type: 'window'; includeUncontrolled: boolean }): Promise<readonly Opened[]>;
     openWindow(url: string): Promise<unknown>;
@@ -57,31 +59,49 @@ type Scope = {
   };
   caches: CacheStorage;
   skipWaiting(): Promise<void>;
-  addEventListener(type: 'push', fn: (e: Waits) => void): void;
-  addEventListener(type: 'notificationclick', fn: (e: Waits & { notification: { close(): void } }) => void): void;
+  addEventListener(type: 'push', fn: (e: Waits & { data?: { json(): unknown } | null }) => void): void;
+  addEventListener(type: 'notificationclick', fn: (e: Waits & { notification: { close(): void; data?: unknown } }) => void): void;
   addEventListener(type: 'install' | 'activate', fn: (e: Waits) => void): void;
   addEventListener(type: 'fetch', fn: (e: Fetched) => void): void;
 };
 
 const sw = self as unknown as Scope;
 
+/** Where a tap opens, from what came with the push or with the line: an address under this scope, or `null`. */
+const openOf = (raw: unknown): string | null => {
+  const path = raw && typeof raw === 'object' ? (raw as { open?: unknown }).open : undefined;
+  if (typeof path !== 'string') return null;
+  /* A PATH AS THE WORKER SENDS IT, OR THE ADDRESS THIS FILE KEPT ON THE LINE FROM ONE: under the scope either way. */
+  const rest = path.startsWith(sw.registration.scope) ? path.slice(new URL(sw.registration.scope).origin.length) : path;
+  if (!/^\/[A-Za-z0-9_/-]{1,240}$/u.test(rest) || rest.includes('//')) return null;
+  const url = new URL(rest, sw.registration.scope).href;
+  return url.startsWith(sw.registration.scope) ? url : null;
+};
+
 /* THE TAG MAKES A SECOND PUSH REPLACE THE FIRST LINE. Two unread lines saying the same thing are one fact drawn twice,
    and the kernel already holds urgent ones to one an hour. */
 sw.addEventListener('push', (e) => {
-  e.waitUntil(sw.registration.showNotification('Something in your BrainDog needs you', { tag: 'braindog' }));
+  let open: string | null = null;
+  try {
+    open = openOf(e.data?.json());
+  } catch {
+    open = null;
+  }
+  e.waitUntil(sw.registration.showNotification('Something in your BrainDog needs you', { tag: 'braindog', ...(open ? { data: { open } } : {}) }));
 });
 
-/* THE RECORD'S HOME IS THE ROOT OF THE SCOPE, `/app/`, which is the record the session is on. The push names no record,
-   so this cannot open a slug; a Home already open is focused rather than opened twice, and a window on another screen
-   is left where it is, because navigating it would throw away whatever was being typed there. */
+/* A TAP OPENS WHAT THE PUSH NAMED (E44), the question in Decide on the record it is about, or else THE RECORD'S HOME,
+   the root of the scope, `/app/`, which is the record the session is on. A window already on that address is focused
+   rather than opened twice, and a window on another screen is left where it is, because navigating it would throw
+   away whatever was being typed there. */
 sw.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const home = sw.registration.scope;
+  const to = openOf(e.notification.data) ?? sw.registration.scope;
   e.waitUntil(
     (async () => {
       const open = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const there = open.find((w) => w.url === home);
-      return there ? there.focus() : sw.clients.openWindow(home);
+      const there = open.find((w) => w.url === to);
+      return there ? there.focus() : sw.clients.openWindow(to);
     })(),
   );
 });
