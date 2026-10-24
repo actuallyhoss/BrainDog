@@ -199,6 +199,54 @@ export function dayAgo(iso: string, now: number): string | null {
 }
 
 /**
+ * A NIGHT'S COPY THAT FAILED, AND WHY, IN PLAIN WORDS (scope 2026-10-24 A22). A failed night is a fault and never a
+ * question (`kernel/src/copies.ts`, cause `night#export.night`), so Backups, which looked only for the question a night
+ * used to open, said nothing of it while the index said a copy failed. This is what Backups says instead: the fault's own
+ * sentence, then why and since when.
+ *
+ * THE RAW ERROR IS NEVER SAID. It reaches only a self-host's owner (`record/src/methods/faults.ts`), and it is an
+ * engineer's line ("the dump ended 12 bytes short..."), so it is read for which of a few known reasons it is and said as
+ * that reason. On the Cloud there is no error to read: the copies are ours to fix, and the night's failure reached us.
+ */
+export type NightFailed = { said: string; why: string };
+
+/** The fault a failed night raises (`NIGHT_FAULT` in the kernel), found by its door so a renamed kind still finds it. */
+export const isNightFault = (f: Fault): boolean => f.cause.startsWith('night#');
+
+/** The known reasons: the engineer's words each is read from, and the person's words it is said as. */
+const NIGHT_REASONS: readonly [RegExp, string][] = [
+  [/no BLOBS binding|nowhere to put/iu, 'This server has no place set up to keep copies.'],
+  [/bytes short|wrote \d+ of the|could not be read back/iu, 'The copy came out incomplete, so it was not kept.'],
+  [/would not export|cannot open the record/iu, 'Your record could not be read out for the copy.'],
+  [/overloaded|too busy|timed? ?out/iu, 'Your record was too busy to be copied at the time.'],
+  [/\bkey\b|seal|encrypt/iu, 'The key that locks your copies could not be used.'],
+];
+
+/** Why a night failed, in a person's words: a known reason, or the plain line for one this host does not name. */
+export function nightReason(error: string | undefined): string {
+  if (error === undefined || error.trim() === '') return 'We were told when it failed, and fixing it is ours.';
+  return NIGHT_REASONS.find(([at]) => at.test(error))?.[1] ?? 'Something went wrong while it was being saved.';
+}
+
+/**
+ * The failed night Backups says, or `null` with none open: the fault's sentence, then its reason and how long it has
+ * been failing ("It has failed 3 times, first 2 days ago, last today."), every word of it plain.
+ */
+export function nightFailed(faults: readonly Fault[] | null | undefined, now: number): NightFailed | null {
+  const f = (faults ?? []).find(isNightFault);
+  if (f === undefined) return null;
+  const last = dayAgo(f.last, now);
+  const first = dayAgo(f.since, now);
+  const times =
+    f.count > 1 && first !== null && last !== null && first !== last
+      ? ` It has failed ${f.count} times, first ${first}, last ${last}.`
+      : last !== null
+        ? ` It failed ${last}.`
+        : '';
+  return { said: firstSentence(f.said), why: `${nightReason(f.error)}${times}` };
+}
+
+/**
  * A model by its own name: `@cf/vendor/glm-5.3-flash` reads `glm-5.3-flash`. The provider's path in front of it is an
  * address, which a person never reads; the last part is the name the provider gives it.
  */

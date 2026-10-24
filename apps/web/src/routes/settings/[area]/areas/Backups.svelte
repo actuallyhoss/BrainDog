@@ -24,7 +24,7 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { nightParts, nightsLine, nightsOf, nightsSaid, nightWords, tileWords } from '../../billing.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
-  import { aboutCopies } from '../health.ts';
+  import { aboutCopies, nightFailed, type Fault } from '../health.ts';
   import { createClient } from '@braindog/client';
   import StateRow from './StateRow.svelte';
 
@@ -157,6 +157,25 @@
     untrack(() => void readMissed());
   });
 
+  /**
+   * A NIGHT THAT FAILED, AS THE RECORD KEEPS IT NOW: a fault, never a question (`kernel/src/copies.ts`), so the read above
+   * finds none for a night that failed since. Only the owner reads faults (`faults` refuses anyone else), so nobody else
+   * is asked. Said with its reason in plain words (`nightFailed` in `health.ts`); a read that fails says nothing.
+   */
+  let nightFaults = $state.raw<Fault[] | null>(null);
+  const failedNight = $derived(nightFailed(nightFaults, Date.now()));
+  $effect(() => {
+    if (!anOwner) return;
+    untrack(() => void readNightFaults());
+  });
+
+  async function readNightFaults() {
+    const out = await createClient({ base: apiBase() })
+      .call<{ faults: Fault[] }>('faults')
+      .catch(() => null);
+    if (out?.ok && Array.isArray(out.value?.faults)) nightFaults = out.value.faults;
+  }
+
   async function readMissed() {
     const out = await createClient({ base: apiBase() })
       .governance({ status: 'open' })
@@ -268,7 +287,10 @@
 
 <!-- THE NIGHT THAT DID NOT RUN, FIRST IN WHAT IS KEPT, in the warn well: the same sentence the index leads with. -->
 {#snippet missedRow()}
-  {#if missed}
+  {#if failedNight}
+    <!-- A NIGHT THAT FAILED, AND WHY (`nightFailed`): the fault's sentence and its reason in plain words. -->
+    <div role="status" data-night-failed><StateRow icon="alert" tone="warn" title={failedNight.said} line={failedNight.why} action={missed ? answerButton : undefined} /></div>
+  {:else if missed}
     <div role="status"><StateRow icon="alert" tone="warn" title={missed.said} line={words.missedLine} action={answerButton} /></div>
   {/if}
 {/snippet}
