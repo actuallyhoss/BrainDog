@@ -2370,14 +2370,19 @@ export type PageRow = Entry & {
 /** The keys a block answers one to a row, which go with the rows a section does not send. */
 const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'whens', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files', 'helpers'] as const;
 
-/** A text cut at `ROW_TEXT_MOST` code points, or `null` when it is no longer than that. */
+/** The mark a cut text ends in, so a reader sees there is more (E23). One code point, counted in the cut. */
+export const CUT_MARK = '…';
+
+/** A text cut at `ROW_TEXT_MOST` code points, its last one `CUT_MARK`, or `null` when it is no longer than that. */
 function cutText(text: string): string | null {
   /* A STRING NO LONGER THAN THE CUT IN UTF-16 UNITS IS NO LONGER IN CODE POINTS, so most texts are not walked at all. */
   if (text.length <= ROW_TEXT_MOST) return null;
   let points = 0;
   let at = 0;
+  let kept = 0;
   for (const ch of text) {
-    if (points === ROW_TEXT_MOST) return text.slice(0, at);
+    if (points === ROW_TEXT_MOST - 1) kept = at;
+    if (points === ROW_TEXT_MOST) return `${text.slice(0, kept).trimEnd()}${CUT_MARK}`;
     points += 1;
     at += ch.length;
   }

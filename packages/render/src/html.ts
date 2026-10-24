@@ -34,7 +34,7 @@ import { PATH_DONE, PATH_NEXT, pathMore, pathPlan, unvalued } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
-import { TODO_META_JOIN, todoLines, todoMeta as metaCells } from './todo.ts';
+import { TODO_META_JOIN, todoLines, todoMeta as metaCells, todoTitle } from './todo.ts';
 import { rowsCell, timelineCell, timelineDays, timelineDetails, timelineTitle } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
@@ -300,6 +300,14 @@ const boardDetail = (cells: readonly string[], opts: RenderOptions): string => {
 /* AND A TOOLTIP, because a dot is not self-explaining to somebody looking at it. A screen reader has
    been told since this shipped; a sighted reader was left with a mark and no way to ask what it means.
    `aria-label` still names it — `title` is only the hover. */
+/** A task's title: its short name, and the rest of it quiet after it when there is more (`todoTitle`, E23). */
+const todoTitleHTML = (value: string | undefined, opts: RenderOptions): string => {
+  const { text, working } = takeWorking(value ?? null);
+  const { head, rest } = todoTitle(text ?? '');
+  if (rest === '') return cell('item-title', value, opts);
+  return `<span class="item-title">${working ? workingSpan() : ''}<span class="item-words">${renderInline(inline(head, opts), opts)}<span class="item-title-rest"> ${renderInline(inline(rest, opts), opts)}</span></span></span>`;
+};
+
 const workingSpan = (): string => `<span role="img" aria-label="${WORKING_LABEL}" title="${WORKING_LABEL}">${WORKING_GLYPH}</span> `;
 
 /**
@@ -656,7 +664,7 @@ function list(b: Block, o: RenderOptions): string {
       const key = ` data-row="${escape(rowKey(r, i))}"`;
       if (b.kind === 'todo') {
         const lines = todoLines(r.cells, o.now, r.done === true);
-        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', lines.detail, o)}${todoMeta(lines.meta, o)}</li>`;
+        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${todoTitleHTML(r.cells[0], o)}${cell('item-detail', lines.detail, o)}${todoMeta(lines.meta, o)}</li>`;
       }
       if (b.kind === 'timeline') {
         /* A GROUPED TIMELINE SAYS EACH DAY ONCE, over its rows, and the rows under it leave their own date blank

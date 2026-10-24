@@ -36,7 +36,7 @@
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
-  import { TODO_META_JOIN, todoLines } from '../../src/todo.ts';
+  import { TODO_META_JOIN, todoLines, todoTitle } from '../../src/todo.ts';
   import { timelineCell, timelineDays, timelineDetails, timelineTitle } from '../../src/timeline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
@@ -205,6 +205,7 @@
       {@const state = tickState(row.done, ticks.get(i))}
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
+      {@const parts = todoTitle(title.text ?? '')}
       {@const lines = todoLines(row.cells, opts.now, row.done === true)}
       {@const meta = lines.meta}
       {@const named = text(inline(title.text ?? '', opts)) || TASK}
@@ -249,14 +250,18 @@
                does the menu's control, so a long list is still one stop and not two a task. -->
           <span class="item-title"
             ><button type="button" class="item-open" tabindex={i === at ? 0 : -1} onfocus={() => (at = i)} onclick={() => onopen?.(row)}
-              >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{text(
-                inline(title.text ?? '', opts),
-              )}</button
+              >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if parts.rest}<span
+                  class="item-words"
+                  >{text(inline(parts.head, opts))}<span class="item-title-rest">{' '}{text(inline(parts.rest, opts))}</span></span
+                >{:else}{text(inline(title.text ?? '', opts))}{/if}</button
             ></span
           >
         {:else}
           <span class="item-title"
-            >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
+            >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if parts.rest}<span
+                class="item-words"
+                ><Text nodes={inline(parts.head, opts)} {opts} /><span class="item-title-rest">{' '}<Text nodes={inline(parts.rest, opts)} {opts} /></span></span
+              >{:else}<Text nodes={inline(title.text ?? '', opts)} {opts} />{/if}</span
           >
         {/if}
         <span class="item-detail"><Text nodes={inline(lines.detail, opts)} {opts} /></span>

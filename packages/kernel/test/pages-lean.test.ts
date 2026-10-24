@@ -143,8 +143,10 @@ test('A LONG TEXT IS CUT AT 280 CHARACTERS, as list cuts it, and the row says cl
   const [cards] = page(k, 'portfolio').blocks as [PageResult['blocks'][number]];
   const row = cards.rows[0] as PageRow;
   assert.equal(row.clipped, true);
-  assert.equal([...String(row.fields.note)].length, ROW_TEXT_MOST);
-  assert.ok(noteOf('Project 01').startsWith(String(row.fields.note)), 'the cut is the start of the note');
+  assert.ok([...String(row.fields.note)].length <= ROW_TEXT_MOST);
+  /* EVERY CUT ENDS IN "…" (E23), so a reader sees there is more. */
+  assert.ok(String(row.fields.note).endsWith('…'), 'the cut is not marked');
+  assert.ok(noteOf('Project 01').startsWith(String(row.fields.note).slice(0, -1)), 'the cut is the start of the note');
 
   /* THE FIELDS A HOST ACTS ON A ROW WITH, drawn or not: the panel opens on every field, a tick's Undo puts back what the
      row held, and a row's tone is read from its state and its days. */
@@ -173,9 +175,9 @@ test('THE CUT COUNTS CHARACTERS, NOT UNITS, so an emoji is one and is never spli
   assert.deepEqual(brief.fields, k.get('things#2')!.fields);
 
   assert.equal(wide.clipped, true);
-  assert.equal(wide.fields.about, '🙂'.repeat(ROW_TEXT_MOST));
+  assert.equal(wide.fields.about, `${'🙂'.repeat(ROW_TEXT_MOST - 1)}…`);
   /* A LIST OF TEXTS IS CUT TEXT BY TEXT, and keeps every one of them. */
-  assert.deepEqual(wide.fields.repos, ['a'.repeat(ROW_TEXT_MOST), 'short']);
+  assert.deepEqual(wide.fields.repos, [`${'a'.repeat(ROW_TEXT_MOST - 1)}…`, 'short']);
   sql.close();
 });
 

@@ -127,6 +127,9 @@ const SHAPES: Record<string, string> = {
      the head of one cell, and if the two renderers read them differently one of them prints a glyph
      nobody asked for. */
   'a todo with an agent working on one of its rows': '```todo\n[ ] ●︎ Draft the September issue | due Friday\n[x] Send the quote | done\n```',
+  /* A TITLE LONG ENOUGH TO BE A NAME AND A QUIET REST (E23), with the working dot in front of it. */
+  'a todo whose title runs on past its first clause':
+    '```todo\n[ ] ●︎ Review the Encore payout batch before Friday. Check the three refunds Stripe flagged, then write back to both creators | due Friday\n```',
   /* A TODO'S THIRD AND FOURTH CELLS ARE ONE LINE, and a row with them blank draws no line at all: the
      blank row is what a page writes for every two-column todo, so the two sides disagreeing about it
      would be a difference on every task the product shows. */
