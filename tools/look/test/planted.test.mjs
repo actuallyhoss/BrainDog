@@ -31,13 +31,14 @@ test('THE WORDS IT PLANTS ARE THE KINDS THE WORDS CHECK READS', () => {
   assert.deepEqual(Object.keys(rawIn(FAULTS, { all: true })), ['placeholders', 'paths', 'dates', 'hashes', 'handles', 'refs', 'codes', 'zeros', 'ticks', 'machine', 'dashes']);
 });
 
-test('THE SIDEBAR IS PLANTED TOO: the parked project is a slug in every answer that holds it, which the words check reads', () => {
-  const list = { ok: true, value: { rows: [{ seq: 4, fields: { name: SIDE_NAME, lane: 'parked' } }, { seq: 1, fields: { name: 'Kiln' } }] } };
+test('THE SIDEBAR IS PLANTED TOO: a project in play is a slug in every answer that holds it, which the words check reads', () => {
+  const list = { ok: true, value: { rows: [{ seq: 4, fields: { name: SIDE_NAME, lane: 'building' } }, { seq: 1, fields: { name: 'Kiln' } }] } };
   const got = plant('/api/list', list).value.rows;
   assert.deepEqual(got.map((r) => r.fields.name), [SIDE_SLUG, 'Kiln']);
-  assert.equal(got[0].fields.lane, 'parked', 'only the name changes');
+  assert.equal(got[0].fields.lane, 'building', 'only the name changes');
   assert.equal(list.value.rows[0].fields.name, SIDE_NAME, 'the answer it was handed is not changed');
-  assert.deepEqual(rawIn(`Projects\n${SIDE_SLUG}\nKiln`, { all: true }).slugs.e, [SIDE_SLUG]);
+  const said = rawIn(`Projects\n${SIDE_SLUG}\nKiln`, { all: true });
+  assert.deepEqual([said.slugs?.count, said.dashes?.count], [1, 1], 'a slug and a long dash');
 });
 
 test('THE SOURCE ANSWERS AS THE SEED DOES, with the faults in what it says', async () => {

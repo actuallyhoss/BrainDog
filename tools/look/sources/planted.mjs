@@ -7,7 +7,7 @@
  *
  * WORDS: one next step, which Today, Projects and the project's page all draw, says a template slot, a handle, a run's
  * and a question's id, a path, a refusal code, a raw date, an empty amount, a code quote, two machine words, a hash and
- * a long dash. THE FRAME: the parked project Tallow is named by a slug wherever a list answer holds it, so the sidebar,
+ * a long dash. THE FRAME: the project Portage, in play, is named by a slug wherever a list answer holds it, so the sidebar,
  * which lists it on every screen, draws a slug where the screen itself may not.
  * COUNTS: `boot` says 3 questions wait where the Needs you page holds 8, and leaves one project out of the rail. The More
  * sheet listed the rail's projects, 2 where the lane bars say 3; since batch 3 it lists the projects in play from their
@@ -24,9 +24,9 @@ const DAY = 86_400_000;
 export const MARKER = 'Settle how Kiln is licensed, before the September issue announces it';
 export const FAULTS = 'Settle {{kiln.licence}} for tools#8 and SG185, see ~/Developer/kiln/NEXT.md, ROUTE_UNKNOWN since 2026-10-06, GBP 0.00 owed, 3 rows in `kiln` with a typed value, build 8b1fe59 \u2014 then ship';
 
-/** The parked project the sidebar lists on every screen, and the slug its name is turned into there and everywhere. */
-export const SIDE_NAME = 'Tallow';
-export const SIDE_SLUG = 'tallow-display-face';
+/** The project in play the sidebar lists on every screen, and the slug its name is turned into there and everywhere. */
+export const SIDE_NAME = 'Portage';
+export const SIDE_SLUG = 'Portage \u2014 the letter, portage-letter-site';
 
 /** How far the record's clock is moved on, and the page left out of the rail. */
 export const LATER_DAYS = 9;
