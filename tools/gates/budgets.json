@@ -135,8 +135,8 @@
     "todayCopyMs": 300,
     "//revisitMs": "The roadmap puts a revisit (Back to a screen the page already holds) under 100 ms, and every screen meets it: 18 to 56 ms over five full runs (Money was 93 to 160, now 30 to 36). A page drawn from what the tab kept settles when it is drawn, the read behind it lands over it. Ceiling 100.",
     "revisitMs": 100,
-    "//callsMax": "Scope 2026-10-24 A6: the most reads a cold open of each screen asks before it is quiet, on the gates' record, the higher of the two widths, measured on 2026-10-24 before the reads were cut. A ceiling: it only falls.",
-    "callsMax": { "Today": 28, "Needs you": 21, "A project": 31, "Projects": 16, "Money": 20, "Work": 15, "A list": 20, "Agents": 29, "Settings": 15 }
+    "//callsMax": "Scope 2026-10-24 A6: the most requests to the record a cold open of each screen makes before it is quiet, on the gates' record at either width. First held at the figures measured before the reads were cut (Today 28); since the reads a screen asks at once go as one `reads`, held at the most seen over three runs on a Mac under a load of about 90, plus two, because how reads fall into waves moves with a runner's speed. Today's is the scope's own line, 12. A ceiling: it only falls.",
+    "callsMax": { "Today": 12, "Needs you": 10, "A project": 17, "Projects": 10, "Money": 11, "Work": 9, "A list": 13, "Agents": 19, "Settings": 10 }
   },
   "speed": {
     "//": "`tools/look/nightly.mjs`: the live six on his record every night, read-only through the look's forwarder (scope 2026-10-24 A5). What the perf gate cannot see: the trip to his record and its own time.",

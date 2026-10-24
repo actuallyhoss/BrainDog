@@ -172,55 +172,64 @@
     "perf.callsMax.Today": {
       "kind": "ceiling",
       "lines": [
-        { "at": 28, "on": "2026-10-24", "why": "The most reads a cold open of Today asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 28, "on": "2026-10-24", "why": "The most reads a cold open of Today asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 12, "on": "2026-10-24", "why": "The reads Today asks at once go as one request (`reads`): the scope's line, 12, over the most seen in three runs under heavy load, 11.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Needs you": {
       "kind": "ceiling",
       "lines": [
-        { "at": 21, "on": "2026-10-24", "why": "The most reads a cold open of Needs you asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 21, "on": "2026-10-24", "why": "The most reads a cold open of Needs you asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 10, "on": "2026-10-24", "why": "The reads Needs you asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.A project": {
       "kind": "ceiling",
       "lines": [
-        { "at": 31, "on": "2026-10-24", "why": "The most reads a cold open of A project asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 31, "on": "2026-10-24", "why": "The most reads a cold open of A project asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 17, "on": "2026-10-24", "why": "The reads A project asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Projects": {
       "kind": "ceiling",
       "lines": [
-        { "at": 16, "on": "2026-10-24", "why": "The most reads a cold open of Projects asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 16, "on": "2026-10-24", "why": "The most reads a cold open of Projects asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 10, "on": "2026-10-24", "why": "The reads Projects asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Money": {
       "kind": "ceiling",
       "lines": [
-        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of Money asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of Money asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 11, "on": "2026-10-24", "why": "The reads Money asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Work": {
       "kind": "ceiling",
       "lines": [
-        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Work asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Work asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 9, "on": "2026-10-24", "why": "The reads Work asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.A list": {
       "kind": "ceiling",
       "lines": [
-        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of A list asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of A list asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 13, "on": "2026-10-24", "why": "The reads A list asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Agents": {
       "kind": "ceiling",
       "lines": [
-        { "at": 29, "on": "2026-10-24", "why": "The most reads a cold open of Agents asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 29, "on": "2026-10-24", "why": "The most reads a cold open of Agents asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 19, "on": "2026-10-24", "why": "The reads Agents asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "perf.callsMax.Settings": {
       "kind": "ceiling",
       "lines": [
-        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Settings asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Settings asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" },
+        { "at": 10, "on": "2026-10-24", "why": "The reads Settings asks at once go as one request (`reads`): the most seen over three runs under heavy load, plus two for how waves fall on a slower runner.", "by": "perf.mjs" }
       ]
     },
     "speed.todaySettleMs": {
