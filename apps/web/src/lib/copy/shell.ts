@@ -136,14 +136,14 @@ export const shell = {
   /* THE ERROR PAGE, ONE LINE OF WHAT HAPPENED AND ONE BUTTON FOR WHAT TO DO. No request id and no status word: a person
      cannot act on either. Support is named only on the last one, where waiting and retrying are not going to fix it. */
   errorPage: {
-    offline: { title: 'You are offline', body: 'Check your connection and this loads again.', action: 'Load it again' },
+    offline: { title: 'You are offline', body: 'Check your connection and this loads again.', action: 'Try again' },
     wait: (seconds: number) => ({
       title: 'Too many requests',
       body: `Try again in ${seconds} ${seconds === 1 ? 'second' : 'seconds'}.`,
       action: 'Try again',
     }),
-    rolling: { title: 'BrainDog is updating', body: 'It will be back in a minute. Load it again then.', action: 'Load it again' },
-    broken: { title: 'This screen did not load', body: 'Nothing was changed. Load it again.', action: 'Load it again' },
+    rolling: { title: 'BrainDog is updating', body: 'It will be back in a minute. Try again then.', action: 'Try again' },
+    broken: { title: 'This screen did not load', body: 'Nothing was changed. Try again.', action: 'Try again' },
     stuck: (address: string) => `Still not working? Write to ${address}.`,
     home: 'Go to Today',
   },
@@ -181,7 +181,7 @@ export const shell = {
   openUnfiltered: (list: string) => `Open ${list}`,
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   clearFilters: 'Clear filters',
-  tryAgain: 'Load it again',
+  tryAgain: 'Try again',
   addOne: 'Add the first one',
   /**
    * A declared value as a person reads it on a control: `saas` is SaaS, `two_yearly` is Two yearly.

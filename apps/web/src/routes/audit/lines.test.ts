@@ -406,7 +406,7 @@ test('September is Sep down the whole screen, and the dot between two parts of a
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
   assert.doesNotMatch(markup, />\s+·/u, 'an element opens on white space and a dot');
-  assert.match(markup, /<span class="note" title=\{note\}>\{' · '\}\{note\}<\/span>/u);
+  assert.match(markup, /<span class="note" title=\{note\} data-own>\{' · '\}\{note\}<\/span>/u);
   assert.match(markup, /<span class="where-inline"\s*>\{' · '\}\{thing\.list\}<\/span/u);
 });
 

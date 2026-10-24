@@ -79,6 +79,9 @@
    * sentence here that named the allowance would be wrong the day the door moves it.
    */
   const words = {
+    /** A refused read, in a person's words (U-A14): the record's own sentence waits behind Read details. */
+    refusedTitle: 'The inbox could not be read',
+    refusedBody: 'Nothing was changed. Try again in a moment.',
     /** The press that asks for a rule drafted from a sender's alike messages (today F14): no internal name in it. */
     askPattern: 'Suggest a rule',
     asking: 'Drafting a rule',
@@ -735,8 +738,8 @@
 
 <div class="page">
   {#if refused}
-    <Empty kind="error" title={refused}>
-      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    <Empty kind="error" title={words.refusedTitle} body={words.refusedBody} detail={refused}>
+      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if !answered || unrouted}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->

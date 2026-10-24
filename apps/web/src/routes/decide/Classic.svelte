@@ -859,7 +859,7 @@
     <Waiting />
   {:else if from === 'refused'}
     <Empty kind="error" title={refusal}>
-      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if open.length === 0}
     <!-- ALL CLEAR, with the last decision's age, and the other queue when something waits in it. -->

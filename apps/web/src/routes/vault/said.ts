@@ -61,7 +61,7 @@ export const words = {
    * record said instead, which for that case is "Sign in again to open the vault."
    */
   /** A three-armed result whose third arm reached a read. A conflict carries no sentence of its own. */
-  noAnswer: 'The record answered something this screen could not read. Load it again.',
+  noAnswer: 'The record answered something this screen could not read. Try again.',
 } as const;
 
 /** The one refusal code that means the record holds no such list, rather than refusing the reader. */

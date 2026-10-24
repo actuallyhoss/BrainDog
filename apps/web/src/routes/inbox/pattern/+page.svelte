@@ -283,17 +283,17 @@
 <div class="page">
   {#if loadFix !== null}
     <Empty kind="error" title={words.unreached} detail={loadFix}>
-      {#snippet actions()}<Button onclick={load}>{words.retry}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" onclick={load}>{words.retry}</Button>{/snippet}
     </Empty>
   {:else if !loaded}
     <Waiting rows={4} />
   {:else if cantOpen}
     <Empty kind="no-data-yet" title={words.cantOpen}>
-      {#snippet actions()}<Button href="/inbox">{words.toInbox}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" href="/inbox">{words.toInbox}</Button>{/snippet}
     </Empty>
   {:else if samples.length === 0 && asked.samples.length === 0 && step === 1 && pasted === 0}
     <Empty kind="no-data-yet" title={words.noSamples} body={words.noSamplesBody}>
-      {#snippet actions()}<Button href="/inbox">{words.toInbox}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" href="/inbox">{words.toInbox}</Button>{/snippet}
     </Empty>
   {:else}
     <!-- THE FOUR STEPS AS ONE SEGMENTED CONTROL on the ground: the step in hand is the white pill, and a step not yet

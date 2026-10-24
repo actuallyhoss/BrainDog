@@ -708,7 +708,7 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note}>{' · '}<span data-own>{note}</span></span>{/if}{#if thing?.list}<span class="where-inline"
+            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
                 >{' · '}{thing.list}</span
               >{/if}</span
           >
@@ -788,7 +788,7 @@
   -->
   {#if refused}
     <Empty kind="error" title={refused}>
-      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if route.data.live && !live}
     <!-- Bars while the live log is on its way, rather than a blank page under the title. -->

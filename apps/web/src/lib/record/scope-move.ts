@@ -47,7 +47,7 @@ export const words = {
   current: 'Where it applies now',
   noPlaces: 'BrainDog could not reach this record.',
   /** The press under `noPlaces`, which reads the projects again. */
-  retry: 'Retry',
+  retry: 'Try again',
   /** A project this tab could not name is still a project, and never its id. */
   someProject: 'A project',
   /** The verb on the bar over a selection, and the sheet's title. */

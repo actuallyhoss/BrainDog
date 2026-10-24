@@ -86,7 +86,7 @@ export const words = {
   needsSample: 'A suggestion carries at least one message from the inbox, so whoever answers can check it.',
   needsList: 'Pick where it files what it reads first.',
   unreached: 'BrainDog could not reach this record.',
-  retry: 'Retry',
+  retry: 'Try again',
   noSamples: 'No messages to make a rule from',
   noSamplesBody: 'Open the builder from a group of alike messages in the Inbox.',
   toInbox: 'Go to the Inbox',

@@ -682,8 +682,11 @@
   {/if}
 {:else if got.from === 'refused'}
   <div class="said">
-    <Empty kind="error" heading title={got.fix}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    <!-- A REFUSAL IN A PERSON'S WORDS (U-A14): what happened and one Try again; the record's own sentence waits behind
+         Read details. Offline says so, since the record's sentence about a read that never left is no help. -->
+    {@const said = navigator.onLine === false ? copy.errorPage.offline : copy.errorPage.broken}
+    <Empty kind="error" heading title={said.title} body={said.body} detail={got.fix}>
+      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>{/snippet}
     </Empty>
   </div>
 {:else if !live}

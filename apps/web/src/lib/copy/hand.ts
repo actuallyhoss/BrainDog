@@ -38,7 +38,7 @@ export const hand = {
   handStartAs: 'As',
   handStartAnyMachine: 'Any machine',
   handStartOwnProfile: 'The runner’s own profile',
-  handRetry: 'Retry',
+  handRetry: 'Try again',
   /* MERGE WITH, from a person's own menu: the item, the sheet's title, its search and its two empty lines. */
   mergeWith: 'Merge with another person',
   mergeSheetTitle: (name: string): string => (name ? `Merge ${name} with` : 'Merge this person with'),

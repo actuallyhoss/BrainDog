@@ -397,7 +397,7 @@
     <Waiting />
   {:else if shown === 'refused' && answer?.from === 'refused'}
     <Empty kind="error" title={answer.fix}>
-      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if shown === 'none'}
     <Empty kind="no-results" title={copy.searchNone(q)} body={copy.searchNoneNext}>

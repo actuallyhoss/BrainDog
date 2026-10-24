@@ -9,7 +9,7 @@
   "Get Started"; and the CTA is a real button or link, so it joins the tab order.
 
   THE WHOLE SCREEN'S FORM IS ONE TILE ON THE BOARD (the UI pass of 20 October, 2.A.18): 24 in (20 on a phone), at most
-  640 wide, on the page's start edge, never centred. In it, the glyph in a 40px NEUTRAL well, the title at 17/600 in
+  640 wide, centred on the page (U-A6). In it, the glyph in a 40px NEUTRAL well, the title at 17/600 in
   ink, the one line at 15/22 in `--ink-2`, and 12 under it the ONE action, which the caller passes as
   `Button weight="primary"`; a second action is quiet. Then the agent prompt in a `CodeLine` with its Copy. Inside a
   tile, a sheet or a panel the same column is drawn on that surface, because a tile never holds a tile.
@@ -223,8 +223,7 @@
     cursor: pointer;
   }
 
-  /* NOTHING IS CENTRED: centring one block in a column of start-aligned ones is worse than not marking it at all
-     (19 §6). */
+  /* A COMPACT ONE SITS AT THE START, in the column of start-aligned lines it is one of (19 §6). */
   .empty {
     display: flex;
     flex-direction: column;
@@ -234,8 +233,12 @@
     min-inline-size: 0;
   }
 
-  /* THE WHOLE SCREEN'S FORM: one tile on the board, at most 640 wide, on the page's start edge. */
+  /* THE WHOLE SCREEN'S FORM: one tile at most 640 wide, CENTRED, its words and its one action centred in it (U-A6): a
+     refusal or an empty screen is the only thing on the page, so it sits where the eye lands, not at the start edge. */
   .empty:not(.compact) {
+    align-items: center;
+    margin-inline: auto;
+    text-align: center;
     max-inline-size: 640px;
     padding: var(--sp-5);
     background: var(--tile);
@@ -251,6 +254,9 @@
   /* ON A SURFACE ALREADY, the same column without a second tile: a tile never holds a tile. `:where`, so a section's
      compact line below still outranks it. */
   :global(:where(.tile, .sheet, dialog, [data-surface='tile'], .block-slot)) .empty:not(.compact) {
+    align-items: flex-start;
+    margin-inline: 0;
+    text-align: start;
     max-inline-size: 56ch;
     padding: var(--sp-2) 0;
     background: none;

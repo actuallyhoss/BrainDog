@@ -650,7 +650,7 @@
   <div class="board">
     {#if refused}
       <Empty kind="error" title={refused.fix}>
-        {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+        {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
       </Empty>
     {:else}
       {#if from}
