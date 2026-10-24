@@ -695,9 +695,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - portfolio 1.24.0 (the scope of 24 October, B27): a project's kind set offers its kind's four key numbers as drafts,
  *   one question a project (`kind-offers-kpis`, `kind_drafts`), and none to a project that holds key numbers. One rule
  *   and one script added and nothing taken away, so a minor step. 1.23.0 is master's (the stages road).
+ * - portfolio 1.25.0 (E26, the screens scope of 24 October): Numbers gets a page of its own, `page.all-numbers`, which
+ *   says `list: datapoints`, so the list's address opens on it: each kind of number once, under the project it is for,
+ *   with its newest value, unit and age, and the two that moved most this year as lines. 1.23.0 is master's and 1.24.0
+ *   another lane's, so a version of its own. One page added and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.24.0',
+  portfolio: '1.25.0',
   people: '3.6.0',
   'money-core': '3.20.0',
   estate: '2.3.0',

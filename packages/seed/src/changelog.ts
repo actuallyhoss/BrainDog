@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.25.0',
+      notes: 'Numbers has a page of its own: each kind of number once, under the project it is for, with its newest value and how old it is, and the two that moved most this year as lines. A number opens its chart from its own page.',
+    },
+    {
       version: '1.24.0',
       notes: 'Setting what kind a project is offers the key numbers that kind is usually judged by, four of them as suggestions you keep or drop, unless the project already has key numbers of its own.',
     },

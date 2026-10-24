@@ -1789,22 +1789,6 @@ const DECLARED: Record<string, Version> = {
       "`page.portfolio`'s cards in play read each card's line from the key number its project leads with, `kpi: headline` on the trend column over `project-done-by-week`, which a card whose project keeps none still draws; no id added or taken away -> 88ed9a4e174d8bd8",
     ],
   },
-  'portfolio@1.22.0': {
-    holds: `
-      metric.kpi-stale metric.kpis-held metric.project-said metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
-      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
-      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
-      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
-      metric.projects-retired metric.projects-with-agent metric.projects-with-health
-      page.all-numbers page.portfolio
-      register.datapoints register.kpis register.things
-      rule.project-past-aim
-    `,
-    declares: '907c77761e80f712',
-    history: [
-      "Portfolio 1.22.0 (E26): `page.all-numbers`, Numbers' own page (`list: datapoints`): each kind of number once under its project, with its newest value, unit and age, and the two that moved most this year as lines; one page added -> 907c77761e80f712",
-    ],
-  },
   'portfolio@1.21.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-said metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
@@ -1819,6 +1803,26 @@ const DECLARED: Record<string, Version> = {
     declares: '572c66bf9ad6163e',
     history: [
       "Portfolio 1.21.0 (batch 4's look on his record): `page.portfolio`'s In play cards draw a hundred at most where they drew twelve, so the lane bar over them counts every project in play; no id added or taken away -> 572c66bf9ad6163e",
+    ],
+  },
+  /* NUMBERS HAS A PAGE OF ITS OWN (E26). 1.23.0 is master's and 1.24.0 another lane's, so a version of its own. One page
+     added and nothing taken away. */
+  'portfolio@1.25.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.project-past-aim
+      script.kpi_backfill
+    `,
+    declares: 'b81f3e2271681c18',
+    history: [
+      "Portfolio 1.25.0 (E26): `page.all-numbers`, Numbers' own page (`list: datapoints`): each kind of number once under its project, with its newest value, unit and age, and the two that moved most this year as lines; one page added -> b81f3e2271681c18",
     ],
   },
   /* A PROJECT'S PLAN IS DRAWN, NOT LISTED (the thinking scope of 24 October, C18 and C19). 1.22.0 IS MASTER'S (the

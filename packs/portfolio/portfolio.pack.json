@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Setting what kind a project is offers the key numbers that kind is usually judged by, four of them as suggestions you keep or drop, unless the project already has key numbers of its own.",
+  "changes": "Numbers has a page of its own: each kind of number once, under the project it is for, with its newest value and how old it is, and the two that moved most this year as lines. A number opens its chart from its own page.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -298,6 +298,47 @@
           "order": [ { "field": "revenue", "dir": "desc" } ],
           "limit": 8,
           "when": { "metric": "projects-earning-said", "gt": 1 }
+        }
+      ]
+    },
+    {
+      "page": "all-numbers",
+      "title": "Numbers",
+      "icon": "observe",
+      "list": "datapoints",
+      "requires": [ "register.datapoints" ],
+      "pack": "portfolio",
+      "header": { "search": { "param": "q" } },
+      "blocks": [
+        {
+          "key": "numbers-line",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Each kind of number your projects report, once, with its newest value and how old it is."
+        },
+        {
+          "key": "numbers-by-project",
+          "kind": "lines",
+          "heading": "By project, this year",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.datapoints",
+          "columns": [ { "field": "at" }, { "field": "value" }, { "field": "name" }, { "field": "unit" }, { "field": "amount" }, { "field": "thing" } ],
+          "where": "source is not example",
+          "back": 366,
+          "bucket": "week",
+          "limit": 2,
+          "most": 40,
+          "empty": "No project has reported a number this year."
+        },
+        {
+          "key": "numbers-rows",
+          "kind": "link",
+          "heading": "Every reading",
+          "icon": "rows",
+          "span": 12,
+          "authored": [ { "cells": [ "Every reading, as a table", "/r/datapoints?rows=1", "Each number on its own row, newest first" ] } ]
         }
       ]
     },

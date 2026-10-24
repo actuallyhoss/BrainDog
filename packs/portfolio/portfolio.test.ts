@@ -201,7 +201,7 @@ function drawn(doc: File): { metric: string; when: unknown }[] {
   return out;
 }
 
-test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, two rules and two scripts that only ask', () => {
+test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them, two rules and two scripts that only ask', () => {
   const doc = file();
   assert.equal(doc.pack, 'portfolio');
   const kinds = doc.declarations.map(kindOf);
@@ -210,10 +210,10 @@ test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, 
     /* TWENTY SINCE 1.17.0 (PGS-C17): `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
        the strip's Earning with its nights. THREE LISTS AND TWENTY-TWO FIGURES SINCE 1.19.0: Numbers and the key numbers,
        with how many key numbers are kept and how long since a measure was read. FOUR LISTS AND TWENTY-FIVE SINCE 1.23.0:
-       the stages, how many a project has, and which shape its plan is drawn in. A SECOND RULE AND ITS SCRIPT SINCE 1.24.0
+       the stages, how many a project has, and which shape its plan is drawn in. TWO PAGES SINCE 1.25.0: Numbers' own. A SECOND RULE AND ITS SCRIPT SINCE 1.24.0
        (B27 of 24 October): a project's kind offers its key numbers as drafts. */
-    { register: 4, page: 1, metric: 25, rule: 2, script: 2 },
-    'four lists, one page, twenty-five figures, two rules and two scripts',
+    { register: 4, page: 2, metric: 25, rule: 2, script: 2 },
+    'four lists, two pages, twenty-five figures, two rules and two scripts',
   );
   /* ONE SCRIPT SINCE 1.22.0, the key-numbers backfill, AND A SECOND SINCE 1.24.0, the drafts by kind: each reads Projects'
      own lists, reaches nothing outside and holds no key, and files questions rather than rows. Only the rule that starts
@@ -251,9 +251,9 @@ test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, 
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.24.0');
+  assert.equal(doc.version, '1.25.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -348,14 +348,14 @@ function project(api: Api, name: string): string {
 }
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same thirty-four parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same thirty-five parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const parts = await ours();
-    assert.equal(parts.length, 34);
+    assert.equal(parts.length, 35);
     for (const id of parts) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));
@@ -421,7 +421,7 @@ test('THE EXAMPLE IS THE MODULE\'S ONE PROJECT, and it goes in on a record with 
 
 test('THE PROJECT PAGE STAYS IN THE SEED: the file draws no page per project, and says so', () => {
   const pages = file().declarations.filter((d) => typeof d.page === 'string');
-  assert.deepEqual(pages.map((d) => d.page), ['portfolio']);
+  assert.deepEqual(pages.map((d) => d.page), ['portfolio', 'all-numbers']);
   for (const d of pages) assert.ok(typeof d.title !== 'string' || !d.title.includes('{{'), 'a page drawn per project is in the file; move the README line and this test with it');
   assert.match(readFileSync(new URL('./README.md', import.meta.url), 'utf8'), /project page/u, 'the README does not say where the project page lives');
 });

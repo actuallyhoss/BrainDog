@@ -972,7 +972,8 @@ const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale', 'pro
 const beforeKpis = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
-    .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)) && d.script !== 'kpi_backfill')
+    /* AND NUMBERS' OWN PAGE (portfolio 1.25.0, E26), which reads the readings Portfolio holds only since 1.19.0. */
+    .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)) && d.script !== 'kpi_backfill' && d.page !== 'all-numbers')
     /* AND 1.24.0'S OFFER BY KIND (B27 of 24 October), the rule and its script, which read the kind going below. */
     .filter((d) => d.rule !== 'kind-offers-kpis' && d.script !== 'kind_drafts')
     .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind' && f.id !== 'drawn_as') } : d)),
