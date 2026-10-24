@@ -443,7 +443,7 @@ export function roomFor<T extends { rank: number }>(asks: readonly T[], waiting:
 /* ── what BrainDog draws unasked ───────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * WHAT IT DRAWS UNASKED (§45 "Who designs": "I drew Encore's payroll as a calendar. Keep it?"). The tiers above arrange;
+ * WHAT IT DRAWS UNASKED (§45 "Who designs": "I drew the payroll as a calendar. Keep it?"). The tiers above arrange;
  * this one draws: a visual offered for a thing that has data for one and no picture of it, filed as a draft in the
  * page's one reserved slot and kept or thrown away there. AT MOST ONE A DAY AND ONE AT A TIME (`DREW_A_DAY`), so a
  * person is asked one "Keep it?" a day at most, never a queue of them, and A NO IS TERMINAL: a key once asked is never

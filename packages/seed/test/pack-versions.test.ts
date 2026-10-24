@@ -1763,6 +1763,26 @@ const DECLARED: Record<string, Version> = {
       "Portfolio 1.21.0 (batch 4's look on his record): `page.portfolio`'s In play cards draw a hundred at most where they drew twelve, so the lane bar over them counts every project in play; no id added or taken away -> 572c66bf9ad6163e",
     ],
   },
+  /* A PROJECT'S PLAN IS DRAWN, NOT LISTED (the thinking scope of 24 October, C18 and C19). 1.22.0 IS MASTER'S (the
+     key-numbers backfill), so a version of its own. A list, a field and three figures added. */
+  'portfolio@1.23.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.project-past-aim
+      script.kpi_backfill
+    `,
+    declares: '7f2a561af892229d',
+    history: [
+      "Portfolio 1.23.0 (the thinking scope of 24 October, C18 and C19): `register.stages` added, a list of steps over the projects with its done-when line, `register.things` gains `drawn_as`, and `project-staged`, `project-plan-path` and `project-plan-roadmap` added -> 7f2a561af892229d",
+    ],
+  },
   /* THE KEY-NUMBERS BACKFILL SHIPS (the alive scope of 24 October, B26). 1.21.0 MAY BE RELEASED, so a version of its
      own. One script added and nothing taken away. */
   'portfolio@1.22.0': {

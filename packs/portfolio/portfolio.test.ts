@@ -68,8 +68,8 @@ const file = (): File => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 /** The one list Projects leans on and does not own, Work's tasks, and Projects' own one. */
 const WORK = 'tasks';
 const OWN = ['things'] as const;
-/** AND ITS OTHER TWO SINCE 1.19.0: Numbers, taken over from the founder use case, and each project's key numbers. */
-const LISTS = [...OWN, 'datapoints', 'kpis'] as const;
+/** AND ITS OTHER TWO SINCE 1.19.0: Numbers, taken over from the founder use case, and each project's key numbers; and its stages since 1.23.0. */
+const LISTS = [...OWN, 'stages', 'datapoints', 'kpis'] as const;
 const SUBSETS: readonly { name: string; holds: readonly string[] }[] = [
   { name: 'with Work', holds: [WORK] },
   { name: 'without Work', holds: [] },
@@ -201,7 +201,7 @@ function drawn(doc: File): { metric: string; when: unknown }[] {
   return out;
 }
 
-test('THE FILE IS ITS OWN: three lists, one page, twenty-two figures over them, one rule and one script that only asks', () => {
+test('THE FILE IS ITS OWN: four lists, one page, twenty-five figures over them, one rule and one script that only asks', () => {
   const doc = file();
   assert.equal(doc.pack, 'portfolio');
   const kinds = doc.declarations.map(kindOf);
@@ -209,9 +209,10 @@ test('THE FILE IS ITS OWN: three lists, one page, twenty-two figures over them, 
     Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
     /* TWENTY SINCE 1.17.0 (PGS-C17): `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
        the strip's Earning with its nights. THREE LISTS AND TWENTY-TWO FIGURES SINCE 1.19.0: Numbers and the key numbers,
-       with how many key numbers are kept and how long since a measure was read. */
-    { register: 3, page: 1, metric: 22, rule: 1 },
-    'three lists, one page, twenty-two figures and one rule',
+       with how many key numbers are kept and how long since a measure was read. FOUR LISTS AND TWENTY-FIVE SINCE 1.23.0:
+       the stages, how many a project has, and which shape its plan is drawn in. */
+    { register: 4, page: 1, metric: 25, rule: 1 },
+    'four lists, one page, twenty-five figures and one rule',
   );
   /* ONE SCRIPT SINCE 1.22.0, the key-numbers backfill: it reads Projects' own lists, reaches nothing outside and holds no
      key, and it files questions rather than rows. Nothing else in the file runs a script or reaches out. */
@@ -245,9 +246,9 @@ test('THE FILE IS ITS OWN: three lists, one page, twenty-two figures over them, 
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.22.0');
+  assert.equal(doc.version, '1.23.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -342,14 +343,14 @@ function project(api: Api, name: string): string {
 }
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-eight parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same thirty-two parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const parts = await ours();
-    assert.equal(parts.length, 28);
+    assert.equal(parts.length, 32);
     for (const id of parts) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

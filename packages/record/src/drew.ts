@@ -18,7 +18,7 @@ import type { Kernel, RegisterDecl } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 import { designCheck, shapeBlock, type ShapeList } from 'braindog-render';
 
-import { DREW_A_DAY, drewKey, drewOffer, planRows, planShapeOf, PLAN_SHAPES, type PlanFacts, type PlanShape, type Unpictured } from './design-agent.ts';
+import { DREW_A_DAY, drewKey, drewOffer, planRows, planShapeOf, PLAN_SHAPES, PLAN_STAGES_LEAST, type PlanFacts, type PlanShape, type Unpictured } from './design-agent.ts';
 
 /** A dated list is drawn by day once this many of its entries have a day. */
 export const DATED_LEAST = 5;
@@ -33,7 +33,7 @@ const BY_DAY_KINDS: ReadonlySet<string> = new Set(['calendar', 'lanes', 'timelin
 const LISTING_KINDS: ReadonlySet<string> = new Set(['table', 'cards', 'todo', 'board', 'feed']);
 
 /** The field a project row keeps its chosen plan shape in: a choice holding the plan shapes. */
-export const PLAN_FIELD = 'plan';
+export const PLAN_FIELD = 'drawn_as';
 
 const NOT_EXAMPLE = `coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%'`;
 
@@ -138,16 +138,21 @@ function planFactsOf(sql: Sql, kernel: Kernel, home: string, reads: (list: strin
 }
 
 /**
- * What a project's page draws its plan as while nobody chose: its stages where it has any, its dated work on a roadmap
- * where it has that, and nothing else (`packages/seed/src/modules/portfolio.ts` `projectTemplate`).
+ * What a project's page draws its plan as while nobody chose: its road where it has stages, its roadmap where it has
+ * dated work, BOTH where it has both, and nothing where it has neither (`packages/seed/src/modules/portfolio.ts`
+ * `projectTemplate`, whose road and roadmap each step aside only for the other kept alone).
  */
-export const planDrawnOf = (f: PlanFacts, chosen: PlanShape | null): PlanShape | null =>
-  chosen ?? (f.stages > 0 ? 'path' : f.spans + f.moments > 0 ? 'roadmap' : null);
+export const planDrawnOf = (f: PlanFacts, chosen: PlanShape | null): PlanShape | 'both' | null => {
+  if (chosen !== null) return chosen;
+  const road = f.stages > 0;
+  const dated = f.spans + f.moments > 0;
+  return road && dated ? 'both' : road ? 'path' : dated ? 'roadmap' : null;
+};
 
 /**
- * Each project whose plan reads best in another shape than the one it is drawn in, with the row patch keeping it would
- * write: its plan field set to that shape. A project list with no plan field holding the shape is offered nothing,
- * since there is nowhere for a kept shape to stay.
+ * Each project drawn two ways at once whose plan reads best in one of them, with the row patch keeping it would write:
+ * its plan field set to that shape, so the other steps aside. A project list with no plan field holding the shape is
+ * offered nothing, since there is nowhere for a kept shape to stay.
  */
 function plansOf(sql: Sql, kernel: Kernel, reads: (list: string) => boolean): Drawing[] {
   const homes = [...kernel.registers()].filter(([, r]) => r.scopes !== undefined);
@@ -170,17 +175,18 @@ function plansOf(sql: Sql, kernel: Kernel, reads: (list: string) => boolean): Dr
     const name = typeof fields[decl.title] === 'string' ? (fields[decl.title] as string).trim() : '';
     if (name === '') continue;
     const chosen = typeof fields[PLAN_FIELD] === 'string' && (PLAN_SHAPES as readonly string[]).includes(fields[PLAN_FIELD] as string) ? (fields[PLAN_FIELD] as PlanShape) : null;
-    const best = planShapeOf(f);
     const drawn = planDrawnOf(f, chosen);
-    /* A SHAPE HE CHOSE HOLDS STILL (§45: "Kept designs hold still"), and one the list cannot keep is not offered. */
-    if (best === null || chosen !== null || best === drawn || !(field.values ?? []).includes(best)) continue;
+    /* A SHAPE HE CHOSE HOLDS STILL (§45: "Kept designs hold still"), a page drawing one shape is already that shape,
+       and one the list cannot keep is not offered. Its road where its stages say the most, else its dated work. */
+    const best = f.stages >= PLAN_STAGES_LEAST ? 'path' : planShapeOf({ ...f, stages: 0 });
+    if (drawn !== 'both' || best === null || !(field.values ?? []).includes(best)) continue;
     out.push({
       kind: 'plan',
       list: home,
       seq: row.seq,
       name,
       shape: best,
-      was: drawn,
+      was: null,
       rows: planRows(f, best),
       keep: { kind: 'row', list: home, at: `${home}#${row.seq}`, version: row.version, field: PLAN_FIELD },
     });
@@ -239,7 +245,7 @@ export function drewDraft(nowMs: number, drawings: readonly Drawing[], filed: Re
       why,
       options: [
         { id: 'keep', label: 'Keep it', because: offer.why, recommended: true, patches: [{ at: keep.at, version: keep.version, patch: { [keep.field]: shape } }] },
-        { id: 'away', label: 'Throw away', because: 'Its plan stays drawn as it is.' },
+        { id: 'away', label: 'Throw away', because: 'Its plan stays drawn both ways.' },
       ],
     },
     by: 'rules',

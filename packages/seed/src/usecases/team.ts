@@ -21,7 +21,7 @@ import { counted } from './counted.ts';
 type Body = Record<string, unknown>;
 
 /** The lists a team's record holds, so the project page leaves out what reads money and services. */
-const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan', 'cycle_days'];
+const HOLDS = ['things', 'stages', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan', 'cycle_days'];
 
 /*
  * THE DOOR A NEW TEAM NEEDS, into Settings, Agents: the line to paste into Claude Code for this record, the real one
@@ -226,8 +226,13 @@ export const TEAM = {
      needs Cloud, which brain.dog does not sell and where inviting people is held (the audit of 22 October, U-C4). One
      line's words, so a patch would do; a minor step, since 2.21.0 is live on brain.dog.
      2.23.0 (things, not rows, 24 October): the project page it embeds is drawn for every project, parked and finished
-     ones too, so a parked project's row opens its page. One `for:` widened; a minor step, since 2.22.0 is released. */
-  version: '2.23.0',
+     ones too, so a parked project's row opens its page. One `for:` widened; a minor step, since 2.22.0 is released.
+
+     2.24.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October, C18 and C19): the project page it embeds draws the
+     project's stages as its road in the rail, keeps its plan as its road or its roadmap alone once a shape is kept,
+     and opens on one note of two sentences where it was two notes. A block added, nothing taken away, and 2.23.0 is
+     published, so a minor step of its own. */
+  version: '2.24.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

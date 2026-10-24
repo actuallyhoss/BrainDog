@@ -942,14 +942,15 @@ const peopleBefore6 = (b: Body): Body => (b.heading === 'Everyone' ? EVERYONE_CA
  * PROJECTS AS IT WAS BEFORE portfolio 1.19.0 (the KPI plan of 21 October, K1-A): no Numbers, which it took over from the
  * founder use case, no Key numbers, no figures over them, and no kind on a project.
  */
-const KPI_LISTS: ReadonlySet<string> = new Set(['datapoints', 'kpis']);
-const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale']);
-/* AND portfolio 1.22.0'S SCRIPT THAT OFFERS THE KEY NUMBERS (`kpi_backfill`) goes with them. */
+/* AND portfolio 1.22.0'S SCRIPT THAT OFFERS THE KEY NUMBERS (`kpi_backfill`) goes with them.
+   AND WITH PORTFOLIO 1.23.0'S STAGES, THEIR FIGURE AND THE PLAN'S KEPT SHAPE off first, newer still. */
+const KPI_LISTS: ReadonlySet<string> = new Set(['datapoints', 'kpis', 'stages']);
+const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale', 'project-staged', 'project-plan-path', 'project-plan-roadmap']);
 const beforeKpis = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
     .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)) && d.script !== 'kpi_backfill')
-    .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind') } : d)),
+    .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind' && f.id !== 'drawn_as') } : d)),
 });
 
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -1289,8 +1290,37 @@ const handedBefore = (doc: Body, id: string): Body =>
 /* AND ONE OF BILLS AND INVOICES WAS AN `item` (P25, the UI pass of 20 October), which a use case's label setting starts from. */
 const oneBefore = (doc: Body): Body => JSON.parse(JSON.stringify(doc).replaceAll('"default":"bill or invoice"', '"default":"item"')) as Body;
 
+/**
+ * THE PROJECT PAGE AS IT WAS BEFORE portfolio 1.23.0 (founder 3.2.0, team 2.24.0): no road of stages, the roadmap drawn
+ * on its dated work alone, and its two opening sentences two notes on one figure.
+ */
+const roadBefore = (doc: Body): Body =>
+  withPage(
+    {
+      ...doc,
+      declarations: (doc.declarations as Body[]).map((d) =>
+        d.page === 'project' && Array.isArray(d.requires) ? { ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.stages') } : d,
+      ),
+    },
+    'project',
+    (now) =>
+      now.flatMap((b): Body[] => {
+        if (b.kind === 'steps' && b.heading === 'The road') return [];
+        if (b.kind === 'note' && b.lead === true && Array.isArray(b.says)) {
+          const { says, ...rest } = b as Body & { says: Body[] };
+          return [
+            { ...rest, when: says[0]!.when, body: says[0]!.body },
+            { ...rest, when: { metric: 'project-in-review:{{name}}', is: 0 }, body: says[1]!.body },
+          ];
+        }
+        const all = (b.when as { all?: Body[] } | undefined)?.all;
+        if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
+        return [b];
+      }),
+  );
+
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(doc, id), id)), id), id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(roadBefore(doc), id), id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* AND UNTIL THE KPI PLAN OF 21 OCTOBER (K3-C) no project page drew its Key numbers. */

@@ -37,6 +37,7 @@ import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fillFeed } from '../../../packs/live-feed/fill.ts';
 import { fillRates } from '../../../packs/rates-poll/fill.ts';
 import { FIRST_PARTY, NOW, PAGES, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
+import { projectTemplate } from '../src/modules/portfolio.ts';
 
 type Body = Record<string, unknown>;
 type Doc = Body & { pack: string; version: string; requires?: { packs?: Record<string, string> }; declarations: Body[]; extends?: Record<string, unknown> };
@@ -208,7 +209,9 @@ const READINGS_HANDED: Doc = {
 } as never;
 
 async function furnish(rec: Rec): Promise<void> {
-  value(await rec.k.install([{ id: 'page.project', kind: 'page', body: PAGES.project as never }]), 'laying the project page');
+  /* THE PROJECT PAGE THE RECORD'S LISTS LAY: a Portfolio released before 1.23.0 keeps no stages, so its page has no road. */
+  const page = projectTemplate(picture(rec).lists.keys());
+  value(await rec.k.install([{ id: 'page.project', kind: 'page', body: page as never }]), 'laying the project page');
   await take(rec, READINGS, 'the readings list');
 }
 

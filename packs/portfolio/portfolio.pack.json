@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Projects offers each project its key numbers from what you already keep in Numbers, once a project, as a question on Decide. Nothing is added until you say yes.",
+  "changes": "A project can keep its stages, each with the line that says when it is done, and its page draws them as its road with the next one marked. A project with both can keep its plan as its stages alone or as a roadmap alone, and BrainDog offers the one it drew for it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -64,6 +64,34 @@
         { "id": "repos", "label": "Repositories", "type": "list", "of": "text" },
         { "id": "folders", "label": "Folders", "type": "list", "of": "text" },
         { "id": "domains", "label": "Domains", "type": "list", "of": "text" },
+        {
+          "id": "drawn_as",
+          "label": "Plan drawn as",
+          "type": "enum",
+          "values": [ "path", "roadmap" ],
+          "labels": { "path": "Its stages", "roadmap": "A roadmap" }
+        },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "stages",
+      "icon": "milestone",
+      "name": "Stages",
+      "one": "stage",
+      "holds": "the stages a project goes through, in order, each with the line that says when it is done",
+      "title": "name",
+      "mobile": [ "name", "thing", "done" ],
+      "pack": "portfolio",
+      "steps": { "of": "thing", "done": "done", "order": "order" },
+      "order": { "field": "order", "dir": "asc" },
+      "fields": [
+        { "id": "name", "label": "Stage", "type": "text", "required": true, "search": true },
+        { "id": "thing", "label": "Project", "type": "ref", "to": "things", "required": true, "index": true },
+        { "id": "done_when", "label": "Done when", "type": "text" },
+        { "id": "done", "label": "Done", "type": "bool", "default": false },
+        { "id": "order", "label": "Order", "type": "int" },
+        { "id": "aim", "label": "Aiming for", "type": "day" },
         { "id": "tags", "type": "list", "of": "text" }
       ]
     },
@@ -543,6 +571,39 @@
           }
         ]
       },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "project-staged",
+      "name": "Stages",
+      "source": "register.stages",
+      "where": "thing is {{it}}",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "project-plan-path",
+      "name": "Plan drawn as its road",
+      "source": "register.things",
+      "where": { "all": [ { "field": "name", "is": "{{it}}" }, { "field": "drawn_as", "is": "path" } ] },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "project-plan-roadmap",
+      "name": "Plan drawn as a roadmap",
+      "source": "register.things",
+      "where": { "all": [ { "field": "name", "is": "{{it}}" }, { "field": "drawn_as", "is": "roadmap" } ] },
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },

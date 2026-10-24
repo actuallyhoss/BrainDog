@@ -251,8 +251,28 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   type Page = { page?: string; blocks?: { kind?: string }[] };
   const project = (next.declarations as Page[]).find((d) => d.page === 'project')!;
   assert.deepEqual(project.blocks!.filter((b) => b.kind === 'kpis'), [{ kind: 'kpis', heading: 'Key numbers', icon: 'chart-line', span: 12, key: 'kpis', source: 'kpis', for: 'project' }]);
+  /* AND ITS ROAD, SINCE founder 3.2.0 (portfolio 1.23.0): the stages block, its list on the page's requires, the two
+     plan blocks' kept shape on their `when:`, and its two opening notes as one note of two sentences, each laid back here
+     as 2.6.0 drew it, so nothing else of the page moved. */
+  type Block = { kind?: string; heading?: string; says?: { when?: unknown; body: string }[]; when?: unknown; [k: string]: unknown };
+  const asBefore = (blocks: Block[]): Block[] =>
+    blocks.flatMap((b): Block[] => {
+      if (b.kind === 'kpis' || (b.kind === 'steps' && b.heading === 'The road')) return [];
+      if (b.kind === 'note' && b.lead === true && Array.isArray(b.says)) {
+        const { says, ...rest } = b;
+        return [
+          { ...rest, when: says[0]!.when, body: says[0]!.body },
+          { ...rest, when: { metric: 'project-in-review:{{name}}', is: 0 }, body: says[1]!.body },
+        ] as Block[];
+      }
+      const all = (b.when as { all?: unknown[] } | undefined)?.all;
+      if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
+      return [b];
+    });
   /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */
-  const less = (useCaseThingsUndone(next as never).declarations as Page[]).map((d) => (d.page === 'project' ? { ...d, blocks: d.blocks!.filter((b) => b.kind !== 'kpis') } : d));
+  const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[] })[]).map((d) =>
+    d.page === 'project' ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: asBefore(d.blocks as Block[]) } : d,
+  );
   assert.deepEqual(less, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
   assert.equal(next.hands['register.datapoints'], 'portfolio');
   const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;

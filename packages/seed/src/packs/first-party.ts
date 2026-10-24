@@ -680,9 +680,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `page.service`), with no `nav` and `fleeting`, so none takes an address from a steadier page. People's Everyone is
  *   faces, the owner left off (`self is not true`), and `people-count` counts the people it draws. Three pages added and
  *   two declarations changed, nothing taken away, so minor steps. 3.18.0, 3.5.0 and 2.2.0 ARE RELEASED (origin/master).
+ * - portfolio 1.23.0 (the thinking scope of 24 October, C18 and C19): a project's plan is drawn, not listed. Stages, a
+ *   list of steps over the projects, each with its done-when line, drawn on the project page as its road with the next
+ *   one marked; and a project's plan field, which keeps its plan as its road alone or its roadmap alone, the shape
+ *   kept from what BrainDog drew for it. Its two lead notes are one note with two sentences (`says:`), so the page
+ *   stays at twenty-one blocks. A list, a field and three figures added and nothing taken away, so a minor step that
+ *   reaches a record on its own. 1.22.0 is master's (the KPI backfill).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.22.0',
+  portfolio: '1.23.0',
   people: '3.6.0',
   'money-core': '3.19.0',
   estate: '2.3.0',

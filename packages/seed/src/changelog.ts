@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.23.0',
+      notes:
+        "A project can keep its stages, each with the line that says when it is done, and its page draws them as its road with the next one marked. A project with both can keep its plan as its stages alone or as a roadmap alone, and BrainDog offers the one it drew for it.",
+    },
+    {
       version: '1.22.0',
       notes: 'Projects offers each project its key numbers from what you already keep in Numbers, once a project, as a question on Decide. Nothing is added until you say yes.',
     },

@@ -18,7 +18,7 @@ import { MODULE_NAMES } from '../usecases/names.ts';
 
 /** The lists each first-party module declares, in the order its document declares them, by module id. */
 const BROUGHT: readonly { pack: string; lists: readonly string[] }[] = [
-  { pack: 'portfolio', lists: ['things', 'datapoints', 'kpis'] },
+  { pack: 'portfolio', lists: ['things', 'stages', 'datapoints', 'kpis'] },
   { pack: 'people', lists: ['people', 'organisations'] },
   { pack: 'money-core', lists: ['obligations', 'accounts', 'fx', 'categories', 'filing_rules', 'transactions', 'recurring', 'plans', 'installments', 'balances', 'snapshots', 'books'] },
   { pack: 'estate', lists: ['services'] },

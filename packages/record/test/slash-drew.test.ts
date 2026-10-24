@@ -30,7 +30,7 @@ const PROJECTS = {
     fields: [
       { id: 'name', type: 'text', required: true },
       { id: 'repos', type: 'list', of: 'text' },
-      { id: 'plan', type: 'enum', values: ['path', 'roadmap', 'timeline', 'board'] },
+      { id: 'drawn_as', type: 'enum', values: ['path', 'roadmap'] },
     ],
   } as never,
 };
@@ -53,6 +53,24 @@ const JOBS = {
   } as never,
 };
 
+/* A LIST OF STEPS POINTING AT THE PROJECTS: each project's stages. */
+const STAGES = {
+  id: 'register.stages',
+  kind: 'register' as const,
+  body: {
+    id: 'stages',
+    name: 'Stages',
+    title: 'name',
+    steps: { of: 'project', done: 'done', order: 'order' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'project', type: 'ref', to: 'projects', required: true },
+      { id: 'done', type: 'bool', default: false },
+      { id: 'order', type: 'int' },
+    ],
+  } as never,
+};
+
 const PAGE = {
   id: 'page.desk',
   kind: 'page' as const,
@@ -63,10 +81,11 @@ async function record() {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
-  value(await api.kernel.install([PROJECTS, JOBS, PAGE]));
+  value(await api.kernel.install([PROJECTS, STAGES, JOBS, PAGE]));
   value(api.kernel.create('projects', { name: 'Marsh' }, { actor: 'p_owner' }));
-  /* SIX RELEASES ON A DAY AND NO SPAN: moments, so Marsh' plan reads as a timeline, where it is drawn as a roadmap. */
+  /* SIX RELEASES ON A DAY AND THREE STAGES: Marsh is drawn both ways, its road and its roadmap, and its stages say the most. */
   for (let i = 1; i <= 6; i++) value(api.kernel.create('jobs', { what: `Release ${i}`, project: 'projects#1', due: `2026-11-0${i}` }, { actor: 'p_owner' }));
+  for (const [i, name] of ['Art', 'Island', 'Launch'].entries()) value(api.kernel.create('stages', { name, project: 'projects#1', order: i }, { actor: 'p_owner' }));
   return { api, sql, day: (n: number) => clock.set(NOW + n * DAY) };
 }
 
@@ -78,7 +97,7 @@ test('ONE DRAWING A DAY, ABOUT ITS PROJECT, IN THE SLOT WITH KEEP IT, AND KEEP W
   const first = drew((await api.slashTick()) as Ticked);
   assert.deepEqual(
     first.map((f) => f.question),
-    ["I drew Marsh's plan as a timeline. Keep it?"],
+    ["I drew Marsh's plan as a path of stages. Keep it?"],
   );
   /* THE SLOT READS IT AS A QUESTION ABOUT MARSH, with Keep it the one suggested answer. */
   const read = value<{ blocks: { queue?: { id: string; about?: string; cause?: string; options: { key: string; label: string; recommended: boolean }[] }[] }[] }>(
@@ -86,7 +105,7 @@ test('ONE DRAWING A DAY, ABOUT ITS PROJECT, IN THE SLOT WITH KEEP IT, AND KEEP W
   );
   const q = read.blocks[0]!.queue!.find((x) => x.id === first[0]!.id)!;
   assert.equal(q.about, 'projects#1');
-  assert.equal(q.cause, 'drew:plan:projects#1:timeline');
+  assert.equal(q.cause, 'drew:plan:projects#1:path');
   assert.deepEqual(
     q.options.filter((o) => o.recommended).map((o) => o.label),
     ['Keep it'],
@@ -97,7 +116,7 @@ test('ONE DRAWING A DAY, ABOUT ITS PROJECT, IN THE SLOT WITH KEEP IT, AND KEEP W
   assert.equal(drew((await api.slashTick()) as Ticked).length, 0);
   value(await api.decide({ id: first[0]!.id, decide: { option: 'keep', reason: 'yes' } }, owner));
   const marsh = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'projects' }, owner)).rows[0]!;
-  assert.equal(marsh.fields.plan, 'timeline');
+  assert.equal(marsh.fields.drawn_as, 'path');
   sql.close();
 });
 

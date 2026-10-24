@@ -102,13 +102,14 @@ test('THE KEY NUMBERS LIST IS THE CONTRACT: every field and every enum value is 
 });
 
 test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and founder 3.0.0 hands Numbers to it and lays its two links', () => {
-  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.22.0');
+  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.23.0');
   const m = firstPartyManifest('portfolio');
   assert.deepEqual(m.requires, []);
   for (const id of ['register.datapoints', 'register.kpis', 'metric.kpis-held', 'metric.kpi-stale']) assert.ok(m.provides.includes(id), id);
   const doc = useCaseDocument('founder', TODAY) as { version: string; declarations: Body[]; hands: Record<string, string>; seeds?: Body[] };
-  /* 3.1.0 SINCE 24 October (things, not rows): its project page is drawn for every project; Numbers is handed as 3.0.0 did. */
-  assert.equal(doc.version, '3.1.0');
+  /* 3.1.0 SINCE 24 October (things, not rows): its project page is drawn for every project; Numbers is handed as 3.0.0 did.
+     3.2.0 since its project page draws Portfolio 1.23.0's stages. */
+  assert.equal(doc.version, '3.2.0');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');
   assert.ok(!(doc.seeds ?? []).some((s) => s.register === 'datapoints'), 'and seeds no list it does not own');
@@ -121,7 +122,7 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
 test('ON A RECORD WITH PROJECTS ALONE, a key number is kept with its defaults, its readings land, and the two figures say so', async () => {
   const k = await empty();
   await put(k, firstPartyDocument('portfolio', { holds: [] }));
-  assert.deepEqual(held(k).sort(), ['datapoints', 'kpis', 'things']);
+  assert.deepEqual(held(k).sort(), ['datapoints', 'kpis', 'stages', 'things']);
   /* THE ORGANISATION AND THE SERVICE ARE LINKS, left out where the record holds neither. */
   assert.deepEqual(fieldsOf(k, 'datapoints').map((f) => f.id).filter((f) => f === 'organisation' || f === 'about_service'), []);
 

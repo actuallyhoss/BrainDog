@@ -204,7 +204,8 @@ test("THE LISTS A SHARED USE CASE MAY NOT DECLARE ARE THE MODULES' OWN, as their
      `MODULE_LISTS` in `@braindog/declare`, which cannot read this package. So the two are held equal here. */
   /* BUT NUMBERS, PORTFOLIO'S SINCE 1.19.0 AND NOT IN THE TABLE, as `holdings` is in none: the add-ons that read and write
      it name it, and the core spells an add-on's name only on the owner's word (`tools/gates/core-names.mjs`). */
-  const unlisted: Partial<Record<string, readonly string[]>> = { portfolio: ['datapoints'] };
+  /* AND ITS STAGES SINCE 1.23.0, for the same reason. */
+  const unlisted: Partial<Record<string, readonly string[]>> = { portfolio: ['datapoints', 'stages'] };
   for (const id of FIRST_PARTY) {
     const provided = firstPartyManifest(id).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
     assert.deepEqual([...MODULE_LISTS[id].lists].sort(), provided.filter((l) => !(unlisted[id] ?? []).includes(l)).sort(), id);

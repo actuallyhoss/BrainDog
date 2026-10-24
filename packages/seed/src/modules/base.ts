@@ -43,6 +43,8 @@ export type SeedRegister = {
   delete?: 'refuse_while_referenced';
   /** The order a read that names none comes back in (PGS-B06): one field that sorts, `desc` highest first (`declare.ts`). */
   order?: { field: string; dir: 'asc' | 'desc' };
+  /** A list whose rows are steps of another's: the link naming that row, the done flag, and the order they go in. */
+  steps?: { of: string; done: string; order?: string };
 };
 
 export type SeedField = FieldDecl & {

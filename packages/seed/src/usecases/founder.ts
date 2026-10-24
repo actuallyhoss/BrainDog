@@ -29,7 +29,7 @@ import { projectTemplate } from '../modules/portfolio.ts';
 import { counted } from './counted.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
-const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
+const HOLDS = ['things', 'stages', 'people', 'accounts', 'obligations', 'transactions', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
 
 /**
  * WHICH FIELD OF A NUMBER IS WHICH, BY PLACE: when, the value, the measure, its unit, and the project it is about. The
@@ -439,8 +439,13 @@ export const FOUNDER = {
 
      3.1.0, THINGS, NOT ROWS (24 October): the project page it embeds is drawn for every project, parked and finished ones
      too, where it was drawn for those building or earning, so a parked project's row opens its page. One declaration's
-     `for:` widened, nothing added or taken away; a minor step, since 3.0.0 is on origin/master. */
-  version: '3.1.0',
+     `for:` widened, nothing added or taken away; a minor step, since 3.0.0 is on origin/master.
+
+     3.2.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October, C18 and C19): the project page it embeds draws the
+     project's stages as its road in the rail, keeps its plan as its road or its roadmap alone once a shape is kept,
+     and opens on one note of two sentences where it was two notes. A block added, nothing taken away, and 3.1.0 is
+     published, so a minor step of its own. */
+  version: '3.2.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

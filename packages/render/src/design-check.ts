@@ -76,7 +76,7 @@ const TOKENS: ReadonlySet<string> = new Set([...DRAWN_TOKENS, 'accent', 'font'])
 const NOT_A_COLOUR: ReadonlySet<string> = new Set(['transparent', 'currentcolor', 'inherit', 'initial', 'unset', 'none', 'revert']);
 
 /** The colour names CSS knows that a draft is likeliest to reach for, which read as one colour in both themes. */
-const NAMED = /\b(?:white|black|red|green|blue|yellow|orange|purple|pink|gray|grey|silver|navy|teal|maroon|olive|lime|aqua|fuchsia|gold|brown|beige|crimson|coral|salmon|indigo|violet|tomato|wheat|ivory|khaki|lavender|plum|tan|cyan|magenta)\b/iu;
+const NAMED = /\b(?:white|black|red|green|blue|yellow|orange|purple|pink|gray|grey|silver|navy|teal|maroon|olive|lime|aqua|fuchsia|brown|beige|crimson|coral|salmon|indigo|violet|tomato|wheat|ivory|khaki|lavender|plum|tan|cyan|magenta)\b/iu;
 const LITERAL = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/iu;
 
 /** Where a colour is set: a CSS property, an SVG paint attribute, or a script setting one. */

@@ -181,9 +181,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.ok(page, 'a project has its own page');
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
-    /* THE TWO OPENING SENTENCES FIRST, which carry no heading: nothing is handed back, and nothing is open, so the second
-       draws. The figures beside them sit in the rail. */
-    undefined,
+    /* THE OPENING SENTENCE FIRST, which carries no heading: one note since portfolio 1.23.0, its second sentence said
+       while nothing is handed back. The figures beside it sit in the rail. */
     undefined,
     'Waiting on you',
     /* ITS KEY NUMBERS, SINCE founder 3.0.0 (the KPI plan of 21 October, K3-C): the whole width under the questions. */
@@ -195,6 +194,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Where it stands',
     'Where it stands',
     'Handed back or blocked',
+    /* ITS ROAD, SINCE portfolio 1.23.0: its stages in the rail, drawn only when it has any. */
+    'The road',
     /* THE TEMPLATE SINCE work 1.15.0: the plan, then one More about tile holding what changed, who worked on it, its
        notes, its money and what it runs on. What is open went in 1.10.0, the plan drawing the same tasks, and Done, by
        week in founder 2.3.0, a chart of ones and twos: what was finished this week is At a glance's last figure. A
@@ -220,8 +221,9 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
-  assert.equal(blocks[0]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
-  assert.notEqual(blocks[1]!.drawn, false, 'and nothing is open, so that one is');
+  /* ONE NOTE SINCE portfolio 1.23.0: nothing is handed back, so it says its second sentence and not the first. */
+  assert.notEqual(blocks[0]!.drawn, false, 'the opening note is drawn');
+  assert.doesNotMatch(String((blocks[0] as { body?: unknown }).body ?? ''), /handed back/u, 'nothing is handed back, so that sentence is not said');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
   /* FOUND BY HEADING, since the template's blocks move with each version and a place in the list says nothing. */
   const headed = (heading: string) => blocks.find((b) => b.heading === heading)!;

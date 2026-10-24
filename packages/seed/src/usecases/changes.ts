@@ -27,6 +27,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
+    {
+      version: '3.2.0',
+      notes: "A project page draws the project's stages as its road, each with the line that says when it is done and the next one marked. A project with both stages and dated work can keep its plan as its stages alone or as a roadmap alone.",
+    },
     { version: '3.1.0', notes: 'Every project has its page now, parked and finished ones too, and a parked one says quietly since when it has been parked.' },
     {
       version: '3.0.0',
@@ -52,6 +56,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    {
+      version: '2.24.0',
+      notes: "A project page draws the project's stages as its road, each with the line that says when it is done and the next one marked. A project with both stages and dated work can keep its plan as its stages alone or as a roadmap alone.",
+    },
     { version: '2.23.0', notes: 'Every project has its page now, parked and finished ones too, and a parked one says quietly since when it has been parked.' },
     {
       version: '2.22.0',

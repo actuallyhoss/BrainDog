@@ -193,6 +193,9 @@ export const SAMPLE_READINGS: Fields[] = [
 /** The kinds of project, since portfolio 1.19.0: what each one is, which picks the key numbers offered for it. */
 export const PROJECT_KINDS = ['business', 'client', 'product', 'content'] as const;
 
+/** The shapes a project's plan is kept in, SINCE portfolio 1.23.0: its road of stages, or its roadmap of dated work (`design-agent.ts` `PlanShape`). */
+export const PLAN_SHAPES = ['path', 'roadmap'] as const;
+
 /**
  * THE KEY NUMBERS' CONTRACT, SINCE portfolio 1.19.0 (the KPI plan of 21 October, Part 2.1): the `kpis` list's id, every
  * field it declares and every value of its enums, said once, so the kernel's ranking (`kpi-rank.ts`), the page source
@@ -331,6 +334,43 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
          read as about the project. A list of text, as an owner who added it by hand already had it, so the update lays
          the pack's field over theirs and keeps every row. */
       { id: 'domains', label: 'Domains', type: 'list', of: 'text' },
+      /* HOW ITS PLAN IS DRAWN, SINCE portfolio 1.23.0 (§45 "Each project's roadmap is designed for that project"): its
+         road of stages alone, or its roadmap of dated work alone, chosen by its owner or kept from what BrainDog drew
+         for it (`packages/record/src/drew.ts`). Empty draws each it has, as before. Optional, so every project already
+         written stays valid. */
+      {
+        id: 'drawn_as',
+        label: 'Plan drawn as',
+        type: 'enum',
+        values: PLAN_SHAPES,
+        labels: { path: 'Its stages', roadmap: 'A roadmap' },
+      },
+    ],
+  },
+  /**
+   * THE STAGES A PROJECT GOES THROUGH, SINCE portfolio 1.23.0 (§45 "A roadmap is drawn, not listed: its stages, each
+   * one's done-when line, and where it stands"). One row a stage, in order, each with the line that says when it is
+   * done. A list of steps (`steps:`), so the project page draws them as a path with the one that is next marked, and an
+   * agent's plan for a project is written here as its road.
+   */
+  stages: {
+    id: 'stages',
+    icon: 'milestone',
+    name: 'Stages',
+    one: 'stage',
+    holds: "the stages a project goes through, in order, each with the line that says when it is done",
+    title: 'name',
+    mobile: ['name', 'thing', 'done'],
+    pack: 'portfolio',
+    steps: { of: 'thing', done: 'done', order: 'order' },
+    order: { field: 'order', dir: 'asc' },
+    fields: [
+      { id: 'name', label: 'Stage', type: 'text', required: true, search: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', required: true, index: true },
+      { id: 'done_when', label: 'Done when', type: 'text' },
+      { id: 'done', label: 'Done', type: 'bool', default: false },
+      { id: 'order', label: 'Order', type: 'int' },
+      { id: 'aim', label: 'Aiming for', type: 'day' },
     ],
   },
   /**
@@ -857,6 +897,44 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* A PROJECT'S STAGES, SINCE portfolio 1.23.0: the project page draws them as its road when it has any. */
+  'project-staged': {
+    metric: 'project-staged',
+    name: 'Stages',
+    source: 'register.stages',
+    where: 'thing is {{it}}',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHICH SHAPE ITS PLAN IS KEPT IN, SINCE portfolio 1.23.0: its road alone, or its roadmap alone. Neither chosen, the
+     project page draws both where it has both. */
+  'project-plan-path': {
+    metric: 'project-plan-path',
+    name: 'Plan drawn as its road',
+    source: 'register.things',
+    where: { all: [{ field: 'name', is: '{{it}}' }, { field: 'drawn_as', is: 'path' }] },
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'project-plan-roadmap': {
+    metric: 'project-plan-roadmap',
+    name: 'Plan drawn as a roadmap',
+    source: 'register.things',
+    where: { all: [{ field: 'name', is: '{{it}}' }, { field: 'drawn_as', is: 'roadmap' }] },
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* WHAT MOVED ON A PROJECT, MONTH BY MONTH, in and out: Money's `in-by-month` and `out-by-month` narrowed to the project,
      from what moved and not from what was promised. Filed with Money by the list they read (`packs/first-party.ts`), and
      left off the project page on a record that keeps no Money (`PROJECT_LINKS`). */
@@ -1267,7 +1345,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
     layout: { rail: 4 },
-    requires: ['register.things', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
+    requires: ['register.things', 'register.stages', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
     blocks: [
       /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
          (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
@@ -1278,22 +1356,20 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          a bare title over a band of tiles. Now work handed back is the line when there is any, and otherwise the line
          is the project's own next step, the one sentence whoever works on it keeps current. A project with no next step
          written has neither: the app drops a lead clause whose hole it cannot fill (`leadOf`), so it never reads
-         an empty line. */
+         an empty line.
+
+         ONE NOTE AND TWO SENTENCES, SINCE portfolio 1.23.0 (`says:`), where it was two notes on one figure, so the page
+         keeps a block for its road under the ceiling a use case adds to. The first whose `when:` holds is said. */
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'project-in-review:{{name}}', gt: 0 },
-        body: 'Work on {{name}} has been handed back, and it waits for you to check it.',
-      },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'project-in-review:{{name}}', is: 0 },
-        /* THE NEXT STEP ALONE, SINCE portfolio 1.12.0: the page's title already names the project, and "Next on Kiln:"
-           in front of it said so twice. */
-        body: '{{next}}',
+        says: [
+          { when: { metric: 'project-in-review:{{name}}', gt: 0 }, body: 'Work on {{name}} has been handed back, and it waits for you to check it.' },
+          /* THE NEXT STEP ALONE, SINCE portfolio 1.12.0: the page's title already names the project, and "Next on Kiln:"
+             in front of it said so twice. */
+          { body: '{{next}}' },
+        ],
       },
       {
         /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT THIS PROJECT, answered where it is shown, three at a time, and the rest
@@ -1435,6 +1511,28 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       /* NO WHAT IS OPEN, SINCE portfolio 1.10.0: the plan draws every open task with a day, so the page listed the same
          tasks twice, one tile above the other. A task with no day is on Work, narrowed to the project. */
       {
+        /* ITS ROAD, SINCE portfolio 1.23.0 (§45 "A roadmap is drawn, not listed"): its stages in order, each with the
+           line that says when it is done, the done ones marked and the one that is next said, so where it stands is
+           read at a glance. Drawn only when the project has stages. IN THE RAIL, under where it stands and what waits,
+           a path read top to bottom, so the main column keeps the plan of its work and the first screen keeps its six. */
+        kind: 'steps',
+        heading: 'The road',
+        icon: 'flag',
+        span: 12,
+        area: 'rail',
+        source: 'register.stages',
+        where: 'thing is {{name}}',
+        columns: [
+          { field: 'name', label: 'Stage' },
+          { field: 'done_when', label: 'Done when' },
+        ],
+        order: [{ field: 'order', dir: 'asc' }],
+        limit: 20,
+        /* AND NOT WHILE ITS PLAN IS KEPT AS A ROADMAP ALONE, SINCE portfolio 1.23.0 (`drawn_as`). */
+        when: { all: [{ metric: 'project-staged:{{name}}', gt: 0 }, { metric: 'project-plan-roadmap:{{name}}', is: 0 }] },
+        empty: '{{name}} has no stages yet.',
+      },
+      {
         /* ITS PLAN ON A TIME AXIS, AND ITS DATES ONCE, SINCE portfolio 1.8.0: a calendar of the month above it drew the
            same tasks on the same days a second time, so it went.
 
@@ -1454,7 +1552,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 50,
-        when: { metric: 'project-dated:{{name}}', gt: 0 },
+        /* AND NOT WHILE ITS PLAN IS KEPT AS ITS ROAD ALONE, SINCE portfolio 1.23.0 (`drawn_as`). */
+        when: { all: [{ metric: 'project-dated:{{name}}', gt: 0 }, { metric: 'project-plan-path:{{name}}', is: 0 }] },
         empty: 'No task on {{name}} has a day yet.',
       },
       {
@@ -1720,8 +1819,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
  * project. So services are a link and not a dependency, the way People's "Met in" is (`first-party.ts` `LINKS`). Money
  * owed on a project is the same: a team's products have work and agents on them and no invoices in the record. So is
  * what moved on it, month by month, which Money's transactions hold.
+ *
+ * AND ITS STAGES, SINCE portfolio 1.23.0: a record that still holds an older Projects is laid the page without its
+ * road, and without the plan's kept shape on the roadmap's `when:`, until Projects updates (`planGone`).
  */
-export const PROJECT_LINKS: readonly string[] = ['services', 'obligations', 'transactions'];
+export const PROJECT_LINKS: readonly string[] = ['services', 'obligations', 'transactions', 'stages'];
+
+/** The figures a project's kept plan shape is read by, declared with the stages since portfolio 1.23.0. */
+const PLAN_FIGURES: readonly string[] = ['project-plan-path', 'project-plan-roadmap'];
 
 /**
  * What a project's stat row says from its tasks when a figure over money is left out, and how many figures the row
@@ -1752,6 +1857,15 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
   const linesGone = (series: unknown): boolean => Array.isArray(series) && series.some((line) => figureGone((line as { metric?: unknown } | null)?.metric));
   const page = PORTFOLIO_PAGES.project!;
   const blocks: Record<string, unknown>[] = [];
+  /* A RECORD WITHOUT THE STAGES HAS NONE OF THE PLAN'S SHAPE EITHER, so a `when:` leaf on it goes, and an `all:` left
+     with one leaf is that leaf, as the page drew before 1.23.0. */
+  const planGone = !held.has('stages');
+  const unshaped = (when: unknown): unknown => {
+    const all = (when as { all?: unknown[] } | null)?.all;
+    if (!planGone || !Array.isArray(all)) return when;
+    const kept = all.filter((leaf) => !PLAN_FIGURES.includes(String((leaf as { metric?: unknown } | null)?.metric ?? '').split(':')[0] ?? ''));
+    return kept.length === 1 ? kept[0] : { all: kept };
+  };
   /* A ROW OF FIGURES EVERY ONE OF WHICH READS A LIST THE RECORD DOES NOT HOLD GOES WHOLE, as a block over such a list
      does: made up from the tasks instead, it would say At a glance's figures a second time under a heading about money. */
   const cellsGone = (cells: unknown): boolean => Array.isArray(cells) && cells.length > 0 && cells.every((c) => figureGone((c as { metric?: unknown } | null)?.metric));
@@ -1786,6 +1900,7 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
     }
     if (owed !== null && owed.area === block.area && typeof block.span === 'number') block = { ...block, span: Math.min(12, block.span + owed.span) };
     owed = null;
+    if (block.when !== undefined) block = { ...block, when: unshaped(block.when) };
     const cells = block.cells as { metric: string }[] | undefined;
     if (!cells) {
       blocks.push(block);
