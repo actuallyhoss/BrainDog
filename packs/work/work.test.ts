@@ -253,13 +253,13 @@ function unplaced(pack: Pack, holds: readonly string[]): Pack {
 const SCRIPTS: Readonly<Record<string, string>> = { close_follow_ups: './close-follow-ups.js', start_with_parent: './start-with-parent.js' };
 const source = (script: string): string => readFileSync(new URL(SCRIPTS[script]!, import.meta.url), 'utf8');
 
-test('THE FILE IS WORK AND ONLY WORK: three lists, two pages, twenty-seven figures over its own lists, two rules, two scripts', () => {
+test('THE FILE IS WORK AND ONLY WORK: three lists, two pages, twenty-eight figures over its own lists, two rules, two scripts', () => {
   const doc = file();
   assert.equal(doc.pack, 'work');
   const kinds = doc.declarations.map((d) => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else');
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 3, page: 2, metric: 27, rule: 2, script: 2 },
+    { register: 3, page: 2, metric: 28, rule: 2, script: 2 },
   );
   assert.ok(!kinds.includes('ingest') && !kinds.includes('something else'), 'the file declares something that is none of the five');
   assert.deepEqual(doc.declarations.flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : [])), [...OWN]);
@@ -313,7 +313,7 @@ test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and i
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-three parts wait, each on one of the two', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-four parts wait, each on one of the two', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
@@ -323,9 +323,10 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-three p
     { at: '"Tasks", "Project"', holds: [PROJECTS] },
     { at: '"Work", "thing"', holds: [PROJECTS] },
     /* EVERY TASK SAYS ITS PROJECT UNDER IT, SINCE the UI pass of 20 October (proj F10), and the column waits for Projects. */
-    { at: '"Work", "Late and this week", "thing"', holds: [PROJECTS] },
-    { at: '"Work", "With an agent", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Late", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Waiting on you", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "This week", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "With an agent", "thing"', holds: [PROJECTS] },
     { at: '"Work", "No due day", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Later", "thing"', holds: [PROJECTS] },
     /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
@@ -454,7 +455,7 @@ const TASK = { what: 'Proof the spring catalogue', state: 'open', by: '2026-03-1
 const THREAD = { name: 'Spring catalogue', state: 'open' };
 
 for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-six parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-seven parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, moduleDoc(holds, [])));
@@ -462,7 +463,7 @@ for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
     const mine = stored(filed.api);
     const theirs = stored(built.api);
     const work = (await read(file())).declarations.map((d) => d.id);
-    assert.equal(work.length, 36);
+    assert.equal(work.length, 37);
     for (const id of work) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));
@@ -637,10 +638,10 @@ test('WORK ASKS ITS OWN QUESTIONS: a queue of the questions about tasks, three d
   for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:tasks\}\} question\(s\) for you/u);
 });
 
-/* FOUR SINCE the UI pass of 20 October (proj F10): the questions, then one row of three lists, Late and this week, With an
-   agent and Waiting on you; At a glance went, its Open the head's count. */
-test('FOUR TILES BEFORE THE FOLD AT 1440, the questions over one row of three lists', () => {
-  assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late and this week', 'With an agent', 'Waiting on you']);
+/* FIVE SINCE the screens scope of 24 October (E24): the questions, then four bands in his order, Late, Waiting on you,
+   This week and With an agent, two to a row. */
+test('FIVE TILES BEFORE THE FOLD AT 1440, the questions over four bands in his order', () => {
+  assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late', 'Waiting on you', 'This week', 'With an agent']);
 });
 
 test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT TASKS: nothing at nought, two at two, and not the one about a person', async () => {

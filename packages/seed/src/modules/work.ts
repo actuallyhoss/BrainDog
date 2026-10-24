@@ -374,6 +374,19 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
     snapshot: { grain: 'day', into: 'series.open-tasks' },
   },
+  /* EVERY TASK NOT FINISHED, kept for later included: what Work's head counts, so it equals the chips under it, which
+     count every row not in a done state (E24). */
+  'tasks-in-play': {
+    metric: 'tasks-in-play',
+    name: 'Open',
+    source: 'register.tasks',
+    where: LIVE,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   'tasks-later': {
     metric: 'tasks-later',
     name: 'Kept for later',
@@ -847,8 +860,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        Projects goes without, so the page's keys keep one order whether the strip is there or not. */
     /* NO SEARCH BOX, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line
        with no field round it, and the frame's own search is one press away on every screen. */
+    /* THE HEAD COUNTS WHAT THE CHIPS COUNT, SINCE the screens scope of 24 October (E24): every task not finished, the
+       folded Later among them, so Open equals the project chips added up. It read Open 39 beside Encore 46. */
     header: {
-      count: { metric: 'open-tasks' },
+      count: { metric: 'tasks-in-play' },
       action: { verb: 'row.create', label: 'Add' },
     },
     filters: [{ field: 'thing', control: 'chips' }],
@@ -932,32 +947,63 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'questions-open-in:tasks', gt: 0 },
       },
       {
-        /* LATE AND THIS WEEK, ONE THIRD OF THE ROW, SINCE the UI pass of 20 October (proj F10): what is late first, then
-           what falls due by the day, beside what agents hold and what waits on you. Late was a strip the whole width for
-           one task, and At a glance spread three bare numbers across the page, the first of them the head's count.
-           A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ; its second line is when it is due,
-           then its project. */
+        /* FOUR BANDS IN HIS ORDER, SINCE the screens scope of 24 October (E24): Late, Waiting on you, This week, With an
+           agent, half the row each, so a phone reads them in that order. Late and this week was one list, and the late
+           task sat among the week's. Each is a `todo`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ; its second line
+           is when it is due, then its project. */
         kind: 'todo',
-        heading: 'Late and this week',
+        heading: 'Late',
         icon: 'calendar-days',
-        span: 4,
+        span: 6,
         source: 'register.tasks',
-        where: `${YOURS}, by before +8d`,
+        where: `${YOURS}, by before today`,
         columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
         order: [
           { field: 'by', dir: 'asc' },
           { field: 'priority', dir: 'asc' },
         ],
-        limit: 12,
-        when: { any: [{ metric: 'tasks-late-yours', gt: 0 }, { metric: 'tasks-this-week-yours', gt: 0 }] },
+        limit: 8,
+        when: { metric: 'tasks-late-yours', gt: 0 },
+      },
+      {
+        /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and its
+           project. `todo` is `cells: 4, optional: 2` in `braindog-render`'s `kinds.ts`, and both renderers draw the third
+           and fourth cells as one quiet line joined by a dot (`src/todo.ts`, held by `test/waiting-due.test.ts`). SECOND,
+           after Late (E24). */
+        kind: 'todo',
+        heading: 'Waiting on you',
+        icon: 'hourglass',
+        span: 6,
+        source: 'register.tasks',
+        where: WAITING,
+        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'thing' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        when: { metric: 'tasks-waiting', gt: 0 },
+      },
+      {
+        /* YOURS FROM TODAY TO A WEEK OUT, what `tasks-this-week-yours` counts. */
+        kind: 'todo',
+        heading: 'This week',
+        icon: 'calendar-days',
+        span: 6,
+        source: 'register.tasks',
+        where: `${YOURS}, by after yesterday, by before +8d`,
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
+        order: [
+          { field: 'by', dir: 'asc' },
+          { field: 'priority', dir: 'asc' },
+        ],
+        limit: 8,
+        when: { metric: 'tasks-this-week-yours', gt: 0 },
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
-           waits on you, beside it. A THIRD OF THE ROW SINCE work 1.15.0. */
+           waits on you. LAST OF THE FOUR (E24). */
         kind: 'todo',
         heading: 'With an agent',
         icon: 'session',
-        span: 4,
+        span: 6,
         source: 'register.tasks',
         where: `${IN_HAND}, agent is set`,
         /* THE AGENT FIRST, THEN WHEN AND WHICH PROJECT, so every task on the page says its project. */
@@ -966,24 +1012,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         limit: 8,
         working: true,
         when: { metric: 'tasks-with-agents', gt: 0 },
-      },
-      {
-        /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and who
-           changed it last. `todo` is `cells: 4, optional: 2` in `braindog-render`'s `kinds.ts`, and both renderers draw
-           the third and fourth cells as one quiet line joined by a dot (`src/todo.ts`, held by
-           `test/waiting-due.test.ts`). `changed` is not a field of tasks; the kernel reads it from each row's history.
-           A THIRD OF THE ROW SINCE work 1.15.0. */
-        kind: 'todo',
-        heading: 'Waiting on you',
-        icon: 'hourglass',
-        span: 4,
-        source: 'register.tasks',
-        where: WAITING,
-        /* THE REASON IT WAITS, THEN WHEN AND WHICH PROJECT (the UI pass of 20 October, proj F10). */
-        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'thing' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        when: { metric: 'tasks-waiting', gt: 0 },
       },
       {
         /* WHAT IS FURTHER OFF, FOLDED SHUT: yours after this week, yours with no day, and what is kept for later. A

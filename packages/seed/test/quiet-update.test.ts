@@ -263,8 +263,9 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   /* AND THE PAGES ARE THIS BUILD'S: Money's side column, and This week drawn on the new figure. */
   const page = value<{ layout?: unknown; blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('money'));
   assert.deepEqual(page.layout, { rail: 4 });
-  const work = value<{ blocks: { heading?: string; when?: { any?: { metric?: string }[] } }[] }>(k.page('work'));
-  assert.deepEqual(work.blocks.find((b) => b.heading === 'Late and this week')?.when?.any?.map((w) => w.metric), ['tasks-late-yours', 'tasks-this-week-yours']);
+  const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
+  /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October (E24). */
+  assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
   const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Lasts');
   assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
@@ -619,10 +620,14 @@ const BEFORE_UI_PASS = JSON.parse(readFileSync(new URL('./fixtures/before-ui-pas
   work: { page: Body; updatesHealth: Body };
 };
 
-/** A document with the UI pass of 20 October taken off its pages, as the morning's build declared them. */
+/**
+ * A document with the UI pass of 20 October taken off its pages, as the morning's build declared them. AND THE SCREENS
+ * SCOPE OF 24 OCTOBER WITH IT (E24), in the same unreleased 1.19.0: the page is the morning's whole, and the figure its
+ * head counts now, `tasks-in-play`, goes.
+ */
 const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
   ...doc,
-  declarations: (doc.declarations as Body[]).map((d) => {
+  declarations: (doc.declarations as Body[]).filter((d) => !(id === 'work' && d.metric === 'tasks-in-play')).map((d) => {
     /* ITS PLACE ON THE RAIL AS THE DOCUMENT SAYS IT, which an older step may have taken off. */
     if (id === 'portfolio' && d.page === 'portfolio') return { ...BEFORE_UI_PASS.portfolio.page, nav: d.nav };
     if (id === 'work' && d.page === 'work') {
