@@ -1618,10 +1618,32 @@
 
   /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
 
-  /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, each as it lands. */
-  .body[data-board][data-enter] :global(.home-page > .page > *),
+  /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, the first six one after another `--d-stagger`
+     apart, so the last is still by 450ms (`motion.ts` `ARRIVAL`, scope E39). A tile past the sixth is simply there. */
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)),
   .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
     animation: tile-in var(--d-page) var(--ease-out) both;
+    animation-delay: calc(var(--arrive, 0) * var(--d-stagger));
+  }
+
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(2)) {
+    --arrive: 1;
+  }
+
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(3)) {
+    --arrive: 2;
+  }
+
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(4)) {
+    --arrive: 3;
+  }
+
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(5)) {
+    --arrive: 4;
+  }
+
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(6)) {
+    --arrive: 5;
   }
 
   @keyframes -global-tile-in {
@@ -1632,7 +1654,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .body[data-board][data-enter] :global(.home-page > .page > *),
+    .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)),
     .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
       animation: none;
     }

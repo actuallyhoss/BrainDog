@@ -34,6 +34,16 @@ export function swapInPlace(): void {
   void tick().then(() => void (swapping = false));
 }
 
+/**
+ * A PLACE'S FIRST DRAW ARRIVES IN ORDER (fluid F6, scope E39): its first tiles rise one after another, `gap` apart
+ * (`--d-stagger`), `most` of them, each over a page's `--d-page`, so the last is still by `by`. The rest are simply
+ * there. Never on a way back, and never under reduced motion. Home's sheet writes the same numbers as `nth-child` delays.
+ */
+export const ARRIVAL = { gap: 40, most: 6, page: 200, by: 450 } as const;
+
+/** When the tile at `index` starts to rise, in milliseconds, or `null` for one past the first `most`, which is simply there. */
+export const arrivalDelay = (index: number): number | null => (index >= 0 && index < ARRIVAL.most ? index * ARRIVAL.gap : null);
+
 /** The fade that stands in for every move under reduced motion. */
 export const FADE = 120;
 

@@ -389,6 +389,9 @@
     --d-state: var(--d-exit);
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
     --d-panel-out: var(--d-rows);
+    /* TILES ARRIVING ON A PLACE'S FIRST DRAW, one after another (scope E39): this far apart, six at most, so the last is
+       still by 450ms (five gaps and a page's 200). */
+    --d-stagger: 40ms;
 
     /* The two named curves, then the three kept for one job each. Platform conventions, not anyone's identity. */
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
