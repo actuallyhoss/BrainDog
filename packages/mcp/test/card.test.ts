@@ -141,7 +141,8 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const waiting = slots.get('Waiting') ?? '';
   /* WHAT COSTS MOST TO LEAVE WAITING LEADS (AGT-C08, `govern.ts` `order: 'wait'`), not the newest: by Decide's own rank
      the seed's change to Kiln and Portage is said before the four questions this run asked a moment ago. */
-  assert.match(waiting, /^\d+ on [^,]+, first: Update Kiln’s note and move Portage to earning\?$/u);
+  /* THIS PROJECT'S COUNT IS SAID BESIDE ALL OF THEM when fewer wait here (scope D9). */
+  assert.match(waiting, /^\d+ (?:here of \d+ )?on [^,]+, first: Update Kiln’s note and move Portage to earning\?$/u);
   /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
      `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */
   /* AND THE PLAN'S CARD LEADS WITH A LESSON THAT HELD (`lessonsHeld`, plan §3.2 row 8): a method before a fact. */

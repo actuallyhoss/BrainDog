@@ -375,7 +375,7 @@ test('A LONG STEP AND THREE QUESTIONS STILL MAKE A BRIEF OF FIVE SHORT LINES, on
   const next = lines.find((line) => /^Next\s/u.test(line));
   assert.ok(next && next.length <= 100 && next.endsWith('Check before acting.') && next.includes('Go to the box by the door'), told.hook);
   const waiting = lines.find((line) => /^Waiting\s/u.test(line));
-  assert.match(waiting ?? '', /^Waiting\s+\d+ on .+, first: /u, told.hook);
+  assert.match(waiting ?? '', /^Waiting\s+\d+ (?:here of \d+ )?on .+, first: /u, told.hook);
   /* AN AGENT'S CARD IS THE PLAN'S: five lines at most, and no More line, since this is what context says. */
   assert.ok(lines.length <= PLAN_CARD_LINES, told.hook);
   assert.ok(!told.hook.includes('call context for the full picture'), told.hook);
