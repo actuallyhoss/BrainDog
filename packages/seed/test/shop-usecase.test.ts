@@ -95,7 +95,10 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   const { k, sql } = await made(['shop'], false);
   const blocks = value<{ blocks: Drawn[] }>(k.page('orders')).blocks;
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  const shown = blocks.filter((b) => b.drawn !== false && b.heading !== undefined);
+  /* ONE BOX TO ADD THE FIRST ORDER, SINCE 1.4.0 (audit C, X7): the page said "Nothing here yet" and nothing to press. */
+  const adds = blocks.filter((b) => b.kind === 'capture' && b.drawn !== false);
+  assert.deepEqual(adds.map((b) => b.heading), ['Add an order']);
+  const shown = blocks.filter((b) => b.drawn !== false && b.heading !== undefined && b.kind !== 'capture');
   assert.deepEqual(shown.map((b) => b.heading), [], 'a tile was drawn over nothing');
   assert.deepEqual(blocks.flatMap((b) => b.rows ?? []), []);
   /* THE PAGE'S ONE LINE SAYS NOTHING: every clause's figure is nought, and a clause at nought is left out. */
@@ -106,7 +109,7 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   value(k.create('orders', { what: '3 vanilla jars', how_many: 3, due: dayOf(Date.parse(`${TODAY}T00:00:00Z`) + 2 * 86_400_000), total: { amount: 135_000, currency: 'EGP' } }, { actor: 'p_owner' }));
   const after = value<{ blocks: Drawn[] }>(k.page('orders')).blocks;
   for (const b of after) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  const drawn = after.filter((b) => b.drawn !== false && b.heading !== undefined);
+  const drawn = after.filter((b) => b.drawn !== false && b.heading !== undefined && b.kind !== 'capture');
   assert.deepEqual(drawn.map((b) => b.heading), ['Due this week', 'Still to come in']);
   /* THE TILE IS HEADED AS TODAY'S MONEY TILE OPENS IT (audit 69 finding 4): `OWED_TO_YOU` in
      `apps/web/src/lib/home/default-home.ts` is the same words, held equal by hand since the seed cannot read the web. */

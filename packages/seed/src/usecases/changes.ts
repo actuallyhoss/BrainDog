@@ -101,6 +101,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   guide: [{ version: '1.6.1', notes: NAMED('Steps') }],
   shop: [
+    { version: '1.4.0', notes: 'The Orders page opens on a box to add an order, so a new shop has something to press on its first tab.' },
     { version: '1.3.0', notes: 'Orders sits second in the menu, after Work and before Projects, Money and People.' },
     {
       version: '1.2.0',

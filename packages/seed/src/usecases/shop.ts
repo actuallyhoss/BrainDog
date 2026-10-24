@@ -53,8 +53,11 @@ export const SHOP = {
      headed Still to come in, the words Today's money tile opens it with, where it said Owed to you. Commit 63423720,
      the deployed build, holds 1.0.0, so no version is cut for it.
      1.3.0: the Orders page says its place on the rail, second after Work (places-and-computed-101, SHL-A18). 1.2.0 IS IN
-     THE CATALOGUE (published by batch 99), so this is a version of its own. */
-  version: '1.3.0',
+     THE CATALOGUE (published by batch 99), so this is a version of its own.
+     1.4.0: the Orders page opens on a box to add an order (audit C of 25 October, X7), where a new shop's first tab said
+     "Nothing here yet" over nothing to press. A block added to a page that is already there, so a minor step. 1.3.0 is
+     master's. */
+  version: '1.4.0',
   title: 'Shop',
   summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
   author: 'BrainDog',
@@ -167,6 +170,15 @@ export const SHOP = {
             lead: true,
             span: 12,
             body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all',
+          },
+          {
+            /* ONE BOX TO ADD AN ORDER, SINCE 1.4.0 (audit C of 25 October, X7): a new shop's first tab said "Nothing here
+               yet" with no way to write an order down. Under the line, as Work's box is under its own. */
+            kind: 'capture',
+            heading: 'Add an order',
+            icon: 'plus',
+            span: 12,
+            register: 'orders',
           },
           {
             /* WHAT IS PAST ITS DAY AND NOT SENT, the longest late first, drawn only while something is. */

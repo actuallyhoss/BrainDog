@@ -2019,6 +2019,19 @@ const DECLARED: Record<string, Version> = {
       '`page.orders` says its place on the rail, `nav.place` 20, second after Work (places-and-computed-101, SHL-A18; batch 101) -> 3ebf3b51d97bdce0',
     ],
   },
+  /* A BOX TO ADD AN ORDER (audit C of 25 October, X7). 1.3.0 IS MASTER'S, so a version of its own. */
+  'shop@1.4.0': {
+    holds: `
+      metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
+      page.orders register.orders register.products setting.label_orders
+      setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: 'db1dc8be3e901825',
+    history: [
+      '`page.orders` opens on a capture box for `register.orders` under its line, "Add an order", where a new shop drew nothing to press (audit C of 25 October, X7) -> db1dc8be3e901825',
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

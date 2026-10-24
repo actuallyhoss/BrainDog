@@ -455,7 +455,8 @@
   /**
    * A PLACE WITH NOTHING IN IT YET SAYS SO IN ONE SENTENCE, by its own first step (the audit of 22 October, U-C2): Money
    * on a new record drew its name and an Add an account box over an empty board. Only where every block the page
-   * declares draws nothing but a box to add the first entry, and never on a row's own page.
+   * declares draws nothing but a box to add the first entry, and never on a row's own page. AND THEN IT IS THE ONLY
+   * LINE (audit C, X7): the generic "One screen that gathers what you keep an eye on" stood under it on a new Orders.
    */
   const blank = $derived.by(() => {
     if (!live || about !== null || arranging || showSource) return null;
@@ -792,7 +793,7 @@
     title={live.page.page.title}
     headless={projectPage && !arranging && !showSource}
     sentence={projectPage ? '' : (blank ?? undefined)}
-    define={headlined ? undefined : 'page'}
+    define={headlined || blank !== null ? undefined : 'page'}
     below={headBelow && !tiled ? declaredBelow : undefined}
     {tiled}
   >
