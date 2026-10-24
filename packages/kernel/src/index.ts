@@ -286,7 +286,7 @@ import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
-import { beatRun, presentRuns, pulseRun, revivedAt, seatRun, workingRuns } from './presence.ts';
+import { RESUMED_MS, beatRun, presentRuns, pulseRun, revivedAt, seatRun, workingRuns } from './presence.ts';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */
 import {
   INSTRUCTIONS,
@@ -5539,11 +5539,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         writing(SESSION, found.id, { state: 'active' }, { actor, cascade: false, stamp: { last_seen: now }, ...batch }).ok;
       /* THE HEARTBEAT IS NOT A WRITE: no version, no `updated_at`, no event (`41 §13` #6). As a
          write, every agent write would turn the next edit of its run's row into a conflict. */
+      /* SILENT AN HOUR AND WRITING AGAIN IS COMING BACK TOO (`RESUMED_MS`), as `beatRun` reads it for a call. */
+      const was = sql.one<{ at: string | null }>("SELECT json_extract(fields, '$.last_seen') AS at FROM entry WHERE id = ?", found.id)?.at;
+      const heard = typeof was === 'string' ? Date.parse(was) : Number.NaN;
+      const resumed = Number.isFinite(heard) && heard <= Date.parse(now) - RESUMED_MS;
       if (!back) sql.exec("UPDATE entry SET fields = json_set(fields, '$.last_seen', ?) WHERE id = ?", now, found.id);
       /* AND THE RUN'S WORK COUNTED, in place for the same reason: one more write, and the stretch it began when this is
          the first since the run opened or came back. A run the data steps have not reached has no `wrote` yet, and is
          counted from the log when they do (`runsDataSteps`). */
-      worked(found.id, now, back);
+      worked(found.id, now, back || resumed);
       /* A RE-ATTACHED RUN IS PLACED AGAIN, in place like the heartbeat and for the same reason: a
          run that came back in another folder is in that folder's project, and the record noting
          where it found the run is not an edit anybody made. */

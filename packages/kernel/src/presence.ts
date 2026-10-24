@@ -129,17 +129,30 @@ export const BEAT_MS = 60_000;
  * `last_seen` under `BEAT_MS` old stays, so a beat on every tool call is one statement a minute.
  */
 export function beatRun(sql: Sql, id: string, nowMs: number): boolean {
+  const now = new Date(nowMs).toISOString();
+  /* BACK AFTER AN HOUR'S SILENCE IS A NEW STRETCH (`RESUMED_MS`): `stretch_at` moves with the clock, so how long a
+     session open for two days has been at it is counted from when it came back, not from when it opened. */
   const moved = sql.one<{ id: string }>(
-    `UPDATE entry SET fields = json_set(fields, '$.last_seen', ?)
+    `UPDATE entry SET fields = CASE WHEN json_extract(fields, '$.last_seen') <= ?
+         THEN json_set(fields, '$.last_seen', ?, '$.stretch_at', ?) ELSE json_set(fields, '$.last_seen', ?) END
      WHERE id = ? AND register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle')
        AND json_extract(fields, '$.last_seen') IS NOT NULL AND json_extract(fields, '$.last_seen') <= ?
      RETURNING id`,
-    new Date(nowMs).toISOString(),
+    new Date(nowMs - RESUMED_MS).toISOString(),
+    now,
+    now,
+    now,
     id,
     new Date(nowMs - BEAT_MS).toISOString(),
   );
   return moved !== undefined;
 }
+
+/**
+ * A run silent this long that calls again has begun a new stretch of work (`beatRun`), as one that comes back from an
+ * end does (`REVIVED`). An hour: longer than a turn spent thinking, shorter than a night with the terminal left open.
+ */
+export const RESUMED_MS = 60 * 60_000;
 
 /** The rows of the runs register that `where` keeps, newest heard from first (as `heardAt` reads it), with their fields read. */
 function runsWhere(sql: Sql, where: string, ...params: string[]): RunRow[] {

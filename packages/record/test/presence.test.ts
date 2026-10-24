@@ -172,3 +172,21 @@ test('A RESUMED RUN COUNTS ITS TIME FROM THE RESUME: twelve hours after it stopp
   assert.equal(row.for_s, 5 * 60, `for ${String(row.for_s)} s, counted from when it first opened`);
   sql.close();
 });
+
+test('A SESSION LEFT OPEN AND SILENT FOR HOURS that calls again is at it from that call, not from when it opened', async () => {
+  const { api, sql, clock } = await record();
+  const ctx = agent('c-open');
+  const run = await opened(api, ctx);
+  value(await api.beat({}, ctx));
+  /* OPEN ALL AFTERNOON, ITS BRIDGE PULSING, AND NO CALL. */
+  clock.advance(5 * 60 * MIN);
+  value(await api.pulse({}, ctx));
+  value(await api.beat({}, ctx));
+  clock.advance(10 * MIN);
+  value(await api.pulse({}, ctx));
+  value(await api.beat({}, ctx));
+  const row = value<PresenceRow[]>(await api.presence({}, owner)).find((r) => r.run === run);
+  assert.ok(row, 'the open run is not a row');
+  assert.equal(row.for_s, 10 * 60, `for ${String(row.for_s)} s, counted from when it opened five hours ago`);
+  sql.close();
+});
