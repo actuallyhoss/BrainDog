@@ -36,7 +36,8 @@ test('A PAGE ON log HANGS ON THE TASK, ITS RECEIPT NAMES IT, AND undo TAKES IT B
 
   const drawn = await call('log', { spoken: 'Draw the payroll calendar', note: 'Payroll calendar', page: '<h1>Payroll</h1><svg viewBox="0 0 10 10"></svg>' });
   assert.ok(!drawn.error, drawn.text);
-  assert.match(drawn.text, /^Put "Payroll calendar" on "Draw the payroll calendar" in Tasks\./u);
+  /* AN AGENT'S PAGE IS A DRAFT WHETHER IT SAYS SO OR NOT (owner's call, 24 Oct): a person keeps it or throws it away. */
+  assert.match(drawn.text, /^Version 1 of "Payroll calendar" waits on "Draw the payroll calendar" in Tasks as a draft/u);
   const batch = /call undo with batch "([^"]+)"/u.exec(drawn.text)?.[1];
   assert.ok(batch, drawn.text);
   assert.equal(pages.size, 1);
