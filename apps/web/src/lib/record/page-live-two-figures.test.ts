@@ -80,6 +80,14 @@ test('a plan named with a bar is one cell, and six tracks at most are drawn', ()
   assert.equal(block.total, 7, 'the count of every plan is kept beside the six drawn');
 });
 
+/* THE AUDIT OF 25 OCTOBER, Z12 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`, Instalments): his plans
+   read in small letters, the text the import wrote on each part, where Needs you and the plan's own row start each
+   with a capital. A plan is a name, and a name starts with a capital; a name typed with one keeps every letter as typed. */
+test('A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL, as its own row and Needs you name it', () => {
+  const block = tile([{ key: 'harbourview', value: 1 }], [{ key: 'harbourview', value: 39 }, { key: 'larch', value: 14 }, { key: 'iPad', value: 3 }]);
+  assert.deepEqual(tracks(block).map((t) => t[0]), ['Harbourview', 'Larch', 'iPad']);
+});
+
 test('a paid count for a plan the second figure does not hold draws no track', () => {
   const block = tile([{ key: 'Gone', value: 1 }], [{ key: 'Flat', value: 6 }]);
   assert.deepEqual(tracks(block), [['Flat', '0', '6']]);
@@ -132,7 +140,7 @@ test('a seventh plan still being paid is drawn, and a paid one is what is left o
   const block = tile([...paid, { key: 'Flat', value: 2 }], total);
   const drawn = tracks(block);
   assert.deepEqual(drawn[0], ['Flat', '2', '3'], 'the one plan with a part left leads');
-  assert.deepEqual(drawn.map((t) => t[0]), ['Flat', 'a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(drawn.map((t) => t[0]), ['Flat', 'A', 'B', 'C', 'D', 'E']);
   assert.equal(block.shown, 6);
   assert.equal(block.total, 8);
   assert.equal(block.total - block.shown, 2, 'two plans are said as left out');

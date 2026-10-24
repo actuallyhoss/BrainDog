@@ -1556,7 +1556,11 @@ export function blockOf(
     const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
     /* WHAT EACH TRACK SAYS UNDER ITS BAR, from the three figures after the two counts when the tile reads them. */
     const next = nextPart(readings.slice(2), now);
-    const plans = second!.map((g) => ({ key: String(g.key), name: labelled(g) ?? String(g.key), paid: done.get(String(g.key)) ?? 0, parts: typeof g.value === 'number' ? g.value : 0 }));
+    /* A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL (the audit of 25 October, Z12): an import wrote each
+       plan's name in small letters on its parts, and the tile said it so while Needs you and the plan's own row started
+       it with a capital. A name typed with a capital anywhere is kept as typed, "iPad" among them. */
+    const named = (key: string): string => (/\p{Lu}/u.test(key) ? key : key.charAt(0).toUpperCase() + key.slice(1));
+    const plans = second!.map((g) => ({ key: String(g.key), name: labelled(g) ?? named(String(g.key)), paid: done.get(String(g.key)) ?? 0, parts: typeof g.value === 'number' ? g.value : 0 }));
     const open = (p: (typeof plans)[number]): boolean => p.paid < p.parts;
     const tracks = [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => {
       const said = open(p) ? next(p.key) : '';
