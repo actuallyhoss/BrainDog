@@ -73,7 +73,18 @@ export type More = {
   signsAt?: string | null;
   /** Where the copies are, so a line about a copy links there and says so; absent, it links where the signs are. */
   backupsAt?: string | null;
+  /**
+   * Where what came in waits, for a reader who may open it: a line about messages waiting to be filed opens them
+   * (audit 25 October, Y6), rather than the signs page saying the same line again. Absent, it links where the signs are.
+   */
+  inboxAt?: string | null;
 };
+
+/** The word of the link at the line's end when what needs a look is messages waiting: they open where they wait. */
+export const OPEN_THEM = 'Open them';
+
+/** The sign that counts messages waiting to be filed. */
+const ARRIVALS = 'arrivals-filed';
 
 /** Whether last night's copy is in: `null` when there is nothing to judge by. */
 export type CopyState = 'in' | 'missing' | null;
@@ -173,9 +184,17 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   const fault = leadFault(more.faults);
   if (fault) return [{ text: firstSentence(fault.said), needs: true }];
   if ((redSigns(more.signs) ?? 0) > 0) {
-    const raw = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '')?.said;
+    const lead = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '');
+    const raw = lead?.said;
     const named = raw === undefined ? 'One check needs a look' : plainSign(raw).replace(/[.!?]$/u, '');
-    const link = aboutCopies(named) && more.backupsAt ? { text: BACKUPS, href: more.backupsAt } : more.signsAt ? { text: LOOK, href: more.signsAt } : null;
+    const link =
+      lead?.sign === ARRIVALS && more.inboxAt
+        ? { text: OPEN_THEM, href: more.inboxAt }
+        : aboutCopies(named) && more.backupsAt
+          ? { text: BACKUPS, href: more.backupsAt }
+          : more.signsAt
+            ? { text: LOOK, href: more.signsAt }
+            : null;
     return [{ text: `${named}.`, needs: true }, ...(link ? [{ text: ' ' }, link] : [])];
   }
   if (copy === 'missing') return [{ text: 'No copy last night.', needs: true }, ...(more.backupsAt ? [{ text: ' ' }, { text: BACKUPS, href: more.backupsAt }] : [])];

@@ -332,7 +332,7 @@
    */
   const signsAt = $derived(shell.pages.includes('health') ? '/p/health' : area === undefined ? null : '/settings');
 
-  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups' }) : null);
+  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups', inboxAt: owns ? '/inbox' : null }) : null);
 
   /**
    * TRY AGAIN AND DETAILS, under the sentence while a fault is open (AGT-C06). Try again queues the job behind the fault
