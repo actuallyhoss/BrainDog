@@ -233,6 +233,22 @@ function ruleName(sql: Sql, bare: string): string {
   return typeof body?.name === 'string' && body.name.trim() !== '' ? body.name.trim() : plain(bare);
 }
 
+/**
+ * A name read once a reading for each id it is asked, as `ruleName` or `scriptName` reads it: a month of runs of one
+ * automation asked its declaration once a run, three hundred queries for one name.
+ */
+function namedOnce(read: (bare: string) => string): (bare: string) => string {
+  const said = new Map<string, string>();
+  return (bare) => {
+    let name = said.get(bare);
+    if (name === undefined) {
+      name = read(bare);
+      said.set(bare, name);
+    }
+    return name;
+  };
+}
+
 /** Every live automation that is switched on: its bare id, its name, and when its first version went in. */
 function switchedOn(sql: Sql): { bare: string; name: string; since: string }[] {
   return sql
@@ -264,13 +280,14 @@ function readFailed(sql: Sql, nowMs: number): SignReading {
   if (runs.length === 0) return reading('none', null, `No automation has run in ${FLOW_WINDOW_DAYS} days.`);
   const failed = runs.filter((r) => r.state === 'failed');
   const facts = [`${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days, ${failed.length} failed.`];
+  const nameOf = namedOnce((bare) => ruleName(sql, bare));
   if (failed.length <= AUTOMATIONS_FAILED_MOST) {
     const before = sql
       .all<{ rule: string }>("SELECT rule FROM automation_run WHERE state = 'failed' AND started_at >= ? AND coalesce(finished_at, started_at) < ? ORDER BY rowid", monthFrom(nowMs), since)
-      .map((r) => ruleName(sql, r.rule));
+      .map((r) => nameOf(r.rule));
     return reading('green', 0, `None of ${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days failed.${earlier(before, 'failed')}`, facts);
   }
-  const who = tally(failed.map((r) => ruleName(sql, r.rule)));
+  const who = tally(failed.map((r) => nameOf(r.rule)));
   facts.push(...who.map(([name, n]) => `${name} failed ${n === 1 ? 'once' : `${n} times`}.`));
   return reading('red', failed.length, `${count(failed.length, 'automation run')} failed in ${FLOW_WINDOW_DAYS} days: ${names(who.map(([name]) => name))}.`, facts);
 }
@@ -293,8 +310,9 @@ function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
   const facts = [`${count(waiting.length, 'run waits', 'runs wait')} on a person, ${parked.length} past ${waiting.length === 1 ? 'its' : 'their'} wait.`];
   if (parked.length <= AUTOMATIONS_PARKED_MOST)
     return reading('green', 0, waiting.length === 0 ? 'No run waits on a person.' : 'Every run that waits on a person is inside its wait.', facts);
-  facts.push(...parked.map((p) => `${ruleName(sql, p.rule)} asked on ${daySaid(p.at, tz)} and was never woken.`));
-  return reading('red', parked.length, `${count(parked.length, 'run is', 'runs are')} still waiting on a person after ${parked.length === 1 ? 'its' : 'their'} wait ended: ${names(tally(parked.map((p) => ruleName(sql, p.rule))).map(([n]) => n))}.`, facts);
+  const nameOf = namedOnce((bare) => ruleName(sql, bare));
+  facts.push(...parked.map((p) => `${nameOf(p.rule)} asked on ${daySaid(p.at, tz)} and was never woken.`));
+  return reading('red', parked.length, `${count(parked.length, 'run is', 'runs are')} still waiting on a person after ${parked.length === 1 ? 'its' : 'their'} wait ended: ${names(tally(parked.map((p) => nameOf(p.rule))).map(([n]) => n))}.`, facts);
 }
 
 function readIdle(sql: Sql, nowMs: number): SignReading {
@@ -333,7 +351,8 @@ function readStopped(sql: Sql, nowMs: number, tz: string): SignReading {
   const stopped = runs.filter((r) => Number(r.stopped) === 1);
   const facts = [`${count(runs.length, 'script run')} in ${FLOW_WINDOW_DAYS} days, ${stopped.length} stopped a chain.`];
   if (stopped.length <= CHAINS_STOPPED_MOST) return reading('green', 0, `No chain of rules and scripts hit its depth limit in ${FLOW_WINDOW_DAYS} days.`, facts);
-  const who = stopped.map((r) => ({ name: scriptName(sql, r.target.slice('declaration:script.'.length)), ts: r.ts }));
+  const nameOf = namedOnce((bare) => scriptName(sql, bare));
+  const who = stopped.map((r) => ({ name: nameOf(r.target.slice('declaration:script.'.length)), ts: r.ts }));
   facts.push(...who.map((w) => `${w.name} stopped a chain on ${daySaid(w.ts, tz)}; nothing past that point ran.`));
   return reading('red', stopped.length, `${count(stopped.length, 'chain')} of rules and scripts hit ${stopped.length === 1 ? 'its' : 'their'} depth limit in ${FLOW_WINDOW_DAYS} days, at ${names(tally(who.map((w) => w.name)).map(([n]) => n))}.`, facts);
 }
