@@ -12,9 +12,9 @@
   A TILE ON THE BOARD: flat, no border, no shadow. The drawing is a small board inside it, its blocks
   drawn as the board's own colour, so it reads as a picture of a page and not as a tile inside a tile.
 
-  THE COMPACT FORM IS ONE QUIET LINE THAT OPENS ON TAP (`compact`, look fault G). On a page somebody opened to read
+  THE COMPACT FORM IS A QUIET LINE OR TWO THAT OPENS ON TAP (`compact`, look fault G). On a page somebody opened to read
   their own things, the whole card over the first tile outranked the page: a first screen on a phone, a third of one on
-  a laptop. So there it is Slash's mark, the sentence on one line and a chevron, and a press opens the card whole, with
+  a laptop. So there it is Slash's mark, the sentence on a line or two and a chevron, and a press opens the card whole, with
   the same line as its way to close. Nothing is hidden for good: the sentence is the line's accessible name whole, even
   where a narrow screen cuts it.
 -->
@@ -118,7 +118,7 @@
   }
 
   /* THE FOLDED LINE: a tile one line tall, the board's own radius, body text in the quiet ink. A whole row to press,
-     44px on a finger, and never a second line: what does not fit is cut, and the press opens it whole. */
+     44px on a finger, and never a third line: what does not fit in two is cut, and the press opens it whole. */
   .offer-line {
     display: flex;
     align-items: center;
@@ -140,12 +140,16 @@
     color: var(--ink);
   }
 
+  /* TWO LINES AT MOST (the audit of 25 October, Z18): one line at 390 cut the question itself, "30 transactions this
+     week. Want a pag…". It wraps, and only past a second line is it cut. */
   .offer-line-why {
     flex: 1;
     min-inline-size: 0;
+    display: -webkit-box;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .offer-turn {

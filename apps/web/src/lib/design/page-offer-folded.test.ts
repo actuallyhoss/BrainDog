@@ -115,11 +115,13 @@ test('THE COMPACT FORM IS ONE LINE: the sentence and a way to open it, and nothi
   assert.ok(html.includes(`aria-label="${offerWords.noticed}: ${ledger.why}"`));
   for (const kept of ['offer-mini', 'offer-acts', offerWords.make, offerWords.notNow]) assert.ok(!html.includes(kept), `${kept} is drawn before the line is opened`);
 
-  /* ONE LINE AT ANY WIDTH: it does not wrap, and what does not fit is cut. */
+  /* TWO LINES AT MOST, SINCE THE AUDIT OF 25 OCTOBER (Z18, `loop/proof/looks/audit-2026-10-25/money-390-light-full.png`):
+     one line at 390 cut the question itself, "30 transactions this week. Want a pag…". It wraps, and only past two lines
+     is it cut. */
   const css = source('./OfferCard.svelte');
   const why = /\.offer-line-why \{([^}]*)\}/u.exec(css)?.[1] ?? '';
-  assert.match(why, /white-space: nowrap/u);
-  assert.match(why, /text-overflow: ellipsis/u);
+  assert.doesNotMatch(why, /white-space: nowrap/u);
+  assert.match(why, /line-clamp: 2/u);
   /* A FLAT TILE: no border, no shadow, no gradient. */
   const line = /\.offer-line \{([^}]*)\}/u.exec(css)?.[1] ?? '';
   assert.match(line, /border: 0/u);
