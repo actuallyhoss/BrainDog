@@ -8585,7 +8585,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const penHeld = new Map<string, Held<ReturnType<typeof penFor>>>();
   /* AND HOW MUCH THE RECORD HAS BEEN USED, which the pen ranks by and which moves without a write: a list opened is a count
      of the day's observation raised, not a row. One read over a table of a line a kind, a subject and a day. */
-  const usedNow = (): unknown => sql.one('SELECT count(*) AS lines, total(n) AS uses FROM observation') ?? null;
+  /* ONLY WHAT THE PEN READS: which day each list or page was read on (a new line) and how often a page was opened
+     (`page.render`'s count, `opensSince`). Every read an agent makes raises some other count, and keying on the total
+     of every count meant the pen was weighed again on every call while an agent worked (bench 24 Oct, H1: `context` and
+     `governance` each spent most of their `boot` here, on a record whose pen had not changed). */
+  const usedNow = (): unknown =>
+    sql.one("SELECT count(*) AS lines, (SELECT total(n) FROM observation WHERE kind = 'page.render') AS opens FROM observation") ?? null;
 
   /**
    * AN OFFER AS `boot` SENDS IT: a draft that is the very declaration keeping it writes (`change.to`, as both kinds of

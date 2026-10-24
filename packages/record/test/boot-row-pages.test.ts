@@ -58,3 +58,28 @@ test('A PAGE WITH A PLACE IN THE RAIL IS STILL LISTED WHOLE, a project among the
   for (const p of projects) assert.ok(b.pages.some((q) => q.slug === p.slug), `${p.slug} left boot`);
   sql.close();
 });
+
+test('THE PEN IS WEIGHED ONCE WHILE AGENTS READ, and again when a page is opened (bench 24 Oct, H1)', async () => {
+  const sql = openSqlite();
+  /* EVERY READ OF THE USE LOG BY THE DAY, which is the pen weighing it; the key the pen is held by reads it whole. */
+  let weighed = 0;
+  const counted = { ...sql, all: (text: string, ...params: never[]) => ((weighed += /FROM observation WHERE day/u.test(text) ? 1 : 0), sql.all(text, ...params)) };
+  const api = await createRecordApi({ sql: counted as never, clock: fixedClock(Date.UTC(2026, 9, 24, 9)) });
+  api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAY', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } });
+  assert.ok((await installSeed(api.kernel)).ok);
+  const boot = async () => assert.ok((await api.boot(owner as never)).ok);
+  await api.list({ register: 'tasks' }, owner);
+  await boot();
+  const first = weighed;
+  assert.ok(first > 0, 'the pen read no use at all, so this test proves nothing');
+  /* MORE READS OF A LIST ALREADY READ TODAY RAISE ITS COUNT FOR THE DAY, which the pen does not weigh. */
+  for (let i = 0; i < 3; i += 1) await api.list({ register: 'tasks' }, owner);
+  await boot();
+  assert.equal(weighed, first, 'the pen was weighed again for reads that change nothing it weighs');
+  /* A PAGE OPENED IS WHAT IT RANKS BY, so the next boot weighs it again. */
+  const slug = api.kernel.pages().find((p) => p.about === null)!.slug;
+  assert.ok((await api.page({ slug }, owner)).ok);
+  await boot();
+  assert.ok(weighed > first, 'a page opened did not move the pen');
+  sql.close();
+});
