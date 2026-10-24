@@ -119,7 +119,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
     [
       undefined, undefined, undefined, 'What needs doing?', 'Questions for you', 'Late', 'Waiting on you', 'This week', 'With an agent',
       'Not this week', 'After this week', 'No due day', 'Later', 'Needs a project', 'With no project',
-      'Done lately', 'Done recently',
+      'Not moved in three months', 'Untouched for 90 days', 'Done lately', 'Done recently',
     ],
     headings.join(', '),
   );
@@ -141,7 +141,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   );
   assert.ok(!drawn.some((b) => b.kind === 'section' && (b as { box?: boolean }).box === true), 'a boxed section would take the capture line onto its surface');
   assert.equal(Object.hasOwn((PAGES.work!.blocks as { heading?: string }[]).find((b) => b.heading === 'Late')!, 'span'), true, 'Late names no width of its own');
-  for (const folded of ['Not this week', 'Needs a project', 'Done lately'])
+  for (const folded of ['Not this week', 'Needs a project', 'Not moved in three months', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
   /* PAST ITS DATE IS LATE, AND FIRST, because it is still the next thing to do. The sample's is four days late. This
@@ -164,9 +164,10 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
 
   /* BUT WITH NO PROJECT, SINCE work 1.19.0 (AGT-D14): a table under its own fold of tasks drawn and ticked in a list
      above, there to be given a project. As a list that ticks it would draw each of them twice
-     (work-overview-twice.test.ts). */
+     (work-overview-twice.test.ts). AND UNTOUCHED FOR 90 DAYS, SINCE C32 (the old Work screen retired), for the same
+     reason: a table of tasks drawn and ticked in their band above, there to be done, dated or dropped. */
   const untickable = page.blocks
-    .filter((b) => b.kind !== 'todo' && b.heading !== 'With no project')
+    .filter((b) => b.kind !== 'todo' && b.heading !== 'With no project' && b.heading !== 'Untouched for 90 days')
     .flatMap((b) => b.rows.filter((r) => typeof r.fields.what === 'string' && !['done', 'dropped'].includes(String(r.fields.state))).map((r) => `${b.heading}: ${String(r.fields.what)}`));
   assert.deepEqual(untickable, [], 'a task in play drawn in a block with no tick');
 });
@@ -441,4 +442,29 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is what is late in L
   const yesterday = new Date(NOW - 86_400_000).toISOString().slice(0, 10);
   for (const by of [TODAY, yesterday]) assert.ok(k.create('tasks', { what: `An agent's task due ${by}`, state: 'open', agent: 'claude', by }, { actor: 'p_1' }).ok);
   check();
+});
+
+/* ── whose work, and what has not moved (C32, the old Work screen retired) ── */
+
+test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN THREE MONTHS, as the old screen did', async () => {
+  let now = NOW - 120 * 86_400_000;
+  const k = await openRecord(openSqlite(), { now: () => now });
+  const out = await installSeed(k);
+  assert.ok(out.ok, sayOf(out));
+  assert.ok(k.create('tasks', { what: 'Left since the spring', state: 'open' }, { actor: 'p_1' }).ok);
+  now = NOW;
+  const page = opened(k, 'work');
+  const whose = (page.filters ?? []).find((f) => f.field === 'whose');
+  assert.ok(whose, 'Work has no filter by whose work it is');
+  assert.deepEqual(whose.values.map((v) => v.label), ['Yours', 'Agents']);
+  assert.ok(whose.values.every((v) => v.count > 0), 'the sample holds work of both');
+  const stale = block(page, 'Untouched for 90 days');
+  assert.notEqual(stale.drawn, false);
+  assert.ok(stale.rows.some((r) => r.fields.what === 'Left since the spring'), 'the task untouched for four months is not under Untouched for 90 days');
+  assert.ok(stale.rows.every((r) => Date.parse(String(r.updated_at)) < NOW - 90 * 86_400_000), 'a task written lately is drawn as untouched');
+
+  const agents = k.page('work', { whose: 'agents' });
+  assert.ok(agents.ok, sayOf(agents));
+  for (const b of agents.value.blocks.filter((x) => x.kind === 'todo' && x.source === 'register.tasks'))
+    assert.ok(b.rows.every((r) => typeof r.fields.agent === 'string' && r.fields.agent !== ''), `${String(b.heading)} draws work no agent holds under Agents`);
 });

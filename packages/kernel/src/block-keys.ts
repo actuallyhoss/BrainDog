@@ -518,6 +518,13 @@ export const FILTER_TYPES: ReadonlySet<string> = new Set(['enum', 'ref', 'bool',
 /** The most reader filters one page declares. Past four the strip is a form. */
 export const FILTERS_MOST = 4;
 
+/**
+ * The most named choices a filter of its own declares (`options:`), and the fewest: two, since "All" is always the
+ * strip's first and one choice beside it would be a switch.
+ */
+export const FILTER_OPTIONS_MOST = 6;
+export const FILTER_OPTIONS_FEWEST = 2;
+
 /** The keys of `nav`. `tabs: true` draws every page of the section as a strip of tabs over each of them. */
 export const NAV_KEYS: ReadonlySet<string> = new Set(['section', 'order', 'place', 'icon', 'tabs']);
 

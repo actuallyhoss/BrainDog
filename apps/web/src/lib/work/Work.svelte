@@ -14,12 +14,16 @@
   THIS FILE KEEPS THE READ, as `/p/[slug]` does for any other page: the record read with the reader's filter, its
   `opened()` and `closed()` bracket, the re-read after a write, and listening for the record to move. A first open with
   nothing in the tab draws the local copy's page at once, asked behind it as `/p/work` is (`lib/data/local.ts`). The screen as it
-  was is at `/?work&classic` (`WorkClassic.svelte`) until the page has parity, and on a record with no Work page.
+  was is gone (C32, 24 October): the page narrows by whose work it is and folds what has not moved, and a record with
+  tasks and no Work page is sent to its tasks list's own page (`page.ts`).
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at as inApp } from '$lib/at.ts';
+  import { registerHref } from '$lib/record/where.ts';
+  import { TASKS } from './list.ts';
   import { keep, keptAnswer } from '$lib/data/kept.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
@@ -41,6 +45,11 @@
 
   const view = $derived(workView(route.url.searchParams, data.pages));
   const showSource = $derived(route.url.searchParams.get('src') === '1');
+
+  /* A RECORD WITH TASKS AND NO WORK PAGE OPENS ITS LIST'S OWN PAGE, in place of this address, so Back does not return here. */
+  $effect(() => {
+    if (view === 'list') void goto(inApp(registerHref(TASKS, undefined)), { replaceState: true });
+  });
 
   /* WHAT THE ADDRESS NARROWS THE PAGE TO, held as the last one read so a choice that did not change reads nothing. */
   let filter = $state.raw<Record<string, string>>(untrack(() => filterOf(route.url.searchParams)));
@@ -187,10 +196,6 @@
   onpointercancel={() => (pressing = false)}
 />
 
-{#if view === 'classic'}
-  {#await import('./WorkClassic.svelte') then loaded}
-    <loaded.default {data} />
-  {/await}
-{:else}
+{#if view === 'page'}
   <PageView slug={WORK_PAGE} got={shown} {showSource} {reread} />
 {/if}

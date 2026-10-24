@@ -1955,12 +1955,17 @@ function readerFilters(
   filter: Readonly<Record<string, string>> | undefined,
 ): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null } | null {
   const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
-  const declared = said.flatMap((f): { field: string; control: PageFilter['control'] }[] => {
-    const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown }) : {};
+  const all = said.flatMap((f): { field: string; control: PageFilter['control']; options?: Choice[] }[] => {
+    const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown; options?: unknown }) : {};
     const control = one.control === 'chips' || one.control === 'segmented' ? one.control : null;
-    return typeof one.field === 'string' && control !== null ? [{ field: one.field, control }] : [];
+    if (typeof one.field !== 'string' || control === null) return [];
+    if (one.options === undefined) return [{ field: one.field, control }];
+    const options = optionsOf(one.options);
+    return options.length > 0 ? [{ field: one.field, control, options }] : [];
   });
-  if (declared.length === 0) return null;
+  if (all.length === 0) return null;
+  /* A FILTER OF ITS OWN CHOICES IS NO FIELD'S (`options:`), and is answered beside the fields' filters below. */
+  const declared = all.filter((d) => d.options === undefined);
 
   /* A PAGE THAT DRAWS THE LOG IS FILTERED BY ITS OWN THREE QUESTIONS (PGS-C24): who wrote a line, what kind of change it
      was and which list it was on, answered from the log and never from a list's field of the same word. */
@@ -1990,14 +1995,35 @@ function readerFilters(
     if (!clauseOf(field, spec, value, pointed, spec.to)) continue;
     chosen.set(field, { value: pointed ? String(pointed.seq) : value, pointed, to: spec.to });
   }
+  /* EACH CHOICE OF ITS OWN IS ITS SENTENCE, read against each list: a list whose fields the sentence does not name is left
+     as it is, as a list without a field is under a field's filter. */
+  const own = all.filter((d): d is { field: string; control: PageFilter['control']; options: Choice[] } => d.options !== undefined);
+  const sentenceOn = (register: string, where: string): Predicate | null => {
+    const schema = schemas.get(register) ?? deps.schemaOf(register);
+    if (!schema) return null;
+    const got = predicateOf(where, schema, deps.ctx);
+    return got.bad.length === 0 && got.predicate !== undefined ? got.predicate : null;
+  };
+  const picks = new Map<string, Choice>();
+  for (const { field, options } of own) {
+    const said = filter && Object.hasOwn(filter, field) ? filter[field]?.trim() : undefined;
+    const pick = said === undefined ? undefined : options.find((c) => c.value === said);
+    if (pick) picks.set(field, pick);
+  }
   const clausesOn = (register: string, except?: string): Predicate[] => {
     const schema = schemas.get(register) ?? deps.schemaOf(register);
-    return [...chosen].flatMap(([field, c]) => {
+    const fields = [...chosen].flatMap(([field, c]) => {
       if (field === except) return [];
       const spec = filterable(schema ?? null, field);
       const clause = spec ? clauseOf(field, spec, c.value, c.pointed, c.to) : null;
       return clause ? [clause] : [];
     });
+    const sentences = [...picks].flatMap(([field, c]) => {
+      if (field === except) return [];
+      const clause = sentenceOn(register, c.where);
+      return clause ? [clause] : [];
+    });
+    return [...fields, ...sentences];
   };
   const clauses = new Map(lists.map((r) => [r, clausesOn(r)] as const));
 
@@ -2069,7 +2095,43 @@ function readerFilters(
     }
     return { field, label, control, chosen: pick, values: shown, reads };
   });
-  return { answer, clauses, log: logged?.keep ?? null };
+  /* A FILTER OF ITS OWN CHOICES, in the page's order among the rest: each choice with how many open rows its sentence
+     keeps on the lists it reads, under the other choices, as a field's values are counted. A choice is offered at
+     nought too, since the strip is the page's own words and not what the rows happen to hold. */
+  const answers = all.map((d): PageFilter => {
+    if (d.options === undefined) return answer.find((a) => a.field === d.field)!;
+    const reads: string[] = [];
+    const counts = d.options.map(() => 0);
+    for (const r of lists) {
+      const s = schemas.get(r);
+      if (!s) continue;
+      const sentences = d.options.map((c) => sentenceOn(r, c.where));
+      if (sentences.every((p) => p === null)) continue;
+      reads.push(r);
+      const base = [...openOn(deps, r, s), ...clausesOn(r, d.field)];
+      sentences.forEach((p, i) => {
+        if (p === null) return;
+        const parts = [...base, p];
+        const where: Predicate = parts.length === 1 ? parts[0]! : { all: parts };
+        for (const [, n] of tallied(deps, r, s.state ?? 'id', where)) counts[i] = counts[i]! + n;
+      });
+    }
+    const values = d.options.map((c, i) => ({ value: c.value, label: c.label, count: counts[i]! }));
+    return { field: d.field, label: wordsOf(d.field), control: d.control, chosen: picks.get(d.field)?.value ?? null, values, reads };
+  });
+  return { answer: answers, clauses, log: logged?.keep ?? null };
+}
+
+/** A filter's own choice: the word an address keeps, the name a person reads, and the sentence of the rows it keeps. */
+type Choice = { value: string; label: string; where: string };
+
+/** A filter's `options:` as the declaration checked them (`filterOptionsFault`), each one that is whole. */
+function optionsOf(raw: unknown): Choice[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((c): Choice[] => {
+    const one = c !== null && typeof c === 'object' && !Array.isArray(c) ? (c as { value?: unknown; label?: unknown; where?: unknown }) : {};
+    return typeof one.value === 'string' && typeof one.label === 'string' && typeof one.where === 'string' ? [{ value: one.value, label: one.label, where: one.where }] : [];
+  });
 }
 
 /* ── the sources the record reads (PGS-A11) ──────────────────────────────── */

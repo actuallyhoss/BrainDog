@@ -57,7 +57,7 @@ test("KILN'S HERO COUNTS AS MANY LATE AS WORK DOES FOR KILN", () => {
   assert.ok(kiln.length > 0, 'Kiln has work');
   /* The hero reads the open rows on the reader's day of the record's clock (`ProjectShape.svelte`). */
   const hero = openWorkOf(kiln, via, localDay(now), false)?.late ?? 0;
-  /* Work bands every row on the record's day (`WorkClassic.svelte`), and its Late is the overdue band. */
+  /* Work's day rules band every row on the record's day (`work/board.ts`), and its Late is the overdue band. */
   const shape = shapeOf(tasks);
   const work = kiln.filter((r) => bandOf(r.fields, shape, dayOf(now)) === 'overdue').length;
   assert.ok(hero > 0, 'the seed has late work on Kiln to count');

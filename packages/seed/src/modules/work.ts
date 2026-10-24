@@ -323,6 +323,9 @@ const LIVE = 'state is not done or dropped';
 /** Work somebody has taken on: in play, and not kept for later. What Open counts. */
 const OPEN = 'state is not backlog or done or dropped';
 
+/** OPEN AND NOT WRITTEN IN THREE MONTHS: what has not moved, which the old Work screen counted after 90 days (C32). */
+const STALE = `${OPEN}, updated_at before -90d`;
+
 /**
  * What waits on a person: handed back to be checked, or stuck.
  *
@@ -866,7 +869,19 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       count: { metric: 'tasks-in-play' },
       action: { verb: 'row.create', label: 'Add' },
     },
-    filters: [{ field: 'thing', control: 'chips' }],
+    /* WHOSE WORK, SINCE work 1.19.0 (C32): Yours, Agents or All, as the old Work screen's toolbar picked, narrowing every
+       band. Yours is what no agent holds and Agents what one does, the cut every band already makes by `agent`. */
+    filters: [
+      { field: 'thing', control: 'chips' },
+      {
+        field: 'whose',
+        control: 'segmented',
+        options: [
+          { value: 'yours', label: 'Yours', where: 'agent is empty' },
+          { value: 'agents', label: 'Agents', where: 'agent is set' },
+        ],
+      },
+    ],
     blocks: [
       {
         /* THE ONE SENTENCE WHEN NOTHING IS OPEN, SINCE work 1.14.0: the counts under it say nothing then, since a clause
@@ -1073,6 +1088,29 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-no-project', gt: 0 },
       },
       { ...WITH_NO_PROJECT },
+      {
+        /* WHAT HAS NOT MOVED IN THREE MONTHS, FOLDED SHUT, SINCE work 1.19.0 (C32): open work last written more than 90
+           days ago, the longest untouched first, a tap away to be done, dated or dropped. NO FIGURE
+           GATES IT: a block with nothing in it is not drawn, and a heading over nothing goes with it (`emptyHidden`). */
+        kind: 'section',
+        heading: 'Not moved in three months',
+        icon: 'hourglass',
+        span: 12,
+        fold: true,
+      },
+      {
+        /* A TABLE AND NOT A LIST THAT TICKS, as With no project is: a task here is in its band above too, and a list a
+           person ticks down holds a task once (`work-overview-twice.test.ts`). The longest untouched first. */
+        kind: 'table',
+        heading: 'Untouched for 90 days',
+        icon: 'hourglass',
+        span: 12,
+        source: 'register.tasks',
+        where: STALE,
+        columns: [DESCRIPTION, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
+        order: [{ field: 'updated_at', dir: 'asc' }],
+        limit: 8,
+      },
       {
         /* WHAT WAS FINISHED, FOLDED SHUT, SINCE work 1.11.0: how fast work moves and what moved, a tap away. Above the
            fold the page is what is still to do. */

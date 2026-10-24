@@ -12,9 +12,10 @@
  *
  * HALF OF IT GOES WITH THE SCREEN AS IT WAS. `/?work` draws the declared Work page now (`Work.svelte`), whose bands are
  * declared and whose project filter the kernel applies, so the bands and their order (`BANDS`, `bandOf`, `bandTitle`,
- * `byDue`, `byFinished`), the project pick (`ALL`, `NONE`, `inProject`) and the search (`matches`) are read only by
- * `WorkClassic.svelte` and `work-tiles.ts`, and are deleted with them. `shapeOf`, `projectOf`, `dayIn` and the day
- * words stay: every page's row panel, row menu and capture line read them (`lib/page`).
+ * `byDue`, `byFinished`), the project pick (`ALL`, `NONE`, `inProject`) and the search (`matches`) were the old Work
+ * screen's, retired on 24 October (C32); `board.test.ts` and the one-clock test still hold them as the record's day
+ * rules. `shapeOf`, `projectOf`, `dayIn` and the day words stay: every page's row panel, row menu and capture line read
+ * them (`lib/page`).
  */
 
 import type { FieldDecl, Fields, RegisterDecl } from '../record/schema.ts';

@@ -202,10 +202,6 @@ export const HELD = {
     ids: ['work'],
     why: 'the `work` word in the query that opens the Work screen at `/?work`.',
   },
-  'apps/web/src/lib/work/work-tiles.ts': {
-    ids: ['agents'],
-    why: "the Work screen's view of the tasks agents hold (yours, agents', all), which is not the Agents pack.",
-  },
   'apps/web/src/lib/work/page.ts': {
     ids: ['work'],
     why: "the declared Work page's slug, `page.work`, which `/?work` draws.",

@@ -1162,7 +1162,7 @@
     clearTimeout(ahead);
     const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
     if (!(link instanceof HTMLAnchorElement) || link.origin !== page.url.origin || data.live !== true || data.refused || live.version === null) return;
-    if (placeOf('/', new URLSearchParams(link.search)) !== WORK || new URLSearchParams(link.search).has('classic')) return;
+    if (placeOf('/', new URLSearchParams(link.search)) !== WORK) return;
     ahead = setTimeout(() => void import('$lib/work/warm.ts').then((m) => m.warmWork(apiBase(), live.version)), wait);
   }
 </script>

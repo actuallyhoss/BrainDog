@@ -218,6 +218,43 @@ test('A CHOSEN VALUE IS ANDED ONTO EVERY BLOCK WHOSE LIST HAS THE FIELD, and the
   sql.close();
 });
 
+/* A FILTER OF ITS OWN CHOICES (C32): Work's Yours, Agents and All, which no one field of a task answers. */
+const WHOSE = { field: 'whose', control: 'segmented', options: [{ value: 'yours', label: 'Yours', where: 'hold is you' }, { value: 'agents', label: 'Agents', where: 'hold is agent' }] };
+
+test('A FILTER MAY BE ITS OWN CHOICES, each a sentence of the rows it keeps, counted on the open rows and anded where it reads', async () => {
+  const page = (filters: unknown): Declaration => ({ ...WORK, body: { ...(WORK.body as object), filters } as never });
+  assert.equal(validateDeclaration(page([WHOSE])), null);
+  const one = { ...WHOSE, options: [WHOSE.options[0]] };
+  assert.equal(validateDeclaration(page([one]))?.code, 'DECLARATION_INVALID', 'one choice beside All is a switch');
+  const twice = { ...WHOSE, options: [WHOSE.options[0], WHOSE.options[0]] };
+  assert.equal(validateDeclaration(page([twice]))?.code, 'DECLARATION_INVALID');
+  const bare = { ...WHOSE, options: [{ value: 'yours', label: 'Yours' }, WHOSE.options[1]] };
+  assert.equal(validateDeclaration(page([bare]))?.code, 'DECLARATION_INVALID', 'a choice says the rows it keeps');
+
+  const { k, sql } = await record();
+  value(await k.install([page([{ field: 'project', control: 'chips' }, WHOSE])]));
+  const all = value<{ filters?: PageFilter[]; blocks: BlockResult[] }>(k.page('work'));
+  const whose = filterOf(all, 'whose');
+  assert.equal(whose.label, 'Whose');
+  assert.equal(whose.control, 'segmented');
+  assert.equal(whose.chosen, null);
+  assert.deepEqual(whose.values, [
+    { value: 'yours', label: 'Yours', count: 2 },
+    { value: 'agents', label: 'Agents', count: 2 },
+  ]);
+  const agents = value<{ filters?: PageFilter[]; blocks: BlockResult[] }>(k.page('work', { whose: 'agents' }));
+  assert.deepEqual(titles(agents.blocks[0], 'what'), ['Order clay', 'Answer the post']);
+  assert.deepEqual(titles(agents.blocks[1], 'text'), ['Cone 6 is enough'], 'a list the sentence names nothing of is left as it is');
+  assert.equal(filterOf(agents, 'whose').chosen, 'agents');
+  /* AND UNDER THE OTHER CHOICES: Kiln's own work, yours and the agents'. */
+  const kiln = value<{ filters?: PageFilter[] }>(k.page('work', { project: '1' }));
+  assert.deepEqual(filterOf(kiln, 'whose').values.map((v) => v.count), [1, 1]);
+  const unknown = value<{ filters?: PageFilter[]; blocks: BlockResult[] }>(k.page('work', { whose: 'nobody' }));
+  assert.equal(filterOf(unknown, 'whose').chosen, null);
+  assert.equal(titles(unknown.blocks[0], 'what').length, 5);
+  sql.close();
+});
+
 test('A PAGE WITH NO FILTERS ANSWERS NONE, and a lone block read is never narrowed', async () => {
   const { k, sql } = await record();
   const plain: Declaration = { id: 'page.plain', kind: 'page', body: { page: 'plain', title: 'Plain', requires: REQUIRES, blocks: [table('tasks', 'what')] } as never };

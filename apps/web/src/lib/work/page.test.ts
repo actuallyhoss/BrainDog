@@ -5,7 +5,7 @@ import { PAGES } from '@braindog/seed';
 
 import { filterOf } from '../page/filters.ts';
 import { TASKS } from './list.ts';
-import { CLASSIC, WORK_PAGE, workView } from './page.ts';
+import { WORK_PAGE, workView } from './page.ts';
 
 const q = (s: string) => new URLSearchParams(s);
 
@@ -16,12 +16,13 @@ test('/?work draws the declared page on a record that holds it', () => {
   assert.equal(workView(q('work&src=1'), [WORK_PAGE]), 'page');
 });
 
-test('/?work&classic draws the screen as it was, and so does a record with tasks and no Work page', () => {
-  assert.equal(workView(q(`work&${CLASSIC}`), [WORK_PAGE]), 'classic');
-  assert.equal(workView(q('work'), ['money']), 'classic');
-  assert.equal(workView(q('work'), []), 'classic');
+test('/?work&classic is an address somebody kept and draws the page, and a record with tasks and no Work page opens its list', () => {
+  /* THE OLD SCREEN IS GONE (C32): nothing reads the word. */
+  assert.equal(workView(q('work&classic'), [WORK_PAGE]), 'page');
+  assert.equal(workView(q('work'), ['money']), 'list');
+  assert.equal(workView(q('work'), []), 'list');
   /* A PAGE CALLED SOMETHING LIKE IT IS NOT IT. */
-  assert.equal(workView(q('work'), ['work-board']), 'classic');
+  assert.equal(workView(q('work'), ['work-board']), 'list');
 });
 
 /* WHAT WORK HANDS THE ONE READER, read off the work module's own declaration: the keys it keeps are the page's (`n` goes
@@ -35,8 +36,19 @@ const work = PAGES[WORK_PAGE] as unknown as {
 test('the project strip narrows by the field the page declares, `thing`, which the address carries as f.thing', () => {
   /* A TASK KEEPS ITS PROJECT IN `thing` (labelled Project). There is no `project` field, and the kernel refuses a filter
      on a field no required list has, so `?f.project=` would narrow nothing. */
-  assert.deepEqual(work.filters?.map((f) => f.field), ['thing']);
+  assert.deepEqual(work.filters?.map((f) => f.field), ['thing', 'whose']);
   assert.deepEqual(filterOf(q('work&f.thing=12')), { thing: '12' });
+});
+
+test('WHOSE WORK IT IS NARROWS THE PAGE, as the old screen\'s Yours, Agents and All did (C32), carried as f.whose', () => {
+  const whose = work.filters?.find((f) => f.field === 'whose') as { control?: string; options?: { value: string; label: string }[] } | undefined;
+  assert.equal(whose?.control, 'segmented');
+  assert.deepEqual(whose?.options?.map((c) => c.label), ['Yours', 'Agents']);
+  assert.deepEqual(filterOf(q('work&f.whose=agents')), { whose: 'agents' });
+  /* AND WHAT HAS NOT MOVED IN THREE MONTHS IS FOLDED SHUT, which the old screen counted after 90 days. */
+  const at = work.blocks.findIndex((b) => b.kind === 'section' && (b as { heading?: string }).heading === 'Not moved in three months');
+  assert.ok(at > 0 && work.blocks[at]!.fold === true);
+  assert.match(String((work.blocks[at + 1] as { where?: string }).where), /updated_at before -90d/u);
 });
 
 test('the Work page opens on its line, then the capture line over the tasks', () => {

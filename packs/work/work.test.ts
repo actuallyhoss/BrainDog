@@ -204,9 +204,10 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 /* ── Where the file and the module cannot agree yet ────────────────────────────────────────────── */
 
 /**
- * The module with the two places the plan still stores more laid on as the file says them, on a record without
- * Projects: a task's and a thread's phone line still name the project, second, and Work keeps an empty list of filters
- * where its filter by project was, before its blocks. And the one place the module stores more taken out (`unplaced`).
+ * The module with the one place the plan still stores more laid on as the file says it, on a record without Projects:
+ * a task's and a thread's phone line still name the project, second. Work's filters no longer empty there (C32): its
+ * filter by whose work it is stays when the one by project waits. And the one place the module stores more taken out
+ * (`unplaced`).
  */
 function apart(pack: Pack, holds: readonly string[]): Pack {
   const body = (d: Pack['declarations'][number], next: Body): Pack['declarations'][number] => ({ ...d, body: next as never });
@@ -219,10 +220,6 @@ function apart(pack: Pack, holds: readonly string[]): Pack {
         const mobile = [...((d.body as Body).mobile as string[])];
         mobile.splice(1, 0, 'thing');
         d = body(d, { ...(d.body as Body), mobile });
-      }
-      if (d.id === 'page.work') {
-        const { blocks, ...rest } = d.body as Body;
-        d = body(d, { ...rest, filters: [], blocks });
       }
       return d;
     }),
@@ -386,10 +383,9 @@ for (const { name, holds } of SUBSETS) {
   });
 }
 
-test('TWO THINGS THE PLAN STILL STORES MORE THAN THE MODULE, word for word, only where Projects is not: the day one goes, drop it from apart', async () => {
-  /* THE PLAN KEEPS A PHONE FIELD THAT IS NOT THERE (his to rule) AND AN EMPTIED LIST OF FILTERS (AREA K's line in
-     `packages/declare/src/when.ts`). Each line below is the whole of a difference, so a new one is a red test too. */
-  const FILTERS = 'the page Work, filters: the file says [], the module says nothing';
+test('ONE THING THE PLAN STILL STORES MORE THAN THE MODULE, word for word, only where Projects is not: the day it goes, drop it from apart', async () => {
+  /* THE PLAN KEEPS A PHONE FIELD THAT IS NOT THERE (his to rule). Its emptied list of filters went with C32: Work filters
+     by whose work it is on every record. Each line below is the whole of a difference, so a new one is a red test too. */
   const PHONE = ['Threads', 'Tasks'].flatMap((list) => [
     `the list ${list}, mobile, part 2: the file says "thing", the module says "state"`,
     `the list ${list}, mobile, part 3: the file says "state", the module says nothing`,
@@ -397,8 +393,8 @@ test('TWO THINGS THE PLAN STILL STORES MORE THAN THE MODULE, word for word, only
   const want: Readonly<Record<string, string[]>> = {
     'with Projects and People': [],
     'with Projects alone': [],
-    'with People alone': [PHONE[0]!, PHONE[1]!, PHONE[2]!, PHONE[3]!, FILTERS],
-    'with neither': [...PHONE, FILTERS],
+    'with People alone': [PHONE[0]!, PHONE[1]!, PHONE[2]!, PHONE[3]!],
+    'with neither': [...PHONE],
   };
   for (const { name, holds } of SUBSETS) {
     const { api, close } = await record(holds);
@@ -417,12 +413,20 @@ test('HAND AND FILTER GO IN AS THE FILE SHIPS on all four records, and each wait
     stores[name] = [body('register.tasks').hand, body('page.work').filters];
     close();
   }
-  const FILTER = [{ field: 'thing', control: 'chips' }];
+  const WHOSE = {
+    field: 'whose',
+    control: 'segmented',
+    options: [
+      { value: 'yours', label: 'Yours', where: 'agent is empty' },
+      { value: 'agents', label: 'Agents', where: 'agent is set' },
+    ],
+  };
+  const FILTER = [{ field: 'thing', control: 'chips' }, WHOSE];
   assert.deepEqual(stores, {
     'with Projects and People': [{ person: 'owner', agent: 'agent', taken: 'doing' }, FILTER],
     'with Projects alone': [{ agent: 'agent', taken: 'doing' }, FILTER],
-    'with People alone': [{ person: 'owner', agent: 'agent', taken: 'doing' }, []],
-    'with neither': [{ agent: 'agent', taken: 'doing' }, []],
+    'with People alone': [{ person: 'owner', agent: 'agent', taken: 'doing' }, [WHOSE]],
+    'with neither': [{ agent: 'agent', taken: 'doing' }, [WHOSE]],
   });
 });
 

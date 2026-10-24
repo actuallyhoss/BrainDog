@@ -57,7 +57,7 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, kpisFault, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_OPTIONS_FEWEST, FILTER_OPTIONS_MOST, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, kpisFault, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, lookPlacesFault, withoutHoles } from './compose.ts';
 /* A GLYPH NAMED THAT THE RENDERER HAS NOT, refused with the nearest names it has (`glyph-names.ts`). */
 import { glyphFault } from './glyph-names.ts';
@@ -1411,7 +1411,7 @@ export type Owners = ReadonlyMap<string, string | null>;
  */
 function filtersFault(id: string, filters: unknown, requires: unknown, installed?: Known): Refusal | null {
   if (filters === undefined) return null;
-  const shape = `${id}'s filters is a list of at most ${FILTERS_MOST}, each { field, control: ${FILTER_CONTROLS.join(' or ')} }.`;
+  const shape = `${id}'s filters is a list of at most ${FILTERS_MOST}, each { field, control: ${FILTER_CONTROLS.join(' or ')} }, or { field, control, options } for options of its own.`;
   if (!Array.isArray(filters)) return bad('DECLARATION_INVALID', shape, 'filters');
   if (filters.length > FILTERS_MOST) return bad('OUT_OF_BOUNDS', `${id} declares ${filters.length} filters. ${shape}`, 'filters');
   const seen = new Set<string>();
@@ -1419,15 +1419,23 @@ function filtersFault(id: string, filters: unknown, requires: unknown, installed
   for (const [i, raw] of filters.entries()) {
     const at = `filters[${i}]`;
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return bad('DECLARATION_INVALID', shape, at);
-    const f = raw as { field?: unknown; control?: unknown };
-    const stray = Object.keys(f).find((k) => k !== 'field' && k !== 'control');
-    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${at} has ${stray}:, and a filter is { field, control }.`, at, ['field', 'control']);
+    const f = raw as { field?: unknown; control?: unknown; options?: unknown };
+    const stray = Object.keys(f).find((k) => k !== 'field' && k !== 'control' && k !== 'options');
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${at} has ${stray}:, and a filter is { field, control } or { field, control, options }.`, at, ['field', 'control', 'options']);
     if (typeof f.field !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(f.field))
       return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(f.field ?? null)} as its field; a filter names one field of the page's lists.`, at);
     if (!(FILTER_CONTROLS as readonly unknown[]).includes(f.control))
       return bad('DECLARATION_INVALID', `${id}.${at}'s control is ${JSON.stringify(f.control ?? null)}; it is ${FILTER_CONTROLS.join(' or ')}.`, at, [...FILTER_CONTROLS]);
     if (seen.has(f.field)) return bad('DECLARATION_INVALID', `${id} filters on ${f.field} twice. Keep one.`, at);
     seen.add(f.field);
+    /* A FILTER OF ITS OWN CHOICES (`options:`): each a word the address keeps, the name a person reads and the sentence
+       of the rows it keeps, so a page can be narrowed by a question no one field answers ("Yours", "Agents"). Its
+       `field` is then the word the address holds the choice under, and no list need declare it. */
+    if (f.options !== undefined) {
+      const optionsFault = filterOptionsFault(id, at, f.options);
+      if (optionsFault) return optionsFault;
+      continue;
+    }
     if (!installed || lists.length === 0) continue;
     const typed = lists.flatMap((r) => {
       const fields = installed.get(r)?.fields;
@@ -1443,6 +1451,34 @@ function filtersFault(id: string, filters: unknown, requires: unknown, installed
         `${id} filters on ${f.field}, which is ${typed[0]}. A filter picks one value of a field that is ${[...FILTER_TYPES].join(', ')}.`,
         at,
       );
+  }
+  return null;
+}
+
+/**
+ * Why a filter's own `options` cannot be drawn, or `null`: from two to six, each `{ value, label, where }`, the value a
+ * word an address keeps, the label the words a person reads, and `where` the sentence of the rows the choice keeps, read
+ * against each list the page draws when it is chosen.
+ */
+function filterOptionsFault(id: string, at: string, options: unknown): Refusal | null {
+  const shape = `${id}.${at}.options is a list of ${FILTER_OPTIONS_FEWEST} to ${FILTER_OPTIONS_MOST}, each { value, label, where }.`;
+  if (!Array.isArray(options) || options.length < FILTER_OPTIONS_FEWEST || options.length > FILTER_OPTIONS_MOST)
+    return bad('DECLARATION_INVALID', shape, `${at}.options`);
+  const values = new Set<string>();
+  for (const [n, raw] of options.entries()) {
+    const where = `${at}.options[${n}]`;
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return bad('DECLARATION_INVALID', shape, where);
+    const c = raw as { value?: unknown; label?: unknown; where?: unknown };
+    const stray = Object.keys(c).find((k) => k !== 'value' && k !== 'label' && k !== 'where');
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${where} has ${stray}:, and a choice is { value, label, where }.`, where, ['value', 'label', 'where']);
+    if (typeof c.value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(c.value))
+      return bad('DECLARATION_INVALID', `${id}.${where}'s value is ${JSON.stringify(c.value ?? null)}; it is a word an address keeps, such as yours.`, where);
+    if (values.has(c.value)) return bad('DECLARATION_INVALID', `${id}.${at} offers ${c.value} twice. Keep one.`, where);
+    values.add(c.value);
+    if (typeof c.label !== 'string' || c.label.trim() === '' || c.label.length > 40)
+      return bad('DECLARATION_INVALID', `${id}.${where}'s label is the words a person reads, 40 characters at most.`, where);
+    if (typeof c.where !== 'string' || c.where.trim() === '')
+      return bad('DECLARATION_INVALID', `${id}.${where}'s where is the sentence of the rows the choice keeps, such as "agent is empty".`, where);
   }
   return null;
 }

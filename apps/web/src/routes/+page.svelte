@@ -11,8 +11,8 @@
   tile of its own. `/?classic` is an address somebody kept, and it opens Today; nothing reads the word.
 
   THE WORK PAGE IS HERE TOO, at `/?work`, for the same reason: `lib/work/Work.svelte` draws the declared Work page
-  (`page.work`), and the screen as it was is kept at `/?work&classic` (`lib/work/WorkClassic.svelte`). The nav's Work
-  row opens it on a record that holds tasks (`WORK` in `lib/nav.ts`).
+  (`page.work`); the screen as it was is gone (C32), and `/?work&classic` opens the page. The nav's Work row opens it on
+  a record that holds tasks (`WORK` in `lib/nav.ts`).
 
   AN ADDRESS NAMING A RECORD THAT DID NOT ANSWER IS A PAGE THAT IS NOT HERE. `/nowhere` has the shape of a record's name,
   so it reached this door as the front door of a record called "nowhere", and the record behind the session answered

@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "A thread has six states, its moves and a day it aims for. A follow-up takes its parent's project, thread and owner where it left them empty, and its agent when that agent made it. The Board opens with the line to add work. A project waits for Projects, and an owner for People. A project with nothing written on its tasks for thirty days is marked quiet. Work answers your questions about tasks, lists open work with no project, and shows Late, Waiting on you, This week and With an agent.",
+  "changes": "A thread has six states, its moves and a day it aims for. A follow-up takes its parent's project, thread and owner where it left them empty, and its agent when that agent made it. The Board has the line to add work. A project with nothing written on its tasks for thirty days is marked quiet. Work answers your questions about tasks, lists work with no project, shows Late, Waiting on you, This week and With an agent, narrows to yours or the agents', and folds what has not moved in three months.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -162,7 +162,12 @@
         "action": { "verb": "row.create", "label": "Add" }
       },
       "filters": [
-        { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } }
+        { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } },
+        {
+          "field": "whose",
+          "control": "segmented",
+          "options": [ { "value": "yours", "label": "Yours", "where": "agent is empty" }, { "value": "agents", "label": "Agents", "where": "agent is set" } ]
+        }
       ],
       "blocks": [
         {
@@ -310,6 +315,24 @@
           "order": [ { "field": "created_at", "dir": "desc" } ],
           "limit": 5,
           "when": { "holds": [ "things" ] }
+        },
+        {
+          "kind": "section",
+          "heading": "Not moved in three months",
+          "icon": "hourglass",
+          "span": 12,
+          "fold": true
+        },
+        {
+          "kind": "table",
+          "heading": "Untouched for 90 days",
+          "icon": "hourglass",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped, updated_at before -90d",
+          "columns": [ { "field": "what", "width": "minmax(20ch,1fr)" }, { "field": "by", "label": "Due", "width": "13ch", "align": "end" } ],
+          "order": [ { "field": "updated_at", "dir": "asc" } ],
+          "limit": 8
         },
         {
           "kind": "section",
