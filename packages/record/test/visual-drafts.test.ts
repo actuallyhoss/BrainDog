@@ -55,7 +55,7 @@ type Read = { version: number; kept: number | null; draft: number | null; page: 
 test('A DRAFT NEVER REPLACES THE KEPT VERSION in visuals: it waits beside it, marked, and the receipt says draft', async () => {
   const { api, task, sql } = await record();
   const drew = agent();
-  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Week one</h1>', title: 'Launch week' }, drew));
+  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Week one</h1>', title: 'Launch week', draft: false }, drew));
   const two = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Week one, tighter</h1>', title: 'Launch week', draft: true }, drew));
   assert.equal(two.draft, true);
   assert.match(two.said, /waits on .* as a draft/u);
@@ -73,7 +73,7 @@ test('A DRAFT NEVER REPLACES THE KEPT VERSION in visuals: it waits beside it, ma
 test('KEEP MAKES IT STAND AT THE DRAFT, THROW AWAY LEAVES THE KEPT ONE, and only a person settles a draft', async () => {
   const { api, task, sql } = await record();
   const drew = agent();
-  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>A</h1>', title: 'Launch week' }, drew));
+  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>A</h1>', title: 'Launch week', draft: false }, drew));
   value(await api.attachVisual({ on: task, page: '<h1>B</h1>', title: 'Launch week', draft: true }, drew));
   assert.equal(refused(await api.settleVisual({ id: one.visual, version: 2, as: 'keep' }, drew)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refused(await api.settleVisual({ id: one.visual, version: 1, as: 'keep' }, owner)).code, 'TRANSITION_ILLEGAL', 'version 1 is no draft');
@@ -117,7 +117,7 @@ test('TRY AGAIN THROWS THE DRAFT AWAY AND ASKS THE RUN THAT DREW IT, whose next 
   const { api, task, sql } = await record();
   const drew = agent();
   const run = value<{ spoken: string }>(await api.attach({ source: 'startup', doing: 'Drawing the week' }, drew)).spoken;
-  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>A</h1>', title: 'Launch week' }, drew));
+  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>A</h1>', title: 'Launch week', draft: false }, drew));
   value(await api.attachVisual({ on: task, page: '<h1>B</h1>', title: 'Launch week', draft: true }, drew));
 
   const again = value<{ said: string; told: string; kept: number }>(await api.settleVisual({ id: one.visual, version: 2, as: 'again' }, owner));
@@ -138,5 +138,27 @@ test('TRY AGAIN THROWS THE DRAFT AWAY AND ASKS THE RUN THAT DREW IT, whose next 
   /* A VERSION A PERSON DREW has nobody to ask. */
   const mine = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Mine</h1>', title: 'My week' }, owner));
   assert.equal(refused(await api.settleVisual({ id: mine.visual, version: 1, as: 'again' }, owner)).code, 'TRANSITION_ILLEGAL');
+  sql.close();
+});
+
+test("AN AGENT'S VERSION IS A DRAFT BY DEFAULT, and a person's own is kept as it comes", async () => {
+  const { api, task, sql } = await record();
+  const drew = agent();
+  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Drawn</h1>', title: 'Launch week' }, drew));
+  assert.equal(one.draft, true, 'an agent that says nothing hands a draft in');
+  assert.match(one.said, /waits on .* as a draft/u);
+  const [held] = value<{ visuals: Listed[] }>(await api.visuals({ on: task }, owner)).visuals;
+  assert.deepEqual([held!.kept, held!.draft?.version], [false, 1]);
+  /* ITS NEXT VERSION, unasked, waits too, and the one kept by Keep stays where it stands. */
+  value(await api.settleVisual({ id: one.visual, version: 1, as: 'keep' }, owner));
+  const two = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Drawn again</h1>', title: 'Launch week' }, drew));
+  assert.equal(two.draft, true);
+  const [after] = value<{ visuals: Listed[] }>(await api.visuals({ on: task }, owner)).visuals;
+  assert.deepEqual([after!.version, after!.draft?.version], [1, 2]);
+
+  const mine = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Mine</h1>', title: 'My week' }, owner));
+  assert.equal(mine.draft, undefined, "a person's own version is kept");
+  const mineHeld = value<{ visuals: Listed[] }>(await api.visuals({ on: task }, owner)).visuals.find((v) => v.id === mine.visual)!;
+  assert.deepEqual([mineHeld.kept, mineHeld.draft], [true, null]);
   sql.close();
 });

@@ -4,7 +4,8 @@
  * host's store.
  *
  * A VERSION MAY COME AS A DRAFT (`draft: true`), which waits beside the version the visual stands at and never replaces
- * it. A person settles it in BrainDog with `settleVisual`: Keep, so the visual stands at it; Throw away; or Try again,
+ * it. AN AGENT'S VERSION IS A DRAFT BY DEFAULT (owner's call, 24 Oct): one a token, a runner or BrainDog itself hands in
+ * waits unless it says `draft: false`, while a person's own version is kept as it comes. A person settles it in BrainDog with `settleVisual`: Keep, so the visual stands at it; Throw away; or Try again,
  * which throws it away and tells the run that drew it to draw it again, as a draft.
  */
 
@@ -301,7 +302,8 @@ export function methods(deps: RecordDeps) {
       const bytes = BYTES.encode(checked.page);
       const page = hex(await crypto.subtle.digest('SHA-256', bytes));
       if (a.draft !== undefined && typeof a.draft !== 'boolean') return no('VALUE_MALFORMED', 'draft is true for a version to be kept or thrown away, or left out.', { at: 'draft' });
-      const draft = a.draft === true;
+      /* AN AGENT DRAWS, AND A PERSON DECIDES: anybody but a person hands a draft in unless it says otherwise. */
+      const draft = a.draft ?? ctx.principal.kind !== 'person';
       const body: VisualBody = { title, page, bytes: bytes.byteLength, pictures, ...(draft ? { draft: true as const } : {}) };
 
       /* WHICH VISUAL: the one named, or the one this thing carries under this title, or a new one. */

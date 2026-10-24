@@ -1,7 +1,7 @@
 /**
  * `braindog attach <file.html> [pictures...] --on "<thing>"`: pictures first through the file door, then the page in one
  * call, so no call carries more than one of them. `--draft` hands the version in as a draft, which waits for a person to
- * keep or throw away in BrainDog. `--undo <batch>` takes it back as the receipt says.
+ * keep or throw away in BrainDog; with an agent's token every version is one by default (`attachVisual`). `--undo <batch>` takes it back as the receipt says.
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';

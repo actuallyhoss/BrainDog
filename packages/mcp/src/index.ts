@@ -709,7 +709,8 @@ export const TOOLS: readonly Tool[] = [
       ['note'],
     ),
     /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. So
-       is `draft: true`, a page handed in to be kept or thrown away, which Try again's instruction names to the run. */
+       is `draft: true`, a page handed in to be kept or thrown away, which Try again's instruction names to the run; an
+       agent's page is a draft whether it says so or not (`attachVisual`). */
     quiet: ['page', 'draft'],
     writes: true,
   },

@@ -162,8 +162,8 @@ test('WHO MAY: a reader of the list may not, an agent at propose may on a questi
 test('THE RECEIPT TAKES IT BACK: an agent undoes its own visual, and a new version goes back to the one before', async () => {
   const { api, ticket } = await record();
   const writes = agent('write');
-  const first = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>One</h1>', title: 'Plan' }, writes));
-  const second = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>Two</h1>', title: 'Plan' }, writes));
+  const first = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>One</h1>', title: 'Plan', draft: false }, writes));
+  const second = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>Two</h1>', title: 'Plan', draft: false }, writes));
   assert.equal(second.version, 2);
 
   const back = value<{ put: number; lines: string[] }>(await api.undoOwn({ batch: second.batch! }, writes));
