@@ -20,7 +20,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import type { WriteContext } from '@braindog/kernel';
+import { NIGHT_FAULT, nightWhy, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -36,9 +36,10 @@ type FaultVerbs = {
 
 /**
  * One fault as a person reads it: the sentence, how many times it failed, since when and when last. `cause` is the
- * handle `retryFault` takes, never shown. `error` only to a self-host's owner in person.
+ * handle `retryFault` takes, never shown. `error` only to a self-host's owner in person. `why` on a failed night's copy:
+ * its reason as one plain sentence (`nightWhy` in the kernel), to every reader of the fault.
  */
-export type FaultSeen = { cause: string; said: string; count: number; since: string; last: string; error?: string };
+export type FaultSeen = { cause: string; said: string; count: number; since: string; last: string; error?: string; why?: string };
 
 /** The longest cause `retryFault` takes: `outbox#` or `schedule#` and a job kind, never a sentence. */
 const CAUSE_MOST = 200;
@@ -71,7 +72,16 @@ export function methods(deps: RecordDeps) {
       if (!out.ok) return out as Result<never>;
       const raw = operates(ctx);
       const faults = out.value.faults.map(
-        (f): FaultSeen => ({ cause: f.cause, said: f.said, count: f.count, since: f.first_at, last: f.last_at, ...(raw && f.error !== '' ? { error: f.error } : {}) }),
+        (f): FaultSeen => ({
+          cause: f.cause,
+          said: f.said,
+          count: f.count,
+          since: f.first_at,
+          last: f.last_at,
+          ...(raw && f.error !== '' ? { error: f.error } : {}),
+          /* A FAILED NIGHT'S REASON IN PLAIN WORDS (A22), to everybody who reads the fault: never the raw error. */
+          ...(f.cause === NIGHT_FAULT && f.error !== '' ? { why: nightWhy(f.error) } : {}),
+        }),
       );
       return { ok: true, value: { faults } };
     },

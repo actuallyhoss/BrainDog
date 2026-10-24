@@ -133,3 +133,31 @@ export function drillLine(drill: DrillFacts, now: number): DrillLine {
   const overdue = now - Date.parse(drill.at) > DRILL_DUE_MS;
   return { text: copy.drillPassed(when), fault: overdue, mark: overdue ? copy.drillOverdue : null };
 }
+
+/**
+ * A NIGHT THAT FAILED, AND WHY (A22, audit E10): the record's fault for a failed night (`night#export.night`), with its
+ * reason in plain words (`why`, the kernel's `nightWhy`), as one line over the copies. The raw error is never read here:
+ * the record hands it only to a self-host's operator, and it can name a bucket or a key.
+ */
+export const NIGHT_CAUSE = 'night#export.night';
+
+/** The line: the sentence, and the word that marks it beside the deeper red. */
+export type FailedNight = { text: string; mark: string };
+
+/**
+ * The failed night's line from the record's `faults` answer, or `null` where no night failed, the answer is not a list,
+ * or the fault carries no reason (a record built before `why`, which the index's sentence still names).
+ */
+export function failedNight(faults: unknown, now: number): FailedNight | null {
+  if (!Array.isArray(faults)) return null;
+  const f = faults.find((x) => typeof x === 'object' && x !== null && (x as { cause?: unknown }).cause === NIGHT_CAUSE) as
+    | { why?: unknown; last?: unknown; count?: unknown }
+    | undefined;
+  if (!f || typeof f.why !== 'string' || f.why.trim() === '') return null;
+  const last = instant(f.last);
+  /* LAST NIGHT'S WHERE IT FAILED IN THE LAST DAY AND A BIT, else how long ago, so an old failure never reads as tonight's. */
+  const when = last === null || now - Date.parse(last) <= LATE_MS ? null : ago(last, now);
+  const times = typeof f.count === 'number' && Number.isInteger(f.count) ? f.count : 1;
+  const why = /[.!?]$/u.test(f.why.trim()) ? f.why.trim() : `${f.why.trim()}.`;
+  return { text: copy.copiesFailedSaid(when, why, times), mark: copy.copiesFailed };
+}

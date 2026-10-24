@@ -8,7 +8,7 @@
   /* Lane F: backups and putting a copy back. */
   import { backUpNow, downloadSnapshot, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
   import { readBoot, rereadBoot } from '$lib/record/boot-live.ts';
-  import { copiesOf, copyLine, drillLine, readDrill, type CopyFacts, type DrillFacts } from './copies.ts';
+  import { copiesOf, copyLine, drillLine, failedNight, readDrill, type CopyFacts, type DrillFacts, type FailedNight } from './copies.ts';
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Bytes as a person reads them: `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
@@ -147,6 +147,23 @@
   });
 
   /**
+   * A NIGHT THAT FAILED, AND WHY (A22): the record's fault for it, its reason in plain words, as a line under the last
+   * copy's. Only the owner reads faults (`faults` refuses anybody else), so nobody else is asked. A record built before
+   * the reason, or a night that did not fail, draws no line.
+   */
+  let nightFailed = $state<FailedNight | null>(null);
+  $effect(() => {
+    if (!anOwner) return;
+    untrack(
+      () =>
+        void createClient({ base: apiBase() })
+          .call<{ faults: unknown }>('faults')
+          .then((out) => (nightFailed = out.ok ? failedNight(out.value.faults, Date.now()) : null))
+          .catch(() => undefined),
+    );
+  });
+
+  /**
    * A NIGHT THAT DID NOT RUN, AS THE RECORD ASKED ABOUT IT: the open question the record opened itself when a copy
    * failed ("The backup on 3 Sep did not run"). The Settings index leads with it, and this area said "No backups here
    * yet" under it, so the two read as a contradiction. It is said here first, with the one way to act on it. A record
@@ -267,6 +284,12 @@
     <p class="last-copy" data-late={lastCopy.late ? '' : undefined}>
       {#if lastCopy.late}<span class="late-word">{copy.copiesLate}</span>{/if}
       <span>{lastCopy.text}</span>
+    </p>
+  {/if}
+  {#if nightFailed}
+    <p class="last-copy" data-late="" data-night-failed>
+      <span class="late-word">{nightFailed.mark}</span>
+      <span>{nightFailed.text}</span>
     </p>
   {/if}
   {@render drillLineOf()}

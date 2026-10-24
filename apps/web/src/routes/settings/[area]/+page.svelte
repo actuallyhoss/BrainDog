@@ -403,6 +403,7 @@
             {#each faults ?? [] as f (f.cause)}
               <li>
                 <p class="fault-said">{f.said}</p>
+                {#if f.why}<p class="fault-why">{f.why}</p>{/if}
                 <p class="fault-when">{faultWords.failed(f.count, dayOf(f.since))}</p>
                 {#if f.error}<p class="fault-error">{f.error}</p>{/if}
                 {#if f.cause !== fault.cause}
@@ -608,6 +609,11 @@
 
   .fault-said {
     color: var(--ink);
+  }
+
+  /* A FAILED NIGHT'S REASON, in plain words (A22): read, so the second ink. */
+  .fault-why {
+    color: var(--ink-2);
   }
 
   .fault-when {

@@ -419,7 +419,7 @@ export {
 } from './handoff.ts';
 export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
 /* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`, LCH-C03). */
-export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, type CopyFacts, type Lifecycle } from './copies.ts';
+export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, nightWhy, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
 export { CAUSE, MOOT_GONE, MOOT_HELD, canon as canonValue, causeFault, causeOf, moot, mootWhy, noop, recheck, sha256 } from './cause.ts';
 /* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */

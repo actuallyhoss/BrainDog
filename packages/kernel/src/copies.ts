@@ -47,6 +47,27 @@ export const keptNote = (id: string, bytes: number): string => `snapshot ${id} $
  */
 export const failedNote = (): string => 'failed: the copy could not be saved';
 
+/**
+ * WHY A NIGHT FAILED, IN WORDS A PERSON READS (A22, audit E10). The fault keeps the raw reason, which only an operator
+ * is shown, since a thrown error can name a bucket, a key or a host. Everybody who reads the fault is told this instead:
+ * the reason as one plain sentence, read from the raw one by what it is about and never quoting it. A reason none of
+ * these fit is said as stopping partway, never left out.
+ */
+const NIGHT_WHYS: readonly [RegExp, string][] = [
+  [/over \d+ ?MiB|too large|exceeded (its )?memory|memory limit|out of memory|invalid string length|array buffer allocation/iu, 'Your record was too large to copy in one piece.'],
+  [/cpu|time ?limit|timed? ?out|never generate a response|deadline|took too long/iu, 'The copy took longer than BrainDog allows for one.'],
+  [/would not export|could not be read for/iu, 'Your record could not be read for the copy.'],
+  [/recipient|sealer|seal(ed|ing)?\b|\bkek\b|wrap/iu, 'The key that locks your copies could not be used.'],
+  [/bytes short|wrote \d+ of the|read back/iu, 'The copy came out shorter than your record, so it was not kept.'],
+  [/\br2\b|bucket|network|connection|fetch failed|unavailable|\b50[234]\b|internal error/iu, 'The place your copies are kept could not be reached.'],
+];
+
+/** A failed night's reason as one plain sentence, from the raw one the fault keeps (see `NIGHT_WHYS`). */
+export function nightWhy(error: string): string {
+  for (const [match, said] of NIGHT_WHYS) if (match.test(error)) return said;
+  return 'It stopped partway, and the copy was not kept.';
+}
+
 const KEPT = /^snapshot \S+ (\d+) bytes$/u;
 
 /**

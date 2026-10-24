@@ -23,8 +23,8 @@ import type { MeterKey } from '../../../lib/record/actions.ts';
  */
 export type Part = { text: string; needs?: true; href?: string };
 
-/** One open fault as the record's `faults()` answers it: its sentence, how many times, since when. */
-export type Fault = { cause: string; said: string; count: number; since: string; last: string; error?: string };
+/** One open fault as the record's `faults()` answers it: its sentence, how many times, since when, and a failed night's reason. */
+export type Fault = { cause: string; said: string; count: number; since: string; last: string; error?: string; why?: string };
 
 /**
  * The engine as `engineHealth()` answers it, the part this sentence and `engineLines` read. The four fields beside the

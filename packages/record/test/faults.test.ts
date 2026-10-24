@@ -135,3 +135,20 @@ test('A FAULT THE KERNEL RAISED IS READ BY THE OWNER through the real record: it
   assert.equal(refusal(await api.faults({}, member)).code, 'FORBIDDEN');
   sql.close();
 });
+
+test('A FAILED NIGHT SAYS WHY IN PLAIN WORDS to the owner and her agent, and never the raw reason (A22)', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const raw = 'snapshot over 40 MiB: this record dumped 52428800 bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).';
+  api.kernel.copyFailed(raw);
+  for (const who of [owner, agent]) {
+    const out = await api.faults({}, who);
+    assert.ok(out.ok, JSON.stringify(out));
+    const night = out.value.faults.find((f) => f.cause === 'night#export.night');
+    assert.ok(night, 'the failed night is a fault');
+    assert.equal(night.why, 'Your record was too large to copy in one piece.');
+    assert.equal(night.error, undefined);
+    assert.ok(!JSON.stringify(out.value).includes('MiB'), 'nothing of the raw reason reaches the answer');
+  }
+  sql.close();
+});
