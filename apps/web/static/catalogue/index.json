@@ -2635,8 +2635,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "9a96fef0312f1ec959d84fb3335b72a6112528a6d3770e6315ffdbcfbee2ac78",
+          "bytes": 2561,
+          "published_at": "2026-10-24T22:51:53.344Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Readings"
+            ],
+            "pages": [
+              "Reading"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words.",
+          "preview": true
+        },
         {
           "version": "2.0.0",
           "checksum": "8a20783a652b811bc953fa8b90cc925f85b2b5be2597c4a4fb93e71a8998f940",

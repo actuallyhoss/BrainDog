@@ -1,9 +1,9 @@
 {
   "pack": "reading-list",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "title": "Reading list",
   "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",
-  "changes": "readings no longer declares a field named title: the kernel keeps that name for the record's own. It is now name, still what each row is titled by.",
+  "changes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
