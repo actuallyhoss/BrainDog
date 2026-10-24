@@ -27,7 +27,8 @@ const DATED: Leg[] = [
     on: 'due',
     amount: 'amount',
     /* ONE-OFFS ONLY: a bill that says it repeats is walked as its line in `recurring`, and walking the bill as well
-       would spend it twice. Its own day still stands, so it is not dropped from anything that lists what falls due. */
+       would spend it twice. And what falls due reads this leg too (`walkedOf` in the kernel's `deadlines`), so Due soon
+       names the money once, on its line, where it named the bill and the line side by side. */
     where: `${OPEN}, repeats is not monthly or quarterly or yearly`,
     incoming: { field: 'direction', is: 'owed_to_me' },
   },

@@ -103,6 +103,32 @@ function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
   };
 }
 
+/**
+ * Which rows of one list fall due on one of its day fields, as the record's cash walks say: the rows any leg over that
+ * list and that day moves, or `[]` when no walk reads them, or one cannot be read here.
+ *
+ * WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE (the scope of 24 October, B4 and B5). A repeating line that is paused is
+ * not walked (`state is live`), and a bill that repeats is walked as its repeating line and not as itself, so listing
+ * either as due said a paused fee was two weeks late and one premium twice in Due soon. Read off the legs the record
+ * already declares, as `moneyWayOf` reads their money, so no module's own word for a live line is written here. A row
+ * is due when ANY leg moves it, because a record walks one list in several ways (all of it, one book, the money out
+ * alone), and a list no walk reads keeps every row that is not finished.
+ */
+function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps: PageDeps, kit: SourceKit): Predicate[] {
+  const over = legs.filter(
+    (l): l is Leg => l !== null && typeof l === 'object' && (l as { register?: unknown }).register === schema.register && (l as { on?: unknown }).on === field,
+  );
+  if (over.length === 0) return [];
+  const each: Predicate[] = [];
+  for (const leg of over) {
+    if (typeof leg.where !== 'string' || leg.where.trim() === '') return [];
+    const said = kit.predicateOf(leg.where, schema, deps.ctx);
+    if (said.bad.length || said.predicate === undefined) return [];
+    each.push(said.predicate);
+  }
+  return [each.length === 1 ? each[0]! : { any: each }];
+}
+
 /** A stored money value as a reader is shown it, its amount and currency and nothing else, or `null`. */
 function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string'
@@ -112,7 +138,8 @@ function moneyValue(v: Json | undefined): { amount: number; currency: string } |
 
 /**
  * A block over `deadlines`: every row of every list the reader may read that falls due on a field the list declares
- * `deadline: true`, is not in one of the list's `done` states, and falls due by `horizon:` days from today, overdue
+ * `deadline: true`, is not in one of the list's `done` states, is moved by the record's cash walk where one reads that
+ * day (`walkedOf`), and falls due by `horizon:` days from today, overdue
  * first and then by day.
  *
  * ONE ANSWER ACROSS THE LISTS, so Home says what is coming without naming a list: a task's `by`, a service's `renews`,
@@ -163,7 +190,8 @@ function deadlinesBlock(deps: PageDeps, block: PageBlock, base: BlockResult, als
        state yet is open. */
     const open: Predicate[] = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
     for (const field of dated) {
-      const got = deps.list({ register: list.id, where: { all: [{ field, lte: last }, ...open] }, limit: DEADLINES_READ, order: [{ field, dir: 'asc' }] });
+      const walked = walkedOf(schema, field, legs, deps, kit);
+      const got = deps.list({ register: list.id, where: { all: [{ field, lte: last }, ...open, ...walked] }, limit: DEADLINES_READ, order: [{ field, dir: 'asc' }] });
       if (!got.ok) return { ...base, refusals: refused(got) ? also(got.refusal) : also() };
       counted += got.value.matched;
       for (const r of got.value.rows) {
