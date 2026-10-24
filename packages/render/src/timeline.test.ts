@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dayThisYear, rowsCell, timelineCell, timelineDays } from './timeline.ts';
+import { dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
 
 const rows = (...days: string[]) => days.map((d) => ({ cells: [d, 'something'] }));
 
@@ -47,4 +47,19 @@ test('AN AMOUNT OF NOTHING IS NOT SAID on a timeline, and on rows only where it 
   assert.equal(rowsCell('+GBP 0.00', now), '');
   assert.equal(rowsCell('£0', now), '£0', 'a balance of nothing stays');
   assert.equal(rowsCell('1 Jul 2026', now), '1 Jul');
+});
+
+/* THE AUDIT OF 25 OCTOBER, Z13 (`loop/proof/looks/audit-2026-10-25/money-1512-light.png`): the Ledger tile drew the bank's
+   own codes as names, "22OCT26 Phone Banking Transfer" and a shop's name ending in a till number. The day column says
+   the day, and a till number run onto a shouted name is no part of the name. */
+test('A BANK LINE READS AS A NAME: its own date stamp and a till number run onto a shouted name are left off', () => {
+  assert.equal(timelineTitle('22OCT26 Phone Banking Transfer'), 'Phone Banking Transfer');
+  assert.equal(timelineTitle('05OCT2026 PHONE BANKING TRANSFER'), 'Phone Banking Transfer');
+  assert.equal(timelineTitle('TALLYCART1'), 'Tallycart');
+  assert.equal(timelineTitle('SWIFTCAB RIDE 2210'), 'Swiftcab Ride 2210', "a number apart is the bank's words, and kept");
+  assert.equal(timelineTitle('WREN ABERNATHY HOLLOWAY'), 'Wren Abernathy Holloway');
+  /* A PERSON'S OWN WORDS ARE KEPT: small letters, a short word, and a stamp that is the whole line. */
+  assert.equal(timelineTitle('Rent2'), 'Rent2');
+  assert.equal(timelineTitle('HMRC VAT Q3'), 'Hmrc VAT Q3');
+  assert.equal(timelineTitle('22OCT26'), '22OCT26');
 });

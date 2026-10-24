@@ -58,7 +58,25 @@ export const timelineCell = (text: string | undefined, now?: number): string =>
  * is the author's, and is left as written.
  */
 export const timelineTitle = (text: string | undefined): string =>
-  text === undefined ? '' : /[[\]{}()`*_<>]/u.test(text) ? text : readable(text);
+  text === undefined ? '' : /[[\]{}()`*_<>]/u.test(text) ? text : readable(bankLine(text));
+
+/** A bank's own day at the head of its line, "22OCT26 " or "05OCT2026 ", with words after it. */
+const BANK_STAMP = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}(?:\d{2})?\s+(?=\S)/u;
+
+/** A till or branch number run onto a word in capitals, "TALLYCART1": three capitals or more, then up to four digits. */
+const TILL = /(?<![\p{L}\p{N}])(\p{Lu}{3,})\d{1,4}(?![\p{L}\p{N}])/gu;
+
+/**
+ * A BANK'S CODES LEFT OFF ITS LINE (the audit of 25 October, Z13): the Ledger tile reads who was paid, and where nobody
+ * is known, the bank's line, and that line drew "22OCT26 Phone Banking Transfer" and a shop's name ending in a till
+ * number. The day is the column beside it, and the number a till adds to a shop's name is no part of the name. Only a
+ * stamp with words after it, and only a number run onto a word in capitals, which a person does not type; the line as
+ * the bank wrote it stays on the entry.
+ */
+function bankLine(text: string): string {
+  const bare = text.replace(BANK_STAMP, '');
+  return /\p{Ll}/u.test(bare) ? bare : bare.replace(TILL, '$1');
+}
 
 /**
  * A `rows` cell as it is drawn: the same, except that only money MOVING by nothing (`−£0`, `+£0`) is left out. A
