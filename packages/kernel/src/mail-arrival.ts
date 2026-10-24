@@ -298,6 +298,16 @@ function shippingPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | nu
 /* ── the whole reading ──────────────────────────────────────────────────── */
 
 /**
+ * THE SENDER OF MAIL A PATTERN TOOK IS MET TOO (scope B36), untrusted and with where it was seen, as the reading below
+ * meets the sender of mail no pattern took: before this, only unpatterned mail met anybody, so the people his
+ * patterns read from every day were nobody in People. Only the verified `From`, never a name the body prints.
+ */
+export function meetPatternedSender(meet: MailDeps['meet'], headers: Record<string, string>): void {
+  const read = readMail({ ...(headers.from === undefined ? {} : { from: headers.from }), ...(headers.subject === undefined ? {} : { subject: headers.subject }), body: '' });
+  if (read.from) meet({ email: read.from.name ? `${read.from.name} <${read.from.email}>` : read.from.email, source: `mail from ${read.domain}`, untrusted: true });
+}
+
+/**
  * Reads one verified, unmatched mail: meets who it names, then files or asks what it says. Inside the arrival's own
  * transaction; the caller hands over the stored row's id. Mail with nothing it can place is `handled: false`, kept
  * untriaged as before.

@@ -276,7 +276,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
+import { meetPatternedSender, readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
@@ -9795,6 +9795,16 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
       /* FORWARDED MAIL NO PATTERN TOOK IS READ FOR WHO AND WHAT (`mail-arrival.ts`), in a transaction of its own after the
          bytes are stored. What it files or asks is the record's; mail it can place nothing in falls through, untriaged. */
+      const mailMeet = (a: MeetArgs) => meetPerson(peopleDeps({ actor: 'ingest:mail' }, () => null, (p) => openSuggestion(governDeps(), 'ingest:mail', p)), a);
+      /* VERIFIED MAIL A PATTERN TOOK MEETS ITS SENDER (scope B36), in a transaction of its own after the bytes are stored, so
+         a meeting that throws or is refused never costs the arrival. A skip rule's mail meets nobody, and nor does a redelivery. */
+      if (arrived.ok && arrival.channel === 'email' && arrival.verified !== false && !arrived.value.redelivered && (arrived.value.state === 'matched' || arrived.value.state === 'review'))
+        try {
+          const headers = Object.fromEntries(Object.entries(arrival.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
+          transaction(() => meetPatternedSender(mailMeet, headers));
+        } catch {
+          /* the arrival stands; the sender is met by the next one */
+        }
       const out: Result<Arrived> = (() => {
         if (!(arrived.ok && arrival.channel === 'email' && arrival.verified !== false && arrival.ingest === undefined && arrived.value.state === 'untriaged' && !arrived.value.redelivered)) return arrived;
         const first = arrived.value;
@@ -9809,7 +9819,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                 ing: ingestDeps(only),
                 lists,
                 people,
-                meet: (a) => meetPerson(peopleDeps({ actor: 'ingest:mail' }, () => null, (p) => openSuggestion(governDeps(), 'ingest:mail', p)), a),
+                meet: mailMeet,
               },
               { raw: first.raw, headers: Object.fromEntries(Object.entries(arrival.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v])), body: arrival.body ?? '' },
             ),
