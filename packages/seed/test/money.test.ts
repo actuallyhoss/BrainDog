@@ -945,7 +945,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
   /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the UI pass
      of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.moved']);
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-accounts', 'cash-now', 'cash-now.moved']);
   assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);

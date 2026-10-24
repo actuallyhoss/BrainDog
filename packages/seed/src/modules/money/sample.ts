@@ -110,7 +110,7 @@ export const ACCOUNTS: Fields[] = [
   { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true, last4: '7730' },
   /* THE ONE A CARD ALERT NAMES. Four digits nothing else in the sample repeats, so the `lookup:` in
      `packs/card-alerts` has exactly one row to find on a record that installs it. */
-  { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false, last4: '4471' },
+  { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false, last4: '4471', limit: gbp(500_000), to_pay: gbp(124_000), to_pay_on: day(-2) },
 ];
 
 /* ── categories ──────────────────────────────────────────────────────────── */

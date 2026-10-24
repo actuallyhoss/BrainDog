@@ -24,6 +24,7 @@
     field,
     register,
     nameOf,
+    start = false,
   }: {
     /** The rule's handle, as `ruleApply` takes it. Never drawn. */
     id: string;
@@ -33,6 +34,8 @@
     field: string;
     register: string | null;
     nameOf: (rule: string) => string;
+    /** Opened from a page's link that asks for it (`?again=1`, Money's File old entries): read the dry run at once. */
+    start?: boolean;
   } = $props();
 
   const client = createClient({ base: apiBase() });
@@ -73,6 +76,15 @@
     dry = out.value;
     stage = 'ready';
   }
+
+  /* ASKED FOR BY THE LINK THAT OPENED THE PAGE, the dry run is read once, and nothing is written until Run. */
+  let started = false;
+  $effect(() => {
+    if (start && !started) {
+      started = true;
+      void read();
+    }
+  });
 
   function cancel() {
     dry = null;

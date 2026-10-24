@@ -101,6 +101,8 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   const cash = value<{ id: string }>(k.create('accounts', { name: `Current in ${side.word}`, kind: 'bank', balance: at(100_000), as_of: day(-1), book: kiln.book }, OWNER));
   if (side.savings > 0) make('accounts', { name: `Savings in ${side.word}`, kind: 'bank', balance: { amount: side.savings, currency: side.currency }, as_of: day(-1) });
   make('accounts', { name: `Deposit in ${side.word}`, kind: 'bank', balance: at(5_000), as_of: day(-1), liquid: false, arrives: day(10) });
+  /* AND A CARD THAT SAYS WHAT IS TO PAY ON IT (B8), which no figure of cash counts. */
+  make('accounts', { name: `Card in ${side.word}`, kind: 'card', balance: at(-2_000), as_of: day(-1), liquid: false, limit: at(10_000), to_pay: at(2_000), to_pay_on: day(-1) });
   make('transactions', { what: `Paid in ${side.word}`, on: day(-2), direction: 'out', amount: at(1_000), account: cash.id, state: 'cleared', thing: kiln.thing });
   make('transactions', { what: `Software in ${side.word}`, on: day(-1), direction: 'out', amount: at(700), account: cash.id, state: 'cleared', category: kiln.category });
   /* AND ONE LAST MONTH, on a day number this month has reached, for the figures of last month and of last month to this day

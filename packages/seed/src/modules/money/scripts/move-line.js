@@ -155,3 +155,6 @@ export const MOVE_LINE_RULE = {
   when: 'state is paid',
   steps: [{ script: { id: 'move_line', as: 'asking', input: { bill: '{{trigger.entry}}' } } }],
 };
+
+/** The rule and the script, as Money's automations spread them. */
+export const MOVE_LINE = [MOVE_LINE_RULE, MOVE_LINE_SCRIPT];

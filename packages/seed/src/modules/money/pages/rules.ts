@@ -55,6 +55,15 @@ export const MONEY_RULES_PAGE: SeedPage = {
       body: 'No rule has filed anything in the last 30 days. {{rules-filing}} rule(s) filed {{rule-filed}} of your entries before that.',
     },
     {
+      /* FILE OLD ENTRIES, SINCE money-core 3.19.0 (B24 of 24 October): a rule files what is written after it, and the
+         entries already there with no category wait for a rule made later. The link opens the filing rule's Run again,
+         which says how many it would file before anything is written, and files them as one change one Undo takes back. */
+      kind: 'note',
+      span: 12,
+      when: { metric: 'txn-uncategorised', gt: 0 },
+      body: 'Entries with no category in the last 91 days: {{txn-uncategorised}}. [File old entries](/automations/txn-categorise?again=1)',
+    },
+    {
       /* EVERY RULE, ON OR OFF, in the person's own order and then by its text. A rule opens from its line, where it
          is switched off; one that is off keeps its count below. */
       kind: 'table',

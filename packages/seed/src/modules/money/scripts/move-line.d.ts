@@ -7,3 +7,4 @@ export declare function moveLine(bill: SettleRow, line: SettleRow, next: unknown
 export default function run(ctx: unknown): Promise<unknown>;
 export declare const MOVE_LINE_SCRIPT: Record<string, unknown>;
 export declare const MOVE_LINE_RULE: Record<string, unknown>;
+export declare const MOVE_LINE: Record<string, unknown>[];

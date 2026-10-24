@@ -150,6 +150,34 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * WHAT IS TO PAY ON THE CARDS, AND THE DAY THAT WAS TRUE, SINCE money-core 3.19.0 (B8 of 24 October): "To pay on it", which
+   * `card_owed` writes from each card text, summed over the open cards that say it, and the newest of their days. No
+   * card that says it, no value, so Money's first line leaves the sentence out.
+   */
+  'card-to-pay': {
+    metric: 'card-to-pay',
+    name: 'To pay on the card',
+    source: 'register.accounts',
+    where: 'kind is card, state is not closed, to_pay is set',
+    value: { sum: 'to_pay' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'card-to-pay-on': {
+    metric: 'card-to-pay-on',
+    name: 'To pay on the card, as of',
+    source: 'register.accounts',
+    where: 'kind is card, state is not closed, to_pay is set',
+    value: { max: 'to_pay_on' },
+    format: 'day',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* HOW MANY ACCOUNTS CASH NOW ADDS UP, AND THE OLDEST DAY ONE OF THEM WAS TRUE: the line under the
      hero figure, so a reader knows what it is a sum of and how old the weakest part of it is. */
   'cash-accounts': {

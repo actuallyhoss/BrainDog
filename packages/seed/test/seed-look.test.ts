@@ -178,7 +178,8 @@ test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
 
 /* AND HOW MUCH THERE IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): with two books the line leads with Cash
    now, and every line ends on the part that is late, a sentence the app leaves out while none is. */
-const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.19.0 (B8), left out whole with no card that says it. */
+const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
 test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and with one book on its cash', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };
@@ -196,8 +197,10 @@ test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
   assert.deepEqual(two.map((b) => b.body), [`You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
+  /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
   assert.deepEqual(two[0]!.values, {
     'books-held': 2,
+    'card-to-pay': 0,
     'cash-accounts': 2,
     'cash-now': [
       { amount: 250_000, currency: 'GBP' },

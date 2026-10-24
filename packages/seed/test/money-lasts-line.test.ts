@@ -95,7 +95,8 @@ const bill = (k: Kernel, amount: number, due: number): void =>
    October, money F3), and the line says what there is. */
 /* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0 (the audit of 22 October, U4): a sentence of its own,
    which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
-const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.19.0 (B8), left out whole with no card that says it. */
+const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
 const WHAT_THERE_IS = `Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.${LATE}`;
 const LASTS = `Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`;
 const BOOKS = `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE}`;

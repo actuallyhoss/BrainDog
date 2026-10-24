@@ -798,7 +798,7 @@
                loaded only here, by `import()`, so no other screen carries it. -->
           {#if owner && row && againField !== null}
             {#await import('./RunAgain.svelte') then part}
-              <part.default id={row.id} body={row.body} field={againField} register={row.register} nameOf={ruleNameOf} />
+              <part.default id={row.id} body={row.body} field={againField} register={row.register} nameOf={ruleNameOf} start={page.url.searchParams.get('again') === '1'} />
             {/await}
           {/if}
 

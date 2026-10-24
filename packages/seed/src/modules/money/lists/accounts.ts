@@ -58,6 +58,14 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
      * every card and every account that is cash.
      */
     { id: 'arrives', label: 'Arrives', type: 'day' },
+    /**
+     * WHAT IS TO PAY ON A CARD, SINCE money-core 3.19.0 (B8 of 24 October). A card text says what is left of the limit, never what
+     * is owed, so the limit is typed once and `card_owed` writes "To pay on it" as the limit less the newest available, with
+     * the day of that text (`scripts/card-to-pay.js`). Money's first line says it. Empty on every account that is no card.
+     */
+    { id: 'limit', label: 'Credit limit', type: 'money' },
+    { id: 'to_pay', label: 'To pay on it', type: 'money' },
+    { id: 'to_pay_on', label: 'To pay as of', type: 'day' },
     /* INDEXED, because Cash now by book groups the accounts by it and a book's page filters them by it. */
     { ...BOOK, index: true },
     /* NOT REQUIRED, because an account typed before the field was there holds none, and that account is open: every

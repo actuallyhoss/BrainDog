@@ -11,6 +11,12 @@ const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s),
  */
 const LATE_PART = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
 
+/**
+ * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.19.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
+ * page is at its ceiling of blocks, so the sentence is the line's. No card that says it, and the sentence goes whole.
+ */
+const CARD_OWES = ' On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
+
 export const HEADLINE: Record<string, unknown>[] = [
   {
     /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
@@ -33,7 +39,7 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: ONE_BOOK,
-    body: `${WHAT_THERE_IS}${LATE_PART}`,
+    body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,
   },
   {
     /* WITH TWO BOOKS OR MORE THE LINE SAYS WHERE THE MONEY IS KEPT, AND NO SUM, SINCE money-core 3.17.0. No block here
@@ -50,7 +56,7 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE_PART}`,
+    body: `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
   },
   /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
      lasts, which are the three figures the line above says, so a person read them twice before reading anything
@@ -82,7 +88,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
        the cash alone and no answer stands a screen away from a second one. */
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
-    body: `${WHAT_THERE_IS}${LATE_PART}`,
+    body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
@@ -95,7 +101,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.${LATE_PART}`,
+    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.${LATE_PART}${CARD_OWES}`,
   },
   HEADLINE[1]!,
 ];
