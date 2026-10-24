@@ -231,7 +231,6 @@ import { learnedOrder, learnedSorted, replacedIn, replacesField } from './method
 import { briefFactsFor } from './methods/briefing.ts';
 import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } from './methods/door-switch.ts';
 import { briefTick } from './brief-write.ts';
-import { writtenTick } from './written-brief.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
@@ -4943,29 +4942,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * request and the gathering reads every list that keeps a date. Kept in memory, so a restart looks once more, which
    * costs a read and never an ask: the ask is bounded by `BRIEF_ASKS_DAY`.
    */
-  /** How often a later tick looks: the version check is cheap, so far oftener than the cards' fifteen minutes. */
-  const WRITTEN_LOOK_MS = 30_000;
   let briefLooked = Number.NEGATIVE_INFINITY;
   const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
     const model = deps.slashModel;
-    /* A MODEL THAT WRITES THE BRIEF IS ASKED FOR IT WHEN ITS ROWS CHANGE, NOT BY THE SLOT OF THE DAY (`writtenTick`): the
-       record's version is the mark, so a tick that finds it unmoved gathers nothing. Counted as a headline's ask is. */
-    if (typeof model?.written === 'function') {
-      if (again && nowMs - briefLooked < WRITTEN_LOOK_MS) return [];
-      briefLooked = nowMs;
-      const written = model.written.bind(model);
-      const owner = { principal: { kind: 'system', id: SLASH }, outbound: true } as const;
-      const out = await writtenTick({
-        version: kernel.version(),
-        facts: () => kernel.transaction(() => briefFactsFor(methodDeps(), owner, nowMs)),
-        now: nowMs,
-        zone: kernel.identity()?.tz ?? 'UTC',
-        read: (key) => kernel.prefsOf(SLASH)[key],
-        write: (key, value) => kernel.setPref(SLASH, key, value as never),
-        ask: (input) => slashAsked('headline', input, (i) => written(i)),
-      });
-      return out.dropped === null ? [] : [out.dropped];
-    }
+    /* A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT: Today greets only (DIRECTION §51) and the agents' briefing passes
+       cards alone, so its ask every change bought sentences nobody read. Nor does it fall to the cards' ask below. */
+    if (typeof model?.written === 'function') return [];
     if (typeof model?.brief !== 'function') return [];
     if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
     briefLooked = nowMs;

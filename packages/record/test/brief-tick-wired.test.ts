@@ -237,3 +237,28 @@ test('A BRIEFING THAT FAILS NEVER COSTS THE DAY ITS LOOK: a model that throws le
   assert.equal(typeof brief.said, 'string');
   sql.close();
 });
+
+test('A MODEL THAT WRITES THE BRIEF IS ASKED NOTHING FOR IT: nobody reads it, and the rules\' cards stand', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOON);
+  const asked = { written: 0, brief: 0 };
+  const model = {
+    name: 'test model',
+    draft: async () => ({ drafts: [] }),
+    written: async () => ((asked.written += 1), { sentences: ['Studio rent is late.'] }),
+    brief: async () => ((asked.brief += 1), { cards: [] }),
+  } as unknown as SlashModel;
+  const { counts, meter: m } = meter();
+  const api = await createRecordApi({ sql, clock, slashModel: model, slashMeter: m });
+  value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }));
+  value(await api.kernel.install([BILLS] as never));
+  value(api.kernel.create('bills', { name: 'Studio rent', due: '2026-10-13' } as never, { actor: 'p_owner' }));
+  assert.ok((await api.slashTick()).ran);
+  clock.set(NOON + 6 * HOUR);
+  await api.slashTick();
+  assert.deepEqual(asked, { written: 0, brief: 0 });
+  assert.ok(!counts.background.includes('headline'), JSON.stringify(counts.background));
+  const brief = value<Brief>(await (api as unknown as { briefing(a: unknown, c: CallContext): Promise<unknown> }).briefing({}, OWNER));
+  assert.ok(brief.cards.every((c) => c.by === 'rule'), JSON.stringify(brief.cards));
+  sql.close();
+});
