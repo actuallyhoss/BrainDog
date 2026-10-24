@@ -192,15 +192,24 @@ export const allStale = (measures: readonly Measure[], nowMs: number): boolean =
  * few points at the start of a month drew a stroke that read as a climb this week. As many `stat` fences as six tiles
  * a fence takes (`KINDS.stat.rows`).
  */
-export function staleTilesText(measures: readonly Measure[], ago: (iso: string) => string): string {
+export function staleTilesText(measures: readonly Measure[], ago: (iso: string) => string, beside: readonly { group?: string | undefined }[] = []): string {
   const shared = sharedNames(measures);
-  const rows = measures.map((m) => {
+  const row = (m: Measure): string => {
     const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
     const said = m.latest ? `${dayLabel(m.latest.day)}, ${ago(m.latest.at)}` : '';
     return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(said)}`;
-  });
+  };
+  /* A GROUPED BLOCK (its sixth column) HEADS EACH GROUP, THE FIRST ONE TOO: its tiles sat above the first project's name
+     and read as the page's own. One group is the page's own, and is not headed by the name over it. */
+  const groups = new Map<string, Measure[]>();
+  for (const m of measures) groups.set(m.group ?? '', [...(groups.get(m.group ?? '') ?? []), m]);
+  const headed = new Set([...groups.keys(), ...beside.map((m) => m.group ?? '')]).size > 1;
   const fences: string[] = [];
-  for (let i = 0; i < rows.length; i += TILES_MOST) fences.push(['```stat', ...rows.slice(i, i + TILES_MOST), '```'].join('\n'));
+  for (const [group, of] of [...groups].sort(([a], [b]) => (a === b ? 0 : a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))) {
+    const rows = of.map(row);
+    const heading = headed ? ` | ${escapeCell(group !== '' ? group : measureWords.ungrouped)}` : '';
+    for (let i = 0; i < rows.length; i += TILES_MOST) fences.push([`\`\`\`stat${heading}`, ...rows.slice(i, i + TILES_MOST), '```'].join('\n'));
+  }
   return fences.join('\n\n');
 }
 

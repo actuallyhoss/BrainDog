@@ -1378,7 +1378,7 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
     const { lines, latest } = linesAndLatest(measuresFor(block), block.readOnce);
     /* EVERY LINE OLDER THAN A WEEK IS A TILE THAT SAYS ITS AGE (`staleTilesText`), never a chart drawn as this month's. */
     const nowMs = Date.parse(block.stale_at);
-    const drawnLines = allStale(lines, nowMs) ? staleTilesText(lines, (at) => sinceWords(at, nowMs)) : linesText(lines, latest);
+    const drawnLines = allStale(lines, nowMs) ? staleTilesText(lines, (at) => sinceWords(at, nowMs), latest) : linesText(lines, latest);
     return parse([drawnLines, latestText(latest, lines.length > 0, lines, (at) => sinceWords(at, nowMs))].filter(Boolean).join('\n\n'), { page: true });
   }
   /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its

@@ -239,3 +239,17 @@ test('NUMBERS THAT STOPPED A WEEK AGO OR MORE ARE TILES THAT SAY THEIR AGE, neve
   );
   assert.deepEqual(parse(staleTilesText(many, () => 'ago'), { page: true }).filter((s): s is Block => s.type === 'block').map((b) => b.rows.length), [6, 2], 'six tiles a fence');
 });
+
+test('A GROUPED BLOCK OF STALE TILES HEADS EVERY GROUP WITH ITS PROJECT, the first one too', () => {
+  const late = Date.UTC(2026, 8, 28, 12);
+  const grouped = (name: string, group: string | undefined) => ({
+    ...measuresOf([point(name, 3, day(2)), point(name, 4, day(3))], FIELDS, late, 30, 'Numbers', { tz: 'UTC' })[0]!,
+    ...(group ? { group } : {}),
+  });
+  const tiles = [grouped('Players', 'Kiln'), grouped('Servers', 'Kiln'), grouped('Orders', 'Marlow'), grouped('Loose', undefined)];
+  const drawn = parse(staleTilesText(tiles, () => 'ago'), { page: true }).filter((s): s is Block => s.type === 'block');
+  assert.deepEqual(drawn.map((b) => [b.kind, b.heading]), [['stat', 'Kiln'], ['stat', 'Marlow'], ['stat', 'Everything else']]);
+  assert.deepEqual(drawn[0]!.rows.map((r) => r.cells[0]), ['Players', 'Servers']);
+  const one = parse(staleTilesText([grouped('Players', 'Kiln')], () => 'ago'), { page: true }).filter((s): s is Block => s.type === 'block');
+  assert.equal(one[0]!.heading, undefined, "one group is the page's own and is not headed by the name over it");
+});
