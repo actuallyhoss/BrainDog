@@ -139,12 +139,15 @@ test('INSTALLED THROUGH THE ADD-ON DOOR AS IT SHIPS, it arms the next 08:00 and 
   sql.close();
 });
 
-test('A MORNING WITH NO AGENT SENDS NOTHING: no note in the app and nothing queued', { skip: SOURCES_BUILT ? false : NOT_BUILT }, async () => {
+test('A MORNING WITH NO AGENT SENDS NOTHING: no note in the app and no notice queued', { skip: SOURCES_BUILT ? false : NOT_BUILT }, async () => {
   const { api, sql, clock } = await record();
-  const before = outbox(sql).length;
+  /* A NOTICE, AND NOT EVERY ROW: the same morning runs the record's own daily scripts too (Projects 1.24.0 queues its
+     `kpi_backfill` as a `script.run`), which is the record at work and not a note sent. */
+  const sent = () => outbox(sql).filter((r) => r.kind.startsWith('notify.')).length;
+  const before = sent();
   await fire(api, sql, clock, 'agent-notes-morning');
   assert.deepEqual(notes(sql, 'agent-notes-morning'), []);
-  assert.equal(outbox(sql).length, before, 'no push and no mail');
+  assert.equal(sent(), before, 'no push and no mail');
   assert.equal(armed(sql, 'agent-notes-morning'), '2026-10-15T07:00:00.000Z', 'and the next morning is armed');
   sql.close();
 });
