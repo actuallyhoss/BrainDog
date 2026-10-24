@@ -461,6 +461,24 @@ export type Unpictured =
   | { kind: 'dated'; page: string; pageTitle: string; list: string; listName: string; rows: number; draft?: Draft }
   | { kind: 'plan'; list: string; seq: number; name: string; shape: PlanShape; was: PlanShape | null; rows: number; draft?: Draft };
 
+/* ── when the rules cannot draw it: the model ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * THE MODEL STEP (C14, §45 "Thinking and cost"): a thing that earned a drawing whose rules' draft the design check
+ * refused, or that the rules could not draft at all, is asked of the model once, in these words, about its page. What
+ * comes back is held to the same check before it is filed (`describe`), and the offer says what it cost.
+ *
+ * ONCE A KEY, whatever the model answered: `drewOffer` is handed every key the model was asked as asked, so a thing the
+ * model could not draw either never costs a second ask, and the next drawing is offered in its place.
+ */
+export function drewAsk(u: Unpictured): string {
+  if (u.kind === 'dated') return `Draw ${u.listName} on ${u.pageTitle} by day, so the days its entries fall on can be read at a glance. Keep everything else on the page as it is.`;
+  return `Draw the plan of ${u.name} as ${PLAN_SAY[u.shape]}, from what it holds.`;
+}
+
+/** What a model-made drawing says beside its reason: what asking cost (`slash.ts` `costSaid`). */
+export const drewCostWhy = (why: string, cost: string | null): string[] => (cost === null ? [why] : [why, cost]);
+
 /** The most "I drew X. Keep it?" a day, and at once. */
 export const DREW_A_DAY = 1;
 

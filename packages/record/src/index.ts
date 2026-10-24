@@ -238,7 +238,8 @@ import type { EngineHealthRead } from './methods/engine.ts';
 import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
-import { drawingsOf, drewDraft, drewFiled } from './drew.ts';
+import { drewCostWhy } from './design-agent.ts';
+import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
@@ -3515,11 +3516,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * one waits, filed as Slash's question through the same loop as every other, so the cap and a no hold for it too. A
    * plan is kept by setting its project's plan, a page's calendar by accepting the change to the page.
    */
-  const slashDrew = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
-    const draft = drewDraft(clock.now(), drawingsOf(sql, kernel), drewFiled(sql));
+  /** The record's owner as a caller, whom the model draws for, as the daily look reads the record as its owner (`slashReading`). */
+  const drewOwner = (): CallContext | null => {
+    const id = kernel.members().find((m) => m.level === 'owner' && m.suspended_at === null)?.person_id ?? null;
+    return id === null ? null : { principal: { kind: 'person', id, level: 'owner' } };
+  };
+  const slashDrew = async (preview: SlashPreviewer | null = null): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const modelAsked = kernel.prefsOf(SLASH)[DREW_MODEL_PREF];
+    const asked = new Set(Array.isArray(modelAsked) ? modelAsked.filter((k): k is string => typeof k === 'string') : []);
+    const owner = drewOwner();
+    const canAsk = deps.slashModel !== undefined && preview !== null && owner !== null;
+    const draft = drewDraft(clock.now(), drawingsOf(sql, kernel), drewFiled(sql), asked, canAsk);
     if (draft === null) return { filed: [], dropped: [] };
-    const { filed, skipped } = await slashFiling([draft], slashReading());
-    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
+    const said = (skipped: { question: string; why: string }[]) => skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`);
+    if (!('asked' in draft)) {
+      const { filed, skipped } = await slashFiling([draft], slashReading());
+      return { filed, dropped: said(skipped) };
+    }
+    /* WHAT THE RULES COULD NOT DRAW IS ASKED OF THE MODEL ONCE (C14): the key is kept before the ask, so an ask that
+       fails or hangs is never paid for again, and what comes back passed the design check in `describe` before it is
+       filed here as the drawing, with what it cost said beside its reason. */
+    kernel.setPref(SLASH, DREW_MODEL_PREF, [...asked, draft.key].slice(-200));
+    const got = await slashDescribed(draft.asked, draft.page, owner!, preview);
+    if (!got.ok) return { filed: [], dropped: [`${draft.question} was not drawn: ${'refusal' in got ? got.refusal.fix : 'the record changed while it was drawn.'}`] };
+    const first = got.value.drafts[0];
+    if (first === undefined) return { filed: [], dropped: got.value.dropped.map((d) => `${draft.question} was not drawn: ${d}`) };
+    const cost = got.value.cost?.said ?? null;
+    const made: SlashDraft = {
+      key: draft.key,
+      question: draft.question,
+      body_kind: 'change',
+      body: { ...first.body, why: drewCostWhy(draft.why, cost), about: `page.${draft.page}` },
+      by: got.value.by,
+      cause: draft.cause,
+    };
+    const { filed, skipped } = await slashFiling([made], slashReading());
+    return { filed, dropped: said(skipped) };
   };
 
   /**
@@ -10850,7 +10882,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       out.filed.push(...projects.filed);
       out.dropped.push(...projects.dropped);
       /* THEN THE ONE THING BRAINDOG DREW TODAY, if anything has data for a picture and none (`slashDrew`). */
-      const drew = await slashDrew();
+      const drewAs = drewOwner();
+      const drew = await slashDrew(drewAs === null ? null : previewerOf(this, drewAs));
       out.filed.push(...drew.filed);
       out.dropped.push(...drew.dropped);
       /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */

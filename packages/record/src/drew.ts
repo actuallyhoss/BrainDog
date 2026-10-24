@@ -18,7 +18,7 @@ import type { Kernel, RegisterDecl } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 import { designCheck, shapeBlock, type ShapeList } from 'braindog-render';
 
-import { DREW_A_DAY, drewKey, drewOffer, planDrawnOf, planOffered, planRows, PLAN_SHAPES, type PlanFacts, type PlanShape, type Unpictured } from './design-agent.ts';
+import { DREW_A_DAY, drewAsk, drewKey, drewOffer, planDrawnOf, planOffered, planRows, PLAN_SHAPES, type PlanFacts, type PlanShape, type Unpictured } from './design-agent.ts';
 
 /** A dated list is drawn by day once this many of its entries have a day. */
 export const DATED_LEAST = 5;
@@ -49,7 +49,13 @@ const shapeListOf = (r: RegisterDecl): ShapeList => ({
 });
 
 /** What a drawing is, with what keeping it writes: a page's declaration changed, or a project's row patched. */
-export type Drawing = Unpictured & { keep: { kind: 'page'; declaration: string; body: Record<string, unknown> } | { kind: 'row'; list: string; at: string; version: number; field: string } };
+export type Drawing = Unpictured & {
+  keep:
+    | { kind: 'page'; declaration: string; body: Record<string, unknown> }
+    | { kind: 'row'; list: string; at: string; version: number; field: string }
+    /* THE RULES COULD NOT DRAW IT (C14): the model is asked, about this page, in `drewAsk`'s words. */
+    | { kind: 'model'; page: string; asked: string };
+};
 
 /**
  * A page somebody wrote that lists a dated list with nothing that shows it by day, with the page as it would be with a
@@ -80,16 +86,13 @@ function datedOf(sql: Sql, kernel: Kernel, reads: (list: string) => boolean): Dr
       const rows = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) IS NOT NULL AND ${NOT_EXAMPLE}`, list, `$.${day.id}`)?.n ?? 0);
       if (rows < DATED_LEAST) continue;
       const block = shapeBlock({ kind: 'calendar', list: shapeListOf(decl), heading: `${decl.name} by day`, span: 12 });
-      if (!block || designCheck({ blocks: [block], reads }).length > 0) continue;
-      out.push({
-        kind: 'dated',
-        page: slug,
-        pageTitle: title,
-        list,
-        listName: decl.name,
-        rows,
-        keep: { kind: 'page', declaration: p.id, body: { ...body, blocks: [...blocks, block] } },
-      });
+      const found: Unpictured = { kind: 'dated', page: slug, pageTitle: title, list, listName: decl.name, rows };
+      /* A CALENDAR THE RULES CANNOT DRAW, OR ONE THE DESIGN CHECK REFUSES, IS THE MODEL'S TO DRAW (C14), asked once. */
+      if (!block || designCheck({ blocks: [block], reads }).length > 0) {
+        out.push({ ...found, keep: { kind: 'model', page: slug, asked: drewAsk(found) } });
+        continue;
+      }
+      out.push({ ...found, keep: { kind: 'page', declaration: p.id, body: { ...body, blocks: [...blocks, block] } } });
     }
   }
   return out;
@@ -208,14 +211,33 @@ export function drawingsOf(sql: Sql, kernel: Kernel, reads: (list: string) => bo
 export type DrewDraft = { key: string; question: string; body_kind: 'change' | 'options'; body: Record<string, unknown>; by: 'rules'; cause: string };
 
 /**
+ * Today's one drawing when the rules cannot draw it (C14): the words the model is asked, about the page, and what the
+ * question it files says. The caller asks, holds what comes back to the design check, and files it with its cost.
+ */
+export type DrewAsk = { key: string; question: string; why: string; asked: string; page: string; cause: string };
+
+/** The pref Slash keeps every drawing's key in that the model was asked, so none is asked of it twice. */
+export const DREW_MODEL_PREF = 'drew.model';
+
+/**
  * Today's one drawing as the question Slash files, or `null`. A page drawing is a change to that page, accepted to keep
  * it; a plan is two answers, Keep it with the row's plan set, and Throw away, which writes nothing.
  */
-export function drewDraft(nowMs: number, drawings: readonly Drawing[], filed: ReturnType<typeof drewFiled>): DrewDraft | null {
-  const offer = drewOffer({ nowMs, unpictured: drawings, filedOn: filed.filedOn, waiting: filed.waiting, asked: filed.asked });
+export function drewDraft(
+  nowMs: number,
+  drawings: readonly Drawing[],
+  filed: ReturnType<typeof drewFiled>,
+  /** Every key the model was asked before (`DREW_MODEL_PREF`), which is never offered again; empty with no model. */
+  modelAsked: ReadonlySet<string> = new Set(),
+  /** Whether a model is there to ask: without one, a drawing only the model could make is not offered. */
+  model = false,
+): DrewDraft | DrewAsk | null {
+  const drawable = model ? drawings : drawings.filter((x) => x.keep.kind !== 'model');
+  const offer = drewOffer({ nowMs, unpictured: drawable, filedOn: filed.filedOn, waiting: filed.waiting, asked: new Set([...filed.asked, ...modelAsked]) });
   if (offer === null) return null;
-  const d = drawings.find((x) => drewKey(x) === offer.key);
+  const d = drawable.find((x) => drewKey(x) === offer.key);
   if (!d) return null;
+  if (d.keep.kind === 'model') return { key: offer.key, question: offer.title, why: offer.why, asked: d.keep.asked, page: d.keep.page, cause: offer.key };
   const why = [offer.why];
   if (d.keep.kind === 'page')
     return {
