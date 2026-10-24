@@ -159,7 +159,10 @@ function listChange(f: FieldDecl | undefined, name: string, was: readonly unknow
       const named = vs.map((v) => linkName(f?.to, v, names)).filter((n): n is string => n !== null);
       const rest = vs.length - named.length;
       if (rest === 0) return listed(named);
-      return named.length === 0 ? (rest === 1 ? 'one more' : `${rest} more`) : listed([...named, rest === 1 ? 'one more' : `${rest} more`]);
+      /* "another project" where the list it points at says what one of its rows is, else "one more". */
+      const one = f?.to ? REGISTERS[f.to]?.one?.trim().toLowerCase() : undefined;
+      const more = rest > 1 ? `${rest} more` : named.length === 0 && one ? `another ${one}` : 'one more';
+      return named.length === 0 ? more : listed([...named, more]);
     };
     if (gone.length === 0) return `added this to ${said(added)}`;
     if (added.length === 0) return `took this off ${said(gone)}`;
