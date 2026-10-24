@@ -40,7 +40,7 @@ export function warmFor(url: URL): Warm | null {
       return pageReader(base, io).read(slug, filter);
     };
   }
-  if (inner === '/decide' && !url.searchParams.has('classic')) {
+  if (inner === '/decide') {
     return async (base, io) => {
       const [{ readDecide, readCalls }, { loadHandled }, { createClient }] = await Promise.all([
         import('../../routes/decide/views.ts'),

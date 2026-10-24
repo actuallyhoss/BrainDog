@@ -20,8 +20,9 @@
   BRAINDOG'S OWN PAGE UPDATES ARE ONE CARD under the questions, for the owner (`Improved.svelte`): "BrainDog improved 4
   of your pages", what changes, and Accept. It reads what waits from the same place Add-ons does (`improved.ts`).
 
-  THE OLD SCREEN IS KEPT, at `/decide?classic` (`Classic.svelte`), until this page does everything it did, and it is
-  what a host too old to draw a body is shown. It is loaded only when it is asked for.
+  THE OLD SCREEN IS GONE (C31, 24 October). Its keys are this page's now: a number answers with that option and `x`
+  chooses a card for one answer to several (the page reader's), `a` gives the suggested answer and `d` defers. `/decide?classic`
+  is an address somebody kept, and it opens this page. A host that cannot draw a body says so in the page's own refusal.
 
   `/decide/<id>` IS WHERE ONE QUESTION IS EXAMINED, and every card here opens it.
 -->
@@ -42,7 +43,7 @@
   import { goto } from '$app/navigation';
   import { choose, type PackState } from '$lib/record/packs.ts';
   import { hostedHere } from '../settings/billing.ts';
-  import { fromInput, keyAct } from './press.ts';
+  import { fromInput, keyAct, queueAct } from './press.ts';
   import type { Improved } from './improved.ts';
   import { askerOf as cardAsker } from '$lib/decide/card.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -77,8 +78,6 @@
 
   let { data } = $props();
 
-  const classic = $derived(route.url.searchParams.has('classic'));
-
   /* ── the reader ──────────────────────────────────────────────────────────── */
 
   const shell = $derived(route.data as unknown as Shell);
@@ -99,8 +98,6 @@
 
   /** The record's answer for the page, `null` while it is out. */
   let got = $state<Opened | null>(null);
-  /** A host too old to draw a body, which is shown the classic screen. */
-  let unserved = $state(false);
   let calls = $state<Call[]>([]);
   let client: ReturnType<typeof createClient> | null = null;
   /** A read of the page's own is out: `listen` waits for it rather than asking again on top of it. */
@@ -148,12 +145,14 @@
       const [out, called] = await Promise.all([storedDecide().then((body) => readDecide(apiBase(), body)), readCalls(client)]);
       /* THE CALLS ARE THE PAGE'S COMPANY, NOT ITS CONDITION: a refusal of them keeps what was drawn before. */
       if (called.from === 'live') calls = called.value;
-      /* A HOST TOO OLD TO DRAW THE BODY IS TOLD FROM THE FIRST ANSWER, and a later read that is refused keeps the page
-         as it was drawn rather than blanking it for one sentence. The copy's page is not one drawn by the record: a
-         refusal replaces it, unless nobody was reached. */
+      /* A HOST THAT CANNOT DRAW THE BODY, OR WAS NOT REACHED, IS A REFUSAL like any other: a later read that is refused
+         keeps the page as it was drawn rather than blanking it for one sentence, and the copy's page stays while
+         nobody was reached. */
       if (out === null) {
-        unserved = got === null || fromCopy;
-        fromCopy = false;
+        if (got === null || (fromCopy && !offlineNow())) {
+          got = { from: 'refused', fix: offlineNow() ? copy.readOffline : copy.screenFailed };
+          fromCopy = false;
+        }
       } else if (out.from === 'live' || got === null || (fromCopy && !offlineNow())) {
         got = out;
         fromCopy = false;
@@ -182,12 +181,10 @@
   const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));
 
   $effect(() => {
-    if (classic) return;
     untrack(() => void readHandled());
   });
 
   $effect(() => {
-    if (classic) return;
     untrack(() => {
       const at = opened();
       void read()
@@ -297,9 +294,12 @@
     /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g` then `e` is not an edit. */
     if (e.key === 'g') return void (goAt = Date.now());
     const act = keyAct(e.key);
-    if (act === null || Date.now() - goAt < 1000) return;
+    const queued = queueAct(e.key);
+    if ((act === null && queued === null) || Date.now() - goAt < 1000) return;
     const card = questionUnder();
     if (!card) return;
+    if (queued !== null) return void queueKey(e, card, queued);
+    if (act === null) return;
     if (act === 'edit') {
       const id = card.dataset.row?.slice('q:'.length);
       if (!id || !answerable) return;
@@ -326,13 +326,32 @@
     press.click();
   }
 
+  /**
+   * `a` AND `d` ON THE QUESTION UNDER THE CURSOR. `a` presses the suggested answer, or Accept where the record answers
+   * with its two, and never one that is hard to undo or moves money: such a card opens whole on its own page, where its
+   * button names the amount, as a number on a hard option did on the old screen. `d` opens the question to defer it,
+   * with its reason and wake date.
+   */
+  function queueKey(e: KeyboardEvent, card: HTMLElement, queued: 'approve' | 'defer') {
+    const id = card.dataset.row?.slice('q:'.length);
+    if (!id || !answerable) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (queued === 'defer') return void goto(at(`/decide/${encodeURIComponent(id)}?defer`));
+    const press = card.querySelector<HTMLElement>('.queue-act[data-recommended], .queue-option[data-recommended] .queue-act') ?? twoOn(card)?.accept ?? null;
+    if (!press || (press instanceof HTMLButtonElement && press.disabled)) return;
+    /* THE BUTTON ENTER WOULD PRESS IS THE SAFE ONE (`card.ts` `enter`): any other weighs something. */
+    const weighs = card.querySelector('.queue-cost') !== null || press.dataset.enter === undefined;
+    if (weighs) return void goto(at(`/decide/${encodeURIComponent(id)}`));
+    press.click();
+  }
+
   $effect(() => {
-    if (classic) return;
     window.addEventListener('keydown', onkey, { capture: true });
     return () => window.removeEventListener('keydown', onkey, { capture: true });
   });
   /* NOT WHILE AN ANSWER WAITS FOR ITS UNDO, so the card holding it is not drawn afresh under the reader. */
-  listen(follow, () => classic || reading || typing() || document.querySelector('main [data-held], main [aria-busy="true"]') !== null);
+  listen(follow, () => reading || typing() || document.querySelector('main [data-held], main [aria-busy="true"]') !== null);
 
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 
@@ -392,14 +411,9 @@
 </script>
 
 <svelte:head>
-  {#if !classic && !unserved}<title>{titleOf(said('decide'))}</title>{/if}
+  <title>{titleOf(said('decide'))}</title>
 </svelte:head>
 
-{#if classic || unserved}
-  {#await import('./Classic.svelte') then loaded}
-    <loaded.default {data} />
-  {/await}
-{:else}
   <!-- THE LINE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count; on a
        page with nothing at all to draw the cleared mark under it says that, once. NOTHING RED IN THE HEAD (plan of 20
        October): noting a choice to make is the rarest thing done here, so it and Select are in the "⋯", and only for
@@ -529,7 +543,6 @@
   </div>
 
   <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
-{/if}
 
 {#snippet handledColumn()}
   {#if handled}<div class="handled-col" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="column" /></div>{/if}

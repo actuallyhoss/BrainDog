@@ -13,7 +13,7 @@ test('A PAGE AND NEEDS YOU ARE READ AHEAD, under a record slug or none; every ot
   assert.equal(typeof warmFor(at('/app/acme/p/kiln')), 'function');
   assert.equal(typeof warmFor(at('/app/decide')), 'function');
   assert.equal(typeof warmFor(at('/app/acme/decide')), 'function');
-  assert.equal(warmFor(at('/app/decide?classic')), null, 'the kept classic screen reads as it always did');
+  assert.equal(typeof warmFor(at('/app/decide?classic')), 'function', 'a kept address of the old screen opens Decide, read ahead as it is');
   assert.equal(warmFor(at('/app/')), null);
   assert.equal(warmFor(at('/app/r/tasks')), null);
   assert.equal(warmFor(at('/app/decide/SG8')), null);

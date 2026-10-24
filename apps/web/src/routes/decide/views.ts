@@ -1,8 +1,8 @@
 /**
  * DECIDE, DECLARED, AND THE TWO LISTS UNDER THE QUEUE THAT ARE NOT YET A SOURCE.
  *
- * THE PAGE IS A BODY LIKE ANY OTHER ("every page is declared"). `/decide` was a screen of its own, kept
- * now at `/decide?classic` (`Classic.svelte`) until the declared page does everything it did; `decideHome` is the body
+ * THE PAGE IS A BODY LIKE ANY OTHER ("every page is declared"). `/decide` was a screen of its own, and
+ * since 24 October it is this page alone (the old one's keys moved onto it); `decideHome` is the body
  * the page draws through `PageView`, as Today's is (`lib/home/default-home.ts`): the line the head says, the first
  * question drawn whole, the rest to be chosen and answered at once, what was put off and what was decided folded shut
  * under them. The record draws it with `previewPage` and nothing is installed, so nothing here is anybody's record by
@@ -516,8 +516,8 @@ export function decideBlockOf(b: Answered, now: number): LiveBlock {
 
 /**
  * DECIDE'S PAGE, DRAWN BY THE RECORD and never installed: `previewPage` answers the body as `page` answers an installed
- * one, each block held to the reader, and writes nothing. `null` from a host older than the method, which leaves the
- * classic screen as the way in.
+ * one, each block held to the reader, and writes nothing. `null` from a host older than the method, or none reached,
+ * which the screen says as a refusal.
  */
 export async function readDecide(base: string, body: DecideBody = DECIDE_HOME, io?: Fetch): Promise<Opened | null> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });

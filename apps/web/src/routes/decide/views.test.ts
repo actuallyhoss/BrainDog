@@ -152,7 +152,7 @@ test('the record draws the page: the first question whole, the rest after it onc
   assert.ok(shaped.drawsAny);
 });
 
-test('a host older than the method shows the classic screen, and a refusal is the record’s sentence', async () => {
+test('a host older than the method answers nothing to draw, and a refusal is the record’s sentence', async () => {
   const older = (async () => reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called previewPage.' } })) as unknown as Fetch;
   assert.equal(await readDecide(BASE, DECIDE_HOME, older), null);
   const refused = (async () => reply(400, { ok: false, refusal: { code: 'DECLARATION_INVALID', fix: 'That page cannot be drawn.' } })) as unknown as Fetch;
@@ -281,12 +281,13 @@ test('how the calls went is one line over those already checked', () => {
 
 const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 
-test('the screen draws the declared page through the one reader, and keeps the old one at ?classic', () => {
+test('the screen draws the declared page through the one reader, and no old screen beside it', () => {
   assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select whole \{reread\} opens=\{handled \? handledColumn : undefined\} \/>/u);
   assert.match(screen, /readDecide\(/u);
   assert.match(screen, /decideDrawn\(/u);
-  assert.match(screen, /searchParams\.has\('classic'\)/u);
-  assert.match(screen, /import\('\.\/Classic\.svelte'\)/u);
+  /* `/decide?classic` IS AN ADDRESS SOMEBODY KEPT, and it draws this page: nothing reads the word. */
+  assert.doesNotMatch(screen, /searchParams\.has\('classic'\)/u);
+  assert.doesNotMatch(screen, /Classic\.svelte/u);
 });
 
 test('the head is calm: no group control, no waiting chart, no key hints, no counts', () => {

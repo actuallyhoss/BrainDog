@@ -29,6 +29,14 @@ export type KeyAct = 'accept' | 'edit' | 'decline';
 export const keyAct = (key: string): KeyAct | null => (key === 'Enter' ? 'accept' : key === 'e' ? 'edit' : key === 'Backspace' ? 'decline' : null);
 
 /**
+ * THE QUEUE'S TWO MORE, on `/decide` and not on one question's page: `a` gives the suggested answer (or Accept) and `d`
+ * opens the question to defer it. They were the old screen's (`/decide?classic`, retired 24 October), and a number and
+ * `x` are the page reader's.
+ */
+export type QueueAct = 'approve' | 'defer';
+export const queueAct = (key: string): QueueAct | null => (key === 'a' ? 'approve' : key === 'd' ? 'defer' : null);
+
+/**
  * WHETHER A KEY CAME FROM INSIDE SOMETHING A PERSON TYPES OR TICKS IN: a field, a box, a choice or anything editable.
  *
  * READ OFF THE KEY'S OWN TARGET, NOT ONLY OFF THE FOCUS. Backspace on a row's tick, or in a field a card had just

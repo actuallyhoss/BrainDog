@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords } from './press.ts';
+import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, queueAct, twoWords } from './press.ts';
 import { words } from './words.ts';
 
 const change = (band = 'rows') => ({
@@ -284,4 +284,10 @@ test('the suggested answer is the accent’s tint, and not marked where the choi
   assert.doesNotMatch(style, /data-recommended|\.queue-rec\b|\.dc-rec\b/u, 'Needs you draws its own copy of the suggestion again, which can drift');
   /* NOTHING MOVES OR FADES WHEN A KEY LANDS: the by-line is always there, and nothing on the card is transitioned. */
   assert.match(queue, /\.page :global\(\.queue-card > \.queue-by\) \{\n\s+display: flex;\n\s+transition: none;/u, 'the by-line waits for the cursor and moves the card under it');
+});
+
+test('a and d are the queue keys, and no other key is', () => {
+  assert.equal(queueAct('a'), 'approve');
+  assert.equal(queueAct('d'), 'defer');
+  for (const key of ['A', 'D', 'e', 'Enter', 'x', '1']) assert.equal(queueAct(key), null, key);
 });

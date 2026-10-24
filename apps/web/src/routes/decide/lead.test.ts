@@ -107,28 +107,6 @@ test('a share is the pair the question’s body gives as data, and a sentence ne
   assert.equal(evidenceIn({ options: [{ id: 'accept', because: '2 of 5 steps are done.' }] }), null);
 });
 
-/**
- * THE SCREEN READS THESE, and keeps what the gates and the other tests hold it to. A pure module the screen does not
- * call fixes nothing, so the wiring is read as text, the way `page.test.ts` reads the answer buttons.
- */
-test('the queue draws its sentence, its lead and its chart from this module, and draws the open question once', () => {
-  const page = readFileSync(new URL('./Classic.svelte', import.meta.url), 'utf8');
-  assert.match(page, /from '\.\/lead\.ts'/u);
-  assert.match(page, /sentenceOf\(/u);
-  assert.match(page, /waitedOf\(/u);
-  /* THE OPEN QUESTION'S SHARE IS READ FROM ITS BODY, never out of its reason's words. */
-  assert.match(page, /evidenceIn\(body/u);
-  assert.doesNotMatch(page, /evidenceOf\(/u);
-  /* THE LEAD IS ITS OWN `ol.queue`, and the rows under it start after it, so no question is drawn twice. */
-  assert.match(page, /<ol class="queue"/u);
-  assert.match(page, /class="q"/u);
-  assert.match(page, /order\.slice\(1\)/u);
-  /* THE HOOKS THE KEYS GATE PRESSES. */
-  /* THE OPTIONS ARE THE ONE DECISION CARD'S, which carries the ids the keys find by, and marks the suggestion. */
-  for (const hook of ['id="q-{q.id}"', 'idOf={(key) => `opt-${q.id}-${key}`}', '<DecisionCard', 'class="pick"', 'data-picking=', 'data-cursor=', 'data-done='])
-    assert.ok(page.includes(hook), `the queue no longer draws ${hook}`);
-});
-
 test('the declared page says the same sentence from a count, how many are hard to undo, the first suggestion and how many are late', () => {
   assert.deepEqual(countSentence(0, 0, 'Yes'), null);
   assert.deepEqual(countSentence(2, 0, 'Per seat', 'Claude'), { text: 'Two questions wait on you. Claude suggests “Per seat” for the first.', needs: '' });

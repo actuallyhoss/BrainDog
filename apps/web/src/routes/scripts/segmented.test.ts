@@ -5,7 +5,7 @@
  * (`class="segmented"` on the page's own element) has no `data-slides`, and `controls.css` leaves it the fill that
  * fades out in one place and in at another. Five were written by hand: a script's two groups (how often, and which
  * door), the health of an update on a track, the months of `/usage` (a `nav` of links, one of them this month), and
- * the old decide screen's group control.
+ * the switch between Decide's columns on a phone.
  *
  * WHAT EACH KEEPS: its name for a screen reader, its pressed or current mark, and `data-on` on the chosen segment,
  * which is how the part finds it.
@@ -25,7 +25,7 @@ const read = (path: string): string =>
 
 const FORM = { name: 'scripts/[id]/ScriptForm.svelte', text: read('./[id]/ScriptForm.svelte'), tracks: 2 };
 const USAGE = { name: 'usage/+page.svelte', text: read('../usage/+page.svelte'), tracks: 1 };
-const DECIDE = { name: 'decide/Classic.svelte', text: read('../decide/Classic.svelte'), tracks: 1 };
+const DECIDE = { name: 'decide/+page.svelte', text: read('../decide/+page.svelte'), tracks: 1 };
 const FILES = [FORM, USAGE, DECIDE];
 
 /** An element of the page's own (a lower-case tag) that carries the track's class. */
@@ -79,14 +79,13 @@ test('usage: the months are a nav of links, and the month on screen is the curre
   assert.match(styles(USAGE.text), /:global\(\.months\) \.month\s*\{[^}]*text-decoration:\s*none/u);
 });
 
-test('the old decide screen: the group control is a named group that gives way on a phone', () => {
+test('decide: the switch between Money, Quick and Handled is a named group, each column pressed when it shows', () => {
+  /* THE OLD SCREEN'S GROUP CONTROL WENT WITH IT (24 October); the declared page's one track is the phone's switch
+     between its columns. */
   const page = markup(DECIDE.text);
-  assert.match(page, /<Segmented\b[^>]*\bclass="group-by"[^>]*\brole="group"[^>]*\baria-label=\{copy\.decideGroup\}/u);
-  assert.match(page, /aria-pressed=\{grouping === 'about'\}\s+data-on=\{grouping === 'about' \? '' : undefined\}/u);
-  /* Named by its own class as well as the part's: the control is drawn in the page head, outside this file's `.page`,
-     so a bare `:global(.segmented)` would hide every other screen's control on a phone. */
-  const css = styles(DECIDE.text);
-  assert.match(css, /@media \(width < 900px\) \{[\s\S]*?:global\(\.segmented\.group-by\)\s*\{\s*display:\s*none;/u);
-  assert.doesNotMatch(css, /:global\(\.segmented\)\s*\{/u, 'a rule for every track on every screen');
-  assert.match(css, /:global\(\.head\[data-under\] \.segmented\.group-by\)\s*\{/u);
+  assert.match(page, /<Segmented role="group" aria-label=\{WORDS\.columns\} full>/u);
+  assert.match(page, /data-on=\{showing === c \? '' : undefined\} aria-pressed=\{showing === c\}/u);
+  /* ITS RULES REACH THE PART'S TRACK THROUGH THE PAGE'S OWN `.switch`, never every track on every screen. */
+  assert.match(styles(DECIDE.text), /\.switch > :global\(\.segmented\)\s*\{/u);
+  assert.doesNotMatch(styles(DECIDE.text), /(?:^|[{};]\s*):global\(\.segmented\)\s*\{/u, 'a rule for every track on every screen');
 });

@@ -68,26 +68,21 @@ test('a level with no word for it is still refused in a sentence', () => {
 /**
  * A SOURCE READ, BECAUSE THE FOUR TESTS ABOVE PASS AGAINST A SCREEN WITH THE REPAIR TORN OUT.
  *
- * MEASURED, on the checking pass: the line `disabled={!answerable}` was deleted from the option
- * buttons in `+page.svelte` (the classic queue, `Classic.svelte` now) and every one of the four tests above stayed green, because all four ask
- * `answering.ts` and none of them asks the screen. The module is the easy half. The half that was
- * actually broken is the WIRING, and there is no DOM harness in this app to press a button in, so
- * this reads the markup the way `first-run.test.ts` reads `RowForm.svelte` for the same reason.
+ * MEASURED, on the checking pass: the line `disabled={!answerable}` was deleted from the option buttons of the old
+ * queue and every one of the four tests above stayed green, because all four ask `answering.ts` and none of them asks
+ * the screen. The module is the easy half; the half that was broken is the WIRING, and there is no DOM harness in this
+ * app to press a button in, so this reads the markup the way `first-run.test.ts` reads `RowForm.svelte`.
  *
- * WHAT IT PINS IS THE FOUR PLACES A READER CAN GET IN, and they are four and not one: the option
- * button, the batch commit, the keyboard answer inside `take`, and the batch commit's own handler.
- * A control that is off is not a path that is closed, so the two handlers are pinned as well as the
- * two controls, and each is pinned to sit BEFORE the call it is guarding rather than merely to exist
- * somewhere in the function.
+ * THE OLD QUEUE IS GONE (24 October), and the screen is the declared page (`+page.svelte`): every card is the one
+ * decision card through `QueueAnswer`, which works out who may answer from the shell, and the page's own keys are the
+ * only path a reader reaches an answer by without a card's button. So what is pinned is the card's rule, the sentence
+ * over the queue, and each key's guard sitting before the press it guards.
  */
-const page = readFileSync(fileURLToPath(new URL('./Classic.svelte', import.meta.url)), 'utf8');
+const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 
 test('every option is words and not a button for a reader who may not answer, and the screen says why', () => {
-  /* THE CARD IS THE ONE DECISION CARD NOW (`lib/decide/DecisionCard.svelte`), and its rule is the renderer's: a control
-     that cannot act is absent, not greyed. So the screen hands it the answer it worked out, and the card draws the
-     options as words when it is no. */
-  assert.match(page, /<DecisionCard\n\s+question=\{queueOf\(q, aboutFor\(q\)\)\}\n\s+may=\{answerable\}/u, 'the card is not told who may answer');
-  assert.match(page, /onpress=\{\(key\) => void take\(q, key\)\}/u, 'a press on the card does not reach take, where the guard is');
+  /* THE CARD IS THE ONE DECISION CARD (`lib/decide/DecisionCard.svelte`), and its rule is the renderer's: a control that
+     cannot act is absent, not greyed. */
   const card = readFileSync(fileURLToPath(new URL('../../lib/decide/DecisionCard.svelte', import.meta.url)), 'utf8');
   /* EACH CHOICE IS A BUTTON ONLY FOR A READER WHO MAY ANSWER, and the same rectangle as words for one who may not; the
      buttons under the choices (Decide, Accept and Decline, Not now) are not drawn for them at all. */
@@ -95,45 +90,29 @@ test('every option is words and not a button for a reader who may not answer, an
   assert.match(card, /\{:else\}\n\s+<div class="dc-choice" data-read>\n\s+\{@render choiceBody\(way\)\}/u, 'the card draws nothing in place of the option it will not offer');
   assert.match(card, /\{#if drawn && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?(\s+\{#if moneyAbove\}[^\n]*\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
   /* THE KEPT COPY IS THE ONE EXCEPTION (VERIFY H45): while it is drawn nobody is known to answer or not, so the controls
-     keep their boxes, quiet and `aria-disabled`, and nothing presses; the live shell decides. A reader the live shell
-     says may not answer still reads words. */
+     keep their boxes, quiet and `aria-disabled`, and nothing presses; the live shell decides. */
   assert.match(card, /const kept = \$derived\(may === undefined && shell\.stale === true && !answerable\);/u, 'the card holds its controls for somebody the live shell said may not answer');
   assert.match(card, /const drawn = \$derived\(answerable \|\| kept\);/u);
   assert.match(card, /function press\(way: Way\) \{\n(\s+if \(busy \|\| holding !== null\) return;\n)?\s+if \(kept \|\|/u, 'a control held for the kept copy answers');
   assert.match(card, /function selectWay\(way: Way\) \{\n\s+if \(kept \|\|/u, 'a choice held for the kept copy is chosen');
   /* THE SENTENCE THAT SAYS WHY HAS TO BE ON THE PAGE, over the queue, before anybody presses. */
-  assert.match(
-    page,
-    /\{#if !answerable\}\n\s+<p class="cannot" id="cannot-decide">\{whyNot\}<\/p>\n\s+\{\/if\}/u,
-    'nothing renders the sentence that says why the options are words',
-  );
+  assert.match(page, /\{#if !answerable[^}]*\}\n(\s+<!--[^]*?-->\n)?\s+<p class="cannot" id="cannot-decide">\{whyNot\}<\/p>/u, 'nothing renders the sentence that says why the options are words');
 });
 
-test('the batch commit is off too, and points at the same sentence', () => {
-  assert.match(
-    page,
-    /disabled=\{batching \|\| !answerable \|\| \(from === 'live' && !batchReason\.trim\(\)\)\}\n\s+aria-describedby=\{answerable \? undefined : 'cannot-decide'\}/u,
-    'one answer to eight questions is still offered to a reader who may not answer one',
-  );
-});
-
-test('both handlers refuse before they act, not only the controls that call them', () => {
-  const guard = /if \(!answerable\) \{\n\s+toasts\.push\(whyNot, \{ intent: 'warn' \}\);\n\s+return;\n\s+\}/gu;
-  assert.equal([...page.matchAll(guard)].length, 2, 'the two write handlers do not both refuse a reader who may not answer');
-
-  /* AND EACH ONE BEFORE THE WRITE IT GUARDS. `1` to `9` and `a` reach `take` with no button in the
-     way, so a guard sitting under `answerFor` would be a key that answers and then apologises. */
-  const takeAt = page.indexOf('async function take(q: Question, key: string) {');
-  const answeredAt = page.indexOf('const a = answerFor(q, key,');
-  assert.ok(takeAt >= 0 && answeredAt > takeAt, 'take no longer reads the way this test assumes');
-  const inTake = page.slice(takeAt, answeredAt).search(guard);
-  assert.ok(inTake >= 0, 'a keyboard answer records before anybody checks whether it may');
-
-  const batchAt = page.indexOf('async function answerPicked() {');
-  const sentAt = page.indexOf('const out = await answerQuestion(apiBase(), q.id, a.option, reason);');
-  assert.ok(batchAt >= 0 && sentAt > batchAt, 'answerPicked no longer reads the way this test assumes');
-  const inBatch = page.slice(batchAt, sentAt).search(guard);
-  assert.ok(inBatch >= 0, 'the batch sends its answers before anybody checks whether it may');
+test('the page keys refuse a reader who may not answer before they press anything', () => {
+  /* `e` OPENS THE QUESTION TO CHANGE IT, and `a` and `d` answer or defer it: each asks `answerable` before it acts. */
+  const onkeyAt = page.indexOf('function onkey(e: KeyboardEvent) {');
+  const editAt = page.indexOf("if (act === 'edit') {", onkeyAt);
+  assert.ok(onkeyAt >= 0 && editAt > onkeyAt, 'onkey no longer reads the way this test assumes');
+  assert.match(page.slice(editAt, editAt + 200), /if \(!id \|\| !answerable\) return;/u, 'e opens a question for somebody who may not answer it');
+  const queueAt = page.indexOf('function queueKey(');
+  const clickAt = page.indexOf('press.click();', queueAt);
+  assert.ok(queueAt >= 0 && clickAt > queueAt, 'queueKey no longer reads the way this test assumes');
+  const guardAt = page.indexOf('if (!id || !answerable) return;', queueAt);
+  assert.ok(guardAt > queueAt && guardAt < clickAt, 'a and d act before anybody checks whether the reader may answer');
+  /* AND `a` NEVER PRESSES WHAT WEIGHS SOMETHING: a cost on the card, or a button Enter would not press, opens it whole. */
+  const weighAt = page.indexOf('const weighs = ', queueAt);
+  assert.ok(weighAt > guardAt && weighAt < clickAt, 'a presses an answer before it is weighed');
 });
 
 /**

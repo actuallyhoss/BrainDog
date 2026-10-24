@@ -26,7 +26,6 @@ const TODAY = new Set([
   'automations/HubRows.svelte',
   'automations/[id]/+page.svelte',
   'decide/+page.svelte',
-  'decide/Classic.svelte',
   'inbox/+page.svelte',
   'jobs/+page.svelte',
   'packs/+page.svelte',

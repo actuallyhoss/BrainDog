@@ -193,26 +193,6 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     };
 
     /**
-     * THE CURSOR ON THE FIRST QUESTION `a` CAN ANSWER. `a` takes the suggested option or accepts a change,
-     * and a question with neither is one it rightly leaves alone. The record's rules now raise questions
-     * of their own at the head of the queue (a balance to update, an invoice gone late) with two plain
-     * options and no suggestion, so `onFirst` put the cursor where `a` has nothing to do and the gate read
-     * the key as dead. Each `j` moves one question; this stops on the first with a suggestion or an accept.
-     */
-    const onSuggested = async (page) => {
-      for (let i = 0; i < 20; i++) {
-        await page.keyboard.press('j');
-        await page.waitForTimeout(120);
-        const answerable = await page.evaluate(() => {
-          const q = document.querySelector('li.q[data-cursor]');
-          /* DecisionCard marks its suggestion `.queue-option[data-recommended]`; `.rec` is the older card's mark. */
-          return !!q && (q.querySelector('.queue-option[data-recommended], .rec') !== null || q.querySelector('[id$="-accept"]') !== null);
-        });
-        if (answerable) return;
-      }
-    };
-
-    /**
      * THE CURSOR ON THE FIRST ROW OF TODAY THAT `test` ACCEPTS. Today is a declared page drawn as a home (`lib/page`,
      * PageBody in mode=home), whose `j` walks every row of every block: questions, tasks and what falls due. `x` ticks
      * only a task and a number answers only a question, so each is pressed on a row it can act on. The row the keys
@@ -229,6 +209,22 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     const onTask = onTodayRow(() => document.querySelector('[data-row-cursor] [role="checkbox"]') !== null);
     /* AND ON `/decide`, THE CURSOR ON A QUESTION'S CARD, which is what Decide's own keys act on (`questionUnder`). */
     const onCard = onTodayRow(() => document.querySelector('.qa[data-row^="q:"][data-row-cursor]') !== null);
+    /* A CARD WITH AN OPTION TO ANSWER BY NUMBER, and one with the box `x` chooses it by.
+
+       AND THE FIRST QUESTION `a` CAN ANSWER. `a` takes the suggested option or accepts a change, and a question with
+       neither is one it rightly leaves alone, as is one that is hard to undo or moves money, which it opens instead.
+       The record's rules raise questions of their own at the head of the queue (a balance to update, an invoice gone
+       late) with two plain options and no suggestion, so the first card is not always one `a` has anything to do on.
+       Each `j` moves one question; this stops on the first with a safe suggestion or an accept. DecisionCard marks its
+       suggestion `.queue-option[data-recommended]` or `.queue-act[data-recommended]`. */
+    const onCardAnswer = onTodayRow(() => document.querySelector('.qa[data-row^="q:"][data-row-cursor] .queue-act') !== null);
+    const onCardSuggested = onTodayRow(() => {
+      const card = document.querySelector('.qa[data-row^="q:"][data-row-cursor]');
+      if (!card || card.querySelector('.queue-cost') !== null) return false;
+      const press = card.querySelector('.queue-act[data-recommended], .queue-option[data-recommended] .queue-act') ?? card.querySelector('[id$="-opt-accept"]');
+      return press !== null && press.hasAttribute('data-enter');
+    });
+    const onCardPick = onTodayRow(() => document.querySelector('.qa[data-row^="q:"][data-row-cursor] [role="checkbox"]') !== null);
 
     /**
      * THE WRITES A TICK OR AN ANSWER SENDS, HELD. One record serves every recipe in this run, in the registry's order,
@@ -472,17 +468,18 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* SG5 is not the last open question, so `j` has a next one to go to. */
       'gate-next': { route: '/decide/SG5', press: ['j'] },
 
-      /* THE QUEUES, on the classic screen at `/decide?classic`: 1-9, a, d and x on the `#q-` cards are its keys, and
-         the declared page at `/decide` walks with the page reader's (j, k, x, Enter). The cursor starts on nothing,
-         so a first `j` is the change for `decide-move`; every other key is pressed with the cursor already placed by
-         `setup`, or the `j` would be what changed the page. `e` is the declared page's own (`+page.svelte` `onkey`),
-         pressed there on a card, and the change is the question opening at `?edit`. */
-      'decide-move': { route: '/decide?classic', press: ['j'] },
+      /* THE QUEUES, on the declared page at `/decide` since the classic screen went (24 October): the page reader walks
+         with j and k, chooses a card with `x` and answers with its option's number (`PageBody.svelte` `homeKey`), and
+         `e`, `a` and `d` are the page's own (`+page.svelte` `onkey`). The cursor starts on nothing, so a first `j` is the
+         change for `decide-move`; every other key is pressed with the cursor already on a card by `setup`, or the `j`
+         would be what changed the page. An answer is held at the socket as Today's are, so the queue stays as the later
+         recipes expect it. */
+      'decide-move': { route: '/decide', press: ['j'] },
       'decide-edit': { route: '/decide', setup: onCard, press: ['e'] },
-      'decide-answer': { route: '/decide?classic', setup: onFirst, press: ['1'] },
-      'decide-approve': { route: '/decide?classic', setup: onSuggested, press: ['a'] },
-      'decide-defer': { route: '/decide?classic', setup: onFirst, press: ['d'] },
-      'decide-select': { route: '/decide?classic', setup: onFirst, press: ['x'] },
+      'decide-answer': { route: '/decide', setup: held(onCardAnswer), press: ['1'] },
+      'decide-approve': { route: '/decide', setup: held(onCardSuggested), press: ['a'] },
+      'decide-defer': { route: '/decide', setup: onCard, press: ['d'] },
+      'decide-select': { route: '/decide', setup: onCardPick, press: ['x'] },
       'inbox-move': { route: '/inbox', setup: arrivals, press: ['j'] },
       'inbox-file': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['e'] },
       'inbox-select': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['x'] },
