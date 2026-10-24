@@ -166,7 +166,18 @@ export type SideHeads = Record<'money' | 'kernel' | 'lists' | 'views' | 'extras'
  * out (Work, People), then money's lists, the agents' own, the other lists, every saved view, and the tools. Empty groups
  * are left out. GENERIC: a list is money's by a money field it declares and the agents' by the kernel declaring it.
  */
-export function groupsOf(places: readonly SideLink[], lists: readonly SideList[], views: readonly SideLink[], tools: readonly SideLink[], heads: SideHeads): SideGroup[] {
+export function groupsOf(placed: readonly SideLink[], all: readonly SideList[], views: readonly SideLink[], tools: readonly SideLink[], heads: SideHeads): SideGroup[] {
+  /* ONE ROW A LIST (audit C of 25 October, X6): a new shop's sidebar said "People, People 1", the People place and the
+     list it is named as. Two rows never say one word: the list is the place's row, which carries the list's count, as
+     Work carries its tasks'. The same reading the shell makes of a page named as its list (`waiting` in `boot-live.ts`). */
+  const word = (s: string): string => s.trim().toLowerCase();
+  const named = new Set(placed.map((p) => word(p.label)));
+  const folded = new Map(all.flatMap((l) => (!l.kernel && named.has(word(l.name)) ? [[word(l.name), l] as const] : [])));
+  const places = placed.map((p) => {
+    const l = folded.get(word(p.label));
+    return l && p.count === undefined ? { ...p, count: l.count } : p;
+  });
+  const lists = all.filter((l) => folded.get(word(l.name)) !== l);
   const row = (l: SideList): SideLink => ({ href: `/r/${l.id}`, label: l.name, icon: l.icon, count: l.count });
   const group = (key: keyof SideHeads, items: SideLink[]): SideGroup[] => (items.length > 0 ? [{ key, ...heads[key], items }] : []);
   const saved = [...views, ...lists.flatMap((l) => l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })))];
@@ -179,6 +190,13 @@ export function groupsOf(places: readonly SideLink[], lists: readonly SideList[]
     ...group('extras', [...tools]),
   ];
 }
+
+/**
+ * WHETHER THE SIDEBAR OPENS ON ITS PROJECTS (audit C of 25 October, X6): only once the record holds one. "Projects 0 in
+ * play" headed the sidebar of a new shop, which keeps orders and not projects; a record's first project is added on its
+ * Projects page, which says how.
+ */
+export const holdsProjects = (read: { rows: readonly unknown[] } | null): boolean => read !== null && read.rows.length > 0;
 
 /**
  * WORK'S ROW SAYS HOW MANY ARE OPEN (audit Z8, today-1512-light.png): it said 59, every row the tasks list holds with

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, lanesOf, phoneLine, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
+import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, holdsProjects, lanesOf, phoneLine, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
 
 const HEADS = {
   money: { label: 'Money', icon: 'money' },
@@ -33,6 +33,25 @@ test('lists group in the order the phone read them: places, money, the agents, t
   );
   assert.equal(groups[2]?.items[0]?.count, 5);
   assert.equal(groups[1]?.items[0]?.href, '/r/a1');
+});
+
+test('ONE ROW A LIST (audit C, X6): a place and the list it is named as are one row, which carries the list count', () => {
+  /* Invented: a record whose Guests place is off the bar and whose Guests list holds two. The sidebar said "Guests,
+     Guests 2", two rows of one word. A list named as no place keeps its own row. */
+  const groups = groupsOf([{ href: '/p/guests', label: 'Guests', icon: 'people' }], [list('folk', { name: 'Guests', count: 2 }), list('kilns', { name: 'Kilns', count: 3 })], [], [], HEADS);
+  assert.deepEqual(
+    groups.map((g) => [g.label, g.items.map((i) => `${i.label} ${String(i.count)} ${i.href}`)]),
+    [
+      ['Guests', ['Guests 2 /p/guests']],
+      ['Other lists', ['Kilns 3 /r/kilns']],
+    ],
+  );
+});
+
+test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT (audit C, X6): "Projects 0 in play" headed a new shop', () => {
+  assert.equal(holdsProjects(null), false);
+  assert.equal(holdsProjects({ rows: [] }), false);
+  assert.equal(holdsProjects({ rows: [{ key: 'things#1' }] }), true);
 });
 
 test('an empty kind draws no group, and a kernel list that holds money stays with the agents', () => {

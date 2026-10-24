@@ -26,7 +26,7 @@
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
   import { REGISTERS } from '../record/held.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, phoneLine, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
+  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, holdsProjects, phoneLine, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
   import { keptRead, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
 
@@ -450,25 +450,28 @@
 {:else}
   <aside class="s-side" aria-label={words.title}>
     <div class="s-scroll">
-      <div class="s-head">
-        {#if projects}<a class="s-title" href={at(projects)}>{words.title}</a>{:else}<span class="s-title">{words.title}</span>{/if}
-        {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
-        {#if read}
-          <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /></a>
+      <!-- THE PROJECTS ONCE THERE IS ONE (audit C, X6): "Projects 0 in play" headed a new shop. -->
+      {#if read === null ? !answered : holdsProjects(read)}
+        <div class="s-head">
+          {#if projects}<a class="s-title" href={at(projects)}>{words.title}</a>{:else}<span class="s-title">{words.title}</span>{/if}
+          {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
+          {#if read}
+            <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /></a>
+          {/if}
+        </div>
+        {#if read && split}
+          <ul class="s-list">
+            {#each play as p (p.key)}{@render row(p, false)}{/each}
+          </ul>
+          {#if split.parked.length > 0 || split.finished.length > 0}
+            <div class="s-foot">
+              {@render fold('parked', split.parked, read.label('parked'), 'archive')}
+              {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
+            </div>
+          {/if}
+        {:else if !answered}
+          {@render outline()}
         {/if}
-      </div>
-      {#if read && split}
-        <ul class="s-list">
-          {#each play as p (p.key)}{@render row(p, false)}{/each}
-        </ul>
-        {#if split.parked.length > 0 || split.finished.length > 0}
-          <div class="s-foot">
-            {@render fold('parked', split.parked, read.label('parked'), 'archive')}
-            {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
-          </div>
-        {/if}
-      {:else if !answered}
-        {@render outline()}
       {/if}
       {@render listed()}
       {#if answered}{@render end()}{/if}
