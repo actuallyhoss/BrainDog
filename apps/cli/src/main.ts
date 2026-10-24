@@ -82,6 +82,18 @@ import { verify } from './verify.ts';
    `process.exit` does not wait for it. */
 const say = (line: string) => writeFileSync(2, `${line}\n`);
 
+/* NODE'S "SQLite is an experimental feature" IS NOT SAID TO A PERSON (audit D, W3). `usecase`, `pack`, `kennel` and
+   `import` load `node:sqlite` for a scratch record and printed two lines of it, with a process id, above their answer.
+   Every other warning is still printed as Node prints it. Set here, before any command loads the module by import(). */
+{
+  const printed = process.listeners('warning');
+  process.removeAllListeners('warning');
+  process.on('warning', (w) => {
+    if (w.name === 'ExperimentalWarning' && /SQLite/u.test(w.message)) return;
+    for (const l of printed) l(w);
+  });
+}
+
 /**
  * The session headers a command in this folder sends to a host: where it stands, and the run its session's file names
  * only while that run is the caller's (`heldHere`), read per request because the start hook may write the file after
@@ -448,6 +460,33 @@ const usage = () =>
     '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, init and serve do not take it.',
   ].join('\n');
 
+/**
+ * One command's own lines of the usage: each `braindog <command> ...` line and the lines under it, or `[]` for a word the
+ * usage does not name. `init` and `serve` share one description, so lines that follow each other are kept together.
+ *
+ * `<command> --help` ANSWERS THIS AND EXITS 0 (audit D, W1). It was refused by each command's own parser, exit 1, with a
+ * sentence of what it takes ("braindog runner has no such command", "--help is not a record"), so the one place a person
+ * looks for a command's help was a refusal.
+ */
+function helpOf(command: string): string[] {
+  const blocks: string[][] = [];
+  for (const line of usage().split('\n')) {
+    if (line.startsWith('braindog ')) {
+      const last = blocks.at(-1);
+      if (last !== undefined && last.every((l) => l.startsWith('braindog '))) last.push(line);
+      else blocks.push([line]);
+    } else if (line.startsWith('  ') && blocks.length > 0) blocks.at(-1)!.push(line);
+  }
+  const names = (l: string): boolean => l === `braindog ${command}` || l.startsWith(`braindog ${command} `);
+  return blocks.filter((b) => b.some(names)).flat();
+}
+
+/** Whether the words before any `--` ask for help: what follows `--` is a command `keys exec` and `run` hand on. */
+const asksHelp = (args: readonly string[]): boolean => {
+  const end = args.indexOf('--');
+  return (end < 0 ? args : args.slice(0, end)).some((a) => a === '--help' || a === '-h');
+};
+
 async function mcp(args: string[]): Promise<void> {
   let values: { host?: string | undefined; agent?: string | undefined; local?: boolean | undefined };
   try {
@@ -766,7 +805,8 @@ async function runnerServiceCommand(args: string[]): Promise<void> {
 function selfhost(command: 'init' | 'serve', args: string[]): void {
   const entry = process.env.BRAINDOG_SELFHOST || fileURLToPath(new URL('../../selfhost/src/main.ts', import.meta.url));
   if (!existsSync(entry)) return stop(`braindog ${command} needs the self-host. Set BRAINDOG_SELFHOST to its entry file.`);
-  const child = spawn(process.execPath, [entry, command, ...args], { stdio: 'inherit' });
+  /* THE SELF-HOST IS BUILT ON node:sqlite, so Node's warning that it is experimental is not said on every start. */
+  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', entry, command, ...args], { stdio: 'inherit' });
   /* Ctrl+C reaches the child from the terminal itself, and a second SIGINT would cut short the close
      the self-host starts on the first. Only a SIGTERM aimed at this process needs passing on. */
   process.on('SIGINT', () => {});
@@ -1121,6 +1161,12 @@ try {
        comparing one of them against its own would be splitting a sentence to get it back. */
     if (json) emit({ ok: true, value: { app: build(), format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES_VERSION } });
     else process.stdout.write(`${version()}\n`);
+  } else if (command !== undefined && command !== 'help' && asksHelp(rest) && helpOf(command).length > 0) {
+    const lines = helpOf(command);
+    if (json) {
+      for (const line of lines) json.out(line);
+      emit(json.envelope(0));
+    } else process.stdout.write(`${lines.join('\n')}\n`);
   } else if (command === 'mcp') await mcp(rest);
   else if (command === 'setup') await setupCommand(rest);
   else if (command === 'runner') await runnerCommand(args);
@@ -1162,8 +1208,9 @@ try {
       emit(json.envelope(0));
     } else process.stdout.write(`${usage()}\n`);
   } else if (command === undefined) stop(usage());
-  /* A plain word is echoed, to catch a typo. Anything else could be a token pasted in the wrong place. */
-  else stop(`braindog has no ${/^[a-z][a-z-]{0,31}$/.test(command) ? `command called ${command}` : 'such command'}.\n\n${usage()}`);
+  /* A plain word is echoed, to catch a typo. Anything else could be a token pasted in the wrong place. ONE LINE AND THE
+     WAY TO THE LIST, not the hundred lines of the usage under it, which pushed the typo off the top of the terminal. */
+  else stop(`braindog has no ${/^[a-z][a-z-]{0,31}$/.test(command) ? `command called ${command}` : 'such command'}. braindog --help lists every command.`);
 } catch (e) {
   stop(e instanceof Error ? e.message : String(e));
 }
