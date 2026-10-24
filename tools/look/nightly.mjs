@@ -20,7 +20,7 @@
  * `--check` judges the warm Today against `speed.todaySettleMs` and exits 1 when it is over, so a launchd job can say a
  * slow night without anyone reading the file. The file is `loop/proof/speed/<date>.json` unless `--out` names another.
  *
- * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo): `node tools/look/nightly.mjs --plist >
+ * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo): `node tools/look/nightly.mjs --plist --source live:<record> >
  * ~/Library/LaunchAgents/dog.brain.speed.plist` writes it with this checkout's path and this Node, and
  * `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dog.brain.speed.plist` starts it. No path of anybody's
  * machine is kept in the repository. The job builds the app first when the build is older than the tree, and says
@@ -53,13 +53,16 @@ export function parse(args) {
     if (m === null) throw new Error(`The night's measure takes --source, --out, --runs and --check, and not ${args[i]}.`);
     out[m[1]] = m[2] ?? args[(i += 1)];
   }
-  const raw = out.source ?? 'live:sam';
+  /* THE RECORD IS NAMED BY WHOEVER RUNS IT, and the launchd job carries the one it was written with: no record's name is
+     kept in the repository. */
+  const raw = out.source;
+  if (raw === undefined) throw new Error("The night's measure needs --source live:<record> or --source seed.");
   const colon = raw.indexOf(':');
-  return { source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, runs: Number(out.runs ?? 1) };
+  return { raw, source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, runs: Number(out.runs ?? 1) };
 }
 
 /** The launchd job for this checkout and this Node: every night at 04:30, read-only, `--check` so a slow night exits 1. */
-export function plist(root = ROOT, node = process.execPath) {
+export function plist(source, root = ROOT, node = process.execPath) {
   const log = join(root, '.ship', 'logs', 'speed-nightly.log');
   const esc = (t) => t.replace(/&/gu, '&amp;').replace(/</gu, '&lt;');
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -68,7 +71,7 @@ export function plist(root = ROOT, node = process.execPath) {
 <dict>
   <key>Label</key><string>dog.brain.speed</string>
   <key>ProgramArguments</key>
-  <array><string>${esc(node)}</string><string>${esc(join(root, 'tools', 'look', 'nightly.mjs'))}</string><string>--check</string></array>
+  <array><string>${esc(node)}</string><string>${esc(join(root, 'tools', 'look', 'nightly.mjs'))}</string><string>--source</string><string>${esc(source)}</string><string>--check</string></array>
   <key>WorkingDirectory</key><string>${esc(root)}</string>
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>${esc(dirname(node))}:/usr/bin:/bin</string></dict>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>
@@ -234,7 +237,7 @@ async function built() {
 async function main() {
   const asked = parse(argv.slice(2));
   if (asked.plist) {
-    process.stdout.write(plist());
+    process.stdout.write(plist(asked.raw));
     return;
   }
   const source = await openSource(asked.source, { env: processEnv });

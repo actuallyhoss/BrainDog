@@ -10,7 +10,7 @@ import { judge, methodOf, parse, plist, recOf } from '../nightly.mjs';
 
 test('A READ IS NAMED BY ITS METHOD under either address, and anything else is not a read', () => {
   assert.equal(methodOf('/api/list'), 'list');
-  assert.equal(methodOf('/app/sam/api/boot'), 'boot');
+  assert.equal(methodOf('/app/the-studio/api/boot'), 'boot');
   assert.equal(methodOf('/api/slash/status'), 'slash/status');
   assert.equal(methodOf('/app/_app/immutable/x.js'), null);
 });
@@ -31,16 +31,17 @@ test('A NIGHT IS SLOW WHEN TODAY, OPENED WARM, SETTLES OVER ITS BUDGET, and only
   assert.deepEqual(judge([row({ kind: 'cold', settleMs: 2400 }), row({ screen: 'money', settleMs: 9000 })], S), []);
 });
 
-test('IT READS HIS RECORD UNLESS TOLD OTHERWISE, and refuses a flag it does not take', () => {
-  assert.deepEqual(parse([]).source, { name: 'live', arg: 'sam' });
+test('IT READS THE RECORD IT IS TOLD, needs one, and refuses a flag it does not take', () => {
+  assert.deepEqual(parse(['--source', 'live:the-studio']).source, { name: 'live', arg: 'the-studio' });
   assert.deepEqual(parse(['--source', 'seed', '--check']).source, { name: 'seed', arg: undefined });
-  assert.equal(parse(['--check']).check, true);
+  assert.equal(parse(['--source=seed', '--check']).check, true);
+  assert.throws(() => parse([]), /needs --source/u);
   assert.throws(() => parse(['--fast']), /takes --source/u);
 });
 
 test('THE LAUNCHD JOB RUNS THIS CHECKOUT AT 04:30 WITH --check, and names no path it was not handed', () => {
-  const xml = plist('/repo', '/node/bin/node');
-  assert.match(xml, /<string>\/node\/bin\/node<\/string><string>\/repo\/tools\/look\/nightly.mjs<\/string><string>--check<\/string>/u);
+  const xml = plist('live:the-studio', '/repo', '/node/bin/node');
+  assert.match(xml, /<string>\/node\/bin\/node<\/string><string>\/repo\/tools\/look\/nightly.mjs<\/string><string>--source<\/string><string>live:the-studio<\/string><string>--check<\/string>/u);
   assert.match(xml, /<key>Hour<\/key><integer>4<\/integer><key>Minute<\/key><integer>30<\/integer>/u);
   assert.match(xml, /\/repo\/.ship\/logs\/speed-nightly.log/u);
 });
