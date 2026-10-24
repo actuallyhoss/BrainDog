@@ -153,6 +153,16 @@ function todayIn(zone: string | null): string | null {
 const overlaps = (a: { at: number; text: string }, b: { at: number; text: string }): boolean => a.at < b.at + b.text.length && b.at < a.at + a.text.length;
 
 /**
+ * WHAT A USE CASE CLAIMS OF A SENTENCE (`claimedBy`), and for a shop the person's own trade too (audit C, X1): "I run a
+ * small ceramics studio" said to Shop is the shop, and it asked for an empty Projects because "studio" is a Projects word.
+ */
+function claimsOf(c: UseCase, said: string): (span: Said) => boolean {
+  const own = claimedBy(c, said);
+  const trade = c.usecase === 'shop' ? TRADE.exec(said)?.indices?.[1] : undefined;
+  return (span) => own(span) || (trade !== undefined && span.at >= trade[0] && span.at + span.text.length <= trade[1]);
+}
+
+/**
  * The modules a sentence asks for, closed over what each leans on.
  *
  * A MODULE NOTHING POINTED AT DOES NOT ARRIVE. The reader answers Projects for any sentence at all, so a maths student's
@@ -164,7 +174,7 @@ const overlaps = (a: { at: number; text: string }, b: { at: number; text: string
 function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean, u: UseCase | null, beside: readonly UseCase[], offers: readonly Offer[]): PackId[] {
   /* A USE CASE TAKEN BESIDE THE ONE PROPOSED CLAIMS ITS WORDS TOO: "a small shop" said by a student is the shop's Orders
      and Products, and asks for no Projects of its own. */
-  const claims = (u ? [u, ...beside] : []).map((c) => claimedBy(c, said));
+  const claims = (u ? [u, ...beside] : []).map((c) => claimsOf(c, said));
   const kept = u ? heardFor(read, (span) => claims.some((claimed) => claimed(span))) : read;
   const pointed = new Set(kept.packs.filter((p) => p.why.length > 0).map((p) => p.id));
   /* `toTurnOn` ADDS PEOPLE FOR A NAME, and a declined reading has no packs, so a name alone still keeps People. */
@@ -225,10 +235,13 @@ export function titleOf(bio: string, name: string | null, rows: readonly { regis
   const others = new Set(rows.filter((r) => r.register !== PROJECTS).map((r) => String(r.fields.name ?? '').toLowerCase()));
   const project = rows.find((r) => r.register === PROJECTS && typeof r.fields.name === 'string' && !others.has(r.fields.name.toLowerCase()));
   if (project) return String(project.fields.name);
-  const m = name === null ? null : TRADE.exec(bio);
-  if (!m || name === null) return null;
+  const m = TRADE.exec(bio);
+  if (!m) return null;
   const kind = (m[3] ?? '').toLowerCase();
   const what = (m[2] ?? '').trim().split(/\s+/u).filter((w) => w !== '' && !PLAIN.has(w.toLowerCase()));
+  /* WITH NO NAME HEARD, THE TRADE AS IT WAS SAID (audit C, X2): "a small ceramics studio" is Ceramics studio, where the
+     record was named for the email's local part. A kind of place alone ("a shop", "a business") is still anybody's. */
+  if (name === null) return what.length === 0 ? null : capital([...what, kind === 'cafe' ? 'café' : kind].join(' '));
   const whose = `${name.split(' ')[0]}'s`;
   if (SELLS.has(kind)) return what.length === 0 ? `${whose} ${capital(kind)}` : `${whose} ${[...what.slice(0, -1), plural(what.at(-1) ?? '')].map(capital).join(' ')}`;
   /* "A BUSINESS" ALONE SAYS NOTHING OF WHICH ONE, so it names nothing; "a design business" does. */
@@ -825,6 +838,36 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
   return [place('today', 'today', 'Today', null), ...lists, ...shown.sort(order)];
 }
 
+/*
+ * A BARE WORD FOR MONEY BESIDE A BUSINESS IS THE BUSINESS'S MONEY (audit C, X1): "who owes me money", said by a ceramics
+ * studio, took Personal beside the shop and promised it Savings goals, Goals, Log, Put by and Project steps. Personal is
+ * taken beside a shop, a small business, a founder or a team only where it heard more than these words.
+ */
+const BUSINESS_READINGS: ReadonlySet<string> = new Set(['shop', 'business', 'founder', 'team']);
+const MONEY_WORDS: ReadonlySet<string> = new Set(['money', 'my money', 'finances', 'bills']);
+function moneyAlone(u: UseCase, beside: UseCase, arranged: ReturnType<typeof arrangeTurns>): boolean {
+  if (beside.usecase !== 'personal' || !BUSINESS_READINGS.has(u.usecase)) return false;
+  const why = arranged.ranked.find((r) => r.usecase === beside)?.why ?? [];
+  return why.every((w) => MONEY_WORDS.has(w.text.toLowerCase()));
+}
+
+/*
+ * A THING A SHOP DOES ON A DAY (audit C, X1): "kiln firings", "bookings", "deliveries". The orders a shop keeps carry the
+ * day each is due, so a dated thing said beside a shop is said as its Orders by day, where it was not heard at all and
+ * the one thing she said she loses track of went unsaid. At most one word before it, never a joining word.
+ */
+const DATED = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?!${JOIN}\\s)[\\p{L}'’-]+\\s+)?(?:firings|bookings|deliveries|fittings|collections|pickups|pick-ups)(?![\\p{L}\\p{N}])`, 'giu');
+/* What the word before a dated thing never is: a verb or a word of how many, so "lose track of firings" lights "firings". */
+const NOT_BEFORE = /^(?:of|do|did|does|doing|track|lose|losing|keep|keeping|manage|plan|planning|schedule|all|many|some|any|more|the|my|our|go|to)$/iu;
+function datedIn(said: string): Said[] {
+  return [...said.matchAll(DATED)].map((m) => {
+    const words = m[0].split(/\s+/u);
+    const own = words.length > 1 && !NOT_BEFORE.test(words[0] ?? '');
+    const text = own ? m[0] : (words.at(-1) ?? m[0]);
+    return { at: (m.index ?? 0) + (m[0].length - text.length), text };
+  });
+}
+
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
 export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const name = who(sentence);
@@ -840,7 +883,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const read = unrefused(all, no);
   const arranged = unrefusedCases(turns, no);
   const u = read.declined === 'language' ? null : arranged.pick;
-  const beside = u ? alongside(arranged, u) : [];
+  const beside = u ? alongside(arranged, u).filter((b) => !moneyAlone(u, b, arranged)) : [];
   const modules = modulesOf(read, said, name.name !== null, u, beside, offers);
 
   const where = heardAt(sentence);
@@ -855,13 +898,18 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
      lexicon heard Projects. A PART IS SAID BY THE NAME ITS PLACE HAS (`partName`), never by its pack's. */
   /* THE USE CASES TAKEN BESIDE IT CLAIM THEIR WORDS THE SAME WAY, the one proposed first: a student who runs a small shop
      reads "a small shop" as Orders and Products, and those two places then say the words that turned them on. */
-  const cases = (u ? [u, ...beside] : []).map((c) => ({ c, claimed: claimedBy(c, said), why: arranged.ranked.find((r) => r.usecase === c)?.why ?? [] }));
+  const cases = (u ? [u, ...beside] : []).map((c) => ({ c, claimed: claimsOf(c, said), why: arranged.ranked.find((r) => r.usecase === c)?.why ?? [] }));
   for (const h of phrases) {
     const whose = h.loose ? undefined : cases.find((x) => x.claimed(h))?.c;
     heard.push(line(h.at, h.text, h.loose ? firstRun.shapeNoCurrency : whose ? caseBecame(whose, h.text) : firstRun.and(h.packs.map((id) => partName(id))), h.loose));
   }
   /* A PHRASE A USE CASE HEARD COUNTS AS HEARD, where no phrase already said covers it: "orders" became Orders. */
   for (const { c, why } of cases) for (const w of why) if (!heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, w))) heard.push(line(w.at, w.text, caseBecame(c, w.text)));
+  /* A DATED THING SAID BESIDE A SHOP IS ITS ORDERS BY DAY (`DATED`), where nothing else heard it and it was not refused. */
+  const shop = cases.find((x) => x.c.usecase === 'shop')?.c;
+  const orders = shop ? caseLists(shop).find((l) => l.id === 'orders') : undefined;
+  if (shop && orders && read.declined === null)
+    for (const d of datedIn(said)) if (!no(d) && !heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, d))) heard.push(line(d.at, d.text, firstRun.heardByDay(shop.labels.orders ?? orders.name)));
   heard.sort((a, b) => a.at - b.at);
   /* A PHRASE IS LIT WHOLE (`WHOLE`): "shop" heard inside "a small candle shop" is said as the phrase the person wrote,
      and "freelance" inside "freelance as a designer" as their Clients and Invoices, People then called Clients. */

@@ -82,6 +82,8 @@ export const firstRun = {
   nameNotKept: 'People is off, so your name is kept on your account only.',
   /* An amount typed with no currency is said back, so the person sees why it is not in the entry (`shape.ts`). */
   shapeNoCurrency: 'no currency, so not kept',
+  /* A thing a shop does on a day, such as kiln firings, said as the orders it keeps by the day each is due. */
+  heardByDay: (orders: string) => `${orders}, by the day each is due`,
   /* A title the record keeps, built only from what was typed: the cadence and the client's name (`shape.ts`). */
   shapeInvoice: (cadence: string | null, client: string | null) =>
     `${cadence ? `${cadence.charAt(0).toUpperCase()}${cadence.slice(1)} invoice` : 'Invoice'}${client ? ` to ${client}` : ''}`,

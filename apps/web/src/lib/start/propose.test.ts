@@ -207,7 +207,9 @@ test('THE TITLE IS THE BUSINESS FIRST, in the words heard, and none where nothin
   assert.equal(title("I'm Ana and I have a design business"), "Ana's Design Business");
   assert.equal(title("I'm Ana and I run a business"), null, 'a business alone says nothing of which one');
   assert.equal(title('Sami, I run Kiln Studio and we bill Fenwick'), 'Kiln Studio', 'a project named is the business');
-  assert.equal(title('I run a small candle shop'), null, 'a trade with no name is anybody’s, and the sign-up chooses');
+  /* A TRADE WITH NO NAME IS THE RECORD'S NAME, in sentence case (audit C, X2): it was null, and the record was then
+     named for the email's local part, "mariam", although "a small ceramics studio" was heard. */
+  assert.equal(title('I run a small candle shop'), 'Candle shop', 'a trade with no name heard is named as it was said');
   assert.equal(title("I'm a student"), null);
   assert.equal(title("I'm Tom. I have a cat and a store"), null, 'a joining word is never part of a trade');
   assert.equal(title("I'm Tom. I run a design and print shop"), null);
@@ -1364,4 +1366,40 @@ test('AN AGENCY THAT SENDS INVOICES KEEPS MONEY, though a use case that keeps no
   const p = propose(said, { ...CTX, currency: 'NGN', catalogue: [hours] });
   assert.equal(p.usecase, 'hours-kept');
   assert.ok(p.modules.includes('money-core'), p.modules.join(', '));
+});
+
+/* A STRANGER'S FIRST FIVE MINUTES (audit C, 25 October, X1): with the model off, this reading is what everybody gets. */
+test('A CERAMICS STUDIO IS A SHOP WITH MONEY AND PEOPLE, never somebody’s savings, and its firings are heard', () => {
+  const said = 'I run a small ceramics studio with two potters. I sell online and at markets, and I lose track of kiln firings, orders and who owes me money.';
+  const p = propose(said, CAIRO);
+  assert.equal(p.usecase, 'shop');
+  assert.ok(!p.also.includes('personal'), `a bare "money" beside a shop is Money, never Personal: ${p.also.join(', ')}`);
+  const places = p.places.map((x) => x.name);
+  for (const name of ['Orders', 'Products', 'Money', 'People']) assert.ok(places.includes(name), `${name} in ${places.join(', ')}`);
+  for (const name of ['Savings goals', 'Goals', 'Put by', 'Project steps', 'Projects']) assert.ok(!places.includes(name), `no ${name} in ${places.join(', ')}`);
+  const became = (phrase: string): string | undefined => p.heard.find((h) => h.phrase.includes(phrase))?.became;
+  assert.equal(became('a small ceramics studio'), 'Orders and Products', 'the trade is the shop, not a project');
+  assert.equal(became('two potters'), 'People');
+  assert.equal(became('kiln firings'), 'Orders, by the day each is due');
+  assert.match(became('money') ?? '', /^Money/u);
+  for (const h of p.heard) if (h.at) assert.equal(said.slice(...h.at), h.phrase);
+});
+
+test('A DATED THING IS HEARD ONLY WHERE A SHOP KEEPS ITS DAYS, and never where it was refused', () => {
+  assert.equal(propose('I run a small pottery shop and I never do kiln firings', CAIRO).heard.find((h) => /firings/u.test(h.phrase)), undefined);
+  assert.equal(propose('I am a student and I go to kiln firings', CAIRO).heard.find((h) => /firings/u.test(h.phrase)), undefined);
+});
+
+test('MONEY SAID BY SOMEBODY SAVING IS STILL PERSONAL beside a shop', () => {
+  const p = propose('I run a small candle shop, sell online, take orders and I am saving up money for a car', CAIRO);
+  assert.equal(p.usecase, 'shop');
+  assert.ok(p.also.includes('personal'), p.also.join(', '));
+});
+
+test('WITH NO NAME HEARD THE TRADE ITSELF NAMES THE RECORD, and a bare kind of place still names nothing', () => {
+  const title = (s: string): string | null => propose(s, CTX).title;
+  assert.equal(title('I run a small ceramics studio with two potters'), 'Ceramics studio');
+  assert.equal(title('We have a little vintage clothing store'), 'Vintage clothing store');
+  assert.equal(title('I run a shop'), null);
+  assert.equal(title('I run a small business'), null);
 });

@@ -95,7 +95,10 @@ function lexiconOf(offers: readonly Offer[]): Map<string, PackId[]> {
 
 const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const COUNT = `(\\d{1,3}|${Object.keys(NUMBER_WORDS).join('|')})`;
-const TEAM = new RegExp(`\\b(?:${COUNT}[- ](?:person|people|of us)|team of ${COUNT})\\b`, 'giu');
+/* AND A COUNT OF PEOPLE BY THEIR WORK after "with", "have" or "employ" (audit C, X1): "a ceramics studio with two
+   potters" went unheard. A word that ends as a worker's does, never one of the things a shop counts ("two orders"). */
+const WORKERS = `(?!(?:orders|others|numbers|letters|papers|posters|stickers|flyers|covers|layers|markers|containers|folders|filters|shoulders|answers)(?![\\p{L}]))[\\p{L}]+(?:ers|ors|ists|ians)`;
+const TEAM = new RegExp(`\\b(?:${COUNT}[- ](?:person|people|of us)|team of ${COUNT}|(?<=\\b(?:with|have|employ|hired?)\\s+)${COUNT}\\s+${WORKERS})\\b`, 'giu');
 const SOLO = /\b(?:just me|on my own|solo)\b/iu;
 
 const CADENCE: readonly [RegExp, Cadence][] = [
@@ -270,7 +273,7 @@ export function shape(sentence: string, today: string = new Date().toISOString()
 
   let team: number | null = SOLO.test(said) ? 1 : null;
   for (const m of said.matchAll(TEAM)) {
-    const n = (m[1] ?? m[2] ?? '').toLowerCase();
+    const n = (m[1] ?? m[2] ?? m[3] ?? '').toLowerCase();
     if (hear(m.index ?? 0, m[0], ['people'])) team = NUMBER_WORDS[n] ?? Number(n);
   }
   for (const span of signalsIn(said, [...lexicon.keys()])) hear(span.at, span.text, lexicon.get(span.text.toLowerCase()) ?? []);
