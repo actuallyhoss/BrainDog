@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createClient } from '@braindog/client';
 
 import { forgetRows, rowsOf, rowsSaid } from './ref-rows.ts';
+import { heardLocal } from './local-tab.ts';
 
 const row = (seq: number) => ({ id: `r${seq}`, seq, fields: { name: `Row ${seq}` }, version: 1, created_at: '2026-10-20T00:00:00Z' });
 
@@ -51,4 +52,18 @@ test('A WRITE THIS TAB SENDS WALKS AGAIN, a refusal is handed back and never kep
   assert.equal(!out.ok && out.refusal.code, 'FORBIDDEN');
   l.refuse(false);
   assert.equal((await rowsOf(l.client, 'https://a', 'projects'))?.length, 1, 'the refusal was not kept');
+});
+
+test('A WALK SENT BEFORE ANY VERSION WAS HEARD STANDS AT THE FIRST ONE HEARD, and a version that moves after it walks again', async () => {
+  forgetRows();
+  heardLocal(null);
+  const l = lister(1);
+  await rowsOf(l.client, 'https://a', 'people');
+  heardLocal(7);
+  await rowsOf(l.client, 'https://a', 'people');
+  assert.equal(l.asked(), 1, 'the first version heard asked nothing again');
+  heardLocal(8);
+  await rowsOf(l.client, 'https://a', 'people');
+  assert.equal(l.asked(), 2);
+  heardLocal(null);
 });

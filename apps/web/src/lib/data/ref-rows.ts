@@ -68,6 +68,9 @@ export async function rowsSaid(client: Pick<Client, 'list'>, base: string, regis
   const young = kept !== undefined && Date.now() >= kept.at && Date.now() - kept.at < ROWS_KEPT_MS;
   /* A WALK KEPT BY THE VERSION is still true while the poll hears that version, and waits for nothing to say so. */
   const byVersion = `${versionKept()} w${wrote()}`;
+  /* AND A WALK SENT BEFORE ANY VERSION WAS HEARD stands at the first one heard, as the client's schemas do: a cold open
+     walked a list, heard the version and walked it again (the perf gate's twice-asked, scope 2026-10-24 A11). */
+  if (young && kept.token === `v null w${wrote()}`) kept.token = byVersion;
   if (young && kept.token === byVersion) return kept.walked;
   /* A WALK THE COPY VOUCHED FOR IS ASKED OF IT AGAIN once its catch-up has landed, as before. WITH NONE TO VOUCH FOR, the
      walk goes now and is kept by the version (`keptToken`'s own fallback): Today's first open waited for the copy's
