@@ -294,9 +294,10 @@
   }
 
   /* `:not(:modal)`: the sheet form covers the list over a scrim and takes no width from it.
-     `--dock-col` IS THE SAME WIDTH FOR THE SHELL'S COLUMN, registered as a length (`app.css`) so it can wait: opening,
-     it is given once the panel's slide is over, so the work narrows under a panel already there; closing, it goes at
-     once, as the rule after this one says, so the work widens under a panel already leaving. */
+     `--dock-col` IS THE SAME WIDTH FOR THE SHELL'S COLUMN, registered as a length (`app.css`) so it can move: opening,
+     it opens with the slide, over the panel's step on the sheet curve, so the work makes room as the panel's edge comes
+     (scope E40; given after the slide, the whole list jumped 360px in one frame, CLS 0.11); closing, it goes at once,
+     as the rule after this one says, so the work widens under a panel already leaving. */
   :global(:root) {
     transition-property: --dock-col;
   }
@@ -304,7 +305,8 @@
   :global(:root:has(dialog.dock[open]:not(:modal))) {
     --dock-w: calc(var(--dock-panel) + 2 * var(--inset));
     --dock-col: var(--dock-w);
-    transition-delay: var(--d-panel);
+    transition-duration: var(--d-panel);
+    transition-timing-function: var(--ease-sheet);
   }
 
   /* WHILE A SCREEN CROSS-FADES, a picture of its own, so it is not painted into the work's (`app.css`). */

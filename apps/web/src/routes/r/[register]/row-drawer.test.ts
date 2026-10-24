@@ -72,6 +72,17 @@ test('`p` AND THE MENU\'S PEEK OPEN THE ROW ON THE HOST', () => {
   assert.match(SCREEN, /const typed = host\.host\.dirty && host\.opened !== null && host\.opened !== seq;/u);
 });
 
+test('ESC IN THE LIST CLOSES AN OPEN PEEK BEFORE IT CLEARS A SELECTION (scope E40)', () => {
+  const esc = branch("e.key === 'Escape' && host.opened !== null");
+  assert.match(esc, /host\.close\(\);/u);
+  assert.ok(SCREEN.indexOf("e.key === 'Escape' && host.opened !== null") < SCREEN.indexOf("e.key === 'Escape' && selected.size > 0"), 'the peek closes first');
+  /* AND THE ROOM OPENS WITH THE SLIDE, never after it, so the list does not jump once the panel has landed. */
+  const panel = readFileSync(new URL('../../../lib/ui/Panel.svelte', import.meta.url), 'utf8');
+  const open = panel.slice(panel.indexOf(':global(:root:has(dialog.dock[open]:not(:modal)))'));
+  assert.match(open.slice(0, open.indexOf('}')), /transition-duration: var\(--d-panel\);\s*transition-timing-function: var\(--ease-sheet\);/u);
+  assert.doesNotMatch(panel, /transition-delay: var\(--d-panel\)/u);
+});
+
 test('`j` AND `k` WALK THE HOST ONLY WHILE A ROW IS OPEN, and the list\'s own cursor as before when none is', () => {
   const j = branch("e.key === 'j'");
   const k = branch("e.key === 'k'");

@@ -1739,11 +1739,10 @@
    * opening a task or a question narrows the work beside it rather than drawing over it, and the work's scrollbar, a
    * sticky head and anything full width all stop where the panel starts, which page padding could not do.
    *
-   * ONE REFLOW, IN STEP WITH THE SLIDE. Animating the column would lay the whole work out again on every frame, and
-   * taking it at once left an empty band of ground where the panel had yet to arrive. So the column is given when the
-   * panel's slide is over (`--dock-col` waits `--d-panel`), and until then the panel slides in over the work's end; the
-   * work narrows once, under a panel that is already there. Closing, the column goes at once and the panel slides out
-   * over the work as it widens.
+   * THE ROOM OPENS WITH THE SLIDE (scope E40). Given when the slide was over, the whole list jumped 360px in one frame
+   * after the panel landed (fluid F13, CLS 0.11), so `--dock-col` now opens over the panel's step on its curve and the
+   * work narrows as the panel's edge comes. Closing, the column goes at once and the panel slides out over the work as
+   * it widens.
    *
    * THE WORK THEN PADS NOTHING EXTRA. A screen that draws a panel pads its end by `max(var(--gutter), var(--dock-w))`,
    * which was how it kept clear before the panel had a column; inside `#main` that is `0px` here, so the space is given

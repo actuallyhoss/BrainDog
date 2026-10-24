@@ -2481,6 +2481,11 @@
         e.preventDefault();
         toggleSelect(row.seq, e.shiftKey);
       }
+    } else if (e.key === 'Escape' && host.opened !== null) {
+      /* ESC IN THE LIST CLOSES AN OPEN PEEK FIRST (scope E40), as the key that opened it does in Linear and Quick Look;
+         the next Esc clears a selection. */
+      e.preventDefault();
+      host.close();
     } else if (e.key === 'Escape' && selected.size > 0) {
       e.preventDefault();
       selected = new Set();
