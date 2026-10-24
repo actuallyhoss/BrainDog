@@ -699,10 +699,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   says `list: datapoints`, so the list's address opens on it: each kind of number once, under the project it is for,
  *   with its newest value, unit and age, and the two that moved most this year as lines. 1.23.0 is master's and 1.24.0
  *   another lane's, so a version of its own. One page added and nothing taken away, so a minor step.
+ * - people 3.7.0 (C33, 24 October): Scripts is a page, `page.scripts`, a table of every installed script over the
+ *   kernel's `scripts` source, which `/scripts` draws where it drew a list by hand, so it can be changed by saying so and
+ *   pulled as any page. 3.6.0 is master's (Everyone as faces). A page added and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.25.0',
-  people: '3.6.0',
+  people: '3.7.0',
   'money-core': '3.20.0',
   estate: '2.3.0',
   work: '1.19.0',

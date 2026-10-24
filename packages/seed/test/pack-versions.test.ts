@@ -1752,6 +1752,20 @@ const DECLARED: Record<string, Version> = {
       "People 3.6.0 (things, not rows, 24 October): `page.people`'s Everyone is cards with a face, role, organisation and Last spoke, never the owner (`self is not true`), and `people-count` counts the people Everyone draws; no id added or taken away -> bee224943d7fab5c",
     ],
   },
+  /* SCRIPTS IS A PAGE (C33, 24 October). A VERSION AND NOT A RESET: 3.6.0 is master's. One page added. */
+  'people@3.7.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.activity page.calendar page.health page.people page.relation page.scripts page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '1f3c19205d5f6147',
+    history: [
+      "`page.scripts`, off the rail: its one line and a table of every installed script over the kernel's `scripts` source, its name, what starts it and where it stands; a page added, nothing taken away, over 3.6.0's Everyone as faces -> 1f3c19205d5f6147",
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `

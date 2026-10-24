@@ -39,7 +39,7 @@ import { TASKS } from '../work/list.ts';
 type Fetch = NonNullable<Parameters<typeof createClient>[0]['fetch']>;
 
 /** The previews a screen draws, by the address it draws them at, and the page each is kept as on its first Done. */
-const KEPT_AS: Readonly<Record<string, string>> = { today: 'home', decide: 'decide' };
+const KEPT_AS: Readonly<Record<string, string>> = { today: 'home', decide: 'decide', scripts: 'scripts' };
 
 /** The page a home arranges, and whether the record holds it yet. */
 export type Kept = { id: string; installed: boolean };
@@ -185,6 +185,11 @@ export async function previewedBody(slug: string, holds: Holds): Promise<PageBod
     return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.quiet ? { quiet: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
+  /* SCRIPTS IS THE PEOPLE ADD-ON'S PAGE (C33), drawn from that body until the record keeps one. */
+  if (slug === 'scripts') {
+    const { pack: _pack, ...body } = (await import('@braindog/seed/packs/scripts')).SCRIPTS_PAGES.scripts!;
+    return plainBody(body);
+  }
   return null;
 }
 

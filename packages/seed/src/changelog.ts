@@ -109,6 +109,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '3.7.0', notes: 'Scripts is a page like any other: every script, what starts it and where it stands, which you can change by saying how.' },
     {
       version: '3.6.0',
       notes: 'People shows everyone with a face, what they are to you, who they are with and when you last spoke, and you are no longer in your own list. The count of contacts is the people it shows.',

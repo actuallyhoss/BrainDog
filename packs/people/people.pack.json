@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "People shows everyone with a face, what they are to you, who they are with and when you last spoke, and you are no longer in your own list. The count of contacts is the people it shows.",
+  "changes": "Scripts is a page like any other: every script, what starts it and where it stands, which you can change by saying how.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -399,6 +399,23 @@
           "span": 12,
           "when": { "metric": "green-days", "gt": 1 },
           "body": "Every check has passed for {{green-days}} days, up to yesterday."
+        }
+      ]
+    },
+    {
+      "page": "scripts",
+      "title": "Scripts",
+      "icon": "code",
+      "pack": "people",
+      "blocks": [
+        { "kind": "note", "lead": true, "span": 12, "body": "Every script on this record, and where it stands." },
+        {
+          "kind": "table",
+          "key": "scripts",
+          "span": 12,
+          "source": "scripts",
+          "columns": [ { "field": "title", "label": "Script" }, { "field": "every", "label": "Runs" }, { "field": "last_at", "label": "Where it stands" } ],
+          "empty": "No scripts yet. A script is a short program an agent writes and you accept."
         }
       ]
     },

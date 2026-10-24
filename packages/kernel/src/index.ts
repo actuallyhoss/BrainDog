@@ -16,6 +16,7 @@
  * the rows that made it rather than a reconstruction.
  */
 
+import { scriptRows } from './script-rows.ts';
 import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
@@ -286,6 +287,7 @@ import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
+export { scriptRows, type ScriptRow } from './script-rows.ts';
 import { RESUMED_MS, beatRun, presentRuns, pulseRun, revivedAt, seatRun, workingRuns } from './presence.ts';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */
 import {
@@ -7587,6 +7589,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
+    /* THE INSTALLED SCRIPTS, as the record's `scripts` read lists them, so a `scripts` block draws `/scripts` (C33). */
+    scripts: () => scriptRows(sql, clock.now()),
     /* WHO OPENED A KEY LAST, by the grant its row's secret field names: the newest `grant.read` event, as `keyState`
        reads it. `runs_on` answers who and when, never the grant. */
     keyOpened: (grant) =>

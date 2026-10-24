@@ -279,6 +279,26 @@ export function rowOf(s: Pick<ScriptRow, 'runs' | 'status' | 'last' | 'next'>, n
   return { what, said: next === DUE ? words.short.due : words.short.first(next), tone: undefined };
 }
 
+/**
+ * A row of a page's `scripts` block (`packages/kernel/src/sources/scripts.ts`), read back into the shape `rowOf` says,
+ * and what the row says: its id, what starts it and where it stands, in the old list's words, and its tone. A field out
+ * of shape is read as nothing, so a row never says a run nobody made.
+ */
+export function scriptOf(fields: Readonly<Record<string, unknown>>, now: number = recordNow()): { script: string; title: string } & ReturnType<typeof rowOf> {
+  const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+  const lastAt = text(fields.last_at);
+  const said = rowOf(
+    {
+      runs: { every: text(fields.every), door: text(fields.door), rule: fields.rule === true },
+      status: fields.status === 'paused' ? 'paused' : 'on',
+      last: lastAt === null ? null : { at: lastAt, version: null, outcome: text(fields.last) ?? '', say: text(fields.said) ?? '' },
+      next: text(fields.next),
+    },
+    now,
+  );
+  return { script: text(fields.script) ?? '', title: text(fields.title) ?? '', ...said };
+}
+
 /** Where a script stands: one calm sentence, its tone, and whether Resume is offered. Paused is `warn`, refused `bad`. */
 export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused'>, now: number = recordNow()): { line: string; tone: 'warn' | 'bad' | undefined; resume: boolean } {
   if (s.status === 'paused') return { line: words.paused(s.refused.pauses_at), tone: 'warn', resume: true };

@@ -60,6 +60,7 @@ import { PORTFOLIO_AUTOMATIONS, PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_
 import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 import { HEALTH_PAGES } from './modules/health.ts';
+import { SCRIPTS_PAGES } from './modules/scripts.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
 
@@ -175,7 +176,7 @@ export { METRICS };
 
 /* ── the pages it ships with ────────────────────────────────────── */
 
-export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...BASE_PAGES };
+export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...SCRIPTS_PAGES, ...BASE_PAGES };
 
 /* ── installing it ────────────────────────────────────────────────────────── */
 

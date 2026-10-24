@@ -1093,11 +1093,12 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
   /* AND PEOPLE 3.4.0'S NOTE OF WHO MAY BE HELD TWICE comes off the People page with it (people-held-twice-69). */
   /* AND PEOPLE 3.4.0'S CALENDAR PAGE, added while it is unreleased (calendar-page-82). */
   /* AND PEOPLE 3.4.0'S ACTIVITY PAGE, added while it is still unreleased (activity-page-88). */
+  /* AND PEOPLE 3.6.0'S SCRIPTS PAGE (C33). */
   people: {
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
-      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
+      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity' && d.page !== 'scripts').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
         /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99, PGS-C18). */
         /* AND PEOPLE 3.4.0'S IN TOUCH AND WHAT AGENTS DID, with the night's save of the figure and the line's clause that
            In touch took over (services-people-five-parts-101, PGS-C18). */

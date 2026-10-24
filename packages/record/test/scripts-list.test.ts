@@ -152,3 +152,35 @@ test('A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS: to a c
   }
   sql.close();
 });
+
+/**
+ * `/scripts` IS A DECLARED PAGE (C33): its table reads the kernel's `scripts` source, which is this same read, so the
+ * page, the command line and an agent cannot list different scripts.
+ */
+test('a page block over scripts draws the same scripts, one row each, with where each stands', async () => {
+  const { api, turn } = await record();
+  await turn(refused);
+  const body = {
+    page: 'scripts',
+    title: 'Scripts',
+    blocks: [{ kind: 'table', span: 12, source: 'scripts', columns: [{ field: 'title' }, { field: 'every' }, { field: 'last_at' }] }],
+  };
+  const out = (await api.previewPage({ body }, owner)) as Out;
+  assert.ok(out.ok, out.refusal?.fix);
+  const [block] = (out.value as { blocks: { rows: { id: string; fields: Record<string, unknown> }[]; refusals: unknown[] }[] }).blocks;
+  assert.deepEqual(block?.refusals, []);
+  const rows = block?.rows ?? [];
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    (await listed(api, owner)).map((s) => `script:${s.script}`),
+  );
+  const gold = rows.find((r) => r.fields.script === 'gold-rate')!;
+  assert.equal(gold.fields.title, 'Gold rate');
+  assert.equal(gold.fields.every, '1h');
+  assert.equal(gold.fields.last, 'refused');
+  assert.equal(gold.fields.in_a_row, 1);
+  assert.equal(gold.fields.pauses_at, REFUSED_IN_A_ROW);
+  /* A FIELD NO SCRIPT HAS IS REFUSED BY NAME. */
+  const wrong = await api.previewPage({ body: { ...body, blocks: [{ kind: 'table', source: 'scripts', columns: [{ field: 'salary' }] }] } }, owner);
+  assert.match(JSON.stringify(wrong), /A script has no field called salary/u);
+});

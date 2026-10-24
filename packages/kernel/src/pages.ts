@@ -22,6 +22,7 @@ import { no, ok, refused } from '@braindog/ports';
 import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
+import type { ScriptRow } from './script-rows.ts';
 import type { Exception } from './exceptions.ts';
 import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
 import * as kpiRank from './kpi-rank.ts';
@@ -917,6 +918,8 @@ export type PageDeps = {
   sessionsWorking?: () => { run: Entry; helpers: number }[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
+  /** Every installed script, as the record's `scripts` read lists them (`script-rows.ts`), which a `scripts` block reads. */
+  scripts?: () => ScriptRow[];
   /**
    * The record's vital signs now, in the order of the closed list (`signs.ts` `readSigns`): each its id, its name, its
    * state, its number and its own sentence. A `signs` block reads them; a sign with nothing to read is `none`.

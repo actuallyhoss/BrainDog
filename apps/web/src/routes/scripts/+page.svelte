@@ -1,60 +1,123 @@
 <!--
-  Scripts: `/scripts`, every installed script and where it stands.
+  Scripts: `/scripts`, every installed script and where it stands, as a declared page (C33, 24 October).
 
-  THE TITLE ROW SAYS HOW MANY, HOW MUCH THEY RAN THIS MONTH, AND WHAT HAS STOPPED. The month is the sum of each row's
-  own count, never recounted from history, and the red phrases are a paused script and a refused last run.
+  A PAGE BODY LIKE ANY OTHER. Its blocks are `page.scripts`, the People add-on's (`packages/seed/src/modules/scripts.ts`):
+  one line and a table of every script over the kernel's `scripts` source, drawn by the one page reader through
+  `PageView`, as Decide's are. The record's own `page.scripts` is read where it holds one, so a page he changed by saying
+  so is the page drawn; a record that holds none is drawn the same body by `previewPage`, and keeping a change to it is
+  its first write (`home-arrange.ts`, as Today and Decide are kept). `braindog page pull scripts` reads what it holds.
 
-  ONE TILE OF ROWS, the Automations row shape (`HubRows`): the code glyph in its well, the script's name on up to two
-  lines, and one meta line of what starts it and where it stands ("Runs every day and when an automation starts it ·
-  Not run yet"). A dot and its word lead the second half only when it is paused or its last run was refused. The whole
-  row opens the script, where its facts, recent runs, versions and Resume are (`ScriptCard`): eleven tiles each with a
-  six-field table were a page to scroll, not a list to scan.
+  THE TITLE ROW SAYS HOW MANY, HOW MUCH THEY RAN THIS MONTH, AND WHAT HAS STOPPED, from the rows the page drew
+  (`reading.ts` `sentenceOf`): the month is the sum of each row's own count, never recounted from history, and the red
+  phrases are a paused script and a refused last run. So the page's own line is the head's, and is not drawn again as a
+  tile under it.
+
+  A ROW OPENS THE SCRIPT, where its facts, recent runs, versions and Resume are (`ScriptCard`).
 -->
 <script lang="ts">
-  import { page } from '$app/state';
+  import { untrack } from 'svelte';
+  import { page as route } from '$app/state';
+  import { SCRIPTS_PAGES } from '@braindog/seed/packs/scripts';
   import { apiBase } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { read } from '$lib/data/read.svelte.ts';
-  import { readScripts, rowOf, words } from '$lib/record/scripts.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
+  import type { Opened } from '$lib/record/page-live.ts';
+  import { scriptOf, words } from '$lib/record/scripts.ts';
+  import { listen } from '$lib/page/listen.svelte.ts';
+  import { typing } from '$lib/a11y/keys.svelte.ts';
+  import PageView from '$lib/page/PageView.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import ReadState from '$lib/ui/ReadState.svelte';
-  import Tile from '$lib/ui/Tile.svelte';
-  import HubRows from '../automations/HubRows.svelte';
-  import type { HubRow } from '../automations/hub.ts';
+  import { copy } from '$lib/copy.ts';
+  import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { sentenceOf } from './reading.ts';
 
-  /* THE RECORD'S ADDRESS IS THE QUESTION, so moving to another record under the same route asks again rather than
-     drawing the last record's scripts under the new one's name. */
-  const scripts = read(
-    () => apiBase(page.url),
-    () => readScripts(apiBase(page.url)),
-    { empty: (v) => v.length === 0 },
-  );
+  let { data }: { data: Shell } = $props();
 
-  const rows = $derived(scripts.value ?? []);
-  const told = $derived(scripts.state === 'ready' ? sentenceOf(rows) : null);
+  const SLUG = 'scripts';
+  /** The body the record draws while it holds no `page.scripts`: the add-on's own, as it installs it. */
+  const BUILT = (({ pack: _pack, ...body }) => body)(SCRIPTS_PAGES[SLUG]!);
 
-  /* THE RECORD'S CLOCK (SF3), read once when the list is drawn. */
-  const now = recordNow();
+  const shell = $derived(route.data as unknown as Shell);
+  /* THE RECORD'S OWN PAGE, ONCE IT HOLDS ONE: the add-on installs it, and a change kept on the preview writes it. */
+  const held = $derived((shell.pages ?? []).includes(SLUG));
 
-  const shown = $derived(
-    rows.map((s): HubRow => {
-      const r = rowOf(s, now);
+  /** The record's answer for the page; `null` while it is out. */
+  let got = $state.raw<Opened | null>(null);
+  let reading = false;
+  let started = 0;
+
+  async function readPage(stored: boolean): Promise<Opened> {
+    if (stored) {
+      const { pageReader } = await import('$lib/record/page-live.ts');
+      return pageReader(apiBase()).read(SLUG, {});
+    }
+    const m = await import('../decide/[id]/proposed.ts');
+    const out = await m.drawnOf(BUILT, apiBase());
+    if (out.from === 'refused') return { from: 'refused', fix: out.fix };
+    if (out.from === 'none') return { from: 'refused', fix: copy.screenFailed };
+    return m.openedOf(BUILT, SLUG, String(BUILT.title), out.blocks, out.now);
+  }
+
+  async function read(): Promise<boolean> {
+    reading = true;
+    const mine = ++started;
+    try {
+      const out = await readPage(held);
+      /* A REFUSAL AFTER A PAGE WAS DRAWN KEEPS THE PAGE, until the record answers again. */
+      if (mine === started && (out.from === 'live' || got === null || got.from !== 'live')) got = out;
+      return out.from === 'live';
+    } finally {
+      reading = false;
+    }
+  }
+
+  $effect(() => {
+    void held;
+    untrack(() => {
+      const at = opened();
+      void read()
+        .then((ok) => closed(ok, at))
+        .catch(() => closed(false, at));
+    });
+  });
+
+  async function reread() {
+    await read().catch(() => undefined);
+  }
+
+  /* A NEW VERSION OF THE RECORD READS THE PAGE AGAIN without blanking it: a script installed or paused elsewhere arrives. */
+  listen(reread, () => reading || typing());
+
+  const live = $derived(got?.from === 'live' ? got : null);
+  /* THE SCRIPTS THE PAGE DREW, read back off its `scripts` block, which the head counts and speaks of. */
+  const listed = $derived(live?.page.blocks.find((b) => b.source === 'scripts') ?? null);
+  const now = $derived(live?.now ?? recordNow());
+  const rows = $derived(
+    (listed?.entries ?? []).map((e) => {
+      const s = scriptOf(e.fields, now);
+      const month = typeof e.fields.month === 'number' ? e.fields.month : 0;
       return {
-        key: s.script,
-        name: s.title,
-        what: r.what,
-        said: r.said,
-        dot: r.tone ?? null,
-        path: `/scripts/${encodeURIComponent(s.script)}`,
-        icon: 'code',
+        title: s.title,
+        status: e.fields.status === 'paused' ? ('paused' as const) : ('on' as const),
+        last: typeof e.fields.last_at === 'string' ? { at: e.fields.last_at, version: null, outcome: typeof e.fields.last === 'string' ? e.fields.last : '', say: '' } : null,
+        month: { runs: month, ok: 0, refused: 0 },
       };
     }),
   );
+  const told = $derived(live && rows.length > 0 ? sentenceOf(rows) : null);
+  /* THE PAGE'S OWN LINE IS THE HEAD'S, so it is not drawn again as a tile under it. */
+  const drawn = $derived<Opened | null>(
+    live ? { ...live, page: { ...live.page, blocks: live.page.blocks.map((b) => (b.kind === 'note' && (b as { lead?: unknown }).lead === true ? { ...b, drawn: false } : b)) } } : got,
+  );
+  const none = $derived(live !== null && listed !== null && listed.refusals.length === 0 && rows.length === 0);
+
+  $effect(() => {
+    if (live) drew('ready');
+  });
 
   /* AN AGENT WRITES THESE AS READILY AS A PERSON ACCEPTS THEM, so the empty list says what to ask one,
      in the form every other empty state's prompt takes. An example a person reads and replaces. */
@@ -68,21 +131,18 @@
 {#snippet sentence()}{#each told ?? [] as p, i (i)}{#if p.tone === 'needs'}<span data-needs>{p.text}</span>{:else}{p.text}{/if}{/each}{/snippet}
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
-<PageHead icon="code" title={words.heading} count={scripts.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : undefined}>
+<PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} sentence={told ? sentence : undefined}>
   {#snippet actions()}
     <!-- THE ONE PRIMARY: its word, and on a phone the 44px button with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>
   {/snippet}
 </PageHead>
 <div class="page">
-  {#if scripts.state === 'waiting' || scripts.state === 'refused' || scripts.state === 'offline'}
-    <ReadState state={scripts.state} refusal={scripts.refusal} onretry={scripts.reread} />
-  {:else if rows.length === 0}
+  {#if none}
     <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
   {:else}
-    <Tile>
-      <HubRows rows={shown} />
-    </Tile>
+    <!-- BARS UNTIL THE RECORD ANSWERS, AND ITS SENTENCE WHERE IT REFUSES, as on every page (`PageView`). -->
+    <PageView slug={SLUG} got={drawn} mode="home" {reread} />
   {/if}
 </div>
 

@@ -85,7 +85,7 @@ const blocksOf = (page: Record<string, unknown>): Block[] => (page.blocks as Blo
  */
 /* `signs` SINCE people 3.3.0's Health page: each vital sign with its state and sentence. */
 /* `kpis` SINCE the KPI plan of 21 October (K3-C): a project's key numbers on its page (`sources/kpis.ts`). */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home', 'signs', 'kpis']);
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home', 'signs', 'kpis', 'scripts']);
 
 /**
  * The figures the record computes rather than declares.

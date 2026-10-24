@@ -19,6 +19,9 @@
  *
  * `kpis` ADDED IN K2-A (the key numbers, 21 October): a record with no list of key numbers answers none and says
  * nothing. Nothing else moved.
+ *
+ * `scripts` ADDED IN C33 (24 October), the rows `/scripts` draws: a record with no script installed answers none.
+ * Nothing else moved.
  */
 
 import { test } from 'node:test';
@@ -117,6 +120,7 @@ const BLOCKS: Record<string, PageBlock> = {
   'usage.actions': { kind: 'table', source: 'usage.actions' },
   'usage.projects': { kind: 'table', source: 'usage.projects' },
   kpis: { kind: 'kpis', source: 'kpis', for: 'today' },
+  scripts: { kind: 'table', source: 'scripts' },
 } as Record<string, PageBlock>;
 
 /** A second block for the names with more than one way to answer: a refusal's own sentence, or a `where:` that narrows. */
@@ -202,7 +206,7 @@ test('THE REGISTRY IS REACHED WITH NO FLAG: a source registered is read, and a w
 });
 
 /** The names that belong to no list, written out as the set they were in `pages.ts`. */
-const WHOLE = ['actions', ACTIONS_BLOCKING, 'activity', 'exceptions', 'governance.decided', 'governance.later', 'governance.open', 'kpis', 'signs', 'usage.actions', 'usage.days', 'usage.projects'];
+const WHOLE = ['actions', ACTIONS_BLOCKING, 'activity', 'exceptions', 'governance.decided', 'governance.later', 'governance.open', 'kpis', 'scripts', 'signs', 'usage.actions', 'usage.days', 'usage.projects'];
 
 test('A SOURCE THAT BELONGS TO NO LIST SAYS SO, and a block over it is named as a read of the whole record', () => {
   assert.deepEqual(NAMES.filter((name) => sourceModule(name)?.whole === true), [...WHOLE].sort());
@@ -244,6 +248,7 @@ function snapshot(): Record<string, string> {
     "usage.actions": "{\"kind\":\"table\",\"source\":\"usage.actions\",\"rows\":[{\"id\":\"usage:balance\",\"register\":\"usage.actions\",\"seq\":null,\"fields\":{\"name\":\"balance\",\"channel\":\"poll\",\"project\":null,\"spoken\":null,\"scope\":\"global\",\"runs\":0,\"requests\":0,\"bytes\":0,\"failures\":0,\"held\":0},\"state\":null,\"version\":1,\"created_at\":\"\",\"updated_at\":\"\",\"deleted_at\":null}],\"matched\":1,\"refusals\":[],\"types\":{\"name\":\"text\",\"channel\":\"enum\",\"project\":\"text\",\"spoken\":\"text\",\"scope\":\"enum\",\"runs\":\"int\",\"requests\":\"int\",\"bytes\":\"int\",\"failures\":\"int\",\"held\":\"int\"},\"key\":\"k1012vnv\"}",
     "usage.projects": "{\"kind\":\"table\",\"source\":\"usage.projects\",\"rows\":[{\"id\":\"usage:global\",\"register\":\"usage.projects\",\"seq\":null,\"fields\":{\"name\":null,\"spoken\":null,\"scope\":\"global\",\"actions\":1,\"runs\":0,\"requests\":0,\"bytes\":0,\"failures\":0,\"held\":0},\"state\":null,\"version\":1,\"created_at\":\"\",\"updated_at\":\"\",\"deleted_at\":null}],\"matched\":1,\"refusals\":[],\"types\":{\"name\":\"text\",\"spoken\":\"text\",\"scope\":\"enum\",\"actions\":\"int\",\"runs\":\"int\",\"requests\":\"int\",\"bytes\":\"int\",\"failures\":\"int\",\"held\":\"int\"},\"key\":\"k01lt7rq\"}",
     "kpis": "{\"kind\":\"kpis\",\"source\":\"kpis\",\"for\":\"today\",\"rows\":[],\"matched\":0,\"refusals\":[],\"kpis\":[],\"key\":\"k05lb3wz\"}",
+    "scripts": "{\"kind\":\"table\",\"source\":\"scripts\",\"rows\":[],\"matched\":0,\"refusals\":[],\"key\":\"k0nadgtp\"}",
     "activity again": "{\"kind\":\"feed\",\"source\":\"activity\",\"where\":\"nothing is here\",\"rows\":[],\"matched\":0,\"refusals\":[{\"code\":\"FIELD_UNKNOWN\",\"fix\":\"nothing is here: activity has no field called nothing.\",\"at\":\"nothing\",\"allowed\":[\"actor\",\"kind\",\"target\",\"list\",\"id\",\"seq\",\"created_at\",\"updated_at\",\"version\"]}],\"key\":\"k1fzqnde\"}",
     "actions again": "{\"kind\":\"table\",\"source\":\"actions\",\"columns\":[{\"field\":\"secret\"}],\"rows\":[],\"matched\":0,\"refusals\":[{\"code\":\"FIELD_UNKNOWN\",\"fix\":\"An action has no field called secret.\",\"at\":\"columns\",\"allowed\":[\"ingest\",\"channel\",\"project\",\"host\",\"every\",\"key\",\"state\",\"next\",\"last_at\",\"last_outcome\",\"last_status\",\"last_note\",\"runs\",\"requests\",\"bytes\",\"failures\",\"held\"]}],\"key\":\"k0kgb4d4\"}",
     "governance.open again": "{\"kind\":\"queue\",\"source\":\"governance.open\",\"where\":\"about is things#1\",\"limit\":1,\"rows\":[],\"matched\":1,\"refusals\":[],\"queue\":[{\"id\":\"SG1\",\"who\":\"slash\",\"at\":\"2026-09-15T12:00:00.000Z\",\"kind\":\"options\",\"question\":\"Fire on Friday?\",\"why\":\"\",\"cost\":\"call\",\"options\":[{\"key\":\"yes\",\"label\":\"Yes\",\"because\":\"The bowls are dry.\",\"recommended\":false},{\"key\":\"no\",\"label\":\"No\",\"because\":\"The kiln is booked.\",\"recommended\":false}],\"about\":\"things#1\",\"waits\":\"new\",\"kinds\":[\"call\"],\"list\":\"things\"}],\"waiting\":{\"stale\":0,\"hardToUndo\":0},\"key\":\"k0poi5qa\"}",

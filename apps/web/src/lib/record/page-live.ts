@@ -64,6 +64,7 @@ import { compile } from './where.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
+import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
@@ -1654,6 +1655,31 @@ export function blockOf(
     });
     const runFaces = runFacesOf(b, types, entries, runs, now);
     return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length), names: namesOf(refs), ...(runFaces ? { runFaces } : {}) };
+  }
+  /* THE INSTALLED SCRIPTS (`packages/kernel/src/sources/scripts.ts`), one row a script, which `/scripts` draws (C33).
+     `scripts` names no register, so the common path below would draw them as a block this build cannot draw. A row is
+     keyed by its script and opens its own page, and two of its cells are said as the old list said them (`scriptOf`):
+     `every` is what starts it ("Runs every day and when an automation starts it") and `last_at` where it stands ("Last
+     ran 2 hours ago", "Paused"). A paused one, or one refused on its last run, carries its tone, drawn with its glyph. */
+  if (b.source === 'scripts') {
+    const register = 'scripts';
+    const entries = got.map((r) => entryOf(register, r, refs));
+    const rows: LiveBlock['rows'] = got.map((r, n) => {
+      const s = scriptOf(r.fields, now);
+      const cells = (b.columns ?? []).map((c) => {
+        if (c.field === 'every') return s.what;
+        if (c.field === 'last_at') return s.said;
+        const v = r.fields[c.field];
+        return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
+      });
+      return {
+        key: `script:${s.script || String(n)}`,
+        cells,
+        ...(s.tone ? { tone: s.tone } : {}),
+        ...(s.script ? { href: `/scripts/${encodeURIComponent(s.script)}` } : {}),
+      };
+    });
+    return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length) };
   }
   /* THE RECORD'S VITAL SIGNS (`packages/kernel/src/pages.ts` `signsBlock`), one row a sign in the record's own order,
      which Health draws as cards grouped by state. `signs` names no register, so before this every sign card on Health

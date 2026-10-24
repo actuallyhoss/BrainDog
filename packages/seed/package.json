@@ -12,6 +12,7 @@
     "./packs/metrics": "./src/modules/metrics.ts",
     "./packs/modules": "./src/module-info.ts",
     "./packs/quiet": "./src/packs/quiet.ts",
+    "./packs/scripts": "./src/modules/scripts.ts",
     "./usecases": "./src/usecases/index.ts",
     "./usecases/catalogue": "./src/usecases/catalogue.ts",
     "./usecases/install": "./src/usecases/install.ts",

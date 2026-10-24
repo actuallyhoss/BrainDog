@@ -61,3 +61,35 @@ test('each outcome has one tone, red only for a refusal or a failure', () => {
   assert.equal(toneOf('held'), 'warn');
   assert.equal(toneOf('dropped'), 'quiet');
 });
+
+/* ── the declared page's rows (C33) ── */
+
+test('a row of the page’s scripts block says what starts it and where it stands, as the old list did', async () => {
+  const { scriptOf } = await import('../../lib/record/scripts.ts');
+  const NOW = Date.parse('2026-09-29T10:00:00Z');
+  const ok = scriptOf({ script: 'fx', title: 'FX rate', status: 'on', every: '1d', rule: true, last_at: '2026-09-29T08:00:00Z', last: 'ok', said: '' }, NOW);
+  assert.equal(ok.script, 'fx');
+  assert.equal(ok.title, 'FX rate');
+  assert.equal(ok.what, 'Runs every day and when an automation starts it');
+  assert.match(ok.said, /^Last ran /u);
+  assert.equal(ok.tone, undefined);
+  assert.deepEqual(
+    { said: scriptOf({ script: 'fx', status: 'paused', every: '1h' }, NOW).said, tone: scriptOf({ script: 'fx', status: 'paused' }, NOW).tone },
+    { said: 'Paused', tone: 'warn' },
+  );
+  const refused = scriptOf({ script: 'fx', status: 'on', last_at: '2026-09-29T08:00:00Z', last: 'refused' }, NOW);
+  assert.deepEqual({ said: refused.said, tone: refused.tone }, { said: 'Refused on its last run', tone: 'bad' });
+  /* A FIELD OUT OF SHAPE IS NOTHING: no run nobody made, no id that is not one. */
+  const odd = scriptOf({ script: 7, last_at: 3, status: 'maybe' }, NOW);
+  assert.equal(odd.script, '');
+  assert.equal(odd.said, 'Not run yet');
+});
+
+test('the screen draws the declared page through the one reader, and says its own line in the head', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(screen, /<PageView slug=\{SLUG\} got=\{drawn\} mode="home" \{reread\} \/>/u);
+  assert.match(screen, /from '@braindog\/seed\/packs\/scripts'/u);
+  assert.match(screen, /sentenceOf\(rows\)/u);
+  assert.doesNotMatch(screen, /HubRows/u, 'the list is the page’s table now, not rows built by hand');
+});
