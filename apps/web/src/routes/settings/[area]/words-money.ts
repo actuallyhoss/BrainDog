@@ -27,6 +27,17 @@ export const HOME_CURRENCY = 'home_currency';
 export const TAB_KEYS: readonly VoiceKey[] = ['home', 'decide', 'inbox', 'lists'];
 export const TAB_MOST = 12;
 
+/**
+ * WHAT A TAB'S WORD IS TITLED where the use case gives it no title (`@braindog/declare` `VOICE_TITLES`): the box was
+ * titled by its own default word, so "Your things" stood under the heading "Your lists" (Y21).
+ */
+const TAB_TITLES: Partial<Record<VoiceKey, string>> = {
+  home: 'What Home is called',
+  decide: 'What Decide is called',
+  inbox: 'What the Inbox is called',
+  lists: 'What the lists are called together',
+};
+
 /** One word or line the pack declares: the setting it is kept under, what it is called, what it holds and its default. */
 export type Word = { setting: string; title: string; value: string; fallback: string };
 
@@ -57,7 +68,7 @@ export function wordsOf(s: PackConfig): Spoken {
     if (decl.type !== 'text') continue;
     if (setting.startsWith('voice_')) {
       const key = setting.slice('voice_'.length) as VoiceKey;
-      if (Object.hasOwn(VOICE_LINES, key)) voiced.set(key, wordOf(s, setting, decl.label ?? VOICE_LINES[key], VOICE_LINES[key]));
+      if (Object.hasOwn(VOICE_LINES, key)) voiced.set(key, wordOf(s, setting, decl.label ?? TAB_TITLES[key] ?? VOICE_LINES[key], VOICE_LINES[key]));
       continue;
     }
     const key = Object.keys(labelsOf({ [setting]: '-' }, s.config))[0];

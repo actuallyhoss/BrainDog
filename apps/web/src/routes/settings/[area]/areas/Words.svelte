@@ -43,6 +43,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { ownsRecord } from '../../levels.ts';
+  import { listNameOf, othersOf, renameList } from '$lib/record/list-name.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import {
     HOME_CURRENCY,
@@ -113,6 +114,8 @@
         : `With no home currency, ${one ? 'this limit stops' : 'these limits stop'} counting: ${listed(names)}.`;
     },
     change: (to: string) => (to ? `Change to ${to}` : 'Choose none'),
+    renamed: (was: string, now: string) => `${was} is called ${now} now.`,
+    renameFiled: (now: string) => `The new name ${now} is waiting in Needs you.`,
     keep: (code: string) => `Keep ${code}`,
   } as const;
 
@@ -332,6 +335,36 @@
   }
 
   const shown = $derived(spoken ? (unfolded ? spoken.lines : []) : []);
+
+  /* ── the lists no use case names ───────────────────────────────────────── */
+
+  /* EVERY LIST THE RECORD HOLDS IS HERE (Y21): the use case names some, and the rest are renamed by their own name. */
+  const others = $derived(spoken ? othersOf(spoken.lists.map((l) => l.list), shell.index.registers) : []);
+
+  /** A list's own name, kept when the box is left: the record's change, accepted at once for the owner. */
+  async function renameOther(r: { id: string; name: string }, e: Event): Promise<void> {
+    const input = e.currentTarget as HTMLInputElement;
+    if (input.value.trim() === r.name) return;
+    const asked = listNameOf(shell.index.registers, r.id, input.value);
+    if (!asked.ok) {
+      fix = asked.fix;
+      input.value = r.name;
+      return;
+    }
+    busy = true;
+    fix = '';
+    const at = opened();
+    const out = await renameList(apiBase(), r.id, r.name, asked.name, owner);
+    closed(out.from !== 'refused', at);
+    busy = false;
+    if (out.from === 'refused') {
+      fix = out.fix;
+      input.value = r.name;
+      return;
+    }
+    toasts.push(out.from === 'filed' ? (out.fix ?? words.renameFiled(asked.name)) : words.renamed(r.name, asked.name));
+    await kept();
+  }
 </script>
 
 <svelte:window {onkeydown} />
@@ -392,8 +425,8 @@
 
     {#if owner}
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
-        {#if spoken.lists.length > 0}
-          <Tile icon="rows" title={words.lists} count={spoken.lists.length}>
+        {#if spoken.lists.length + others.length > 0}
+          <Tile icon="rows" title={words.lists} count={spoken.lists.length + others.length}>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
@@ -402,28 +435,49 @@
                        the use case gives only a singular says which list it is, with that one word to rename. -->
                   {#if l.name}
                     {@const name = l.name}
-                    <input
-                      class="field-input list-in"
-                      id="w-{name.setting}"
-                      type="text"
-                      aria-label={words.called}
-                      value={valueIn(name)}
-                      placeholder={name.fallback}
-                      oninput={(e) => (rename(l.list, name, l.one, typedIn(e)), soon())}
-                    />
+                    <div class="field list-in">
+                      <input
+                        class="field-input"
+                        id="w-{name.setting}"
+                        type="text"
+                        aria-label={words.called}
+                        value={valueIn(name)}
+                        placeholder={name.fallback}
+                        oninput={(e) => (rename(l.list, name, l.one, typedIn(e)), soon())}
+                      />
+                    </div>
                   {:else if l.one}
                     {@const one = l.one}
                     <span class="list-name">{nameOf(l.list)}</span>
-                    <input
-                      class="field-input list-in"
-                      id="w-{one.setting}"
-                      type="text"
-                      aria-label={words.one}
-                      value={valueIn(one)}
-                      placeholder={one.fallback}
-                      oninput={(e) => ((typed[one.setting] = typedIn(e)), (oneTyped[l.list] = true), soon())}
-                    />
+                    <div class="field list-in">
+                      <input
+                        class="field-input"
+                        id="w-{one.setting}"
+                        type="text"
+                        aria-label={words.one}
+                        value={valueIn(one)}
+                        placeholder={one.fallback}
+                        oninput={(e) => ((typed[one.setting] = typedIn(e)), (oneTyped[l.list] = true), soon())}
+                      />
+                    </div>
                   {/if}
+                </div>
+              {/each}
+              <!-- THE LISTS THE USE CASE NAMES NOTHING FOR, renamed by their own name when the box is left (Y21). -->
+              {#each others as r (r.id)}
+                <div class="list-words">
+                  <IconWell name={r.icon} />
+                  <div class="field list-in">
+                    <input
+                      class="field-input"
+                      id="w-list-{r.id}"
+                      type="text"
+                      aria-label={words.called}
+                      value={r.name}
+                      disabled={busy}
+                      onchange={(e) => void renameOther(r, e)}
+                    />
+                  </div>
                 </div>
               {/each}
             </div>
@@ -449,10 +503,13 @@
         </p>
       </form>
     {:else}
-      {#if spoken.lists.length > 0}
-        <Tile icon="rows" title={words.lists} count={spoken.lists.length}>
+      {#if spoken.lists.length + others.length > 0}
+        <Tile icon="rows" title={words.lists} count={spoken.lists.length + others.length}>
           {#each spoken.lists as l (l.list)}
             <StateRow icon={iconOf(l.list)} title={l.name?.value ?? nameOf(l.list)} line={l.one ? words.oneOf(l.one.value) : undefined} />
+          {/each}
+          {#each others as r (r.id)}
+            <StateRow icon={r.icon} title={r.name} />
           {/each}
         </Tile>
       {/if}

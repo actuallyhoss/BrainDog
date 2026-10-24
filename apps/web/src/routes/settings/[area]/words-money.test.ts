@@ -191,3 +191,14 @@ test('a member is drawn the words with no control, and the words never say row o
   assert.ok(said.length > 5);
   for (const s of said) assert.doesNotMatch(s, /\brows?\b|list item|entity/iu, `Words says "${s}"`);
 });
+
+test('a tab word the use case gives no title for is titled by what it names, never by its own default word (Y21)', () => {
+  const s = wordsOf({ id: 'usecase-kiln', version: null, config: { voice_lists: { type: 'text', default: 'Your shelves' } }, values: {} });
+  assert.deepEqual(s.tabs.map((w) => [w.title, w.value]), [['What the lists are called together', 'Your shelves']]);
+});
+
+test('every list the record holds is named in the owner form, each in a box (Y21)', () => {
+  const src = readFileSync(new URL('./areas/Words.svelte', import.meta.url), 'utf8');
+  assert.match(src, /othersOf\(/u, 'a list no use case names has no box');
+  assert.match(src, /<div class="field list-in">/u, 'a list name is typed into a line with no box');
+});
