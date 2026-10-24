@@ -130,15 +130,17 @@
       closed(true, first);
       first = null;
     };
+    let asked = 0;
     void (async () => {
-      for (const [i, part] of parts.entries()) {
+      for (const part of parts) {
         await idle();
         if (!here || leaving.signal.aborted) break;
         /* A PART THAT FAILS IS NOT DRAWN, and the next is still asked. */
         await part().catch(() => undefined);
         drawn();
         /* THE QUICK PARTS HEARD: what they found is drawn, or that there is nothing, while the walk reads on. */
-        if (here && i === parts.length - 2) quick = true;
+        asked += 1;
+        if (here && asked === parts.length - 1) quick = true;
       }
       drawn();
       if (here) heard = true;
@@ -167,8 +169,11 @@
   {#if imported}<imported.Part found={imported.found} />{/if}
   {#if !heard && !quick}
     <p class="health-reading" role="status">{words.reading}</p>
+  {:else if !any && !heard}
+    <!-- THE QUICK PARTS FOUND NOTHING, and the walk of pages and notes is still out: the calm line vouches only for them. -->
+    <Empty kind="cleared" title={words.clear} body={words.clearBodyUnchecked} />
   {:else if !any}
-    <Empty kind="cleared" title={words.clear} body={unchecked || !heard ? words.clearBodyUnchecked : words.clearBody} />
+    <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
   {/if}
   {#if quick && !heard}
     <p class="health-reading" role="status">{words.readingPages}</p>

@@ -28,5 +28,6 @@ test('the screen is drawn only once a part has answered, and says nothing to tid
   assert.match(health, /let first: number \| null = opened\(\);/u, 'the screen claims it is drawn on the shell alone');
   assert.match(health, /closed\(true, first\);/u);
   assert.match(health, /\{#if !heard && !quick\}/u, 'the reading line stays up until the walk ends');
+  assert.match(health, /\{:else if !any && !heard\}\s*<!--[^>]*-->\s*<Empty kind="cleared" title=\{words\.clear\} body=\{words\.clearBodyUnchecked\} \/>/u);
   assert.match(health, /words\.readingPages/u);
 });
