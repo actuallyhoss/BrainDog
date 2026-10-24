@@ -3473,10 +3473,36 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const app = appPath(url.pathname);
     /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
     if (app !== null && app.slug !== null && servesKey(app.rest)) return recordKey(request, env, app.slug);
-    if (app !== null) return servesApi(app.rest) ? recordApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
+    if (app !== null) return servesApi(app.rest) ? timedApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
-    return recordApi(request, env, null);
+    return timedApi(request, env, null);
+}
+
+/**
+ * `recordApi`, with how long the answer took said on it (`Server-Timing`, scope 2026-10-24 A1): `rec` is the trip to the
+ * record's object and its answer, as this Worker waited for it (`forward` puts it on the answer), and `door` is the rest, the doors,
+ * the Directory and the limits asked before it. A browser's tools and the night's speed measure read the split from the
+ * answer itself rather than piecing it together from logs.
+ *
+ * THE RECORD'S OWN CLOCK IS NOT ASKED: inside an object time moves only across I/O, so the work it does in its own thread
+ * reads as nothing. What the record costs is read from `rec` against a call that does no work (`version`).
+ */
+async function timedApi(request: Request, env: Env, slug: string | null): Promise<Response> {
+  const t0 = Date.now();
+  const out = await recordApi(request, env, slug);
+  if (out.status === 101 || out.webSocket) return out;
+  const said = /(?:^|,)\s*rec;dur=(\d+)/.exec(out.headers.get('server-timing') ?? '');
+  const rec = said === null ? undefined : Number(said[1]);
+  const total = Date.now() - t0;
+  return withServerTiming(out, rec === undefined ? `door;dur=${total}` : `rec;dur=${rec}, door;dur=${Math.max(0, total - rec)}`);
+}
+
+/** An answer with `Server-Timing` set to `value`, its body, status and other headers as they were. */
+export function withServerTiming(out: Response, value: string): Response {
+  const timed = new Response(out.body, out);
+  timed.headers.set('server-timing', value);
+  return timed;
 }
 
 /**
@@ -3754,11 +3780,16 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
   const removal = removalAsked(inner.method, new URL(inner.url).pathname) ? inner.clone() : null;
   const renaming = renameAsked(inner.method, new URL(inner.url).pathname);
   const leaving = leavesAsked(inner.method, new URL(inner.url).pathname);
+  const t0 = Date.now();
   const out = await stub().fetch(inner);
+  const spent = Date.now() - t0;
   if (removal !== null && out.status === 200) await leftDirectory(removal, env, record);
   if (leaving && out.status === 200) await leftWithNothing(out.clone(), env, record);
   if (renaming && out.status === 200) await renamedEverywhere(out.clone(), env, ctx);
-  if (!restoreAsked(inner.method, new URL(inner.url).pathname)) return out;
+  if (!restoreAsked(inner.method, new URL(inner.url).pathname)) {
+    /* THE WAIT ON THE RECORD rides on its answer as `rec`, for `timedApi` to add the doors' share beside it. */
+    return out.status === 101 || out.webSocket ? out : withServerTiming(out, `rec;dur=${spent}`);
+  }
   return afterRestore(out, actorOf(ctx), {
     reset: () => stub().reopen(),
     restored: async (args) => (await stub().restored(args)) as unknown as Result<unknown>,
