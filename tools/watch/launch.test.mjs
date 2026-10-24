@@ -12,7 +12,7 @@ import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import watch, { allowedCommits, hostInput, namesOf, reasonsBeside } from './launch.mjs';
+import watch, { allowedCommits, hostInput, namesOf, reasonsBeside, shipRuns } from './launch.mjs';
 import { wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
 import { SIGNUP_STOPPED, STOPPING, launchDetail, launchState } from '../../apps/worker/src/launch.ts';
 
@@ -140,6 +140,28 @@ test('QUESTION 3 WITHOUT A TOKEN IS A MISS THAT SAYS SO, never a shrug; and a bu
   assert.ok(bare.lines.some((l) => l.includes('there is no GITHUB_TOKEN and GITHUB_REPOSITORY here, so GitHub cannot be read')), bare.lines.join('\n'));
   const unnamed = await run({ 'https://brain.example.test/.well-known/braindog-build': json({ app: null }) });
   assert.ok(unnamed.lines.includes('           names no commit, so this deploy was not told which build it is'), unnamed.lines.join('\n'));
+});
+
+test('ON HIS MAC, QUESTION 3 READS THE DEPLOYS deploy.mjs LOGGED, and GitHub is asked for nothing', async () => {
+  const log = (sha, verdict) => `\n  deploy of ${sha} to brain.example.test; log x\n...\n  deploy of ${sha}: ${verdict}\n`;
+  const files = {
+    'deploy-2026-10-09T07-00-00Z': log(`${LIVE}56789a`, 'green'),
+    'deploy-2026-10-08T07-00-00Z': log('a1d00001234b', 'green'),
+    'deploy-2026-10-09T11-00-00Z': log('bad00001234c', 'RED'),
+    'deploy-dry-2026-10-09T11-30-00Z': log('d1700001234d', 'green'),
+    'deploy-2026-10-09T11-50-00Z': `\n  deploy of fee00001234e to brain.example.test; log x\n`,
+  };
+  const runs = shipRuns(files);
+  assert.deepEqual(runs.map((r) => [r.head_sha, r.conclusion]), [[`${LIVE}56789a`, 'success'], ['a1d00001234b', 'success'], ['bad00001234c', 'failure']]);
+  assert.equal(shipRuns(files, true).find((r) => r.status === 'in_progress')?.head_sha, 'fee00001234e');
+  const offline = { [`${API}/repos/owner/repo/actions/workflows/deploy.yml/runs?branch=master&per_page=30`]: json({}, 500) };
+  const mac = await run(offline, { github: { deploys: { runs }, lastWatch: iso(NOW - 3 * HOUR) } });
+  assert.equal(mac.code, 0, mac.lines.join('\n'));
+  assert.ok(mac.lines.includes('  the watch before this one started 180 minutes ago, a gap the Mac left asleep, not the product'), mac.lines.join('\n'));
+  const first = await run(offline, { github: { deploys: { runs: shipRuns({ 'deploy-2026-10-09T07-00-00Z': log('a1d00001234b', 'green') }) }, lastWatch: null } });
+  assert.equal(first.code, 1);
+  assert.ok(first.lines.includes('           the live build is abc1234, where the last green deploy is a1d0000'), first.lines.join('\n'));
+  assert.ok(first.lines.includes('  this is the first watch on this Mac'));
 });
 
 test('QUESTION 4: security.txt expiring within 30 days, or with no Expires, is a miss', async () => {

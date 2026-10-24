@@ -32,6 +32,10 @@
  * nothing. The same token reads when the watch last ran, printed so a schedule GitHub skipped shows as a gap and not as
  * the product down.
  *
+ * ON HIS MAC, HOURLY THROUGH launchd (`tools/watch/mac.mjs`), since `watch.yml` runs by hand only (15 October): the
+ * same seven questions, with question 3 read from the deploys `tools/ship/deploy.mjs` logged there (`shipRuns`) and a
+ * red run a macOS notice.
+ *
  * EXIT CODES: 0 when all seven answer as they should, 1 when any does not.
  */
 
@@ -122,8 +126,38 @@ export function allowedCommits(runs, now) {
   return out;
 }
 
+/** A deploy log's last line: `deploy of <sha>: green` or `RED` (`tools/ship/deploy.mjs`). */
+const DEPLOYED = /^\s*deploy of ([0-9a-f]{7,40}): (green|RED)\s*$/mu;
+
+/**
+ * THE DEPLOYS RUN ON HIS MAC, AS GITHUB'S RUN LIST WOULD SAY THEM, since `deploy.yml` runs there and not on GitHub (15
+ * October). One run per `.ship/logs/deploy-<stamp>/deploy.log` that is not a dry run: green or red from its verdict
+ * line, and a log with no verdict while `.ship/deploy.lock` is held is a deploy still running. A log with no verdict
+ * and no lock was stopped, and counts as neither. `files` is `{ name: text }`, handed in so a test plants it.
+ */
+export function shipRuns(files, locked = false) {
+  const runs = [];
+  for (const [name, text] of Object.entries(files)) {
+    const stamp = /^deploy-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})Z$/u.exec(name);
+    if (!stamp) continue;
+    const at = `${stamp[1]}T${stamp[2]}:${stamp[3]}:${stamp[4]}Z`;
+    const said = DEPLOYED.exec(text);
+    const head = /deploy of ([0-9a-f]{7,40}) to /u.exec(text)?.[1];
+    if (said) runs.push({ status: 'completed', conclusion: said[2] === 'green' ? 'success' : 'failure', head_sha: said[1], updated_at: at });
+    else if (locked && head) runs.push({ status: 'in_progress', conclusion: null, head_sha: head, updated_at: at });
+  }
+  return runs;
+}
+
 /** When the watch ran before this run, so a schedule GitHub skipped reads as a gap and not as the product down. Never a miss. */
 async function lastWatchLine(ask, github, ms, now) {
+  /* ON HIS MAC (`mac.mjs`) THE LAST RUN IS HANDED IN, as a time or null for the first watch, and GitHub is not asked. */
+  if (github.lastWatch !== undefined) {
+    if (github.lastWatch === null) return 'this is the first watch on this Mac';
+    const minutes = Math.round((now - Date.parse(github.lastWatch)) / 60_000);
+    if (!Number.isFinite(minutes)) return 'the last watch is not known: its time is not a date';
+    return minutes > 120 ? `the watch before this one started ${minutes} minutes ago, a gap the Mac left asleep, not the product` : `the watch before this one started ${minutes} minutes ago`;
+  }
   const got = await runsOf(ask, github, 'watch.yml', 'per_page=5', ms);
   if (got.error) return `the last watch is not known: ${got.error}`;
   const before = got.runs.find((r) => String(r.id) !== String(github.runId ?? ''));
@@ -166,7 +200,8 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
 
   const build = await asked(ask, `https://${host}/.well-known/braindog-build`, {}, ms);
   const live = build.error || build.status !== 200 ? null : readBuild(parse(build.text)?.app).sha?.toLowerCase();
-  const deploys = await runsOf(ask, github, 'deploy.yml', 'branch=master&per_page=30', ms);
+  /* `github.deploys` IS HANDED IN ON HIS MAC: the deploys `tools/ship/deploy.mjs` ran there, read by `shipRuns`. */
+  const deploys = github.deploys ?? (await runsOf(ask, github, 'deploy.yml', 'branch=master&per_page=30', ms));
   const allowed = deploys.error ? [] : allowedCommits(deploys.runs, now);
   const hit = live ? allowed.find((c) => c.sha.toLowerCase().startsWith(live)) : undefined;
   say(
