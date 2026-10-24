@@ -183,7 +183,9 @@
     </div>
   </Tile>
 
-  <Tile title={words.segmented}>
+  <!-- THE WHOLE WIDTH, so five choices keep one row: in a third of the board at 1512 the track wrapped "Year" under the
+       rest (U-B24, scope E36). -->
+  <Tile title={words.segmented} class="sheet-wide">
     {#each SEGMENTS as n (n)}
       <figure class="cell cell-start">
         <Segmented role="group" aria-label={words.choices(n)} full>
