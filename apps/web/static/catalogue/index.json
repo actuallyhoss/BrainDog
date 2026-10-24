@@ -3673,8 +3673,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.4.0",
+      "latest": "3.5.0",
       "versions": [
+        {
+          "version": "3.5.0",
+          "checksum": "1a85c836848c512fb45b02eafd14cbfc0ef5c83460ed5ed48e9d5bdec2a06a54",
+          "bytes": 43127,
+          "published_at": "2026-10-24T22:19:43.796Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.4.0",
           "checksum": "f16fba6f8af440e23a779c1fe1d364d8d098de28f032aa6bab61edd193002066",

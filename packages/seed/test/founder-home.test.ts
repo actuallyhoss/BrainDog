@@ -286,10 +286,14 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
      gate on the age. */
   const dashboardBefore = (blocks: Block[]): Block[] =>
     blocks.flatMap((b): Block[] => {
+      /* AND 3.5.0 (Y16, Y2): the Organisations table leaves out the ones put away. */
+      if (b.kind === 'table' && b.heading === 'Organisations') return [{ ...b, where: 'merged_into is empty' }];
       if (b.kind !== 'lines') return [b];
       if (String(b.heading).startsWith('Numbers, last reported')) return [];
       const all = (b.when as { all?: unknown[] } | undefined)?.all;
-      return [Array.isArray(all) ? { ...b, when: all[0] } : b];
+      /* AND THE SHAPE NUMBERS' PAGE DRAWS, two charts and forty listed (3.5.0, Y16). */
+      const { limit: _limit, most: _most, ...rest } = b as Block & { limit?: unknown; most?: unknown };
+      return [Array.isArray(all) ? { ...rest, when: all[0] } : rest] as Block[];
     });
   /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */
   const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[]; metric?: string })[])

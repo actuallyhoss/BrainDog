@@ -59,7 +59,7 @@ const NUMBER_COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, 
  * its latest reading, for a small table under the lines (`measureLines` in `packages/kernel/src/measures.ts`). No
  * empty line: a page with no number has nothing here, and where a project sends them is the section under it.
  */
-const numbers = (where: string | null, when?: Record<string, unknown>, heading = 'Numbers, 30 days'): Record<string, unknown> => ({
+const numbers = (where: string | null, when?: Record<string, unknown>, heading = 'Numbers, 30 days', shape: Record<string, unknown> = {}): Record<string, unknown> => ({
   kind: 'lines',
   heading,
   icon: 'chart-line',
@@ -68,8 +68,16 @@ const numbers = (where: string | null, when?: Record<string, unknown>, heading =
   columns: NUMBER_COLUMNS,
   where: ['source is not example', ...(where ? [where] : [])].join(', '),
   back: 30,
+  ...shape,
   ...(when ? { when } : {}),
 });
+
+/**
+ * THE SHAPE NUMBERS' OWN PAGE DRAWS (`all-numbers` in `modules/portfolio.ts`), SINCE 3.5.0 (Y16 of 25 October): the two
+ * that moved most as charts and up to forty listed, so the two pages count the same readings the same. The Dashboard
+ * drew twelve charts and forty listed, "48 more" where Numbers said "36 more".
+ */
+const SAME_AS_NUMBERS = { limit: 2, most: 40 };
 
 /** How many days a number may be old before its heading stops saying thirty days and says how old the newest is. */
 const NUMBERS_FRESH_DAYS = 7;
@@ -85,8 +93,8 @@ const NUMBERS_FRESH_DAYS = 7;
 const numbersAged = (where: string | null, age: string, when?: Record<string, unknown>): Record<string, unknown>[] => {
   const gate = (own: Record<string, unknown>): Record<string, unknown> => (when ? { all: [when, own] } : own);
   return [
-    numbers(where, gate({ metric: age, lt: NUMBERS_FRESH_DAYS })),
-    numbers(where, gate({ metric: age, gte: NUMBERS_FRESH_DAYS }), `Numbers, last reported {{${age}}} days ago`),
+    numbers(where, gate({ metric: age, lt: NUMBERS_FRESH_DAYS }), undefined, SAME_AS_NUMBERS),
+    numbers(where, gate({ metric: age, gte: NUMBERS_FRESH_DAYS }), `Numbers, last reported {{${age}}} days ago`, SAME_AS_NUMBERS),
   ];
 };
 
@@ -489,8 +497,13 @@ export const FOUNDER = {
      the Dashboard says how long ago the newest came in once that is past a week (`datapoints-age`), where it said thirty
      days over a month-old import; and a project page's Numbers is headed Numbers, since that page is at its ceiling of
      blocks and has no room for the second heading. A figure and a block added and none taken away, and 3.3.0 is
-     master's, so a minor step of its own. */
-  version: '3.4.0',
+     master's, so a minor step of its own.
+
+     3.5.0, THE AUDIT OF 25 OCTOBER (Y16 and Y2): the Dashboard's numbers draw the two that moved most and list up to forty,
+     as Numbers' own page does, where they drew twelve charts, so the two pages count the same; and its Organisations table
+     leaves out one People retired (`retired_on`, People 3.8.0). Two blocks reworded in their shape and none added or taken
+     away, and 3.4.0 is master's, so a minor step of its own. */
+  version: '3.5.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -757,7 +770,7 @@ export const FOUNDER = {
             when: { metric: 'organisations-held', gt: 0 },
             /* BY KIND AND WEBSITE SINCE 2.0.0, where it said where each was registered and its currency, which People's
                list does not keep. Each opens People's page for it. */
-            where: 'merged_into is empty',
+            where: 'merged_into is empty, retired_on is empty',
             columns: [
               { field: 'name', label: 'Organisation', width: 'minmax(20ch,1fr)' },
               { field: 'kind', label: 'Kind', width: '14ch' },

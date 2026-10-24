@@ -134,6 +134,27 @@ test('NUMBERS FOUR WEEKS OLD ARE HEADED WITH HOW LONG AGO THE LAST ONE CAME IN, 
   for (const b of charts) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
 });
 
+/* THE AUDIT OF 25 OCTOBER, Y16 AND Y2. The Dashboard counted 52 kinds of number (twelve charts and forty listed) where
+   Numbers counted 42 (two charts and forty listed), so the two pages said different counts of the same readings. Both
+   draw two charts and list the rest now. And People's list leaves out a shop put away (`retired_on`) and the Dashboard's
+   Organisations table still listed it. */
+test('THE DASHBOARD DRAWS TWO CHARTS AND LISTS THE REST AS NUMBERS DOES, and leaves out a retired organisation', async () => {
+  const k = await founder();
+  const kept = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', domain: 'harbour.example' }, OWNER));
+  value(k.create('organisations', { name: 'Chillout Elo', kind: 'company', retired_on: dayOf(NOW - DAY) }, OWNER));
+  for (let m = 0; m < 6; m += 1)
+    for (const d of [0, 1])
+      value(k.create('datapoints', { name: `Measure ${m + 1}`, value: m + d, organisation: kept.id, source: 'reported', at: new Date(NOW - d * DAY).toISOString() }, OWNER));
+  const blocks = value<{ blocks: (Drawn & { latest?: unknown[] })[] }>(k.page('dashboard')).blocks;
+  const chart = blocks.find((b) => b.kind === 'lines' && b.drawn !== false)!;
+  assert.equal(chart.measures?.length, 2, 'two charts, as Numbers draws');
+  assert.equal(chart.latest?.length, 4, 'the other four are listed beside them');
+  const orgs = blocks.find((b) => b.heading === 'Organisations')!;
+  const names = (orgs.rows ?? []).map((r) => r.fields.name);
+  assert.ok(names.includes('Harbour Studio'), 'a kept organisation is listed');
+  assert.ok(!names.includes('Chillout Elo'), 'a retired one is not');
+});
+
 /**
  * A FOUNDER'S HOME SAYS ONLY WHAT IS TRUE OF THIS RECORD, SINCE founder 1.16.0: the way to bring money
  * in only while no account counts as cash, and the week's numbers over the week, six lines at most and the projects they

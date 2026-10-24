@@ -1583,6 +1583,33 @@ const DECLARED: Record<string, Version> = {
   },
   /* NUMBERS HANDED TO PORTFOLIO (the KPI plan of 21 October, K1-A): 2.7.0 IS PUBLISHED AND FROZEN, and a list this pack
      declared goes, so a major step, as 2.0.0 was when organisations went to People. */
+  /* THE AUDIT OF 25 OCTOBER (Y16, Y2). 3.4.0 IS MASTER'S, so a version of its own. No id added or taken away. */
+  'founder@3.5.0': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '539dcf5be4dde3ed',
+    history: [
+      "The audit of 25 October (Z7): `page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
+      "The audit of 25 October (Z20): `page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
+      "The audit of 25 October (Y16, Y2): `page.dashboard` draws two charts and lists up to forty, and its Organisations table leaves out a retired one; no id added or taken away -> 539dcf5be4dde3ed",
+    ],
+  },
   /* THE AUDIT OF 25 OCTOBER (Z7, Z20). 3.3.0 IS MASTER'S, so a version of its own. A figure added. */
   'founder@3.4.0': {
     holds: `
