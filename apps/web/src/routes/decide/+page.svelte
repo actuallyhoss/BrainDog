@@ -627,6 +627,13 @@
       white-space: nowrap;
     }
 
+    /* THE PAGE'S OWN ⋯ IS NOT DRAWN UNDER THE SWITCH (audit Z27, decide-390-light.png): the rule that raises it to the
+       sentence's row reaches only a body first under the head, so here it stood alone on a line of its own under the
+       switch, and later on the tab's edge. The head's ⋯ is the menu, and Edit layout is offered only from 900px. */
+    .body[data-switch] :global(.home-page:not([data-arranging]) > .home-tools) {
+      display: none;
+    }
+
     .body[data-showing='money'] :global(.block-slot[data-key='decide-quick']),
     .body[data-showing='quick'] :global(.block-slot[data-key='decide-money']),
     .body[data-showing='handled'] :global(:is(.block-slot[data-key='decide-money'], .block-slot[data-key='decide-quick'])),

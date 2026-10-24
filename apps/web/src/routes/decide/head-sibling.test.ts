@@ -40,6 +40,13 @@ test('the sheet for asking a question is still drawn, after the page', () => {
   assert.match(markup, /<AskSheet open=\{asking\} onclose=\{\(\) => \(asking = false\)\} onfiled=\{filed\} \/>/u);
 });
 
+/* AUDIT Z27 (decide-390-light.png): a lone "…" on a line of its own under the phone's switch, the page's own menu, which
+   the raise in `PageView` reaches only where the body stands first under the head. Under the switch it is not drawn. */
+test('under the phone’s switch the page’s own menu is not drawn on a line of its own', () => {
+  const narrow = [...styles.matchAll(/@media \(width < 900px\) \{([\s\S]*?)\n {2}\}/gu)].map((m) => m[1]).join('\n');
+  assert.match(narrow, /\.body\[data-switch\] :global\(\.home-page:not\(\[data-arranging\]\) > \.home-tools\) \{\s*display: none;/u);
+});
+
 test('on a phone the page under the sentence keeps Home’s room over its body, so the raised menu clears the name’s row', () => {
   const phone = styles.match(/@media \(hover: none\) and \(width <= 600px\) \{([\s\S]*?)\n {2}\}/u)?.[1] ?? '';
   assert.match(phone, /\.page:has\(> \.body:first-child\) \{\s*padding-block-start: var\(--sp-4\);/u);
