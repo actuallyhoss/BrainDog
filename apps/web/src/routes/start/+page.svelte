@@ -138,6 +138,8 @@
    */
   let made = $state(false);
   let madeModules = $state.raw<string[] | null>(null);
+  /* THE PLACES MADE, by name, which the end says first (audit C, X3). */
+  let madePlaces = $state.raw<string[] | null>(null);
   onMount(() => {
     if (location.hash !== '#made') return;
     history.replaceState(history.state, '', location.pathname + location.search);
@@ -697,6 +699,7 @@
       (await import('$lib/record/boot-live.ts')).forget();
       if (out.failed.length === 0) {
         madeModules = asked.modules;
+        madePlaces = asked.proposal.places.filter((x) => x.kind !== 'today').map((x) => x.name);
         made = true;
         globalThis.scrollTo?.({ top: 0 });
         return;
@@ -810,7 +813,7 @@
         </div>
       </section>
     {:else if made}
-      <Made modules={madeModules} />
+      <Made modules={madeModules} places={madePlaces} />
     {:else if watched}
       <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
            refused a part, its tile says why and the way back is one button. -->

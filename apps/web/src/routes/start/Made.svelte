@@ -15,6 +15,9 @@
   NO KEY IS SHOWN: an MCP app signs in by OAuth and `braindog setup` signs in itself.
 
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
+  `places` are the names of the places made, said in one line over the apps (audit C, X3), so the screen first says what
+  was built. On a phone (under 640) Claude comes first and chosen, since nobody runs a terminal command there, and a
+  command breaks only at its spaces (`CodeLine` `words`).
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
@@ -32,8 +35,8 @@
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
 
-  let made: { modules?: readonly string[] | null | undefined } = $props();
-  void made;
+  let made: { modules?: readonly string[] | null | undefined; places?: readonly string[] | null | undefined } = $props();
+  const madeLine = $derived(firstWords.made(made.places ?? []));
 
   /* This screen's own words. The sub-line says what connecting does, and no longer asks anybody to paste "its line". */
   const words = {
@@ -54,7 +57,9 @@
 
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);
-  const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
+  /* UNDER 640, A PHONE: the apps with no terminal come first (`appLines`). Read once; a turned phone keeps its choice. */
+  const phone = globalThis.matchMedia?.('(width < 640px)').matches ?? false;
+  const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)], phone));
 
   /* CLAUDE CODE FIRST AND CHOSEN, the app a person reading this is likeliest to have. */
   let chosenId = $state<string | null>(null);
@@ -107,6 +112,7 @@
 <section class="made" aria-labelledby="made-h">
   <div class="made-tile">
     <header class="head">
+      <p class="made-line">{madeLine}</p>
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
       <p class="entry-lede">{words.sub}</p>
     </header>
@@ -133,7 +139,7 @@
             <p class="cmd-said">
               {#if steps.length > 1}<span class="cmd-n" aria-hidden="true">{i + 1}</span>{/if}{s.said}
             </p>
-            <div class="cmd"><CodeLine text={s.line} label={s.said} /></div>
+            <div class="cmd"><CodeLine text={s.line} label={s.said} words /></div>
             {#if s.line.startsWith('braindog setup')}<p class="cmd-then">{words.approve}</p>{/if}
           </li>
         {/each}
@@ -181,6 +187,16 @@
   .head {
     display: grid;
     gap: var(--sp-2);
+  }
+
+  /* WHAT WAS MADE, over the title in the body size and ink, so the first thing read is the record, not a command. */
+  .made-line {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 22px;
+    text-wrap: pretty;
   }
 
   /* THE APP'S MARK BEFORE ITS NAME in the segment, 16 at the label's ink, or its maker's colour. */

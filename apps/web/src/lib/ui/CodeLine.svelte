@@ -7,6 +7,9 @@
   it says "Copied" with a tick for a second and a half, and that is the whole receipt: no toast says it again. A copy the
   browser refuses is said once, in the toast, because the button cannot say it.
 
+  WHOLE WORDS (`words`): a command breaks only at its spaces, and a word longer than the block scrolls inside it, so
+  "install.sh" is never read as "instal / l.sh" (audit C, X3).
+
   INLINE (`inline`): a name in a sentence, 13px mono on `--tile-2` at radius 4, 2 by 6 in, no button.
 -->
 <script lang="ts">
@@ -15,7 +18,7 @@
   import Icon from './Icon.svelte';
   import { toasts } from './toast.svelte.ts';
 
-  let { text, inline = false, label }: { text: string; inline?: boolean; label?: string | undefined } = $props();
+  let { text, inline = false, label, words: whole = false }: { text: string; inline?: boolean; label?: string | undefined; words?: boolean } = $props();
 
   /* This part's own words, in a `words` object in the module that draws them. */
   const words = { copy: 'Copy', copied: 'Copied' } as const;
@@ -56,7 +59,7 @@
   <code class="code-inline">{text}</code>
 {:else}
   <div class="code-line">
-    <code class="code-text">{text}</code>
+    <code class="code-text" data-words={whole ? '' : undefined}>{text}</code>
     <span class="code-copy">
       <Button size="sm" weight="quiet" onclick={() => void take()} aria-label={label ? `${words.copy} ${label}` : undefined}>
         <Icon name={copied ? 'check' : 'copy'} size="m" /><span aria-live="polite">{copied ? words.copied : words.copy}</span>
@@ -86,6 +89,11 @@
     line-height: 20px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  .code-text[data-words] {
+    overflow-wrap: normal;
+    overflow-x: auto;
   }
 
   /* THE BUTTON ON THE BLOCK'S OWN FILL takes the tile's colour, so it reads as a control on the grey. */

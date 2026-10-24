@@ -18,6 +18,20 @@ test('five apps, each with a line for this record and no key', () => {
   assert.ok(apps.every((a) => !/bearer|token|—/iu.test(a.line + a.what)));
 });
 
+test('ON A PHONE CLAUDE COMES FIRST, the one app there with no terminal (audit C, X3)', () => {
+  const lines = connectLines('https://brain.dog', 'acme');
+  assert.deepEqual(
+    appLines(lines, lines.install, true).map((a) => a.name),
+    ['Claude', 'ChatGPT', 'Claude Code', 'VS Code', 'Cursor'],
+  );
+  assert.equal(appLines(lines, lines.install, false)[0]?.name, 'Claude Code', 'a laptop still opens on Claude Code');
+});
+
+test('THE SCREEN FIRST SAYS WHAT WAS MADE, by the places on it', () => {
+  assert.equal(firstWords.made(['Orders', 'Products', 'People', 'Money']), 'Your BrainDog is made, with Orders, Products, People and Money.');
+  assert.equal(firstWords.made([]), 'Your BrainDog is made.');
+});
+
 test('the sign waits, then names the agent and the machine', () => {
   assert.deepEqual(signOf([]), { connected: false, said: firstWords.waiting });
   const at = '2026-10-20T10:00:00Z';
