@@ -117,7 +117,7 @@ test('THE BLOCKS: a chart by week drawn only from three points, What changed new
   const changed = by('changed');
   assert.deepEqual([changed.kind, changed.heading, changed.source], ['cards', 'What changed', 'register.learnings']);
   assert.deepEqual(changed.order, [{ field: 'created_at', dir: 'desc' }]);
-  assert.deepEqual(changed.columns!.slice(0, 2), [{ field: 'lesson', as: 'title' }, { field: 'because', as: 'reply' }]);
+  assert.deepEqual(changed.columns!.slice(0, 2), [{ field: 'lesson', as: 'title' }, { field: 'topic', label: 'Bears on', as: 'fact' }], 'since 1.21.0 a card is its line, and what taught it is on its page');
   assert.ok(changed.columns!.some((c) => c.field === 'supersedes'), 'a learning that replaced another does not say which');
 
   const faded = by('faded');
@@ -169,7 +169,8 @@ test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the ch
     sql.exec('UPDATE entry SET created_at = ? WHERE id = ?', new Date(NOW - back * DAY_MS).toISOString(), row.id);
     made.push(row.id);
   }
-  assert.equal(reading(k, 'learnings-arrived'), 6);
+  /* FIVE, SINCE 1.21.0: the sixth says it was last confirmed a hundred days ago, so it did not arrive this month. */
+  assert.equal(reading(k, 'learnings-arrived'), 5);
   assert.equal(reading(k, 'learnings-faded'), 1);
   assert.ok((reading(k, 'learnings-charted') ?? 0) > 0);
 

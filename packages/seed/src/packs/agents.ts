@@ -378,7 +378,16 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      the owner's press moves (`by: 'decide'`), and every move is a line of the record's log. So these read the log over
      `events.skills`, `{ count: changed, field: rev }`: how many skills took a version in thirty days, for the line, and
      in each week of six months, for the chart's second series. A skill that took two in one week is one that changed. */
-  'learnings-arrived': { metric: 'learnings-arrived', name: 'Learnings that arrived, last 30 days', source: 'register.learnings', where: 'created_at after -30d', ...COUNT },
+  /* AND BY THE LEARNING'S OWN DAY TOO, SINCE 1.21.0 (the audit of 25 October, Y29): four learnings last confirmed on 28
+     and 29 August came in by an import this month, and the line said "4 learnings arrived this month" over their own
+     August dates. One the record wrote this month and that says no day of its own still counts. */
+  'learnings-arrived': {
+    metric: 'learnings-arrived',
+    name: 'Learnings that arrived, last 30 days',
+    source: 'register.learnings',
+    where: { all: [{ field: 'created_at', after: '-30d' }, { any: [{ field: 'confirmed_on', empty: true }, { field: 'confirmed_on', after: '-31d' }] }] },
+    ...COUNT,
+  },
   'learnings-charted': { metric: 'learnings-charted', name: 'Learnings from two weeks ago or more, last six months', source: 'register.learnings', where: 'created_at after -182d, created_at before -14d', ...COUNT },
   'skills-changed': { metric: 'skills-changed', name: 'Skills that changed, last 30 days', source: 'events.skills', ...CHANGED, window: '30d' },
   'skills-changed-by-week': { metric: 'skills-changed-by-week', name: 'Skills that changed, by week', source: 'events.skills', ...CHANGED, window: '182d', group_by: 'at', bucket: 'week' },
@@ -665,9 +674,11 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         icon: 'history',
         span: 12,
         source: 'register.learnings',
+        /* EACH LEARNING AS ITS ONE LINE, SINCE 1.21.0 (the audit of 25 October, Y29): the failure that taught it was its
+           body, and printed code (`waitForFunction(...)`, `SQLITE_ERROR`) nobody asked to see. It is on the learning's
+           own page, which the card opens. */
         columns: [
           { field: 'lesson', as: 'title' },
-          { field: 'because', as: 'reply' },
           { field: 'topic', label: 'Bears on', as: 'fact' },
           { field: 'supersedes', label: 'Replaces', as: 'fact' },
           { field: 'confirmed_on', label: 'Last confirmed', as: 'when' },
@@ -684,7 +695,6 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         where: FADED,
         columns: [
           { field: 'lesson', as: 'title' },
-          { field: 'because', as: 'reply' },
           { field: 'confirmed_on', label: 'Last confirmed', as: 'when' },
         ],
         order: [{ field: 'created_at', dir: 'asc' }],
@@ -795,8 +805,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      working right now, where it said Nobody at work over a tile called At work holding quiet runs. No list, field or
      figure goes.
      1.20.0 IS WORDS, SO IT IS MINOR (the audit of 25 October, Z6): the runs open now are headed Open now, where they
-     were headed At work over runs open and quiet. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.20.0', requires: ['register.things'] },
+     were headed At work over runs open and quiet. No list, field or figure goes.
+     1.21.0 IS MINOR (the audit of 25 October, Y29): How the brain changed counts a learning as arrived this month by its
+     own day as well as the day the record wrote it, and its cards say each learning's line without the failure under
+     it. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.21.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

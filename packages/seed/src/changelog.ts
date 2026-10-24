@@ -332,6 +332,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.21.0',
+      notes: 'How the brain changed counts a learning as arriving this month by its own date, so learnings brought in this month from August are not counted. Each learning there shows its one line, and what taught it is on its own page.',
+    },
+    {
       version: '1.20.0',
       notes: 'The runs open now on Agents are headed Open now, with the ones working first and the quiet ones under Quiet, where they were all headed At work.',
     },
