@@ -8,7 +8,7 @@
 
 import type { Category } from '@braindog/declare/catalogue';
 
-import type { Listing } from './listing.ts';
+import type { Listing, ListingKind } from './listing.ts';
 import { LEADING } from './listing.ts';
 import { words } from './words.ts';
 
@@ -34,14 +34,17 @@ export function chipsOf(listings: readonly Listing[]): Chip[] {
 export const SECTIONS = ['setups', 'addons', 'looks'] as const;
 export type Section = (typeof SECTIONS)[number];
 
+/** A listing by the two keys a section is read from. */
+type Sorted = { kind: ListingKind; categories: readonly Category[] };
+
 /** Which section a listing is in: a use case is a ready-made setup, a theme is a look, and anything else an add-on. */
-export const sectionOf = (l: Pick<Listing, 'kind' | 'categories'>): Section =>
+export const sectionOf = (l: Sorted): Section =>
   l.kind === 'usecase' ? 'setups' : l.categories.includes('themes') ? 'looks' : 'addons';
 
 export type SectionChip = { section: Section; name: string; count: number };
 
 /** A chip for each section that holds anything, with how many it holds: the same number its heading says. */
-export function sectionChips(listings: readonly Pick<Listing, 'kind' | 'categories'>[]): SectionChip[] {
+export function sectionChips(listings: readonly Sorted[]): SectionChip[] {
   return SECTIONS.flatMap((section) => {
     const count = listings.filter((l) => sectionOf(l) === section).length;
     return count === 0 ? [] : [{ section, name: words.sections[section], count }];
