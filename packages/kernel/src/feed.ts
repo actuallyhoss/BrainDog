@@ -40,14 +40,18 @@ const tagged = (to: unknown): boolean =>
 /**
  * Collapses setups as the log is walked newest first. `push` each line in order and emit what it answers; `flush` once
  * at the end. `isExample` answers whether the row a line is about carries the `example` tag, for a link, whose line
- * holds only the field that changed.
+ * holds only the field that changed. `madeExample` answers whether a new row's line made it with the tag, from the
+ * fields the line holds unless the caller already knows it (the page feed asks the log, and reads no new row's fields).
  */
-export function setupCollapser<L extends FeedLine>(isExample: (line: L) => boolean): { push: (line: L) => L[]; flush: () => L[] } {
+export function setupCollapser<L extends FeedLine>(
+  isExample: (line: L) => boolean,
+  madeExample: (line: L) => boolean = (line) => tagged(line.to),
+): { push: (line: L) => L[]; flush: () => L[] } {
   let run: L[] = [];
   const role = (line: L): 'create' | 'link' | 'install' | null => {
     if (line.kind === 'install' && line.target_kind === 'pack') return 'install';
     if (line.register === null) return null;
-    if (line.kind === 'create' && tagged(line.to)) return 'create';
+    if (line.kind === 'create' && madeExample(line)) return 'create';
     if (line.kind === 'edit' && (line.from === null || line.from === undefined || line.from === '') && isExample(line)) return 'link';
     return null;
   };

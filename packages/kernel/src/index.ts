@@ -5790,13 +5790,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * BY THE LINE'S SHAPE AND NOT A LIST OF FIELDS, so a pack's own stamp is quiet the day it ships, with nothing here
    * changed and no pack named.
    */
-  function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null }): boolean {
+  /* `listed` IS THE LIST THE LINE'S ROW IS ON WHERE THE CALLER HAS ALREADY READ IT (`null` for a row gone from the table),
+     so a feed that read its rows in one query asks no second one a line. */
+  function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null }, listed?: string | null): boolean {
     /* A SCRIPT'S QUIET RUN (`script-run.ts` stamps `quiet`): it wrote nothing, asked nothing and stopped nothing, so a
        script that runs every night adds no line to a feed on a quiet one. Its history keeps it. */
     if (e.kind === 'pull' && e.target?.startsWith('declaration:script.') && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && e.to.quiet === 1) return true;
     const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
     if (id === null) return false;
-    const listOf = (): string | null => sql.one<{ register: string }>('SELECT register FROM entry WHERE id = ?', id)?.register ?? null;
+    const listOf = (): string | null => (listed !== undefined ? listed : (sql.one<{ register: string }>('SELECT register FROM entry WHERE id = ?', id)?.register ?? null));
     if (e.kind === 'state') return e.actor === 'system' && listOf() === SESSION;
     if (e.kind !== 'edit' || e.field === null || typeof e.to !== 'string' || typeof e.from !== 'string' || !isRunName(e.actor)) return false;
     const at = Date.parse(e.to);
@@ -7872,21 +7874,65 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * rather than the sweep's lines standing in their place.
      */
     activity: (limit) => {
-      type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null };
+      type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null; to_example: number };
+      /* WHAT A LINE SAYS OF THE ROW IT IS ABOUT: its list, its number, what it is named by and whether it is an example. */
+      type About = { register: string; seq: number | null; named: Json | undefined; example: boolean };
       const lines: Raw[] = [];
+      const entryOf = (e: { target: string | null }): string | null => (e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null);
+      /* EACH ROW A LINE IS ABOUT IS READ ONCE, AND ONLY FOR WHAT THE LINE SAYS OF IT (scope 2026-10-25). Every line read
+         its row whole, a query and a parse of every field, and on his record Today's feed was five hundred of them to
+         draw eight. Now the rows of a batch's lines are one query, which answers each row's list, number, the field it is
+         named by and whether it is tagged an example. A READER SHOWN ONLY SOME LINES (`sees`) is asked with the row
+         whole, as `recentHistory` asks her. A row purged from the table is not there, as before. */
+      const about = new Map<string, About | null>();
+      const whole = new Map<string, Entry | null>();
+      const rowOf = (id: string): Entry | null => {
+        if (!whole.has(id)) whole.set(id, byId(id, true));
+        return whole.get(id)!;
+      };
+      const titles = JSON.stringify(Object.fromEntries([...registers].flatMap(([id, d]) => (d.title ? [[id, d.title]] : []))));
+      const learn = (batch: readonly Raw[]): void => {
+        if (sees) return;
+        const ids = [...new Set(batch.flatMap((e) => entryOf(e) ?? []))].filter((id) => !about.has(id));
+        if (ids.length === 0) return;
+        for (const id of ids) about.set(id, null);
+        const rows = sql.all<{ id: string; register: string; seq: number | null; named: Json; text: number | null; example: number | null }>(
+          `SELECT id, register, seq, json_extract(fields, '$.' || json_extract(?, '$.' || register)) AS named,
+                  json_type(fields, '$.' || json_extract(?, '$.' || register)) = 'text' AS text,
+                  json_type(fields, '$.tags') = 'array' AND EXISTS (SELECT 1 FROM json_each(fields, '$.tags') WHERE value = 'example') AS example
+             FROM entry WHERE id IN (SELECT value FROM json_each(?))`,
+          titles,
+          titles,
+          JSON.stringify(ids),
+        );
+        for (const r of rows) about.set(r.id, { register: r.register, seq: r.seq === null ? null : Number(r.seq), named: r.text === 1 ? r.named : undefined, example: r.example === 1 });
+      };
+      const aboutOf = (id: string): About | null => {
+        if (!sees) return about.get(id) ?? null;
+        const row = rowOf(id);
+        if (!row) return null;
+        const title = registers.get(row.register)?.title;
+        const tags = row.fields.tags;
+        return { register: row.register, seq: row.seq, named: title ? row.fields[title] : undefined, example: Array.isArray(tags) && tags.includes('example') };
+      };
       /* AND A LINE THE READER IS NOT SHOWN IS NOT IN IT EITHER (`PageSees`), asked with the row it is about, as
          `recentHistory` asks it: a run's or an instruction's line, a personal list's, a question held from her. */
       const seen = (e: Raw): boolean => {
         if (!sees) return true;
-        const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
-        return sees.line({ kind: e.kind, target: e.target, target_kind: e.target_kind, field: e.field, row: id === null ? null : byId(id, true) });
+        const id = entryOf(e);
+        return sees.line({ kind: e.kind, target: e.target, target_kind: e.target_kind, field: e.field, row: id === null ? null : rowOf(id) });
       };
       /* A LINE ABOUT A ROW SOMEBODY ELSE KEPT PRIVATE IS NOT IN THE FEED (migration 40), whoever the feed is drawn for. */
       const kept = viewer === undefined ? '' : ` AND ${unprivateLine()}`;
       let before = Number.MAX_SAFE_INTEGER;
       for (let walked = 0; lines.length < limit && walked < FEED_WALK; ) {
+        /* A NEW ROW'S LINE IS ASKED ONLY WHETHER THE ROW WAS AN EXAMPLE, all the feed reads of its fields (`feed.ts`), and
+           its fields are left in the log: a project made with its notes carried them all. */
         const batch = sql.all<Raw>(
-          `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
+          `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, CASE WHEN kind = 'create' THEN NULL ELSE to_v END AS to_v, note,
+                  CASE WHEN kind = 'create' AND json_valid(to_v) AND json_type(to_v, '$.tags') = 'array'
+                       THEN EXISTS (SELECT 1 FROM json_each(to_v, '$.tags') WHERE value = 'example') ELSE 0 END AS to_example
+             FROM event
             WHERE rowid < ? AND kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
               AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person', 'sealed')${kept}
             ORDER BY rowid DESC LIMIT ?`,
@@ -7894,15 +7940,21 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           ...(viewer === undefined ? [] : [viewer]),
           FEED_BATCH,
         );
+        learn(batch);
         for (const e of batch) {
           before = Number(e.rowid);
           walked += 1;
-          if (!bookkeeping({ ...e, from: read(e.from_v), to: read(e.to_v) }) && seen(e)) lines.push(e);
+          /* ONLY AN EDIT AND A SCRIPT'S RUN ARE BOOKKEEPING BY WHAT THEY HOLD, so only theirs are parsed, and the list a
+             line's row is on is the one the batch's query found. */
+          const holds = e.kind === 'edit' || e.kind === 'pull';
+          const id = entryOf(e);
+          const listed = id === null || sees ? undefined : (about.get(id)?.register ?? null);
+          if (!bookkeeping({ ...e, from: holds ? read(e.from_v) : null, to: holds ? read(e.to_v) : null }, listed) && seen(e)) lines.push(e);
           if (lines.length >= limit) break;
         }
         if (batch.length < FEED_BATCH) break;
       }
-      type Line = FeedLine & { ts: string; actor: string; note: string | null; row: Entry | null };
+      type Line = FeedLine & { ts: string; actor: string; note: string | null; about: About | null; example: boolean };
       /* A QUESTION IS NAMED BY WHAT IT ASKS, AS A ROW IS BY ITS TITLE. A feed drew "suggested SG10", the question's
          number, where the line could say what was asked; a decision is the question it answered. Asked once a line,
          and only of a line about a question, so a feed of row edits costs nothing more. */
@@ -7913,16 +7965,16 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return said === null || said.trim() === '' || said === '--erased--' ? null : nameSpoken(said.trim());
       };
       /* A RECORD SETTING ITSELF UP IS ONE ROW OF A FEED BLOCK TOO, as it is one line of `whatsNew` (`feed.ts`). */
-      const setup = setupCollapser<Line>((line) => {
-        const tags = line.row?.fields.tags;
-        return Array.isArray(tags) && tags.includes('example');
-      });
+      const setup = setupCollapser<Line>(
+        (line) => line.about?.example === true,
+        (line) => line.example,
+      );
       const said: Line[] = [];
       for (const e of lines) {
-        const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
+        const id = entryOf(e);
         /* A DELETED ROW IS NAMED BY WHAT IT WAS LAST CALLED: its line read `entry:01K…` once the row was gone. A row purged
            from the table has no name left to give, so its line says what was done and to nothing. */
-        const row = id === null ? null : byId(id, true);
+        const row = id === null ? null : aboutOf(id);
         const line: Line = {
           ts: e.ts,
           actor: e.actor,
@@ -7930,13 +7982,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           target: e.target,
           target_kind: e.target_kind,
           field: e.field,
-          from: read(e.from_v),
-          to: read(e.to_v),
+          /* AN EDIT'S OLD VALUE, which says whether a link was set where there was none (`feed.ts`); nothing else is read. */
+          from: e.kind === 'edit' ? read(e.from_v) : null,
+          to: null,
           register: row?.register ?? null,
           seq: row?.seq ?? null,
           title: null,
           note: e.note,
-          row,
+          about: row,
+          example: e.to_example === 1,
         };
         said.push(...setup.push(line));
       }
@@ -7946,14 +8000,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return {
         events: said.map((e): ActivityEvent => {
           if (e.kind === SETUP_KIND) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: null, rows: typeof e.to === 'number' ? e.to : 0, ...signed(e.actor) };
-          const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
-          const row = e.row;
+          const id = entryOf(e);
+          const row = e.about;
           if (!row) {
             const thing = id === null ? governedThing(e.target) : null;
             return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note, ...(thing ? { thing } : {}), ...signed(e.actor) };
           }
-          const title = registers.get(row.register)?.title;
-          const named = title ? row.fields[title] : undefined;
+          const named = row.named;
           return {
             ts: e.ts,
             actor: e.actor,
