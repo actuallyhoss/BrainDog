@@ -238,6 +238,38 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     };
 
     /**
+     * ONE READ'S ANSWER, CHANGED, WHICHEVER WAY IT IS ASKED. Since the client sends the reads a screen asks at once as
+     * one `POST /api/reads` (`packages/client`, `inReadWave`, 24 October), a read by its own address is only one of the
+     * two ways it reaches the record, and a `page.route` on that address alone never saw the Inbox's arrivals or SG4:
+     * the screens drew the record's own answer and their keys were pressed on nothing to act on. Each call in a wave
+     * carries the address it would have had (`at`), so the same pattern finds it there, and its answer is changed in
+     * place, with every other answer in the wave left as the record gave it.
+     */
+    const answering = async (page, pattern, rewrite) => {
+      await page.route(pattern, async (route) => {
+        const res = await route.fetch();
+        await route.fulfill({ response: res, json: rewrite(await res.json()) });
+      });
+      await page.route(/\/api\/reads(?:\?|$)/u, async (route) => {
+        const calls = (() => {
+          try {
+            return JSON.parse(route.request().postData() ?? '{}').calls ?? [];
+          } catch {
+            return [];
+          }
+        })();
+        const res = await route.fetch();
+        const said = await res.json();
+        const answers = said?.ok === true ? said.value?.answers : undefined;
+        if (Array.isArray(answers))
+          calls.forEach((call, i) => {
+            if (typeof call?.at === 'string' && pattern.test(call.at) && answers[i]) answers[i] = { ...answers[i], status: 200, body: rewrite(answers[i].body) };
+          });
+        await route.fulfill({ response: res, json: said });
+      });
+    };
+
+    /**
      * THE GATE'S RECORD HAS NO ARRIVALS, so an inbox key would be pressed on an empty state and read as dead.
      * Two are handed to the screen in the record's own shape, which is the read the keys act on; nothing is
      * written. Filing one then asks the record, which refuses an id it does not hold, and says so in a toast.
@@ -255,9 +287,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         state: 'untriaged',
         reason: null,
       });
-      await page.route(/\/api\/inbox(?:\?|$)/u, (route) =>
-        route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, value: { arrivals: [line(1), line(2)], cursor: null } }) }),
-      );
+      await answering(page, /\/api\/inbox(?:\?|$)/u, () => ({ ok: true, value: { arrivals: [line(1), line(2)], cursor: null } }));
       await page.reload({ waitUntil: 'networkidle' });
       await page.waitForTimeout(200);
     };
@@ -269,11 +299,9 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
      * its two; nothing is written, and `e` puts the focus on the first tick.
      */
     const toTick = async (page) => {
-      await page.route(/\/api\/governance\?.*\bid=SG4(?:&|$)/u, async (route) => {
-        const res = await route.fetch();
-        const said = await res.json();
+      await answering(page, /\/api\/governance\?.*\bid=SG4(?:&|$)/u, (said) => {
         if (said?.ok === true && said.value?.body) said.value.body.rows = [{ name: 'Specimen site' }, { name: 'Licence generator' }];
-        await route.fulfill({ response: res, json: said });
+        return said;
       });
       await page.reload({ waitUntil: 'networkidle' });
       await page.locator('.picks input').first().waitFor({ timeout: 4000 });
