@@ -1006,7 +1006,7 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
     /* A FOLDER CALLED EXACTLY WHAT ONE PROJECT IS CALLED, or a bare repository it lists, is that project's, and no
        operator should be asked "Is braindog BrainDog?" (scope D5). Only for a run with no remote and no other
        repository name, which is where `sam/lantern` and somebody else's `lantern` would part; case and punctuation
-       folded, never a part of a name ("brain" beside "The Sam Brain" still asks). */
+       folded, never a part of a name ("brain" beside "The Studio Brain" still asks). */
     const exact = exactFolder(projects, where);
     if (exact !== null && (ids.length === 0 || (ids.length === 1 && ids[0] === exact.id))) {
       const placed = deps.write(SESSION, row.id, {}, { ...writes.w(), version: row.version, stamp: { project: exact.spoken } });

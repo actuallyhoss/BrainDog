@@ -72,7 +72,7 @@ async function record() {
   const api = await createRecordApi({ sql, clock });
   value(await api.kernel.install([PROJECTS, ORGS, LEDGER]));
   const k = api.kernel;
-  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '', last_seen: '2000-01-01T00:00:00.000Z' } })).id;
   const lanterns = [1, 2].map((n) => run({ doing: `Work ${n}`, remote: 'git@github.com:sam/lantern.git', repo: 'lantern' }));
   run({ doing: 'Bare', repo: 'kiln' });
   const lantern = value<Entry>(k.create('things', { name: 'Lantern', repos: ['lantern'] }, OWNER));

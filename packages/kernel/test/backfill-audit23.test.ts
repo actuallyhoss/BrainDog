@@ -96,7 +96,7 @@ test('ONE PLACE OF A NAME IS STILL SAID BY ITS NAME, and two folders of one name
 test('A FOLDER CALLED EXACTLY WHAT A PROJECT IS CALLED PLACES ITS RUNS UNASKED; a part of a name asks once; an import asks nothing (scope D5)', async () => {
   const { k, sql, deps, clock } = await record();
   const braindog = value<Entry>(k.create('things', { name: 'BrainDog' }, OWNER));
-  value(k.create('things', { name: 'The Sam Brain', repos: ['github.com/sam/brain'] }, OWNER));
+  value(k.create('things', { name: 'The Studio Brain', repos: ['github.com/sam/brain'] }, OWNER));
   clock.set(NOW - 2 * HOUR);
   const placed = [run(k, { cwd: '/Users/sam/Repos/braindog' }), run(k, { cwd: '/Users/sam/Repos/Brain-Dog' })];
   run(k, { repo: 'brain', cwd: '/Users/sam/Developer/brain' });
@@ -111,7 +111,7 @@ test('A FOLDER CALLED EXACTLY WHAT A PROJECT IS CALLED PLACES ITS RUNS UNASKED; 
   assert.ok(done.runs.batch, 'one batch, which Undo takes back whole');
   assert.deepEqual(
     runQuestions(done.suggestions).map((s) => s.question),
-    ['2 runs worked in brain. Is that The Sam Brain?'],
+    ['2 runs worked in brain. Is that The Studio Brain?'],
     'a part of a name is still a question, once',
   );
   assert.equal(k.get(imported)?.fields.project, '', 'an imported run is left as it was');

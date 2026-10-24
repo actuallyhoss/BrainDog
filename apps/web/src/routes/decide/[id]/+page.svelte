@@ -355,9 +355,6 @@
   const hardly = (key: string): boolean => question?.band === 'undo' || hardOption(key);
   const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
-  /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
-  const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)), runBy) : null);
-
   /**
    * THE RUN THAT ASKED, read once for its app and kind, so the line says "Claude Code" and never "An agent" (scope E37).
    * A run handle only; a refused or missing read leaves the plain word.
@@ -372,6 +369,9 @@
     const f = (got.value as { fields?: Record<string, unknown> }).fields ?? {};
     runBy = runByIn({ run: by, agent: f.agent, client: f.client, parent: f.parent });
   }
+
+  /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
+  const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)), runBy) : null);
 
   /**
    * WHEN THE RECORD STILL KEEPS A REASON FOR A QUESTION, it answers the press with `wants: 'reason'` (`decide-write.ts`),

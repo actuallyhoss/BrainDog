@@ -47,7 +47,7 @@ async function record() {
   value(await api.kernel.install([PROJECTS]));
   const k = api.kernel;
   const run = (doing: string) =>
-    value<Entry>(k.create('session', { doing, agent: 'claude', state: 'done', remote: 'git@github.com:sam/lantern.git', repo: 'lantern' }, { ...OWNER, stamp: { project: '' } }));
+    value<Entry>(k.create('session', { doing, agent: 'claude', state: 'done', remote: 'git@github.com:sam/lantern.git', repo: 'lantern' }, { ...OWNER, stamp: { project: '', last_seen: '2000-01-01T00:00:00.000Z' } }));
   const runs = [run('Fix the retry'), run('Ship the cards')];
   const lantern = value<Entry>(k.create('things', { name: 'Lantern', repos: ['lantern'] }, OWNER));
   clock.set(NOW);
@@ -120,7 +120,7 @@ async function twoPlaces() {
   const api = await createRecordApi({ sql, clock });
   value(await api.kernel.install([PROJECTS]));
   const k = api.kernel;
-  const run = (doing: string, remote: string) => value<Entry>(k.create('session', { doing, agent: 'claude', state: 'done', remote, repo: 'lantern' }, { ...OWNER, stamp: { project: '' } }));
+  const run = (doing: string, remote: string) => value<Entry>(k.create('session', { doing, agent: 'claude', state: 'done', remote, repo: 'lantern' }, { ...OWNER, stamp: { project: '', last_seen: '2000-01-01T00:00:00.000Z' } }));
   const sams = [run('Fix the retry', 'git@github.com:sam/lantern.git'), run('Ship the cards', 'git@github.com:sam/lantern.git')];
   const evil = run('Read the keys', 'https://github.com/evil/lantern');
   const lantern = value<Entry>(k.create('things', { name: 'Lantern', repos: ['lantern'] }, OWNER));
