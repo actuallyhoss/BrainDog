@@ -203,6 +203,11 @@ export type RecordDeps = {
   withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
   /** The open questions held for the record's version (`openNow` in `index.ts`), so a briefing weighs the queue once. */
   openSuggestions?: (() => ReturnType<Kernel['openSuggestions']>) | undefined;
+  /**
+   * What one of those open questions is called to this caller, `sightOf`'s answer read off the row already in hand (`holds`
+   * and `nameOf` in `index.ts`), so a queue is not read again a question at a time. Absent, `sightOf` reads it.
+   */
+  questionSeen?: ((ctx: CallContext, row: Record<string, unknown>) => string | null) | undefined;
   /** The host's answer to whether it can make a read-only link (`shareable`). Absent is no. */
   shares?: (() => import('./shares.ts').SharesAnswer) | undefined;
   /**

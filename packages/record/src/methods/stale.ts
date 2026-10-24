@@ -179,7 +179,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   const shown = (open.ok ? open.value : []).flatMap((q) => {
     const id = String(q.id ?? '');
     const at = Date.parse(String(q.opened_at ?? ''));
-    const name = id === '' ? null : sightOf(ctx, `suggestion:${id}`);
+    const name = id === '' ? null : deps.questionSeen ? deps.questionSeen(ctx, q) : sightOf(ctx, `suggestion:${id}`);
     if (name === null || !Number.isFinite(at)) return [];
     return [{ id, name: name.slice(name.indexOf(':') + 1), age: nowMs - at, by: String(q.opened_by ?? ''), cause: typeof q.cause === 'string' ? q.cause : '' }];
   });
