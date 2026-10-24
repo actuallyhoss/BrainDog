@@ -930,3 +930,17 @@ export function withPrivate<T extends { seq: number; private?: true }>(pages: re
     }),
   );
 }
+
+/**
+ * THE HEAD'S COUNT (the audit of 25 October, Y18): the list's own count, which the record answers with the first page,
+ * and never a floor of what has been loaded. Numbers read "200+ of 2,527" over a list the record had counted. A filtered
+ * list says how many match of how many it holds; a row typed here before the record counted it is counted.
+ */
+export function headCount(p: { matched: number; total: number; drawn: number; narrowed: boolean }): { count: number; total?: number } {
+  const count = Math.max(p.matched, p.drawn);
+  return p.narrowed && p.total > count ? { count, total: p.total } : { count };
+}
+
+/** THE FOOT WHILE THE REST IS ON ITS WAY, where the head now says the whole count: what is shown, and that more comes. */
+export const shownSaid = (shown: number, of: number): string =>
+  `Showing ${shown.toLocaleString('en')} of ${of.toLocaleString('en')}. More as you scroll.`;

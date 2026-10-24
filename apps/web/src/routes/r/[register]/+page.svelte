@@ -78,6 +78,8 @@
     nextSort,
     readDefault,
     readingOf,
+    headCount,
+    shownSaid,
     sameDefault,
     toggleChip,
     viewOf,
@@ -1239,16 +1241,6 @@
   ]);
 
   /**
-   * WHAT THE HEAD COUNTS AGAINST: the answer while filtering, the list otherwise.
-   *
-   * Unfiltered the two are the same number, so this changes nothing on the ordinary screen. Filtered
-   * they are not, and the head and the cap line have to be talking about the same denominator or one
-   * of them is wrong wherever they are both visible — which is exactly at the cap, the one place the
-   * cap line exists for.
-   */
-  const denominator = $derived(narrowed || q ? result.matched : result.total);
-
-  /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
    *
    * `more()` stops once `loaded` reaches the cap, and a page is two hundred rows, so it overshoots:
@@ -1257,6 +1249,10 @@
    * rows — two numbers describing rows nobody can see. The head and the line both count the grid.
    */
   const drawn = $derived(Math.min(loaded, DOM_CAP));
+
+  /* THE HEAD SAYS THE LIST'S COUNT (Y18), which the record answered with the first page, and never "200+ of 2,527": what
+     is drawn so far is the foot's to say (`shownSaid`). */
+  const head = $derived(headCount({ matched: result.matched, total: result.total, drawn, narrowed: narrowed || Boolean(q) }));
 
   /**
    * A SORTED LIST THE RECORD STOPPED, which is the one list with no next page that is not whole.
@@ -2987,9 +2983,8 @@
   <div class="list-screen">
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
-    count={whole ? result.matched : drawn}
-    atLeast={!whole && !truncated && drawn < DOM_CAP}
-    total={denominator}
+    count={head.count}
+    total={head.total}
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
@@ -3281,6 +3276,8 @@
     -->
     {#if loaded >= DOM_CAP || truncated}
       <CapLine shown={drawn} total={result.matched} />
+    {:else if cursor !== null && drawn < result.matched}
+      <p class="cap-line" role="status">{shownSaid(drawn, result.matched)}</p>
     {/if}
     </div>
   {/snippet}
