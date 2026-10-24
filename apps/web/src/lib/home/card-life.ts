@@ -20,6 +20,7 @@ import { readBoot, recordNow } from '../record/boot-live.ts';
 import { REGISTERS } from '../record/held.ts';
 import { actor } from '../record/names.ts';
 import { learn } from '../record/remote.ts';
+import { cardsHeld } from './today-read.ts';
 
 /** The most runs read at once, newest first: enough that every project worked on in weeks has its newest. */
 const RUNS_READ = 200;
@@ -97,6 +98,9 @@ const asked = new Map<string, Promise<void>>();
  */
 export async function readLastRuns(base: string, projects: string, cards: readonly { seq: number; id?: string | null | undefined; name: string }[]): Promise<Map<number, LastRun>> {
   if (cards.length === 0) return new Map();
+  /* READ BY THE RECORD IN TODAY'S ONE READ, where it is held at this version (`today-read.ts`). */
+  const held = (await cardsHeld(base, projects).catch(() => null))?.runs;
+  if (held) return lastRunsOf(held.rows as RunRow[], held.field, projects, cards, recordNow());
   const client = createClient({ base });
   if (runsListFor(projects) === null) {
     const booted = await readBoot(base).catch(() => null);

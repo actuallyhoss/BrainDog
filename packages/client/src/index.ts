@@ -1551,10 +1551,10 @@ export const KEPT_READ_MS = 300_000;
 const KEEPS = new Set([
   'get', 'list', 'countBy', 'history', 'backlinks', 'page', 'pages', 'previewPage', 'metric', 'metrics', 'figures', 'governance', 'packs', 'actions',
   'automations', 'examples', 'briefing', 'namedTwice', 'handled', 'textFaults', 'learned', 'matched', 'skillsBehind', 'huesWanted',
-  'learningsTwice', 'stale', 'heldTwice', 'instructionList',
+  'learningsTwice', 'stale', 'heldTwice', 'instructionList', 'today',
 ]);
-/** The kept reads whose answer may carry the reader's own mark: what a feed draws as unread. */
-const MARKED = new Set(['page', 'pages', 'previewPage']);
+/** The kept reads whose answer may carry the reader's own mark: what a feed draws as unread. Today's carries its body's. */
+const MARKED = new Set(['page', 'pages', 'previewPage', 'today']);
 
 /**
  * Whether a page's answer carries the reader's mark: a feed's `seen`, or the changes a block marks unseen from it. Where

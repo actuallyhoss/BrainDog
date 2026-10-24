@@ -13,6 +13,7 @@ import { createClient } from '@braindog/client';
 import { KPIS_KIND } from 'braindog-render';
 
 import type { KpiAnswered } from './card-kpi.ts';
+import { todayHeld } from './today-read.ts';
 
 /** The most key numbers asked for the cards: one a project, and the desk and Projects draw fewer projects than this. */
 const MOST = 200;
@@ -29,11 +30,22 @@ async function read(base: string, about: string | null): Promise<KpiAnswered[]> 
   const out = await client.call<{ blocks?: unknown }>('previewPage', { body }).catch(() => null);
   if (!out?.ok || !Array.isArray(out.value.blocks)) return [];
   const block = out.value.blocks[0] as { kpis?: unknown } | undefined;
-  return Array.isArray(block?.kpis) ? (block.kpis as unknown[]).filter((k): k is KpiAnswered => typeof k === 'object' && k !== null && typeof (k as KpiAnswered).name === 'string' && Array.isArray((k as KpiAnswered).points)) : [];
+  return answered(block?.kpis);
 }
 
-/** Every project's lead number, one a project. */
-export const readLeads = (base: string): Promise<KpiAnswered[]> => read(base, null);
+/** The key numbers a `kpis` block answered, each one that is one. */
+const answered = (kpis: unknown): KpiAnswered[] =>
+  Array.isArray(kpis) ? (kpis as unknown[]).filter((k): k is KpiAnswered => typeof k === 'object' && k !== null && typeof (k as KpiAnswered).name === 'string' && Array.isArray((k as KpiAnswered).points)) : [];
+
+/**
+ * Every project's lead number, one a project: drawn by the record in Today's one read where it is held at this version
+ * (`today-read.ts`), else asked.
+ */
+export async function readLeads(base: string): Promise<KpiAnswered[]> {
+  const got = await (todayHeld(base) ?? Promise.resolve(null));
+  const leads = got?.cards?.leads;
+  return Array.isArray(leads) ? answered(leads) : read(base, null);
+}
 
 /** The number one project leads with, by its row (`things#1`), or `null` where it keeps none. */
 export async function readLead(base: string, about: string): Promise<KpiAnswered | null> {

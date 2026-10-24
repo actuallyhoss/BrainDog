@@ -55,8 +55,15 @@ export function tileOnce<T>(name: string, base: string, version: string, ask: ()
   return value;
 }
 
+/** What else is dropped with Today: a module's own hold, told once it is loaded (`today-read.ts`). */
+const others = new Set<() => void>();
+export function onForgetToday(fn: () => void): void {
+  others.add(fn);
+}
+
 /** Drop everything Today kept. */
 export function forgetToday(): void {
   parts.clear();
   tiles.clear();
+  for (const fn of others) fn();
 }

@@ -139,7 +139,8 @@
      owner's alone, and never a part of `boot`, which an owner is answered as before sharing. */
   let sharedNow = $state<SharedOut | undefined>(undefined);
   $effect(() => {
-    if (!data.me?.owner || data.refused || data.stale) return;
+    /* ON TODAY'S OWN BODY IT COMES WITH THE BODY, in the record's one read (`tilesBeside`). */
+    if (!data.me?.owner || data.refused || data.stale || declares === null) return;
     void data.version;
     untrack(
       () =>
@@ -526,8 +527,10 @@
        one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. A host built
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
-    const m = await import('../../routes/decide/[id]/proposed.ts');
-    const drawn = await m.drawnOf(body, apiBase());
+    /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
+    const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
+    const base = apiBase();
+    const drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>));
     if (drawn.from === 'live')
       return {
         from: 'live',
@@ -578,11 +581,13 @@
     /* THE TAB'S FIRST READ OF TODAY TAKES WHAT `boot` SAID WAS NEW; a later one (another voice, lists learnt) asks. */
     const before = mine === 1 ? newsFirst() : newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
-    void Promise.all([readBody(slug, spoken, held), Promise.race([handledLanded, first])])
+    /* TODAY'S OWN BODY BRINGS WHAT WAS HANDLED WITH IT (`tilesBeside`), so it waits for nothing beside it. */
+    void Promise.all([readBody(slug, spoken, held), slug === null ? null : Promise.race([handledLanded, first])])
       .then(([out]) => {
         if (slug !== declares) return;
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
         if (was && out?.from !== 'live') return;
+        if (slug === null && out?.from === 'live') tilesBeside(apiBase());
         got = out;
         fromCopy = false;
         ok = out?.from === 'live';
@@ -635,6 +640,7 @@
     try {
       const out = await readBody(slug, spoken, held);
       if (slug === declares && out?.from === 'live') {
+        if (slug === null) tilesBeside(apiBase());
         got = out;
         fromCopy = false;
         drewAt = Date.now();
@@ -813,6 +819,9 @@
     let here = true;
     if (untrack(() => handled) === null) handled = keptPart<HandledFound>('handled', base);
     if (untrack(() => handled) !== null) handledHeard();
+    /* ON TODAY'S OWN BODY IT COMES WITH THE BODY, in the record's one read (`tilesBeside`), and is not asked by itself:
+       only its code is fetched now, so it is here when the body lands. */
+    if (declares === null) return void import('./handled.ts').catch(() => undefined);
     void import('./handled.ts').then(
       async (m) => {
         const found = await tileOnce('handled', base, ver, () => m.loadHandled(base)).catch(() => null);
@@ -825,6 +834,27 @@
       here = false;
     };
   });
+  /**
+   * WHAT WAS HANDLED AND WHAT IS SHARED OUT, BESIDE TODAY'S OWN BODY: the parts of the record's one `today` read
+   * (`today-read.ts`) that are Home's own, taken as the body lands. A host without `today` holds none, and each is asked
+   * by itself, as before.
+   */
+  function tilesBeside(base: string): void {
+    const ver = asOf();
+    void import('./today-read.ts')
+      .then((t) => t.todayHeld(base))
+      .then(async (got) => {
+        const m = await import('./handled.ts');
+        const found = got ? m.handledOf({ ok: true, value: got.handled }) : await tileOnce('handled', base, ver, () => m.loadHandled(base)).catch(() => null);
+        keepPart('handled', base, (handled = found && found.rows.length > 0 ? found : null));
+        handledHeard();
+        if (!data.me?.owner || data.stale) return;
+        if (got) return void (sharedNow = sharedFrom(got.shared));
+        const out = await createClient({ base }).call<unknown>('sharedOut').catch(() => null);
+        sharedNow = out?.ok ? sharedFrom(out.value) : undefined;
+      })
+      .catch(() => handledHeard());
+  }
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
   /* WHAT AGENTS ASKED HIM BACK AND WHAT THEY FINISHED TODAY, of what he told them, as the shell last read it (`told-now`). */
   const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));

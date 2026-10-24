@@ -25,6 +25,7 @@ import { blockOf, lookOf, type Fetch, type LiveBlock, type LiveLook, type LivePa
 import { learn, refMapOf, targetsOf, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
 import { rowsOf, walkRows } from '../../../lib/data/ref-rows.ts';
 import { builderPath } from '../../../lib/pattern/draft.ts';
+import type { PageSaid } from '../../../lib/home/today-read.ts';
 
 type Row = Record<string, unknown>;
 
@@ -511,13 +512,19 @@ function walkAhead(client: Client, base: string, body: Row): void {
  * SINCE `previewChange` THIS IS THE FALLBACK: a host older than that method may still have this one, and a page over
  * lists that are installed is drawn by it as it was before.
  */
-export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Drawn> {
+export async function drawnOf(
+  body: Row,
+  base: string,
+  io?: Fetch,
+  /* HOW THE BODY IS ASKED, where it is not `previewPage` alone: Today asks `today`, which answers its tiles beside it. */
+  ask?: (client: ReturnType<typeof createClient>) => Promise<PageSaid>,
+): Promise<Drawn> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   /* THE LISTS THE PAGE'S REFS NAME ARE WALKED BESIDE IT, not after it (`walkAhead`): the body says which lists its
      blocks read, so their targets are known before the record answers, and the walk the answer then needs is the tab's
      walk already out (`ref-rows.ts`). Only through the browser's own fetch, where the walk is the tab's. */
   if (io === undefined) walkAhead(client, base, body);
-  const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
+  const out = ask ? await ask(client) : await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
   if (!out.ok) {
     if (!('refusal' in out)) return { from: 'none' };
     return UNSERVED.has(out.refusal.code) ? { from: 'none' } : { from: 'refused', fix: out.refusal.fix };

@@ -21,6 +21,7 @@ import { handFor } from '../record/hand.ts';
 import { createClient } from '@braindog/client';
 import { learn } from '../record/remote.ts';
 import { viaOf } from '../../routes/r/[register]/[seq]/figures.ts';
+import { cardsHeld } from './today-read.ts';
 
 /** What this tab has asked, so a list's declaration is asked for once. */
 const asked = new Map<string, Promise<void>>();
@@ -76,6 +77,12 @@ async function rowLates(client: ReturnType<typeof createClient>, projects: strin
 export async function latesOf(base: string, projects: string, seqs: readonly number[]): Promise<Map<number, number>> {
   const out = new Map<number, number>();
   if (seqs.length === 0) return out;
+  /* COUNTED BY THE RECORD IN TODAY'S ONE READ, where it is held at this version (`today-read.ts`). */
+  const held = await cardsHeld(base, projects).catch(() => null);
+  if (held) {
+    for (const n of seqs) if ((held.lates[String(n)] ?? 0) > 0) out.set(n, held.lates[String(n)]!);
+    return out;
+  }
   let work = workFor(projects);
   const client = createClient({ base });
   for (const seq of seqs.slice(0, 3)) {
