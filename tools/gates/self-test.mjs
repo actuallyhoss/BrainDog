@@ -338,6 +338,18 @@ export const BROWSER = [
     blind: 'PASSED a build whose scripts arrive a second late. A screen could get slow and nothing would say.',
     red: 'red on every script held back before it is served',
   },
+  /**
+   * `perf-reads`: `BRAINDOG_GATE_SEED=perf-reads` asks each of Today's reads twice, which is what tiles asking for
+   * themselves what the screen already holds look like from outside, and the gate must say Today asked more reads than
+   * its budget.
+   */
+  {
+    gate: 'perf',
+    seed: 'perf-reads',
+    names: 'reads, over its budget',
+    blind: 'PASSED a Today that asks one read twice. A screen could start asking the record again and nothing would say.',
+    red: 'red on every read asked twice',
+  },
 ];
 
 /* A STALE BUILD IS AN ABSENT ONE, and this asked only whether `apps/web/build` existed until

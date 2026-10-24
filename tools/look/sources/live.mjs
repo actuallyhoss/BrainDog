@@ -131,7 +131,9 @@ export async function open(record, { env = process.env, now = Date.now(), send =
         ...(method === 'POST' ? { body: Buffer.concat(chunks) } : {}),
       });
       const body = Buffer.from(await out.arrayBuffer());
-      res.writeHead(out.status, { 'content-type': out.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      /* THE RECORD'S OWN TIME GOES ON (`Server-Timing`), so the night's measure can split the trip from the work. */
+      const timing = out.headers.get('server-timing');
+      res.writeHead(out.status, { 'content-type': out.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(timing ? { 'server-timing': timing } : {}) });
       res.end(body);
     } catch {
       /* The error's own text is not repeated: it can quote the request, and the request carried the token. */

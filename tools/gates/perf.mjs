@@ -25,8 +25,15 @@
  * THE MARK OF BEING DRAWN IS THE APP'S OWN: `main#main[data-screen]` with no `aria-busy` below it and a heading, the
  * same contract `lib.mjs` `readiness` waits for. A screen that never draws is a finding, never a quick pass.
  *
+ * AND HOW MANY READS A COLD OPEN ASKS, with their bytes (scope 2026-10-24 A6): every `/api/` answer the page fetched from
+ * the open until it went quiet (`html[data-quiet]`), read off the browser's own resource timing. Each screen is held to
+ * `callsMax`, the most it was measured asking, so a tile that starts asking the record again, or a read asked twice, is
+ * red here before it reaches his record. The count only falls.
+ *
  * `BRAINDOG_GATE_SEED=perf` holds every script of the build back before it is served, on one screen at one width, which
  * is what a bundle that suddenly weighs a second looks like from outside; `self-test` needs it to go red.
+ * `BRAINDOG_GATE_SEED=perf-reads` asks each of Today's reads twice, which is what duplicated reads look like from
+ * outside, and the gate must say Today asked more reads than its budget.
  *
  * Returns 1 on a finding and 3 when there is no build, and falls off the end for a pass.
  */
@@ -77,6 +84,9 @@ const TYPES = {
  * had when `arm` was called, so a move is drawn only when the heading has changed.
  */
 function stamp() {
+  /* ROOM FOR EVERY READ IN THE BROWSER'S TIMING: its buffer holds 250 entries by default, and a cold open's modules
+     fill it before the screen's reads are asked, so they were never counted. */
+  performance.setResourceTimingBufferSize(Number.MAX_SAFE_INTEGER);
   const d = { at: null, t0: 0, before: null };
   window.__perf = d;
   const heading = () => (document.querySelector('#main h1') ?? document.querySelector('h1'))?.textContent.trim() ?? null;
@@ -97,6 +107,38 @@ function stamp() {
   };
 }
 
+/**
+ * THE PLANTED DUPLICATE (`perf-reads`): every read sent as a GET is sent a second time and its answer dropped, which is
+ * what tiles asking for themselves what the screen already holds look like to the record. Every one and not a single
+ * read, because a cold open's count moves by one or two between runs (a version poll, a presence beat), and a fault
+ * the gate is sure to see is one far past that.
+ */
+function twice() {
+  const real = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const method = (init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET')).toUpperCase();
+    /* The copy's body is read, or the browser never finishes the answer and its timing never counts it. */
+    if (method === 'GET' && /\/api\/[A-Za-z]/u.test(url)) void real(input, init).then((r) => r.arrayBuffer()).catch(() => {});
+    return real(input, init);
+  };
+}
+
+/** The reads a page asked, by the browser's own resource timing: `{ calls, bytes, by }`, `by` counting each method. */
+function readsIn() {
+  const by = {};
+  let bytes = 0;
+  let calls = 0;
+  for (const e of performance.getEntriesByType('resource')) {
+    const m = /\/api\/([A-Za-z][A-Za-z0-9/]*)$/u.exec(new URL(e.name).pathname);
+    if (m === null) continue;
+    calls += 1;
+    bytes += e.decodedBodySize;
+    by[m[1]] = (by[m[1]] ?? 0) + 1;
+  }
+  return { calls, bytes, by };
+}
+
 /** The middle of an odd count of runs; of an even count, the upper of the middle two. */
 const median = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
@@ -111,8 +153,9 @@ const stamped = (page, when) =>
 /**
  * One screen opened one time: `{ paint, drawn, copy, revisit }` in milliseconds, or `{ never }` naming what did not come.
  */
-async function once(browser, origin, screen, width, { record, ready }) {
-  const opened = await openPage(browser, `${origin}${APP_BASE}${screen.route}`, { width, touch: width < Math.max(...budget('perf').widths), record, ready, clock: null, init: stamp });
+async function once(browser, origin, screen, width, { record, ready, reads }) {
+  const init = reads ? `(${stamp})();(${twice})();` : stamp;
+  const opened = await openPage(browser, `${origin}${APP_BASE}${screen.route}`, { width, touch: width < Math.max(...budget('perf').widths), record, ready, clock: null, init });
   try {
     const where = `${screen.name} @${width}`;
     const unmeasured = ready.check(where, screen.route, opened.state);
@@ -124,6 +167,9 @@ async function once(browser, origin, screen, width, { record, ready }) {
       drawn: window.__perf.at,
     }));
     if (cold.paint === null) return { never: `${where}  drew no first contentful paint` };
+    /* THE READS OF THE COLD OPEN, counted once the page is at rest: what it asked to draw this screen and nothing after. */
+    await page.waitForSelector('html[data-quiet]', { state: 'attached', timeout: budget('ready').quietMs }).catch(() => null);
+    const asked = await page.evaluate(readsIn);
 
     /* A REVISIT: out to another screen of the app by a link in its own navigation, then Back. The move is timed from the
        call to the heading being the first screen's again. */
@@ -148,14 +194,14 @@ async function once(browser, origin, screen, width, { record, ready }) {
     await page.reload({ waitUntil: 'commit' });
     await stamped(page, 'on a reload');
     const copy = await page.evaluate(() => window.__perf.at);
-    return { paint: cold.paint, drawn: cold.drawn, copy, revisit };
+    return { paint: cold.paint, drawn: cold.drawn, copy, revisit, calls: asked.calls, bytes: asked.bytes, by: asked.by };
   } finally {
     await opened.context.close().catch(() => {});
   }
 }
 
 /** `{ screen, width, paint, drawn, copy, revisit }` for each screen at each width, every time the middle of `samples` opens. */
-async function walk(root, seeded) {
+async function walk(root, seeded, reads = false) {
   const P = budget('perf');
   const ROOT = join(root, 'apps', 'web', 'build');
   const rows = [];
@@ -190,21 +236,23 @@ async function walk(root, seeded) {
     await answers(origin);
     const ready = readiness('perf', budget('ready').settleTimeoutMs, ROOT);
     browser = await chromium.launch();
-    const widths = seeded ? P.widths.slice(0, 1) : P.widths;
-    const screens = seeded ? SCREENS.slice(0, 1) : SCREENS;
+    const widths = seeded || reads ? P.widths.slice(0, 1) : P.widths;
+    const screens = seeded || reads ? SCREENS.slice(0, 1) : SCREENS;
     for (const width of widths) {
       for (const screen of screens) {
         const runs = [];
         for (let i = 0; i < P.samples; i++) {
-          const got = await once(browser, origin, screen, width, { record, ready }).catch((e) => ({ never: `${screen.name} @${width}  threw: ${String(e?.message ?? e).split('\n')[0]}` }));
+          const got = await once(browser, origin, screen, width, { record, ready, reads }).catch((e) => ({ never: `${screen.name} @${width}  threw: ${String(e?.message ?? e).split('\n')[0]}` }));
           if (got.never) {
             findings.push(got.never);
             break;
           }
           runs.push(got);
         }
+        /* TIMES ARE THE MIDDLE RUN'S; READS ARE THE MOST ANY RUN ASKED, because a read asked once in three is still asked. */
+        const most = runs.reduce((a, r) => (r.calls > a.calls ? r : a), runs[0]);
         if (runs.length === P.samples)
-          rows.push({ screen, width, ...Object.fromEntries(['paint', 'drawn', 'copy', 'revisit'].map((k) => [k, Math.round(median(runs.map((r) => r[k])))])) });
+          rows.push({ screen, width, ...Object.fromEntries(['paint', 'drawn', 'copy', 'revisit'].map((k) => [k, Math.round(median(runs.map((r) => r[k])))])), calls: most.calls, bytes: Math.max(...runs.map((r) => r.bytes)), by: most.by });
       }
     }
     const blind = ready.nothingDrawn();
@@ -217,8 +265,8 @@ async function walk(root, seeded) {
   }
 }
 
-/** Whether a run is the planted one: `perf` among the seeds named, one or several joined by commas. */
-export const seededBy = (value) => String(value ?? '').split(',').some((s) => s.trim() === 'perf');
+/** Whether a run is the planted one: `perf` (or `name`) among the seeds named, one or several joined by commas. */
+export const seededBy = (value, name = 'perf') => String(value ?? '').split(',').some((s) => s.trim() === name);
 
 /** The findings a table of measured rows holds, each saying the number, the budget and the screen. */
 export function judge(rows, P = budget('perf')) {
@@ -231,6 +279,9 @@ export function judge(rows, P = budget('perf')) {
     over(r, 'drawing', r.drawn, P.drawnMs);
     over(r, 'opening from the kept copy', r.copy, r.screen.today ? P.todayCopyMs : P.copyMs);
     over(r, 'a revisit', r.revisit, P.revisitMs);
+    const most = P.callsMax?.[r.screen.name];
+    if (most === undefined) out.push(`${r.screen.name} @${r.width}  has no reads budget in perf.callsMax`);
+    else if (r.calls > most) out.push(`${r.screen.name} @${r.width}  asked ${r.calls} reads, over its budget of ${most} (${Object.entries(r.by).map(([k, v]) => `${k} ${v}`).join(', ')})`);
   }
   return out;
 }
@@ -241,11 +292,12 @@ export default async function perf(root = process.env.BRAINDOG_GATE_ROOT ?? join
     return 3;
   }
   const seeded = seededBy(process.env.BRAINDOG_GATE_SEED);
-  const { rows, findings } = await walk(root, seeded);
+  const reads = seededBy(process.env.BRAINDOG_GATE_SEED, 'perf-reads');
+  const { rows, findings } = await walk(root, seeded, reads);
   findings.push(...judge(rows));
   const label = (r) => `${r.screen.name} @${r.width}`;
   const wide = Math.max(...rows.map((r) => label(r).length));
-  for (const r of rows) console.log(`  ${label(r).padEnd(wide)} paint ${r.paint}  drawn ${r.drawn}  copy ${r.copy}  revisit ${r.revisit}`);
+  for (const r of rows) console.log(`  ${label(r).padEnd(wide)} paint ${r.paint}  drawn ${r.drawn}  copy ${r.copy}  revisit ${r.revisit}  reads ${r.calls} (${r.bytes} bytes)`);
   if (findings.length > 0) {
     console.error(`\n  perf: ${rows.length} screen(s) timed, ${findings.length} finding(s):`);
     for (const f of findings) console.error(`    ${f}`);

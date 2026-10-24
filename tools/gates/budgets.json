@@ -134,6 +134,19 @@
     "//todayCopyMs": "The roadmap puts Today from the kept copy under 300 ms, and it is met: measured 219 to 291 ms over five full runs on a loaded Mac (it was 306 to 550). The screen settles when the copy is drawn and the record is asked quietly behind it, and the page is asked once and not twice. Ceiling 300.",
     "todayCopyMs": 300,
     "//revisitMs": "The roadmap puts a revisit (Back to a screen the page already holds) under 100 ms, and every screen meets it: 18 to 56 ms over five full runs (Money was 93 to 160, now 30 to 36). A page drawn from what the tab kept settles when it is drawn, the read behind it lands over it. Ceiling 100.",
-    "revisitMs": 100
+    "revisitMs": 100,
+    "//callsMax": "Scope 2026-10-24 A6: the most reads a cold open of each screen asks before it is quiet, on the gates' record, the higher of the two widths, measured on 2026-10-24 before the reads were cut. A ceiling: it only falls.",
+    "callsMax": { "Today": 28, "Needs you": 21, "A project": 31, "Projects": 16, "Money": 20, "Work": 15, "A list": 20, "Agents": 29, "Settings": 15 }
+  },
+  "speed": {
+    "//": "`tools/look/nightly.mjs`: the live six on his record every night, read-only through the look's forwarder (scope 2026-10-24 A5). What the perf gate cannot see: the trip to his record and its own time.",
+    "//widths": "The phone and the laptop every batch is judged at.",
+    "widths": [390, 1512],
+    "//todaySettleMs": "The scope's line: `--check` exits 1 when Today, opened warm, settles over 2 s.",
+    "todaySettleMs": 2000,
+    "//quietCapMs": "How long a screen is watched for no call out. A screen still busy then is measured on what it asked by then.",
+    "quietCapMs": 8000,
+    "//restMs": "Kept after the quiet mark, so a tile's late wave still counts against the screen that asked it.",
+    "restMs": 500
   }
 }

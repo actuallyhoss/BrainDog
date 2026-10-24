@@ -169,6 +169,78 @@
         { "at": 100, "on": "2026-10-22", "why": "A revisit by Back now meets the roadmap target on every screen: measured 18 to 56 ms, Money 30 to 36, a kept page settling when it is drawn.", "by": "perf.mjs" }
       ]
     },
+    "perf.callsMax.Today": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 28, "on": "2026-10-24", "why": "The most reads a cold open of Today asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Needs you": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 21, "on": "2026-10-24", "why": "The most reads a cold open of Needs you asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.A project": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 31, "on": "2026-10-24", "why": "The most reads a cold open of A project asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Projects": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 16, "on": "2026-10-24", "why": "The most reads a cold open of Projects asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Money": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of Money asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Work": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Work asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.A list": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 20, "on": "2026-10-24", "why": "The most reads a cold open of A list asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Agents": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 29, "on": "2026-10-24", "why": "The most reads a cold open of Agents asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "perf.callsMax.Settings": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 15, "on": "2026-10-24", "why": "The most reads a cold open of Settings asked before it was quiet, on the gates' record at either width, before the reads were cut (scope 2026-10-24 A6). It only falls.", "by": "perf.mjs" }
+      ]
+    },
+    "speed.todaySettleMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 2000, "on": "2026-10-24", "why": "The night's measure says a slow night when Today, opened warm on his record, settles over 2 s (scope 2026-10-24 A5).", "by": "tools/look/nightly.mjs" }
+      ]
+    },
+    "speed.quietCapMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 8000, "on": "2026-10-24", "why": "How long the night's measure watches a screen for no call out.", "by": "tools/look/nightly.mjs" }
+      ]
+    },
+    "speed.restMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 500, "on": "2026-10-24", "why": "Kept after the quiet mark so a tile's late wave counts against its screen.", "by": "tools/look/nightly.mjs" }
+      ]
+    },
     "cssRules.waiverLookbehindChars": {
       "kind": "ceiling",
       "lines": [
