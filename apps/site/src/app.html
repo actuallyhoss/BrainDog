@@ -23,6 +23,8 @@
          anywhere in the served HTML, which is a thing `grep` can check rather than a thing somebody
          has to remember. -->
     <script src="/signed-in.js"></script>
+    <!-- The visit count (src/lib/site/seen.ts): deferred, so it never holds up the first paint. -->
+    <script src="/seen.js" defer></script>
     <!--
       THE SHARED CARD. Pasted into a message, a post or a chat, a page shows this preview rather than
       a bare URL.
