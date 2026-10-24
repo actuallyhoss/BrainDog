@@ -243,7 +243,10 @@ export function nightFailed(faults: readonly Fault[] | null | undefined, now: nu
       : last !== null
         ? ` It failed ${last}.`
         : '';
-  return { said: firstSentence(f.said), why: `${nightReason(f.error)}${times}` };
+  /* THE RECORD'S OWN PLAIN REASON FIRST (`why`, the kernel's `nightWhy`), which every owner is handed on every host; the
+     raw error is read only where the record sent no reason, as a build before `why` did. */
+  const why = typeof f.why === 'string' && f.why.trim() !== '' ? f.why.trim() : nightReason(f.error);
+  return { said: firstSentence(f.said), why: `${why}${times}` };
 }
 
 /**

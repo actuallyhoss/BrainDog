@@ -844,10 +844,6 @@ export const account = {
   copiesJustNow: 'just now',
   copiesYesterday: 'yesterday',
   copiesAgo: (n: number, unit: 'minute' | 'hour' | 'day') => `${n} ${unit}${n === 1 ? '' : 's'} ago`,
-  /* A NIGHT THAT FAILED, AND WHY (A22): the record's plain reason, never the raw error. */
-  copiesFailed: 'Failed',
-  copiesFailedSaid: (when: string | null, why: string, times: number) =>
-    `${when === null ? 'Last night’s copy' : `The copy ${when}`} failed${times > 1 ? `, ${times} nights running` : ''}. ${why} It tries again tonight.`,
   exportedLast: (when: string) => `Last exported: ${when}`,
   exportedNever: 'Never exported',
 

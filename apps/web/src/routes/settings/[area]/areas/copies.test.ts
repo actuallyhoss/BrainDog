@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DRILL_DUE_MS, LATE_MS, NIGHT_CAUSE, ago, copiesOf, copyLine, drillLine, drillOf, exportLine, failedNight, readDrill } from './copies.ts';
+import { DRILL_DUE_MS, LATE_MS, ago, copiesOf, copyLine, drillLine, drillOf, exportLine, readDrill } from './copies.ts';
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
 const back = (ms: number) => new Date(NOW - ms).toISOString();
@@ -170,32 +170,4 @@ test('no drill line carries an em dash, an id or a path', () => {
 
 test('a drill reported a moment ago reads "just now", as the operator sees it after the first report', () => {
   assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This BrainDog's last restore test: passed just now");
-});
-
-/* ── a night that failed, and why (A22) ─────────────────────────────────── */
-
-const SAID = 'BrainDog could not save a copy of your record. It tries again tonight.';
-const planted = (over: Record<string, unknown> = {}) => [
-  { cause: 'outbox#infer.resolve', said: 'Something else broke.', count: 2, since: back(30 * H), last: back(2 * H) },
-  { cause: NIGHT_CAUSE, said: SAID, count: 1, since: back(9 * H), last: back(9 * H), why: 'Your record was too large to copy in one piece.', ...over },
-];
-
-test('A PLANTED FAILED NIGHT SHOWS ITS REASON IN PLAIN WORDS, marked with a word and never the colour alone', () => {
-  assert.deepEqual(failedNight(planted(), NOW), {
-    text: 'Last night’s copy failed. Your record was too large to copy in one piece. It tries again tonight.',
-    mark: 'Failed',
-  });
-  /* NIGHTS RUNNING ARE COUNTED, and a failure from days ago says when rather than last night. */
-  assert.equal(
-    failedNight(planted({ count: 3, last: back(3 * 24 * H) }), NOW)?.text,
-    'The copy 3 days ago failed, 3 nights running. Your record was too large to copy in one piece. It tries again tonight.',
-  );
-});
-
-test('NO FAILED NIGHT, NO REASON, OR NO LIST DRAWS NO LINE, and the raw error is never what is said', () => {
-  assert.equal(failedNight(planted().slice(0, 1), NOW), null);
-  assert.equal(failedNight(planted({ why: undefined }), NOW), null, 'a record built before the reason');
-  assert.equal(failedNight(null, NOW), null);
-  const line = failedNight(planted({ error: 'R2 bucket braindog-copies refused' }), NOW);
-  assert.ok(line && !line.text.includes('bucket'));
 });

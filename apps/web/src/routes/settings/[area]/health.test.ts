@@ -163,6 +163,9 @@ test('BACKUPS SAYS WHY A NIGHT FAILED, in plain words, with how long it has been
     assert.equal(nightReason(error), said);
     assert.doesNotMatch(said, /[#`{}/\\]|\d/u);
   }
+  /* THE RECORD'S OWN PLAIN REASON COMES FIRST, on every host (`why`, the kernel's `nightWhy`), so the Cloud says it too. */
+  const told = nightFailed([{ ...NIGHT, count: 1, since: NIGHT.last, why: 'Your record was too large to copy in one piece.' }], NOW);
+  assert.equal(told?.why, 'Your record was too large to copy in one piece. It failed today.');
   /* NO NIGHT FAULT, NO LINE: any other fault is the index's to say, not Backups'. */
   assert.equal(nightFailed([PAIRS, MAIL], NOW), null);
   assert.equal(nightFailed(null, NOW), null);
