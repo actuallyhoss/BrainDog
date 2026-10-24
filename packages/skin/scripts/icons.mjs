@@ -1,6 +1,6 @@
 /**
  * The two PNG icons Android asks an installed web app for, 192 and 512 pixels square, drawn from `MARK`, and the tab's
- * 16 and 32 with `favicon.ico` made of them.
+ * 16 and 32 with `favicon.ico` made of them, drawn from `MARK_SMALL`.
  *
  * AN IMAGE TOOL IS NOT A DEPENDENCY THIS REPOSITORY HAS, and the mark is two filled paths, so this draws them itself.
  * The path data is read into outlines, each curve is cut into short straight edges, and each pixel is covered by
@@ -22,7 +22,7 @@ import { deflateSync } from 'node:zlib';
 
 import { HOUSE } from '@braindog/theme';
 
-import { MARK } from '../mark.ts';
+import { MARK, MARK_SMALL } from '../mark.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 
@@ -320,9 +320,20 @@ function ico(images) {
   return Buffer.concat([head, ...images.map((m) => m.file)]);
 }
 
-/** The tab's sizes, and the mark across the whole width of each: at 16 pixels every one of them is needed. */
+/** The tab's sizes, each drawn from `MARK_SMALL`: its own pixels at 16, each as four at 32. */
 const TAB = [16, 32];
-const TAB_FILL = 1;
+
+/**
+ * THE SMALL MARK'S PIXELS AT `size`, a whole multiple of its grid, so every pixel is wholly the mark or wholly not: at
+ * 16 pixels the big mark's curves left nothing whole, and the dog and the brain's edge went with them (E46).
+ */
+function pixels(size) {
+  const k = size / MARK_SMALL.size;
+  if (!Number.isInteger(k)) throw new Error(`The small mark is drawn at whole multiples of ${MARK_SMALL.size} pixels, and ${size} is not one.`);
+  const out = new Float64Array(size * size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) out[y * size + x] = MARK_SMALL.rows[Math.floor(y / k)][Math.floor(x / k)] === '#' ? 1 : 0;
+  return out;
+}
 
 const ground = bytes(HOUSE.schemes.light.bg);
 const ink = bytes(HOUSE.schemes.light.accent);
@@ -336,7 +347,7 @@ for (const size of SIZES) {
 /* THE TAB'S OWN, IN THE FAVICON'S RED (`theme.mjs` writes `mark.svg` in the same), into both apps' static folders: the
    site answers brain.dog/favicon.ico and the app its own path. */
 const red = bytes(HOUSE.frame.light['red-fill']);
-const tab = TAB.map((size) => ({ size, file: pngClear(size, layered(size, TAB_FILL), red) }));
+const tab = TAB.map((size) => ({ size, file: pngClear(size, pixels(size), red) }));
 for (const { size, file } of tab) {
   await writeFile(join(root, 'apps', 'web', 'static', `icon-${size}.png`), file);
   console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);

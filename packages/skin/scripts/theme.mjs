@@ -37,7 +37,7 @@ import {
   refusals,
 } from '@braindog/theme';
 
-import { MARK } from '../mark.ts';
+import { MARK, MARK_SMALL } from '../mark.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 const skin = join(import.meta.dirname, '..');
@@ -67,6 +67,17 @@ const favicon = (hex) =>
   `  <g fill="${hex}">\n` +
   MARK.paths.map((d) => `    <path d="${d}" />\n`).join('') +
   `  </g>\n</svg>\n`;
+
+/**
+ * THE TAB'S SVG, from `MARK_SMALL`: a tab draws its icon at 16 or 32 pixels, and the whole mark at 16 was a blob (E46).
+ * Its edges lie on the pixel grid, and `crispEdges` keeps them there, so at 16 each square is one pixel and at 32 four.
+ * `mark.svg` stays the whole mark, for the install prompt and anything drawn larger.
+ */
+const tabIcon = (hex) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK_SMALL.viewBox}" shape-rendering="crispEdges" role="img" aria-label="BrainDog">\n` +
+  `  <title>BrainDog</title>\n` +
+  `  <path fill="${hex}" d="${MARK_SMALL.path}" />\n` +
+  `</svg>\n`;
 
 /**
  * The BIMI logo: the mark on a plain square, in SVG Tiny Portable/Secure, which a mailbox shows beside a mail from
@@ -130,7 +141,10 @@ const ARTEFACTS = [
   },
   { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.frame.light['red-fill']) },
   { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.frame.light['red-fill']) },
-  { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.frame.light['red-fill']) },
+  /* THE ALPHA DEPLOYMENT'S TAB ICON, and nothing else reads it (`+layout.svelte`), so it is the small mark in its red. */
+  { path: join(root, 'apps/web/static/mark-alpha.svg'), text: tabIcon(ALPHA.frame.light['red-fill']) },
+  { path: join(root, 'apps/web/static/mark-small.svg'), text: tabIcon(HOUSE.frame.light['red-fill']) },
+  { path: join(root, 'apps/site/static/mark-small.svg'), text: tabIcon(HOUSE.frame.light['red-fill']) },
   { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.frame.light['red-fill'], HOUSE.frame.light.tile) },
   { path: join(root, 'apps/worker/src/mail-palette.ts'), text: mailPalette(HOUSE) },
 ];
