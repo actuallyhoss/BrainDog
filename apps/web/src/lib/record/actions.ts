@@ -98,6 +98,8 @@ export type AccountUsage = {
     /** One of the Directory's `PLANS`: `free`, `hosted`, `plus` or `selfhost`. */
     plan: string;
     closed: boolean;
+    /** The day the record was made, where the host says it: `/usage` offers no month from before it. */
+    since?: string;
     month: { month: string; used: LedgerTotals; allowance: { runs: number; requests: number; bytes: number; ms: number } | null; resets: string };
     totals: LedgerTotals;
     projects: ({ scope: string } & LedgerTotals)[];
@@ -243,7 +245,17 @@ export const words = {
   meterFull: (resets: string) => `Used up. Actions wait until ${resets}.`,
   meterPast: (share: string) => `${share} of the month's allowance.`,
   binding: (noun: string) => `The limit this record is nearest is its ${noun}.`,
-  hours: (n: number) => (n === 1 ? '1 hour' : `${n.toLocaleString('en-GB', { maximumFractionDigits: n < 10 ? 1 : 0 })} hours`),
+  /* UNDER AN HOUR IN MINUTES (audit 25 October, X22): "0 hours of 50 hours" stood beside "<1%" on a month that ran. */
+  hours: (n: number) =>
+    n > 0 && n * 60 < 1
+      ? 'under a minute'
+      : n > 0 && n < 1
+        ? Math.round(n * 60) === 1
+          ? '1 minute'
+          : `${Math.round(n * 60)} minutes`
+        : n === 1
+          ? '1 hour'
+          : `${n.toLocaleString('en-GB', { maximumFractionDigits: n < 10 ? 1 : 0 })} hours`,
   /* The plan, what it allows, and what else the month holds. */
   planName: { free: 'Free', hosted: 'Cloud', plus: 'Cloud Plus' } as Record<string, string>,
   planLine: (plan: string, runs: string, requests: string, bytes: string, hours: string) =>
@@ -466,6 +478,11 @@ export type UsageView = {
    * "Nothing has run" over automations that had fired all day.
    */
   fired?: number;
+  /**
+   * The month the earliest record in the view was made, `YYYY-MM`, so the switcher offers no month from before it
+   * (audit 25 October, X22: "August" on a record made in September). `null` where the host does not say.
+   */
+  since?: string | null;
 };
 
 /**
@@ -740,7 +757,15 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
     weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     days: daysOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records,
+    since: sinceOf(said.records),
   };
+}
+
+/** The month the earliest of these records was made, or `null` where none says. */
+function sinceOf(records: AccountUsage['records']): string | null {
+  const made = records.map((r) => (typeof r.since === 'string' && /^\d{4}-\d{2}/u.test(r.since) ? r.since.slice(0, 7) : null));
+  if (made.length === 0 || made.some((m) => m === null)) return null;
+  return (made as string[]).reduce((a, b) => (b < a ? b : a));
 }
 
 /** A month the switcher may show: `YYYY-MM`. */

@@ -38,10 +38,12 @@ test('a share is never written as none when there is some', () => {
   assert.equal(shareOf(1.4), '100%');
 });
 
-test('each meter is a bar with its own figures as the note, and only the nearest one is ink', () => {
+test('each meter is a bar with its own figures in its label, and only the nearest one is ink', () => {
   const bars = meterBars([meter('runs', 0.25), meter('requests', 0.53, true), meter('bytes', 0.16)]);
-  assert.deepEqual(bars.map((b) => b.label), ['Runs', 'Requests', 'Data fetched']);
-  assert.deepEqual(bars.map((b) => b.note), ['18,400 of 75,000', '18,400 of 75,000', '18,400 of 75,000']);
+  /* THE FIGURES BESIDE THE BAR, NEVER ON IT (audit 25 October, X22): a note is drawn at the end of the fill, so on a
+     three-run month it sat on the empty track and the bar ran behind its own words ("ı 3 of 15,000"). */
+  assert.deepEqual(bars.map((b) => b.label), ['Runs · 18,400 of 75,000', 'Requests · 18,400 of 75,000', 'Data fetched · 18,400 of 75,000']);
+  assert.deepEqual(bars.map((b) => b.note), [undefined, undefined, undefined]);
   assert.deepEqual(bars.map((b) => b.tone), [undefined, 'ink', undefined]);
   assert.equal(bars[1]?.value, 0.53);
 });

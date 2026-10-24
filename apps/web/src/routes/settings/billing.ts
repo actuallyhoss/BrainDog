@@ -396,19 +396,20 @@ export const shareOf = (share: number): string =>
   !Number.isFinite(share) || share <= 0 ? '0%' : share < 0.01 ? '<1%' : `${Math.floor(Math.min(share, 1) * 100)}%`;
 
 /**
- * One bar per meter: the meter's short name, what it has used as a note ("18,400 of 75,000"), and its share.
+ * One bar per meter: the meter's short name and what it has used ("Runs · 18,400 of 75,000"), and its share.
  *
- * THE NEAREST ONE IS INK AND THE REST ARE GREY: the binding meter is the one the month turns on. The note
- * is `Meter.line` without the name it starts with, so the figures are the ledger's own and never counted twice.
+ * THE NEAREST ONE IS INK AND THE REST ARE GREY: the binding meter is the one the month turns on. The figures are
+ * `Meter.line` without the name it starts with, so they are the ledger's own and never counted twice.
  */
 export function meterBars(meters: readonly Meter[]): { label: string; value: number; note?: string; tone?: 'ink' }[] {
   return meters.map((m) => {
     const name = usageWords.meterName[m.key] ?? m.key;
     const note = m.line.startsWith(`${name} `) ? m.line.slice(name.length + 1) : undefined;
+    /* THE FIGURES IN THE LABEL, BESIDE THE BAR (audit 25 October, X22): drawn as the bar's note they sat on the empty
+       track of a month that had barely started, and the bar ran behind them. */
     return {
-      label: name,
+      label: note ? `${name} · ${note}` : name,
       value: Math.min(1, Math.max(0, m.share)),
-      ...(note ? { note } : {}),
       ...(m.binding ? { tone: 'ink' as const } : {}),
     };
   });

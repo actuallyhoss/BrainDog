@@ -49,7 +49,9 @@
   import Stacked from '$lib/viz/Stacked.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
-  import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+  import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+  import { hostedHere } from '../settings/billing.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
      a project's "Runs on" can link straight to its slice (`usageHref`). A month the ledger cannot answer is this one. */
@@ -83,7 +85,12 @@
   const n = (v: number): string => v.toLocaleString('en-GB');
 
   const fault = $derived(usage.value && 'fault' in usage.value ? usage.value.fault : null);
-  const view = $derived(usage.value && !('fault' in usage.value) ? usage.value : null);
+  /* ONLY THE CLOUD HOLDS A RECORD TO AN ALLOWANCE (audit 25 October, X21): anywhere else the month is its counts and
+     charts, with no rings and no plan, as Billing says there is nothing to bill. */
+  const hosted = $derived(hostedHere(page.data as unknown as Shell));
+  const view = $derived(usage.value && !('fault' in usage.value) ? (hosted ? usage.value : offCloud(usage.value)) : null);
+  /* NO MONTH FROM BEFORE THE RECORD WAS MADE (X22). */
+  const earlier = $derived(view ? earlierOf(beside, view) : beside.earlier);
   /* A SLICE THAT MATCHES NOTHING SHOWS EVERY PROJECT, with the link back, rather than an empty page under a filter. */
   const sliced = $derived(view && project !== null ? view.groups.filter((g) => g.scope === project) : []);
   const groups = $derived(view ? (sliced.length > 0 ? sliced : view.groups) : []);
@@ -207,8 +214,8 @@
        name, and neither past the year the ledger keeps or ahead of this month. Links, so Back is the month before. -->
   {#if view}
     <Segmented tag="nav" class="months" aria-label={words.months} full>
-      {#if beside.earlier}
-        <a class="segment month" href={at(`/usage?month=${beside.earlier}`)} aria-label={words.monthIn(monthWords(beside.earlier))}>{monthWords(beside.earlier)}</a>
+      {#if earlier}
+        <a class="segment month" href={at(`/usage?month=${earlier}`)} aria-label={words.monthIn(monthWords(earlier))}>{monthWords(earlier)}</a>
       {/if}
       <span class="segment month" data-on aria-current="page">{monthWords(view.month)}</span>
       {#if beside.later}
@@ -245,7 +252,7 @@
             data-wide=""
             lead
             icon="observe"
-            title={view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
+            title={!hosted ? reading.monthTitle(view.current, view.month) : view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
             meta={view.records.length > 1 ? [r.name, r.plan].filter(Boolean).join(' · ') : (r.plan ?? undefined)}
           >
             {#if rings.length > 0}
@@ -336,7 +343,7 @@
                 <div class="use-group" data-faint={g.faint ? '' : undefined}>
                   <h3 class="use-group-h">
                     <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
-                    <span class="use-group-name">{g.name}</span>
+                    <span class="use-group-name">{groupName(g)}</span>
                     <span class="use-counts num">{countsOf(g.totals)}</span>
                   </h3>
                   {@render list(g.actions)}

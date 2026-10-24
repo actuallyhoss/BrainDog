@@ -14,6 +14,10 @@ import { monthWords, shareSaid, words, type Allowed, type Group, type MeterKey, 
 export const said = {
   allowance: "This month's allowance",
   allowanceIn: (month: string) => `${month}'s allowance`,
+  /* OFF THE CLOUD THE TILE IS THE MONTH'S RUNS (X21): a self-host has no allowance to be measured against. */
+  monthTitle: (current: boolean, month: string) => (current ? "This month's runs" : `${monthWords(month)}'s runs`),
+  /* THE ACTIONS IN NO PROJECT (X22): "Everywhere" read as a project of that name. */
+  noProject: 'Not in a project',
   weeks: words.overTime,
   days: 'Runs by day',
   byProject: words.byProject,
@@ -75,6 +79,30 @@ export function sentenceOf(view: UsageView): Sentence | null {
   return { text: view.current ? `${runs} this month${limit}.` : `${runs} in ${month}${limit}.` };
 }
 
+/**
+ * THE MONTH AS A HOST WITH NO ALLOWANCE SHOWS IT (audit 25 October, X21): no meters, no plan and nothing waiting.
+ *
+ * A self-host's Directory keeps a ledger, and its record's plan is `hosted` unless `init` said otherwise, so `/usage`
+ * drew "This month's allowance · Cloud" with 15,000 runs while Billing said there was nothing to bill. Only the Cloud
+ * holds a record to an allowance (`hostedHere` in `settings/billing.ts`), so everywhere else the counts and charts are
+ * drawn and the rings are not.
+ */
+export function offCloud(view: UsageView): UsageView {
+  return { ...view, records: view.records.map((r) => ({ ...r, plan: null, planLine: null, allowance: null, waiting: false, meters: [], binding: null })) };
+}
+
+/** A group's name as the page says it: the actions in no project are "Not in a project". */
+export const groupName = (g: Pick<Group, 'key' | 'name'>): string => (g.key === '' ? said.noProject : g.name);
+
+/**
+ * The month before, where the record was alive in it: `null` for a month before the earliest record was made, and the
+ * month as it was where the host does not say when that was.
+ */
+export function earlierOf(beside: { earlier: string | null }, view: { since?: string | null | undefined }): string | null {
+  if (beside.earlier === null) return null;
+  return view.since && beside.earlier < view.since ? null : beside.earlier;
+}
+
 /** One meter as a ring: its share, the tone that share means, the figure inside it, and its line and sentence. */
 export type Ringed = { key: MeterKey; name: string; share: number; tone: 'ink' | 'warn' | 'danger'; figure: string; amount: string; line: string; said: string; binding: boolean };
 
@@ -120,7 +148,7 @@ export function projectParts(groups: readonly Group[]): { label: string; value: 
   if (ran.length < 2) return null;
   const tied = ran[0]!.totals.runs === ran[1]!.totals.runs;
   const GREYS = ['g2', 'g3', 'g4'] as const;
-  return ran.map((g, i) => ({ label: g.name, value: g.totals.runs, tone: i === 0 && !tied ? 'ink' : GREYS[(tied ? i : i - 1) % GREYS.length]! }));
+  return ran.map((g, i) => ({ label: groupName(g), value: g.totals.runs, tone: i === 0 && !tied ? 'ink' : GREYS[(tied ? i : i - 1) % GREYS.length]! }));
 }
 
 /** The line under the project bar: which project ran most of it, or which share the top. */
@@ -131,8 +159,8 @@ export function projectsSaid(groups: readonly Group[]): string | null {
   const most = ran[0]!.totals.runs;
   const top = ran.filter((g) => g.totals.runs === most);
   const pct = `${Math.floor((most / total) * 100)}%`;
-  if (top.length > 1) return `${AND.format(top.map((g) => g.name))} ran ${pct} each.`;
-  return `${top[0]!.name} ran ${pct} of them.`;
+  if (top.length > 1) return `${AND.format(top.map(groupName))} ran ${pct} each.`;
+  return `${groupName(top[0]!)} ran ${pct} of them.`;
 }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -172,13 +200,21 @@ export function heatOf(view: Pick<UsageView, 'month' | 'days' | 'current'>, thro
   return { rows, cols: WEEKDAYS, values };
 }
 
-/** The line under the heat grid: the busiest day and its runs. Ties go to the earliest. */
+/**
+ * The line under the heat grid: the busiest day and its runs.
+ *
+ * BUSIEST ONLY WHEN ONE DAY LEADS (audit 25 October, X22): "Busiest on Tue 1 Sep, with 1 run" stood over three days of
+ * one run each. Days that tie are named together, and a month whose every day ran alike says so.
+ */
 export function daysSaid(view: Pick<UsageView, 'days'>): string | null {
   const ran = view.days.filter((d) => d.runs > 0);
   if (ran.length === 0) return null;
-  const busiest = ran.reduce((a, b) => (b.runs > a.runs ? b : a));
-  const weekday = WEEKDAYS[(new Date(`${busiest.day.slice(0, 10)}T00:00:00Z`).getUTCDay() + 6) % 7];
-  return `Busiest on ${weekday} ${dateSaid(busiest.day)}, with ${said.runsSaid(busiest.runs)}.`;
+  const most = Math.max(...ran.map((d) => d.runs));
+  const top = ran.filter((d) => d.runs === most);
+  const named = (d: { day: string }): string => `${WEEKDAYS[(new Date(`${d.day.slice(0, 10)}T00:00:00Z`).getUTCDay() + 6) % 7]} ${dateSaid(d.day)}`;
+  if (top.length === 1) return `Busiest on ${named(top[0]!)}, with ${said.runsSaid(most)}.`;
+  if (top.length === ran.length) return `${said.runsSaid(most)} on each of ${ran.length} days.`;
+  return `Busiest on ${AND.format(top.map(named))}, with ${said.runsSaid(most)} each.`;
 }
 
 /**

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { daysOf, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
-import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
 const t = (runs: number, held = 0) => ({ runs, requests: runs * 2, bytes: runs * 1_000, ms: runs * 10, failures: 0, held });
 
@@ -127,6 +127,49 @@ test("Slash's asks as a ring only where the answer carries an allowance of them"
   const bare = usageFromLedger(ledger(100, 0, { asks: 41, neurons: 12_300, days: [] }), '2026-09').records[0] as Allowed;
   assert.equal(asksOf(bare), null);
   assert.equal(asksOf({ ...capped, asks: null }), null);
+});
+
+/* ── the audit of 25 October, X21 and X22: every line true of a three-run month, and no allowance off the Cloud ── */
+
+test('X21: off the Cloud the month names no allowance: no rings, no plan, and the sentence says no limit', () => {
+  const view = offCloud(usageFromLedger(ledger(3), '2026-09', '2026-09-15'));
+  assert.deepEqual(view.records.map((r) => [r.meters.length, r.plan, r.waiting]), [[0, null, false]]);
+  assert.doesNotMatch(sentenceOf(view)?.text ?? '', /allowance/u);
+  assert.equal(said.monthTitle(true, '2026-09'), "This month's runs");
+  assert.equal(said.monthTitle(false, '2026-08'), "August's runs");
+});
+
+test('X22: the busiest day is said only when one day leads', () => {
+  const day = (d: string, runs: number) => ({ day: d, runs });
+  assert.equal(daysSaid({ days: [day('2026-09-01', 1), day('2026-09-02', 1), day('2026-09-03', 1)] }), '1 run on each of 3 days.');
+  assert.equal(daysSaid({ days: [day('2026-09-01', 2), day('2026-09-02', 2), day('2026-09-03', 1)] }), 'Busiest on Tue 1 Sep and Wed 2 Sep, with 2 runs each.');
+  assert.equal(daysSaid({ days: [day('2026-09-01', 1), day('2026-09-02', 3)] }), 'Busiest on Wed 2 Sep, with 3 runs.');
+});
+
+test('X22: run time under an hour is said in minutes, never "0 hours" beside a share over nothing', () => {
+  assert.equal(words.hours(0.0002), 'under a minute');
+  assert.equal(words.hours(0.5), '30 minutes');
+  assert.equal(words.hours(1 / 60), '1 minute');
+  assert.equal(words.hours(2), '2 hours');
+  const rings = ringsOf(usageFromLedger(ledger(3), '2026-09', '2026-09-15').records[0]!);
+  assert.doesNotMatch(rings.find((r) => r.key === 'ms')?.amount ?? '', /^0 hours/u);
+});
+
+test('X22: the actions in no project are "Not in a project", never "Everywhere"', () => {
+  const g = (key: string, name: string, runs: number): Group => ({ key, scope: key, name, faint: key === '', totals: { ...t(runs), ms: 0 }, actions: [] });
+  assert.equal(groupName(g('', 'Everywhere', 3)), 'Not in a project');
+  assert.equal(groupName(g('rec_1:kiln', 'Kiln', 3)), 'Kiln');
+  assert.deepEqual(projectParts([g('', 'Everywhere', 3), g('rec_1:kiln', 'Kiln', 1)])?.map((p) => p.label), ['Not in a project', 'Kiln']);
+});
+
+test('X22: the month before is offered only from the month the record was made', () => {
+  const made: AccountUsage = { ...ledger(3), records: ledger(3).records.map((r) => ({ ...r, since: '2026-09-02' })) };
+  const view = usageFromLedger(made, '2026-09', '2026-09-15');
+  assert.equal(view.since, '2026-09');
+  assert.equal(earlierOf({ earlier: '2026-08' }, view), null, 'August is offered on a record made in September');
+  assert.equal(earlierOf({ earlier: '2026-08' }, { since: '2026-07' }), '2026-08');
+  /* A HOST THAT DOES NOT SAY WHEN THE RECORD WAS MADE keeps the month before, as it always did. */
+  assert.equal(earlierOf({ earlier: '2026-08' }, { since: null }), '2026-08');
 });
 
 test('the page keeps the sample and the clock out of its words', () => {

@@ -573,6 +573,8 @@ export type RecordUsage = {
   slug: string | null;
   plan: Plan;
   closed: boolean;
+  /** The day the record was made, `YYYY-MM-DD`, so a reader offers no month from before it. */
+  since: string;
   month: { month: string; used: UsageTotals; allowance: Allowance | null; resets: string };
   totals: UsageTotals;
   projects: ({ scope: string } & UsageTotals)[];
@@ -2825,8 +2827,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const now = clock.now();
       const start = dayOf(monthStart(now));
       const resets = dayOf(nextMonth(now));
-      const owned = sql.all<{ id: string; plan: string; closed_at: string | null }>(
-        'SELECT id, plan, closed_at FROM dir_record WHERE owner = ? ORDER BY created_at, id',
+      const owned = sql.all<{ id: string; plan: string; closed_at: string | null; created_at: string }>(
+        'SELECT id, plan, closed_at, created_at FROM dir_record WHERE owner = ? ORDER BY created_at, id',
         person,
       );
       /* THE ALLOWANCE'S ROWS ONLY, in every total below, so a month's runs read the same here as in `mayRun`; the
@@ -2852,6 +2854,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           slug: slugOf(r.id),
           plan,
           closed: r.closed_at !== null,
+          since: String(r.created_at).slice(0, 10),
           month: {
             month: start.slice(0, 7),
             used: totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, r.id, start, resets)),
