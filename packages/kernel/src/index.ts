@@ -174,7 +174,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
+import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, STALE_DAYS, claimRank, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -7088,6 +7088,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const kind = String(r.body_kind ?? '');
     const offered = kind === 'options' && Array.isArray(body.options) ? (body.options as unknown[]) : [];
     const withheld = costRows(sql);
+    /* A BANK'S TAIL ASKED ABOUT (`tail:` bodies): the money its waiting messages hold, one value a currency, never added. */
+    const tailMoney = tailMoneyOf(body);
     const options = offered.flatMap((o) => {
       if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
       const one = o as Record<string, unknown>;
@@ -7099,7 +7101,22 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          longer rises for one hard option beside a safe one, so the drawer marks the option and keeps a key off it. An
          option that writes money, or patches a field its list's history withholds, is hard by what it writes. */
       const hard = optionCost(one, withheld) === 'undo';
-      return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}), ...(hard ? { hard: true as const } : {}) }];
+      /* WHAT IT DOES, SAID FOR ITS PICTURE (C20): its own patches in names, and a tail's waiting money on every answer
+         that names an account. */
+      const said = Array.isArray(one.patches) ? optionSaidOf(one.patches as unknown[]) : null;
+      const files = tailMoney !== null && !TAIL_LEAVES.has(one.id) ? tailMoney : null;
+      return [
+        {
+          key: one.id,
+          label: one.label,
+          because: typeof one.because === 'string' ? one.because : '',
+          recommended: one.recommended === true,
+          ...(shows ? { shows } : {}),
+          ...(hard ? { hard: true as const } : {}),
+          ...(said ? { said } : {}),
+          ...(files ? { files } : {}),
+        },
+      ];
     });
     const specOf = (list: string, field: string) => registers.get(list)?.fields.find((f) => f.id === field);
     const does = doesOf(kind, body, {
@@ -7283,6 +7300,59 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const moves = [...counted.values()].sort((a, b) => b.n - a.n).slice(0, ROWS_SAID_MOVES);
     if (titles.length === 0 && moves.length === 0) return null;
     return { list: list.name, rows: rows.length, adds: titles.slice(0, ROWS_SAID_NAMES), more: Math.max(0, titles.length - ROWS_SAID_NAMES), moves };
+  };
+
+  /**
+   * WHAT AN OPTION'S OWN PATCHES DO, IN NAMES (`QueueOption.said`): the list of the first row, how many rows, and what each
+   * field moves them to, most first. A choice by its label, a link by the title of the row it points at (asked once a
+   * value), a word, a number or a day as it is; a secret, a file, money and a long text are left out. `null` when it says
+   * nothing, or the rows are on more than one list.
+   */
+  const optionSaidOf = (patches: readonly unknown[]): NonNullable<QueueOption['said']> | null => {
+    const rows = patches.filter((x): x is { at: string; patch: Record<string, unknown> } => {
+      const r = x as { at?: unknown; patch?: unknown } | null;
+      return r !== null && typeof r === 'object' && typeof r.at === 'string' && r.patch !== null && typeof r.patch === 'object' && !Array.isArray(r.patch);
+    });
+    const first = rows[0] === undefined ? null : get(rows[0].at, { includeDeleted: true });
+    const list = first ? registers.get(first.register) : undefined;
+    if (!first || !list) return null;
+    const handle = rows[0]!.at.split('#')[0];
+    if (rows.some((x) => x.at.split('#')[0] !== handle)) return null;
+    const titles = new Map<string, string | null>();
+    const counted = new Map<string, { field: string; label?: string; to: Json; n: number }>();
+    for (const x of rows)
+      for (const [field, value] of Object.entries(x.patch)) {
+        const spec = list.fields.find((f) => f.id === field);
+        if (!spec || value === null || value === undefined || (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')) continue;
+        let to: Json;
+        if (spec.type === 'ref' && typeof value === 'string') {
+          if (!titles.has(value)) titles.set(value, titles.size < ROWS_SAID_MOVES * 2 ? titleOfRow(value) : null);
+          const title = titles.get(value);
+          if (title === null || title === undefined) continue;
+          to = title;
+        } else if (spec.type === 'enum' && typeof value === 'string') to = spec.labels?.[value] ?? value;
+        else if (spec.type === 'bool' || spec.type === 'int' || spec.type === 'day') to = value;
+        else continue;
+        const key = `${field}\n${String(to)}`;
+        const label = typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : undefined;
+        const was = counted.get(key);
+        if (was) was.n += 1;
+        else counted.set(key, { field, ...(label ? { label } : {}), to, n: 1 });
+      }
+    const moves = [...counted.values()].sort((a, b) => b.n - a.n).slice(0, ROWS_SAID_MOVES);
+    return moves.length === 0 ? null : { list: list.name, rows: rows.length, moves };
+  };
+
+  /** A tail's answers that name no account: the waiting goes on, so no money is filed by them. */
+  const TAIL_LEAVES: ReadonlySet<string> = new Set(['none', 'later', 'reject']);
+
+  /** The money a tail question's waiting messages hold (`body.totals`, minor units by currency), or `null`. */
+  const tailMoneyOf = (body: Record<string, unknown>): { amount: number; currency: string }[] | null => {
+    if (body.tail === null || typeof body.tail !== 'object' || body.totals === null || typeof body.totals !== 'object' || Array.isArray(body.totals)) return null;
+    const out = Object.entries(body.totals as Record<string, unknown>).flatMap(([currency, amount]) =>
+      /^[A-Z]{3}$/u.test(currency) && typeof amount === 'number' && Number.isSafeInteger(amount) && amount !== 0 ? [{ amount, currency }] : [],
+    );
+    return out.length === 0 ? null : out;
   };
 
   /** The lists a read of what went quiet watches: every one this record declares but the kernel's own list of runs. */

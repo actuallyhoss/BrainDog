@@ -105,6 +105,11 @@ export function visualOf(q: QueueQuestion, option: { key: string }, ctx: VisualC
   const o = rec(option) ?? {};
   const applies = APPLIES(key);
   const own = !applies;
+  /* AN OPTION THAT SAYS WHAT IT DOES ITSELF (C20): the rows its own patches move, and the money a tail's answer files. */
+  if (own) {
+    const said = ownSaid(o);
+    if (said) return said;
+  }
   if (own && o.money === undefined && o.change === undefined && o.due === undefined) return null;
 
   if (key === 'merge' || key.startsWith('pick:')) {
@@ -134,6 +139,9 @@ export function visualOf(q: QueueQuestion, option: { key: string }, ctx: VisualC
   const figure = lone ? money(Math.abs(lone.amount), lone.currency) : nameOrNull(ctx.figure);
   if (applies && list !== null && figure !== null && changes.length === 0) return { kind: 'filing', list, figure };
 
+  /* A LONG TEXT CHANGED, such as a project's note, draws the first line that changed (C20): the whole text is no line. */
+  const text = applies && changes.length === 1 ? textChange(changes[0]!) : null;
+  if (text) return text;
   const line = applies && changes.length > 0 ? shiftLinesOf(q, ctx.home).find((l) => l.said === null) : undefined;
   if (line) return { kind: 'change', what: line.what, before: line.before, after: line.after };
   const first = own ? changes[0] : undefined;
@@ -161,4 +169,58 @@ export function rowsVisual(q: QueueQuestion): OptionVisual | null {
     return to === null ? [] : [{ what: nameOrNull(m.label) ?? nameOrNull(m.field.replace(/_/gu, ' ')) ?? '', to, n: m.n }];
   });
   return moves.length > 0 ? { kind: 'moves', list, rows: said.rows, moves } : null;
+}
+
+/** The most of one line a changed text is drawn by. */
+const LINE_MOST = 80;
+
+const lineOf = (v: string): string => {
+  const s = v.replace(/[*_`#>]+/gu, '').replace(/\s+/gu, ' ').trim();
+  return s.length > LINE_MOST ? `${s.slice(0, LINE_MOST - 1).trimEnd()}…` : s;
+};
+
+/**
+ * THE FIRST LINE A LONG TEXT CHANGED, before and after, or `null`: the lines both keep are dropped from the start and
+ * the end, and the first left on each side is drawn. A text that only gains or loses lines draws nothing, which its
+ * question already says; so does a line that is an id or a path once cut (`nameOrNull`).
+ */
+export function textChange(c: { field: unknown; before: unknown; after: unknown }): OptionVisual | null {
+  if (typeof c.before !== 'string' || typeof c.after !== 'string') return null;
+  const short = (v: string): boolean => v.trim().length <= LINE_MOST && !v.includes('\n');
+  if (short(c.before) && short(c.after)) return null;
+  const was = c.before.split('\n');
+  const now = c.after.split('\n');
+  let head = 0;
+  while (head < was.length && head < now.length && was[head]!.trim() === now[head]!.trim()) head++;
+  let tail = 0;
+  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail]!.trim() === now[now.length - 1 - tail]!.trim()) tail++;
+  const pick = (lines: string[]): string | null => lines.slice(head, lines.length - tail).map(lineOf).find((l) => l !== '') ?? null;
+  const [b, a] = [pick(was), pick(now)];
+  if (b === null || a === null || b === a) return null;
+  const [before, after] = [nameOrNull(b), nameOrNull(a)];
+  if (before === null || after === null) return null;
+  return { kind: 'change', what: nameOrNull(c.field) ?? '', before, after };
+}
+
+/**
+ * WHAT AN OPTION SAYS IT DOES ITSELF, drawn (C20): the rows its own patches move, by what they move to, and the money a
+ * bank's tail files in the account it names. `null` when it says neither, or not in names.
+ */
+function ownSaid(o: Record<string, unknown>): OptionVisual | null {
+  const said = rec(o.said);
+  const list = nameOrNull(said?.list);
+  if (said && list !== null && Array.isArray(said.moves)) {
+    const moves = (said.moves as unknown[]).flatMap((m) => {
+      const r = rec(m);
+      if (!r || typeof r.n !== 'number') return [];
+      const to = nameOrNull(typeof r.to === 'boolean' ? (r.to ? 'yes' : 'no') : String(r.to ?? ''));
+      const what = nameOrNull(r.label) ?? nameOrNull(String(r.field ?? '').replace(/_/gu, ' ')) ?? '';
+      return to === null ? [] : [{ what, to, n: r.n }];
+    });
+    if (moves.length > 0) return { kind: 'moves', list, rows: typeof said.rows === 'number' ? said.rows : moves[0]!.n, moves };
+  }
+  const files = movesOf(o.files);
+  const into = nameOrNull(o.label);
+  if (files.length === 1 && into !== null) return { kind: 'filing', list: into, figure: money(Math.abs(files[0]!.amount), files[0]!.currency) };
+  return null;
 }

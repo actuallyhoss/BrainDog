@@ -112,3 +112,32 @@ test('a change to many rows draws what it moves them to, and new rows draw by na
   /* A CARD THAT SAYS NEITHER STILL DRAWS NOTHING. */
   assert.equal(visualOf(ask({ rows_said: { list: 'Keys', rows: 40, adds: [], more: 0, moves: [] } }), { key: 'accept' }, { now }), null);
 });
+
+/* THE KINDS HIS OPEN CARDS DREW BARE (the look of 24 October, C20): an option's own patches, a bank's tail, and a note. */
+
+test('AN OPTION THAT PATCHES ROWS ITSELF DRAWS WHAT IT MOVES THEM TO, and one that leaves them draws nothing', () => {
+  const q = ask({ kind: 'options' });
+  const file = { key: 'file-them', said: { list: 'Ledger', rows: 3, moves: [{ field: 'book', label: 'Book', to: 'Household', n: 3 }] } };
+  assert.deepEqual(visualOf(q, file, { now }), { kind: 'moves', list: 'Ledger', rows: 3, moves: [{ what: 'Book', to: 'Household', n: 3 }] });
+  assert.equal(visualOf(q, { key: 'leave-them' }, { now }), null);
+  /* AN ID WHERE A NAME GOES IS NO PICTURE. */
+  assert.equal(visualOf(q, { key: 'file-them', said: { list: 'Ledger', rows: 3, moves: [{ field: 'book', to: '01M3VMPSHV07AM4S51WDTFM5XG', n: 3 }] } } as never, { now }), null);
+});
+
+test('A BANK TAIL ANSWERED BY AN ACCOUNT DRAWS ITS WAITING MONEY GOING INTO THAT ACCOUNT', () => {
+  const q = ask({ kind: 'options' });
+  const v = visualOf(q, { key: '01M3MVW68Y766MBA7YRVGZ0NVK', label: 'Card (EGP)', files: [{ amount: 1243000, currency: 'EGP' }] } as never, { now });
+  assert.equal(v?.kind, 'filing');
+  assert.equal(v?.kind === 'filing' && v.list, 'Card (EGP)');
+  assert.match(v?.kind === 'filing' ? v.figure : '', /12,430/u);
+  /* NONE OF THESE FILES NOTHING, and says nothing. */
+  assert.equal(visualOf(q, { key: 'none', label: 'None of these' } as never, { now }), null);
+});
+
+test('A LONG NOTE CHANGED DRAWS THE FIRST LINE THAT CHANGED, and one only gaining lines draws nothing', () => {
+  const body = (line: string, extra = '') => `A drawing game played daily.\n\n${line}\n\n## The engineering\n\nPure TypeScript, no browser.${extra}`;
+  const q = ask({ changes: [{ field: 'note', label: 'Note', before: body('**Status:** live, lane ship'), after: body('Live and shipping') }] });
+  assert.deepEqual(visualOf(q, { key: 'accept' }, { now }), { kind: 'change', what: 'Note', before: 'Status: live, lane ship', after: 'Live and shipping' });
+  const grows = ask({ changes: [{ field: 'note', label: 'Note', before: body('Live'), after: body('Live', '\n\nA second paragraph.') }] });
+  assert.equal(visualOf(grows, { key: 'accept' }, { now }), null);
+});

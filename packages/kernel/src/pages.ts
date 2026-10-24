@@ -638,7 +638,22 @@ export type FeedRow = {
  * `hard` is set, and only ever `true`, on an option that cannot be taken back once picked (`weigh.ts` `optionCost`). It
  * is the option that is hard and not the question, so a drawer says it on that option and gives it to no key.
  */
-export type QueueOption = { key: string; label: string; because: string; recommended: boolean; shows?: Shows; hard?: true };
+export type QueueOption = {
+  key: string;
+  label: string;
+  because: string;
+  recommended: boolean;
+  shows?: Shows;
+  hard?: true;
+  /**
+   * WHAT THIS OPTION DOES TO ROWS, IN NAMES (C20, "every open card draws what its options change"), on an option that
+   * carries its own patches: the list, how many rows, and the value each field it sets moves them to, a link by the
+   * title it points at. The question's `rows_said` is accepting's; this is the option's.
+   */
+  said?: { list: string; rows: number; moves: { field: string; label?: string; to: Json; n: number }[] };
+  /** The money choosing this option files where it names, one value a currency (a bank's tail answered: the messages waiting). */
+  files?: { amount: number; currency: string }[];
+};
 
 /**
  * One open question, as the `governance.open` source reads it.

@@ -225,3 +225,58 @@ test('A CHANGE TO MANY ROWS SAYS WHAT IT MOVES THEM TO, AND NEW ROWS SAY THEIR N
   assert.deepEqual(moved?.rows_said, { list: 'Tasks', rows: 3, adds: [], more: 0, moves: [{ field: 'stage', to: 'In the kiln', n: 2 }] });
   assert.deepEqual(added?.rows_said, { list: 'Tasks', rows: 2, adds: ['Kiln wash', 'Cones'], more: 0, moves: [] });
 });
+
+test('AN OPTION THAT PATCHES ROWS SAYS WHAT IT MOVES THEM TO, A LINK BY ITS TITLE, AND A TAIL ANSWER THE MONEY IT FILES (C20)', async () => {
+  const { k } = await record();
+  value(k.create('tasks', { what: 'Bisque', stage: 'to_do' }, OWNER));
+  value(k.create('tasks', { what: 'Fire', stage: 'to_do' }, OWNER));
+  value(
+    k.propose(
+      {
+        question: 'Put both after the glaze test?',
+        body_kind: 'options',
+        body: {
+          options: [
+            {
+              id: 'after-it',
+              label: 'Put them after it',
+              because: 'Both wait on the glaze.',
+              patches: [
+                { at: 'tasks#2', version: 1, patch: { after: 'tasks#1', stage: 'in_kiln', pin: '9999' } },
+                { at: 'tasks#3', version: 1, patch: { after: 'tasks#1' } },
+              ],
+            },
+            { id: 'leave', label: 'Leave them', because: 'They stay as they are.' },
+          ],
+        },
+      } as never,
+      OWNER,
+    ),
+  );
+  value(
+    k.propose(
+      {
+        question: 'Which account is the card ending 0618?',
+        body_kind: 'options',
+        body: { tail: { register: 'tasks', digits: '0618' }, totals: { EGP: 1243000 }, options: [{ id: 'tasks#1', label: 'Glaze test', because: 'It is a card.' }, { id: 'none', label: 'None of these', because: 'They keep waiting.' }] },
+      } as never,
+      OWNER,
+    ),
+  );
+  const [moved, tail] = queued(k).sort((a, b) => a.id.localeCompare(b.id));
+  const [after, leave] = moved!.options;
+  assert.deepEqual(after?.said, {
+    list: 'Tasks',
+    rows: 2,
+    moves: [
+      { field: 'after', label: 'After', to: 'Glaze test', n: 2 },
+      { field: 'stage', to: 'In the kiln', n: 1 },
+    ],
+  });
+  assert.ok(!JSON.stringify(after).includes('9999'), 'a secret is never said');
+  assert.equal(leave?.said, undefined);
+  assert.deepEqual(
+    tail!.options.map((o) => o.files ?? null),
+    [[{ amount: 1243000, currency: 'EGP' }], null],
+  );
+});
