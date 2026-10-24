@@ -87,7 +87,7 @@
   import { palette as opener } from './open.svelte.ts';
   import { untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
-  import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
+  import { asksFirst, capLine, drawProposal, drawReading, inOrder, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
   import Cited from '../ui/Cited.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
   import DecisionCard from '$lib/decide/DecisionCard.svelte';
@@ -910,6 +910,7 @@
              nothing beside its title says the list it is in, where its number used to stand, because
              a list's name is something a person reads and a number is not. */
           detail: hit.why ?? (hit.detail || hit.kind),
+          /* NEVER WHY IT RANKED (E54): a row found by meaning carries a mark, not a caption, so it says its list. */
           href: hit.href,
           group: hit.kind,
           icon: hit.icon,
@@ -1016,7 +1017,10 @@
    * It stays in `flat`, which is what the arrow keys and Enter walk, so holding it out of the
    * headings costs it nothing a reader can feel.
    */
-  const overflow = $derived(rows.find((r) => r.id === 'all' || r.id === 'slash'));
+  const overflow = $derived(rows.find((r) => r.id === 'all'));
+  /* THE ASK'S ROW, FIRST FOR A SENTENCE (E53): three words or a question mark is somebody asking, so it leads. */
+  const askRow = $derived(rows.find((r) => r.id === 'slash'));
+  const askLeads = $derived(askRow !== undefined && asksFirst(askRow.ask ?? ''));
 
   /* THE GROUPS OPENED PAST THEIR SIX, for this query only. */
   let opened = $state<ReadonlySet<string>>(new Set());
@@ -1070,7 +1074,7 @@
     return [...out].sort((a, b) => at(a) - at(b));
   });
 
-  const flat = $derived([...groups.flatMap(([, r]) => r), ...(overflow ? [overflow] : [])]);
+  const flat = $derived(inOrder(groups.flatMap(([, r]) => r), overflow, askRow ? { row: askRow, first: askLeads } : undefined));
 
   /**
    * THE KEY A ROW'S TOOLTIP SHOWS COMES OUT OF THE REGISTRY, never out of this file.
@@ -1449,7 +1453,10 @@
         {#if slashShown.drawn.where !== null}<span class="p-slash-label">{copy.slashWhere}</span> {slashShown.drawn.where}{:else if slashShown.drawn.q !== null}{copy.slashSearched(slashShown.drawn.q)}{/if}
       </p>
     {/if}
+    <!-- LOOKING, AT ONCE (E54): the same frame as the keystroke, where the first answer will land, and gone when it does. -->
+    {#if pending && !slashShown}<p class="p-looking" role="status">{copy.looking}</p>{/if}
     <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (slashShown !== null && slashShown.drawn === null && slashShown.fix === null)}>
+      {#if askRow && askLeads}{@render result(askRow)}{/if}
       {#each groups as [group, items]}
         <div role="group" aria-label={group}>
           <p class="p-group" aria-hidden="true">{group}</p>
@@ -1459,6 +1466,7 @@
         </div>
       {/each}
       {#if overflow}{@render result(overflow)}{/if}
+      {#if askRow && !askLeads}{@render result(askRow)}{/if}
     </div>
     {#if slashShown}
       <!-- OUTSIDE THE LISTBOX, like the sentence below: the state of the ask and the fold are prose about the list. -->
@@ -1847,6 +1855,12 @@
     .p-row[data-cursor] .p-keys {
       display: inline-flex;
     }
+  }
+
+  .p-looking {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--ink-3);
   }
 
   .p-none {

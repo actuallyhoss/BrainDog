@@ -33,6 +33,8 @@ export const palette = {
      surface, which would have it waiting on a socket it has nothing to do with. */
   stopped: 'Stopped.',
   noMatches: 'Nothing matches',
+  /* WHILE THE RECORD IS STILL ANSWERING (E54), where the first row will be: the panel sat white for 2 s on "late". */
+  looking: 'Looking…',
   commands: 'Actions',
   destinations: 'Go to',
   records: 'In your things',
@@ -45,7 +47,7 @@ export const palette = {
   /* SLASH'S ROW AND WHAT IT DRAWS (`50 §5.5` step 5). Every one of these is on screen only when `/api/version` says a model
      is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist.
      The fold's last line is `23 §6`'s, with a colon for the dash. */
-  askSlash: (text: string) => `Ask Slash: ${text}`,
+  askSlash: (text: string) => `Ask BrainDog: ${text}`,
   slashAsking: 'Slash is reading the record.',
   /* WHILE A BUSY RECORD IS ASKED AGAIN (the client's 503 retry): calm, and never the crash sentence to quote. */
   slashBusy: 'BrainDog is busy. Trying again.',

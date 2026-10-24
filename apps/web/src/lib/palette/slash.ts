@@ -47,8 +47,26 @@ export function offersSlash(a: { slash: boolean; prefix: string | null; text: st
   /* A QUESTION MARK IS THE PERSON SAYING IT IS A QUESTION, so the row is offered beside the
      places that matched and not only when none did. It does not wait on the search either: it depends on nothing the
      search answers, so it cannot vanish under the pointer when the hits arrive. */
-  if (question.endsWith('?')) return question;
+  if (asksFirst(question)) return question;
   return a.pending || a.places > 0 ? null : question;
+}
+
+/**
+ * Whether the row is the FIRST row rather than the last: a question mark, or three words or more (E53). A sentence that
+ * long is somebody asking, whatever else it happens to match, so "what needs me today" leads with the ask and not with six
+ * rows that share a word with it. A shorter line is a name being looked for, and the ask stays the fallback under it.
+ */
+export function asksFirst(text: string): boolean {
+  const said = text.trim();
+  return said.endsWith('?') || said.split(/\s+/u).filter(Boolean).length >= 3;
+}
+
+/**
+ * The rows in the order the keys walk them: the ask first when `asksFirst` says so, then the groups, then the overflow
+ * row, then the ask when it is only the fallback. Pure, so a test holds the order the panel draws.
+ */
+export function inOrder<R>(groups: readonly R[], overflow: R | undefined, ask: { row: R; first: boolean } | undefined): R[] {
+  return [...(ask?.first ? [ask.row] : []), ...groups, ...(overflow ? [overflow] : []), ...(ask && !ask.first ? [ask.row] : [])];
 }
 
 /**

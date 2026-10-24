@@ -17,12 +17,12 @@ import assert from 'node:assert/strict';
 import type { Reading, SlashProposal, SlashStatus } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { capLine, drawProposal, drawReading, FIGURES_TRACE, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
+import { asksFirst, capLine, drawProposal, drawReading, FIGURES_TRACE, inOrder, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
 
-const ASK = { slash: true, prefix: null, text: 'which invoices are late', pending: false, places: 0 };
+const ASK = { slash: true, prefix: null, text: 'late invoices', pending: false, places: 0 };
 
 test('THE ROW EXISTS ONLY WITH A MODEL BEHIND IT, and then only for plain text that matched no place', () => {
-  assert.equal(offersSlash(ASK), 'which invoices are late');
+  assert.equal(offersSlash(ASK), 'late invoices');
   /* NO MODEL, NO ROW, and not a greyed one: the function answers nothing to draw. */
   assert.equal(offersSlash({ ...ASK, slash: false }), null);
   /* A PLACE MATCHED, so the question has an answer that is not a model's: the row is the fallback, never a rival. */
@@ -38,8 +38,26 @@ test('THE ROW EXISTS ONLY WITH A MODEL BEHIND IT, and then only for plain text t
   assert.equal(offersSlash({ ...ASK, text: '  late invoices ' }), 'late invoices');
 });
 
+test('THREE WORDS ARE A QUESTION: "what needs me today" puts the ask row first, whatever else matched (E53)', () => {
+  const asked = 'what needs me today';
+  /* SIX ROWS SHARED A WORD WITH IT on his record, and the row was not offered at all. */
+  assert.equal(offersSlash({ ...ASK, text: asked, places: 6 }), asked);
+  assert.equal(offersSlash({ ...ASK, text: asked, pending: true }), asked);
+  assert.equal(asksFirst(asked), true);
+  assert.equal(asksFirst('late invoices'), false);
+  assert.equal(asksFirst('late?'), true);
+  const row = { id: 'slash', title: copy.askSlash(asked) };
+  const flat = inOrder([{ id: 'h-1', title: 'Every day' }, { id: 'h-2', title: 'Go Bus' }], undefined, { row, first: asksFirst(asked) });
+  assert.equal(flat[0], row);
+  assert.equal(flat[0]!.title, 'Ask BrainDog: what needs me today');
+  /* A NAME BEING LOOKED FOR keeps the ask as the fallback under everything. */
+  assert.deepEqual(inOrder([{ id: 'a', title: 'a' }], { id: 'all', title: 'all' }, { row, first: false }).map((r) => r.id), ['a', 'all', 'slash']);
+  /* WITHOUT A MODEL THERE IS STILL NO ROW, first or last. */
+  assert.equal(offersSlash({ ...ASK, text: asked, slash: false }), null);
+});
+
 test("THE ROW'S WORDS SAY SLASH AND THE QUESTION, and no row this palette draws without a model says Slash", () => {
-  assert.equal(copy.askSlash('late invoices'), 'Ask Slash: late invoices');
+  assert.equal(copy.askSlash('late invoices'), 'Ask BrainDog: late invoices');
   /* THE ROWS THAT EXIST WITHOUT A MODEL are built from these keys, and none of them may name Slash. */
   for (const key of ['paletteLabel', 'palettePlaceholder', 'noMatches', 'commands', 'destinations', 'records', 'pages', 'openById'] as const)
     assert.doesNotMatch(String(copy[key]), /Slash/u, key);
