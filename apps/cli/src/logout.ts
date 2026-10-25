@@ -28,7 +28,7 @@ export type LogoutIo = {
   /**
    * Under `--json`, where the machine-readable half of the answer goes (`json.ts`).
    *
-   * COUNTS, NEVER NAMES, exactly as the sentence does: the keys of the vault map are whatever a
+   * COUNTS, NEVER NAMES, exactly as the sentence does: the keys of the `vault` map are whatever a
    * hand-written file put there, and a scope is not this command's to publish.
    */
   answer?: Answering | undefined;
@@ -144,7 +144,7 @@ export async function logout(args: string[], io: LogoutIo): Promise<number> {
   const removed: string[] = [];
   if (tokens > 0) removed.push(count(tokens, 'token', 'tokens'));
   if (runners > 0) removed.push(count(runners, 'runner token', 'runner tokens'));
-  if (grants > 0) removed.push(count(grants, 'vault grant', 'vault grants'));
+  if (grants > 0) removed.push(count(grants, 'keychain access', 'keychain access'));
 
   /* NOTHING TO REMOVE IS THE STATE THAT WAS ASKED FOR, so it is 0, and the file is not rewritten.
      THE SCRATCH FILE IS STILL REMOVED, AND THIS IS THE ONLY PATH THAT HAS TO ASK. `saveHosts`

@@ -1,6 +1,6 @@
 /**
  * `braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host
- * <host>]`: a whole file or folder of keys into the vault in one command (AGT-D08). His 72 went in one `keys put` at a
+ * <host>]`: a whole file or folder of keys into the Keychain in one command (AGT-D08). His 72 went in one `keys put` at a
  * time, and this is the bulk path.
  *
  * A FILE IS `NAME=value` LINES, as a `.env` is: blanks and `#` comments skipped, `export ` and one pair of quotes taken
@@ -17,7 +17,7 @@
  * like a key" and refused, in case a value was written where its name belongs.
  *
  * ONE REQUEST A KEY, through the door `put` uses (`manyDoor`). Under the login a name the record already holds is
- * skipped and counted, because the login adds and never replaces; under a vault grant for the project its value is
+ * skipped and counted, because the login adds and never replaces; under keychain access for the project its value is
  * replaced, and the line says "replaced".
  */
 
@@ -60,7 +60,7 @@ export const exampleNamed = (name: string): boolean => /\.(?:example|sample|temp
 export const keyFileNamed = (name: string): boolean =>
   /\.(?:pem|p8)$/i.test(name) || /^id_(?:rsa|dsa|ecdsa|ed25519)(?:_sk)?$/.test(name) || /(?:^|[._-])private[._-]?key$/i.test(name);
 
-/** The vault's kind for a key read from a file, when the file's name says it. */
+/** The Keychain's kind for a key read from a file, when the file's name says it. */
 const kindOf = (name: string): string | undefined => (/^id_/.test(name) ? 'ssh_key' : undefined);
 
 /** The names a folder of keys holds beside its keys, which are never a key. */
@@ -183,9 +183,9 @@ export function readFrom(path: string): FromRead | string {
 }
 
 /**
- * The door for one project named by a person: that project's vault grant, or the sentence that says how to get one.
+ * The door for one project named by a person: that project's keychain access, or the sentence that says how to get one.
  *
- * A GRANT IS KEPT UNDER WHAT `login --vault` WAS GIVEN, a spoken id such as `things#3` or a row's id, and a person names
+ * A GRANT IS KEPT UNDER WHAT `login --keychain` WAS GIVEN, a spoken id such as `things#3` or a row's id, and a person names
  * a project by its name. So a grant kept under the very words typed is taken first, and otherwise the record is read,
  * under the login and naming no run, for the project of that name, and a grant kept under its row's id or its spoken
  * id is taken. Never the login in its place: under the login a key goes to the run's project, not the one named.
@@ -220,8 +220,8 @@ export async function projectDoor(project: string, host: string | undefined, io:
     if (typeof door !== 'string') return door;
   }
   return ids.length > 0
-    ? `No vault grant for that project is kept here. Run ${login} --vault ${ids[0]!}, then this again.`
-    : `No vault grant for that project is kept here, and no project of yours has that name. Run ${login} --vault <project>, as things#3, then this again.`;
+    ? `No keychain access for that project is kept here. Run ${login} --keychain ${ids[0]!}, then this again.`
+    : `No keychain access for that project is kept here, and no project of yours has that name. Run ${login} --keychain <project>, as things#3, then this again.`;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -281,7 +281,7 @@ export async function putMany(from: string, opts: PutOptions, io: KeysIo): Promi
   }
   io.say(
     many.replaces
-      ? `${keysCount(read.found.length)} to seal. Under the vault grant, a key its project already holds has its value replaced.`
+      ? `${keysCount(read.found.length)} to seal. Under the keychain access, a key its project already holds has its value replaced.`
       : `${keysCount(read.found.length)} to seal. Under your login each goes in as a new key, and a name your record already holds is skipped.`,
   );
   let declined = 0;
@@ -319,7 +319,7 @@ export async function putMany(from: string, opts: PutOptions, io: KeysIo): Promi
   }
   if (unsent > 0) io.say(`${keysCount(unsent)} more ${unsent === 1 ? 'was' : 'were'} not sent.`);
   io.say(counts());
-  /* EVERY KEY THERE IS IN THE VAULT NOW, sealed here or held already, and nothing in it went unread, so the copy in the
+  /* EVERY KEY THERE IS IN THE KEYCHAIN NOW, sealed here or held already, and nothing in it went unread, so the copy in the
      clear is the one left to remove, and removing it is his. */
   if (refused.length === 0 && declined === 0 && unsent === 0 && read.unread === 0 && read.left === 0)
     io.say(`Every key in ${read.name} is sealed. The ${read.folder ? 'folder' : 'file'} is yours to delete.`);
@@ -329,7 +329,7 @@ export async function putMany(from: string, opts: PutOptions, io: KeysIo): Promi
 
 /** `braindog keys put --from <file or folder> ...`: the flags read, then `putMany`. */
 export async function keysPutMany(args: string[], io: KeysIo): Promise<number> {
-  let values: { from?: string | undefined; project?: string | undefined; vault?: string | undefined; opens?: string | undefined; kind?: string | undefined; host?: string | undefined; 'dry-run'?: boolean | undefined };
+  let values: { from?: string | undefined; project?: string | undefined; vault?: string | undefined; keychain?: string | undefined; opens?: string | undefined; kind?: string | undefined; host?: string | undefined; 'dry-run'?: boolean | undefined };
   try {
     ({ values } = parseArgs({
       args,
@@ -339,6 +339,7 @@ export async function keysPutMany(args: string[], io: KeysIo): Promise<number> {
         from: { type: 'string' },
         project: { type: 'string' },
         vault: { type: 'string' },
+        keychain: { type: 'string' },
         opens: { type: 'string' },
         kind: { type: 'string' },
         host: { type: 'string' },
@@ -350,7 +351,8 @@ export async function keysPutMany(args: string[], io: KeysIo): Promise<number> {
     io.say(USAGE);
     return 1;
   }
-  /* `--vault` IS `--project` UNDER `put`'s OWN NAME for it, and two different ones is a mistake to stop at. */
+  /* `--keychain` IS `--project` UNDER `put`'s OWN NAME for it, and two different ones is a mistake to stop at. */
+  values.vault = values.keychain ?? values.vault;
   const project = values.project?.trim() || values.vault?.trim() || undefined;
   const from = values.from?.trim();
   if (!from || (values.project !== undefined && values.vault !== undefined && values.project.trim() !== values.vault.trim())) {

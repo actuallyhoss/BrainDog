@@ -290,26 +290,26 @@ const fullUsage = () =>
   [
     'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>] [--statusline]',
     "  Set this machine up from one record, in order: sign in unless it already is, add the hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, sync its skills, and make one token for each agent it wired, each approved in the app. One line per step, and it stops at the first that fails.",
-    'braindog login <host> [--vault <project|*>]',
+    'braindog login <host> [--keychain <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
-    '  With --vault it asks for a grant that opens the keys of one project, or with * the keys of no project.',
+    '  With --keychain it asks for keychain access that opens the keys of one project, or with * the keys of no project.',
     'braindog logout [<host>] [--host <host>]',
-    "  Remove this machine's token, runner token and vault grants for one host from the hosts file. Nothing is sent, and the host is not told.",
+    "  Remove this machine's token, runner token and keychain access for one host from the hosts file. Nothing is sent, and the host is not told.",
     'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
     '  The keys your record holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
-    'braindog keys put <label> [--opens <what>] [--kind <kind>] [--vault <project>] [--host <host>]',
+    'braindog keys put <label> [--opens <what>] [--kind <kind>] [--keychain <project>] [--host <host>]',
     '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
     'braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host <host>]',
     '  Seal every key in a file of NAME=value lines, or a folder of one key a file, asking you about each on the terminal first. Names are printed, never a value.',
     'braindog keys scan [<folder>] [--project <name>] [--deposit] [--ask] [--host <host>]',
     '  Name every key lying in a repository\'s files (.env, .secrets, .pem) and the file it lies in, and the command that seals them. It sends nothing unless --deposit.',
-    'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
+    'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--keychain <project>] [--host <host>] -- <command> [args...]',
     '  Run the command with the key in one environment variable, named from the label unless --as names it. It is never printed.',
-    'braindog run <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
+    'braindog run <label | credentials#n> [--as <ENV_NAME>] [--keychain <project>] [--host <host>] -- <command> [args...]',
     '  The same as keys exec, under a shorter name.',
-    'braindog keys headers <credentials#n | label> --as <Header> [--vault <project>] [--host <host>]',
+    'braindog keys headers <credentials#n | label> --as <Header> [--keychain <project>] [--host <host>]',
     "  Print the key as one header, {\"<Header>\":\"<value>\"}, for a program that reads it, such as Claude Code's headersHelper. It refuses to print to a terminal.",
-    'braindog keys helper <credentials#n | label> [--vault <project>] [--host <host>]',
+    'braindog keys helper <credentials#n | label> [--keychain <project>] [--host <host>]',
     "  Print the key alone, for Claude Code's apiKeyHelper in a profile that runs on an API key. It refuses to print to a terminal, as keys headers does.",
     'braindog skills sync [--host <host>] [--dry-run]',
     "  Write the record's skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand.",
@@ -656,7 +656,7 @@ async function mcp(args: string[]): Promise<void> {
   setTimeout(() => process.exit(0), 1_000).unref();
 }
 
-/** `braindog login <host> [--vault <scope>]`: one host, and the exit code `login` decides. */
+/** `braindog login <host> [--keychain <scope>]`: one host, and the exit code `login` decides. */
 async function signIn(args: string[]): Promise<void> {
   /* `brain.dog` AND NOT `app.brain.dog`, because the example is the one address a person copies and only production's
      `PUBLIC_HOST` starts a device. This said `app.brain.dog` and that it "signs in on both sides" because the old name
@@ -664,10 +664,10 @@ async function signIn(args: string[]): Promise<void> {
      signs devices in at https://brain.dog, so start there". Tokens minted
      on the old name keep working there, but a new login does not. `test/login.test.ts` reads the host from
      `apps/worker/wrangler.jsonc`, so a later move fails there rather than in somebody's terminal. */
-  const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.';
-  let parsed: { values: { vault?: string | undefined }; positionals: string[] };
+  const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --keychain <project>, and nothing else.';
+  let parsed: { values: { vault?: string | undefined; keychain?: string | undefined }; positionals: string[] };
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' } } });
+    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, keychain: { type: 'string' } } });
   } catch {
     return stop(wrong);
   }
@@ -678,7 +678,7 @@ async function signIn(args: string[]): Promise<void> {
   process.on('SIGINT', () => stopping.abort());
   /* THE SIX DIGITS GO TO STDERR EITHER WAY (§5.2 step 3), which is what makes this command work under
      `--json` at all: the whole device flow is already on the sink the envelope does not use. */
-  const code = await login(host, { file: hostsPath(process.env), say: json ? json.say : say, signal: stopping.signal, vault: parsed.values.vault, answer: json?.answer });
+  const code = await login(host, { file: hostsPath(process.env), say: json ? json.say : say, signal: stopping.signal, vault: parsed.values.keychain ?? parsed.values.vault, answer: json?.answer });
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives: exiting straight after several requests aborted Node 24
      on Windows, and a success must exit 0. */

@@ -1,15 +1,15 @@
 /**
  * `braindog keys put <label>`, `braindog keys exec <label> -- <command>`, `braindog keys headers <credential> --as
- * <Header>` and `braindog keys helper <credential>`: a key into the vault, a key handed to one command, and a key
+ * <Header>` and `braindog keys helper <credential>`: a key into the Keychain, a key handed to one command, and a key
  * handed to one program as the header it asks for or as the API key it asks for, through the host's key doors, under
- * a vault grant (`docs/48-SPEC-CLI.md` §2). `put --from` and `scan` have
+ * keychain access (`docs/48-SPEC-CLI.md` §2). `put --from` and `scan` have
  * files of their own (`keys-many.ts`, `keys-scan.ts`), and a value they read reaches the host only through `sealOne`.
  *
- * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD. The deposit door takes a
+ * `put` WITH NO KEYCHAIN ACCESS TO USE SENDS THE LOGIN INSTEAD. The deposit door takes a
  * `write` token too, and the record puts the key in this run's project as a NEW key: a label already there is refused
  * with the sentence that names the two ways a value is replaced. So an agent that finds a key can put it away on a
- * machine that was never given a vault grant, and a login that leaks can add a key and never swap one. `exec` reads a
- * key back, and that still takes a vault grant and nothing else.
+ * machine that was never given keychain access, and a login that leaks can add a key and never swap one. `exec` reads a
+ * key back, and that still takes keychain access and nothing else.
  *
  * THE VALUE IS NEVER AN ARGUMENT. `put` reads it from standard input, because an argument is kept in shell history
  * and shown in every process list.
@@ -20,7 +20,7 @@
  * closes. `headers` is the one exception, at the owner's request: Claude Code's `headersHelper`
  * reads an HTTP server's headers only from a command's standard output, so a key an HTTP tool needs in a header can
  * reach it no other way. It refuses standard output that is a terminal before it reads or sends anything, it opens
- * the key under a vault grant as `exec` does, which the host logs as a `grant.read`, and it prints the one header
+ * the key under keychain access as `exec` does, which the host logs as a `grant.read`, and it prints the one header
  * document and nothing else. `helper` is the same door for Claude Code's `apiKeyHelper`, which reads a profile's API
  * key the same way, and prints the key alone through the same function.
  *
@@ -59,7 +59,7 @@ type Plaintext = string & { readonly brand: 'Plaintext' };
 export type Spawner = (command: string, args: string[], vars: Record<string, string | undefined>, verbatim?: boolean) => Promise<number>;
 
 export type KeysIo = {
-  /** The hosts file the vault grants are kept in. */
+  /** The hosts file the keychain access is kept in. */
   file: string;
   env: Record<string, string | undefined>;
   /** Standard input read whole, or `null` when it is a terminal and nobody piped anything in. */
@@ -197,7 +197,7 @@ const aFile = (path: string): boolean => {
   }
 };
 
-/** Where a request goes and what it carries: a vault grant for `scope`, or, for `put` alone, the login (`login`). */
+/** Where a request goes and what it carries: keychain access for `scope`, or, for `put` alone, the login (`login`). */
 type Door = { key: string; base: string; bearer: string; scope: string; login: boolean };
 type Answer = { status: number; body: Record<string, unknown> | null };
 
@@ -227,9 +227,9 @@ export const spawnInherit: Spawner = (command, args, vars, verbatim) =>
 /**
  * The host and the bearer a command uses, or the one sentence that says why there is none.
  *
- * A VAULT GRANT FIRST: the one `--vault` names, or the one live grant kept for the host. `put` alone, with no `--vault`
+ * KEYCHAIN ACCESS FIRST: the one `--keychain` names, or the one live grant kept for the host. `put` alone, with no `--keychain`
  * and no grant to take, then uses the login every other command sends (`BRAINDOG_TOKEN`, or the hosts file's), because
- * the deposit door takes a login to add a new key. A grant named with `--vault` is that grant or the sentence about it,
+ * the deposit door takes a login to add a new key. A grant named with `--keychain` is that grant or the sentence about it,
  * never the login in its place, since whoever named one meant to replace a value with it.
  */
 function doorFor(flags: { host?: string | undefined; vault?: string | undefined }, io: KeysIo, mayLogin: boolean): Door | string {
@@ -242,12 +242,12 @@ function doorFor(flags: { host?: string | undefined; vault?: string | undefined 
     return e instanceof Error ? e.message : granted;
   }
   if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true };
-  /* NEITHER IS KEPT, and the sentence still names a vault grant, which is what `tools scan` reads to say why a key it
+  /* NEITHER IS KEPT, and the sentence still names keychain access, which is what `tools scan` reads to say why a key it
      found was kept by name only. */
-  return `No vault grant or login is kept for ${to.key}. Run braindog login ${to.key}.`;
+  return `No keychain access or login is kept for ${to.key}. Run braindog login ${to.key}.`;
 }
 
-/** The host and the vault grant a command uses, or the one sentence that says why there is none. */
+/** The host and the keychain access a command uses, or the one sentence that says why there is none. */
 function grantDoor(flags: { host?: string | undefined; vault?: string | undefined }, io: KeysIo): Door | string {
   let hosts;
   try {
@@ -256,7 +256,7 @@ function grantDoor(flags: { host?: string | undefined; vault?: string | undefine
     return e instanceof Error ? e.message : `${io.file} could not be read.`;
   }
   const named = flags.host || io.env.BRAINDOG_HOST || hosts.default;
-  if (!named) return `No BrainDog host is set. Pass --host, set BRAINDOG_HOST, or run braindog login <host> --vault <project>.`;
+  if (!named) return `No BrainDog host is set. Pass --host, set BRAINDOG_HOST, or run braindog login <host> --keychain <project>.`;
   let key: string;
   try {
     key = hostKey(named);
@@ -264,21 +264,21 @@ function grantDoor(flags: { host?: string | undefined; vault?: string | undefine
     return e instanceof Error ? e.message : 'The BrainDog host is not an address.';
   }
   const url = new URL(key);
-  if (inTheClear(url)) return `${key} is http, not https. BrainDog sends a vault grant only over https, except to this machine.`;
+  if (inTheClear(url)) return `${key} is http, not https. BrainDog sends keychain access only over https, except to this machine.`;
 
   const grants = hosts.hosts[key]?.vault ?? {};
   const scopes = Object.keys(grants);
   const scope = flags.vault ?? (scopes.length === 1 ? scopes[0] : undefined);
   if (scope === undefined)
     return scopes.length === 0
-      ? `No vault grant is kept for ${key}. Run braindog login ${key} --vault <project>.`
-      : `${key} has vault grants for ${scopes.join(', ')}, so name one with --vault.`;
+      ? `No keychain access is kept for ${key}. Run braindog login ${key} --keychain <project>.`
+      : `${key} has keychain access for ${scopes.join(', ')}, so name one with --keychain.`;
   const held = Object.hasOwn(grants, scope) ? grants[scope] : undefined;
   if (!isObject(held) || typeof held.value !== 'string' || !held.value)
-    return `No vault grant for that project is kept for ${key}. Run braindog login ${key} --vault <project>.`;
+    return `No keychain access for that project is kept for ${key}. Run braindog login ${key} --keychain <project>.`;
   const until = typeof held.expires === 'string' ? Date.parse(held.expires) : Number.NaN;
   if (!(until > (io.now ?? Date.now)()))
-    return `The vault grant for ${scope} on ${key} has expired. Run braindog login ${key} --vault ${scope}.`;
+    return `The keychain access for ${scope} on ${key} has expired. Run braindog login ${key} --keychain ${scope}.`;
   return { key, base: url.origin, bearer: held.value, scope, login: false };
 }
 
@@ -299,8 +299,8 @@ function refusedLine(door: Door, answer: Answer): string {
      first and cannot tell which of the two was meant; this side knows it sent the login. */
   if (answer.status === 401 || (door.login && refusal?.at === 'vault'))
     return door.login
-      ? `${door.key} did not take the login. Run braindog login ${door.key}, or braindog login ${door.key} --vault <project>.`
-      : `${door.key} did not take the vault grant. Run braindog login ${door.key} --vault ${door.scope}.`;
+      ? `${door.key} did not take the login. Run braindog login ${door.key}, or braindog login ${door.key} --keychain <project>.`
+      : `${door.key} did not take the keychain access. Run braindog login ${door.key} --keychain ${door.scope}.`;
   if (typeof refusal?.fix === 'string' && refusal.fix) return refusal.fix.slice(0, 300);
   return `${door.key} answered in a way this command does not recognise.`;
 }
@@ -325,8 +325,8 @@ async function depositOne(door: Door, ask: { label: string; opens?: string; kind
 export type ManyDoor = { readonly door: Door; readonly host: string; readonly replaces: boolean };
 
 /**
- * `put --from`'s door, or the one sentence that says why there is none. A PROJECT NAMED IS THAT PROJECT'S VAULT GRANT
- * OR NOTHING, as `--vault` is for `put`, because under the login a key goes to the run's project and not the one typed.
+ * `put --from`'s door, or the one sentence that says why there is none. A PROJECT NAMED IS THAT PROJECT'S KEYCHAIN ACCESS
+ * OR NOTHING, as `--keychain` is for `put`, because under the login a key goes to the run's project and not the one typed.
  * With no project it is `put`'s door: the one grant kept, or the login. Under a grant a key the project already holds
  * has its value replaced (`replaces`); under the login it is refused at the door, and `put --from` counts it skipped.
  */
@@ -417,7 +417,7 @@ function headersOne(header: string | null, value: Plaintext, io: KeysIo): number
  * says why this command exists at all). And `keys helper` (`helper` true): the key alone, for its `apiKeyHelper`.
  *
  * REFUSED BEFORE ANYTHING IS READ OR SENT when standard output is a terminal, because then a person is reading it and
- * not a program. A vault grant and never the login, as `exec`: the login may add a key and never read one.
+ * not a program. Keychain access and never the login, as `exec`: the login may add a key and never read one.
  */
 async function openHeader(label: string, flags: { as?: string | undefined; vault?: string | undefined; host?: string | undefined }, io: KeysIo, helper = false): Promise<number> {
   if ((io.terminal ?? (() => process.stdout.isTTY === true))()) {
@@ -464,10 +464,10 @@ export function variableOf(label: string): string {
     .replace(/^[0-9_]+/, '');
 }
 
-const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --vault and --host, and reads the value from standard input.';
-const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --vault and --host, then -- and the command to run.';
-const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --vault and --host, and nothing else.';
-const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --vault and --host, and nothing else.';
+const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --keychain and --host, and reads the value from standard input.';
+const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --keychain and --host, then -- and the command to run.';
+const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --keychain and --host, and nothing else.';
+const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.';
 
 /** `braindog keys list|put|scan|exec|headers|helper`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {
@@ -491,7 +491,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
   const rest = cut === -1 ? all : all.slice(0, cut);
   const command = cut === -1 ? [] : all.slice(cut + 1);
 
-  let values: { opens?: string | undefined; kind?: string | undefined; vault?: string | undefined; host?: string | undefined; as?: string | undefined };
+  let values: { opens?: string | undefined; kind?: string | undefined; vault?: string | undefined; keychain?: string | undefined; host?: string | undefined; as?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } =
@@ -500,16 +500,18 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
             args: rest,
             allowPositionals: true,
             strict: true,
-            options: { opens: { type: 'string' }, kind: { type: 'string' }, vault: { type: 'string' }, host: { type: 'string' } },
+            options: { opens: { type: 'string' }, kind: { type: 'string' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } },
           })
         : verb === 'helper'
-          ? parseArgs({ args: rest, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, host: { type: 'string' } } })
-          : parseArgs({ args: rest, allowPositionals: true, strict: true, options: { as: { type: 'string' }, vault: { type: 'string' }, host: { type: 'string' } } }));
+          ? parseArgs({ args: rest, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } } })
+          : parseArgs({ args: rest, allowPositionals: true, strict: true, options: { as: { type: 'string' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } } }));
   } catch {
     /* parseArgs quotes what it could not read, and that could be a value typed as an argument. */
     io.say(usage);
     return REFUSED;
   }
+  /* `--keychain` IS THE NAME, and `--vault` stays as the same flag for scripts and installed docs. */
+  values.vault = values.keychain ?? values.vault;
   const [label, ...more] = positionals;
   if (label === undefined || more.length > 0 || !label.trim()) {
     io.say(usage);

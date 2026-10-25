@@ -275,7 +275,7 @@ test('SCAN WITH NEITHER A VAULT GRANT NOR A LOGIN: the keys are recorded by name
   assert.deepEqual(await h.scan(), [
     'Tool kiln-deploy in .mcp.json was recorded.',
     'Tool docs in .mcp.json was recorded.',
-    '2 keys were recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.',
+    '2 keys were recorded by name only, because this machine holds no keychain access it could deposit with, and the values were not kept. Run braindog login <host> --keychain <project>, then scan again.',
   ]);
   assert.deepEqual(h.of('vault/deposit'), []);
   assert.deepEqual(h.rows.map((r) => r.fields.needs), [['KILN_API_TOKEN', 'KILN_REGION'], ['header:Authorization']]);
@@ -288,7 +288,7 @@ test('THE NO-GRANT SENTENCE IS SAID ONCE PER HOST, forgotten once a vault grant 
   const auth = fakeValue();
   const key = hostKey(h.base);
   const state = join(h.home, '.braindog', 'tools-said.json');
-  const noGrant = '1 key was recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.';
+  const noGrant = '1 key was recorded by name only, because this machine holds no keychain access it could deposit with, and the values were not kept. Run braindog login <host> --keychain <project>, then scan again.';
   const deploy = { command: 'npx', env: { KILN_API_TOKEN: token } };
   h.mcp({ 'kiln-deploy': deploy });
 

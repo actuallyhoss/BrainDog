@@ -114,7 +114,7 @@ test('A TOKEN, A RUNNER TOKEN AND THREE VAULT GRANTS ALL GO, AND NO SCOPE IS NAM
   const out = await call([HOST], file);
 
   assert.equal(out.code, 0, out.stderr);
-  assert.deepEqual(out.lines, [`signed out of ${HOST} · a token, a runner token and 3 vault grants removed · no default host is set now`]);
+  assert.deepEqual(out.lines, [`signed out of ${HOST} · a token, a runner token and 3 keychain access removed · no default host is set now`]);
   hidden(out);
   assert.deepEqual(readBack(file), { hosts: {} });
 });
@@ -369,7 +369,7 @@ test('AS A REAL PROCESS: one line on stderr, nothing on stdout, and the token go
 
   assert.equal(out.code, 0, out.stderr);
   assert.equal(out.stdout, '');
-  assert.equal(out.stderr, `signed out of ${HOST} · a token and a vault grant removed · no default host is set now\n`);
+  assert.equal(out.stderr, `signed out of ${HOST} · a token and a keychain access removed · no default host is set now\n`);
   hidden(out);
   assert.deepEqual(readBack(file), { hosts: { [OTHER]: { token: held(OTHER_TOKEN) } } });
 });

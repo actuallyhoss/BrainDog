@@ -21,7 +21,7 @@
  * `claude mcp add-json` changes it, since that program writes the file and nothing here sees it written.
  *
  * ITS LAST LINES SAY WHAT IS LEFT, IN THE WORDS TO TYPE (AGT-D11): this repository's own tools, which only `tools write
- * --scope project` writes, and the tools whose keys need a vault grant this machine does not hold.
+ * --scope project` writes, and the tools whose keys need keychain access this machine does not hold.
  *
  * A SECOND RUN CHANGES NOTHING AND SAYS SO. Every step reads before it writes: a login held is not asked for again,
  * hooks already in the settings are not added again, a registration that already runs this command is left, and
@@ -301,7 +301,7 @@ async function toolRows(conn: Connected): Promise<ToolRow[]> {
   return rows;
 }
 
-/** Whether a tool is handed a key from the vault when it starts: a `needs` entry naming a credential. */
+/** Whether a tool is handed a key from the Keychain when it starts: a `needs` entry naming a credential. */
 const needsKey = (fields: Record<string, unknown>): boolean =>
   Array.isArray(fields.needs) && fields.needs.some((n) => typeof n === 'string' && /=credentials#\d+$/u.test(n));
 
@@ -314,7 +314,7 @@ function whatIsLeft(rows: ToolRow[], conn: Connected, key: string, io: SetupIo):
   const own = conn.top === null ? 0 : rows.filter((r) => r.scope === 'project').length;
   if (own > 0) lines.push(`This repository has ${String(own)} ${own === 1 ? 'tool' : 'tools'} of its own. Write ${own === 1 ? 'it' : 'them'} with braindog tools write --scope project.`);
   const keyed = rows.filter((r) => (r.scope === 'global' || conn.top !== null) && needsKey(r.fields)).length;
-  /* THE PROJECT HERE, or `*` for the keys of no project, as `login --vault` takes it; a grant held and unexpired is no line. */
+  /* THE PROJECT HERE, or `*` for the keys of no project, as `login --keychain` takes it; a grant held and unexpired is no line. */
   const scope = conn.context.project?.spoken ?? '*';
   let granted = false;
   try {
@@ -326,8 +326,8 @@ function whatIsLeft(rows: ToolRow[], conn: Connected, key: string, io: SetupIo):
   if (keyed > 0 && !granted)
     lines.push(
       keyed === 1
-        ? `1 tool needs a key. Approve this machine for it with braindog login ${key} --vault ${scope}.`
-        : `${String(keyed)} tools need keys. Approve this machine for them with braindog login ${key} --vault ${scope}.`,
+        ? `1 tool needs a key. Approve this machine for it with braindog login ${key} --keychain ${scope}.`
+        : `${String(keyed)} tools need keys. Approve this machine for them with braindog login ${key} --keychain ${scope}.`,
     );
   return lines;
 }

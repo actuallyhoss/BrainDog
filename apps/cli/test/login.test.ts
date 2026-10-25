@@ -149,7 +149,7 @@ test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW, on the host produc
   child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
   assert.equal(await new Promise<number | null>((done) => child.on('close', done)), 1);
   assert.ok(PRODUCTION.length > 0, 'apps/worker/wrangler.jsonc has no PUBLIC_HOST for production');
-  assert.equal(stderr.trim(), `braindog login takes one host, as in braindog login https://${PRODUCTION}/app/<slug>, and --vault <project>, and nothing else.`);
+  assert.equal(stderr.trim(), `braindog login takes one host, as in braindog login https://${PRODUCTION}/app/<slug>, and --keychain <project>, and nothing else.`);
 });
 
 test('THE ADDRESS A SIGNED-OUT AGENT PASSES ON IS ON THAT HOST TOO', () => {

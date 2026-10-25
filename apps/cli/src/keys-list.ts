@@ -5,13 +5,13 @@
  * WHETHER THAT DAY IS PAST IS THE RECORD'S TO SAY. Today is a day in the record's zone, and this machine's UTC date is
  * another day for some hours of every night, so the record is asked which keys are past theirs (`pastOf`).
  *
- * NEVER A VALUE AND NEVER A GRANT'S ID. A key's row holds, under its secret field, the id of the grant the vault sealed
+ * NEVER A VALUE AND NEVER A GRANT'S ID. A key's row holds, under its secret field, the id of the grant the Keychain sealed
  * the value in, or what is already known of that grant. This command reads that field for one thing, whether anything
  * is there, and keeps a yes or a no. The rows it hands on, to a person or under `--json`, are built here from five
  * named facts and whether the fifth is past, so a field the record adds later, or anything somebody left in a row, is never printed by passing through.
  * Nor is a row's own id or its number: a person knows a key by its name.
  *
- * READS ONLY, UNDER THE LOGIN, IN PAGES OF FIFTY. It opens no key, so it needs no vault grant, and it sends no session
+ * READS ONLY, UNDER THE LOGIN, IN PAGES OF FIFTY. It opens no key, so it needs no keychain access, and it sends no session
  * headers, so it names no run and starts no work (as `signs` does). Fifty a read because a read of a hundred keys has
  * answered INTERNAL on the Cloud (RQ-AGT-243), and the pages are followed to the end so a record with 166 keys says 166.
  *
@@ -83,7 +83,7 @@ export function shapeOf(decl: unknown): Shape {
 /**
  * WHETHER A VALUE IS SEALED BEHIND A ROW, AND NOTHING ELSE OF WHAT THE FIELD HOLDS. A `list` answers the grant's id
  * there, and `context` answers what is known of the grant; a row pointing at no grant is an index entry, its key kept
- * somewhere the row names (`keysOf` in the web Vault reads it the same two ways).
+ * somewhere the row names (`keysOf` in the web Keychain reads it the same two ways).
  */
 const sealedIn = (v: unknown): boolean => (isObject(v) ? v.sealed === true : typeof v === 'string' && v !== '');
 

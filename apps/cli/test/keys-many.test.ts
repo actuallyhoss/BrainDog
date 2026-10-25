@@ -177,7 +177,7 @@ test('A PROJECT NAMED WITH NO GRANT KEPT for it sends nothing, and never falls b
   /* The record is asked for the project by name; this stub answers no list, so nothing is found. */
   assert.equal(await keys(['put', '--from', '.env', '--project', PROJECTS[0]], run.io), 1);
   assert.ok(run.sent.every((s) => !s.url.endsWith('/api/vault/deposit')), 'nothing was deposited');
-  assert.ok(run.said.some((l) => l.startsWith('No vault grant for that project is kept here')), run.said.join('\n'));
+  assert.ok(run.said.some((l) => l.startsWith('No keychain access for that project is kept here')), run.said.join('\n'));
   nowhere(run, [a, ...h.secrets]);
 });
 

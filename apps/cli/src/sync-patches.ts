@@ -10,9 +10,9 @@
  * file at a time), and `new/<path>` for each new file. A git bundle and not a mailbox of patches, because it carries a
  * merge as it is and `git` itself checks it against the base.
  *
- * KEY-SHAPED FILES GO TO THE VAULT INSTEAD. A new or changed file named as a key is kept (`.env`, `.pem`, `id_rsa` and
+ * KEY-SHAPED FILES GO TO THE KEYCHAIN INSTEAD. A new or changed file named as a key is kept (`.env`, `.pem`, `id_rsa` and
  * their kind), or whose text holds an issuer's key shape, is left out of the patch and named, with the command that
- * seals it in the vault, so a key never rides along with the work. A remote whose address holds a name, a password or
+ * seals it in the Keychain, so a key never rides along with the work. A remote whose address holds a name, a password or
  * anything shaped like a key is carried without them, or not at all.
  *
  * MADE WITHOUT WRITING. Every git command that reads runs with the optional locks off, so the index is left as it was;
@@ -53,7 +53,7 @@ export type Work = {
   staged: string[];
   unstaged: string[];
   added: string[];
-  /** Files left out because they look like keys, each to be put in the vault from where it is. */
+  /** Files left out because they look like keys, each to be put in the Keychain from where it is. */
   vault: string[];
 };
 
@@ -148,7 +148,7 @@ export async function makePatches(root: string, o: GatherOptions, git: Git = run
       }
     }
 
-    /* ── staged and unstaged changes, a file at a time, a key-shaped one routed to the vault ── */
+    /* ── staged and unstaged changes, a file at a time, a key-shaped one routed to the Keychain ── */
     for (const [which, cached] of [
       ['staged', true],
       ['unstaged', false],
@@ -206,12 +206,12 @@ export function workSaid(w: Work): string {
     w.unstaged.length > 0 ? `${String(w.unstaged.length)} unstaged` : null,
     w.added.length > 0 ? `${String(w.added.length)} new ${w.added.length === 1 ? 'file' : 'files'}` : null,
   ].filter((p): p is string => p !== null);
-  return parts.length === 0 ? 'nothing but files left for the vault' : parts.length === 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
+  return parts.length === 0 ? 'nothing but files left for the Keychain' : parts.length === 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
 }
 
-/** The line that routes key-shaped files to the vault, said from the machine they are on. */
+/** The line that routes key-shaped files to the Keychain, said from the machine they are on. */
 export const vaultLine = (repo: string, files: string[]): string =>
-  `${oneLine(repo)}: ${files.map(oneLine).join(', ')} ${files.length === 1 ? 'looks' : 'look'} like ${files.length === 1 ? 'a key' : 'keys'}, so ${files.length === 1 ? 'it was' : 'they were'} left out. Put each in the vault on that machine: braindog keys put --from <file> for a file of NAME=value lines, or braindog keys put <label> < <file>.`;
+  `${oneLine(repo)}: ${files.map(oneLine).join(', ')} ${files.length === 1 ? 'looks' : 'look'} like ${files.length === 1 ? 'a key' : 'keys'}, so ${files.length === 1 ? 'it was' : 'they were'} left out. Put each in the Keychain on that machine: braindog keys put --from <file> for a file of NAME=value lines, or braindog keys put <label> < <file>.`;
 
 /* ── applying ──────────────────────────────────────────────────────────── */
 

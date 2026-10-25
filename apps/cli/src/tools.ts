@@ -8,9 +8,9 @@
  *
  * SCAN ONLY READS CONFIGS. Every client in the table is read, and none is written by a scan.
  *
- * A KEY FOUND IN A CONFIG GOES TO THE VAULT OR NOWHERE (question 4). A key-named or key-shaped env or header value is
+ * A KEY FOUND IN A CONFIG GOES TO THE KEYCHAIN OR NOWHERE (question 4). A key-named or key-shaped env or header value is
  * deposited through `braindog keys put`, the one door, and the row keeps `NAME=credentials#N`. Any other entry keeps
- * its NAME only. With no vault grant, `keys put` deposits with the login as a new key in this run's project; when
+ * its NAME only. With no keychain access, `keys put` deposits with the login as a new key in this run's project; when
  * neither is kept, or the door refuses, the row keeps the name and the value is dropped.
  * No sentence here quotes a value, and no value is written to a row, a lock file, or a proposal.
  *
@@ -171,10 +171,10 @@ export type Depositor = (ask: { label: string; opens: string }, given: string) =
  * A depositor over `braindog keys put`, the one door a key goes in by. The value is handed to it as its standard
  * input and to nothing else; its one line of output never quotes a value.
  *
- * NO GRANT IS NEEDED TO PUT A KEY AWAY. `keys put` uses the vault grant kept for the host
+ * NO GRANT IS NEEDED TO PUT A KEY AWAY. `keys put` uses the keychain access kept for the host
  * when there is one, and otherwise the login this scan already reads the record with, which the door takes to add a
  * NEW key in this run's project. A key whose label is already there is refused with the rotation sentence, which names
- * a vault grant, and is then counted with the keys kept by name only.
+ * keychain access, and is then counted with the keys kept by name only.
  */
 export function depositor(o: { file: string; env: Env; host: string; headers: Record<string, string>; signal?: AbortSignal }): Depositor {
   return async (ask, given) => {
@@ -324,7 +324,7 @@ export type ToolScan = {
   now?: () => number;
   /**
    * The host keys are deposited to and the hosts file its grants are kept in. When given, the sentence about keys
-   * kept by name for want of a vault grant is said once for that host, and again only once a grant has been kept.
+   * kept by name for want of keychain access is said once for that host, and again only once a grant has been kept.
    */
   once?: { host: string; hosts: string } | undefined;
   /** What the client says it is connected to beyond its files, read after them. None asked when not given. */
@@ -372,7 +372,7 @@ function integrationsOf(list: ConnectedList, found: Map<string, Found>, lines: s
   return out;
 }
 
-/** Whether the hosts file keeps an unexpired vault grant for this host. */
+/** Whether the hosts file keeps an unexpired keychain access for this host. */
 function grantHeld(hosts: string, host: string, now: number): boolean {
   try {
     const grants: unknown = readHosts(hosts).hosts[host]?.vault;
@@ -383,11 +383,11 @@ function grantHeld(hosts: string, host: string, now: number): boolean {
 }
 
 /**
- * Whether to say that keys were kept by name for want of a vault grant, now.
+ * Whether to say that keys were kept by name for want of keychain access, now.
  *
  * ONCE PER HOST, because the start hook runs the scan at every session and the sentence would otherwise be in every
  * briefing. It is remembered in `~/.braindog/tools-said.json`, keyed by host and holding only when it was said, until
- * the hosts file keeps an unexpired vault grant for that host; then it is forgotten, so a grant that lapses later is
+ * the hosts file keeps an unexpired keychain access for that host; then it is forgotten, so a grant that lapses later is
  * said again. A state file that cannot be read or written costs only the quiet.
  */
 function noGrantOnce(home: string, once: { host: string; hosts: string }, now: number, noGrant: boolean): boolean {
@@ -763,11 +763,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
     if (!s.dryRun) writeLock(lockFile, lock);
   }
 
-  const noGrant = [...blocked].some((b) => /vault grant/i.test(b));
+  const noGrant = [...blocked].some((b) => /keychain access/i.test(b));
   const sayIt = s.once === undefined || s.dryRun ? noGrant : noGrantOnce(s.home, s.once, now, noGrant);
   if (noGrant && sayIt)
-    lines.push(`${String(named)} key${named === 1 ? ' was' : 's were'} recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.`);
-  for (const b of blocked) if (!/vault grant/i.test(b)) lines.push(b);
+    lines.push(`${String(named)} key${named === 1 ? ' was' : 's were'} recorded by name only, because this machine holds no keychain access it could deposit with, and the values were not kept. Run braindog login <host> --keychain <project>, then scan again.`);
+  for (const b of blocked) if (!/keychain access/i.test(b)) lines.push(b);
   return lines;
 }
 

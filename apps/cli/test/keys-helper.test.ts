@@ -100,7 +100,7 @@ test('IT TAKES NO HEADER AND NOTHING ELSE: --as, a second label or an unknown fl
   ]) {
     const run = io(file, false);
     assert.equal(await keys(args, run.io), 1, args.join(' '));
-    assert.deepEqual(run.said, ['braindog keys helper takes one label or credentials#n, --vault and --host, and nothing else.']);
+    assert.deepEqual(run.said, ['braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.']);
   }
   assert.equal(host.seen.length, 0);
 });

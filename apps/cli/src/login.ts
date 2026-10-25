@@ -139,7 +139,7 @@ export type LoginIo = {
   label?: string | undefined;
   now?: (() => number) | undefined;
   /**
-   * A vault grant rather than a login: `things#3`, a project row id, or `*` for the keys of no project. Its bearer is
+   * Keychain access rather than a login: `things#3`, a project row id, or `*` for the keys of no project. Its bearer is
    * kept under that scope in the hosts file, beside the login token and never in its place.
    */
   vault?: string | undefined;
@@ -208,7 +208,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   const { key } = host;
   const vault = io.vault;
   if (vault !== undefined && !SCOPE.test(vault)) {
-    io.say('--vault names a project by its number, as things#3, or * for the keys that belong to no project.');
+    io.say('--keychain names a project by its number, as things#3, or * for the keys that belong to no project.');
     return REFUSED;
   }
 
@@ -222,7 +222,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   }
 
   const label = (io.label ?? `${await machineName()} · braindog-cli`).slice(0, 120);
-  const again = `Run braindog login ${key}${vault === undefined ? '' : ` --vault ${vault}`} to start again.`;
+  const again = `Run braindog login ${key}${vault === undefined ? '' : ` --keychain ${vault}`} to start again.`;
   const got = await approve(host, vault === undefined ? { reach: 'login' } : { reach: 'vault', scope: vault }, label, {
     again,
     nothing: 'nobody was signed in',
@@ -239,7 +239,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
       hosts.hosts[key] = { ...held, token: { value: bearer, expires, label } };
       hosts.default = key;
     } else {
-      /* A vault grant sits beside the login and never replaces it, and it makes a host the default only when none is. */
+      /* Keychain access sits beside the login and never replaces it, and it makes a host the default only when none is. */
       hosts.hosts[key] = { ...held, vault: { ...held?.vault, [vault]: { value: bearer, expires } } };
       hosts.default ??= key;
     }
@@ -251,13 +251,13 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   io.say(
     vault === undefined
       ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
-      : `vault grant for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
+      : `keychain access for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
   );
   io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
   return 0;
 }
 
-/** What one device flow asks the host for: a login, a vault grant over one scope, or one operation. */
+/** What one device flow asks the host for: a login, keychain access over one scope, or one operation. */
 type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach } | { reach: 'runner' } | { reach: 'shape' };
 
 /** The operation reaches this CLI asks for, each approving one ADMIN call (`OPERATIONS` in `packages/kernel/src/device.ts`). */

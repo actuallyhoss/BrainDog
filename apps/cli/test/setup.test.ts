@@ -277,7 +277,7 @@ test('a dry run says one line per app and profile, and the two things left, and 
   const key = hostKey(host);
   assert.deepEqual(m.out.slice(-3), [
     'This repository has 2 tools of its own. Write them with braindog tools write --scope project.',
-    `2 tools need keys. Approve this machine for them with braindog login ${key} --vault things#1.`,
+    `2 tools need keys. Approve this machine for them with braindog login ${key} --keychain things#1.`,
     'That was a dry run, so nothing was signed in, written, registered or proposed.',
   ]);
 });
