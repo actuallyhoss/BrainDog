@@ -16,6 +16,7 @@ import { EVERY_MACHINE, KEY_ANSWERS, KEY_RULES, LOCK_AFTER_MINUTES } from '@brai
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
+import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -50,6 +51,9 @@ export type KeyAskSeen = {
   answered_by: string | null;
   answered_at: string | null;
 };
+
+/** One tool that needs a key: the key by its spoken id, and the tool by its spoken id and its name. */
+export type KeyUse = { credential: string; tool: string; title: string };
 
 export function methods(deps: RecordDeps) {
   const { kernel, keychain, no, tail } = deps;
@@ -94,6 +98,37 @@ export function methods(deps: RecordDeps) {
       }
       const names = await machineNames();
       return ok({ lock_after: kernel.lockAfter(), rules: kernel.keyAccess(id).map((r) => seenRule(r, names)) });
+    },
+
+    /**
+     * Which tools need which key: `[{ credential, tool, title }]`, one line for each key a tool's `needs` names, by
+     * `credentials#n`, `NAME=credentials#n` or the key's label. KEYCHAIN, as the keychain page that asks is. Names only,
+     * never a value. A record that keeps no tools answers an empty list.
+     */
+    async keyUses(_args: unknown, ctx: CallContext): Promise<Result<KeyUse[]>> {
+      const stop = keychain(ctx);
+      if (stop) return { ok: false, refusal: stop };
+      const tools = listFor('tools', kernel.registers());
+      const out: KeyUse[] = [];
+      if (tools === null) return ok(out);
+      let cursor: string | null = null;
+      do {
+        const page = kernel.list({ register: tools, limit: 500, ...(cursor === null ? {} : { cursor }) });
+        if (!page.ok) return page as Result<never>;
+        for (const t of page.value.rows) {
+          const needs = Array.isArray(t.fields.needs) ? t.fields.needs.filter((n): n is string => typeof n === 'string') : [];
+          const seen = new Set<string>();
+          for (const n of needs) {
+            const named = (n.includes('=') ? n.slice(n.indexOf('=') + 1) : n).trim();
+            const key = named ? kernel.get(named) : null;
+            if (!key || key.register !== KEYS || key.deleted_at || seen.has(key.id)) continue;
+            seen.add(key.id);
+            out.push({ credential: kernel.nameOf(key.id), tool: kernel.nameOf(t.id), title: typeof t.fields.name === 'string' && t.fields.name !== '' ? t.fields.name : kernel.nameOf(t.id) });
+          }
+        }
+        cursor = page.value.cursor;
+      } while (cursor !== null);
+      return ok(out);
     },
 
     /**

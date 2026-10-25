@@ -2284,6 +2284,8 @@ export function createClient(options: ClientOptions) {
        lock window. A machine is a keychain grant's handle from `listDevices`, or `*` for every machine; no rule is always. */
     /** The lock window in minutes and the rules set, every key's or one key's: `{ lock_after, rules }`. */
     keyAccess: (args: { credential?: string } = {}) => call<Answer<'keyAccess'>>('keyAccess', args as Record<string, unknown>),
+    /** Which tools need which key: `[{ credential, tool, title }]`, names only. */
+    keyUses: () => call<Answer<'keyUses'>>('keyUses'),
     /** One key opened always, after asking, or never by one machine or every machine; `rule: null` takes the rule away. */
     setKeyAccess: (args: { credential: string; machine: string; rule: 'always' | 'ask' | 'deny' | null }) =>
       call<Answer<'setKeyAccess'>>('setKeyAccess', args as Record<string, unknown>),

@@ -15,6 +15,7 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'keyAccess', group: 'KEYCHAIN', writes: false, what: 'How long a sign-in opens the keychain for, and which machine may open which key: always, after asking you, or never.',
     takes: { credential: 'text' } },
+  { name: 'keyUses', group: 'KEYCHAIN', writes: false, what: 'Which tools need which key, by name, never a value.' },
   { name: 'setKeyAccess', group: 'KEYCHAIN', writes: true, what: 'Set whether one machine, or every machine, opens one key always, after asking you, or never.' },
   { name: 'keyAsks', group: 'KEYCHAIN', writes: false, what: 'The machines waiting for you to allow a key, newest first, and with recent the last week too.',
     takes: { recent: 'text' } },

@@ -346,6 +346,8 @@ export type UseSources = {
   /** Tool rows as a list read gives them, with the list's id in `register` so the row's page can be linked. */
   tools?: readonly { id: string; seq?: number | null; register?: string; fields: Record<string, unknown> }[];
   scripts?: readonly { script: string; title: string; keys: readonly string[] }[];
+  /** The record's answer to which tools need which key, by the key's spoken id: `keyUses`. */
+  keyUses?: readonly { credential: string; tool: string; title: string }[];
 };
 
 export type Use = { kind: 'action' | 'tool' | 'script'; name: string; href: string | null };
@@ -366,6 +368,7 @@ export function usesOf(k: KeyRow, from: UseSources): Use[] {
     const needs = Array.isArray(t.fields.needs) ? t.fields.needs.filter((n): n is string => typeof n === 'string') : [];
     if (needs.some(names)) out.push({ kind: 'tool', name: String(t.fields.name ?? t.id), href: typeof t.seq === 'number' && t.register ? `/r/${t.register}/${t.seq}` : null });
   }
+  for (const u of from.keyUses ?? []) if (k.spoken !== null && u.credential.toLowerCase() === k.spoken.toLowerCase()) out.push({ kind: 'tool', name: u.title, href: null });
   for (const s of from.scripts ?? []) if (s.keys.some(names)) out.push({ kind: 'script', name: s.title || s.script, href: null });
   return out;
 }

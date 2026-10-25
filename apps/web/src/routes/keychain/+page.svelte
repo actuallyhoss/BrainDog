@@ -375,10 +375,9 @@
   async function usesRead() {
     const c = client;
     if (!c) return;
-    /* TOOLS ARE NOT READ HERE YET: the web may not name the Agents pack's Tools list (web-lists), so `usesOf` takes them
-       once the record hands this screen that list's id. */
-    const [actions, scripts] = await Promise.all([c.actions().catch(() => null), c.scripts().catch(() => null)]);
-    useFrom = { ...(actions?.ok ? { actions: actions.value } : {}), ...(scripts?.ok ? { scripts: scripts.value } : {}) };
+    /* TOOLS COME FROM THE RECORD'S `keyUses`, which names the Tools list so the web need not (web-lists). */
+    const [actions, scripts, keyUses] = await Promise.all([c.actions().catch(() => null), c.scripts().catch(() => null), c.keyUses().catch(() => null)]);
+    useFrom = { ...(actions?.ok ? { actions: actions.value } : {}), ...(scripts?.ok ? { scripts: scripts.value } : {}), ...(keyUses?.ok ? { keyUses: keyUses.value } : {}) };
   }
 
   /* WHO OPENED EACH KEY LAST, asked after the index is drawn, so a slow answer never holds the keys back; the line

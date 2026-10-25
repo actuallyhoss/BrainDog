@@ -89,3 +89,12 @@ test('USED BY NAMES ONLY WHAT NAMES THE KEY, by its label or its handle', () => 
   ]);
   assert.deepEqual(usesOf(k, {}), []);
 });
+
+test('USED BY NAMES A TOOL THE RECORD SAYS NEEDS THE KEY, by its spoken id', () => {
+  const k = key({ label: 'Stripe live', spoken: 'credentials#7' });
+  const keyUses = [
+    { credential: 'credentials#7', tool: 'tools#2', title: 'Billing server' },
+    { credential: 'credentials#8', tool: 'tools#3', title: 'Mail' },
+  ];
+  assert.deepEqual(usesOf(k, { keyUses }), [{ kind: 'tool', name: 'Billing server', href: null }]);
+});
