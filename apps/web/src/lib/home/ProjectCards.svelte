@@ -24,6 +24,7 @@
   import { apiBase } from '$lib/at.ts';
   import { rowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
+  import { shownName } from '$lib/shell/side.ts';
   import { agentsOn, slotStyle, takenBackFree, type ProjectCard as Card } from './project-cards.ts';
   import { projectKept } from '$lib/funnel.ts';
   import { untrack } from 'svelte';
@@ -158,8 +159,8 @@
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
                 <span class="d-top">
-                  <ProjectWell mark={c.mark} name={c.name} hue={c.hue} />
-                  <span class="d-name" dir="auto">{c.name}</span>
+                  <ProjectWell mark={c.mark} name={shownName(c.name)} hue={c.hue} />
+                  <span class="d-name" dir="auto">{shownName(c.name)}</span>
                 </span>
                 <span class="d-said">{words.formed}</span>
                 {#if c.brief}<span class="d-brief" dir="auto">{c.brief}</span>{/if}

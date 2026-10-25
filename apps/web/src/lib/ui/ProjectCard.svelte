@@ -36,6 +36,7 @@
   import { homeCurrency } from '$lib/record/api.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { Sparkline } from '$lib/viz/index.ts';
+  import { shownName } from '$lib/shell/side.ts';
   import { HEALTH, daySaid, lifeOf, slotStyle, workedSaid, type ProjectCard } from '$lib/home/project-cards.ts';
 
   let {
@@ -74,10 +75,14 @@
   /* ITS ONE LIVE LINE (`lifeOf`): who is on it, who worked on it last, how long since its work moved, or since when it
      has been quiet. How long since its work moved stands beside who is on it now, as before. */
   const life = $derived(lifeOf(card, agents));
+  /* THE NAME A CARD SAYS IS THE PROJECT'S TITLE, a handle spaced and capitalised as the rail says it (`shownName`). */
+  const title = $derived(shownName(card.name));
+  /* A CARD WITH NOTHING ELSE TO SAY SAYS THAT, in one honest line: no next step, figure, progress or sign of life. */
+  const empty = $derived(!card.next && figure === null && !leadsWithProgress && card.progress === null && life === null);
   const worked = $derived(life?.kind === 'working' && card.worked ? workedSaid(card.worked) : '');
   const named = $derived(
     [
-      card.name,
+      title,
       lane.toLowerCase(),
       health?.word.toLowerCase(),
       kpi ? kpi.sentence : figure ? `${figure} ${label.toLowerCase()}`.trim() : '',
@@ -114,9 +119,9 @@
 
 <a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named}>
   <span class="pc-a">
-    <ProjectWell mark={card.mark} name={card.name} hue={card.hue} />
+    <ProjectWell mark={card.mark} name={title} hue={card.hue} />
     <span class="pc-id">
-      <span class="pc-name" dir="auto">{card.name}</span>
+      <span class="pc-name" dir="auto">{title}</span>
       {#if lane || health}
         <span class="pc-meta"
           >{lane}{#if lane && health}{' · '}{/if}{#if health}<span class="pc-health" data-tone={health.tone}><span class="dot" aria-hidden="true"></span>{health.word}</span>{/if}</span
@@ -158,6 +163,9 @@
   {/if}
   {#if card.next}
     <span class="pc-next"><Icon name="arrow" size="m" /><span class="sr">Next step: </span><span class="pc-next-words" dir="auto">{card.next}</span></span>
+  {/if}
+  {#if empty}
+    <span class="pc-foot pc-empty"><span class="pc-mark" aria-hidden="true"></span><span class="pc-quiet pc-who">Nothing written yet. <span class="pc-add">Add a next step</span></span></span>
   {/if}
   {#if life}
     <span class="pc-foot" data-life={life.kind}>
@@ -497,6 +505,11 @@
   }
 
   /* A LINE WITH NO FACE BEFORE IT WEARS THE PROJECT'S COLOUR as a dot, so every card's live line is in its own colour. */
+  .pc-add {
+    color: var(--ink-2);
+    text-decoration: underline;
+  }
+
   .pc-mark {
     flex: none;
     inline-size: 8px;
