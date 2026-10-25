@@ -311,6 +311,25 @@
     }
   }
 
+  /* ON A PHONE THE HAIRLINE BETWEEN ROWS STARTS AND ENDS ON THE TEXT'S EDGES. The rows hang a step past the text so a wash
+     has room, and their border ran the whole way out; drawn as a background strip it is inset by the same padding, as the
+     ledger's own rule is. */
+  @media (width < 640px) {
+    .rows > .row,
+    .list > .item {
+      border-block-end: 0;
+      background-image: linear-gradient(var(--rule), var(--rule));
+      background-repeat: no-repeat;
+      background-position: center bottom;
+      background-size: calc(100% - 2 * var(--sp-3)) 1px;
+    }
+
+    .rows > .row:last-child,
+    .list > .item:last-child {
+      background-image: none;
+    }
+  }
+
   /* ── inline: chips ──────────────────────────────────────────────────────── */
 
   /* A RUN OF COUNTS, SET AS FIGURES AND NOT AS BOXES. Each was a tinted box with 12px of padding
