@@ -42,6 +42,7 @@ import { statSync, writeFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { unbom } from './unbom.ts';
 import { hostKey, inTheClear, readHosts, target } from './http.ts';
 import type { Answering } from './json.ts';
 import { keysList } from './keys-list.ts';
@@ -555,7 +556,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
       return REFUSED;
     }
     /* One trailing newline is what `echo` and a file's last line add, and never part of a key. */
-    value = read.replace(/\r?\n$/, '') as Plaintext;
+    value = unbom(read).replace(/\r?\n$/, '') as Plaintext;
     if (!value) {
       io.say('Standard input was empty, so nothing was deposited.');
       return REFUSED;
