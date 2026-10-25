@@ -4,7 +4,7 @@
   NOTHING IS FILED BY ASKING. The press calls the record's `slashDraft`, which drafts, checks and draws each change and
   keeps none of it. What the owner sees is the page as each draft would make it, beside the page as it is, through the
   same reader every declared page goes through (`PageView mode="preview"`). Only then does a press file it: "Keep it"
-  files it and accepts it in one go, "Ask in Needs you" files it for later, and "Not this" drops it unfiled. "Try again"
+  files it and accepts it in one go, "Ask in Needs you" files it for later, and "Throw away" drops it unfiled. "Try again"
   asks the same words once more with the draft shown handed back as turned down, so Slash drafts another way; the one
   turned down is dropped unfiled, and the record leaves it out if it comes back (C34).
 

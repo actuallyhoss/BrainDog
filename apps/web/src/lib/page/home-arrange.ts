@@ -288,7 +288,12 @@ async function drawnBlocks(base: string, body: PageBody, decide: boolean, io?: F
  * rows are untouched, as a page holds none.
  */
 export async function unkeep(base: string, id: string, io?: Fetch): Promise<{ ok: true } | { ok: false; fix: string }> {
-  const out = await createClient({ base, ...(io ? { fetch: io } : {}) }).call('retireDeclaration', { id: `page.${id}` });
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  /* THE PINS A SAID CHANGE KEPT WITH THE PAGE GO WITH IT (basis `said`), or the built page would be drawn under them; a look he pinned himself stays. */
+  const held = await client.call<{ look?: { by?: unknown; basis?: unknown } | null }>('page', { slug: id });
+  const said = held.ok && held.value?.look?.by === 'owner' && held.value.look.basis === 'said';
+  const out = await client.call('retireDeclaration', { id: `page.${id}` });
+  if (out.ok && said) await client.call('retireDeclaration', { id: `look.${id}` });
   if (out.ok) return { ok: true };
   return { ok: false, fix: 'refusal' in out ? out.refusal.fix : copy.recordNotReached };
 }

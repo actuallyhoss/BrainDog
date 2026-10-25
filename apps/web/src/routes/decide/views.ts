@@ -211,8 +211,9 @@ export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money)
  * columns a third each, two a half each, one the whole row, in the order Money, Quick, Handled. One board row, so the
  * three line up at the top and what was put off and decided follows under all of them.
  */
-export function boardOf(has: Readonly<Record<Column, boolean>>): Record<Column, string | null> {
-  const order: Column[] = ['money', 'quick', 'handled'];
+export function boardOf(has: Readonly<Record<Column, boolean>>, first: Group = 'money'): Record<Column, string | null> {
+  /* QUICK FIRST when the kept page puts that queue ahead (`decideDrawn`'s `first`), as said: "show quick questions first". */
+  const order: Column[] = first === 'quick' ? ['quick', 'money', 'handled'] : ['money', 'quick', 'handled'];
   const shown = order.filter((c) => has[c]);
   const span = shown.length === 0 ? 12 : 12 / shown.length;
   const out: Record<Column, string | null> = { money: null, quick: null, handled: null };
@@ -288,6 +289,8 @@ export type DecideDrawn = {
   drawsAny: boolean;
   /** How many questions wait in each group, as the head's sentence counts them: what the phone's switch and each column's head say. */
   groups: Record<Group, number>;
+  /** Which group the kept page draws first: money's unless it puts the quick queue ahead. */
+  first: Group;
 };
 
 /**
@@ -414,9 +417,18 @@ export function decideDrawn(
   if (waits) open = waits.questions;
   const quickCount = Math.max(quick.length, open - money.length);
   const groups = { money: money.length, quick: quickCount };
+  /* A KEPT PAGE THAT PUTS THE QUICK QUEUE AHEAD OF MONEY'S (by the keys the page names them) DRAWS THEM IN THAT ORDER;
+     with any other keys the first open queue is money's, as before. */
+  const keyAt = (n: number | undefined): unknown => {
+    const b = n === undefined ? undefined : (blocks[n] as { key?: unknown; heading?: unknown });
+    /* THE READ MAY NOT HAND THE KEY BACK, so the heading the body gave each queue names it too. */
+    return b?.key ?? (b?.heading === GROUP_WORDS.quick ? GROUP_KEY.quick : b?.heading === GROUP_WORDS.money ? GROUP_KEY.money : undefined);
+  };
+  const first: Group = openAt.length >= 2 && keyAt(openAt[0]) === GROUP_KEY.quick && keyAt(openAt[1]) === GROUP_KEY.money ? 'quick' : 'money';
+  const second: Group = first === 'money' ? 'quick' : 'money';
   const groupOf = (n: number): Group | 'all' | null => {
     if (openAt.length < 2) return n === openAt[0] ? 'all' : null;
-    return n === openAt[0] ? 'money' : n === openAt[1] ? 'quick' : null;
+    return n === openAt[0] ? first : n === openAt[1] ? second : null;
   };
   const shaped = blocks.map((b, n): LiveBlock => {
     if (says(b) || !b.drawn) return b;
@@ -472,7 +484,7 @@ export function decideDrawn(
   const later = shapedLater as { at: number; heading: string } | null;
   const named = later ? shaped.map((b, n) => (n === later.at ? { ...b, heading: later.heading } : b)) : shaped;
   const out = emptyHidden(named);
-  return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn), groups };
+  return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn), groups, first };
 }
 
 /* ── the record's answer, read as the page draws it ───────────────────── */
@@ -540,7 +552,24 @@ export async function readDecide(base: string, body: DecideBody = DECIDE_HOME, i
   const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
   const now = Number.isFinite(said) ? said : Date.now();
   const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
-  return { from: 'live', now, page: { page: { page: body.page, title: body.title }, blocks: blocks.map((b) => decideBlockOf(b, now)) } };
+  return { from: 'live', now, page: { page: { page: body.page, title: body.title }, blocks: inKeptOrder(blocks.map((b) => decideBlockOf(b, now)), body) } };
+}
+
+/**
+ * THE TWO GROUPS IN THE ORDER THE KEPT BODY PUTS THEM. The record reads a body it is previewing under its rules' look,
+ * which leads with what is late and so draws Money first whatever the body says, and a person who said "quick first"
+ * would see no change. Money's and Quick's blocks swap places to match the body; nothing else moves.
+ */
+function inKeptOrder(blocks: LiveBlock[], body: DecideBody): LiveBlock[] {
+  const keyOf = (b: unknown): unknown => (b as { key?: unknown }).key;
+  const asked = body.blocks.map(keyOf);
+  const wantQuickFirst = asked.indexOf(GROUP_KEY.quick) !== -1 && asked.indexOf(GROUP_KEY.quick) < asked.indexOf(GROUP_KEY.money);
+  const m = blocks.findIndex((b) => keyOf(b) === GROUP_KEY.money);
+  const q = blocks.findIndex((b) => keyOf(b) === GROUP_KEY.quick);
+  if (m === -1 || q === -1 || asked.indexOf(GROUP_KEY.money) === -1 || wantQuickFirst === q < m) return blocks;
+  const out = [...blocks];
+  [out[m], out[q]] = [out[q]!, out[m]!];
+  return out;
 }
 
 /** A refusal that says the host has no such method, rather than anything about this page. */

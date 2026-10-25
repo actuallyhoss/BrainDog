@@ -36,7 +36,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { defaultBlockKey } from '@braindog/kernel';
+import { BLOCK_INSTALLS, defaultBlockKey } from '@braindog/kernel';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -125,11 +125,14 @@ const keyByDefault = (answered: Record<string, unknown>): boolean => {
   return key === named || (key.startsWith(`${named}-`) && /^\d+$/u.test(key.slice(named.length + 1)));
 };
 
-/** One answered block with the run taken off it, leaving the declaration underneath. */
+/**
+ * One answered block with the run taken off it, leaving the declaration underneath: only the keys a block is declared
+ * with stay, since the list of what a read answers grows (`queue`, `waiting`) and a Needs you read back was refused for each.
+ */
 export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
   const out: Record<string, unknown> = {};
   const byDefault = keyByDefault(answered);
-  for (const [key, value] of Object.entries(answered)) if (!RUN.has(key) && !(key === 'key' && byDefault)) out[key] = value;
+  for (const [key, value] of Object.entries(answered)) if (!RUN.has(key) && BLOCK_INSTALLS.has(key) && !(key === 'key' && byDefault)) out[key] = value;
   /* A BLOCK WITH NO `kind` IS NOT ONE THIS RECORD COULD HAVE STORED. It is carried as the empty
      string rather than dropped, because a body that came back malformed should stay countable
      instead of losing a block on the way through and reading as a shorter page. */

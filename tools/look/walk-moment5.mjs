@@ -99,7 +99,7 @@ export async function seedWithTalabat() {
 }
 
 /** A source for `serve`: every record path handed to the walk's record with its key, as the gates' forwarder does. */
-function sourceOf(record) {
+export function sourceOf(record) {
   return {
     name: 'moment5',
     record: 'the seed with Talabat payments',

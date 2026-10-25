@@ -27,7 +27,7 @@ import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, MayPropose, Tried } from '@braindog/kernel';
-import { SLASH, coerce, slugify } from '@braindog/kernel';
+import { BLOCK_KEY, SLASH, coerce, keyedBlocks, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, designCheck, isKind, type DesignBlock } from 'braindog-render';
 import type { BriefInput } from './briefing.ts';
@@ -2606,6 +2606,40 @@ const answered = (d: SlashDraft & { rows: SlashRows }, said: string): unknown =>
 const opening = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 
 /**
+ * A PAGE CHANGE THAT MOVED BLOCKS, GIVEN THE PINS THAT KEEP THEM THERE. The record lays its rules' look over every page
+ * it reads and moves what is pressing up, so a kept body that put Cash ahead first drew with what is late above it again.
+ * The blocks the change moved (those off the longest run that kept their order) are pinned in the owner's look, and the
+ * look rides with the page as one change. `held` is the look the page already has, whose pins and hides stay.
+ */
+export function pinMoved(about: { id: string; body: unknown }, to: unknown, held: unknown): unknown {
+  const one = to as { id?: unknown; kind?: unknown; body?: { blocks?: unknown } } | null;
+  const before = (about.body as { blocks?: unknown } | null)?.blocks;
+  if (one === null || typeof one !== 'object' || one.id !== about.id || one.kind !== 'page' || !about.id.startsWith('page.')) return to;
+  const after = one.body?.blocks;
+  if (!Array.isArray(before) || !Array.isArray(after)) return to;
+  const was = keyedBlocks(before as object[]).map((b) => b.key);
+  const now = keyedBlocks(after as object[]).map((b) => b.key);
+  const seq = now.filter((k) => was.includes(k)).map((k) => was.indexOf(k));
+  /* THE LONGEST RUN THAT KEPT ITS ORDER, by the plain quadratic walk: a page holds a few dozen blocks. */
+  const run: number[] = seq.map(() => 1);
+  const from: number[] = seq.map(() => -1);
+  seq.forEach((v, i) => {
+    for (let j = 0; j < i; j += 1) if (seq[j]! < v && run[j]! + 1 > run[i]!) (run[i] = run[j]! + 1), (from[i] = j);
+  });
+  const keep = new Set<number>();
+  for (let at = run.indexOf(Math.max(0, ...run)); at !== -1 && seq.length > 0; at = from[at]!) keep.add(at);
+  const common = now.filter((k) => was.includes(k));
+  const moved = common.filter((_, i) => !keep.has(i) && BLOCK_KEY.test(common[i]!));
+  if (moved.length === 0) return to;
+  const slug = about.id.slice('page.'.length);
+  const mine = held !== null && typeof held === 'object' && (held as { by?: unknown }).by === 'owner' ? (held as Record<string, unknown>) : null;
+  const pinned = [...new Set([...(Array.isArray(mine?.pinned) ? (mine!.pinned as string[]) : []), ...moved])];
+  const hide = (Array.isArray(mine?.hide) ? (mine!.hide as string[]) : []).filter((k) => !pinned.includes(k));
+  const look = { ...(mine ?? {}), look: slug, basis: typeof mine?.basis === 'string' ? mine.basis : 'said', by: 'owner', pinned, ...(hide.length > 0 ? { hide } : {}) };
+  return { declarations: [one, { id: `look.${slug}`, kind: 'look', body: look }] };
+}
+
+/**
  * A description drafted by the model, each draft tried with `previewChange` (and its rules with `tryAutomation`, through
  * `previewerOf`), and what it refused handed back to be mended.
  *
@@ -2626,6 +2660,8 @@ export async function describe(deps: {
   most?: number;
   /** The body a page not yet held was built as, which the draft is measured against (C25, C26). */
   built?: { id: string; blocks: readonly unknown[] };
+  /** Pins the blocks a page change moved, handed in by the record, which holds the page's look. */
+  pin?: (to: unknown) => unknown;
 }): Promise<SlashDescribed> {
   const most = deps.most ?? SLASH_OPEN_CAP;
   const dropped: string[] = [];
@@ -2676,6 +2712,7 @@ export async function describe(deps: {
         dropped.push(one.why);
         continue;
       }
+      if (deps.pin !== undefined) one.draft.body = { ...one.draft.body, to: deps.pin(one.draft.body.to) };
       if (clean.some((c) => c.key === one.draft.key)) continue;
       /* A TRY AGAIN THAT ANSWERS WHAT HE TURNED DOWN HAS NOT TRIED AGAIN, so the same change is dropped, said, and never
          drawn: the first draft stays thrown away. */

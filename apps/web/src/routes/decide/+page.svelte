@@ -220,6 +220,16 @@
     }
   }
 
+  /* A DECIDE KEPT (OR PUT BACK) BY SAYING IT CHANGES THE SHELL'S PAGES, not the queue, so nothing else asks again: read the
+     page the record now holds, or the built one once Undo retires it. */
+  let heldDecide = untrack(() => shell.pages.includes('decide'));
+  $effect(() => {
+    const has = shell.pages.includes('decide');
+    if (has === heldDecide) return;
+    heldDecide = has;
+    untrack(() => void reread());
+  });
+
   /* ── what BrainDog itself has improved ───────────────────────────────────── */
 
   /**
@@ -383,8 +393,8 @@
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
   const counts = $derived<Record<Column, number>>({ money: shaped?.groups.money ?? 0, quick: shaped?.groups.quick ?? 0, handled: handledCount });
   /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */
-  const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }));
-  const columns = $derived((['money', 'quick', 'handled'] as const).filter((c) => counts[c] > 0));
+  const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }, shaped?.first));
+  const columns = $derived((shaped?.first === 'quick' ? (['quick', 'money', 'handled'] as const) : (['money', 'quick', 'handled'] as const)).filter((c) => counts[c] > 0));
   /* ON A PHONE ONE COLUMN AT A TIME, switched with the segmented control over them; the first that holds something.
      `?show=handled` (Today's "Review") opens on Handled, and on a wide board scrolls it into view. */
   let chosenColumn = $state<Column | null>(route.url.searchParams.get('show') === 'handled' ? 'handled' : null);

@@ -160,7 +160,7 @@ import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Pr
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
-import { askedFault, declinedInput, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
+import { askedFault, declinedInput, describe, pinMoved, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
 import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
@@ -5340,6 +5340,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         drawn: drawnVersions(sql),
         preview,
+        ...(about !== null ? { pin: (to: unknown) => pinMoved(about.value, to, liveBody(`look.${about.value.id.replace(/^page\./u, '')}`)) } : {}),
         ...(about !== null && built !== undefined && Array.isArray(built.blocks) && kernel.declarations().every((d) => d.id !== about.value.id)
           ? { built: { id: about.value.id, blocks: built.blocks as unknown[] } }
           : {}),

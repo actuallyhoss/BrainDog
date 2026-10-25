@@ -143,7 +143,7 @@ export const changeWords = {
   keep: 'Keep it',
   keeping: 'Keeping',
   file: 'Ask in Needs you',
-  drop: 'Not this',
+  drop: 'Throw away',
   /** Ask the same words again, with this draft turned down, so Slash drafts another way (§45 "Keep, Try again"). */
   again: 'Try again',
   againing: 'Trying again',
@@ -219,9 +219,11 @@ export type Kept = { kind: 'kept' } | { kind: 'filed'; id: string; href: string;
  */
 export async function fileDrafted(client: SlashClient, draft: Drafted, keep: boolean): Promise<Kept> {
   /* `declaration_id` IS WHAT THE CHANGE INSTALLS, which the record asks for by name: without it every Keep it was refused
-     ("A change proposal needs declaration_id"), found on the first walk of moment 5 (C35). A bundle names none. */
-  const to = draft.change.to as { id?: unknown };
-  const named = typeof to.id === 'string' ? { declaration_id: to.id } : {};
+     ("A change proposal needs declaration_id"), found on the first walk of moment 5 (C35). A bundle is named by its first member. */
+  const to = draft.change.to as { id?: unknown; declarations?: { id?: unknown }[] };
+  /* A BUNDLE IS FILED UNDER ITS FIRST MEMBER, which the record asks for too: a page and its look were refused for want of one. */
+  const first = typeof to.id === 'string' ? to.id : to.declarations?.[0]?.id;
+  const named = typeof first === 'string' ? { declaration_id: first } : {};
   const filed = await client.call<{ id?: unknown }>('propose', { question: draft.question, body_kind: 'change', body: { ...named, to: draft.change.to } });
   if (!filed.ok) return { kind: 'refused', fix: fixOf(filed) };
   const id = String(filed.value?.id ?? '');
