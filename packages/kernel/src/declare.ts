@@ -4698,6 +4698,8 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *               read path fills it through `derive-rows.ts`, and `where` refuses to filter or sort
  *               on it. The `unique: true` + `derive: { normalise }` fingerprint is not built: it
  *               needs a stored value, and `deriveFault` refuses `unique` beside `derive`.
+ *   `hidden_from_agents`  the field's own bookkeeping (a mark, a hue, a draft flag): the short `get` and `list` answers an
+ *               agent reads leave it out, while `format: full` and the app still carry it.
  *   `scope`     where a row applies; the write path holds a token to it, and `inScope` reads by it.
  *   `min` · `max`  bounds, in UTF-8 bytes on text and documents and by value on numbers.
  *   `required_when`  `{ field, is }`: required while another field of the row holds that value.
@@ -4711,6 +4713,7 @@ const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
   'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'derive', 'labels', 'currency_from', 'currency_fixed', 'when',
+  'hidden_from_agents',
 ] as const;
 
 /**

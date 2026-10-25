@@ -63,6 +63,8 @@ export type SeedField = FieldDecl & {
   immutable?: boolean;
   /** The date this row is ABOUT, for tone. Declared, never the first `day` field the register has. */
   deadline?: boolean;
+  /** The list's own bookkeeping: left out of an agent's short answers, kept in `format: full` and the app. */
+  hidden_from_agents?: boolean;
   /**
    * The field this one makes readable, if it makes one readable.
    *

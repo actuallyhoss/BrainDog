@@ -325,9 +325,9 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
       /* THE AGENT WORKING ON IT, by the name it signs its runs with, as a task names one. A delegate, never the owner. */
       { id: 'agent', label: 'Agent', type: 'text', index: true },
       /* A PROJECT THE RECORD FORMED ITSELF from an agent's first session (portfolio 1.18.0), a draft until its owner keeps it. */
-      { id: 'draft', label: 'Not kept yet', type: 'bool', default: false },
-      { id: 'mark', type: 'text' },
-      { id: 'hue', type: 'int' },
+      { id: 'draft', label: 'Not kept yet', type: 'bool', default: false, hidden_from_agents: true },
+      { id: 'mark', type: 'text', hidden_from_agents: true },
+      { id: 'hue', type: 'int', hidden_from_agents: true },
       { id: 'note', type: 'document' },
       { id: 'repos', label: 'Repositories', type: 'list', of: 'text' },
       { id: 'folders', label: 'Folders', type: 'list', of: 'text' },

@@ -1020,6 +1020,8 @@ export type RegisterDecl = {
     transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
     /** On a day: the day a row is due by rather than the day something happened (`isDeadline` in `metrics.ts`). */
     deadline?: boolean;
+    /** The list's own bookkeeping: left out of an agent's short answers, kept in `format: full` and the app. */
+    hidden_from_agents?: boolean;
   })[];
   /** The enum field mirrored onto `entry.state`, when the register has one. */
   state?: string;

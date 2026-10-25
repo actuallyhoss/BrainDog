@@ -34,6 +34,8 @@ export type Field = {
   deadline?: boolean;
   required?: boolean;
   retired?: boolean;
+  /** The list's own bookkeeping: left out of every short line, still in `format: full`. */
+  hidden_from_agents?: boolean;
   default?: unknown;
   /** Where a row applies, on the one field that says it (`scope.ts`). */
   scope?: unknown;
@@ -307,7 +309,7 @@ export function rowLine(row: Shaped, register: string, look: Look): string {
     if (seen.has(id) || parts.length >= 5) return;
     seen.add(id);
     const f = byId.get(id);
-    if (f?.retired === true) return;
+    if (f?.retired === true || f?.hidden_from_agents === true) return;
     /* A REF THE CALLER CANNOT NAME IS LEFT OFF A LINE, where it said "one you cannot open" on every row of a page. */
     if (typeof fields[id] === 'string' && ULID.test(fields[id])) return;
     /* A LIST OF TEXT IS ITS LABEL AND HOW MANY, "In the way 3", never its items: three things in the way of a
@@ -374,7 +376,7 @@ export function rowWhole(row: Shaped, register: string, look: Look): string[] {
   for (const id of new Set(order)) {
     if (id === decl?.title || id === decl?.state || (register === RUNS && (RUN_INSIDES.has(id) || id === 'agent'))) continue;
     const f = byId.get(id);
-    if (f?.retired === true || !Object.hasOwn(fields, id)) continue;
+    if (f?.retired === true || f?.hidden_from_agents === true || !Object.hasOwn(fields, id)) continue;
     const value = fields[id];
     const text =
       typeof value !== 'string' ? null : f?.type === 'document' ? prose(value) : f === undefined || f.type === 'text' ? oneLine(value) : null;

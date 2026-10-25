@@ -9,7 +9,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rowLine, type Decl, type Look } from '../src/brief.ts';
+import { rowLine, rowWhole, type Decl, type Look } from '../src/brief.ts';
 
 const decl = {
   id: 'things',
@@ -66,4 +66,24 @@ test('A LIST OF ROWS STILL NAMES THEM: the count is for a list of text only', ()
   const linked = { ...decl, mobile: ['name', 'stage', 'helpers'] } as Decl;
   const at: Look = { ...look, decl: () => linked };
   assert.equal(rowLine(row({ helpers: ['people#1', 'people#2'] }), 'things', at), 'Oxbow.gg (things#1) · building · Sam (people#1), Ada (people#2)');
+});
+
+test('A FIELD DECLARED hidden_from_agents IS LEFT OUT OF THE LINE AND THE WHOLE READ, and stays in the row', () => {
+  const marked = {
+    ...decl,
+    mobile: ['name', 'stage', 'hue'],
+    fields: [
+      ...decl.fields,
+      { id: 'hue', type: 'int', hidden_from_agents: true },
+      { id: 'mark', type: 'text', hidden_from_agents: true },
+      { id: 'draft', label: 'Not kept yet', type: 'bool', hidden_from_agents: true },
+    ],
+  } as Decl;
+  const l: Look = { ...look, decl: () => marked };
+  const r = row({ hue: 265, mark: 'tag', draft: false });
+  assert.doesNotMatch(rowLine(r, 'things', l), /265|hue/iu);
+  const whole = rowWhole(r, 'things', l).join('\n');
+  assert.doesNotMatch(whole, /Hue|Mark|Not kept yet/u);
+  assert.match(whole, /Oxbow\.gg/u);
+  assert.equal((r.fields as Record<string, unknown>).hue, 265);
 });

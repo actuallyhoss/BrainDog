@@ -747,9 +747,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   Projects is one line and one box. 1.26.0 is master's (Z7). Blocks added and nothing taken away, so a minor step.
  * - portfolio 1.28.0 (the look of 25 October, P7 and P11): Numbers opens on a plain line and its link to every reading says what it opens, and Where they
  *   are counts the projects Projects draws, Finished left out. Words and one filter moved, no id added or taken away, so a minor step.
+ * - portfolio 1.29.0 (the agents' reads): a project's mark, hue and draft flag are declared `hidden_from_agents`, so the short
+ *   answers an agent reads leave them out; `format: full` and the app keep them. Three fields flagged, no id added or taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.28.0',
+  portfolio: '1.29.0',
   people: '3.8.0',
   'money-core': '3.23.0',
   estate: '2.4.0',
