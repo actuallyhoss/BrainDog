@@ -66,7 +66,7 @@
     best: 'Best match',
     jumpTo: 'Jump to',
     lists: 'Lists',
-    listsCount: 'Every row in each list, finished ones too.',
+    listsCount: 'Every entry in each list, finished ones too.',
     recent: 'Changed lately',
     entries: (n: number) => n.toLocaleString('en'),
   } as const;

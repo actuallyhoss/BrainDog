@@ -262,6 +262,8 @@ async function everyRoute(picked, appRoot) {
   const screens = [];
   const missing = [];
   for (const pattern of patterns) {
+    /* THE DESIGN BOOK IS DEV ONLY: a built app redirects it, so it would draw blank. */
+    if (pattern === '/design' || pattern.startsWith('/design/')) continue;
     if (Object.hasOwn(PICKED, pattern)) {
       const { name, from, path } = PICKED[pattern];
       const key = keyOf(pattern.replace(/[[\]]/gu, ''));

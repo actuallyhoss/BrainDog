@@ -281,11 +281,13 @@
   /* A THUMB NEEDS 44px on every press. */
   @media (pointer: coarse) {
     /* THE BOX GROWS TO 44 AND THE MARGIN TAKES THE GROWTH BACK, so the row keeps its height. */
-    a.runs-name {
-      display: flex;
-      align-items: center;
-      min-block-size: 44px;
-      margin-block: -11px;
+    @container (width >= 560px) {
+      a.runs-name {
+        display: flex;
+        align-items: center;
+        min-block-size: 44px;
+        margin-block: -11px;
+      }
     }
 
     .runs-more,

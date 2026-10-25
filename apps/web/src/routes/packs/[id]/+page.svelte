@@ -430,7 +430,7 @@
   const metaOf = (r: string): string => {
     const x = railOf(r);
     const parts: string[] = [];
-    if (x && x.guessed !== true) parts.push(x.count === 1 ? '1 row' : `${x.count.toLocaleString('en-GB')} rows`);
+    if (x && x.guessed !== true) parts.push(x.count === 1 ? '1 entry' : `${x.count.toLocaleString('en-GB')} entries`);
     const at = changedAt[r];
     if (at) parts.push(`changed ${since(at, nowMs)}`);
     return parts.join(' · ');
