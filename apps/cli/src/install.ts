@@ -67,6 +67,7 @@ import { fileURLToPath } from 'node:url';
 
 import { refused, type Result } from '@braindog/ports';
 
+import { unbom } from './unbom.ts';
 import { refuse, type Saying } from './json.ts';
 
 type Env = Record<string, string | undefined>;
@@ -145,7 +146,7 @@ export function readReplace(named: string): Replace {
   const file = resolve(named);
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(file, 'utf8'));
+    raw = JSON.parse(unbom(readFileSync(file, 'utf8')));
   } catch {
     throw new Error(`${file} could not be read as JSON, so braindog install changed nothing. --replace names the file that says what to take out.`);
   }
@@ -495,7 +496,7 @@ function undo(steps: Step[], plans: Plan[], failing: string, cause: unknown): st
 const readObject = (file: string, what: string): Record<string, unknown> => {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    parsed = JSON.parse(unbom(readFileSync(file, 'utf8')));
   } catch {
     throw new Error(`${file} is not valid JSON, so braindog install leaves it alone. Correct it and run install again.`);
   }
@@ -624,7 +625,7 @@ function movingCheckout(dir: string): string | null {
 /* Read without `readObject`'s refusal, because a plain install never writes this file and must not fail on it. */
 function holdsBraindog(file: string): boolean {
   try {
-    const config: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const config: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
     return isObject(config) && isObject(config.mcpServers) && 'braindog' in config.mcpServers;
   } catch {
     return false;

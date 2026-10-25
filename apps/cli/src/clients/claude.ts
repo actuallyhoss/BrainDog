@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import { unbom } from '../unbom.ts';
 import { keepCopy, serversFileOf } from '../install.ts';
 import { isObject, samePath } from '../skills.ts';
 import { onPath, type Client, type Env, type Plan, type Runner, type ServerSet } from './index.ts';
@@ -42,7 +43,7 @@ export const runClaude: ClaudeRunner = (args, cwd) =>
 function readConfig(file: string, label: string): { json: Record<string, unknown> | undefined; fault: string | null } {
   if (!existsSync(file)) return { json: undefined, fault: null };
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const parsed: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
     if (isObject(parsed)) return { json: parsed, fault: null };
   } catch {
     /* JSON.parse quotes the text around the fault, and the text holds keys. */

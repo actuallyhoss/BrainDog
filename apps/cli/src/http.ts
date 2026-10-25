@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { createClient, type Client } from '@braindog/client';
+import { unbom } from './unbom.ts';
 import { cliBuild } from './position.ts';
 import type { Result } from '@braindog/ports';
 
@@ -55,7 +56,7 @@ export function readHosts(file: string): HostsFile {
   if (!existsSync(file)) return { hosts: {} };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    parsed = JSON.parse(unbom(readFileSync(file, 'utf8')));
   } catch {
     /* JSON.parse's own message quotes the text around the fault, and the text holds a token. */
     throw new Error(`${file} is not valid JSON. Correct it by hand, or delete it and sign in again.`);

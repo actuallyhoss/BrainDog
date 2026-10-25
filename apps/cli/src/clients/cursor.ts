@@ -23,6 +23,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { unbom } from '../unbom.ts';
 import { isObject } from '../skills.ts';
 import { planLine, serverFor, writeWhole } from './codex.ts';
 import type { Applied, Client, Env, Plan, ServerSet, Want } from './index.ts';
@@ -122,7 +123,7 @@ const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is
 /** A file's text and its JSON: `text` null when there is no file; `json` null with the sentence when it cannot be read. */
 function readJson(file: string, label: string): { text: string | null; json: Record<string, unknown> | null; fault: string | null } {
   if (!existsSync(file)) return { text: null, json: {}, fault: null };
-  const text = readFileSync(file, 'utf8');
+  const text = unbom(readFileSync(file, 'utf8'));
   try {
     const parsed: unknown = JSON.parse(text);
     if (isObject(parsed)) return { text, json: parsed, fault: null };

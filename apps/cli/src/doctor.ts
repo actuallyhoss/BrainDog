@@ -23,6 +23,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { unbom } from './unbom.ts';
 import { CLIENTS, clientOf, type Client } from './clients/index.ts';
 import { BRAINDOG_SERVER, descriptionOf, holdsTokenShape, isOldServer, readReplace, serversFileOf, wordsOf, type Replace } from './install.ts';
 
@@ -68,7 +69,7 @@ const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'obj
 /** A JSON object read, or null when the file is missing or is not one: a file doctor cannot read is no place. */
 function readJson(file: string): Record<string, unknown> | null {
   try {
-    const raw: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const raw: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
     return isObject(raw) ? raw : null;
   } catch {
     return null;
@@ -77,7 +78,7 @@ function readJson(file: string): Record<string, unknown> | null {
 
 const readText = (file: string): string | null => {
   try {
-    return readFileSync(file, 'utf8');
+    return unbom(readFileSync(file, 'utf8'));
   } catch {
     return null;
   }

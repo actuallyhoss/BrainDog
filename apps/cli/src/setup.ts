@@ -45,6 +45,7 @@ import { createInterface } from 'node:readline/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { unbom } from './unbom.ts';
 import { applyCodexHooks, planCodexHooks } from './clients/codex-hooks.ts';
 import { CLIENTS, type Client } from './clients/index.ts';
 import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
@@ -120,7 +121,7 @@ export const profilesFile = (home: string): string => join(home, '.braindog', 'p
 /** The profiles kept from earlier runs. A file that does not read keeps none, and the next run that writes replaces it. */
 function keptProfiles(file: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const parsed: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
     const list = isObject(parsed) && Array.isArray(parsed.profiles) ? parsed.profiles : [];
     return list.filter((p): p is string => typeof p === 'string' && isAbsolute(p));
   } catch {
@@ -215,7 +216,7 @@ function defaultElsewhere(key: string, file: string): boolean {
 function registration(file: string): 'same' | 'other' | 'none' {
   let config: unknown;
   try {
-    config = JSON.parse(readFileSync(file, 'utf8'));
+    config = JSON.parse(unbom(readFileSync(file, 'utf8')));
   } catch {
     /* NO FILE, OR ONE CLAUDE CODE WILL REFUSE TOO: `claude mcp add-json` is the one that says what is wrong with it. */
     return 'none';

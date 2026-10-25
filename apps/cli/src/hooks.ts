@@ -20,6 +20,7 @@ import type { Client, Context } from '@braindog/client';
 import { buildDay } from '@braindog/mcp/build';
 import { refused } from '@braindog/ports';
 
+import { unbom } from './unbom.ts';
 import { behindSaid, checkPath, hostName } from './behind.ts';
 import { readDoorCache } from './bridge-cache.ts';
 import { allowedPrograms, owedCommands, readAllowed, sentOf, usedTools, type SentCommands } from './commands-used.ts';
@@ -127,7 +128,7 @@ export function readSession(file: string): SessionFile | null {
   if (!existsSync(file)) return null;
   let x: unknown;
   try {
-    x = JSON.parse(readFileSync(file, 'utf8'));
+    x = JSON.parse(unbom(readFileSync(file, 'utf8')));
   } catch {
     return null;
   }
@@ -417,7 +418,7 @@ function hostBuildOf(home: string, key: string): string | null {
 /** What `behindLine` kept for this host in `~/.braindog/update-check.json`, or `null`. */
 function checkedOf(home: string, key: string): { app: string | null; min_cli: string | null } | null {
   try {
-    const x: unknown = JSON.parse(readFileSync(checkPath(home), 'utf8'));
+    const x: unknown = JSON.parse(unbom(readFileSync(checkPath(home), 'utf8')));
     const kept = isObject(x) && isObject(x.hosts) ? x.hosts[key] : undefined;
     if (!isObject(kept)) return null;
     return { app: typeof kept.app === 'string' ? kept.app : null, min_cli: typeof kept.min_cli === 'string' ? kept.min_cli : null };
@@ -780,7 +781,7 @@ export async function hookWork(env: Env, file: string, home?: string): Promise<v
   if (dirname(at) !== resolve(workDir(env)) || !/^later-[0-9a-f]{16}\.json$/u.test(basename(at))) return;
   let job: WorkJob;
   try {
-    job = JSON.parse(readFileSync(at, 'utf8')) as WorkJob;
+    job = JSON.parse(unbom(readFileSync(at, 'utf8'))) as WorkJob;
   } catch {
     return;
   } finally {
@@ -820,7 +821,7 @@ export function wholeToday(env: Env, moved: readonly MovedRepo[], now: number = 
   const today = new Date(now).toISOString().slice(0, 10);
   let kept: Record<string, unknown> = {};
   try {
-    const x = JSON.parse(readFileSync(file, 'utf8')) as unknown;
+    const x = JSON.parse(unbom(readFileSync(file, 'utf8'))) as unknown;
     if (x !== null && typeof x === 'object' && !Array.isArray(x)) kept = x as Record<string, unknown>;
   } catch {
     kept = {};

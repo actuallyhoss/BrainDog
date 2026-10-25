@@ -35,6 +35,7 @@ import { parseArgs } from 'node:util';
 import type { Brief, Client, Context } from '@braindog/client';
 import { refused, type Result } from '@braindog/ports';
 
+import { unbom } from './unbom.ts';
 import { clip } from './clip.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse, type Answering } from './json.ts';
@@ -59,7 +60,7 @@ export const samePath = (path: string): string => {
 export function readLock(file: string): Record<string, unknown> | null {
   if (!existsSync(file)) return {};
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const parsed: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
     return isObject(parsed) ? parsed : null;
   } catch {
     return null;
