@@ -2,10 +2,10 @@
  * The app's own key doors on the self-host, over a real socket: an owner in a browser putting a key in, reading it
  * back, replacing its value, and every credential that must not get through.
  *
- * THESE ARE NOT THE VAULT DOORS AND DO NOT WEAKEN THEM. `/api/vault/*` takes a vault grant's bearer and refuses
- * any request carrying an `Origin`, which `vault-doors.test.ts` holds. `/api/keys/*` is the mirror image: a
+ * THESE ARE NOT THE KEYCHAIN DOORS AND DO NOT WEAKEN THEM. `/api/vault/*` takes a keychain grant's bearer and refuses
+ * any request carrying an `Origin`, which `keychain-doors.test.ts` holds. `/api/keys/*` is the mirror image: a
  * browser session, no bearer of any kind, and an origin this host answers for. What decides whether the session
- * may reach a key is the record's own vault gate, which this file also holds to its fifteen minutes.
+ * may reach a key is the record's own keychain gate, which this file also holds to its fifteen minutes.
  *
  * THE VALUE IS GENERATED HERE AND OBVIOUSLY FAKE, and long enough that a fragment of it anywhere is findable. At
  * the end, the SQLite file and its WAL, the event table, and everything this process wrote to a console, stdout

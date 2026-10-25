@@ -6,7 +6,7 @@
  *
  * THE KEY IS THE HOST'S OR THE PERSON'S, NEVER THE RECORD'S TO READ. This host's endpoint is called with `SLASH_KEY` when
  * the operator set one, and with none otherwise, which is a local model working. HIS OWN KEY is the one he picked from the
- * vault in Settings, by its id, with the provider and address he named (`slashOwnKeyOf`), opened through this host's key
+ * keychain in Settings, by its id, with the provider and address he named (`slashOwnKeyOf`), opened through this host's key
  * store on each call (`actions.ts` `keyOpener`, which counts the opening under a `grant.read` event) and always required.
  * No key is chosen by its label any more. Neither is written anywhere. The builders are
  * `@braindog/host/slash`'s, the ones the Worker uses too.
@@ -143,7 +143,7 @@ export function selfhostFacts(config: SlashConfig | undefined): RouteFacts | und
  * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own press
  * reaches its model with no context, so it passes none and `keyOpener`'s own default stands. The door has an asker and
  * passes their id through `slashOwnKeyFor`, and an automation's question passes `rule:<id>`. This host's own endpoint
- * opens no vault key at all, so only his own key is ever signed for.
+ * opens no keychain key at all, so only his own key is ever signed for.
  */
 const wireOf = (config: SlashConfig, api: () => RecordApi, store: KeyStore | undefined, actor?: string): SlashHostDeps => ({
   grants: () => api().kernel.grants(),
@@ -245,7 +245,7 @@ export type SlashEngineDeps = {
  * "RULES ARE THE FALLBACK, NOT THE ENGINE". When this host's endpoint does not answer, the ask goes to the second
  * endpoint before Slash's rules speak. The first candidate carries no `inference`, so it is asked on the adapter the caller
  * handed in, which is this host's endpoint as it always was; the second carries its own, on the same wire (`wireOf`'s
- * `send`) with the operator's `SLASH_FALLBACK_KEY`. It opens no vault key, so no `grant.read` is signed for it.
+ * `send`) with the operator's `SLASH_FALLBACK_KEY`. It opens no keychain key, so no `grant.read` is signed for it.
  *
  * NEVER ON HIS OWN KEY. A question he sent to the provider he picked is not sent on to the operator's spare because his
  * provider was slow: with his key chosen the route is empty and the core asks as before. The core holds the same rule on
@@ -325,7 +325,7 @@ export async function slashEngineFor(
     slashModelNameOf(config),
   );
   /* GUARDED BY THIS HOST, because `byo`'s asks are on this host's endpoint and the package meters tier `a` alone, and
-     because `configure` checks a grant id's shape and never the vault (`slashGuardedEngine`). */
+     because `configure` checks a grant id's shape and never the keychain (`slashGuardedEngine`). */
   return slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
 }
 
@@ -343,7 +343,7 @@ export async function slashEngineFor(
  * that throws is let go, so the next pass builds again rather than every question after it failing on one bad import.
  *
  * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY, asked on a wire signed `rule:<id>`, so the
- * vault's `grant.read` names the rule that opened it and not `system`. This never runs the vault's session gate
+ * keychain's `grant.read` names the rule that opened it and not `system`. This never runs the keychain's session gate
  * (`slashOwnKeyFor`): a rule has no session for it to read, and installing a rule that asks Slash is the owner's consent to
  * its question going to the model he chose. A key that is gone or will
  * not open stops the run `FORBIDDEN` with nothing sent and nothing in the ledger, and this host's endpoint is never asked
@@ -372,7 +372,7 @@ export function slashAnswersFor(
     if (inference === undefined)
       return no(
         'FORBIDDEN',
-        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key Slash was set to answer with is no longer a key in the vault, so nothing was sent and the run stopped there. Pick your key again in Settings.`,
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key Slash was set to answer with is no longer a key in the keychain, so nothing was sent and the run stopped there. Pick your key again in Settings.`,
         { at: 'grant_id' },
       );
     let closed = false;
@@ -493,7 +493,7 @@ export function slashDoor(
      offering it would save a choice every later ask refuses. `SLASH_KEY` does not make a host able to open the owner's
      key and so does not count. His choice is read on each ask, after the engine that made the `slash_settings` table has
      been built, so a key he picks or revokes counts on the next ask.
-     AND IT IS OPENED FOR THE ASKER, NOT FOR `system`. `slashOwnKeyFor` runs the vault's own gate on `ctx` and signs the
+     AND IT IS OPENED FOR THE ASKER, NOT FOR `system`. `slashOwnKeyFor` runs the keychain's own gate on `ctx` and signs the
      `grant.read` with the asker's id; before it, a read colleague with a fifty-minute-old proof proposed on the owner's key
      and the log said `system`. */
   const byok =
@@ -501,17 +501,17 @@ export function slashDoor(
       ? undefined
       : async (ctx: CallContext) =>
           slashOwnKeyFor(slashOwnKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(config, api, store, actor), config.url);
-  /* THE VAULT'S OWN GATE FOR A SAVE THAT POINTS HIS KEY SOMEWHERE (`slashKeySave`), asked through the read that writes no
+  /* THE KEYCHAIN'S OWN GATE FOR A SAVE THAT POINTS HIS KEY SOMEWHERE (`slashKeySave`), asked through the read that writes no
      event, and the INBOX'S OWN READ for a pattern's arrivals, as the asker. */
-  const vault = async (ctx: CallContext): Promise<Refusal | null> => {
+  const keychain = async (ctx: CallContext): Promise<Refusal | null> => {
     const gate = await api().listGrants(ctx);
     if (gate.ok) return null;
-    return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The vault could not be asked about your key. Try again.' };
+    return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The keychain could not be asked about your key. Try again.' };
   };
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
-  /* THIS HOST'S ENDPOINT OPENS NO VAULT KEY, so the engine is handed on as built: there is no `grant.read` for an asker
+  /* THIS HOST'S ENDPOINT OPENS NO KEYCHAIN KEY, so the engine is handed on as built: there is no `grant.read` for an asker
      to sign unless the ask is on his own key, which `byok` above opens for them. */
-  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, { vault, samples });
+  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, { keychain, samples });
 }
 
 /* ── erasing a person from Slash's ledger ─────────────────────────────────────────────────────────────────────────────── */

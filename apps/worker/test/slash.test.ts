@@ -1,5 +1,5 @@
 /**
- * Slash on the Worker (`src/slash.ts`): the person's own key from the vault, through the same port as the self-host, and the
+ * Slash on the Worker (`src/slash.ts`): the person's own key from the keychain, through the same port as the self-host, and the
  * daily look. The endpoint is a test double and every key an obviously fake value; nothing leaves the machine.
  *
  * AND THE THIRTEENTH PACKAGE, `@braindog/slash`, driven through both hosts' builders at the bottom of this file.
@@ -206,7 +206,7 @@ test("A REAL ASK ON HIS OWN KEY REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'
   assert.equal(proposed.body_kind, 'rowset');
   assert.deepEqual(proposed.citations, ['tasks#1']);
   assert.match(String(proposed.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
-  /* THE FOLD'S LAST LINE IS THE VAULT, REFUSED, on every ask (`46 §4.2`), which is the boundary showing in the output. */
+  /* THE FOLD'S LAST LINE IS THE KEYCHAIN, REFUSED, on every ask (`46 §4.2`), which is the boundary showing in the output. */
   assert.deepEqual(proposed.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
 
   /* THE QUESTION IS ON THE REAL RECORD'S DECIDE. */
@@ -321,7 +321,7 @@ test('NEITHER BUILDER LOADS THE PACKAGE BEFORE IT HAS DECIDED IT NEEDS IT', () =
  * two tests drive the same hole one level further out: `export default`'s own `fetch`, a real `Record$` holding a real
  * record, a bearer that record minted through `createToken`, and the app's own origin sent by hand. Before the refusals
  * existed both answered 200 with a Reading and the model endpoint was called once each, which on a live host is one opening
- * of the person's own vault key and one ask off `ask_cap`, spent by an MCP token or a CLI login (`46 §5.2`). With the two
+ * of the person's own keychain key and one ask off `ask_cap`, spent by an MCP token or a CLI login (`46 §5.2`). With the two
  * locks in, each one disabled on its own turns exactly one of the two red, which is why there are two tests and not one.
  *
  * `src/index.ts` IMPORTS `cloudflare:workers`, which `node --test` cannot load, and the other tests here read it as text for
@@ -514,7 +514,7 @@ test('AND THE OBJECT REFUSES A TOKEN CONTEXT ITSELF, for a router that forwards 
   assert.equal((refused.body['refusal'] as { code: string }).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refused.calls + refused.embeds, 0, 'the model was called for a token');
 
-  /* A PERSON STILL GETS THROUGH, or the refusal above would be a door shut on everybody, and the fold ends on the vault. */
+  /* A PERSON STILL GETS THROUGH, or the refusal above would be a door shut on everybody, and the fold ends on the keychain. */
   const asked = await withModel(() => object.fetch(ask({ 'x-braindog-ctx': JSON.stringify(owner) })));
   assert.equal(asked.status, 200, JSON.stringify(asked.body));
   assert.equal(asked.calls, 1);

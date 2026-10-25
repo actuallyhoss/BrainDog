@@ -95,7 +95,7 @@ async function selfhost(scripts: ReturnType<typeof reader>[] | ((grantId: string
   assert.ok(installed.ok, JSON.stringify(installed));
   const owner = { principal: { kind: 'person' as const, id: person.value.id, level: 'owner' as const } };
   for (const name of ['Acme', 'Bolt']) assert.ok((await running.api.create({ register: 'clients', fields: { name } }, owner)).ok);
-  /* THE VAULT DOOR IS THE ONLY WRITER OF A SECRET FIELD, and it needs a key store this test does not stand up. The
+  /* THE KEYCHAIN DOOR IS THE ONLY WRITER OF A SECRET FIELD, and it needs a key store this test does not stand up. The
      column is set the way `depositGrant` leaves it: the grant's id, and nothing else. */
   running.sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', ?) WHERE register = 'clients' AND json_extract(fields, '$.name') = 'Acme'", grantId);
   running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(Date.now() - 1_000).toISOString());

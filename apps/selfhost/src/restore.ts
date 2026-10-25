@@ -17,7 +17,7 @@
  * copy wrote it, because the proof that a restore is complete is that the record's next export has the copy's manifest
  * table for table, and a rewritten row would be a different file. `server.ts` answers under both names.
  *
- * THE VAULT OPENS ONLY UNDER THE ROOT KEY THAT WRAPPED IT. The keys are bound to the record id and wrapped by the host's
+ * THE KEYCHAIN OPENS ONLY UNDER THE ROOT KEY THAT WRAPPED IT. The keys are bound to the record id and wrapped by the host's
  * KEK (`12 §6`), so a copy from a host with another key file imports whole, its sealed credentials stay shut, and its
  * exports go out unsigned (measured, section 3.4). That is said in one sentence after the one that says it worked.
  */
@@ -286,7 +286,7 @@ export async function initFrom(o: {
           ? await unwrap(store, record, row.purpose, { wrapped: row.wrapped, nonce: row.nonce, kek_id: row.kek_id, wrapped_by: 'kek' })
           : null;
       if (key) key.fill(0);
-      /* A KEY BEHIND THE VAULT PASSPHRASE IS NOT SHUT: it opens here with the same passphrase, and no key file is missing. */
+      /* A KEY BEHIND THE KEYCHAIN PASSPHRASE IS NOT SHUT: it opens here with the same passphrase, and no key file is missing. */
       else if (row.wrapped_by !== 'passphrase') shut.push({ purpose: row.purpose, kek: row.kek_id ?? row.wrapped_by });
     }
     opened.close();
@@ -305,12 +305,12 @@ export async function initFrom(o: {
       '  the copy carries no keys, so on this host the record seals nothing and exports unsigned. Restore from a copy exported with its sealed bytes to keep them.',
     );
   else if (shut.length > 0) {
-    const vault = shut.some((s) => s.purpose === 'record');
+    const keychain = shut.some((s) => s.purpose === 'record');
     const signing = shut.some((s) => s.purpose === 'signing');
-    const what = vault && signing ? 'its vault and its signing key were' : vault ? 'its vault was' : 'its signing key was';
-    const costs = [...(vault ? ['its sealed credentials do not open'] : []), ...(signing ? ['what it exports goes out unsigned'] : [])].join(' and ');
+    const what = keychain && signing ? 'its keychain and its signing key were' : keychain ? 'its keychain was' : 'its signing key was';
+    const costs = [...(keychain ? ['its sealed credentials do not open'] : []), ...(signing ? ['what it exports goes out unsigned'] : [])].join(' and ');
     said.push(
-      `  ${what} wrapped by another host’s root key, ${[...new Set(shut.map((s) => s.kek))].join(' and ')}. On this host ${costs}; serve it with that key file as BRAINDOG_KEK_FILE to open ${vault && signing ? 'them' : 'it'}.`,
+      `  ${what} wrapped by another host’s root key, ${[...new Set(shut.map((s) => s.kek))].join(' and ')}. On this host ${costs}; serve it with that key file as BRAINDOG_KEK_FILE to open ${keychain && signing ? 'them' : 'it'}.`,
     );
   }
   return { ok: true, said };

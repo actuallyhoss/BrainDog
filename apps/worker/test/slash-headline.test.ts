@@ -180,7 +180,7 @@ const INPUT: HeadlineInput = {
   pages: [{ page: 'money', title: 'Money', rules: 'Two bills are due this week.', figures: [{ id: 'bills-due', value: '2', change: '+1' }] }],
 };
 const LINES = '{"lines":{"money":"{{bills-due}} bills are due this week."}}';
-const hisVault = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
+const hisKeychain = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
 
 /** Slash's own store, set to his key. */
 const hisStore = () => {
@@ -196,7 +196,7 @@ test('HIS OWN KEY IS TOLD THE COMPOSE INSTRUCTIONS TOO, and a model to ask is ne
   const ai = fakeAi(() => null);
   const store = hisStore();
   const sent: string[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async (_url, init) => {
       sent.push((JSON.parse(String(init.body)) as { messages: { content: string }[] }).messages[0]!.content);

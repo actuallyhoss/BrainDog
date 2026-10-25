@@ -17,7 +17,7 @@
  *
  * SLOW BY THE STANDARDS OF THIS SUITE, about two seconds, nearly all of it workerd starting once.
  *
- * THE VAULT CASES AT THE END WERE RED against the adapter that handed the kernel each BLOB as the
+ * THE KEYCHAIN CASES AT THE END WERE RED against the adapter that handed the kernel each BLOB as the
  * object's `ArrayBuffer`: the export's grant line read `...,"api_token",1,{},{},...`, and the old file imported into a
  * second object answered `ok` holding `["[object String]","[object Object]"]` where the ciphertext had been.
  */
@@ -99,9 +99,9 @@ class Rec extends DurableObject {
     const sql = this.adapter(this.ctx.storage);
     /* A SIGNER ONLY WHERE A FILE IS IMPORTED, because an unsigned file is refused before a row is read. Made inside
        the request, because workerd refuses to generate a key in the global scope. */
-    const k = await openRecord(sql, { now: () => ${NOW} }, scenario.startsWith('vault-') ? { sign: testSigner() } : {});
+    const k = await openRecord(sql, { now: () => ${NOW} }, scenario.startsWith('keychain-') ? { sign: testSigner() } : {});
     const outcome = (r) => (r.ok ? 'ok' : r.refusal.code);
-    if (scenario === 'vault-import') {
+    if (scenario === 'keychain-import') {
       /* INTO AN EMPTY RECORD, so no createRecord here: the file brings the record with it. */
       const out = await k.import(await request.json());
       const again = out.ok ? await k.export() : null;
@@ -115,19 +115,19 @@ class Rec extends DurableObject {
     }
     /* A CONNECTOR KEY ONLY FOR THE LEASE, because sealedGrant refuses a record that has none before it reads a BLOB,
        and the export's lines are compared across tests that were written without one. */
-    const keys = scenario === 'vault-lease' ? { keys: { connector: { wrapped: new Uint8Array([7, 7, 7]), nonce: new Uint8Array([6]), kek_id: 'kek_fake' } } } : {};
+    const keys = scenario === 'keychain-lease' ? { keys: { connector: { wrapped: new Uint8Array([7, 7, 7]), nonce: new Uint8Array([6]), kek_id: 'kek_fake' } } } : {};
     const made = k.createRecord({ id: '${REC}', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' }, ...keys });
     if (!made.ok) return Response.json({ threw: made.refusal.fix });
     sql.exec('CREATE TABLE probe (x TEXT)');
     const rows = () => sql.all('SELECT x FROM probe ORDER BY rowid').map((r) => r.x);
     try {
       switch (scenario) {
-        case 'vault-export': {
+        case 'keychain-export': {
           const bound = k.bindGrant(GRANT(), 'p_1');
           const out = await k.export();
           return Response.json({ out: outcome(bound), held: held(sql.one('SELECT ciphertext FROM grant')?.ciphertext), lines: out.ok ? out.value : null });
         }
-        case 'vault-lease': {
+        case 'keychain-lease': {
           /* THE CONNECTOR'S OWN PATH, by the kernel's calls and no SQL: a job that names the grant, leased the way a
              runner leases it, then opened on the strength of that lease. */
           const bound = k.bindGrant({ ...GRANT(), sealed_under: 'connector' }, 'p_1');
@@ -261,7 +261,7 @@ const run = async (scenario: string, adapter: 'real' | 'delegating' | 'unwrapped
     )
   ).json()) as Answer;
 
-test('THE VAULT DEPOSIT ON A DURABLE OBJECT: bindGrant seals and binds, where it answered 500', async () => {
+test('THE KEYCHAIN DEPOSIT ON A DURABLE OBJECT: bindGrant seals and binds, where it answered 500', async () => {
   assert.deepEqual(await run('bind'), { out: 'ok', grants: 1 });
 });
 
@@ -296,18 +296,18 @@ test('A NESTED REFUSAL ROLLS BACK ONLY ITS OWN WRITES once the adapter hands nes
   assert.deepEqual(await run('throw', 'delegating'), { threw: 'a real error', rows: [] });
 });
 
-/* ── the vault, through export and import ─────────────────────────────────────────────────────────────────────────── */
+/* ── the keychain, through export and import ─────────────────────────────────────────────────────────────────────────── */
 
 /* THE EXPORT WROTE EVERY BLOB AS `{}` ON A DURABLE OBJECT. The object hands a
    BLOB back as an `ArrayBuffer`, `encode` in `packages/kernel/src/brainl.ts` writes `{ b64 }` only for a `Uint8Array`,
    and `JSON.stringify` writes an `ArrayBuffer` as `{}`. So the owner's export and the nightly copy (`snapshots.ts`, the
-   same call) held every row and none of the vault, signed over the `{}` and looking whole, and a restore into another
+   same call) held every row and none of the keychain, signed over the `{}` and looking whole, and a restore into another
    object answered `ok` with the text `[object Object]` where each sealed column had been. Every R2 copy made before this
-   repair carries no vault. [1, 2, 3] is `AQID`. */
+   repair carries no keychain. [1, 2, 3] is `AQID`. */
 const grantLine = (lines: string[] | null | undefined) => (lines ?? []).find((l) => l.includes('stats.example.test'));
 
 test('A SEALED ROW SURVIVES EXPORT AND IMPORT ON A DURABLE OBJECT, written as b64 and read back as the same bytes', async () => {
-  const exported = await run('vault-export');
+  const exported = await run('keychain-export');
   assert.equal(exported.out, 'ok');
   const line = grantLine(exported.lines);
   assert.ok(line, 'the export holds no grant line');
@@ -315,7 +315,7 @@ test('A SEALED ROW SURVIVES EXPORT AND IMPORT ON A DURABLE OBJECT, written as b6
   /* THE KERNEL READS A Uint8Array, the shape `node:sqlite` hands the self-host, so no reader of a BLOB meets two shapes. */
   assert.deepEqual(exported.held, ['[object Uint8Array]', [1, 2, 3]]);
 
-  const imported = await run('vault-import', 'real', exported.lines);
+  const imported = await run('keychain-import', 'real', exported.lines);
   assert.equal(imported.out, 'ok', imported.fix ?? '');
   assert.deepEqual(imported.held, ['[object Uint8Array]', [1, 2, 3]], 'the restored grant does not hold the bytes that were sealed');
   /* AND THE SECOND OBJECT'S EXPORT SAYS THE SAME, which is the only evidence the round trip lost nothing. */
@@ -323,19 +323,19 @@ test('A SEALED ROW SURVIVES EXPORT AND IMPORT ON A DURABLE OBJECT, written as b6
 });
 
 test('A COPY WRITTEN BEFORE THE REPAIR IS REFUSED ON A DURABLE OBJECT, at the column it lost, and not restored as text', async () => {
-  const old = await run('vault-export', 'unwrapped');
+  const old = await run('keychain-export', 'unwrapped');
   const line = grantLine(old.lines);
   assert.ok(line && !line.includes('"b64"'), `the unwrapped adapter no longer writes the old file, so this tests nothing: ${line}`);
-  const imported = await run('vault-import', 'real', old.lines);
-  assert.equal(imported.out, 'FILE_MALFORMED', `a file with no vault in it was restored: ${JSON.stringify(imported)}`);
+  const imported = await run('keychain-import', 'real', old.lines);
+  assert.equal(imported.out, 'FILE_MALFORMED', `a file with no keychain in it was restored: ${JSON.stringify(imported)}`);
   assert.equal(imported.at, 'grant.ciphertext');
   assert.equal(imported.held, null, 'a refused import left a grant behind');
 });
 
-/* ── the vault, through a connector's lease ───────────────────────────────────────────────────────────────────────── */
+/* ── the keychain, through a connector's lease ───────────────────────────────────────────────────────────────────────── */
 
 /* THE SAME FAULT ON THE DOOR EVERY POLL OPENS. `sealedGrant` hands a leased connector its key as `base64(row.ciphertext)`,
-   and `base64` in `packages/kernel/src/vault.ts` loops to `bytes.length`, which an `ArrayBuffer` does not have: the loop
+   and `base64` in `packages/kernel/src/keychain.ts` loops to `bytes.length`, which an `ArrayBuffer` does not have: the loop
    ran no times and the connector was handed `""` under `ok`, so the refusal a runner would have reported never came.
    The wrapped connector key went out as `""` the same way. Measured with `storageSql` taken from
    `ed350479^`: this case failed on `{ out: 'ok', ciphertext: '', dek: '' }`, and so did the export case above, on its
@@ -343,6 +343,6 @@ test('A COPY WRITTEN BEFORE THE REPAIR IS REFUSED ON A DURABLE OBJECT, at the co
 test('A CONNECTOR\'S LEASE OPENS ITS KEY WHOLE ON A DURABLE OBJECT, where the old adapter handed it an empty string', async () => {
   /* THE RED THIS TEST CAN SEE, kept as an assertion: were the unwrapped adapter ever to answer the bytes, the case below
      would pass whether or not the wrap was there. */
-  assert.deepEqual(await run('vault-lease', 'unwrapped'), { out: 'ok', ciphertext: '', dek: '' });
-  assert.deepEqual(await run('vault-lease'), { out: 'ok', ciphertext: 'AQID', dek: 'BwcH' });
+  assert.deepEqual(await run('keychain-lease', 'unwrapped'), { out: 'ok', ciphertext: '', dek: '' });
+  assert.deepEqual(await run('keychain-lease'), { out: 'ok', ciphertext: 'AQID', dek: 'BwcH' });
 });

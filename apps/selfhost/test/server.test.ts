@@ -499,7 +499,7 @@ test('A STRANGER WHO SIGNS WITH THEIR OWN DOMAIN IS NOT THE BANK, however well t
  * whenever somebody next notices.
  *
  * THE CLOCK IS MOVED RATHER THAN WAITED ON, because the door reads the file at most once every
- * `IN_TOKEN_MS`, and `now` is the same injected clock the vault's fifteen minutes are tested with.
+ * `IN_TOKEN_MS`, and `now` is the same injected clock the keychain's fifteen minutes are tested with.
  */
 test('A TOKEN IS ROTATED BY REPLACING THE FILE, and the old one stops opening the door', async () => {
   let at = Date.now();

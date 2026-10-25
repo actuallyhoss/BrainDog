@@ -1,5 +1,5 @@
 /**
- * The Worker's key doors with the key store bound, over a real record: a vault grant from the device flow, a deposit,
+ * The Worker's key doors with the key store bound, over a real record: a keychain grant from the device flow, a deposit,
  * a read back, a scope that does not reach, a record made before the store was bound, and a root key that is not
  * the record's.
  *
@@ -12,13 +12,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { VaultGrantSeen } from '@braindog/host';
+import type { KeychainGrantSeen } from '@braindog/host';
 import type { Result } from '@braindog/ports';
 import { createRecordApi, type RecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite, type NodeSql } from '../../../packages/kernel/test/sqlite.ts';
 import { keyStoreOf, recordKeys, type KeyStore } from '../src/keys.ts';
-import { OLD_RECORD, serveWorkerVault, type GrantDeps } from '../src/vault.ts';
+import { OLD_RECORD, serveWorkerKeychain, type GrantDeps } from '../src/keychain.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWNER = 'p_01JZ8QK3F7R2M9V4XN6TCB5HAO';
@@ -61,7 +61,7 @@ const testStore = async (): Promise<KeyStore> =>
   (await keyStoreOf(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex'))) ?? assert.fail('no store');
 
 /** A fake value, made per run, that no provider would ever issue. */
-const fake = (): string => `bd_fake_vault_value_${Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('hex')}`;
+const fake = (): string => `bd_fake_keychain_value_${Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('hex')}`;
 
 type Body = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string; at?: string } };
 
@@ -116,7 +116,7 @@ async function record(store: KeyStore | null) {
       assert.ok(out.ok, JSON.stringify(out));
       return out.value.id;
     },
-    /** A vault grant for `scope`, through the device flow a terminal runs and the approval the owner gives. */
+    /** A keychain grant for `scope`, through the device flow a terminal runs and the approval the owner gives. */
     async grant(scope: string): Promise<string> {
       const started = await api.deviceStart({ reach: 'vault', label: 'test-laptop', scope }, '127.0.0.1');
       assert.ok(started.ok, JSON.stringify(started));
@@ -133,7 +133,7 @@ async function record(store: KeyStore | null) {
 function over(api: RecordApi, store?: KeyStore | null): GrantDeps {
   return {
     knows: async (id) => id === REC,
-    vaultGrant: async (_id, bearer) => (await api.vaultGrant(bearer)) as Result<VaultGrantSeen>,
+    keychainGrant: async (_id, bearer) => (await api.keychainGrant(bearer)) as Result<KeychainGrantSeen>,
     keys:
       store === undefined
         ? undefined
@@ -147,7 +147,7 @@ function over(api: RecordApi, store?: KeyStore | null): GrantDeps {
 }
 
 async function call(deps: GrantDeps, which: 'deposit' | 'open', bearer: string, body: Record<string, unknown>) {
-  const res = await serveWorkerVault(
+  const res = await serveWorkerKeychain(
     new Request(`https://app.brain.dog/api/vault/${which}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },

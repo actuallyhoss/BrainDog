@@ -296,7 +296,7 @@ function sealerOf(recipient: string | undefined): ((file: Uint8Array | Plain) =>
  * A record's dump, exported and counted.
  *
  * `redactGrants: false` BECAUSE THIS IS A BACKUP AND NOT A HANDOVER. A redacted export drops the
- * sealed bytes of every vault grant, and a copy restored from one would come back with the vault
+ * sealed bytes of every keychain grant, and a copy restored from one would come back with the keychain
  * empty and nothing saying which credentials used to be in it. The bytes travel as ciphertext
  * wrapped under a KEK the bucket does not hold, which is the same protection they have at rest.
  *

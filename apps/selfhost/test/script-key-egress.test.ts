@@ -1,9 +1,9 @@
 /**
- * A script's key goes to the host its vault entry opens, and to nothing else.
+ * A script's key goes to the host its keychain entry opens, and to nothing else.
  *
  * A SCRIPT NAMES ITS KEYS AND ITS ORIGINS AS TWO LISTS, AND NOTHING JOINED THEM. A probe ran the runner as
- * `server.ts` builds it with a vault of two grants: `goldapi`, whose entry says it opens `api.gold.test`, went out as a
- * bearer to `collector.test` because that origin was also in the script's `egress:`, and the vault's `slash` key (the
+ * `server.ts` builds it with a keychain of two grants: `goldapi`, whose entry says it opens `api.gold.test`, went out as a
+ * bearer to `collector.test` because that origin was also in the script's `egress:`, and the keychain's `slash` key (the
  * one the included model answers everybody with on a host with no `SLASH_KEY`) went the same way. Every grant row
  * says what it opens (`opens TEXT NOT NULL`), and nothing on the script's path read it.
  *
@@ -11,7 +11,7 @@
  * only, so a provider that echoed the header JSON-escaped the PHP way, base64-encoded or URL-encoded handed it to the
  * sandbox, and `ctx.log(await r.text())` put it on the run's event.
  *
- * THE RUNNER, NOT THE WHOLE SERVER. What is under test is `scriptSandbox` between QuickJS and the socket: the vault is
+ * THE RUNNER, NOT THE WHOLE SERVER. What is under test is `scriptSandbox` between QuickJS and the socket: the keychain is
  * a list of rows, `send` records every request that would have left, and `openKey` records every key it was asked for.
  */
 
@@ -33,7 +33,7 @@ const SECRET: Record<string, string> = { g_gold: 'SECRET-OF-goldapi', g_slash: '
 
 type Row = { id: string; label: string; opens: string; revoked_at: string | null; created_at: string };
 const at = '2026-09-22T00:00:00.000Z';
-const VAULT: Row[] = [
+const KEYCHAIN: Row[] = [
   { id: 'g_gold', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: at },
   /* THE KEY LABELLED `slash` IS SAID TO OPEN THE COLLECTOR, so the only thing that can refuse it there is its label. */
   { id: 'g_slash', label: 'slash', opens: 'collector.test', revoked_at: null, created_at: at },
@@ -85,7 +85,7 @@ function provider(): { send: Send; sent: { host: string; auth: string | null }[]
 async function run(source: string, egress: string[], keys: string[], limits: Record<string, number> = { cpu_ms: 1_000 }) {
   const net = provider();
   const opened: string[] = [];
-  const runner = scriptSandbox({ kernel: { grants: () => VAULT } } as never, {
+  const runner = scriptSandbox({ kernel: { grants: () => KEYCHAIN } } as never, {
     openKey: async (grant) => (opened.push(grant.id), SECRET[grant.id] ?? null),
     send: net.send,
     resolve,
@@ -105,7 +105,7 @@ async function run(source: string, egress: string[], keys: string[], limits: Rec
   return { answer, sent: net.sent, opened };
 }
 
-test('A KEY GOES TO THE HOST ITS VAULT ENTRY OPENS: goldapi reaches api.gold.test and is refused for collector.test before it is opened', async () => {
+test('A KEY GOES TO THE HOST ITS KEYCHAIN ENTRY OPENS: goldapi reaches api.gold.test and is refused for collector.test before it is opened', async () => {
   /* THE CONTROL FIRST, so the refusal below is about the host and not about the key. */
   const home = await run(`export default async function run(ctx) { await ctx.fetch(${JSON.stringify(GOLD)} + '/rate', { key: 'goldapi' }); }`, [GOLD, COLLECTOR], ['goldapi']);
   assert.ok('writes' in home.answer, JSON.stringify(home.answer));
@@ -116,7 +116,7 @@ test('A KEY GOES TO THE HOST ITS VAULT ENTRY OPENS: goldapi reaches api.gold.tes
   assert.ok('refused' in away.answer, JSON.stringify(away.answer));
   assert.equal(away.answer.refused.code, 'FORBIDDEN');
   assert.match(away.answer.refused.why, /The key "goldapi" opens api\.gold\.test, and relay fetched collector\.test with it/);
-  assert.deepEqual(away.sent, [], 'the key left for a host its vault entry does not open');
+  assert.deepEqual(away.sent, [], 'the key left for a host its keychain entry does not open');
   assert.deepEqual(away.opened, [], 'the key was opened for a request that could not be sent');
 });
 
@@ -150,7 +150,7 @@ test('A KEY SENT AWAY IS A RULE BROKEN, NOT AN ERROR TO CATCH: the run is refuse
   assert.deepEqual(caught.sent, []);
 });
 
-test("THE VAULT'S `slash` KEY IS NEVER A SCRIPT'S, by its label or by its id, even to the host its entry opens", async () => {
+test("THE KEYCHAIN'S `slash` KEY IS NEVER A SCRIPT'S, by its label or by its id, even to the host its entry opens", async () => {
   /* WHAT THE PROBE SAW BEFORE: `{"answer":"ran","opened":["slash"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-slash"}]}`. */
   for (const name of ['slash', 'g_slash']) {
     const named = await run(`export default async function run(ctx) { await ctx.fetch(${JSON.stringify(COLLECTOR)} + '/in', { key: ${JSON.stringify(name)} }); }`, [COLLECTOR], [name]);

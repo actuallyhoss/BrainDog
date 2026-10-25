@@ -10,7 +10,7 @@
  *
  * IT READ `src/index.ts` AND NOTHING ELSE, WHICH WAS ONE FILE OUT OF THREE. Counted on 2026-09-21:
  * `apps/worker/src` constructs a Response in five places in five modules. `index.ts` (`json`),
- * `inbound.ts` (`reply`) and `vault.ts` (`answerOpen`) each build an answer of their own, and each is
+ * `inbound.ts` (`reply`) and `keychain.ts` (`answerOpen`) each build an answer of their own, and each is
  * a single construction site serving a whole surface, which is what lets one rule cover every answer
  * the module gives. `session.ts` (`withCookie`) and `http.ts` (`withinCap`) re-wrap a Response they
  * were handed, so the headers they answer with are the headers they were given, and `http.ts`'s is a
@@ -20,7 +20,7 @@
  *
  * SO IT READS THE DIRECTORY AND NEVER A LIST OF NAMES. The next module that answers is held to this
  * on the day it lands, with nobody editing this file, which is the only version of this test that is
- * still true a week after it was written. `vault.ts` is the one the widening found, and it was found
+ * still true a week after it was written. `keychain.ts` is the one the widening found, and it was found
  * rather than added.
  *
  * IT READS THE SOURCE AS TEXT, which is the shape several gates in this repository already use and is
@@ -31,7 +31,7 @@
  *
  * AND `no-store` IS FOLLOWED BY NAME, because only one of the three says it in the call. `json`
  * writes the header list inline, `reply` names `HEADERS` two declarations above itself, and
- * `answerOpen` names `VAULT_HEADERS`, which belongs to `packages/host` and is reached through a
+ * `answerOpen` names `KEYCHAIN_HEADERS`, which belongs to `packages/host` and is reached through a
  * re-export. A check that accepted only the inline spelling would have demanded that all three be
  * rewritten to look like the one that already passed, which is a test dictating a style rather than
  * checking a rule.
@@ -116,9 +116,9 @@ function whole(src: string, from: number): string {
 }
 
 /**
- * THREE FILES, WHICH IS WHAT THE LONGEST ONE ACTUALLY TAKES TODAY. `answerOpen` in `src/vault.ts`
- * names `VAULT_HEADERS`, `packages/host/src/index.ts` re-exports it, and
- * `packages/host/src/vault.ts` declares it with `no-store` in it. A header list a fourth file away
+ * THREE FILES, WHICH IS WHAT THE LONGEST ONE ACTUALLY TAKES TODAY. `answerOpen` in `src/keychain.ts`
+ * names `KEYCHAIN_HEADERS`, `packages/host/src/index.ts` re-exports it, and
+ * `packages/host/src/keychain.ts` declares it with `no-store` in it. A header list a fourth file away
  * would be a header list nobody reading the answer could find either.
  */
 const THROUGH = 3;

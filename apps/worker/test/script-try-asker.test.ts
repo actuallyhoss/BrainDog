@@ -1,6 +1,6 @@
 /**
  * Whose name a trial opens the owner's key in on the Cloud: `Record$`'s `tryScript`, as `src/index.ts` ships it, and the
- * `grant.read` it leaves in the vault's log. The self-host's half is `apps/selfhost/test/script-try-asker.test.ts`.
+ * `grant.read` it leaves in the keychain's log. The self-host's half is `apps/selfhost/test/script-try-asker.test.ts`.
  *
  * `Record$` OPENED A TRIAL'S KEY WITH THE ALARM'S OPENER. `#openKey(api)` is `keyOpener(api, env.KEK)`, whose actor is
  * `system` because the alarm has nobody behind it, and `tryScript` called it the same way, so the owner trying her draft
@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 
 import { bundled, objectStorage } from './bundled-worker.ts';
 import { keyStoreOf, recordKeys } from '../src/keys.ts';
-import { serveWorkerKeys } from '../src/vault.ts';
+import { serveWorkerKeys } from '../src/keychain.ts';
 
 const HOST = 'app.example.test';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -90,7 +90,7 @@ test("THE OWNER'S TRIAL ON THE CLOUD OPENS HER KEY IN HER NAME, and the grant.re
   /* THE KEYS LIST COMES WITH THE AGENTS PACK, offered and accepted the way `slash-in-do.test.ts` installs one. */
   const filed = await call('propose', { question: 'Install agents?', body_kind: 'pack', body: { install: 'agents' } });
   assert.ok(filed.body.ok, JSON.stringify(filed));
-  const accepted = await call('decide', { id: filed.body.value?.id, decide: { option: 'accept', reason: 'the vault needs its list' } });
+  const accepted = await call('decide', { id: filed.body.value?.id, decide: { option: 'accept', reason: 'the keychain needs its list' } });
   assert.ok(accepted.body.ok, JSON.stringify(accepted));
 
   /* THE KEY, PUT THROUGH THE APP'S OWN KEY DOOR for a fresh owner session, sealed by this Worker's key store. */

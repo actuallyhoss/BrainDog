@@ -50,7 +50,7 @@ const fakeAi = (answers: string[]) => {
 
 const switchedOn = (ai: ReturnType<typeof fakeAi>) => ({ AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' });
 const noGrants = () => ({ kernel: { grants: () => [] } }) as never;
-const hisVault = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
+const hisKeychain = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
 
 /** Slash's own store, on the included model until `tier` says `b`. */
 const slashStore = (tier: 'a' | 'b') => {
@@ -113,7 +113,7 @@ test('THROUGH THE CHOICE: the included model by default, his own key when he cho
   const ai = fakeAi([CARDS, CARDS]);
   const store = slashStore('a');
   const sent: { url: string; authorization: string | null; system: string; user: unknown }[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async (url, init) => {
       const body = JSON.parse(String(init.body)) as { messages: { content: string }[] };
@@ -158,7 +158,7 @@ test('ON HIS OWN KEY A BRIEFING THAT FAILS IS TOLD TO THE OPERATOR AS HIS, as a 
   const ai = fakeAi([CARDS]);
   const store = slashStore('b');
   const fails: ModelFail[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async () => new Response('upstream is down', { status: 503 }),
     open: () => async () => HIS_TOKEN,

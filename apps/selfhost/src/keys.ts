@@ -1,10 +1,10 @@
 /**
  * The root key, and the three the record is wrapped with. `49 §4.4`, `12 §6`, `ADR-062`.
  *
- * THE VAULT CANNOT HOLD ITS OWN KEY. `12 §6` states it as the reason this file is in the host and
- * not in the kernel: reading the vault needs the KEK, so the safe cannot hold what opens it. The
+ * THE KEYCHAIN CANNOT HOLD ITS OWN KEY. `12 §6` states it as the reason this file is in the host and
+ * not in the kernel: reading the keychain needs the KEK, so the safe cannot hold what opens it. The
  * record holds sealed bytes and the fingerprint of what wrapped them, and has no way to open
- * either: `vault.ts` performs no crypto at all, deliberately. `secret-grep` is red on a key that
+ * either: `keychain.ts` performs no crypto at all, deliberately. `secret-grep` is red on a key that
  * reaches a log, and now on the names THIS file uses: it looked only for `plaintext`, `plainText`,
  * `decrypted` and `secretValue`, none of which appears here, so the claim in this header was true of
  * a vocabulary nothing in the repository speaks.
@@ -270,7 +270,7 @@ export async function openKeyStore(
  * this store holds it, and the current one otherwise.
  *
  * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
- * (`packages/kernel/src/vault.ts`, `openGrant`), and between a new key file and the re-wrap every stored credential
+ * (`packages/kernel/src/keychain.ts`, `openGrant`), and between a new key file and the re-wrap every stored credential
  * would refuse although `byId` could open them all. The same function as the
  * Worker's, over this host's store. A record wrapped under a key neither file holds is offered the current id, so its
  * refusal names both.
@@ -329,7 +329,7 @@ export async function unwrap(store: KeyStore, record: string, purpose: Purpose, 
 }
 
 /**
- * This store over one record, as the vault passphrase's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
+ * This store over one record, as the keychain password's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
  * The same function as the Worker's, over this host's store.
  *
  * `open` OPENS ONLY A KEY THE ROOT KEY WRAPPED. A record key behind a passphrase names no root key, and this store has
@@ -400,7 +400,7 @@ export async function recordKeys(
   const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
 
   /* THE TWO DEKS ARE ZERO-FILLED TOO. They are wrapped and then nothing here needs them again: the
-     record opens them through the vault, under the KEK, when it has something to seal. */
+     record opens them through the keychain, under the KEK, when it has something to seal. */
   const dekRecord = new Uint8Array(randomBytes(KEK_BYTES));
   const dekConnector = new Uint8Array(randomBytes(KEK_BYTES));
 

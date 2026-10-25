@@ -7,8 +7,8 @@
  * swept the day it lands without anybody writing a line for it.
  *
  * WHAT IS PLANTED:
- * - a value put into a `secret` field through the app's own key door, which the host seals into the vault;
- * - the vault's own keys, made here so their bytes are known, and wrapped under this host's key store as `init` would;
+ * - a value put into a `secret` field through the app's own key door, which the host seals into the keychain;
+ * - the keychain's own keys, made here so their bytes are known, and wrapped under this host's key store as `init` would;
  * - the title of a row in `obligations`, a list the member was never given.
  *
  * WHO ASKS: the owner by the server key, a READ token the owner minted, a member invited to Reads on `tasks` and
@@ -124,10 +124,10 @@ function isPair(k: webcrypto.CryptoKeyPair | webcrypto.CryptoKey): k is webcrypt
 }
 
 /**
- * The record's vault keys, one for each `Purpose`, made here rather than by `recordKeys`, which zero-fills its bytes:
+ * The record's keychain keys, one for each `Purpose`, made here rather than by `recordKeys`, which zero-fills its bytes:
  * a canary nobody knows the bytes of cannot be looked for. Wrapped with `wrap`, which is what `recordKeys` calls.
  */
-async function vaultKeys(store: KeyStore) {
+async function keychainKeys(store: KeyStore) {
   const generated: webcrypto.CryptoKeyPair | webcrypto.CryptoKey = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
   if (!isPair(generated)) throw new Error('Ed25519 produced a single key where a keypair was asked for.');
   const signing = new Uint8Array(await crypto.subtle.exportKey('pkcs8', generated.privateKey));
@@ -180,7 +180,7 @@ async function stack() {
   assert.ok(person.ok);
   const owner = person.value.id;
   const ownerCtx: CallContext = { principal: { kind: 'person', id: owner, level: 'owner' } };
-  const vault = await vaultKeys(store);
+  const keychain = await keychainKeys(store);
   const made = await running.api.createRecord({
     id: REC,
     slug: 'the-studio',
@@ -188,7 +188,7 @@ async function stack() {
     tz: 'UTC',
     locale: 'en',
     owner: { id: owner, email: 'ada@example.com', name: 'Ada' },
-    keys: vault.keys,
+    keys: keychain.keys,
   });
   assert.ok(made.ok, JSON.stringify(made));
   assert.ok(running.directory.provision({ slug: 'the-studio', email: 'ada@example.com', record: REC }).ok);
@@ -239,7 +239,7 @@ async function stack() {
   const canaries = {
     sealed: [
       { name: 'the value in a secret field', forms: [value, ...written(new TextEncoder().encode(value))] },
-      { name: 'a vault key', forms: vault.held.flatMap((bytes) => written(bytes)) },
+      { name: 'a keychain key', forms: keychain.held.flatMap((bytes) => written(bytes)) },
     ] as Canary[],
     /* THE OWNER AND THE OWNER'S READ TOKEN MAY READ THIS ONE, and nobody else asked here may. */
     row: { name: 'the title of a row in obligations', forms: [mark] } as Canary,

@@ -255,7 +255,7 @@ test("THE QUESTION IS ASKED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED I
     const r = s.run();
     assert.equal(r?.state, 'done', r?.say ?? 'no run');
     assert.deepEqual(JSON.parse(r?.vars ?? '{}'), { rate: 4.25 });
-    /* SIGNED BY THE RULE AND NOT BY `system`, so the vault's log tells an automation's opening from a scheduled action's. */
+    /* SIGNED BY THE RULE AND NOT BY `system`, so the keychain's log tells an automation's opening from a scheduled action's. */
     assert.deepEqual(s.reads(), ['rule:rate']);
   } finally {
     await s.close();

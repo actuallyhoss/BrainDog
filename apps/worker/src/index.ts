@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -33,7 +33,7 @@ import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 /* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
-import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
@@ -111,10 +111,10 @@ import { ladder } from './ladder.ts';
 import { rewrapRecord } from './rewrap.ts';
 import { workerSigner } from './sign.ts';
 import { prefixOf, r2Snapshots, steady, streamDumpOf, type Kept } from './snapshots.ts';
-import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
-import type { GrantDeps } from './vault.ts';
-import { passphraseRoot } from './vault.ts';
-import { withVaultPassphrase, type PassphraseUnlock, type VaultPassphrase } from '@braindog/host';
+import { serveWorkerKeys, serveWorkerKeychain, servesKeys, servesKeychain, type KeyDeps } from './keychain.ts';
+import type { GrantDeps } from './keychain.ts';
+import { passphraseRoot } from './keychain.ts';
+import { withKeychainPassphrase, type PassphraseUnlock, type KeychainPassphrase } from '@braindog/host';
 import type { HeldKeys, RewrapArgs, Rewrapped } from './rewrap.ts';
 import { serveOAuth } from './oauth.ts';
 import { servesOAuth, servesOAuthMeta } from './route.ts';
@@ -382,10 +382,10 @@ function storageSql(storage: DurableObjectStorage): Sql {
    *
    * THE ONE PLACE A BLOB CHANGES SHAPE, BECAUSE EVERY READER IN THE KERNEL TESTS FOR A `Uint8Array`, which is what
    * `node:sqlite` returns to the self-host. Without it `encode` in `packages/kernel/src/brainl.ts` wrote each
-   * `ArrayBuffer` as `{}`, so every export and every nightly copy this Worker made held the rows and none of the vault:
+   * `ArrayBuffer` as `{}`, so every export and every nightly copy this Worker made held the rows and none of the keychain:
    * signed, its manifest hashing the `{}`, and restored into another object as the text `[object Object]` with `ok`.
-   * `base64` in `vault.ts` read `length` off the same buffer and handed a leased connector `""`.
-   * THE R2 COPIES MADE BEFORE THIS LINE CARRY NO VAULT, and `decode`
+   * `base64` in `keychain.ts` read `length` off the same buffer and handed a leased connector `""`.
+   * THE R2 COPIES MADE BEFORE THIS LINE CARRY NO KEYCHAIN, and `decode`
    * now refuses them at import with `FILE_MALFORMED` at the column, rather than restoring them in silence.
    */
   const bytesIn = (row: Record<string, unknown>): Row => {
@@ -773,7 +773,7 @@ export class Record$ extends DurableObject<Env> {
   /**
    * One call a running script made, from `ScriptOutbound` or `ScriptRecord`: a fetch, a list or a get.
    *
-   * AN RPC INTO THE OBJECT THE RUN STARTED IN, which is still awaiting it in `#act`. The key store, the vault and the
+   * AN RPC INTO THE OBJECT THE RUN STARTED IN, which is still awaiting it in `#act`. The key store, the keychain and the
    * record live here and nowhere the sandbox can reach, and a run id this object did not open answers with a refusal.
    */
   async script(run: string, call: ScriptCall): Promise<ScriptReply> {
@@ -928,7 +928,7 @@ export class Record$ extends DurableObject<Env> {
         readAddress: sharedReader(),
         /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), in the sandbox a scheduled run gets:
            `runScript`, a fresh Worker from `env.LOADER.load`, with this caller's reads and, for the owner only, the
-           vault by label. Asked of the Directory's allowance and counted on its ledger like a run, because it is one.
+           keychain by label. Asked of the Directory's allowance and counted on its ledger like a run, because it is one.
            No `LOADER` is a deployment with no sandbox, which says so and runs nothing. The key is opened in the asker's
            name (`askerOf`), not as `system`, which is the alarm's because a scheduled run has nobody behind it. */
         tryScript: (d) => {
@@ -1274,7 +1274,7 @@ export class Record$ extends DurableObject<Env> {
    * case 10: five runs ended, two questions left `pending`, and the alarm armed an hour out for the record's `purge`
    * sweep, the next row in `schedule`, and not for them; with no such row it is the parked runs' day. So a pass that
    * leased its full five answers `true`, and `alarm()` sets the next alarm for now. That, and not a loop here, because
-   * each question is a POST and a vault opening, and `#act` has already spent up to 800 of this invocation's 1,000
+   * each question is a POST and a keychain opening, and `#act` has already spent up to 800 of this invocation's 1,000
    * subrequests (`invocation()`): five more fit in the 200 it leaves, a queue's worth may not.
    *
    * A PASS THAT THROWS IS LOGGED AND NOT RETHROWN, `#act`'s rule. `serveAsks` catches what `answer` throws itself; this
@@ -1616,7 +1616,7 @@ export class Record$ extends DurableObject<Env> {
 
   /**
    * The one opener over `KEK` for a single-request send: the alarm's actions and scripts, and a script's trial. One
-   * place, so `KEK` keeps the readers `test/vault.test.ts` names and a trial adds none. `actor` is whoever asked, and
+   * place, so `KEK` keeps the readers `test/keychain.test.ts` names and a trial adds none. `actor` is whoever asked, and
    * absent for the alarm, where `keyOpener` signs `system`.
    */
   #openKey(api: RecordApi, actor?: string): OpenKey | null {
@@ -1966,14 +1966,14 @@ export class Record$ extends DurableObject<Env> {
     (await this.#record()).doorTurnedAway(args);
   }
 
-  /** A vault grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `vaultGrant` is INTERNAL. */
-  async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
+  /** A keychain grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `keychainGrant` is INTERNAL. */
+  async keychainGrant(bearer: string): Promise<Result<KeychainGrant>> {
     const api = await this.#record();
     const broken = api.kernel.refused();
-    return broken ? { ok: false, refusal: broken } : api.vaultGrant(bearer);
+    return broken ? { ok: false, refusal: broken } : api.keychainGrant(bearer);
   }
 
-  /** The fingerprint this record's vault is wrapped by, or `null` for a record made before the key store was bound. */
+  /** The fingerprint this record's keychain is wrapped by, or `null` for a record made before the key store was bound. */
 /**
    * An invitation link: looked at with a token alone, or spent for the person `/auth/invite` has just made or signed in.
    *
@@ -2004,7 +2004,7 @@ export class Record$ extends DurableObject<Env> {
   /**
    * A key deposited through a key door. AN RPC AND NEVER A ROUTE: `depositGrant` is INTERNAL.
    *
-   * `by` IS A VAULT GRANT OR A BROWSER SESSION, and which one it is decides what the record allows. The Worker
+   * `by` IS A KEYCHAIN GRANT OR A BROWSER SESSION, and which one it is decides what the record allows. The Worker
    * checked one or the other before calling; the gate itself is the record's, in `depositGrant`.
    *
    * `seal` IS THE WORKER'S, CALLED BACK OVER RPC. The value stays in the Worker's closure and this object receives
@@ -2016,7 +2016,7 @@ export class Record$ extends DurableObject<Env> {
    */
   async depositGrant(
     args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
-    by: VaultGrant | CallContext,
+    by: KeychainGrant | CallContext,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
     opts?: { agentDeposit?: true | undefined },
@@ -2039,21 +2039,21 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /** A key's sealed material, for the Worker to open. AN RPC AND NEVER A ROUTE: `openForGrant` is INTERNAL. */
-  async openForGrant(args: { label?: unknown; credential?: unknown }, by: VaultGrant | CallContext, hints: SessionHints, kekId: string): Promise<Result<OpenedForGrant>> {
+  async openForGrant(args: { label?: unknown; credential?: unknown }, by: KeychainGrant | CallContext, hints: SessionHints, kekId: string): Promise<Result<OpenedForGrant>> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.openForGrant(args, by, hints, kekId);
   }
 
   /**
-   * Whether the record key opens for one key door's request. AN RPC AND NEVER A ROUTE: `unlockVault` is INTERNAL.
+   * Whether the record key opens for one key door's request. AN RPC AND NEVER A ROUTE: `unlockKeychain` is INTERNAL.
    * `unlock` IS THE WORKER'S, CALLED BACK OVER RPC, as `seal` is for `depositGrant`: the passphrase and the key it opens
    * stay in the Worker, and this object is told only whether it opened.
    */
-  async unlockVault(by: VaultGrant | CallContext, unlock: PassphraseUnlock): Promise<Result<VaultPassphrase>> {
+  async unlockKeychain(by: KeychainGrant | CallContext, unlock: PassphraseUnlock): Promise<Result<KeychainPassphrase>> {
     const api = await this.#record();
     const broken = api.kernel.refused();
-    return broken ? { ok: false, refusal: broken } : api.unlockVault(unlock, by);
+    return broken ? { ok: false, refusal: broken } : api.unlockKeychain(unlock, by);
   }
 
   /**
@@ -2061,7 +2061,7 @@ export class Record$ extends DurableObject<Env> {
    *
    * THE LEASE IS THE AUTHORITY, AND THE RECORD CHECKS IT. `sealedGrant` refuses a job that is no longer leased to the
    * caller, one whose lease has lapsed, and a key the job's payload does not name, so the Worker holding this stub can
-   * open the one key that one post asked for and nothing else in the vault. The record's id comes back beside the seal
+   * open the one key that one post asked for and nothing else in the keychain. The record's id comes back beside the seal
    * because the Worker addresses this object by its Durable Object id, and the AAD and the KEK wrap both name the
    * record's own. `system` signs the `grant.read`, as it does for the alarm's scheduled calls: nobody asked.
    */
@@ -2220,10 +2220,10 @@ export class Record$ extends DurableObject<Env> {
        landed on it, and every call after waited (`loop/research-104.md` 2.1). */
     const path = new URL(request.url).pathname;
     if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
-    /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
-       (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
+    /* THE METHOD ROUTER'S HANDLERS, WITH THE KEYCHAIN PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
+       (`withKeychainPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
-    const handlers = withVaultPassphrase(handlersFor(api), api, passphraseRoot(this.env.KEK, () => api.kernel.identity()?.id ?? null));
+    const handlers = withKeychainPassphrase(handlersFor(api), api, passphraseRoot(this.env.KEK, () => api.kernel.identity()?.id ?? null));
     /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
        as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
     if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlers, ctx);
@@ -3453,9 +3453,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
     if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
-    /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, no cookie may reach them, and a login
+    /* THE KEY DOORS, before any door is asked: their bearer is a keychain grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
-    if (servesVault(url.pathname)) return keyDoor(request, env);
+    if (servesKeychain(url.pathname)) return keyDoor(request, env);
     /* THE KENNEL, THE REGISTRY EVERY HOST READS ADD-ONS FROM (`kennel.ts`), before any record door because it is nobody's
        record: its reads are public, and a write names who asks by an author's key, a bearer, or this host's session. */
     if (servesKennel(url.pathname))
@@ -3574,9 +3574,9 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
         count: (call) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).seen(call),
       });
     /* THE KEY DOORS NAME THEIR RECORD BY THE GRANT, AND ONLY AT THE ROOT. A grant under a slug would be a second way to
-       say which record, and the vault is the last place to accept two answers to that. */
-    if (slug !== null && servesVault(url.pathname))
-      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }, 404);
+       say which record, and the keychain is the last place to accept two answers to that. */
+    if (slug !== null && servesKeychain(url.pathname))
+      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/keychain/ (and /api/vault/), and a grant names its own record.' } }, 404);
 
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
@@ -3664,7 +3664,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     /* NOR SLASH'S ASK, FOR THE SAME REASON AND BECAUSE THE DOOR CANNOT SAY IT HERE. `serveSlash` refuses any
        `authorization` header, but `inward()` below deletes that header, so on this host the door never saw one and
        the `Origin` check was all that stood: a read token sending the app's own origin by hand was answered 200 with a
-       Reading, and each ask opened the person's own vault key and spent the month's `ask_cap` (`46 §5.2`, measured
+       Reading, and each ask opened the person's own keychain key and spent the month's `ask_cap` (`46 §5.2`, measured
        in `test/slash.test.ts`). A cookie reaches it above; a bearer is refused here, in the door's own words. */
     if (servesSlash(url.pathname) !== null) return json({ ok: false, refusal: NO_SLASH_TOKEN }, 403);
 
@@ -4023,39 +4023,39 @@ function arrivals(env: Env): CloudIngestDeps {
 }
 
 /**
- * `/api/vault/*`: the grant is checked by the record its bearer names, and then `vault.ts` answers.
+ * `/api/vault/*`: the grant is checked by the record its bearer names, and then `keychain.ts` answers.
  *
  * THE DOORS GET KEYS ONLY WHEN `KEK` IS BOUND, and the store is opened inside them, after the grant, so a key store
  * that will not open says so only to a grant holder.
  *
  * AND THE DEPOSIT DOOR TAKES AN AGENT'S LOGIN TOKEN, checked as `/api` checks any bearer, by `bearerOf` in
  * `session.ts` and nothing else, so the record the key is sealed for is the one whose token table knew it.
- * `vault.ts` asks it only for a bearer that is not a vault grant, and only at
+ * `keychain.ts` asks it only for a bearer that is not a keychain grant, and only at
  * `/api/vault/deposit`; the record then adds the key as new, in the token's run's project, or refuses.
  */
 async function keyDoor(request: Request, env: Env): Promise<Response> {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  /* A LOGIN TOKEN SPENDS ITS OWN WRITE MINUTE HERE, as the same token does at `/api/create` (`overLimit`). A vault grant
+  /* A LOGIN TOKEN SPENDS ITS OWN WRITE MINUTE HERE, as the same token does at `/api/create` (`overLimit`). A keychain grant
      never reached this line before and still does not; a login token is the credential every agent holds, so without
-     this one that leaked could add key rows with no cap. `serveVault` answers a refused token with the grant's sentence
+     this one that leaked could add key rows with no cap. `serveKeychain` answers a refused token with the grant's sentence
      and reads no body, so nothing is deposited, and the 429 is put back in its place below. */
   const spent: { over: Response | null } = { over: null };
   const deps: GrantDeps = {
     knows: (id) => directory.knows(id),
-    vaultGrant: async (id, bearer) => (await recordKeyHalf(env).vaultGrant(id, bearer)),
+    keychainGrant: async (id, bearer) => (await recordKeyHalf(env).keychainGrant(id, bearer)),
     token: async (asked) => {
       const found = await bearerOf(asked, 'api', bearerDeps(env));
       if ('status' in found)
         return found.status === 403
           ? { ok: false, refusal: found.refusal }
-          : { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a vault grant nor a login this record knows.', at: 'authorization' } };
+          : { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this record knows.', at: 'authorization' } };
       spent.over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, asked, 'write');
       if (spent.over !== null) return { ok: false, refusal: { code: 'RATE_LIMITED', fix: 'This login has used its writes for this minute.', at: 'authorization' } };
       return ok({ record: found.record, ctx: found.ctx });
     },
     keys: isBound(env.KEK) ? keyHalf(env) : undefined,
   };
-  const out = await serveWorkerVault(request, deps);
+  const out = await serveWorkerKeychain(request, deps);
   return spent.over ?? out;
 }
 
@@ -4065,26 +4065,26 @@ function keyHalf(env: Env): KeyDeps {
   return {
     store: () => keyStoreOf(env.KEK),
     wrappingKey: (id) => record(id).wrappingKey(),
-    /* `opts` IS `vault.ts`'s, set on the login-token deposit alone, and handed on as it came. */
+    /* `opts` IS `keychain.ts`'s, set on the login-token deposit alone, and handed on as it came. */
     depositGrant: async (id, args, by, hints, seal, opts?: { agentDeposit?: true | undefined }) =>
-      (await record(id).depositGrant(args, by as unknown as VaultGrant, hints, seal, opts)) as unknown as Result<Deposited>,
+      (await record(id).depositGrant(args, by as unknown as KeychainGrant, hints, seal, opts)) as unknown as Result<Deposited>,
     openForGrant: async (id, args, by, hints, kekId) =>
-      (await record(id).openForGrant(args, by as unknown as VaultGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
-    /* THE PASSPHRASE'S UNLOCK, over RPC: `unlock` is the Worker's, called back by the record after its vault gate. */
-    unlockVault: async (id, by, unlock) =>
-      (await record(id).unlockVault(by as unknown as VaultGrant, unlock)) as unknown as Result<VaultPassphrase>,
+      (await record(id).openForGrant(args, by as unknown as KeychainGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
+    /* THE PASSPHRASE'S UNLOCK, over RPC: `unlock` is the Worker's, called back by the record after its keychain gate. */
+    unlockKeychain: async (id, by, unlock) =>
+      (await record(id).unlockKeychain(by as unknown as KeychainGrant, unlock)) as unknown as Result<KeychainPassphrase>,
   };
 }
 
-/** `vaultGrant` over RPC, which the vault door needs and the app's doors do not: a session is not a grant. */
+/** `keychainGrant` over RPC, which the keychain door needs and the app's doors do not: a session is not a grant. */
 const recordKeyHalf = (env: Env) => ({
-  vaultGrant: async (id: string, bearer: string) =>
-    (await env.RECORD.get(env.RECORD.idFromName(id)).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
+  keychainGrant: async (id: string, bearer: string) =>
+    (await env.RECORD.get(env.RECORD.idFromName(id)).keychainGrant(bearer)) as unknown as Result<KeychainGrantSeen>,
 });
 
 /** The one sentence every caller that is not a browser session gets at `/api/keys/*`. It is the record's own. */
 const noSession = (): Response =>
-  json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the vault.', at: 'principal' } }, 403);
+  json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the keychain.', at: 'principal' } }, 403);
 
 /** What a token gets at `/api/slash/read`, from the router and from the object. The sentence is `serveSlash`'s own. */
 const NO_SLASH_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Slash about this record.', at: 'principal' };
@@ -4096,7 +4096,7 @@ const NO_SLASH_UNSIGNED: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign i
  *
  * THE RECORD IS THE SESSION'S. Nothing in the body names one, and the host step seals for the record whose cookie
  * this is. `serveKeys` has already refused a bearer and any origin this Worker does not answer for; what is left
- * for the record to decide is whether this person may reach the vault at all, which is `vault(ctx)`.
+ * for the record to decide is whether this person may reach the keychain at all, which is `keychain(ctx)`.
  */
 function appKeys(request: Request, env: Env, id: string, ctx: CallContext): Promise<Response> {
   return serveWorkerKeys(request, ctx, {

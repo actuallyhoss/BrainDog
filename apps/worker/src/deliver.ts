@@ -236,7 +236,7 @@ const b64 = (text: string): Uint8Array => Uint8Array.from(atob(text), (c) => c.c
 
 /**
  * The record's half of opening a post's key: which record it is, and the seal its lease earned. Over RPC on the
- * Worker, as `Record$.sealFor`, because the record holds the lease and the vault and the Worker holds the KEK.
+ * Worker, as `Record$.sealFor`, because the record holds the lease and the keychain and the Worker holds the KEK.
  */
 export type SealAsk = (args: { outbox: string; leasedUntil: string; grant: string }) => Promise<Result<{ record: string; seal: LeasedSeal }>>;
 

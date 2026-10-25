@@ -13,7 +13,7 @@
  * one request whose body held `hunter2`.
  *
  * `hunter2` IS PUT IN BY SQL, as `packages/kernel/test/flow-waits.test.ts` puts it, because no door writes a plaintext
- * into a secret field: in use the field holds a vault grant's id, and that id is what would have left. The model is the
+ * into a secret field: in use the field holds a keychain grant's id, and that id is what would have left. The model is the
  * only double, as in `slash-answers.test.ts`, whose stack this is, cut down to what a question needs.
  */
 

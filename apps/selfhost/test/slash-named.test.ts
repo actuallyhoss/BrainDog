@@ -14,7 +14,7 @@
  * `slashAskDoor` no `byok` builder.
  *
  * NOTHING IS A DOUBLE BUT THE ENDPOINT. The key goes in through `/api/keys/put` as an owner's browser puts one in, which
- * seals it under this host's real key store as a vault grant; the setting names that grant's id; the propose opens it
+ * seals it under this host's real key store as a keychain grant; the setting names that grant's id; the propose opens it
  * through `keyOpener`, the same opener the `slash`-labelled key uses. So the bearer the endpoint sees is the value typed
  * into the key door and nothing written in this file stands in for the cipher. The operator's `SLASH_KEY` is set too,
  * because the claim is that it does not stand in for the owner's.
@@ -194,7 +194,7 @@ test('TIER b REACHES THE ENDPOINT WITH THE KEY THE OWNER PUT IN AND THE MODEL TH
     assert.equal(out.status, 200, out.raw);
     assert.equal(out.body?.value?.['body_kind'], 'rowset');
     assert.equal(s.sent.length, 2);
-    /* BOTH PASSES CARRY THE VALUE TYPED INTO THE KEY DOOR, opened from the vault by id, and the owner's model name. The
+    /* BOTH PASSES CARRY THE VALUE TYPED INTO THE KEY DOOR, opened from the keychain by id, and the owner's model name. The
        draft went on this host's own route, the operator's key and `SLASH_MODEL`, until his own key carried both passes;
        with no address of his own it is still this host's endpoint he is sent to. */
     for (const i of [0, 1]) {

@@ -389,7 +389,7 @@ async function init(args: readonly string[]): Promise<void> {
   /* AND THE THREE KEYS, `49 §5.22` step 4, bound to the record id that step 6 is about to write.
      They are made HERE rather than inside `createRecord` because the kernel must not be able to make
      one: `12 §6` puts the key hierarchy in the host, the record holds sealed bytes and the
-     fingerprint of what sealed them, and `vault.ts` performs no crypto at all. */
+     fingerprint of what sealed them, and `keychain.ts` performs no crypto at all. */
   const keys = await recordKeys(store, id);
 
   /* THE RECORD FIRST. 51 §13 D21: a Directory row never points at a record that failed to

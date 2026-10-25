@@ -1,10 +1,10 @@
 /**
  * Whose name a trial opens the owner's key in: a draft script run by `scriptTry` (`@braindog/host/script-try`) and the
- * `grant.read` it leaves in the vault's log.
+ * `grant.read` it leaves in the keychain's log.
  *
  * A TRIAL HAS AN ASKER AND A SCHEDULED RUN HAS NONE, AND THE SELF-HOST OPENED BOTH AS `system`. `server.ts` handed the
  * trial the opener it builds for the scheduled pass, `keyOpener(api, options.keys)`, whose actor defaults to `system`,
- * so the owner trying her own draft left a `grant.read` the vault's log could not tell from the nightly run's. Slash's
+ * so the owner trying her own draft left a `grant.read` the keychain's log could not tell from the nightly run's. Slash's
  * included key had the same fault and was fixed by threading the asker's id to `keyOpener`
  * (`packages/host/src/slash.ts`, `slashAskerEngine`, and `slash-byok-guard.test.ts`, "signed by her and not by system").
  *
@@ -103,7 +103,7 @@ async function stack() {
   assert.ok(running.directory.provision({ slug: 'the-studio', email: 'ada@example.com', record: REC }).ok);
   assert.ok((await running.api.kernel.install([KEYS, GOLD_LIST])).ok);
 
-  /* A SESSION FOR ADA, planted as `slash-byok-guard.test.ts` plants one, proved at `authedAt`. The vault door takes a key
+  /* A SESSION FOR ADA, planted as `slash-byok-guard.test.ts` plants one, proved at `authedAt`. The keychain door takes a key
      only from an owner whose proof is under fifteen minutes old, so the key goes in through a fresh one. */
   const plant = (authedAt: number): string => {
     const sid = randomBytes(32).toString('base64url');
@@ -160,18 +160,18 @@ test("THE OWNER'S TRIAL OPENS HER KEY IN HER NAME, and the grant.read it leaves 
 });
 
 /*
- * A TRIAL OPENED THE OWNER'S KEY FOR A SESSION THE VAULT ITSELF REFUSES. The record
- * handed the trial the vault on `level === 'owner'` alone, and the vault's own gate asks one thing more, a proof under
+ * A TRIAL OPENED THE OWNER'S KEY FOR A SESSION THE KEYCHAIN ITSELF REFUSES. The record
+ * handed the trial the keychain on `level === 'owner'` alone, and the keychain's own gate asks one thing more, a proof under
  * fifteen minutes old. Measured on this stack: a session proved two hours ago was refused `listGrants` with
  * `NEEDS_BROWSER_SESSION`, and the same cookie's `scriptTry` sent one request carrying the owner's key and left a
  * `grant.read` signed with her id, for an opening her session could not have made. A cookie is thirty days of standing
  * access, and the draft chooses the origin, so the trial was what a laptop left open reached.
  */
-test('A SESSION PROVED TWO HOURS AGO IS REFUSED THE VAULT, AND ITS TRIAL SENDS NO KEY, opens nothing and is told to sign in again', async () => {
+test('A SESSION PROVED TWO HOURS AGO IS REFUSED THE KEYCHAIN, AND ITS TRIAL SENDS NO KEY, opens nothing and is told to sign in again', async () => {
   const s = await stack();
   try {
     const stale = s.plant(Date.now() - 120 * MINUTE);
-    /* V1, THE WITNESS THAT THE VAULT REFUSES THIS SESSION, so the case below is about the trial and not the cookie. */
+    /* V1, THE WITNESS THAT THE KEYCHAIN REFUSES THIS SESSION, so the case below is about the trial and not the cookie. */
     const v1 = await s.call(stale, 'listGrants', {});
     assert.equal(v1.status, 403, v1.text);
     assert.match(v1.text, /NEEDS_BROWSER_SESSION/);
@@ -179,8 +179,8 @@ test('A SESSION PROVED TWO HOURS AGO IS REFUSED THE VAULT, AND ITS TRIAL SENDS N
     const v2 = await s.call(stale, 'scriptTry', { body: DRAFT });
     /* THE TRIAL STILL RUNS, KEYLESS, rather than being refused whole: the answer is the run's, with the fetch refused. */
     assert.equal(v2.status, 200, v2.text);
-    assert.equal(s.sent.length, 0, 'the trial of a session the vault refuses sent a request');
-    assert.deepEqual(s.reads(), [], 'the trial of a session the vault refuses opened the owner key');
+    assert.equal(s.sent.length, 0, 'the trial of a session the keychain refuses sent a request');
+    assert.deepEqual(s.reads(), [], 'the trial of a session the keychain refuses opened the owner key');
     assert.match(v2.text, /Sign in again to try it with the key/, `the trial did not say why the key stayed shut: ${v2.text}`);
   } finally {
     await s.close();

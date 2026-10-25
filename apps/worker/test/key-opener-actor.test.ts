@@ -1,6 +1,6 @@
 /**
  * The Worker's `keyOpener` (`../src/actions.ts`), and the one argument `apps/selfhost/test/slash-byok-guard.test.ts`
- * measures on the other host: the id that reaches `kernel.openGrant`, which is the id `packages/kernel/src/vault.ts`
+ * measures on the other host: the id that reaches `kernel.openGrant`, which is the id `packages/kernel/src/keychain.ts`
  * signs the `grant.read` event with.
  *
  * WHY THIS IS A SEPARATE FILE AND NOT A CASE IN `actions.test.ts`. That file's own `BOUND` case drives the real
@@ -8,8 +8,8 @@
  * opposite one, so it earns its own name rather than a fourth assertion bolted onto a case about something else.
  *
  * THE PREMISE, SAID ONCE: `kernel.openGrant(args, actor)` is what writes `grant.read`, with `actor` as the row's
- * `actor` column (`packages/kernel/src/index.ts` `openGrant: (args, actor) => openGrant(sql, vaultDeps(actor), args,
- * transaction)`, and `vault.ts`'s `openGrant` itself, `event(sql, deps, 'grant.read', args.id, row.kind)` off
+ * `actor` column (`packages/kernel/src/index.ts` `openGrant: (args, actor) => openGrant(sql, keychainDeps(actor), args,
+ * transaction)`, and `keychain.ts`'s `openGrant` itself, `event(sql, deps, 'grant.read', args.id, row.kind)` off
  * `deps.actor`). So a fake `kernel.openGrant` that records the `actor` it was called with is a faithful stand-in for
  * the write it is not asked to perform here: whatever it saw is what a real one would have signed the row with.
  */

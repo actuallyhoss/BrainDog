@@ -93,7 +93,7 @@ const script = (name: string, origin: string) => ({
   },
 });
 
-/** A self-host with a Directory, a record Ada owns, the key in its vault and `scripts` installed and due now. */
+/** A self-host with a Directory, a record Ada owns, the key in its keychain and `scripts` installed and due now. */
 async function selfhost(scripts: ReturnType<typeof script>[], resolve: Resolve, send: Send) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-script-'));
   let opened = 0;
@@ -254,7 +254,7 @@ test("THE KEY'S VALUE IS NOT IN THE SANDBOX'S LOG EITHER, as the runner hands it
 
 test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same label is, and with none live nothing is sent at all', async () => {
   /* HERE BECAUSE the three tests above stayed green with `grantNamed`'s revoked filter deleted and
-     with the host's "not in the vault" refusal deleted, which sent the request bare. A key revoked after the script was
+     with the host's "not in the keychain" refusal deleted, which sent the request bare. A key revoked after the script was
      installed is the ordinary way to reach both. */
   const { scriptSandbox } = await import('../src/script.ts');
   const run = async (grants: { id: string; label: string; opens: string; revoked_at: string | null; created_at: string }[]) => {
@@ -283,7 +283,7 @@ test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same la
 
   const revoked = await run([{ id: 'g_new', label: 'goldapi', opens: 'api.gold.test', revoked_at: '2026-09-22T01:00:00.000Z', created_at: '2026-09-22T00:00:00.000Z' }]);
   assert.ok('refused' in revoked.answer, JSON.stringify(revoked.answer));
-  assert.match(revoked.answer.refused.why, /The key "goldapi" is not in the vault, so nothing was sent\./);
+  assert.match(revoked.answer.refused.why, /The key "goldapi" is not in the keychain, so nothing was sent\./);
   assert.deepEqual([revoked.calls, revoked.opened.length], [0, 0]);
 });
 

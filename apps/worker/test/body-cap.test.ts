@@ -22,7 +22,7 @@ test('EACH DOOR HAS ITS CEILING, AND A DOOR WITH ITS OWN CAP HAS NONE HERE', () 
   assert.equal(capFor('/app/studio/api/sealedPut'), BODY_MOST.sealed.bytes);
   assert.equal(capFor('/api/sealedGet'), BODY_MOST.api.bytes, 'only the put carries a part');
   assert.equal(capFor('/api/seen'), BODY_MOST.seen.bytes);
-  assert.equal(capFor('/api/vault/deposit'), BODY_MOST.vault.bytes);
+  assert.equal(capFor('/api/vault/deposit'), BODY_MOST.keychain.bytes);
   assert.equal(capFor('/mcp'), BODY_MOST.mcp.bytes);
   assert.equal(capFor('/auth/magic/start'), BODY_MOST.auth.bytes);
   assert.equal(capFor('/oauth/token'), BODY_MOST.oauth.bytes);

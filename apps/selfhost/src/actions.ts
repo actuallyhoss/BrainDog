@@ -62,12 +62,12 @@ const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 /**
  * The key a scheduled action sends, opened under this host's key store.
  *
- * THE SAME BYTES AS THE VAULT DOOR'S (`47 §4.6`): the record's key unwrapped under the KEK, HKDF-SHA-256 over
+ * THE SAME BYTES AS THE KEYCHAIN DOOR'S (`47 §4.6`): the record's key unwrapped under the KEK, HKDF-SHA-256 over
  * it with the grant id as info, and AES-256-GCM with the AAD the record names. No key store, a record key
  * this store does not open, or bytes that do not open, are all `null`, and the run sends nothing.
  *
  * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. A scheduled action has no asker, so the
- * default stands. Slash's tier `b` does have one, and with `system` written into this line the owner's vault log showed
+ * default stands. Slash's tier `b` does have one, and with `system` written into this line the owner's keychain log showed
  * `system` for her own asks and for a colleague's alike. That path is
  * the one to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashOwnKeyFor` hands this opener a view of the
  * record whose `openGrant` signs as the asker whatever it is told. The Worker's `keyOpener` takes the same parameter.

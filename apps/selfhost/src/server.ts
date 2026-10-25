@@ -19,8 +19,8 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
-  type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
+  engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveKeychain, servesKeys, servesSlash, servesKeychain, sessionOf, slashRecordMeter, withSession,
+  type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type KeychainDoor,
 } from '@braindog/host';
 import {
   clearCookie,
@@ -94,7 +94,7 @@ import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngi
 import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
-import { keysDoor, vaultDoor } from './vault.ts';
+import { keysDoor, keychainDoor } from './keychain.ts';
 import { serveShape, servesShape, type ShapeDoor } from '@braindog/host/shape';
 import { serveFirstRead, type FirstReadDoor } from '@braindog/host/first-read';
 import { selfhostFirstReadDoor } from './first-read.ts';
@@ -104,7 +104,7 @@ import { methods as shapeMethods } from '@braindog/record/shape';
 /* OAUTH 2.1 ON THIS HOST: the host package's doors over this process's Directory. */
 import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
-import { withVaultPassphrase } from '@braindog/host';
+import { withKeychainPassphrase } from '@braindog/host';
 import { rootKeysOf } from './keys.ts';
 import { slashErasing } from './slash.ts';
 import { ACCESS_ENDED_AT, accessEndedSaid, MEMBER_STOPPED } from '@braindog/kernel';
@@ -327,8 +327,8 @@ type Site = {
   origins: ReadonlySet<string>;
   /** `/auth/*`, less the address, which is per request. */
   door: Omit<AuthDoor, 'ip'>;
-  /** The key doors: a vault grant's bearer, an agent's login token at the deposit door, and this process's key store when it has one. */
-  vault: VaultDoor<CallContext>;
+  /** The key doors: a keychain grant's bearer, an agent's login token at the deposit door, and this process's key store when it has one. */
+  keychain: KeychainDoor<CallContext>;
   /** The shape door (PRF-A13): a shape grant's bearer, and the record's scrambled copy. */
   shape: ShapeDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
@@ -530,11 +530,11 @@ const OPERATION_DOORS: ReadonlySet<string> = new Set(Object.values(OPERATION_MET
 const RUNNER_DOORS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent', 'readCancel']);
 
 /**
- * The deposit door's write minute for a login token, by the request that spent it: `serveVault` answers a refused token
- * with the vault grant's sentence, so the 429 is put back in its place where the door is answered (`answer`), as the
+ * The deposit door's write minute for a login token, by the request that spent it: `serveKeychain` answers a refused token
+ * with the keychain grant's sentence, so the 429 is put back in its place where the door is answered (`answer`), as the
  * Worker's `keyDoor` puts back its own.
  */
-const vaultSpent = new WeakMap<Request, Response>();
+const keychainSpent = new WeakMap<Request, Response>();
 
 /**
  * An agent's login token at `/api/vault/deposit`: checked as `/api` checks any bearer, and a
@@ -542,10 +542,10 @@ const vaultSpent = new WeakMap<Request, Response>();
  * that is not a token, because the record's `allows` admits more than a token on its rungs. A token spends its own write
  * minute here, as it does at `/api/create`.
  */
-async function vaultToken(request: Request, site: Site | null): Promise<Result<CallContext>> {
+async function keychainToken(request: Request, site: Site | null): Promise<Result<CallContext>> {
   const refused: Result<CallContext> = {
     ok: false,
-    refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a vault grant nor a login this record knows.', at: 'authorization' },
+    refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this record knows.', at: 'authorization' },
   };
   const sent = presented(request);
   if (site === null || sent === undefined) return refused;
@@ -553,7 +553,7 @@ async function vaultToken(request: Request, site: Site | null): Promise<Result<C
   if (!('ctx' in known) || known.ctx.principal.kind !== 'token') return refused;
   const over = await overLimit(site, { door: 'bearer', ctx: known.ctx }, '', 'write');
   if (over !== null) {
-    vaultSpent.set(request, over);
+    keychainSpent.set(request, over);
     return { ok: false, refusal: { code: 'RATE_LIMITED', fix: 'This login has used its writes for this minute.', at: 'authorization' } };
   }
   return { ok: true, value: known.ctx };
@@ -1185,7 +1185,7 @@ export async function start(options: {
   shared?: { send?: Send | undefined; resolve?: Resolve | undefined } | undefined;
   /**
    * A model for Slash to draft with (`@braindog/host/slash`): `SLASH_ENDPOINT`, `SLASH_MODEL` and `SLASH_KEY` in the environment
-   * when not given. Absent, Slash's own rules draft. The key is the environment's, else the person's own key in the vault
+   * when not given. Absent, Slash's own rules draft. The key is the environment's, else the person's own key in the keychain
    * labelled `slash`; it is opened on each call and never kept (`slash.ts`). `send` is for tests.
    */
   slash?: SlashConfig | undefined;
@@ -1245,7 +1245,7 @@ export async function start(options: {
       }
   )) {
   /* ONE CLOCK FOR THE RECORD AND THE DIRECTORY. A test that moves it a day forward moves both, which is how
-     rotation and the vault's fifteen minutes are tested against a real socket. */
+     rotation and the keychain's fifteen minutes are tested against a real socket. */
   const pinned = options.now;
   const clock = { now: typeof pinned === 'function' ? pinned : pinned === undefined ? () => Date.now() : () => pinned };
 
@@ -1702,7 +1702,7 @@ export async function start(options: {
     answersSlash: answers !== undefined,
     allowShape: options.allowShape === true,
     sign,
-    /* THE OPERATOR'S CUT-OFF, READ AT EACH CALL, for the grant readers the record holds (device, vault, operation) and
+    /* THE OPERATOR'S CUT-OFF, READ AT EACH CALL, for the grant readers the record holds (device, keychain, operation) and
        the owner's two listings, which mark what it ended. */
     validFrom,
     invitations: () => invitesOff,
@@ -1718,7 +1718,7 @@ export async function start(options: {
        opener a scheduled run's fetch leaves by. ONLY WHEN `actions` IS ON, for its reason: a trial sends a request to
        somebody else's server, and a self-host that was not asked to send any answers `NOT_IN_THIS_BUILD` instead. The
        ledger is the Directory's, opened below, and a trial asked before it is counted by nobody. THE KEY IS OPENED IN
-       THE ASKER'S NAME, NOT THE SCHEDULED PASS'S `system` (`askerOf`), so the vault's log can tell her trial from a run. */
+       THE ASKER'S NAME, NOT THE SCHEDULED PASS'S `system` (`askerOf`), so the keychain's log can tell her trial from a run. */
     tryScript:
       options.actions === undefined
         ? undefined
@@ -1741,7 +1741,7 @@ export async function start(options: {
               reads: d.reads as never,
               grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null,
               /* AN OWNER WHOSE PROOF IS OLD IS TOLD TO SIGN IN AGAIN, not that the record holds no key (`script-try.ts`
-                 `STALE`). The record works it out from the vault's own gate; left off here, the key stayed shut and the
+                 `STALE`). The record works it out from the keychain's own gate; left off here, the key stayed shut and the
                  run was told the record holds none, which sent her looking for a key that was there. */
               stale: d.stale,
             });
@@ -1806,9 +1806,9 @@ export async function start(options: {
   /* THE WIRING IS SHARED, not copied. Both hosts call `handlersFor`, so a route cannot exist in one
      and not the other, and it throws at start rather than 404ing in production. `openShare`'s answer is signed into a
      link on its way out (`withShareLinks`), for the record this process holds and the origin it serves the app from. */
-  /* AND THE VAULT PASSPHRASE'S TWO ROUTES ARE ANSWERED THROUGH THIS PROCESS'S KEY STORE (`withVaultPassphrase`), which
+  /* AND THE KEYCHAIN PASSPHRASE'S TWO ROUTES ARE ANSWERED THROUGH THIS PROCESS'S KEY STORE (`withKeychainPassphrase`), which
      takes the passphrase off before the record is called. */
-  const handlers = withVaultPassphrase(
+  const handlers = withKeychainPassphrase(
     withShareLinks(handlersFor(api), async () => {
       const record = api.kernel.identity()?.id;
       return shareKey === null || record === undefined || site === null ? null : { key: shareKey, record, origin: site.origin };
@@ -2062,8 +2062,8 @@ export async function start(options: {
     hosts: new Set([...loopback, new URL(origin).host]),
     origins,
     /* AN AGENT'S LOGIN TOKEN MAY ADD A KEY AT THE DEPOSIT DOOR, checked as every `/api`
-       bearer is (`vaultToken`); the record refuses anything but a token's context there. */
-    vault: vaultDoor(api, options.keys, (asked) => vaultToken(asked, site)),
+       bearer is (`keychainToken`); the record refuses anything but a token's context there. */
+    keychain: keychainDoor(api, options.keys, (asked) => keychainToken(asked, site)),
     /* THE RECORD READS THE GRANT BEFORE IT READS A ROW (`shapeExport`), so the door hands the bearer on unread. */
     shape: { copy: (bearer) => shapeMethods({ kernel: api.kernel, clock, validFrom }).shapeExport(bearer) },
     keys: keysDoor(api, options.keys, origins),
@@ -2449,17 +2449,17 @@ async function answer(
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 
-  /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a vault grant, which `contextFor` would
+  /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a keychain grant, which `contextFor` would
      not know, and a cookie or a login token must not reach them at all. AND ONLY AT THE ROOT: a grant names its own
      record, so a slug in front of it would be a second answer to which record, and the Worker refuses the same path in
      the same words (`apps/worker/src/index.ts` `recordApi`). */
-  if (servesVault(path))
+  if (servesKeychain(path))
     return write(
       res,
       named === null
-        ? /* A LOGIN TOKEN'S SPENT MINUTE IS ITS 429, put back in the place of the grant's sentence (`vaultToken`). */
-          await serveVault(request, site.vault).then((out) => vaultSpent.get(request) ?? out)
-        : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
+        ? /* A LOGIN TOKEN'S SPENT MINUTE IS ITS 429, put back in the place of the grant's sentence (`keychainToken`). */
+          await serveKeychain(request, site.keychain).then((out) => keychainSpent.get(request) ?? out)
+        : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/keychain/ (and /api/vault/), and a grant names its own record.' } }),
     );
 
   /* THE SHAPE DOOR, BESIDE THE KEY DOORS AND FOR THEIR REASON: its bearer is a shape grant, which `contextFor` would

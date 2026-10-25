@@ -14,7 +14,7 @@
  *
  * THE MODEL IS HIS OWN KEY'S, AND IT IS COUNTED. The Worker has no endpoint of its own any more;
  * a record reaches a model it did not come with only through the key its owner picked. So the owner puts an API token in
- * the vault through the key door, picks it in Settings with a provider, an address and a model, and the ask is answered by
+ * the keychain through the key door, picks it in Settings with a provider, an address and a model, and the ask is answered by
  * Miniflare's `outboundService`, which is every `fetch` the Worker makes. It counts the calls and keeps the address and the
  * header each carried. A 200 that never reached the model reads as green if only the status is checked, which is what
  * this file once found; and a call that reached it without the key is a fault of its own, so the header is asserted too.
@@ -49,7 +49,7 @@ const SESSION_SECRET = 'slash-in-do-session-secret-not-a-secret-0123456789';
 const FAKE_KEK = '0'.repeat(64);
 /* HIS PROVIDER, an address on a name reserved for tests, which `slashBaseUrlOf` reads as public and nothing resolves. */
 const PROVIDER = 'https://model.example.test/v1';
-/* NOT A SECRET: the value put in the vault for this run, so the header the provider sees can be told to be his. */
+/* NOT A SECRET: the value put in the keychain for this run, so the header the provider sees can be told to be his. */
 const HIS_TOKEN = 'slash-in-do-provider-token-not-a-secret';
 
 let mf: InstanceType<typeof Miniflare> | undefined;
@@ -130,7 +130,7 @@ before(async () => {
   const accepted = await owner().call('decide', { id: filed.value.id, decide: { option: 'accept', reason: 'the ask needs a list to read' } });
   assert.ok(accepted.ok, `the pack would not install: ${JSON.stringify(accepted)}`);
 
-  /* AND `agents`, BECAUSE THE VAULT DEPOSITS INTO IT. `putKey` below always writes to `register.credentials`
+  /* AND `agents`, BECAUSE THE KEYCHAIN DEPOSITS INTO IT. `putKey` below always writes to `register.credentials`
      (`record/src/index.ts`'s `KEYS`), and `agents` is the one pack that declares that list; no production path
      installs it for a record on its own, so a real owner reaches this door only after installing it, the same as
      this test now does. Without this, the door refused `REGISTER_UNKNOWN`: "There is no register called
@@ -141,7 +141,7 @@ before(async () => {
   assert.ok(agentsIn.ok, `agents would not install: ${JSON.stringify(agentsIn)}`);
 
   /* HIS KEY, PUT IN THROUGH THE KEY DOOR AS AN API TOKEN, and picked in Settings by its grant id. The sign-in above is a
-     proof of a moment ago, so the vault's gate that both the key door and a save pointing his key somewhere ask is open. */
+     proof of a moment ago, so the keychain's gate that both the key door and a save pointing his key somewhere ask is open. */
   const put = await owner().putKey({ label: 'model provider', opens: 'Slash', value: HIS_TOKEN, kind: 'api_token' });
   assert.ok(put.ok, `the key door would not take his key: ${JSON.stringify(put)}`);
   const grants = await owner().listGrants();

@@ -33,7 +33,7 @@ const rootHex = (): string => randomBytes(32).toString('hex');
 
 const storeOf = async (bound: string): Promise<KeyStore> => (await keyStoreOf(bound)) ?? assert.fail('bound, and no store');
 
-/** A record made under `store`, with one credential sealed under its record key as the vault door seals a deposit. */
+/** A record made under `store`, with one credential sealed under its record key as the keychain door seals a deposit. */
 async function recordUnder(store: KeyStore, secret: string) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 25, 12)) });

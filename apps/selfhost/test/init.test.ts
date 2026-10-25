@@ -88,13 +88,13 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
        boots, serves, accepts writes and cannot seal one of them: `openGrant` has nothing to open
        with, `bindGrant` nothing to bind under, and a snapshot nothing to sign. Rows alone prove
        nothing, so each one is opened here under the KEK the command made. */
-    const vault = sql.all<{ purpose: string; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string; wrapped_by: string }>(
+    const keychain = sql.all<{ purpose: string; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string; wrapped_by: string }>(
       'SELECT purpose, wrapped, nonce, kek_id, wrapped_by FROM vault_key ORDER BY purpose',
     );
-    assert.deepEqual(vault.map((v) => v.purpose), ['connector', 'record', 'signing'], '30 §1: three vault_key rows');
+    assert.deepEqual(keychain.map((v) => v.purpose), ['connector', 'record', 'signing'], '30 §1: three vault_key rows');
 
     const store = await openKeyStore(join(data, 'kek'));
-    for (const row of vault) {
+    for (const row of keychain) {
       assert.equal(row.wrapped_by, 'kek');
       assert.equal(row.kek_id, (await store.current()).kekId, 'wrapped under a key this host does not hold');
       const open = await unwrap(store, record.id, row.purpose as 'record', {
@@ -108,7 +108,7 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
 
     /* AND THE BINDING IS TO THIS RECORD. A row copied into another record's file does not open,
        which is the whole of 12 §6's AAD, and is invisible from reading the code. */
-    const first = vault[0]!;
+    const first = keychain[0]!;
     assert.equal(
       await unwrap(store, 'rec_SOMEBODY_ELSE', 'connector', {
         wrapped: new Uint8Array(first.wrapped),

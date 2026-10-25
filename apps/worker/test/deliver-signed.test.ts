@@ -111,7 +111,7 @@ test('END TO END ON A REAL RECORD: the lease opens the record-sealed key, the po
   } as never);
   assert.ok(made.ok, JSON.stringify(made));
 
-  /* SEALED AS THE VAULT DOOR SEALS A PERSON'S DEPOSIT: under the record key, for one grant id and version. */
+  /* SEALED AS THE KEYCHAIN DOOR SEALS A PERSON'S DEPOSIT: under the record key, for one grant id and version. */
   const secret = `bd_fake_webhook_secret_${randomBytes(12).toString('hex')}`;
   const dek = (await unwrap(store, REC, 'record', keys.record)) ?? assert.fail('the record key did not open');
   const nonce = crypto.getRandomValues(new Uint8Array(12));

@@ -127,7 +127,7 @@ export async function keyStoreOf(bound: KekBinding | undefined): Promise<KeyStor
  * this store holds it, and the current one otherwise.
  *
  * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
- * (`packages/kernel/src/vault.ts`, `openGrant`), and a record keeps the old id from a rotation until its night. Offering
+ * (`packages/kernel/src/keychain.ts`, `openGrant`), and a record keeps the old id from a rotation until its night. Offering
  * the current id in that window refused every stored credential on the Cloud, although `byId` could open them all.
  * A record wrapped under a key this store does not hold is offered the current id, so its refusal names both.
  */
@@ -168,7 +168,7 @@ export async function unwrap(store: KeyStore, record: string, purpose: Purpose, 
 }
 
 /**
- * This store over one record, as the vault passphrase's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
+ * This store over one record, as the keychain password's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
  *
  * `open` OPENS ONLY A KEY THE ROOT KEY WRAPPED. A record key behind a passphrase names no root key, and this store has
  * nothing to open it with, which is the point of the passphrase. `close` wraps under `under`, the root key the record's

@@ -19,7 +19,7 @@ export function capFor(pathname: string): number | null {
   if (/^\/+api\/+import\/*$/.test(rest)) return BODY_MOST.import.bytes;
   if (/^\/+api\/+sealedPut\/*$/.test(rest)) return BODY_MOST.sealed.bytes;
   if (/^\/+api\/+seen\/*$/.test(rest)) return BODY_MOST.seen.bytes;
-  if (/^\/+api\/+vault(?:\/|$)/.test(rest)) return BODY_MOST.vault.bytes;
+  if (/^\/+api\/+(?:vault|keychain)(?:\/|$)/.test(rest)) return BODY_MOST.keychain.bytes;
   if (/^\/+api\/+[^/]/.test(rest)) return BODY_MOST.api.bytes;
   if (/^\/+mcp\/*$/.test(rest)) return BODY_MOST.mcp.bytes;
   if (/^\/+auth(?:\/|$)/.test(rest)) return BODY_MOST.auth.bytes;

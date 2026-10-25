@@ -87,7 +87,7 @@ test('SWITCHED ON WITH NO ENDPOINT, the record has a model named included, and o
   assert.match((ai.runs[1]!.inputs['messages'] as { content: string }[])[0]!.content, /has just said what they are starting/u);
 });
 
-test("AN AUTOMATION'S QUESTION IS ANSWERED WITH NO VAULT GRANT, because the included model opens no key", async () => {
+test("AN AUTOMATION'S QUESTION IS ANSWERED WITH NO KEYCHAIN GRANT, because the included model opens no key", async () => {
   const clock = fixedClock(Date.UTC(2026, 8, 23, 9));
   const sql = openSqlite();
   const own = openSqlite();
@@ -108,8 +108,8 @@ test("AN AUTOMATION'S QUESTION IS ANSWERED WITH NO VAULT GRANT, because the incl
 
 const GRANT = '01M33H56ZCMM62YT38ARN8JRM8';
 const HIS_TOKEN = 'provider-token-for-this-test';
-/** His vault, as the host reads it: one live API token, the one he picked. */
-const hisVault = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
+/** His keychain, as the host reads it: one live API token, the one he picked. */
+const hisKeychain = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
 
 /** Slash's own store with his key chosen: the two tables `slashOwnKeyOf` reads, written as the package writes them. */
 const chosen = (provider: 'anthropic' | 'openai' = 'openai') => {
@@ -125,7 +125,7 @@ test('HIS OWN KEY WINS ON THE PRESS: with his key chosen, the included model nev
   const ai = fakeAi(['{"drafts":[]}']);
   const store = chosen();
   const sent: { url: string; authorization: string | null; model: unknown }[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async (url, init) => (
       sent.push({ url: String(url), authorization: new Headers(init.headers).get('authorization'), model: (JSON.parse(String(init.body)) as { model: unknown }).model }),
@@ -151,7 +151,7 @@ test('A KEY THAT WILL NOT OPEN SENDS NOTHING, and the included model is not aske
   const ai = fakeAi([]);
   const store = chosen();
   const sent: string[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async (url) => (sent.push(String(url)), new Response('{}', { status: 200 })),
     open: () => async () => null,
@@ -167,7 +167,7 @@ test('HIS KEY ON ANTHROPIC IS ASKED IN MESSAGES: x-api-key, the version header, 
   const store = chosen('anthropic');
   store.exec("UPDATE slash_meta SET value = 'https://api.anthropic.example.test' WHERE key = 'own.base_url'");
   const sent: { url: string; headers: Headers }[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisKeychain, {
     store: () => store,
     send: async (url, init) => (
       sent.push({ url: String(url), headers: new Headers(init.headers) }),
@@ -254,7 +254,7 @@ test('A BAD ANSWER IS BILLED AND ENDS THE RUN: prose from the included model is 
 });
 
 /* AN AUTOMATION'S QUESTION GOES TO HIS KEY TOO, signed by the rule, and
-   neither the included model nor the operator's ceiling is in it. The record's vault is his, seen through a view whose
+   neither the included model nor the operator's ceiling is in it. The record's keychain is his, seen through a view whose
    `grants` holds the one key he picked, because this suite seals no key. */
 test("ON HIS OWN KEY AN AUTOMATION'S QUESTION IS ANSWERED THERE: one POST with his key, no run of the included model", async () => {
   const clock = fixedClock(Date.UTC(2026, 8, 23, 9));

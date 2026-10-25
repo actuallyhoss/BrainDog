@@ -3,12 +3,12 @@
  *
  * TWO WAYS TO A MODEL, AND THE OWNER CHOOSES. The INCLUDED model (`includedInference` below): Workers AI through `AI`, which
  * spends the Cloudflare account's neurons and opens no key at all. And HIS OWN KEY: a provider (Anthropic's Messages or an
- * OpenAI-compatible endpoint), an https address on the public internet, a model name, and a key he picked from his vault,
+ * OpenAI-compatible endpoint), an https address on the public internet, a model name, and a key he picked from his keychain,
  * which Settings saves in Slash's own store and `@braindog/host/slash`'s `slashOwnKeyOf` reads back. The key is opened
  * through `KEK` on each call (`actions.ts` `keyOpener`, one `grant.read` event each time) and dropped when the call returns.
  * Which of the two answers is read on every ask, so a choice saved a second ago is the one the next ask goes to.
  *
- * `SLASH_ENDPOINT` IS NOT READ HERE ANY MORE. It named a deployment's own endpoint, asked with whatever key the vault held
+ * `SLASH_ENDPOINT` IS NOT READ HERE ANY MORE. It named a deployment's own endpoint, asked with whatever key the keychain held
  * under the label `slash`, which on a hosted record was the person's key sent to an address the operator chose. His own
  * key replaces it: he names the address, he picks the key by its id, and no key is chosen by its label. The builders are `@braindog/host/slash`'s, the ones the self-host uses, so the two
  * hosts cannot drift.
@@ -17,7 +17,7 @@
  * `SlashKeyClosedError` before anything is sent, never a request with no key, because every address his key goes to is a
  * hosted provider on his own bill. `wireOf` sets it, and the own-key path in the host keeps it whatever a caller passes.
  *
- * NO `KEK`, NO OWN KEY. Unbound, no vault key can be opened, so the settings door will not store one, and Slash is the
+ * NO `KEK`, NO OWN KEY. Unbound, no keychain key can be opened, so the settings door will not store one, and Slash is the
  * included model or nothing.
  *
  * THE INCLUDED MODEL IS SWITCHED ON BY `SLASH_INCLUDED`, NOT BY THE BINDING. `AI` is bound in both environments already
@@ -665,7 +665,7 @@ export function includedCandidates(env: SlashEnv): RouteFacts | undefined {
   };
 }
 
-/** The handle the operator's key goes by inside the keyed wire. It names no vault row: the key is the Worker's secret. */
+/** The handle the operator's key goes by inside the keyed wire. It names no keychain row: the key is the Worker's secret. */
 const FALLBACK_GRANT = 'operator.fallback';
 
 /**
@@ -738,7 +738,7 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
     { sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) },
     { tiers: CLOUD_TIERS, ...(route === undefined ? {} : { route }) },
   );
-  /* GUARDED BY THIS HOST, as on the self-host: `configure` checks a grant id's shape and never the vault, and the guard
+  /* GUARDED BY THIS HOST, as on the self-host: `configure` checks a grant id's shape and never the keychain, and the guard
      holds a save on his own key to a live API token (`slashGuardedEngine`). It reads the tiers this Worker runs as the
      package does, so a record saved on `byo` is counted where the package answers it. */
   const guarded = slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants(), tiers: CLOUD_TIERS });
@@ -1156,8 +1156,8 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
  * that and for four other ways a grant fails to open (`actions.ts`). His key's wire always requires it (`wireOf`), the host
  * throws before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as a key that is gone: none.
  *
- * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's key names the rule that
- * opened it and not `system`. This never runs the vault's session gate (`slashOwnKeyFor`): a rule has no session for it
+ * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the keychain's `grant.read` for the owner's key names the rule that
+ * opened it and not `system`. This never runs the keychain's session gate (`slashOwnKeyFor`): a rule has no session for it
  * to read, and installing a rule that asks Slash is the owner's consent to its question going to the model he chose (Q3's
  * default).
  */
@@ -1173,7 +1173,7 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
     }));
   return async (ask) => {
     const own = keyed ? slashOwnKeyOf(deps.sql) : null;
-    /* THE INCLUDED MODEL OPENS NO KEY, SO NONE OF THE KEY RULES BELOW IS ITS. There is no vault grant to gate on and no
+    /* THE INCLUDED MODEL OPENS NO KEY, SO NONE OF THE KEY RULES BELOW IS ITS. There is no keychain grant to gate on and no
        rule id to sign a `grant.read` with, so the question goes to the engine's own model. */
     if (own === null) {
       if (!included)
@@ -1189,7 +1189,7 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
     if (inference === undefined)
       return no(
         'FORBIDDEN',
-        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key Slash was set to answer with is no longer a key in the vault, so nothing was sent and the run stopped there. Pick your key again in Settings.`,
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key Slash was set to answer with is no longer a key in the keychain, so nothing was sent and the run stopped there. Pick your key again in Settings.`,
         { at: 'grant_id' },
       );
     const engine = await engineOf();
@@ -1277,22 +1277,22 @@ export function workerSlashDoor(
   /* HIS OWN KEY IS OFFERED ONLY WHERE A KEY CAN BE OPENED. A `byok` handed in here is what lets the settings door store
      it: offering it on a Worker with no `KEK` would save a choice every later ask refuses. `api` is not called until an
      ask, by which time the engine is built and its `slash_settings` table exists for `slashOwnKeyOf` to read.
-     OPENED FOR THE ASKER, NOT FOR `system`: `slashOwnKeyFor` runs the vault's own gate on `ctx` and signs the `grant.read`
+     OPENED FOR THE ASKER, NOT FOR `system`: `slashOwnKeyFor` runs the keychain's own gate on `ctx` and signs the `grant.read`
      with the asker's id, where this line once opened the owner's key for any caller the door let through. */
   const byok = isBound(env.KEK)
     ? async (ctx: CallContext) => slashOwnKeyFor(slashOwnKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor))
     : undefined;
-  /* THE VAULT'S OWN GATE FOR A SAVE THAT POINTS HIS KEY SOMEWHERE (`slashKeySave`), asked through the read that writes no
+  /* THE KEYCHAIN'S OWN GATE FOR A SAVE THAT POINTS HIS KEY SOMEWHERE (`slashKeySave`), asked through the read that writes no
      event, and the INBOX'S OWN READ for a pattern's arrivals, as the asker. */
-  const vault = async (ctx: CallContext): Promise<Refusal | null> => {
+  const keychain = async (ctx: CallContext): Promise<Refusal | null> => {
     const gate = await api().listGrants(ctx);
     if (gate.ok) return null;
-    return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The vault could not be asked about your key. Try again.' };
+    return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The keychain could not be asked about your key. Try again.' };
   };
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
   /* THE DAY'S CEILING, from the same ledger the month's count is read from (`slashDayStop`). */
   const day = async (): Promise<Refusal | null> => slashDayStop(deps.sql, Date.now());
-  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { vault, samples, day });
+  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { keychain, samples, day });
 }
 
 /* ── the daily look, and what it heard go wrong ───────────────────────────────────────────────────────────────────── */

@@ -20,7 +20,7 @@ import { idempotentCalls, readPublic, sendAction, type Execute, type OpenKey, ty
 import type { RecordApi } from '@braindog/record';
 
 import { isBound, keyStoreOf, offeredId, type KekBinding } from './keys.ts';
-import { openSealed } from './vault.ts';
+import { openSealed } from './keychain.ts';
 
 export {
   IDEMPOTENCY_KEY,
@@ -55,13 +55,13 @@ export const ALARM_RUNS = 5;
 /**
  * The key a scheduled action sends, opened under `env.KEK`, or `null` when `KEK` is not bound.
  *
- * THE SAME BYTES AS THE READ DOOR'S, through `vault.ts`: the record's key unwrapped under the root key, HKDF over it
+ * THE SAME BYTES AS THE READ DOOR'S, through `keychain.ts`: the record's key unwrapped under the root key, HKDF over it
  * with the grant id, AES-256-GCM with the AAD the record names. `openGrant` writes the `grant.read` event, so a run
  * that read a key is on the record. A bound value that is not a key, a record made before the store was bound, or
  * bytes that do not open, are all `null`, and the run sends nothing.
  *
  * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. The alarm's actions have no asker, so the
- * default stands. Slash's tier `b` does have one, and with `system` written into this line an owner reading the vault's
+ * default stands. Slash's tier `b` does have one, and with `system` written into this line an owner reading the keychain's
  * log could not tell her own asks from a colleague's. That path is the one
  * to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashOwnKeyFor` hands this opener a view of the record
  * whose `openGrant` signs as the asker whatever it is told.

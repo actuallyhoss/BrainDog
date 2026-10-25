@@ -7,11 +7,11 @@
  * bytes. A read runs the other way and answers once, from `answerOpen`, with `no-store`, which is the gate's
  * recorded exemption for this file. Nothing here logs.
  *
- * TWO DOORS AND ONE STEP. `vaultDoor` is `/api/vault/*`, whose credential is a vault grant on an agent's machine
+ * TWO DOORS AND ONE STEP. `keychainDoor` is `/api/vault/*`, whose credential is a keychain grant on an agent's machine
  * and which refuses any request carrying an `Origin`. `keysDoor` is `/api/keys/*`, the app's own, whose
  * credential is a browser session and which requires one. They share the sealing and opening below and nothing
  * else, so the second is a door beside the first rather than a hole in it: what decides whether a session may do
- * this is the record's `vault(ctx)` gate, which wants an owner, no token, and a proof under fifteen minutes old.
+ * this is the record's `keychain(ctx)` gate, which wants an owner, no token, and a proof under fifteen minutes old.
  *
  * THE BYTES ARE `47 §4.6`'S AND THEY ARE NOT IN THIS FILE. The record's DEK is unwrapped under the KEK with
  * `record ‖ 0x1F ‖ "record"`; the grant key is HKDF-SHA-256 over it with an empty salt and the grant id as info;
@@ -33,13 +33,13 @@ import {
   purposeOf,
   seal as sealBytes,
   sealedUnderOf,
-  VAULT_HEADERS,
-  vaultReply,
+  KEYCHAIN_HEADERS,
+  keychainReply,
   type KeysDoor,
   type SealedUnder,
   type SessionHints,
-  type VaultDoor,
-  type VaultGrantSeen,
+  type KeychainDoor,
+  type KeychainGrantSeen,
 } from '@braindog/host';
 import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
@@ -50,8 +50,8 @@ import { offeredId, unwrap, type KeyStore } from './keys.ts';
 /** A value in the clear. Named in this file and never passed out of it but to the one answer that asked. */
 type Plaintext = Uint8Array & { readonly brand: 'Plaintext' };
 
-/** Who a deposit or a read is by: an agent's checked vault grant, or a person's browser session. */
-type By = VaultGrantSeen | CallContext;
+/** Who a deposit or a read is by: an agent's checked keychain grant, or a person's browser session. */
+type By = KeychainGrantSeen | CallContext;
 
 /** 64 KiB, which is more than a private key or an env file of keys. */
 const VALUE_LIMIT = 65_536;
@@ -99,7 +99,7 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
   const body = JSON.stringify({ ok: true, value: { credential, label, value: new TextDecoder().decode(plain) } });
   plain.fill(0);
   const headers = new Headers();
-  for (const [k, v] of VAULT_HEADERS) headers.append(k, v);
+  for (const [k, v] of KEYCHAIN_HEADERS) headers.append(k, v);
   return new Response(body, { status: 200, headers });
 }
 
@@ -112,10 +112,10 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
  */
 function steps(api: RecordApi, store: KeyStore) {
   const recordId = (): string | null => api.kernel.identity()?.id ?? null;
-  /* THE RECORD KEY A PASSPHRASE OPENS FOR ONE REQUEST, or `null` while the vault is on the root key. The record's
-     `unlockVault` puts the vault gate first and counts the try; the caller zero-fills what comes back. */
+  /* THE RECORD KEY A PASSPHRASE OPENS FOR ONE REQUEST, or `null` while the keychain is on the root key. The record's
+     `unlockKeychain` puts the keychain gate first and counts the try; the caller zero-fills what comes back. */
   const unlocked = (record: string, by: By, body: Record<string, unknown>) =>
-    unlockedKey(body, record, (unlock) => api.unlockVault(unlock, by));
+    unlockedKey(body, record, (unlock) => api.unlockKeychain(unlock, by));
 
   /* `opts` IS SET ON THE LOGIN-TOKEN DEPOSIT ALONE (`depositByToken` below), and never from anything in a request. */
   const deposit = async (
@@ -162,7 +162,7 @@ function steps(api: RecordApi, store: KeyStore) {
       return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: kekId, bytes: value.length, hint });
     };
     /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT, which is why this is two shapes rather than
-       one spread. A vault grant already carries its project, and reading a second one out of its body would be a
+       one spread. A keychain grant already carries its project, and reading a second one out of its body would be a
        way to put a key somewhere the grant does not reach. */
     const args =
       'principal' in by
@@ -178,23 +178,23 @@ function steps(api: RecordApi, store: KeyStore) {
 
   const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const record = recordId();
-    if (record === null) return vaultReply(no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' }));
+    if (record === null) return keychainReply(no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' }));
     const door = await unlocked(record, by, body);
-    if (!door.ok) return vaultReply(door);
+    if (!door.ok) return keychainReply(door);
     const recordKey = door.value;
     try {
       /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a new key file
          and the re-wrap this process makes as it starts (`offeredId`). */
       const kekId = await offeredId(store, api.kernel.wrappingKey());
       const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
-      if (!out.ok) return vaultReply(out);
+      if (!out.ok) return keychainReply(out);
       const sealed = out.value;
       const key = await grantKey(store, record, sealed.key, sealed.id, recordKey, purposeOf(sealed));
-      if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
+      if (!key) return keychainReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
       const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
       /* A failed decrypt says only that these bytes do not open under this key. */
       if (opened === null)
-        return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
+        return keychainReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
       return answerOpen(sealed.credential, sealed.label, opened as Plaintext);
     } finally {
       recordKey?.fill(0);
@@ -208,15 +208,15 @@ function steps(api: RecordApi, store: KeyStore) {
  * An agent's door, `/api/vault/*`. Without a key store both halves answer `NOT_IN_THIS_BUILD`.
  *
  * `token` IS THE HOST'S OWN `/api` BEARER CHECK, and with it the deposit door takes an agent's login token as well as a
- * vault grant: the record adds that key as new, in the token's run's project, or refuses.
- * The open door still takes a vault grant only (`serveVault` in `@braindog/host`).
+ * keychain grant: the record adds that key as new, in the token's run's project, or refuses.
+ * The open door still takes a keychain grant only (`serveKeychain` in `@braindog/host`).
  */
-export function vaultDoor(
+export function keychainDoor(
   api: RecordApi,
   store: KeyStore | undefined,
   token?: (request: Request) => Promise<Result<CallContext>>,
-): VaultDoor<CallContext> {
-  const grant = (bearer: string) => api.vaultGrant(bearer);
+): KeychainDoor<CallContext> {
+  const grant = (bearer: string) => api.keychainGrant(bearer);
   if (!store) return { grant };
   const { deposit, open } = steps(api, store);
   return {

@@ -45,7 +45,7 @@ const slashStore = (tier: 'a' | 'b') => {
   return store;
 };
 
-/** A vault that holds no key, so a key he chose once is gone. Nothing here opens the key store. */
+/** A keychain that holds no key, so a key he chose once is gone. Nothing here opens the key store. */
 const api = () => ({ kernel: { grants: () => [] } }) as unknown as RecordApi;
 const keys = {} as KeyStore;
 
@@ -75,7 +75,7 @@ test('A KEY HE CHOSE THAT IS GONE SENDS NOTHING, and the endpoint is not asked i
     (e: unknown) => e as { sent?: unknown; message: string },
   );
   assert.equal(thrown?.sent, false, 'a headline on a gone key was not marked as never sent');
-  assert.match(thrown?.message ?? '', /no longer a key in the vault/u);
+  assert.match(thrown?.message ?? '', /no longer a key in the keychain/u);
   assert.deepEqual(wire.told, []);
   store.close();
 });
@@ -117,7 +117,7 @@ test('A BRIEFING ON A KEY HE CHOSE THAT IS GONE SENDS NOTHING, and the endpoint 
     (e: unknown) => e as { sent?: unknown; message: string },
   );
   assert.equal(thrown?.sent, false, 'a briefing on a gone key was not marked as never sent');
-  assert.match(thrown?.message ?? '', /no longer a key in the vault/u);
+  assert.match(thrown?.message ?? '', /no longer a key in the keychain/u);
   assert.deepEqual(wire.told, []);
   store.close();
 });

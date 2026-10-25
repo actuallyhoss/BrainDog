@@ -8,7 +8,7 @@
  * be ended by the raced deadline, because locally the loaded Worker runs on the object's thread, so a four-second loop
  * under `wall_ms: 500` answered clean with its log; the self-host refuses any run that answers past its deadline.
  *
- * THE VAULT HERE IS `grantNamed` OVER ROWS, the lookup `src/index.ts` passes, and not a stub that answers any label
+ * THE KEYCHAIN HERE IS `grantNamed` OVER ROWS, the lookup `src/index.ts` passes, and not a stub that answers any label
  * with a grant: the rule under test is that a grant's `opens` decides where its key may go, so the rows have to carry
  * one. `openKey` answers each grant's bytes by label, and the provider double echoes the authorization header back in
  * the spelling its path names, as `apps/selfhost/test/script-key-egress.test.ts` does on the other host.
@@ -43,7 +43,7 @@ import { ScriptOutbound, ScriptRecord, ScriptRuns, runScript } from '../src/scri
 export { ScriptOutbound, ScriptRecord };
 
 const at = '2026-09-22T00:00:00.000Z';
-const VAULT = [
+const KEYCHAIN = [
   { id: 'g_gold', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: at },
   { id: 'g_slash', label: 'slash', opens: 'collector.test', revoked_at: null, created_at: at },
 ];
@@ -95,7 +95,7 @@ export class Rec extends DurableObject {
           object: this.ctx.id.toString(),
           runs: this.runs,
           send: () => send,
-          grant: grantNamed(() => VAULT),
+          grant: grantNamed(() => KEYCHAIN),
           now: () => Date.now(),
         },
         scripted,
@@ -227,7 +227,7 @@ export default async function run(ctx) {
   assert.deepEqual(away.sent, [], 'a request left after the key was sent where it does not open');
 });
 
-test("THROUGH THE GATEWAY, a script naming the vault's `slash` key is refused before it runs, and nothing is sent", async () => {
+test("THROUGH THE GATEWAY, a script naming the keychain's `slash` key is refused before it runs, and nothing is sent", async () => {
   const { answer, sent } = await run(`export default async function run(ctx) { await ctx.fetch('${COLLECTOR}/in', { key: 'slash' }); }`, { egress: [COLLECTOR], keys: ['slash'] });
   assert.equal(answer.refused?.code, 'FORBIDDEN', JSON.stringify(answer));
   assert.match(answer.refused?.why ?? '', /slash/);

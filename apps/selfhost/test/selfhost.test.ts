@@ -170,7 +170,7 @@ test('the new reads answer, and a page names the blocks it could not draw', asyn
     assert.deepEqual(pages.body.value, [], 'this record declares no pages');
 
     const grants = await s.call('listGrants');
-    assert.equal(grants.status, 200, 'the vault index is a read like any other');
+    assert.equal(grants.status, 200, 'the keychain index is a read like any other');
     assert.deepEqual(grants.body.value, []);
 
     // 422 and not 404: a slug nobody declared is a value the caller can fix, and 30 §6 keeps 404 for

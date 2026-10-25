@@ -1,12 +1,12 @@
 /**
- * The Worker's vault step: `/api/vault/deposit` and `/api/vault/open`. `12 §6` rule 9,
+ * The Worker's keychain step: `/api/vault/deposit` and `/api/vault/open`. `12 §6` rule 9,
  * ADR-062.
  *
- * WITHOUT `env.KEK` BOTH DOORS CHECK THE VAULT GRANT AND THEN ANSWER `NOT_IN_THIS_BUILD`. The grant is checked first,
- * with the record's `vaultGrant` and never `verifyToken`, so a login token is refused here exactly as on the
+ * WITHOUT `env.KEK` BOTH DOORS CHECK THE KEYCHAIN GRANT AND THEN ANSWER `NOT_IN_THIS_BUILD`. The grant is checked first,
+ * with the record's `keychainGrant` and never `verifyToken`, so a login token is refused here exactly as on the
  * self-host, and the gap says so only to a grant holder.
  *
- * WITH IT, THE DOORS SEAL AND OPEN AS THE SELF-HOST'S DO, through `packages/host/src/vault.ts`. A deposit's value
+ * WITH IT, THE DOORS SEAL AND OPEN AS THE SELF-HOST'S DO, through `packages/host/src/keychain.ts`. A deposit's value
  * arrives in the body, is sealed here under a key derived from the record's own, and is dropped; the record, over
  * RPC, is handed sealed bytes. A read runs the other way and answers once, from `answerOpen`, with `no-store`.
  * The bytes are `47 §4.6`'s: the record's DEK is unwrapped under the root key with `record ‖ 0x1F ‖ "record"`, the
@@ -15,11 +15,11 @@
  *
  * A RECORD MADE BEFORE THE KEY STORE WAS BOUND HAS NO WRAPPED KEY, and it answers one sentence saying so.
  *
- * A RECORD KEY BEHIND THE VAULT PASSPHRASE IS OPENED WITH THE PASSPHRASE THE BODY CARRIES, and never with the root key,
- * which opens nothing there (`12 §6`, "The optional second factor"). The record's `unlockVault` is asked first, over RPC:
- * it puts the vault gate before anything, counts the try against the passphrase's limit, and calls back the step
+ * A RECORD KEY BEHIND THE KEYCHAIN PASSPHRASE IS OPENED WITH THE PASSPHRASE THE BODY CARRIES, and never with the root key,
+ * which opens nothing there (`12 §6`, "The optional second factor"). The record's `unlockKeychain` is asked first, over RPC:
+ * it puts the keychain gate before anything, counts the try against the passphrase's limit, and calls back the step
  * `unlockedKey` builds, so the key it opens stays in this Worker for the one request and is zero-filled after it. An
- * agent's vault grant carries no passphrase and opens nothing behind one.
+ * agent's keychain grant carries no passphrase and opens nothing behind one.
  *
  * THE BYTES ARE `@braindog/host`'S `sealing.ts`, shared with the self-host: `47 §13` D9's key hierarchy, held
  * in one place so a credential deposited in one host opens in the other. They were written out in both, byte for
@@ -33,8 +33,8 @@
 
 import {
   grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, purposeOf, seal as sealBytes, sealedUnderOf,
-  serveKeys, serveVault, servesKeys, servesVault, unlockedKey, VAULT_HEADERS, vaultReply,
-  type KeysDoor, type PassphraseUnlock, type RootKeys, type SealedUnder, type SessionHints, type VaultGrantSeen, type VaultPassphrase,
+  serveKeys, serveKeychain, servesKeys, servesKeychain, unlockedKey, KEYCHAIN_HEADERS, keychainReply,
+  type KeysDoor, type PassphraseUnlock, type RootKeys, type SealedUnder, type SessionHints, type KeychainGrantSeen, type KeychainPassphrase,
 } from '@braindog/host';
 import type { CallContext, Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
@@ -42,19 +42,19 @@ import { no, ok, type Result } from '@braindog/ports';
 import { keyStoreOf, offeredId, rootKeysOf, unwrap, type KekBinding, type KeyStore } from './keys.ts';
 import { recordOf } from './route.ts';
 
-export { servesKeys, servesVault };
+export { servesKeys, servesKeychain };
 
 /** A value in the clear. Named in this file and never passed out of it but to the one answer that asked. */
 type Plaintext = Uint8Array & { readonly brand: 'Plaintext' };
 
-/** Who a deposit or a read is by: an agent's checked vault grant, or a person's browser session. */
-export type By = VaultGrantSeen | CallContext;
+/** Who a deposit or a read is by: an agent's checked keychain grant, or a person's browser session. */
+export type By = KeychainGrantSeen | CallContext;
 
 /** The record's half of the doors, over RPC: every call names the record the caller was checked against. */
 export type KeyDeps = {
   /** `env.KEK`'s store, opened after the caller is checked, or `null` when the secret is empty. */
   store(): Promise<KeyStore | null>;
-  /** The fingerprint the record's vault is wrapped by, or `null` for a record made before the store was bound. */
+  /** The fingerprint the record's keychain is wrapped by, or `null` for a record made before the store was bound. */
   wrappingKey(record: string): Promise<string | null>;
   depositGrant(
     record: string,
@@ -74,30 +74,30 @@ export type KeyDeps = {
     kekId: string,
   ): Promise<Result<OpenedForGrant>>;
   /**
-   * The record's `unlockVault`, over RPC: the vault gate, the count of wrong passphrases, and `unlock` called when the
+   * The record's `unlockKeychain`, over RPC: the keychain gate, the count of wrong passphrases, and `unlock` called when the
    * record key is behind a passphrase. `unlock` runs here in the Worker when the record calls it back, so the key it
    * opens never reaches the record.
    *
    * OPTIONAL, BECAUSE THE RECORD'S HALF LANDS BESIDE IT. Without it a record behind a passphrase opens nothing here, and
    * says `WRONG_KEY`, which is true of this host until it can ask.
    */
-  unlockVault?: ((record: string, by: By, unlock: PassphraseUnlock) => Promise<Result<VaultPassphrase>>) | undefined;
+  unlockKeychain?: ((record: string, by: By, unlock: PassphraseUnlock) => Promise<Result<KeychainPassphrase>>) | undefined;
 };
 
 /** What the Worker needs: whether the Directory holds the record, the record's answer, and its keys when bound. */
 export type GrantDeps = {
   knows(record: string): Promise<boolean>;
-  vaultGrant(record: string, bearer: string): Promise<Result<VaultGrantSeen>>;
+  keychainGrant(record: string, bearer: string): Promise<Result<KeychainGrantSeen>>;
   /** An agent's login token at the deposit door: the record it names and the context /api builds for it. */
   token?: ((request: Request) => Promise<Result<{ record: string; ctx: CallContext }>>) | undefined;
   keys?: KeyDeps | undefined;
 };
 
-/* The sentence `vaultGrant` gives for every bearer it does not know, so a record this Worker does not hold reads
+/* The sentence `keychainGrant` gives for every bearer it does not know, so a record this Worker does not hold reads
    the same as a bearer that record does not know. */
-const UNKNOWN: Result<VaultGrantSeen> = {
+const UNKNOWN: Result<KeychainGrantSeen> = {
   ok: false,
-  refusal: { code: 'FORBIDDEN', fix: 'That vault grant is not one this record knows.', at: 'vault' },
+  refusal: { code: 'FORBIDDEN', fix: 'That keychain grant is not one this record knows.', at: 'vault' },
 };
 
 /** 64 KiB, which is more than a private key or an env file of keys. */
@@ -168,7 +168,7 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
   const body = JSON.stringify({ ok: true, value: { credential, label, value: new TextDecoder().decode(plain) } });
   plain.fill(0);
   const headers = new Headers();
-  for (const [k, v] of VAULT_HEADERS) headers.append(k, v);
+  for (const [k, v] of KEYCHAIN_HEADERS) headers.append(k, v);
   return new Response(body, { status: 200, headers });
 }
 
@@ -176,13 +176,13 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
  * The store, and the record key when a passphrase opened it, once the record is known to have a wrapped key to open.
  *
  * THE PASSPHRASE IS TRIED AFTER THE STORE AND BEFORE THE RECORD IS ASKED WHAT IT IS WRAPPED BY. The record's
- * `unlockVault` puts the vault gate first and counts the try, and a record key behind a passphrase names no root key,
+ * `unlockKeychain` puts the keychain gate first and counts the try, and a record key behind a passphrase names no root key,
  * so it would otherwise read as a record made before the store was bound. `recordKey` is the caller's to zero-fill.
  */
 async function ready(keys: KeyDeps, record: string, by: By, body: Record<string, unknown>): Promise<Result<{ store: KeyStore; recordKey: Uint8Array | null }>> {
   const store = await keys.store();
   if (!store) return no('NOT_IN_THIS_BUILD', NO_STORE, { at: 'keys' });
-  const ask = keys.unlockVault;
+  const ask = keys.unlockKeychain;
   const unlocked = ask === undefined ? ok(null) : await unlockedKey(body, record, (unlock) => ask(record, by, unlock));
   if (!unlocked.ok) return unlocked;
   const recordKey = unlocked.value;
@@ -223,7 +223,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
           const sealed = await sealBytes(key, nonce, target.aad, value);
           return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: kekId, bytes: value.length, hint });
         };
-        /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A vault grant already carries its
+        /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A keychain grant already carries its
            project, and reading a second one out of its body would be a way to put a key out of its reach. */
         const args =
           'principal' in by
@@ -240,23 +240,23 @@ function doors(keys: KeyDeps, record: () => string | null) {
 
   const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const id = record();
-    if (id === null) return vaultReply(UNKNOWN);
+    if (id === null) return keychainReply(UNKNOWN);
     const opened = await ready(keys, id, by, body);
-    if (!opened.ok) return vaultReply(opened);
+    if (!opened.ok) return keychainReply(opened);
     const { store, recordKey } = opened.value;
     try {
       /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a rotation and
          this record's night (`offeredId`). Behind a passphrase the record does not compare it. */
       const kekId = await offeredId(store, await keys.wrappingKey(id));
       const out = await keys.openForGrant(id, { label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
-      if (!out.ok) return vaultReply(out);
+      if (!out.ok) return keychainReply(out);
       const sealed = out.value;
       const key = await grantKey(store, id, sealed.key, sealed.id, recordKey, purposeOf(sealed));
-      if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
+      if (!key) return keychainReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
       const decrypted = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
       /* A failed decrypt says only that these bytes do not open under this key. */
       if (decrypted === null)
-        return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
+        return keychainReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
       return answerOpen(sealed.credential, sealed.label, decrypted as Plaintext);
     } finally {
       recordKey?.fill(0);
@@ -273,15 +273,15 @@ function doors(keys: KeyDeps, record: () => string | null) {
  * THE RECORD THE KEYS ARE SEALED FOR IS THE ONE WHOSE GRANT WAS CHECKED, held from that check rather than read from
  * the request a second time.
  */
-export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Response> {
+export function serveWorkerKeychain(request: Request, deps: GrantDeps): Promise<Response> {
   let checked: string | null = null;
   const steps = deps.keys ? doors(deps.keys, () => checked) : null;
   const token = deps.token;
-  return serveVault<CallContext>(request, {
+  return serveKeychain<CallContext>(request, {
     grant: async (bearer) => {
       const record = recordOf(`Bearer ${bearer}`);
       if (record === null || !(await deps.knows(record))) return UNKNOWN;
-      const out = await deps.vaultGrant(record, bearer);
+      const out = await deps.keychainGrant(record, bearer);
       if (out.ok) checked = record;
       return out;
     },
@@ -308,11 +308,11 @@ export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Res
 }
 
 /**
- * The root key the vault passphrase's two routes are answered through, inside the record's own object: `env.KEK`'s
+ * The root key the keychain password's two routes are answered through, inside the record's own object: `env.KEK`'s
  * store over the record that object holds, or `null` with no store bound or no identity yet
- * (`withVaultPassphrase` in `packages/host/src/passphrase.ts`).
+ * (`withKeychainPassphrase` in `packages/host/src/passphrase.ts`).
  *
- * OPENED WHEN A STEP RUNS AND NOT BEFORE, so the store is read only for an owner the record's vault gate has already
+ * OPENED WHEN A STEP RUNS AND NOT BEFORE, so the store is read only for an owner the record's keychain gate has already
  * let through. A bound value that is not a key still throws, as it does at every other door, rather than reading as a
  * host with no store.
  */
@@ -332,7 +332,7 @@ export type SessionKeyDeps = { origins: ReadonlySet<string>; record: string; key
  * Answer one of the app's own key doors, `/api/keys/*`, for a browser session the Worker has already resolved.
  *
  * THE RECORD IS THE SESSION'S, not the request's. `doorOf` decided which record this person's cookie names, and
- * that is what is passed in: nothing in the body may name a second one, for the reason the vault door holds the
+ * that is what is passed in: nothing in the body may name a second one, for the reason the keychain door holds the
  * record its grant was checked against rather than reading it twice.
  */
 export function serveWorkerKeys(request: Request, ctx: CallContext, deps: SessionKeyDeps): Promise<Response> {

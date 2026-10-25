@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 
 import { bundled, objectStorage } from './bundled-worker.ts';
 import { keyStoreOf, recordKeys } from '../src/keys.ts';
-import { serveWorkerKeys } from '../src/vault.ts';
+import { serveWorkerKeys } from '../src/keychain.ts';
 
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
@@ -107,7 +107,7 @@ async function hosted(answer: () => Response) {
   assert.ok((await change('register.tasks', 'register', TASKS)).ok);
   const pack = await call('propose', { question: 'Install agents?', body_kind: 'pack', body: { install: 'agents' } });
   assert.ok(pack.ok, JSON.stringify(pack));
-  assert.ok((await call('decide', { id: pack.value?.id, decide: { option: 'accept', reason: 'the vault needs its list' } })).ok);
+  assert.ok((await call('decide', { id: pack.value?.id, decide: { option: 'accept', reason: 'the keychain needs its list' } })).ok);
   const value = `bd_fake_slash_${crypto.randomUUID().replaceAll('-', '')}`;
   const put = await serveWorkerKeys(
     new Request(`${ORIGIN}/api/keys/put`, {

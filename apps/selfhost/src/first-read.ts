@@ -171,7 +171,7 @@ export async function catalogueOffer(dir: string | null, log: (line: string) => 
 
 /**
  * This host's endpoint as the reader's model, on the operator's `SLASH_KEY` alone: a stranger has no key of their own and
- * opens no vault, so no grant is read and none is signed.
+ * opens no keychain, so no grant is read and none is signed.
  */
 function modelOf(config: SlashConfig | undefined, send: Send): Inference | undefined {
   if (config === undefined) return undefined;

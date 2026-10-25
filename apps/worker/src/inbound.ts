@@ -126,7 +126,7 @@ const secret = (): string => {
  * How recent an owner's last sign-in must be to move where a record's mail arrives: `12 §6`.
  *
  * THE KERNEL'S OWN FIFTEEN MINUTES, TO THE MILLISECOND. `FRESH` in `packages/record/src/index.ts` guards
- * the four doors whose answer the browser that asked cannot take back: the vault gate and `deviceApprove`
+ * the four doors whose answer the browser that asked cannot take back: the keychain gate and `deviceApprove`
  * hand out something that then works from anywhere, and `restore` and `deleteRecord` throw away what
  * nobody can put back. A forwarding address is both at once. `FRESH` is not exported, and exporting it to
  * be read once here would put a number the kernel decides into this file's import list; the value is in
@@ -154,7 +154,7 @@ const digest = async (token: string): Promise<string> =>
  *
  * AN OWNER AND NOTHING BELOW IT. The address is where a bank's mail lands, so whoever can change it
  * can redirect a record's incoming statements: that is the owner's decision in the same way the
- * vault's is (`12 §6`). A colleague at `decide` is refused with the sentence that says so, because
+ * keychain's is (`12 §6`). A colleague at `decide` is refused with the sentence that says so, because
  * "ask an owner" is the remedy and a caller that cannot read it retries forever.
  *
  * WHAT IT ANSWERS IS THE TOKEN AND NOT THE ADDRESS. The address is
@@ -196,7 +196,7 @@ export async function serveInbound(request: Request, door: InboundDoor, ctx: Cal
 
   /* AND A PROOF IN THE LAST FIFTEEN MINUTES, WHICH IS THE RUNG THIS DOOR WAS MISSING. Every other
      owner-only door in this tree that hands out something working from anywhere asks for one, in the same
-     words and the same order: the vault gate, `deviceApprove`, `restore` and `deleteRecord`, all in
+     words and the same order: the keychain gate, `deviceApprove`, `restore` and `deleteRecord`, all in
      `packages/record/src/index.ts`. A cookie is thirty days of standing access, and this door hands out a
      live credential and revokes the previous one in the same call, so without this a stranger at an open
      laptop takes a record's bank mail and stops it arriving without proving they are anybody.

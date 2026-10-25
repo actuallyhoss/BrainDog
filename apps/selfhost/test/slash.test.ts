@@ -21,7 +21,7 @@ test('NO SLASH_ENDPOINT, NO MODEL: the rules draft', () => {
   });
 });
 
-test('AN ENDPOINT IS CALLED WITH THE OPERATOR KEY, and with no key when there is none in the vault', async () => {
+test('AN ENDPOINT IS CALLED WITH THE OPERATOR KEY, and with no key when there is none in the keychain', async () => {
   const sent: RequestInit[] = [];
   const send = async (_url: URL, init: RequestInit) => (sent.push(init), new Response('{"drafts":[]}', { status: 200 }));
   const withKey = slashModelFor({ url: 'http://localhost:11434/v1/chat/completions', key: 'fake-operator-key', send }, () => ({}) as RecordApi, undefined);

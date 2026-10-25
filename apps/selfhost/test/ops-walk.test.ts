@@ -32,7 +32,7 @@ const GRANT_ARGS = { id: GRANT, label: 'Kiln deploy' };
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
-/** A record made under `store`, with one credential sealed under its record key as the vault door seals a deposit. */
+/** A record made under `store`, with one credential sealed under its record key as the keychain door seals a deposit. */
 async function recordUnder(store: KeyStore, secret: string) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 25, 12)) });

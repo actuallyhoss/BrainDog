@@ -638,7 +638,7 @@ test('REVOCATION WRITES `null`, AND A RECORD WITH NO ADDRESS TAKES NO MAIL AT AL
 
 /**
  * WHOEVER CAN MOVE THIS ADDRESS CAN REDIRECT A RECORD'S BANK MAIL, which is why the ladder here is the
- * vault's rather than ADMIN's. Every case below is a refusal that must also be a write that did not
+ * keychain's rather than ADMIN's. Every case below is a refusal that must also be a write that did not
  * happen, so `wrote` is asserted empty at the end rather than per case: a door that refused and wrote
  * anyway would have rotated an address on its way to saying no.
  *
@@ -726,11 +726,11 @@ test('A WRITE THE DIRECTORY REFUSES IS NOT AN ADDRESS ANYBODY WAS SHOWN', async 
  * THE RUNG EVERY OTHER SECRET-HANDING DOOR IN THIS TREE HAS, AND THIS ONE DID NOT.
  *
  * `packages/record/src/index.ts` asks for a proof under fifteen minutes old in four places, and all four
- * are doors whose answer the browser that asked cannot take back: the vault gate at `:1068` and
+ * are doors whose answer the browser that asked cannot take back: the keychain gate at `:1068` and
  * `deviceApprove` at `:3717` hand out something that then works from anywhere, and `restore` at `:3862`
  * and `deleteRecord` at `:3914` throw away what nobody can put back. Each spends a
- * sentence on the same reason, and the vault's is the shortest: a cookie is thirty days of standing
- * access, and the vault is the one place a laptop left open on a desk should not be enough. A forwarding
+ * sentence on the same reason, and the keychain's is the shortest: a cookie is thirty days of standing
+ * access, and the keychain is the one place a laptop left open on a desk should not be enough. A forwarding
  * address is that kind of answer twice over. Minting one hands out a live credential, and minting again
  * is how the previous one is revoked, so a stranger at somebody's open laptop could both take the mail
  * and stop it arriving without ever proving they are the owner.

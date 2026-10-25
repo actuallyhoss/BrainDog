@@ -1,5 +1,5 @@
 /**
- * The key doors on the self-host, over a real socket: a vault grant from the device flow, a deposit, a read back, a
+ * The key doors on the self-host, over a real socket: a keychain grant from the device flow, a deposit, a read back, a
  * rotation, and every bearer that must not get through.
  *
  * THE VALUE IS GENERATED HERE AND OBVIOUSLY FAKE, and long enough that a fragment of it anywhere is findable. At the
@@ -53,7 +53,7 @@ const KEYS = {
 };
 
 /** A fake value, made per run, that no provider would ever issue. */
-const fake = (): string => ['bd_fake_vault_value_', randomBytes(24).toString('hex')].join('');
+const fake = (): string => ['bd_fake_keychain_value_', randomBytes(24).toString('hex')].join('');
 
 type Body = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string; at?: string } } | null;
 
@@ -78,7 +78,7 @@ function listen() {
 }
 
 async function stack() {
-  const dir = mkdtempSync(join(tmpdir(), 'braindog-vault-'));
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-keychain-'));
   const file = join(dir, 'record.brain');
   const serverKey = randomBytes(32).toString('base64url');
   let now = Date.UTC(2026, 8, 15, 12);
@@ -145,7 +145,7 @@ async function stack() {
     call,
     project,
     advance: (ms: number) => void (now += ms),
-    /** A vault grant for `scope`, through the device flow a terminal runs and the approval a person gives. */
+    /** A keychain grant for `scope`, through the device flow a terminal runs and the approval a person gives. */
     async grant(scope: string): Promise<string> {
       const started = await call('/auth/device', { body: { reach: 'vault', label: 'test-laptop · braindog-cli', scope } });
       assert.equal(started.status, 200, started.raw);
@@ -183,7 +183,7 @@ test('DEPOSIT, READ BACK AND ROTATE UNDER A PROJECT GRANT, SIGNED BY THE RUN, AN
 
     /* A run to sign the reads, attached with the login token as the command line does. */
     const here = { 'x-braindog-agent': 'claude', 'x-braindog-host': 'test-laptop', 'x-braindog-repo': 'kiln' };
-    const attached = await s.call('/api/attach', { bearer: login, body: { source: 'startup', client_id: 'cc-vault' }, headers: here });
+    const attached = await s.call('/api/attach', { bearer: login, body: { source: 'startup', client_id: 'cc-keychain' }, headers: here });
     assert.equal(attached.status, 200, attached.raw);
     const spoken = String(attached.body?.value?.spoken);
     assert.match(spoken, /^S[1-9][0-9]*$/);

@@ -34,7 +34,7 @@ export function degradeLines(e: Record<string, string | undefined>, mailOn: bool
   const model = set('SLASH_FALLBACK_ENDPOINT') && set('SLASH_FALLBACK_MODEL') && set('SLASH_FALLBACK_KEY');
   lines.push(
     model
-      ? '  model: this host has its own endpoint, and a key in the vault is used first.'
+      ? '  model: this host has its own endpoint, and a key in the keychain is used first.'
       : '  model: off until you add your own key in the app (Settings, Keys). Everything else works without it.',
   );
   lines.push('  billing: off. A self-hosted BrainDog is free and counts nothing.');

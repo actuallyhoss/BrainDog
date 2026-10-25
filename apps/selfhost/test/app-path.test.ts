@@ -177,7 +177,7 @@ test('WITH NO CREDENTIAL, EVERY SLUG IS REFUSED AS THE ROOT REFUSES IT, so the a
 test('THE KEY DOORS ARE AT THE ROOT ONLY, and /auth, /account and /in are never answered under a slug', async () => {
   const s = await stack();
   try {
-    /* A grant names its own record, so a slug in front of the vault would be a second answer to which record. The
+    /* A grant names its own record, so a slug in front of the keychain would be a second answer to which record. The
        Worker refuses the same path in the same words (`apps/worker/src/index.ts` `recordApi`). */
     for (const path of ['/app/the-studio/api/vault/open', '/app/the-studio/api/vault/deposit']) {
       const out = await s.call(path, { body: {}, bearer: s.serverKey });

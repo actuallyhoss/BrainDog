@@ -1,6 +1,6 @@
 /**
  * Sign-in, end to end, over a real socket: the server key, the lockout, a session against `/api`, a passkey
- * made and used by the software authenticator, rotation, and the vault's fifteen minutes.
+ * made and used by the software authenticator, rotation, and the keychain's fifteen minutes.
  *
  * ONE CLOCK, MOVED BY THE TEST. `start({ now })` takes a function, and the record and the Directory both read
  * it, so "twenty-five hours later" is one assignment rather than a day of waiting or a mocked `Date`.
@@ -205,10 +205,10 @@ test('A SESSION READS AND WRITES /api, A PAGE ELSEWHERE CANNOT USE IT, AND AN AG
     assert.equal(admin.body?.refusal?.code, 'NEEDS_BROWSER_SESSION');
     assert.equal((await s.call('/api/listTokens', { sid })).status, 200);
 
-    /* A fresh proof opens the vault. */
+    /* A fresh proof opens the keychain. */
     assert.equal((await s.call('/api/listGrants', { sid })).status, 200);
 
-    /* AND THE ONE VAULT WRITE A SCREEN REACHES. The session gets as far as the record, which says there is no such
+    /* AND THE ONE KEYCHAIN WRITE A SCREEN REACHES. The session gets as far as the record, which says there is no such
        grant; the bearer minted from that same session never gets that far. */
     const revoked = await s.call('/api/revokeGrant', { sid, body: { id: 'g_nowhere' } });
     assert.equal(revoked.status, 422, JSON.stringify(revoked.body));
@@ -222,7 +222,7 @@ test('A SESSION READS AND WRITES /api, A PAGE ELSEWHERE CANNOT USE IT, AND AN AG
   }
 });
 
-test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTER A DAY, AND ASKED AGAIN BY THE VAULT', async () => {
+test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTER A DAY, AND ASKED AGAIN BY THE KEYCHAIN', async () => {
   const s = await stack();
   try {
     const first = await s.keyIn();
@@ -260,11 +260,11 @@ test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTE
     const second = await passkeyIn(1);
     assert.equal((await s.call('/api/listGrants', { sid: second })).status, 200);
 
-    /* THE VAULT ASKS AGAIN after fifteen minutes, and nothing else does. */
+    /* THE KEYCHAIN ASKS AGAIN after fifteen minutes, and nothing else does. */
     s.advance(16 * MINUTE);
     const stale = await s.call('/api/listGrants', { sid: second });
     assert.equal(stale.status, 403);
-    assert.deepEqual(stale.body?.refusal, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the vault.', at: 'principal' });
+    assert.deepEqual(stale.body?.refusal, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' });
     assert.equal((await s.call('/api/boot', { sid: second })).status, 200);
 
     /* ROTATED AFTER A DAY OF USE: a new id on the answer, the old one good for a minute, then not. */
@@ -279,7 +279,7 @@ test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTE
     assert.equal((await s.call('/api/boot', { sid: second })).status, 401);
     assert.equal((await s.call('/api/boot', { sid: third })).status, 200);
 
-    /* ROTATION IS NOT A PROOF, so the vault still asks; a new sign-in is one, and it retires the cookie it replaced. */
+    /* ROTATION IS NOT A PROOF, so the keychain still asks; a new sign-in is one, and it retires the cookie it replaced. */
     assert.equal((await s.call('/api/listGrants', { sid: third })).status, 403);
     const fourth = await passkeyIn(2, third);
     assert.equal((await s.call('/api/listGrants', { sid: fourth })).status, 200);

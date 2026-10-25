@@ -31,7 +31,7 @@
  * are a harness of their own and were not built here.
  *
  * ON HIS OWN KEY. The Worker named an endpoint of its own and keyed it with whatever
- * the vault held under the label `slash`; it names none now, and the one model a keyed question reaches is the key the
+ * the keychain held under the label `slash`; it names none now, and the one model a keyed question reaches is the key the
  * owner picked in Settings, by its grant id. So the key is put through the key door as
  * before and then chosen through the settings door, as the owner chooses it, and every sentence about a missing key is
  * the one his own key's path says.
@@ -42,7 +42,7 @@ import assert from 'node:assert/strict';
 
 import { bundled, objectStorage } from './bundled-worker.ts';
 import { keyStoreOf, recordKeys } from '../src/keys.ts';
-import { serveWorkerKeys } from '../src/vault.ts';
+import { serveWorkerKeys } from '../src/keychain.ts';
 
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
@@ -69,9 +69,9 @@ const RATE = {
 const NO_KEY =
   'rule.rate asked Slash at step 1, and Slash on this host answers on your own key, which is not chosen yet, so the run stopped there. Pick your key in Settings.';
 
-/** And the one for a key he chose that is no longer a key in the vault. */
+/** And the one for a key he chose that is no longer a key in the keychain. */
 const KEY_GONE =
-  'rule.rate asked Slash at step 1, and the key Slash was set to answer with is no longer a key in the vault, so nothing was sent and the run stopped there. Pick your key again in Settings.';
+  'rule.rate asked Slash at step 1, and the key Slash was set to answer with is no longer a key in the keychain, so nothing was sent and the run stopped there. Pick your key again in Settings.';
 
 /** The model's usual answer: the number, and a count that bills a few tokens. */
 const RATE_ANSWER = (): Response =>
@@ -160,7 +160,7 @@ async function hosted(opts: { kek?: boolean; key?: boolean; answer?: () => Respo
     /* THE KEYS LIST COMES WITH THE AGENTS PACK, offered and accepted as `script-try-asker.test.ts` installs it. */
     const pack = await call('propose', { question: 'Install agents?', body_kind: 'pack', body: { install: 'agents' } });
     assert.ok(pack.ok, JSON.stringify(pack));
-    assert.ok((await call('decide', { id: pack.value?.id, decide: { option: 'accept', reason: 'the vault needs its list' } })).ok);
+    assert.ok((await call('decide', { id: pack.value?.id, decide: { option: 'accept', reason: 'the keychain needs its list' } })).ok);
   }
   const value = `bd_fake_slash_${crypto.randomUUID().replaceAll('-', '')}`;
   if (opts.key) {
@@ -276,7 +276,7 @@ test("THE QUESTION IS POSTED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED 
     const [r] = s.runs();
     assert.equal(r?.state, 'done', r?.say ?? 'no run');
     assert.deepEqual(JSON.parse(r?.vars ?? '{}'), { rate: 4.25 });
-    /* SIGNED BY THE RULE AND NOT BY `system`, so the vault's log tells an automation's opening from a scheduled action's. */
+    /* SIGNED BY THE RULE AND NOT BY `system`, so the keychain's log tells an automation's opening from a scheduled action's. */
     assert.deepEqual(s.reads(), ['rule:rate']);
     assert.equal(s.sent.length, 1, 'the second alarm asked again');
   } finally {
@@ -313,7 +313,7 @@ test('ON HIS OWN KEY ask_cap 0 STOPS NOTHING: the question is posted once, and t
   }
 });
 
-/* ── 4 · no key in the vault ─────────────────────────────────────────────── */
+/* ── 4 · no key in the keychain ─────────────────────────────────────────────── */
 
 test('KEK BOUND AND NO KEY CHOSEN: NOTHING IS POSTED, NOTHING IS SPENT, and the run says where the key is chosen', async () => {
   const s = await hosted({ answer: () => new Response('{"error":"no key"}', { status: 401 }) });
@@ -335,9 +335,9 @@ test('KEK BOUND AND NO KEY CHOSEN: NOTHING IS POSTED, NOTHING IS SPENT, and the 
 
 /* ── 4b · a key that was revoked ─────────────────────────────────────────── */
 
-/* A REVOKED GRANT KEEPS ITS ROW AND ITS ID (`packages/kernel/src/vault.ts` `revokeGrant`), and Slash's settings still name
+/* A REVOKED GRANT KEEPS ITS ROW AND ITS ID (`packages/kernel/src/keychain.ts` `revokeGrant`), and Slash's settings still name
    it, so a check that read the setting alone would pass it and post with no `authorization`: case 4's keyless POST by
-   another road. The key path asks the vault whether the grant is live on every call (`ownOptionsOf`). */
+   another road. The key path asks the keychain whether the grant is live on every call (`ownOptionsOf`). */
 test('HIS KEY, REVOKED AFTER HE CHOSE IT, IS NO KEY: nothing is posted, nothing is spent, and the run says to pick it again', async () => {
   const s = await hosted({ key: true, answer: () => new Response('{"error":"no key"}', { status: 401 }) });
   try {
@@ -417,7 +417,7 @@ test('A QUESTION NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED AT PROPOSE
     s.reopen();
     const made = await s.call('create', { register: 'obligations', fields: { what: 'Rent' } });
     assert.ok(made.ok, JSON.stringify(made));
-    /* ONLY THE VAULT WRITES A SECRET FIELD, so `pin` is put in the row by SQL, as the kernel's own case puts it. */
+    /* ONLY THE KEYCHAIN WRITES A SECRET FIELD, so `pin` is put in the row by SQL, as the kernel's own case puts it. */
     s.storage.sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.value?.id as never);
 
     await s.object().alarm();
@@ -484,7 +484,7 @@ test.todo('the answered question of case 2 through workerd, in slash-in-do.test.
 
 /* ── 10 · more questions than one pass leases ────────────────────────────── */
 
-test('SEVEN QUESTIONS BEFORE ONE ALARM, NO KEY: all seven runs fail on the vault sentence and none is left waiting a day', async () => {
+test('SEVEN QUESTIONS BEFORE ONE ALARM, NO KEY: all seven runs fail on the keychain sentence and none is left waiting a day', async () => {
   const s = await hosted();
   try {
     assert.ok((await s.change('rule.rate', 'rule', RATE)).ok, 'the rule was not filed');

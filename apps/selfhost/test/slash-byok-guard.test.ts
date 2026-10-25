@@ -4,7 +4,7 @@
  *
  * WHY A SELF-HOST AND NOT A DOOR OVER A HAND-WRITTEN ENGINE. All three faults sat in the join between this package and the
  * app: `slashByokOf` was handed a grant id and an opener that signed every read `system`, the package's meter looked at
- * tier `a` alone, and `configure` checked a grant id's shape and never the vault. `test/slash.test.ts` drives each builder
+ * tier `a` alone, and `configure` checked a grant id's shape and never the keychain. `test/slash.test.ts` drives each builder
  * by hand and stayed green through all three, so the measurement has to be made end to end: a key put
  * in through `/api/keys/put`, sealed under `openKeyStore`, opened by `keyOpener`, sent by the endpoint double below.
  *
@@ -37,8 +37,8 @@ const MINUTE = 60_000;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OPERATOR = 'fake-operator-key';
 const OWNER_MODEL = 'gpt-4o-mini';
-/* THE SENTENCE `46 §5.5` step 3 GIVES FOR TIER `b` WITH NO OPEN KEY, which `§5.9` step 4 names for a vault that refuses. */
-const CLOSED = 'Your key is not open in this session. Open the vault, or switch Slash to the included model.';
+/* THE SENTENCE `46 §5.5` step 3 GIVES FOR TIER `b` WITH NO OPEN KEY, which `§5.9` step 4 names for a keychain that refuses. */
+const CLOSED = 'Your key is not open in this session. Open the keychain, or switch Slash to the included model.';
 
 const TASKS = {
   id: 'register.tasks',
@@ -163,7 +163,7 @@ async function stack() {
     return { id: bo.value.id, sid: plant(bo.value.id, ago) };
   };
 
-  /** The owner's key in the vault and tier `b` on its grant, both from Ada's own fresh browser session. */
+  /** The owner's key in the keychain and tier `b` on its grant, both from Ada's own fresh browser session. */
   const tierB = async (sid: string): Promise<{ value: string; grant: string }> => {
     const value = ['bd_fake_slash_byok_', randomBytes(24).toString('hex')].join('');
     const put = await call('/api/keys/put', sid, { label: 'OpenAI', opens: 'Slash on my own account', value });
@@ -210,13 +210,13 @@ test('§1: A READ COLLEAGUE WITH A FIFTY-MINUTE-OLD PROOF IS REFUSED THE OWNER K
     assert.equal(out.status, 403, `a read colleague proposed on the owner's key: ${out.status} ${out.body?.refusal?.code ?? ''}`);
     assert.deepEqual(out.body?.refusal && { code: out.body.refusal.code, fix: out.body.refusal.fix }, { code: 'FORBIDDEN', fix: CLOSED });
     assert.equal(s.sent.length, 0, 'the refusal came after a model call');
-    assert.deepEqual(s.reads(), [], 'the vault was read for a caller it refuses');
+    assert.deepEqual(s.reads(), [], 'the keychain was read for a caller it refuses');
   } finally {
     await s.close();
   }
 });
 
-test('§1: THE OWNER WITH A STALE PROOF IS SENT BACK TO THE VAULT TOO, since the vault asks for a proof in fifteen minutes', async () => {
+test('§1: THE OWNER WITH A STALE PROOF IS SENT BACK TO THE KEYCHAIN TOO, since the keychain asks for a proof in fifteen minutes', async () => {
   const s = await stack();
   try {
     await s.tierB(s.plant(s.owner));
@@ -273,13 +273,13 @@ test('§1: BACK ON TIER a, THE GRANT LEFT IN SETTINGS OPENS NO GATE, so a read c
     const ada = s.plant(s.owner);
     await s.tierB(ada);
     /* `configure` keeps `grant_id` when the tier goes back to `a`. Measured with `slashGrantIdOf` answering it on any
-       tier: this propose was 403 FORBIDDEN, the vault's sentence for a key nobody was going to send. */
+       tier: this propose was 403 FORBIDDEN, the keychain's sentence for a key nobody was going to send. */
     assert.equal((await s.call('/api/slash/settings', ada, { tier: 'a' })).status, 200);
     const bo = await s.colleague(50 * MINUTE);
     const out = await s.call('/api/slash/propose', bo.sid, { question: 'Which tasks are open?' });
-    assert.equal(out.status, 200, `a tier a propose was stopped at the vault: ${out.status} ${out.body?.refusal?.code ?? ''}`);
+    assert.equal(out.status, 200, `a tier a propose was stopped at the keychain: ${out.status} ${out.body?.refusal?.code ?? ''}`);
     assert.ok(s.sent.every((init) => s.bearer(init) === `Bearer ${OPERATOR}`), 'a tier a ask went out on a key other than the operator one');
-    assert.deepEqual(s.reads(), [], 'a tier a ask read the vault');
+    assert.deepEqual(s.reads(), [], 'a tier a ask read the keychain');
   } finally {
     await s.close();
   }
@@ -326,7 +326,7 @@ test('§3: A PROPOSE ON A STORED ask_id DRAFTS NOTHING ON THIS HOST, so the cap 
   }
 });
 
-test('§5: TIER b NAMING A GRANT THE VAULT HAS NOT GOT IS 422 AT grant_id, and the propose after it still works', async () => {
+test('§5: TIER b NAMING A GRANT THE KEYCHAIN HAS NOT GOT IS 422 AT grant_id, and the propose after it still works', async () => {
   const s = await stack();
   try {
     const ada = s.plant(s.owner);
@@ -347,7 +347,7 @@ test('§3: ON TIER byo AT ask_cap 1, THE SECOND READ IS SLASH_BUDGET_SPENT, beca
   const s = await stack();
   try {
     const ada = s.plant(s.owner);
-    /* NO GRANT AND NO VAULT: tier `byo` is "your own endpoint", and on this host that endpoint is `SLASH_ENDPOINT` with
+    /* NO GRANT AND NO KEYCHAIN: tier `byo` is "your own endpoint", and on this host that endpoint is `SLASH_ENDPOINT` with
        `SLASH_KEY`, the operator's. `46 §4.1` calls the tier unmetered, which is only true of an endpoint the owner pays for. */
     const set = await s.call('/api/slash/settings', ada, { tier: 'byo', model: OWNER_MODEL, ask_cap: 1 });
     assert.equal(set.status, 200, set.raw);
@@ -372,7 +372,7 @@ test('§5: TIER b NAMING A LIVE GRANT THAT IS NOT AN api_token IS 422 AT grant_i
   const s = await stack();
   try {
     const ada = s.plant(s.owner);
-    /* A PASSWORD IS A LIVE KEY IN THE VAULT AND WOULD OPEN, so the existence check passes it: measured before this case,
+    /* A PASSWORD IS A LIVE KEY IN THE KEYCHAIN AND WOULD OPEN, so the existence check passes it: measured before this case,
        the save answered 200 and the next propose went out as `Bearer <the password>` to `SLASH_ENDPOINT`. */
     const value = ['bd_fake_password_', randomBytes(12).toString('hex')].join('');
     const put = await s.call('/api/keys/put', ada, { label: 'Bank login', opens: 'the bank', kind: 'password', value });

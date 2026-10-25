@@ -109,7 +109,7 @@ test('A CLOUD COPY BECOMES THE RECORD THIS HOST SERVES, under its own id and own
   const data = scratch();
   let running: Awaited<ReturnType<typeof start>> | null = null;
   try {
-    /* THE SAME ROOT KEY THE COPY WAS WRAPPED WITH, put where `init` looks for it: the case in which the vault opens. */
+    /* THE SAME ROOT KEY THE COPY WAS WRAPPED WITH, put where `init` looks for it: the case in which the keychain opens. */
     const lines = await cloudCopy(join(data, 'kek'));
     const file = join(data, 'nightly.brainl');
     writeFileSync(file, `${lines.join('\n')}\n`);
@@ -196,7 +196,7 @@ test('A COPY WRAPPED BY ANOTHER HOST’S ROOT KEY IS RESTORED AND SAYS, IN ONE S
     assert.ok(at >= 0, out.said);
     assert.match(
       said[at + 1]!,
-      /^  its vault and its signing key were wrapped by another host’s root key, [0-9a-f]{18}\. On this host its sealed credentials do not open and what it exports goes out unsigned; /,
+      /^  its keychain and its signing key were wrapped by another host’s root key, [0-9a-f]{18}\. On this host its sealed credentials do not open and what it exports goes out unsigned; /,
     );
     assert.equal(said.filter((l) => l.includes('root key')).length, 1, out.said);
     assert.ok(!out.said.includes('—'));

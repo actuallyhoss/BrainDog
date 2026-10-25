@@ -71,7 +71,7 @@ const BARE = routeSource.replace(CALL, '').match(/[^\n]*url\.pathname[^\n]*/g) ?
 /* THE DOORS, ONE OR MORE SAMPLE PATHS PER BRANCH OF `route()`. `/mcp/` is here because an MCP client configured with the
    slash reached the site's 404 page when measured, while `servesMcp` accepts it. `/healthz/` is not, as the
    bare `/auth` is not: the router forgives it, and nobody was measured asking it. `/a`, `/s` and `/ws` have no branch
-   because they are not built, and the site keeps its 404 page for them. The vault's doors are under `/api/`, so the
+   because they are not built, and the site keeps its 404 page for them. The keychain's doors are under `/api/`, so the
    site's `/api/*` carries them. */
 const DOOR_OF: { [asked: string]: string[] } = {
   'HEALTHZ.test': ['/healthz'],
@@ -80,7 +80,7 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesAccount: ['/account/usage'],
   servesMcp: ['/mcp', '/mcp/'],
   servesIn: ['/in/abc'],
-  servesVault: ['/api/vault/deposit'],
+  servesKeychain: ['/api/vault/deposit'],
   /* The file store, `PUT /api/files` and `GET /api/files/<sha256>`, under `/api/*` like every other
      door here, so the site's own entry already carries it. */
   servesFiles: ['/api/files/abc123'],

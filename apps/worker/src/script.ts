@@ -432,11 +432,11 @@ export class ScriptRuns {
     if (call.key !== null && !decl.keys.includes(call.key))
       return refuse({ code: 'FORBIDDEN', why: `${decl.id} asked for the key ${JSON.stringify(call.key)}, which it does not declare.` });
 
-    /* A DECLARED KEY THAT IS NOT IN THE VAULT IS THE HOST FAILING, NOT A RULE BROKEN. Accept checked it was there; if
+    /* A DECLARED KEY THAT IS NOT IN THE KEYCHAIN IS THE HOST FAILING, NOT A RULE BROKEN. Accept checked it was there; if
        it was revoked since, the script gets an error it may catch, and nothing is sent without it. */
     const grant = call.key === null ? null : turn.grant(call.key);
-    if (call.key !== null && grant === null) return { error: `The key "${call.key}" is not in the vault any more, so nothing was sent.` };
-    /* AND A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY OPENS, never the vault's `slash` key: `keyRefused`, which the
+    if (call.key !== null && grant === null) return { error: `The key "${call.key}" is not in the keychain any more, so nothing was sent.` };
+    /* AND A KEY GOES ONLY TO THE HOST ITS KEYCHAIN ENTRY OPENS, never the keychain's `slash` key: `keyRefused`, which the
        self-host's runner asks too, and a rule broken like the four above. Judged on `url`, the request being sent. */
     const broken = grant === null ? null : keyRefused(decl.id, grant, url);
     if (broken !== null) return refuse(broken);
@@ -560,7 +560,7 @@ export type ScriptWiring = {
   /** The executor for one run's declared origins: `actionExecutor` with this record's `keyOpener`. */
   send: (egress: readonly string[]) => Execute;
   /**
-   * A vault label to the grant a send opens, or `null` when the vault holds no such key. The row, never its bytes, and
+   * A keychain label to the grant a send opens, or `null` when the keychain holds no such key. The row, never its bytes, and
    * with what it opens, which decides where the key may go.
    */
   grant: (label: string) => ScriptGrant | null;

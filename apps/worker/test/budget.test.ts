@@ -11,7 +11,7 @@
  * next unrelated wake, which on a quiet record is hours.
  *
  * A SOURCE READ AND NOT A RUN, because driving it needs a Durable Object, an alarm and a Directory
- * stub, and what it would prove is that one argument is present. `vault.test.ts` guards the KEK
+ * stub, and what it would prove is that one argument is present. `keychain.test.ts` guards the KEK
  * readers the same way and for the same reason.
  */
 
