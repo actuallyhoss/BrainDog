@@ -282,7 +282,7 @@ const version = (): string => `app ${build()} · format ${FORMAT_VERSION} · ker
  */
 const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(envelope)}\n`);
 
-const usage = () =>
+const fullUsage = () =>
   [
     'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>] [--statusline]',
     "  Set this machine up from one record, in order: sign in unless it already is, add the hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, sync its skills, and make one token for each agent it wired, each approved in the app. One line per step, and it stops at the first that fails.",
@@ -343,27 +343,27 @@ const usage = () =>
     '  List what a catalogue holds, the Kennel when no --from is named, with what each can reach and call out to. Nothing is sent to a record.',
     'braindog usecase preview <file> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the file in its catalogue, to install and look at. Removed when it stops.',
-    'braindog pack new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml] [--from-page <file.dog>]',
+    'braindog addon new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml] [--from-page <file.dog>]',
     '  Write a starting add-on folder: its .pack.json (or .pack.yaml), a first page over a first list with two example rows, its test and a README.',
-    'braindog pack check <file|dir>',
+    'braindog addon check <file|dir>',
     '  Read an add-on, JSON or YAML, warn on any key its manifest does not take, and install it in a scratch record here, saying every refusal a record would give. Nothing is sent.',
-    'braindog pack test <dir>',
+    'braindog addon test <dir>',
     '  Install the add-on in a scratch record, write the rows in its <id>.test.json and say each expectation as passed or failed. Nothing is sent.',
-    'braindog pack preview <file|dir> [--port <n>]',
+    'braindog addon preview <file|dir> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the add-on in its catalogue, and print its page. Removed when it stops.',
-    'braindog pack diff|search|install|yank <...>',
+    'braindog addon diff|search|install|yank <...>',
     '  The same as for a use case: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
-    'braindog pack install <file> --force | braindog pack uninstall <id> [--force]',
-    '  --force on pack install or pack uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
-    'braindog pack publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
+    'braindog addon install <file> --force | braindog addon uninstall <id> [--force]',
+    '  --force on addon install or addon uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
+    'braindog addon publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
     '  Add an add-on version to a catalogue folder, or submit it to the Kennel and say whether it is listed or waits for review, signed with an author key or as the person signed in.',
     'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher>',
     "  The Kennel operator's review, with PROVISION_KEY set: what waits; show installs one in a scratch record and prints what it reaches and calls out to; list sends it with a preview of its pages; refuse says why; trust lists a publisher's files at once.",
-    'braindog pack key <file> --author <name>',
+    'braindog addon key <file> --author <name>',
     '  Make an author key in a file you choose, outside any repository. Keep it private: it signs what you publish.',
-    'braindog pack key rotate <old key file> <new key file> --to <folder>',
+    'braindog addon key rotate <old key file> <new key file> --to <folder>',
     '  Name a new key as the successor of the old one in a catalogue, signed by the old key, so readers who trusted it trust the new one.',
-    'braindog pack key revoke <key file> --to <folder> --reason <why> [--successor <key id>]',
+    'braindog addon key revoke <key file> --to <folder> --reason <why> [--successor <key id>]',
     '  Mark a key as untrusted in a catalogue, signed by that key. Versions it signed are said as untrusted and not offered.',
     'braindog automations list|show <id> [--host <host>]',
     '  Say every automation you can read, what starts it and how its runs went; or one, with its last ten runs step by step.',
@@ -404,7 +404,7 @@ const usage = () =>
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
-    "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
+    "  Serve BrainDog to an agent over stdin and stdout, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
     'braindog hook start|end|beat|prompt|tool|stop|watch|notify',
     '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. On a machine that has joined setup sync, end and the day\'s first start begin braindog sync push in the background and never wait for it. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh. notify is what Codex runs when a turn ends: when the run has not taken something you told it, this machine shows one notice saying so.',
     'braindog statusline [--beat-only]',
@@ -470,7 +470,7 @@ const usage = () =>
  */
 function helpOf(command: string): string[] {
   const blocks: string[][] = [];
-  for (const line of usage().split('\n')) {
+  for (const line of fullUsage().split('\n')) {
     if (line.startsWith('braindog ')) {
       const last = blocks.at(-1);
       if (last !== undefined && last.every((l) => l.startsWith('braindog '))) last.push(line);
@@ -480,6 +480,80 @@ function helpOf(command: string): string[] {
   const names = (l: string): boolean => l === `braindog ${command}` || l.startsWith(`braindog ${command} `);
   return blocks.filter((b) => b.some(names)).flat();
 }
+
+/**
+ * `braindog --help`: every command once, grouped by what a person does, one short line each. The long text of a command
+ * is `braindog <command> --help`, which prints that command's lines of `fullUsage`.
+ */
+const GROUPS: [string, [string, string][]][] = [
+  ['Sign in', [
+    ['setup <host>', 'Set this machine up from one record, in order'],
+    ['login <host>', 'Sign this machine in; approve six digits in the app'],
+    ['logout [<host>]', "Remove this machine's token for a host"],
+  ]],
+  ['Keys', [
+    ['keys list', 'The keys your record holds, never a value'],
+    ['keys put <label>', 'Deposit a key read from standard input'],
+    ['keys scan [<folder>]', 'Name the keys lying in a repository'],
+    ['keys exec|run <label> -- <cmd>', 'Run a command with one key in its environment'],
+    ['keys headers|helper <label>', 'Print a key for a program that reads it'],
+  ]],
+  ['Agents and sessions', [
+    ['mcp', 'Serve BrainDog to an agent over stdin and stdout'],
+    ['install [--apply]', "Add the hooks to Claude Code's settings"],
+    ['hook <event>', 'What Claude Code runs on session and tool events'],
+    ['statusline', "Draw Claude Code's status line"],
+    ['session <verb>', 'Read or change the run this folder is in'],
+    ['context', 'Print the card: this run, the next step, what waits'],
+    ['skills sync', "Write the record's skills where Claude Code reads them"],
+    ['tools scan|write', 'Record MCP servers, or show the entries to write'],
+    ['token create', 'Mint a token for an agent'],
+    ['runner <verb>', 'Run approved jobs on this machine'],
+  ]],
+  ['Records', [
+    ['export / import / verify', 'Back up, restore or check a .brainl file'],
+    ['page pull|push|check', 'Fetch, set or validate a page as a .dog file'],
+    ['attach <file.html> --on <thing>', 'Put a page on a task, project or decision'],
+    ['usecase <verb>', 'Export, check, install or publish a use case'],
+    ['automations <verb>', 'List, show, run or cancel automations'],
+    ['actions run <name>', 'Run a scheduled action now'],
+    ['scripts resume <id>', 'Start a paused script again'],
+    ['people harvest', 'Meet the people who committed to your projects'],
+    ['signs', "Say your record's vital signs"],
+    ['tidy', 'Say what went stale and the call that clears each'],
+    ['understand', 'Say what your record would link'],
+    ['private-terms', 'Write your private list from your own record'],
+    ['feed propose <file>', 'Ask for each live feed a setup file lists'],
+  ]],
+  ['Add-ons', [
+    ['addon new|check|test|preview', 'Write, check and try an add-on here (also: pack)'],
+    ['addon install|uninstall <id>', 'Ask the owner to install an add-on, or remove one'],
+    ['addon publish|yank|diff|search', 'Publish, take back, compare or find add-ons'],
+    ['addon key <verb>', 'Make, rotate or revoke an author key'],
+    ['kennel review', "The Kennel operator's review"],
+  ]],
+  ['Sync', [
+    ['sync inventory|join|push|pull', "Carry this machine's setup to another"],
+    ['sync patches|drill|retire', 'Restore unpushed work, test a bundle, retire a machine'],
+    ['env diff|apply|pins|check', 'Compare and set up every Claude Code profile'],
+  ]],
+  ['Other', [
+    ['doctor', 'List what still names a replaced tool or holds a key'],
+    ['init <slug> / serve', 'Create or serve a record on this machine'],
+    ['update [--check]', 'Replace this command with the build that is out'],
+    ['--version', 'The build and the formats it speaks'],
+  ]],
+];
+
+const usage = (): string =>
+  [
+    "braindog <command> [options]   (braindog <command> --help for that command's lines)",
+    ...GROUPS.flatMap(([title, rows]) => ['', `${title}:`, ...rows.map(([name, line]) => `  ${name.padEnd(34)}${line}`)]),
+    '',
+    `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
+    'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
+    '--json answers with one JSON document on stdout; mcp, hook, setup, run and serve do not take it.',
+  ].join('\n');
 
 /** Whether the words before any `--` ask for help: what follows `--` is a command `keys exec` and `run` hand on. */
 const asksHelp = (args: readonly string[]): boolean => {
@@ -1132,7 +1206,10 @@ function install(args: string[]): void {
  */
 const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'attach', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'env', 'sync', 'actions']);
 
-const [command, ...rest] = process.argv.slice(2);
+/* `pack` IS THE OLD NAME OF `addon`, kept working: both are the one handler, with the same subcommands. */
+const [named, ...rest] = process.argv.slice(2);
+const command = named === 'addon' ? 'pack' : named;
+const helpName = (c: string): string => (c === 'pack' ? 'addon' : c);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
    so no command's own `parseArgs` has to know a global exists. */
 const cut = takeJson(rest);
@@ -1161,8 +1238,8 @@ try {
        comparing one of them against its own would be splitting a sentence to get it back. */
     if (json) emit({ ok: true, value: { app: build(), format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES_VERSION } });
     else process.stdout.write(`${version()}\n`);
-  } else if (command !== undefined && command !== 'help' && asksHelp(rest) && helpOf(command).length > 0) {
-    const lines = helpOf(command);
+  } else if (command !== undefined && command !== 'help' && asksHelp(rest) && helpOf(helpName(command)).length > 0) {
+    const lines = helpOf(helpName(command));
     if (json) {
       for (const line of lines) json.out(line);
       emit(json.envelope(0));

@@ -719,14 +719,34 @@ test('nothing is listed as coming later, and an unknown command is not echoed un
 
   const help = run('--help');
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /^braindog login <host> \[--vault <project\|\*>\]\n[\s\S]*^braindog keys put <label>[\s\S]*^braindog keys exec <label[\s\S]*^braindog skills sync \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools scan \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools write \[--scope user\|project\] \[--dry-run\]\n[\s\S]*^braindog mcp /m);
+  /* THE HELP IS GROUPED BY WHAT A PERSON DOES, one short line a command; the long text is the command's own --help. */
+  const rows = help.stdout.split(/\r?\n/);
+  assert.ok(rows.length < 80, `${rows.length} lines`);
+  const groups = ['Sign in:', 'Keys:', 'Agents and sessions:', 'Records:', 'Add-ons:', 'Sync:', 'Other:'];
+  const at = groups.map((g) => rows.indexOf(g));
+  assert.ok(at.every((n) => n >= 0) && at.every((n, k) => k === 0 || n > at[k - 1]!), `groups out of order: ${at}`);
+  for (const row of rows.filter((l) => l.startsWith('  '))) assert.ok(row.length <= 90, row);
+  assert.match(help.stdout, /^  login <host> +\S/m);
+  assert.match(help.stdout, /^  keys put <label> +\S/m);
+  assert.match(help.stdout, /^  addon new\|check\|test\|preview +\S.*\(also: pack\)$/m);
+  assert.doesNotMatch(help.stdout, /^braindog (?:login|keys|addon|pack) /m);
+
+  /* A COMMAND'S OWN HELP KEEPS ITS LONG TEXT, and `pack` answers as `addon` does. */
+  const own = run('keys', '--help');
+  assert.equal(own.status, 0);
+  assert.match(own.stdout, /^braindog keys put <label>/m);
+  const addon = run('addon', '--help');
+  assert.equal(addon.status, 0);
+  assert.match(addon.stdout, /^braindog addon new <id>/m);
+  assert.doesNotMatch(addon.stdout, /braindog pack /);
+  assert.equal(run('pack', '--help').stdout, addon.stdout);
   assert.doesNotMatch(help.stdout, /Not built yet: .*(?:skills|tools)/);
 
   /* EVERY COMMAND THE SERVER'S INSTRUCTIONS NAME IS ONE THIS HELP LISTS. They told every agent to run
      `braindog key add`, which was never a command, so the one way to deposit a key was a typo. */
   const named = [...INSTRUCTIONS.matchAll(/braindog ([a-z]+(?: [a-z]+)?)/g)].map((m) => m[1]!);
   assert.ok(named.length > 0, 'the instructions name no command, so this proves nothing');
-  for (const command of named) assert.match(help.stdout, new RegExp(`^braindog ${command}(?![a-z])`, 'm'), command);
+  for (const command of named) assert.match(help.stdout, new RegExp(`^  ${command}(?![a-z])`, 'm'), command);
 });
 
 /* ── last, over everything above ───────────────────────────────────────── */

@@ -1045,7 +1045,7 @@ function planAgentSkill(file: string, options: Options): Plan {
  * record retires the list and keeps every item in it, and a version that declares the list again puts it back. Every
  * other refusal (a stale plan, a rename, a type change, a call out nobody approved) stands and prints as it always has.
  */
-export const FORCE_USAGE = '--force on pack install or pack uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.';
+export const FORCE_USAGE = '--force on addon install or addon uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.';
 
 /**
  * The three record calls the forced commands make, as `@braindog/client` names them. A stand-in in the tests.
@@ -1085,7 +1085,7 @@ const removalsOf = (diff: unknown): Removal[] => {
 };
 
 /**
- * `braindog pack install <file> [--force]` once the file is read, and `braindog pack uninstall <id> [--force]`, against
+ * `braindog addon install <file> [--force]` once the file is read, and `braindog addon uninstall <id> [--force]`, against
  * the record. Answers the exit code.
  *
  * WITHOUT `--force` NOTHING CHANGES: a plan taking a list away from its items is refused `WOULD_ORPHAN` by the record and
@@ -1117,7 +1117,7 @@ export async function forcedPack(
   if (!planned.ok) return refuse(io, planned, saidOf(planned));
   const diff = (planned.value as { diff?: { planHash?: unknown; pack?: { id?: unknown; version?: unknown } } } | null)?.diff;
   if (typeof diff?.planHash !== 'string') {
-    io.say('The record answered no plan for this add-on. Read it again with braindog pack install --dry-run.');
+    io.say('The record answered no plan for this add-on. Read it again with braindog addon install --dry-run.');
     return 1;
   }
   const put = await client.installPack({ doc: given.doc, planHash: diff.planHash, ...(force ? { retireWithRows: true } : {}) });

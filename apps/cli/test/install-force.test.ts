@@ -123,6 +123,6 @@ test('THE FLAG IS READ BEFORE --, the line names two lists, and the usage says w
     forcedLine([{ retire: 'services', name: 'Services', rows: 41 }, { retire: 'jobs', name: 'Jobs', rows: 1 }]),
     'Forced: Services keeps its 41 items and Jobs keeps its 1 item, retired.',
   );
-  assert.match(FORCE_USAGE, /--force on pack install or pack uninstall/);
+  assert.match(FORCE_USAGE, /--force on addon install or addon uninstall/);
   assert.doesNotMatch(FORCE_USAGE, /\u2014/u);
 });

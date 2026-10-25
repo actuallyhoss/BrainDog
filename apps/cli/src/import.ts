@@ -1782,7 +1782,7 @@ export async function applyPlan(
       /* A PACK THE CATALOGUE COULD NOT GIVE IS SAID WITH WHY, and nothing is filed: an offer with no document behind it is
          a question whose yes installs nothing. */
       if (pack.doc === null) {
-        tally.waiting.push(`${pack.says} (the ${pack.install} pack) was not filed on Decide: ${pack.unfound ?? 'no catalogue gave it'}. Install it with braindog pack install ${pack.install}, or run the import again once the catalogue holds it.`);
+        tally.waiting.push(`${pack.says} (the ${pack.install} pack) was not filed on Decide: ${pack.unfound ?? 'no catalogue gave it'}. Install it with braindog addon install ${pack.install}, or run the import again once the catalogue holds it.`);
         continue;
       }
       const requires = isObj(pack.doc.requires) && isObj(pack.doc.requires.packs) ? pack.doc.requires.packs['money-core'] : undefined;

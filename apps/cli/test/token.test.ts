@@ -73,7 +73,7 @@ test('--inbox MINTS A TOKEN THAT READS THE INBOX ON A SELF-HOST, printed once; w
 
   assert.equal(await tokenCommand(['create', '--name', 'triage', '--inbox'], s.io), 0, s.said.join('\n'));
   assert.equal(s.out.length, 4, s.out.join('\n'));
-  assert.match(s.out[0]!, /^token t_\S+ · triage · read · reads the inbox · expires \d{4}-\d{2}-\d{2}$/);
+  assert.match(s.out[0]!, /^triage · read · reads the inbox · expires \d{4}-\d{2}-\d{2} · t_\S+$/);
   assert.equal(s.out[1], '');
   assert.equal(s.out[3], 'shown once');
   const granted = s.out[2]!;
@@ -86,7 +86,7 @@ test('--inbox MINTS A TOKEN THAT READS THE INBOX ON A SELF-HOST, printed once; w
   /* THE SAME COMMAND WITHOUT THE FLAG: a token for the whole record, from the owner, refused at the inbox. */
   s.out.length = 0;
   assert.equal(await tokenCommand(['create', '--name', 'laptop'], s.io), 0, s.said.join('\n'));
-  assert.match(s.out[0]!, /^token t_\S+ · laptop · read · expires /);
+  assert.match(s.out[0]!, /^laptop · read · expires \S+ · t_\S+$/);
   const without = await s.inbox(s.out[2]!);
   assert.equal(without.status, 403, JSON.stringify(without.body));
   assert.equal(without.body.refusal?.code, 'FORBIDDEN');

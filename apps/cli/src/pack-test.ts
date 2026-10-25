@@ -85,7 +85,7 @@ export function runPackTest(scratch: Scratch, test: PackTest): TestRun {
   const lines: string[] = [];
   const ids: string[] = [];
   for (const [i, row] of test.rows.entries()) {
-    const put = scratch.kernel.create(row.list, row.fields, { actor: 'p_scratch', note: 'Written by braindog pack test.' });
+    const put = scratch.kernel.create(row.list, row.fields, { actor: 'p_scratch', note: 'Written by braindog addon test.' });
     if (!put.ok) {
       const r = 'refusal' in put ? put.refusal : null;
       lines.push(`  FAILED  row ${i + 1} into ${oneLine(row.list)} was refused: ${r ? oneLine(`${r.fix} (${r.code})`) : 'the record did not write it.'}`);

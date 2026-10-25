@@ -208,9 +208,9 @@ const packReadme = (id: string, title: string, file: string): string =>
   [
     `# ${title}`,
     `What ${title} adds to a BrainDog, in one sentence.`,
-    `Edit ${file}, then run braindog pack check ${id} to see what a record would say about it.`,
-    `Run braindog pack test ${id} to write the rows in ${testFileName(id)} into a scratch record and check what it expects.`,
-    `Publish it with braindog pack publish ${file} --kennel, signed with --sign <key file> or as the person signed in.`,
+    `Edit ${file}, then run braindog addon check ${id} to see what a record would say about it.`,
+    `Run braindog addon test ${id} to write the rows in ${testFileName(id)} into a scratch record and check what it expects.`,
+    `Publish it with braindog addon publish ${file} --kennel, signed with --sign <key file> or as the person signed in.`,
     '',
   ].join('\n');
 
@@ -262,12 +262,12 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
       options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' }, 'from-page': { type: 'string' } },
     }));
   } catch {
-    io.say('braindog pack new takes an id, and --title, --author, --out <folder>, --yaml and --from-page <file.dog>.');
+    io.say('braindog addon new takes an id, and --title, --author, --out <folder>, --yaml and --from-page <file.dog>.');
     return 1;
   }
   const [id, ...more] = positionals;
   if (!id || more.length > 0 || !ID.test(id) || id.length < 2) {
-    io.say('braindog pack new takes one id of lower-case letters, digits and dashes, as in braindog pack new reading-club.');
+    io.say('braindog addon new takes one id of lower-case letters, digits and dashes, as in braindog addon new reading-club.');
     return 1;
   }
   const words = id.replace(/-/gu, ' ');
@@ -309,7 +309,7 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
   writeFileSync(join(dir, testFileName(id)), `${JSON.stringify(packStarterTest(), null, 2)}\n`);
   writeFileSync(join(dir, 'README.md'), packReadme(id, title, file));
   const holds = fromPage === undefined ? 'one list, a page over it and two example rows' : `what ${basename(fromPage)} shows`;
-  io.out(`${title} 1.0.0 written to ${dir}: ${file} with ${holds}, ${testFileName(id)} and a README. Check it with braindog pack check ${values.out ?? id}, and test it with braindog pack test ${values.out ?? id}.`);
+  io.out(`${title} 1.0.0 written to ${dir}: ${file} with ${holds}, ${testFileName(id)} and a README. Check it with braindog addon check ${values.out ?? id}, and test it with braindog addon test ${values.out ?? id}.`);
   for (const line of taken) io.out(line);
   return 0;
 }
@@ -370,7 +370,7 @@ async function createUseCase(args: string[], io: AgentIo): Promise<number> {
 async function checkPack(args: string[], io: AgentIo): Promise<number> {
   const [file, ...more] = args;
   if (!file || more.length > 0 || file.startsWith('-')) {
-    io.say('braindog pack check takes one file or folder, as in braindog pack check bookshelf or braindog pack check bookshelf/bookshelf.pack.json.');
+    io.say('braindog addon check takes one file or folder, as in braindog addon check bookshelf or braindog addon check bookshelf/bookshelf.pack.json.');
     return 1;
   }
   const read = await readFileAs(file, io, 'pack');
@@ -406,7 +406,7 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
 async function testPack(args: string[], io: AgentIo): Promise<number> {
   const [given, ...more] = args;
   if (!given || more.length > 0 || given.startsWith('-')) {
-    io.say('braindog pack test takes the folder a pack is in, as in braindog pack test bookshelf.');
+    io.say('braindog addon test takes the folder a pack is in, as in braindog addon test bookshelf.');
     return 1;
   }
   const read = await readFileAs(given, io, 'pack');
@@ -418,7 +418,7 @@ async function testPack(args: string[], io: AgentIo): Promise<number> {
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch {
-    io.say(`There is no test to run: ${path} is missing or is not JSON. braindog pack new writes one to start from.`);
+    io.say(`There is no test to run: ${path} is missing or is not JSON. braindog addon new writes one to start from.`);
     return 1;
   }
   const test = readPackTest(doc);
@@ -1318,7 +1318,7 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id> [--yaml] [--from-page <file.dog>], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
+  'braindog addon takes new <id> [--yaml] [--from-page <file.dog>], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
 
 /**
  * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for
@@ -1347,7 +1347,7 @@ async function installPackFile(given: string, host: string | undefined, io: Agen
   return proposePack(read.file.file.pack.manifest.pack, read.file.file.doc, question, host, io);
 }
 
-/** `braindog pack …`: the add-on half of the SDK. */
+/** `braindog addon …`: the add-on half of the SDK. */
 export async function pack(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'check') return checkPack(rest, io);
@@ -1368,7 +1368,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
     }
     const [given, ...more] = positionals;
     if (!given || more.length > 0) {
-      io.say('braindog pack install takes one id or one .pack.json file, as in braindog pack install project-brief or braindog pack install packs/project-brief/project-brief.pack.json.');
+      io.say('braindog addon install takes one id or one .pack.json file, as in braindog addon install project-brief or braindog addon install packs/project-brief/project-brief.pack.json.');
       return 1;
     }
     const dryRun = values['dry-run'] === true;
@@ -1395,7 +1395,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
     const { force, rest: left } = (await import('./install.ts')).takeForce(rest);
     const [id, ...more] = left;
     if (!id || more.length > 0 || !ID.test(id)) {
-      io.say('braindog pack uninstall takes one add-on id, as in braindog pack uninstall project-brief.');
+      io.say('braindog addon uninstall takes one add-on id, as in braindog addon uninstall project-brief.');
       return 1;
     }
     const { connect } = await import('./skills.ts');

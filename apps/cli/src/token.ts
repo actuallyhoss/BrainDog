@@ -162,7 +162,7 @@ export async function tokenCommand(args: string[], io: TokenIo): Promise<number>
   }
 
   const expires = typeof minted.expires_at === 'string' ? minted.expires_at.slice(0, 10) : '';
-  io.out(`token ${minted.id} · ${values.name ?? 'no name'} · ${minted.scope}${inbox ? ' · reads the inbox' : ''} · expires ${expires}`);
+  io.out(`${values.name ?? 'no name'} · ${minted.scope}${inbox ? ' · reads the inbox' : ''} · expires ${expires} · ${minted.id}`);
   io.out('');
   io.out(minted.bearer);
   io.out('shown once');
