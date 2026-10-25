@@ -118,7 +118,7 @@
 {/snippet}
 
 {#snippet change(k: KpiView)}
-  {#if k.change || k.when}
+  {#if k.change || k.when || k.aged}
     <p class="kpi-meta">
       {#if k.change}
         <span class="kpi-change" data-tone={k.change.tone} data-dir={k.change.dir}
@@ -127,11 +127,12 @@
             >{/if}{k.change.said}</span
         >
         <span class="kpi-against">{k.change.against}</span>
-      {:else}
+      {:else if k.when}
         <span class="kpi-against">{k.when}</span>
       {/if}
-      <!-- AN OLD READING SAYS ITS DAY beside the change it is read against (`aged`, more than a week). -->
-      {#if k.aged && k.change}<span class="kpi-against" data-old="">{k.aged}</span>{/if}
+      <!-- AN OLD READING SAYS ITS DAY, beside the change it is read against or alone (`aged`, more than a week): a figure
+           with no change line (a target a year out) said nothing of its age (audit P24). -->
+      {#if k.aged}<span class="kpi-against" data-old="">{k.aged}</span>{/if}
     </p>
   {/if}
 {/snippet}

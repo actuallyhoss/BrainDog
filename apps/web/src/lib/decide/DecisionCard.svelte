@@ -52,6 +52,7 @@
   import '@braindog/skin/kinds/queue.css';
   import './form.css';
   import OptionVisual from './OptionVisual.svelte';
+  import { foldedLine, plainReason, repeatedReasons, sharedBefore } from './fold.ts';
   import { visualOf as optionVisualOf, type VisualContext } from './option-visual.ts';
   import { groundNow, want } from './ground.svelte.ts';
   import { getContext, tick, untrack } from 'svelte';
@@ -180,6 +181,18 @@
   const hardLine = $derived(hardSaid(card, primary));
   const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
   /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
+  /* THE WORDS A LONG LIST REPEATS ARE SAID ONCE OVER IT (`fold.ts`). */
+  const visualOfWay = (way: Way) => optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: recordNow(), home: grounded?.home ?? null });
+  const folded = $derived(repeatedReasons(card.ways.map((w) => w.because)));
+  const same = $derived(
+    sharedBefore(
+      card.ways.flatMap((w) => {
+        const v = w.shows ? null : visualOfWay(w);
+        return v?.kind === 'change' ? [{ what: v.what, before: v.before }] : [];
+      }),
+    ),
+  );
+  const foldLines = $derived([...[...folded].map(([b, c]) => foldedLine(b, c)), ...(same !== null ? [`Each takes ${same}.`] : [])]);
   const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !drawn));
   /* THE ANSWER CHOSEN: the reader's, or the one the form starts on (the suggestion, where a key may give it). */
   let picked = $state<string | null>(null);
@@ -588,9 +601,10 @@
       >{:else if way.shows && 'file' in way.shows}<span class="queue-visual" data-shows="file"><img class="queue-file dc-choice-file" src={way.shows.file.src} alt="" /></span
       >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
-    {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
-    <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. -->
-    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: recordNow(), home: grounded?.home ?? null })} />{/if}
+    {#if way.because && !folded.has(way.because)}<span class="dc-choice-does" dir="auto">{plainReason(way.because)}</span>{/if}
+    <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. A change every
+         row shares is said once over the list (`fold.ts`), and its row keeps its name. -->
+    {#if !way.shows}{@const v = visualOfWay(way)}{#if !(v?.kind === 'change' && same !== null && v.before === same)}<OptionVisual visual={v} />{/if}{/if}
   </span>
 {/snippet}
 
@@ -764,6 +778,7 @@
       {:else if listed}
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
+        {#each foldLines as line (line)}<p class="dc-fold" dir="auto">{line}</p>{/each}
         <ul class="queue-options dc-choices" role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
           {#each card.ways as way, i (way.key)}
             {@const marked = way.recommended}

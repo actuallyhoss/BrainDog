@@ -51,7 +51,7 @@ export const commentWords = {
   heading: 'Comments',
   reading: 'Reading the comments.',
   /** NOTHING, WHERE NOTHING HAS BEEN SAID (today F9): the field under the heading is the whole of an empty thread. */
-  none: '',
+  none: 'No comments yet',
   addLabel: 'Add a comment',
   add: 'Add comment',
   reply: 'Reply',
@@ -99,6 +99,9 @@ export function threadsOf(lines: readonly Line[]): Thread[] {
   return threads;
 }
 
+/** How long a thread may take to read before it says it could not. */
+const READ_MS = 10_000;
+
 type Failed = { ok: false; refusal?: { code: string; fix: string } };
 
 const failedOf = (out: Failed): Said => ({
@@ -108,7 +111,11 @@ const failedOf = (out: Failed): Said => ({
 
 /** The thread on one thing, named as the record takes it: `tasks#3`, `suggestion:<id>` or `decision:<id>`. */
 export async function readThread(base: string, on: string, clock: () => number = Date.now): Promise<Heard> {
-  const out = (await createClient({ base }).comments(on)) as { ok: true; value: Line[] } | Failed;
+  /* A READ THAT NEVER ANSWERS SETTLES AS UNREACHABLE, so the card never says Reading for good (audit P21). */
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<Failed>((done) => (timer = setTimeout(() => done({ ok: false, refusal: { code: 'UNREACHABLE', fix: '' } }), READ_MS)));
+  const out = (await Promise.race([createClient({ base }).comments(on), slow])) as { ok: true; value: Line[] } | Failed;
+  clearTimeout(timer);
   if (out.ok) return { from: 'live', lines: out.value, now: clock() };
   if (out.refusal === undefined || out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', why: out.refusal?.fix ?? '' };
   return { from: 'refused', fix: out.refusal.fix };

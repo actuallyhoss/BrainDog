@@ -519,3 +519,24 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     margin-inline-start: 0;
   }
 }
+
+/* WHAT AN OPTION WOULD CHANGE (`.ov`) LIES UNDER ITS WORDS, FROM THE NAME'S EDGE TO THE END: left to the grid's auto-placement
+   it fell into the end column, so the left column stopped short and the figure ran into a long name (audit P2). */
+.dc-choice-main > .ov {
+  grid-column: 2 / -1;
+  grid-row: auto;
+  margin-block-start: var(--sp-1);
+}
+
+.dc-choice-name {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* WHAT A LONG LIST SAYS OF MANY ROWS AT ONCE, over the list ("12 have nothing kept for ... yet."). */
+.dc-fold {
+  margin: 0 0 var(--sp-2);
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}

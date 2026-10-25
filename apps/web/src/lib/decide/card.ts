@@ -380,6 +380,9 @@ export function askerOf(q: QueueQuestion, me: string | null = null, names: Reado
   const named = (v: unknown): string | null => nameOrNull(typeof v === 'string' ? spoken(v) : v);
   const runName = r ? (named(r.name) ?? named(r.title)) : named(run);
   const app = nameOrNull(field(q, 'app')) ?? (r ? (nameOrNull(r.app) ?? nameOrNull(r.client)) : null);
+  /* A SIGNER THE READER HOLDS NO NAME FOR IS NAMED BY THE RUN THAT FILED IT where there is one, an agent or script by its
+     title, and not "Someone on this record" over a question a named run asked (audit P21). */
+  if (who.name === copy.feedSomeone && runName !== null) return { name: app ?? runName, kind: 'agent', app: null, run: app === null ? null : runName };
   /* A RUN SIGNS AS ITS HANDLE (`S42`), which `actor` says as An agent: where the record names the app it ran in, that
      is the name, so the by-line reads "Claude Code · Tidy invoices" and not "An agent · Claude Code". */
   if (who.kind === 'agent' && who.name === nameWords.agent && app !== null) return { name: app, kind: 'agent', app: null, run: runName };
