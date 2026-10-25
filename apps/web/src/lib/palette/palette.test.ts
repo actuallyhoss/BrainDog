@@ -38,7 +38,7 @@ const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../
 
 
 /** A command that passes, so a fixture below can fail on one property at a time. */
-const good: Command = { id: 'fixture', title: 'Open the vault', href: '/vault', group: 'Go to', icon: 'vault' };
+const good: Command = { id: 'fixture', title: 'Open the Keychain', href: '/keychain', group: 'Go to', icon: 'vault' };
 
 /* ── the rule, applied to the list ────────────────────────────────────────── */
 
@@ -81,7 +81,7 @@ test('a command whose name is not a word anybody types is refused', () => {
   for (const title of ['', '···', '»', 'a b'])
     assert.equal(admits({ ...good, title }), 'unsayable', `"${title}" was admitted as a name`);
   /* And it is not simply refusing everything short: two of the shipped rows are one word. */
-  assert.equal(admits({ ...good, title: 'Vault' }), null);
+  assert.equal(admits({ ...good, title: 'Keychain' }), null);
 });
 
 test('the three tests are taken in order, so a refusal names the first thing wrong with the row', () => {

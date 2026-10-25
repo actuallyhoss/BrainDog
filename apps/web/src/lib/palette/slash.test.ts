@@ -8,7 +8,7 @@
  *
  * AND THE ANSWER IS DRAWN BY CODE, NOT BY A MODEL. A `Reading` is a predicate, the rows it matched and what was read; what
  * this file checks is that the predicate comes out as words a person can check against the rows, that each row is an
- * address, and that the fold ends on the vault, refused, every time (`23 §6`), including for an engine that forgot to say so.
+ * address, and that the fold ends on the Keychain, refused, every time (`23 §6`), including for an engine that forgot to say so.
  */
 
 import { test } from 'node:test';
@@ -124,7 +124,7 @@ test('A READING IS DRAWN AS THE PREDICATE, THEN THE ROWS AS ADDRESSES, THEN THE 
   assert.equal(copy.slashGrantRefused, 'grant: refused');
 });
 
-test("THE FOLD'S LAST LINE IS THE VAULT, REFUSED, even when the engine left it off, and it is never said twice", () => {
+test("THE FOLD'S LAST LINE IS THE KEYCHAIN, REFUSED, even when the engine left it off, and it is never said twice", () => {
   const forgot = drawReading({ ...READING, read: READING.read.slice(0, 1) });
   assert.equal(forgot.fold.at(-1), copy.slashGrantRefused);
   assert.equal(drawReading(READING).fold.filter((l) => l === copy.slashGrantRefused).length, 1);

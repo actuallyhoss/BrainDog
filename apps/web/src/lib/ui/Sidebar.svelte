@@ -285,7 +285,7 @@
     { href: '/automations', label: copy.automations, icon: 'refresh' },
     { href: '/jobs', label: copy.jobs, icon: 'play' },
     { href: '/packs', label: copy.packs, icon: 'packs' },
-    { href: '/vault', label: copy.vault, icon: 'vault' },
+    { href: '/keychain', label: copy.keychain, icon: 'vault' },
     { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 

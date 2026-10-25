@@ -12,7 +12,7 @@ import { chordOf, gotoOf, hrefOf, sayGoto, type Goto } from './goto.ts';
 /** Where a letter goes in a list already read. */
 const to = (list: readonly Goto[], key: string) => list.find((l) => l.key === key)?.href;
 
-const LEARNT = { h: '/', d: '/decide', i: '/inbox', s: '/search', v: '/vault', p: '/packs', ',': '/settings/appearance' };
+const LEARNT = { h: '/', d: '/decide', i: '/inbox', s: '/search', k: '/keychain', p: '/packs', ',': '/settings/appearance' };
 
 test('the seven somebody learnt keep their letters, with or without the rail drawing them', () => {
   for (const rows of [[], [{ href: '/p/projects', name: 'Projects' }, { href: '/', name: 'Today' }]]) {
@@ -85,11 +85,11 @@ test('a learnt place the rail draws is said by the rail name, and an accent is i
 test('the sheet prints the same list, and the `g` row takes it', () => {
   const rows = [{ href: '/s/money', name: 'Money' }];
   const line = chordOf(gotoOf(rows));
-  assert.equal(line.key, 'g then h d i s v p , m');
-  assert.equal(line.label, 'Go to Today, Needs you, Inbox, Search, Vault, Add-ons, Settings, Money');
+  assert.equal(line.key, 'g then h d i s k p , m');
+  assert.equal(line.label, 'Go to Today, Needs you, Inbox, Search, Keychain, Add-ons, Settings, Money');
   const row = BINDINGS.find((b) => b.id === 'goto')!;
   const was = { key: row.key, label: row.label };
-  assert.equal(was.key, 'g then h d i s v p ,', 'before the layout hands a list, the row says the seven');
+  assert.equal(was.key, 'g then h d i s k p ,', 'before the layout hands a list, the row says the seven');
   sayGoto(rows);
   assert.deepEqual({ key: row.key, label: row.label }, line);
   Object.assign(row, was);

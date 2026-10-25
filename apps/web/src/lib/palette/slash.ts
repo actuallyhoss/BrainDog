@@ -11,7 +11,7 @@
  *
  * WHAT THE ANSWER DRAWS is pass 1 of `46 §5.4`: the predicate Slash drafted, in words and BEFORE the rows, so a person reads
  * what was asked of the record before reading what it answered; the rows, drawn by code as addresses; and the fold, whose
- * last line is the vault, refused, on every ask (`23 §6`). The model writes none of the words below. It chose a predicate,
+ * last line is the Keychain, refused, on every ask (`23 §6`). The model writes none of the words below. It chose a predicate,
  * and the predicate is data.
  */
 
@@ -149,7 +149,7 @@ export type Drawn = { where: string | null; q: string | null; rows: DrawnRow[]; 
 /**
  * A `Reading`, as the palette draws it.
  *
- * THE VAULT'S LINE IS WRITTEN HERE AND NOT COPIED FROM THE ANSWER. The engine appends `{ register: 'grant', rows: 0,
+ * THE KEYCHAIN'S LINE IS WRITTEN HERE AND NOT COPIED FROM THE ANSWER. The engine appends `{ register: 'grant', rows: 0,
  * predicate: 'refused' }` to every trace, and `23 §6` says the line is drawn every time, including when nothing about
  * credentials was asked. So the drawing does not depend on the engine remembering: the engine's line is dropped wherever it
  * is, and the one line is put last, which also means it can never be drawn twice. Only the refused line is dropped, so a

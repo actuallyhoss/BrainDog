@@ -1903,7 +1903,7 @@
     font-weight: 500;
   }
 
-  /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the vault, refused, drawn every time. */
+  /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the Keychain, refused, drawn every time. */
   .p-slash-fold {
     padding: var(--sp-2) var(--sp-4) var(--sp-3);
     color: var(--ink-3);

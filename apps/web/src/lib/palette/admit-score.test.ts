@@ -21,8 +21,8 @@ const row = (id: string, title: string, aliases?: string[], group = 'Go to'): Co
 });
 const ids = (list: { id: string }[]) => list.map((c) => c.id);
 
-test('"mail" ranks Inbox first, "keys" the Vault and "questions" Needs you', () => {
-  for (const [typed, want] of [['mail', 'c-inbox'], ['secrets', 'c-vault'], ['keys', 'c-vault'], ['questions', 'c-decide']] as const)
+test('"mail" ranks Inbox first, "keys" the Keychain and "questions" Needs you', () => {
+  for (const [typed, want] of [['mail', 'c-inbox'], ['secrets', 'c-keychain'], ['keys', 'c-keychain'], ['questions', 'c-decide']] as const)
     assert.equal(ranked(commands(live), typed)[0]?.id, want, `"${typed}" did not lead with ${want}`);
 });
 

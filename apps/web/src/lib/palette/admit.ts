@@ -9,7 +9,7 @@
  * So the rule is written at the top of this file. A command belongs here when it can be STARTED WITHOUT FIRST CHOOSING WHERE, and
  * three tests decide it. All three have to pass:
  *
- *   1. NO OBJECT IS REQUIRED BEFORE IT. "Open the vault" always makes sense. "File this row under
+ *   1. NO OBJECT IS REQUIRED BEFORE IT. "Open the Keychain" always makes sense. "File this row under
  *      Groceries" needs the row first, so it lives on the row. Mechanically: the address names its
  *      whole target, with no placeholder segment left for something you have not picked yet.
  *   2. IT MEANS THE SAME THING FROM EVERY SCREEN. A period filter on the spending view is a control
@@ -270,7 +270,7 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'today', aliases: ['start', 'today', 'dashboard', 'overview'] },
   { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide', aliases: ['questions', 'approve', 'approvals', 'pending'] },
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
-  { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault', aliases: ['keys', 'secrets', 'passwords', 'tokens'] },
+  { id: 'c-keychain', title: copy.keychain, href: '/keychain', group: copy.destinations, icon: 'vault', aliases: ['vault', 'keys', 'secrets', 'passwords', 'tokens'] },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install'] },
   /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, folded into the palette (batch 5d). The bare
      `/slash` opens the palette itself (`routes/slash/+page.ts`), so this row goes to the history. */
