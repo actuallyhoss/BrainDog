@@ -80,7 +80,8 @@ export async function context(args: string[], io: AgentIo): Promise<number> {
       const headers = await asked.headers(to.key);
       return clientFor(to, async () => (ahead === undefined ? headers : { ...headers, 'x-braindog-ahead': ahead }), AbortSignal.timeout(budgetOf(io.env))).context();
     })) ?? at.context;
-  const record = cardOf(c);
+  /* A person at a terminal cannot make a tool call, so the shell says the command; the hook's card keeps the tool's words. */
+  const record = cardOf(c)?.map((l) => l.replace(/^(More\s+)call context for the full picture$/u, '$1braindog context --json')) ?? null;
   const [device, decides] = await Promise.all([record === null ? (io.device ?? deviceName(io.env, at.to.key)) : '', asksWaiting(c) ? whoDecides(at.client) : null]);
   const claude = inClaudeCode(io.env);
   let text: string;

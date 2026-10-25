@@ -4020,6 +4020,8 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown, inTex
   const ruled = ruledOf(value);
   const landed = ruled !== null && !('filed' in ruled);
   if (!landed && (name === 'propose' || (isObject(value) && 'filed' in value))) return `${head} Nothing was written, so there is nothing to undo.`;
+  /* A NAME ALONE IS NOTED, NOT WRITTEN: `meet` says `mention` and files no question, so there is nothing to put back. */
+  if (name === 'meet' && isObject(value) && value.mention === true && value.question === undefined) return `${head} Nothing was written.`;
   return `${head} No undo handle came back for this one; the owner can put it back from the app.`;
 }
 

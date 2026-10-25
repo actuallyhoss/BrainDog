@@ -421,7 +421,10 @@ export function whereSaid(where: unknown, decl: Decl | undefined, look: Look): s
   }
   if (typeof where.field !== 'string') return 'filtered';
   const f = byId.get(where.field);
-  const value = (v: unknown): string => (f?.type === 'ref' || f?.type === 'list' ? (refSaid(v, look) ?? String(v)) : (said(f, v, look, 30) ?? String(v)));
+  /* A value that is itself a word of the filter language is quoted, so Agent is "empty" never reads as the empty test. */
+  const value = (v: unknown): string =>
+    typeof v === 'string' && /^(empty|none|blank|null|nothing|present|missing|unset)$/iu.test(v.trim()) ? `"${v.trim()}"` : valueOf(v);
+  const valueOf = (v: unknown): string => (f?.type === 'ref' || f?.type === 'list' ? (refSaid(v, look) ?? String(v)) : (said(f, v, look, 30) ?? String(v)));
   const label = labelOf(f, where.field);
   if (where.is !== undefined) return where.field === decl?.state ? value(where.is) : `${label} is ${value(where.is)}`;
   if (where.not !== undefined) return `${label} is not ${value(where.not)}`;

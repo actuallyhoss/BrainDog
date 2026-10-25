@@ -106,7 +106,7 @@ export async function attachCommand(args: string[], io: AgentIo): Promise<number
   }
   const at = resolve(io.cwd, file);
   if (!existsSync(at) || !statSync(at).isFile()) {
-    io.say(`There is no page at ${file}.`);
+    io.say(`There is no file at ${file}. Try: braindog attach audit.html --on "Fix the login"`);
     return 1;
   }
   if (statSync(at).size > PAGE_MOST) {

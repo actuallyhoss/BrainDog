@@ -12124,7 +12124,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'token')
-        return no('FORBIDDEN', 'attach is how an agent says which run it is, and a person is never a run.', { at: 'principal' });
+        return no('FORBIDDEN', 'This machine signs in as a person, so the session has no run. Run braindog setup <host> to give agents a token.', { at: 'principal' });
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, ['client_id', 'doing', 'source', 'branch', 'head']);
       if (wrong) return { ok: false, refusal: wrong };

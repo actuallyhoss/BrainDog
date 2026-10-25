@@ -459,6 +459,9 @@ function askedIn(sql: Sql, id: string): string {
 
 const NO_WORDS = 'A question with no words.';
 
+/* A sentence joined after a colon starts lower-case, but only a common opening word: a name or a month keeps its capital. */
+const joined = (said: string): string => (/^(The|A|An|This|That|These|Those|There|It|Its|Your|Our|No|Some|One|Nothing|Every|Each|Something|Someone|Many|Few|All|Both|Several) /u.test(said) ? said.charAt(0).toLowerCase() + said.slice(1) : said);
+
 /** Whether this record has ever been asked anything: with nothing ever asked, the two question signs have nothing to judge by. */
 const everAsked = (sql: Sql): boolean => sql.one('SELECT 1 AS x FROM suggestion LIMIT 1') !== undefined;
 
@@ -509,7 +512,7 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
     : faults.length > 0
       ? /* THE FAULT'S OWN WORDS (UI pass of 21 October, P36), not "a fault of the record". */
         faults.length === 1
-        ? `Something went wrong, not a choice for you: ${askedIn(sql, faults[0]!.id)}`
+        ? `Something went wrong, not a choice for you: ${joined(askedIn(sql, faults[0]!.id))}`
         : `${faults.length} open questions are things that went wrong, not choices for you. The first: ${askedIn(sql, faults[0]!.id)}`
       : `${uncaused.length} open questions carry no cause.`;
   return reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);

@@ -189,7 +189,7 @@ test('A NAME ALONE IS NOTED, and the answer says what would add them', async () 
     }).surface,
   );
   const said = await mcp.answer('meet', { name: 'Priya', where: 'a note in Lanternfish' }, { who: 'agent' });
-  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: No undo handle came back for this one; the owner can put it back from the app.`);
+  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: Nothing was written.`);
 });
 
 test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', async () => {
