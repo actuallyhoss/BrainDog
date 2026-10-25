@@ -71,7 +71,7 @@
     });
   };
   /* AN OLD IMPORT SOURCE IS NEVER NAMED ON SCREEN: a run it made is an imported one. */
-  const unsourced = (t: string): string => t.replace(/Sam Brain/gu, 'Imported');
+  const unsourced = (t: string): string => t.replace(/\bSam Brain\b/gu, 'Imported');
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
   const hereWords = {
     working: 'Working here now',
