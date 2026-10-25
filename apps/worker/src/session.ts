@@ -171,6 +171,20 @@ export type BearerDeps = {
   ) => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[]; child?: { id: string; parent: string } } | null>;
   /** `token` is the id of the key the bearer is, so the record ANDs its narrowing into what the person holds. */
   access: (record: string, person: string, token?: string) => Promise<Held | null>;
+  /**
+   * `verify` and then `access` for the key it found, in ONE call to the record: what `verify` answers, with what the
+   * person holds through that key (`held`, `null` when they are not on the record), or `null` for a bearer the record
+   * does not know. Absent, the two are asked one after the other, as before.
+   *
+   * ONE TRIP AND NOT TWO, because each is a turn in the record's queue: on a busy record every turn waited seconds, and
+   * a bearer's `/api/boot` spent two of them before the record was asked for the answer (`Server-Timing: door`).
+   */
+  admit?: (
+    record: string,
+    bearer: string,
+    surface: 'api' | 'mcp',
+    build?: string,
+  ) => Promise<{ verified: NonNullable<Awaited<ReturnType<BearerDeps['verify']>>>; held: Held | null } | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
   /**
@@ -257,7 +271,15 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
      machine is behind. Only a short one goes: a build is `YYYY.MM.DD+<hash>`, and the record drops anything else anyway. */
   const said = request.headers.get(CLI_HEADER)?.trim();
   const build = said !== undefined && said !== '' && said.length <= CLI_BUILD_MOST ? said : undefined;
-  const seen = bearer ? await deps.verify(record, bearer, surface, build) : null;
+  /* THE DIRECTORY'S TWO READS GO OUT BESIDE THE RECORD'S CHECK AND ARE READ ONLY AFTER IT, so a bearer nobody issued is
+     answered as before and learns nothing from either; what changes is that their trips overlap the record's instead
+     of following it. The slug is read only under one, and the lapse only for a bearer that carries a secret. */
+  const named = slug !== null && deps.named !== undefined ? settled(deps.named(slug)) : null;
+  const lapsing = bearer && deps.lapsed !== undefined ? settled(deps.lapsed(record)) : null;
+  const admitted = !bearer ? null : deps.admit !== undefined ? await deps.admit(record, bearer, surface, build) : null;
+  const seen = !bearer ? null : deps.admit !== undefined ? (admitted?.verified ?? null) : await deps.verify(record, bearer, surface, build);
+  const lapsedOf = async (): Promise<boolean> => (lapsing === null ? false : unsettled(await lapsing));
+  const nameOf = async (): Promise<string | null> => (named === null ? null : unsettled(await named));
   if (!seen) {
     const asked = surface === 'api' && bearer && deps.operation ? operationAsked(request) : null;
     /* THE PATH'S NAME IS ASKED BEFORE THE GRANT IS READ, BECAUSE READING IT SPENDS IT. `heldBy` below asks it too, but
@@ -265,14 +287,14 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
        was refused 403 with the grant already gone. THE ANSWER IS THE UNKNOWN BEARER'S 401 AND NOT
        `heldBy`'s 403: nothing has checked the secret yet, and a 403 here would tell anybody holding a record id which
        names are that record's, which is what `heldBy` waits for the secret to prevent. The grant is kept either way. */
-    if (asked !== null && slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record)) return { status: 401 };
+    if (asked !== null && slug !== null && (named === null || (await nameOf()) !== record)) return { status: 401 };
     const grant = asked !== null && bearer && deps.operation ? await deps.operation(record, bearer) : null;
     if (!grant) return { status: 401 };
     if (grant.method !== asked)
       return { status: 403, refusal: { code: 'FORBIDDEN', fix: `This bearer was approved for one ${grant.method} and reaches nothing else. Start the device again for this.`, at: 'operation' } };
-    const admitted = await heldBy(deps, record, grant.person, slug);
+    const admitted = await heldBy(deps, record, grant.person, slug, nameOf);
     if ('status' in admitted) return admitted;
-    return lapseOf(deps, record, grant.method, {
+    return lapseOf(lapsedOf, record, grant.method, {
       principal: { kind: 'person', id: grant.person, level: admitted.held.level as PersonPrincipal['level'] },
       operation: grant.method,
       credentialed: true,
@@ -281,9 +303,9 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   }
   /* THE KEY'S OWN ID GOES WITH THE PERSON, so the record ANDs its narrowing chain into what they hold (`token_lens`): a
      child key is narrowed by its own row and its parent's, so it is the child's id, not the agent's the principal names. */
-  const admitted = await heldBy(deps, record, seen.person_id, slug, seen.child?.id ?? seen.id);
-  if ('status' in admitted) return admitted;
-  const held = admitted.held;
+  const kept = await heldBy(deps, record, seen.person_id, slug, nameOf, seen.child?.id ?? seen.id, admitted === null ? undefined : admitted.held);
+  if ('status' in kept) return kept;
+  const held = kept.held;
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT INSIDE THE RECORD, and nothing in the request can add to it.
      The record's inbox gate admits a whole-record owner token that carries `inbox`, and
      before this no token principal carried a reach, so a token minted with it was refused like any other.
@@ -308,11 +330,11 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
      itself after this, from the request as it came. A write refuses in the lapse's sentence, as on `/api`, and a call
      this cannot read goes on at `read`, where the record's own ladder refuses anything that writes. */
   if (surface === 'mcp') {
-    if (deps.lapsed === undefined || !(await deps.lapsed(record))) return { record, ctx };
+    if (!(await lapsedOf())) return { record, ctx };
     const message: unknown = await request.clone().json().catch(() => null);
     return mcpWrites(message) ? { status: 403, refusal: LAPSED } : { record, ctx: capped(ctx) };
   }
-  return lapseOf(deps, record, methodAsked(request), ctx);
+  return lapseOf(lapsedOf, record, methodAsked(request), ctx);
 }
 
 /**
@@ -320,13 +342,28 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
  *
  * AFTER THE SECRET AND THE PERSON ARE CHECKED, so a lapsed record answers a forged bearer the same 401 as a paid one.
  */
-async function lapseOf(deps: BearerDeps, record: string, method: string, ctx: CallContext): Promise<Bearer> {
-  if (deps.lapsed === undefined || !(await deps.lapsed(record))) return { record, ctx };
+async function lapseOf(lapsed: () => Promise<boolean>, record: string, method: string, ctx: CallContext): Promise<Bearer> {
+  if (!(await lapsed())) return { record, ctx };
   const lapse = underLapse(method, ctx);
   return 'refusal' in lapse ? { status: 403, refusal: lapse.refusal } : { record, ctx: lapse.ctx };
 }
 
 type PersonPrincipal = Extract<CallContext['principal'], { kind: 'person' }>;
+
+/**
+ * A call sent early and read later, held so a failure waits for the reader. A bare promise nobody awaits on the path that
+ * returns early (an unknown bearer) would reject unheard; this one throws where it is read, as an awaited call did.
+ */
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+const settled = <T>(p: Promise<T>): Promise<Settled<T>> =>
+  p.then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+const unsettled = <T>(s: Settled<T>): T => {
+  if (s.ok) return s.value;
+  throw s.error;
+};
 
 /**
  * The lists a person is held to on the record, when they are held to any, the rows of each they reach, and what the lens
@@ -352,11 +389,14 @@ async function heldBy(
   record: string,
   person: string,
   slug: string | null,
+  nameOf: () => Promise<string | null>,
   token?: string,
+  known?: Held | null,
 ): Promise<{ held: Held } | { status: 403; refusal: Refusal }> {
-  if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record))
+  if (slug !== null && (deps.named === undefined || (await nameOf()) !== record))
     return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
-  const held = token === undefined ? await deps.access(record, person) : await deps.access(record, person, token);
+  /* `known` IS WHAT `admit` ALREADY ANSWERED IN THE SAME TRIP AS THE SECRET, so the record is not asked twice. */
+  const held = known !== undefined ? known : token === undefined ? await deps.access(record, person) : await deps.access(record, person, token);
   if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
   return { held };
 }

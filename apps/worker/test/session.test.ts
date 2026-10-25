@@ -188,6 +188,39 @@ test('A BEARER FOR ONE RECORD UNDER ANOTHER RECORD’S SLUG IS 403, AND NOTHING 
   assert.deepEqual(forged, { status: 401 });
 });
 
+test('A BEARER ASKS ITS RECORD ONCE, AND THE DIRECTORY’S READS OVERLAP THAT ONE TRIP', async () => {
+  const X = 'rec_01J8ZC0000000000000000000X';
+  const trips: string[] = [];
+  const bearer: BearerDeps = {
+    knows: async () => (trips.push('knows'), true),
+    verify: async () => (trips.push('verify'), { id: 'tok_1', person_id: 'p_1', scope: 'read' }),
+    access: async () => (trips.push('access'), OWNER),
+    admit: async () => {
+      trips.push('admit');
+      return { verified: { id: 'tok_1', person_id: 'p_1', scope: 'read' }, held: OWNER };
+    },
+    named: async (slug) => (trips.push('named'), slug === 'x-studio' ? X : null),
+    lapsed: async () => (trips.push('lapsed'), false),
+  };
+  const request = at('/api/boot', { headers: { authorization: `Bearer ${X}.secret` } });
+  const own = await bearerOf(request, 'api', bearer, 'x-studio');
+  assert.equal('record' in own ? own.record : '', X);
+  assert.equal('record' in own ? own.ctx.principal.kind : '', 'token');
+  /* THE DIRECTORY'S TWO READS ARE SENT BEFORE THE RECORD IS WAITED FOR, and the record is asked once: no verify, no access. */
+  assert.deepEqual(trips, ['knows', 'named', 'lapsed', 'admit'], 'the record was asked more than once, or a Directory read waited for it');
+  /* A PERSON THE RECORD HOLDS NOTHING FOR IS STILL 403, from the same trip. */
+  const off = await bearerOf(request, 'api', { ...bearer, admit: async () => ({ verified: { id: 'tok_1', person_id: 'p_1', scope: 'read' }, held: null }) });
+  assert.deepEqual(off, { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } });
+  /* AND A BEARER NOBODY ISSUED IS THE 401 IT WAS, the slug and the lapse unread, even when the Directory failed. */
+  const failing = async (): Promise<never> => {
+    throw new Error('directory down');
+  };
+  const forged = await bearerOf(request, 'api', { ...bearer, admit: async () => null, lapsed: failing, named: failing }, 'y-studio');
+  assert.deepEqual(forged, { status: 401 });
+  /* A DIRECTORY THAT FAILED ON A REAL BEARER STILL FAILS THE CALL, as the awaited read did. */
+  await assert.rejects(bearerOf(request, 'api', { ...bearer, lapsed: failing }), /directory down/);
+});
+
 test('withCookie adds the cookie and changes nothing else', async () => {
   const inner = new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
   const out = withCookie(inner, CLEAR);

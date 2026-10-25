@@ -1787,6 +1787,28 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
+   * `verify` and then `access` for the key it found, in one call: the bearer path's whole question of this record
+   * (`bearerOf`'s `admit`), or `null` for a bearer it does not know. `held` is `null` for a person not on the record.
+   *
+   * ONE TURN IN THIS OBJECT'S QUEUE AND NOT TWO. The Worker asked `verify`, waited, then asked `access`, so on a busy
+   * record every bearer call queued here twice before its own request was even sent: production's `/api/boot` spent
+   * four to six seconds in those two turns while the answer itself took a fifth of one (`Server-Timing`, 2026-10-26).
+   * The two run back to back in one event, so no other request lands between the secret and what it holds.
+   */
+  async admit(
+    bearer: string,
+    surface: string,
+    build?: string,
+  ): Promise<{ verified: Verified; held: { level: string | null; registers: string[] | null; levels: Record<string, string> } | null } | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    const out = await api.kernel.verifyToken(bearer, surface, validFromOf(this.env), build);
+    if (!out.ok) return null;
+    const seen = out.value;
+    return { verified: seen, held: api.kernel.access(seen.person_id, seen.child?.id ?? seen.id) };
+  }
+
+  /**
    * A one-hour key under an app's sealed parent, for the OAuth door (`oauth.ts`'s `child`). AN RPC AND NEVER A ROUTE:
    * the record's `mintChild` is host-only, and the parent is proved by its bearer. The operator's `TOKENS_VALID_FROM`
    * holds here through the record `#open` built, so a parent made before it mints nothing.
@@ -2865,6 +2887,9 @@ function bearerDeps(env: Env): BearerDeps {
     lapsed: async (id) => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true,
     verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
     access: (id, person, token) => held(env, id, (record) => (token === undefined ? record.access(person) : record.access(person, token))),
+    /* THE TWO ABOVE IN ONE TRIP TO THE RECORD, which is what the bearer path asks (`Record$.admit`). */
+    admit: (id, bearer, surface, build) =>
+      held(env, id, (record) => record.admit(bearer, surface, build)) as ReturnType<NonNullable<BearerDeps['admit']>>,
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
     /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). An armed record rejects
