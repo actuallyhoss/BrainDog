@@ -502,11 +502,11 @@ function crontabOf(): string | null {
 
 /**
  * Every process of this machine, as `ps -A` lists it with its start time, or none where there is no such command
- * (Windows, which a later job reads its own way). Read, never signalled: doctor says which app to restart and the
+ * (on Windows, `winProcs` reads the same from CIM). Read, never signalled: doctor says which app to restart and the
  * person restarts it. LC_ALL=C keeps the start time in the one form `Date` reads.
  */
 export function psOf(): Proc[] {
-  if (process.platform === 'win32') return [];
+  if (process.platform === 'win32') return winProcs();
   let text: string;
   try {
     text = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,lstart=,command='], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' }, stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000, maxBuffer: 16 * 1024 * 1024 });
@@ -520,6 +520,23 @@ export function psOf(): Proc[] {
     if (m && !Number.isNaN(started)) procs.push({ pid: Number(m[1]), ppid: Number(m[2]), started, command: m[4] ?? '' });
   }
   return procs;
+}
+
+/* Windows has no `ps`: CIM lists the same four facts, the start time turned to ms in PowerShell so no date form is parsed. */
+const WIN_PS =
+  'Get-CimInstance Win32_Process | Where-Object { $_.CreationDate } | ForEach-Object { @{ p = $_.ProcessId; q = $_.ParentProcessId; s = ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(); c = [string]$_.CommandLine } } | ConvertTo-Json -Compress';
+
+function winProcs(): Proc[] {
+  try {
+    const text = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', WIN_PS], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+    const raw: unknown = JSON.parse(text.trim() || '[]');
+    const rows = (Array.isArray(raw) ? raw : [raw]) as { p?: unknown; q?: unknown; s?: unknown; c?: unknown }[];
+    return rows
+      .filter((r) => typeof r.p === 'number' && typeof r.q === 'number' && typeof r.s === 'number')
+      .map((r) => ({ pid: r.p as number, ppid: r.q as number, started: r.s as number, command: typeof r.c === 'string' ? r.c : '' }));
+  } catch {
+    return [];
+  }
 }
 
 /**
