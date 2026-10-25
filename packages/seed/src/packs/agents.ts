@@ -6,7 +6,7 @@
  * so no field here points at a person. A row applies to a project or to
  * everywhere, and a record without People loses nothing this pack holds.
  *
- * A KEY'S ROW IS AN INDEX. `value` names the grant the vault sealed a key into, and only the vault
+ * A KEY'S ROW IS AN INDEX. `value` names the grant the Keychain sealed a key into, and only the Keychain
  * door writes it: a create naming it is refused, so no seed row and no pack seed can carry one.
  */
 
@@ -132,12 +132,12 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
     icon: 'key',
     pack: 'agents',
     role: 'keys-index',
-    holds: 'what each key opens and where it applies; the key itself is sealed in the vault or kept somewhere named',
+    holds: 'what each key opens and where it applies; the key itself is sealed in the Keychain or kept somewhere named',
     title: 'label',
     state: 'state',
     done: ['retired'],
     /* ONE NAME IS ONE KEY WITHIN A PROJECT, and of two alike the one holding the sealed value stays: an import's index
-       row is often the older and the vault's the newer, so keeping the oldest would lose the key. */
+       row is often the older and the Keychain's the newer, so keeping the oldest would lose the key. */
     same: { fields: ['label'], within: 'project', fold: 'text', keep: 'sealed' },
     mobile: ['label', 'opens', 'project'],
     fields: [
@@ -148,7 +148,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
       { id: 'kind', label: 'Kind', type: 'enum', values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'], required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
       { id: 'value', label: 'Locked value', type: 'secret' },
-      /* For a key that is not in the vault: where a person finds it. */
+      /* For a key that is not in the Keychain: where a person finds it. */
       { id: 'where', label: 'Kept at', type: 'text', max: 280 },
       { id: 'origin', label: 'Came from', type: 'text', max: 280 },
       /* WHAT A PERSON WROTE ABOUT THE KEY, AND NEVER THE KEY. Added in 1.2.0 because an imported key register carried a
@@ -335,13 +335,13 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
   /* ONE SKILL'S LESSONS, `{{it}}` filled from the skill page's own `{{name}}`, the clauses of the tile drawn on it. */
   'skill-learnings': { metric: 'skill-learnings', name: 'Learnings that bear on a skill', source: 'register.learnings', where: 'topic is {{it}}, state is active', ...COUNT },
-  /* THE KEYS, SINCE 1.10.0 (AGT-D01): how many keys not retired the vault holds a value for, a number with no verdict
-     to read beside the Vault's own "sealed here", which counts every key but the retired ones (`keysOf` in
+  /* THE KEYS, SINCE 1.10.0 (AGT-D01): how many keys not retired the Keychain holds a value for, a number with no verdict
+     to read beside the Keychain's own "sealed here", which counts every key but the retired ones (`keysOf` in
      `apps/web/src/lib/record/vault.ts`), so a key gone stale still counts as sealed; how many live keys hold no value
      and do not say where they are kept, so nobody could find them again; and how many are past their day. A sealed
      field answers only `is set` and `is empty` (`packages/where/src/sentence.ts`), never what it holds. */
-  'keys-sealed': { metric: 'keys-sealed', name: 'Keys sealed in the vault', source: 'register.credentials', where: 'state is not retired, value is set', ...COUNT },
-  /* EVERY KEY NOT RETIRED SINCE THE UI PASS OF 21 OCTOBER (H25), as the Vault's "have no value yet" counts (`missing`
+  'keys-sealed': { metric: 'keys-sealed', name: 'Keys sealed in the Keychain', source: 'register.credentials', where: 'state is not retired, value is set', ...COUNT },
+  /* EVERY KEY NOT RETIRED SINCE THE UI PASS OF 21 OCTOBER (H25), as the Keychain's "have no value yet" counts (`missing`
      in `apps/web/src/routes/vault/tiles.ts`): a stale or broken key with no value is as lost as a live one. */
   'keys-nowhere': { metric: 'keys-nowhere', name: 'Keys with no value and nowhere they are kept', source: 'register.credentials', where: 'state is not retired, value is empty, where is empty', ...FIX },
   'keys-expired': { metric: 'keys-expired', name: 'Keys past their day', source: 'register.credentials', where: 'state is live, expires before today', ...FIX },
@@ -544,14 +544,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          a record with nothing wrong draws none. Loose at the foot since 1.17.0 and no longer a tile headed Needs a look,
          which on his record held only what the record tidies on its own: things here twice, runs written off and steps
          nobody took. Those are the lists' own (`?twice=1` on each), and the page no longer nags with them. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', is: 1 }, body: '1 key has no value. [Add it in the vault](/vault)' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 1 }, body: '{{keys-nowhere}} keys have no value. [Add them in the vault](/vault)' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', is: 1 }, body: '1 key has no value. [Add it in the Keychain](/keychain)' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 1 }, body: '{{keys-nowhere}} keys have no value. [Add them in the Keychain](/keychain)' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.' },
       /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
          scan): a count of places, and the first one's list and number in the reading's why, never the key. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', is: 1 }, body: 'A key is written in plain text in 1 place. Move it to the vault.' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 1 }, body: 'Keys are written in plain text in {{keys-in-text}} places. Move each to the vault.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', is: 1 }, body: 'A key is written in plain text in 1 place. Move it to the Keychain.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 1 }, body: 'Keys are written in plain text in {{keys-in-text}} places. Move each to the Keychain.' },
     ],
   },
   /* One page per skill in use. The trigger leads, because it is the sentence that makes a session
@@ -808,8 +808,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      were headed At work over runs open and quiet. No list, field or figure goes.
      1.21.0 IS MINOR (the audit of 25 October, Y29): How the brain changed counts a learning as arrived this month by its
      own day as well as the day the record wrote it, and its cards say each learning's line without the failure under
-     it. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.21.0', requires: ['register.things'] },
+     it. No list, field or figure goes.
+     1.22.0 IS WORDS, SO IT IS MINOR (Vault is now Keychain): the Keys list, its count and the notes about a key with no
+     value or one in plain text say Keychain where they said vault, and the links go to /keychain. No list, field or
+     figure goes. */
+  manifest: { id: 'agents', version: '1.22.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

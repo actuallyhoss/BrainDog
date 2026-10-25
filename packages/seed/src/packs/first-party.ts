@@ -717,6 +717,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - estate 2.4.0 (the audit of 25 October, Z40): Services names what is lapsing, a table drawn only while `lapsing` holds
  *   one, each by its name, who it is with and the day it was due, in the place of At a glance, whose two figures said
  *   no names. 2.3.0 is master's (a page for each service). One block for another and no id taken away, so a minor step.
+ * - estate 2.5.0 (Vault is now Keychain): a service page links its keys as the Keychain, at /keychain. A link's words and address, no id added
+ *   or taken away, so a minor step.
  * - people 3.7.0 (C33, 24 October): Scripts is a page, `page.scripts`, a table of every installed script over the
  *   kernel's `scripts` source, which `/scripts` draws where it drew a list by hand, so it can be changed by saying so and
  *   pulled as any page. 3.6.0 is master's (Everyone as faces). A page added and nothing taken away, so a minor step.
@@ -754,7 +756,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.29.0',
   people: '3.8.0',
   'money-core': '3.23.0',
-  estate: '2.4.0',
+  estate: '2.5.0',
   work: '1.19.0',
 };
 

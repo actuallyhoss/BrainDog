@@ -560,8 +560,8 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
    * called never moves the project's page to a numbered address. ITS OWN ROW BY NUMBER (`seq is {{seq}}`), since two
    * services may share a name.
    *
-   * THE KEYS ARE THE VAULT'S, AND A LINK THERE. They are kept on the agents' list of keys, which Services does not hold,
-   * and a block over it would refuse Services on a record without that list; the Vault opens on the provider's keys.
+   * THE KEYS ARE THE KEYCHAIN'S, AND A LINK THERE. They are kept on the agents' list of keys, which Services does not hold,
+   * and a block over it would refuse Services on a record without that list; the Keychain opens on the provider's keys.
    */
   service: {
     page: 'service',
@@ -592,7 +592,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         heading: 'Keys',
         icon: 'key',
         span: 12,
-        body: 'Keys for {{name}} are kept in the [Vault](/vault?q={{name}}).',
+        body: 'Keys for {{name}} are kept in the [Keychain](/keychain?q={{name}}).',
       },
     ],
   },

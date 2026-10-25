@@ -122,8 +122,8 @@ export const SKILLS: Fields[] = [
   { name: 'chase-invoice', trigger: 'When an invoice is 30 days past its date.', kind: 'skill', project: null, body: '# Chase an invoice\n\nSend a short reminder once an invoice is 30 days past its date.', rev: 2, because: [6], state: 'retired' },
 ];
 
-/* INDEX ROWS ONLY. None names `value`: that field is the vault door's, and a create naming it is refused.
-   A key in the vault is deposited; one that is not says where it is kept. */
+/* INDEX ROWS ONLY. None names `value`: that field is the Keychain door's, and a create naming it is refused.
+   A key in the Keychain is deposited; one that is not says where it is kept. */
 export const CREDENTIALS: Fields[] = [
   { label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example', provider: 'Fenwick Cloud', kind: 'api_token', project: 1, origin: '.mcp.json on kiln-mbp', verified: day(-2), expires: day(12), state: 'stale' },
   { label: 'Object storage, write', opens: 'The font binaries bucket', provider: 'Fenwick Cloud', kind: 'ssh_key', project: 1, where: 'The studio password manager, in the Kiln folder', state: 'live' },

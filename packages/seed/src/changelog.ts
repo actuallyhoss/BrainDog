@@ -275,6 +275,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.5.0', notes: 'The Vault is now the Keychain, and a service page says its keys are kept there. Nothing you keep is moved or changed.' },
     { version: '2.4.0', notes: 'Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.' },
     {
       version: '2.3.0',
@@ -347,6 +348,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.22.0',
+      notes: 'The Vault is now the Keychain. Keys and the notes about a key with no value or one written in plain text say Keychain, and their links go to it. Nothing you keep is moved or changed.',
+    },
     {
       version: '1.21.0',
       notes: 'How the brain changed counts a learning as arriving this month by its own date, so learnings brought in this month from August are not counted. Each learning there shows its one line, and what taught it is on its own page.',
