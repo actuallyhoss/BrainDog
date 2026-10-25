@@ -528,13 +528,14 @@
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
     /* AND THE DESK'S CARDS' OWN CODE WHILE THE RECORD DRAWS, so they are drawn with the page and take their parts from the
-       same read: loaded after the page, the cards and their lines landed after the screen said it was ready. */
-    const cardsCode = import('./ProjectCards.svelte').catch(() => null);
+       same read: loaded after the page, the cards and their lines landed after the screen said it was ready. FETCHED
+       BESIDE THE READ AND NEVER WAITED ON: their code is slower than the read, and waiting held the whole body back until
+       it came, so the body landed as the reader moved on and a list's revisit after Today went from 30 ms to 100. */
+    void import('./ProjectCards.svelte').catch(() => null);
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
     const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
     const base = apiBase();
     const drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>));
-    await cardsCode;
     if (drawn.from === 'live')
       return {
         from: 'live',
