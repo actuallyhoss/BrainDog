@@ -74,7 +74,7 @@ export const historyWords = {
   lastWeek: 'Last 7 days',
   byAgents: (n: number) => `${count(n)} by agents`,
   byYou: (n: number) => `${count(n)} by you`,
-  byRest: (n: number) => `${count(n)} by scripts, rules and BrainDog`,
+  byRest: (n: number) => `${count(n)} by scripts and rules`,
   lanesSubject: 'Agent stretches of work in the last 24 hours',
   groupsSubject: 'Changes by who made them',
   kindsSubject: 'Changes by kind, the five biggest',
