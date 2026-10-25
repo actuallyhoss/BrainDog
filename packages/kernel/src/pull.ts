@@ -65,7 +65,7 @@ export type PullDecl = {
  * kind `none` names no key, and the top-level one is read instead, as it always was.
  *
  * ONE READER, used by the fire here and by `prepareAction`, because the fire writes the key's id into
- * the job and the vault refuses a lease on a job that names any other key (`sealedGrant`).
+ * the job and the keychain refuses a lease on a job that names any other key (`sealedGrant`).
  */
 export function keyNameOf(decl: { grant?: unknown; fetch?: unknown }): string | undefined {
   const auth = decl.fetch !== null && typeof decl.fetch === 'object' ? (decl.fetch as { auth?: unknown }).auth : undefined;
@@ -182,7 +182,7 @@ export function checkInterval(decl: PullDecl): Result<number> {
  * A `pull` row fires: queue one fetch, and say when the next one is due.
  *
  * THE PAYLOAD CARRIES THE GRANT'S ID AND NOT ITS BYTES. The runner opens it through the record's own
- * vault, under a `grant.read` event, so a fetch that reads a credential is a fetch that is on the
+ * keychain, under a `grant.read` event, so a fetch that reads a credential is a fetch that is on the
  * record — and one that never happened cannot pretend it did.
  */
 export function firePull(deps: PullDeps, row: { id: string; payload: string; due_at?: string }, decl: PullDecl | null): Fired {
@@ -198,8 +198,8 @@ export function firePull(deps: PullDeps, row: { id: string; payload: string; due
      credential that was rejected stops costing requests until somebody rebinds it. Getting here
      means it was pending, so it is live.
 
-     THE KEY IS RESOLVED HERE AND ITS ID GOES IN THE JOB, because the vault opens a credential only
-     for a job that names it by id (`sealedGrant`). A name the job carried as written reached the vault
+     THE KEY IS RESOLVED HERE AND ITS ID GOES IN THE JOB, because the keychain opens a credential only
+     for a job that names it by id (`sealedGrant`). A name the job carried as written reached the keychain
      as a label and was refused as a key the job does not send. */
   const named = keyNameOf(decl);
   const key =
@@ -530,7 +530,7 @@ export function finishPull(deps: FinishDeps, job: { payload: string }, finish: P
   const ingest = fired === null ? undefined : fired.ingest;
   if (typeof ingest !== 'string' || ingest === '') return;
   const actor = `ingest:${ingest}`;
-  /* THE KEY THE JOB NAMED, which the fire resolved to an id and the vault opened for this run. */
+  /* THE KEY THE JOB NAMED, which the fire resolved to an id and the keychain opened for this run. */
   const named = fired === null ? undefined : fired.grant;
   const key = typeof named === 'string' && named !== '' ? deps.keyOf(named) : null;
 

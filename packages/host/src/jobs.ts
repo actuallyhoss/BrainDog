@@ -30,7 +30,7 @@ export const CLAIM_ASKS_MOST = Math.ceil(CLAIM_WAIT_MOST_MS / CLAIM_EVERY_MS) + 
  *
  * `null` AND NEVER A REFUSAL, because the caller is a host deciding whether the bearer is a runner's at all, after the
  * token table did not know it; a bearer that is neither is the host's 401, in the words it already gives. `validFrom`
- * is the host's cut-off, as `vaultGrant` takes it: a machine enrolled before it is refused as one nobody enrolled.
+ * is the host's cut-off, as `keychainGrant` takes it: a machine enrolled before it is refused as one nobody enrolled.
  */
 export async function runnerContext(api: RecordApi, bearer: string, validFrom?: string): Promise<CallContext | null> {
   if (typeof bearer !== 'string' || bearer === '') return null;

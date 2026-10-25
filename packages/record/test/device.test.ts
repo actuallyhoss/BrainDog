@@ -129,7 +129,7 @@ test('STARTS ARE COUNTED PER ADDRESS: TEN IN FIFTEEN MINUTES, THEN FIFTEEN MINUT
 test('THE THREE INTERNAL METHODS EXIST AND NO ROUTE REACHES THEM; THE THREE ADMIN ONES ARE ROUTED ADMIN', async () => {
   const r = await record();
   const routed = new Map(ROUTES.map((route) => [route.name, route.group]));
-  for (const name of ['deviceStart', 'devicePoll', 'vaultGrant'] as const) {
+  for (const name of ['deviceStart', 'devicePoll', 'keychainGrant'] as const) {
     assert.equal(typeof r.api[name], 'function');
     assert.equal(routed.has(name), false, `${name} is routed`);
     assert.ok((UNROUTED as readonly string[]).includes(name), `${name} is not listed in UNROUTED`);

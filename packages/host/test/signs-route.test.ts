@@ -47,7 +47,7 @@ test('THE ROUTE COUNTS BY GROUP: signs adds one READ+ route and nothing that wri
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'signs'));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
-  for (const group of ['DATA', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A TOKEN’S GET REACHES THE RECORD METHOD OF ITS NAME, and answers what the record said', async () => {

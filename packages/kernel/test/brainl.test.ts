@@ -145,7 +145,7 @@ async function filled() {
  *
  * Without this the round-trip proved almost nothing: the fixture filled `entry`, `event`,
  * `declaration` and `counter`, so an export that silently dropped grants, members, metric points,
- * predictions or the vault keys would have passed every assertion in this file — and a customer
+ * predictions or the keychain keys would have passed every assertion in this file — and a customer
  * would have found out by opening their copy and discovering their credentials index was gone.
  *
  * These are written with SQL rather than through the kernel because most of them have no kernel
@@ -425,7 +425,7 @@ test('every travelling table arrives, and not one of them quietly stays behind',
   for (const { table_name } of travelling) {
     /* AN `export` EVENT DOES NOT TRAVEL, and is the only row that does not. It is a fact about this
        installation's copies rather than about the business — the same argument the `local` section
-       makes for tokens and device grants — and it has to be written, because a vault whose reads are
+       makes for tokens and device grants — and it has to be written, because a keychain whose reads are
        not audited cannot answer "did anything get out". Counting it here would mean no two exports
        of an unchanged record are the same bytes, because the first one changed the record. */
     const skip = table_name === 'event' ? " WHERE kind <> 'export'" : '';
@@ -964,9 +964,9 @@ test('THE HEADER OF A SIGNATURE IS CHECKED, not taken', async () => {
   sql.close();
 });
 
-test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the vault is not identity', async () => {
+test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the keychain is not identity', async () => {
   /**
-   * THE HEADER ALWAYS TRAVELS AND THE VAULT DOES NOT, so one row of the header was arriving as a
+   * THE HEADER ALWAYS TRAVELS AND THE KEYCHAIN DOES NOT, so one row of the header was arriving as a
    * confident lie.
    *
    * `dog_meta` is the record's identity and is deliberately adopted whole: opening a file into an
@@ -976,7 +976,7 @@ test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the va
    * identity. It is a count of rows in another table, and `vault_key` is in `NEEDS_IDENTITY`, so a
    * `sections: ['data']` file carries the claim and not the thing claimed.
    *
-   * The result was worse than the silence it replaced: a fresh record with an empty vault, saying
+   * The result was worse than the silence it replaced: a fresh record with an empty keychain, saying
    * it holds three keys. A reader who believes it seals a grant against a key that is not there.
    *
    * RECOMPUTED RATHER THAN SKIPPED, because an absent row is ambiguous between "this build never
@@ -1001,11 +1001,11 @@ test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the va
   const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   assert.ok(((await target.import(lines)) as { ok: boolean }).ok, 'the import was refused');
 
-  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 0, 'the vault travelled after all');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 0, 'the keychain travelled after all');
   assert.equal(
     sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'keys'")?.value,
     'none',
-    'a record with an empty vault says it holds three keys',
+    'a record with an empty keychain says it holds three keys',
   );
 
   /* AND THE IDENTITY IS STILL ADOPTED, which is the thing this must not break. */
@@ -1017,7 +1017,7 @@ test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the va
   source.sql.close();
 });
 
-test('AND A FILE THAT DOES CARRY THE VAULT IS BELIEVED, because then the claim and the thing agree', async () => {
+test('AND A FILE THAT DOES CARRY THE KEYCHAIN IS BELIEVED, because then the claim and the thing agree', async () => {
   /* The recompute reads the target after the import, so a full export puts the rows in and the row
      counts them. Asserting it separately, because a fix that answered `none` unconditionally would
      pass the test above and lose the answer the row exists to give. */
@@ -1036,7 +1036,7 @@ test('AND A FILE THAT DOES CARRY THE VAULT IS BELIEVED, because then the claim a
   const sql = openSqlite();
   const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   assert.ok(((await target.import(lines)) as { ok: boolean }).ok, 'the import was refused');
-  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 2, 'the vault did not travel');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 2, 'the keychain did not travel');
   assert.equal(sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'keys'")?.value, 'record,signing');
   sql.close();
   source.sql.close();

@@ -3,7 +3,7 @@
  * else.
  *
  * WHAT "NOTHING ELSE" MEANS HERE. A shape bearer is held as `device_grant.token_hash` on a row of reach `shape`, so the
- * four other readers of a bearer each turn it away: `verifyToken` (the `token` table), `vaultGrant` (reach `vault`),
+ * four other readers of a bearer each turn it away: `verifyToken` (the `token` table), `keychainGrant` (reach `keychain`),
  * `operationGrant` (the four ADMIN reaches) and the runner's `runnerGrant` (reach `runner`). `shapeGrant` alone admits
  * it, again and again, until its life runs out or it is revoked.
  */
@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { DEFAULT_DAYS, verifyToken, type TokenDeps } from '../src/token.ts';
-import { REACHES, deviceApprove, deviceList, devicePoll, deviceRevoke, deviceStart, operationGrant, shapeGrant, vaultGrant, type Exchanged } from '../src/device.ts';
+import { REACHES, deviceApprove, deviceList, devicePoll, deviceRevoke, deviceStart, operationGrant, shapeGrant, keychainGrant, type Exchanged } from '../src/device.ts';
 import { runnerGrant } from '../src/jobs.ts';
 import { applyMigrations } from '../src/migrate.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
@@ -81,11 +81,11 @@ test('A SHAPE GRANT, APPROVED ONCE, IS ADMITTED AGAIN AND AGAIN FOR NINETY DAYS,
   assert.equal((await shapeGrant(deps(), grant.bearer)).ok, false, 'a shape grant outlived its ninety days');
 });
 
-test('A SHAPE GRANT READS NOTHING ELSE: no key door, no vault, no operation and no runner takes its bearer', async () => {
+test('A SHAPE GRANT READS NOTHING ELSE: no key door, no keychain, no operation and no runner takes its bearer', async () => {
   const { deps } = await setup();
   const { bearer } = await approved(deps);
   assert.equal((await verifyToken(deps(), bearer)).ok, false, 'the key door took a shape bearer');
-  assert.equal((await vaultGrant(deps(), bearer)).ok, false, 'the vault took a shape bearer');
+  assert.equal((await keychainGrant(deps(), bearer)).ok, false, 'the keychain took a shape bearer');
   assert.equal((await operationGrant(deps(), bearer)).ok, false, 'an operation door took a shape bearer');
   assert.equal((await runnerGrant(deps(), bearer)).ok, false, 'the runner door took a shape bearer');
   /* And it is still whole after all four tried it: none of them spent it. */
@@ -98,10 +98,10 @@ test('NO OTHER GRANT IS A SHAPE GRANT, and a revoked one, a stranger and a suspe
   const stranger = await shapeGrant(deps(), `${RECORD}.${'x'.repeat(43)}`);
   assert.equal(stranger.ok, false);
 
-  const vault = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: '*' }));
-  value(await deviceApprove(deps(), OWNER, { user_code: vault.user_code }));
-  const vaultBearer = (value(await devicePoll(deps(), { device_code: vault.device_code })) as Exchanged).bearer;
-  assert.deepEqual(await shapeGrant(deps(), vaultBearer), stranger, 'a vault bearer opened a shape copy');
+  const keychain = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: '*' }));
+  value(await deviceApprove(deps(), OWNER, { user_code: keychain.user_code }));
+  const keychainBearer = (value(await devicePoll(deps(), { device_code: keychain.device_code })) as Exchanged).bearer;
+  assert.deepEqual(await shapeGrant(deps(), keychainBearer), stranger, 'a keychain bearer opened a shape copy');
   assert.deepEqual(await shapeGrant(deps(), `rec_other.${grant.bearer.split('.')[1]}`), stranger, 'another record was admitted');
 
   sql.exec('UPDATE person SET suspended_at = ? WHERE id = ?', new Date(NOW).toISOString(), OWNER);

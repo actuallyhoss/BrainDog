@@ -1,15 +1,15 @@
 /**
  * The sealed census (LCH-C08 job 5): no route that is safe by method answers a sealed value, to the owner or to a
- * member, on a record whose vault holds one.
+ * member, on a record whose keychain holds one.
  *
- * WHAT IS PLANTED is what the record keeps and never hands back: a vault key's wrapped bytes and nonce, and a key's
+ * WHAT IS PLANTED is what the record keeps and never hands back: a keychain key's wrapped bytes and nonce, and a key's
  * sealed columns, `ciphertext`, `nonce` and the two `prev_` ones, each an invented string written as bytes, and a list
  * whose secret field names that key, as a deposit leaves it. Every GET route of `ROUTES` is then asked, with each
  * argument it takes filled with something this record holds, and every answer is searched for each planted string as
  * text, base64, hex and as the numbers a byte array is written out as.
  *
  * THE CENSUS MUST SEE SOMETHING. A setup where every route refused would pass by saying nothing, so the owner's
- * answers must include enough 200s, and `listGrants` must name the key by its label: the vault was read through a
+ * answers must include enough 200s, and `listGrants` must name the key by its label: the keychain was read through a
  * safe door, and only its sealed half stayed in.
  */
 
@@ -65,7 +65,7 @@ async function planted() {
   /* THE RECORD KEY'S PURPOSE AND THE CONNECTOR'S, whichever the new record has not written itself. */
   const held = new Set(sql.all<{ purpose: string }>('SELECT purpose FROM vault_key').map((r) => r.purpose));
   const free = ['record', 'connector'].filter((p) => !held.has(p));
-  assert.ok(free.length > 0, 'the new record already holds every vault key this census could plant');
+  assert.ok(free.length > 0, 'the new record already holds every keychain key this census could plant');
   for (const purpose of free)
     sql.exec("INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id) VALUES (?, ?, ?, 'kek', 'kek_7c')", purpose, bytes(PLANTS['vault_key.wrapped']), bytes(PLANTS['vault_key.nonce']));
   const acme = await api.create({ register: 'clients', fields: { name: 'Acme Candles' } }, OWNER);
@@ -110,7 +110,7 @@ test('NO SAFE ROUTE ANSWERS A SEALED VALUE, to the owner or to a member', async 
   assert.deepEqual(found, [], 'a safe route answered a sealed value');
   assert.ok(answered.owner >= SAFE.length / 2, `the owner was answered ${answered.owner} of ${SAFE.length} reads, too few to say anything`);
   assert.ok(answered.member > 0, 'the member was answered nothing');
-  assert.match(grants, /Kiln supplier portal/, 'listGrants did not read the vault, so the census proves nothing about it');
+  assert.match(grants, /Kiln supplier portal/, 'listGrants did not read the keychain, so the census proves nothing about it');
   sql.close();
 });
 

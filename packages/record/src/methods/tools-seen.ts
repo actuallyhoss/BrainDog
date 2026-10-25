@@ -317,7 +317,7 @@ export function methods(deps: RecordDeps) {
         const name = f.name.trim();
         const needs = (f.needs ?? []).map((n) => n.trim());
         if ([f.command ?? '', ...(f.args ?? []), f.endpoint ?? '', ...needs].some((v) => v !== '' && looksLikeCredential(v))) {
-          out.push({ name, did: 'skipped', why: 'How it starts holds what looks like a key, so none of it was written down. Keep the key in the vault and name it among the keys it needs.' });
+          out.push({ name, did: 'skipped', why: 'How it starts holds what looks like a key, so none of it was written down. Keep the key in the keychain and name it among the keys it needs.' });
           continue;
         }
         if (f.scope === 'project' && project === null) {

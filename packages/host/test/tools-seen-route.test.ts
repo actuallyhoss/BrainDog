@@ -36,7 +36,7 @@ test('ONCE WIRED, THE ROUTE COUNTS BY GROUP: one DATA route, nothing else grows'
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'toolsSeen'));
   assert.equal(all.DATA, (without.DATA ?? 0) + 1);
-  for (const group of ['READ+', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['READ+', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('ONCE WIRED, A POST REACHES THE RECORD METHOD OF ITS NAME with the machine and the tools as sent', { skip: wired ? false : 'routes/index.ts does not hold its line yet' }, async () => {

@@ -20,7 +20,7 @@
  * A REFUSED FETCH IS A REJECTED PROMISE IN THE SCRIPT. `CtxHost` has no way to refuse a run from outside, so a refusal
  * reaches the script as an ordinary error carrying `sendAction`'s sentence. Uncaught, the run is refused with that
  * sentence on its event. Caught, the script goes on without the answer, which is all catching it can buy: nothing was
- * sent, and no key was opened. THE ONE EXCEPTION IS A KEY SENT WHERE ITS VAULT ENTRY DOES NOT OPEN (`keyRefused`), which
+ * sent, and no key was opened. THE ONE EXCEPTION IS A KEY SENT WHERE ITS KEYCHAIN ENTRY DOES NOT OPEN (`keyRefused`), which
  * is a rule broken rather than a provider failing, and refuses the run however the script handles it.
  *
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
@@ -52,7 +52,7 @@ import { SLASH_KEY_LABEL } from './slash.ts';
 export type RunSandbox = (decl: ScriptDecl, host: CtxHost) => Promise<ScriptAnswer>;
 
 /**
- * The grant a vault label names, or `null`. By reference: an id, a label and what its vault entry says it opens, never
+ * The grant a keychain label names, or `null`. By reference: an id, a label and what its keychain entry says it opens, never
  * the bytes. `opens` is carried because it decides where the key may go (`keyRefused`).
  */
 export type GrantOf = (label: string) => ScriptGrant | null;
@@ -134,9 +134,9 @@ function sealedOf(api: Pick<RecordApi, 'kernel'>, register: string): Set<string>
 /**
  * One row as a script is handed it: every field but a secret.
  *
- * A SECRET FIELD HOLDS A GRANT ID, NOT THE KEY, AND IT IS STILL TAKEN OFF. It says which vault entry opens what, and a
+ * A SECRET FIELD HOLDS A GRANT ID, NOT THE KEY, AND IT IS STILL TAKEN OFF. It says which keychain entry opens what, and a
  * script can copy anything it is handed into a row it writes or a line of its log, both of which people read who were
- * never shown the vault. The script names its keys by label in `keys:` and the host opens them; it never needs to know
+ * never shown the keychain. The script names its keys by label in `keys:` and the host opens them; it never needs to know
  * where they are sealed. `list<secret>` is refused at install (`declare.ts`), and is named here anyway, because this is
  * the last place that could catch one and the kernel's own `redacts` reads a list by its element type the same way.
  */
@@ -417,31 +417,31 @@ function cycleLineOf(line: Json): CycleLine | null {
  * Why a script may not send `grant` to `at`, or `null` when it may. The refusal is `FORBIDDEN` and is a rule broken, so
  * it refuses the whole run on both hosts, as a key the script does not declare does.
  *
- * A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY SAYS IT OPENS. A script names its keys and its origins as two lists, and
+ * A KEY GOES ONLY TO THE HOST ITS KEYCHAIN ENTRY SAYS IT OPENS. A script names its keys and its origins as two lists, and
  * nothing joined them: a probe sent `goldapi`, whose entry opens `api.gold.test`, to
  * `collector.test` as a bearer, because that origin was also in the script's `egress:`, and the one line the owner
  * approves names both lists without saying which host gets the key. A `call` has one host and one grant, so the pairing
  * was implicit there; a script is the first declaration that can hold two origins and one key. The host is compared
- * exactly, with no subdomain let in: `opens: stripe.com` does not open `api.stripe.com`, because a vault entry that names
+ * exactly, with no subdomain let in: `opens: stripe.com` does not open `api.stripe.com`, because a keychain entry that names
  * a parent would otherwise open every name under it, whoever holds them.
  *
- * AND NEVER THE VAULT'S `slash` KEY, WHATEVER IT OPENS. On a host with no `SLASH_KEY` it is the key the included model
+ * AND NEVER THE KEYCHAIN'S `slash` KEY, WHATEVER IT OPENS. On a host with no `SLASH_KEY` it is the key the included model
  * answers everybody with, which `slashGuardedEngine` already refuses as a tier `b` key for the same reason. It is
  * matched on the label the lookup found, so naming it by its grant id is refused too.
  */
 export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptRefusal | null {
   if (grant.label === SLASH_KEY_LABEL)
-    return { code: 'FORBIDDEN', why: `${script} named the vault's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not send it anywhere.` };
+    return { code: 'FORBIDDEN', why: `${script} named the keychain's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not send it anywhere.` };
   const host = at.hostname.replace(/\.$/, '');
   if (hostOpened(grant.opens) === host) return null;
   return {
     code: 'FORBIDDEN',
-    why: `The key "${grant.label}" opens ${hostOpened(grant.opens) ?? JSON.stringify(grant.opens ?? '')}, and ${script} fetched ${host} with it, so nothing was sent. A script sends a key only to the host its vault entry says it opens.`,
+    why: `The key "${grant.label}" opens ${hostOpened(grant.opens) ?? JSON.stringify(grant.opens ?? '')}, and ${script} fetched ${host} with it, so nothing was sent. A script sends a key only to the host its keychain entry says it opens.`,
   };
 }
 
 /**
- * The refusal for a script that declares the vault's `slash` key, asked before its sandbox starts, or `null`.
+ * The refusal for a script that declares the keychain's `slash` key, asked before its sandbox starts, or `null`.
  *
  * BEFORE THE SANDBOX AND NOT ONLY AT THE FETCH, so a script that names the key and never uses it is refused all the
  * same: a declaration that names the included model's key is one the owner should not have been asked to approve.
@@ -449,7 +449,7 @@ export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptR
  */
 export function slashDeclared(script: string, keys: readonly string[]): ScriptRefusal | null {
   if (!keys.includes(SLASH_KEY_LABEL)) return null;
-  return { code: 'FORBIDDEN', why: `${script} declares the vault's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not name it.` };
+  return { code: 'FORBIDDEN', why: `${script} declares the keychain's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not name it.` };
 }
 
 /**
@@ -474,12 +474,12 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const fetch = async (asked: HostRequest): Promise<HostResponse> => {
       if (kept.stop !== null) throw new Error(kept.stop.why);
-      /* BEFORE THE KEY IS LOOKED UP, so a write by an agent's trial reaches neither the vault nor the socket. A rejected
+      /* BEFORE THE KEY IS LOOKED UP, so a write by an agent's trial reaches neither the keychain nor the socket. A rejected
          promise like a refused key's: the script may catch it and go on reading. */
       const unread = options.readOnly === true ? readOnlyRefused(asked.method, asked.url, asked.body) : null;
       if (unread !== null) throw new Error(unread);
       const grant = asked.key === null ? null : options.grantOf(asked.key);
-      if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the vault, so nothing was sent.`);
+      if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the keychain, so nothing was sent.`);
       const broken = grant === null ? null : keyRefused(scripted.script, grant, new URL(asked.url));
       if (broken !== null) {
         kept.stop = broken;

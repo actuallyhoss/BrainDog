@@ -9,7 +9,7 @@
 function api(kernel: Kernel) {
   const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null => null;
   const scoped = (ctx: CallContext, need: Need): Refusal | null => null;
-  const vault = (ctx: CallContext): Refusal | null => null;
+  const keychain = (ctx: CallContext): Refusal | null => null;
   const admin = (ctx: CallContext): Refusal | null => null;
 
   return {
@@ -26,7 +26,7 @@ function api(kernel: Kernel) {
     },
 
     async listGrants(ctx: CallContext) {
-      const stop = vault(ctx);
+      const stop = keychain(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.grants());
     },

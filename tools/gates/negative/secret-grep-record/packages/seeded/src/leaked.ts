@@ -4,7 +4,7 @@
  * Its own failure message opens *"A credential never goes in the record, and never in a log"* — and
  * its five sinks were all the log half: `console`, `log`, `telemetry`, `push`, `dispatch`. A
  * plaintext written INTO the record was checked by nothing, which is `12 §6`'s promise and the one
- * the vault exists to keep.
+ * the keychain exists to keep.
  *
  * The line below binds the unwrapped value as a parameter, which is what a real leak looks like:
  * the SQL is innocent and the variable is not. The gate reads the bound parameters only — a column

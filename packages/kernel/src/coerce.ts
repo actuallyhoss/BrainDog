@@ -437,7 +437,7 @@ function holdsKey(value: unknown): boolean {
  * an agent over MCP or a caller of the API could.
  */
 const keyRefused = (at: string): Coerced =>
-  bad('VALUE_MALFORMED', `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.`, at);
+  bad('VALUE_MALFORMED', `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the keychain, and write here what it opens.`, at);
 
 /**
  * What `min:` and `max:` measure (`02 §5`): the UTF-8 bytes of a text or a document, the value of a

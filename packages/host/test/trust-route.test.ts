@@ -73,7 +73,7 @@ test('THE ROUTE COUNTS BY GROUP: trust adds one READ+ route and nothing that wri
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'trust'));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
-  for (const group of ['DATA', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('THE OWNER, A MEMBER AND A TOKEN ARE EACH HANDED TO THE RECORD METHOD OF ITS NAME, and answered what it said', async () => {

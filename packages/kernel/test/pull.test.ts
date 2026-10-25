@@ -100,7 +100,7 @@ test('A FIRE IS ONE OUTBOX ROW, and it carries the grant’s ID and never its by
   const payload = JSON.parse(queued[0]!.payload) as Record<string, unknown>;
   assert.deepEqual(payload, { ingest: 'npm-downloads', cursor: 'page-2', grant });
 
-  /* THE SEALED BYTES ARE NOT IN IT. The runner opens the grant through the record's own vault, under
+  /* THE SEALED BYTES ARE NOT IN IT. The runner opens the grant through the record's own keychain, under
      a `grant.read` event — so a fetch that reads a credential is a fetch that is on the record. */
   assert.ok(!queued[0]!.payload.includes('ciphertext'));
   assert.ok(!queued[0]!.payload.includes('npm, read'), 'the label rode along with it');

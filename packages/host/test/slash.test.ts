@@ -295,7 +295,7 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
   assert.equal(out.value.body_kind, 'rowset');
   assert.deepEqual(out.value.citations, ['tasks#1']);
   assert.match(String(out.value.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
-  /* THE FOLD'S LAST LINE IS THE VAULT, REFUSED, on every ask (`46 §4.2`). */
+  /* THE FOLD'S LAST LINE IS THE KEYCHAIN, REFUSED, on every ask (`46 §4.2`). */
   assert.deepEqual(out.value.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
   assert.deepEqual(out.value.read.at(0), { register: 'tasks', rows: 2, predicate: '{"field":"state","is":"open"}' });
 
@@ -322,7 +322,7 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
      count non-terminal rows and a zero printed for an unknown is a figure in a prompt that nothing measured. */
   const drafting = JSON.parse(String(net.sent[0]!.init.body)) as { messages: { content: string }[] };
   assert.match(drafting.messages[1]!.content, /tasks \(2 rows\): what:text · amount:money · due:day · state:enum/u);
-  assert.ok(!drafting.messages[1]!.content.includes('grant'), 'the vault register reached the prompt');
+  assert.ok(!drafting.messages[1]!.content.includes('grant'), 'the keychain register reached the prompt');
 
   sql.close();
   own.close();
@@ -376,7 +376,7 @@ test('A PREDICATE THE GRAMMAR REFUSES FALLS BACK ON THE RECORD\'S OWN SEARCH, wh
 const SLASH_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWN_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE';
 const GONE_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAF';
-const VAULT = [
+const KEYCHAIN = [
   { id: SLASH_GRANT, label: 'slash', kind: 'api_token', revoked_at: null },
   { id: OWN_GRANT, label: 'openai', kind: 'api_token', revoked_at: null },
   { id: GONE_GRANT, label: 'anthropic', kind: 'api_token', revoked_at: '2026-09-01T00:00:00.000Z' },
@@ -434,7 +434,7 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
   ];
   const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 700, completion_tokens: 60 }));
   const opened: string[] = [];
-  const deps = { grants: () => VAULT, openKey: async (g: { id: string }) => (opened.push(g.id), keyOf(g.id)), send: net.send };
+  const deps = { grants: () => KEYCHAIN, openKey: async (g: { id: string }) => (opened.push(g.id), keyOf(g.id)), send: net.send };
   const config = slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:11434/v1/chat/completions', SLASH_MODEL: 'llama3' }, { operatorKey: false });
   const slash = createSlash({ sql: own, clock, inference: slashInferenceOf(config, deps)!, record: slashRecord(api) });
 
@@ -467,11 +467,11 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
   await typed.complete(ask('glm-5.3'));
   assert.equal(sentModel(net, 2), 'glm-5.3');
 
-  /* NO ADAPTER for a grant that is revoked, one the vault never held, one that is not an API token, and a host that
+  /* NO ADAPTER for a grant that is revoked, one the keychain never held, one that is not an API token, and a host that
      cannot open keys. */
   assert.equal(slashOwnInference({ ...OWN, grant_id: GONE_GRANT }, deps), undefined);
   assert.equal(slashOwnInference({ ...OWN, grant_id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAG' }, deps), undefined);
-  assert.equal(slashOwnInference(OWN, { ...deps, grants: () => VAULT.map((g) => ({ ...g, kind: 'password' })) }), undefined);
+  assert.equal(slashOwnInference(OWN, { ...deps, grants: () => KEYCHAIN.map((g) => ({ ...g, kind: 'password' })) }), undefined);
   assert.equal(slashOwnInference(OWN, { ...deps, openKey: null }), undefined);
   /* AND FOR AN ADDRESS THE RULES REFUSE, stored before a rule changed: it is checked again on every call. */
   assert.equal(slashOwnInference({ ...OWN, base_url: 'https://10.0.0.5/v1' }, deps), undefined);
@@ -481,9 +481,9 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
   const sent = net.sent.length;
   const shut = slashOwnInference(OWN, { ...deps, openKey: async () => null })!;
   await assert.rejects(shut.complete(ask('gpt-4o-mini')), /did not open/u);
-  let vault = VAULT;
-  const revoking = slashOwnInference(OWN, { ...deps, grants: () => vault })!;
-  vault = VAULT.map((g) => (g.id === OWN_GRANT ? { ...g, revoked_at: '2026-09-22T09:00:00.000Z' } : g));
+  let keychain = KEYCHAIN;
+  const revoking = slashOwnInference(OWN, { ...deps, grants: () => keychain })!;
+  keychain = KEYCHAIN.map((g) => (g.id === OWN_GRANT ? { ...g, revoked_at: '2026-09-22T09:00:00.000Z' } : g));
   await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /did not open/u);
   assert.equal(net.sent.length, sent);
 
@@ -495,7 +495,7 @@ test('HIS OWN KEY ON ANTHROPIC IS ASKED IN MESSAGES: its address, x-api-key and 
   const net = endpoint(() =>
     new Response(JSON.stringify({ content: [{ type: 'text', text: '{"answer":4}' }], usage: { input_tokens: 12, output_tokens: 3 } }), { status: 200 }),
   );
-  const deps = { grants: () => VAULT, openKey: async (g: { id: string }) => keyOf(g.id), send: net.send };
+  const deps = { grants: () => KEYCHAIN, openKey: async (g: { id: string }) => keyOf(g.id), send: net.send };
   const key = slashOwnInference({ ...OWN, provider: 'anthropic', base_url: null, model: 'claude-x' }, deps)!;
   const reply = await key.complete(ask('glm-5.3'));
   assert.deepEqual(reply, { text: '{"answer":4}', usage: { in: 12, out: 3 }, model: 'claude-x' });
@@ -518,7 +518,7 @@ test('NO ENDPOINT MEANS NEITHER PORT IS BUILT, so a keyless host keeps drafting 
   assert.equal(slashModelOf(slashFromEnv({}), deps), undefined);
   assert.equal(slashInferenceOf(slashFromEnv({}), deps), undefined);
   /* AN ENDPOINT WITH NO OPERATOR KEY IS A KEYLESS MODEL, a server on the owner's own machine, whether or not the host can
-     open the vault: the vault is not read for it. Where a key is required, a call is refused
+     open the keychain: the keychain is not read for it. Where a key is required, a call is refused
      before anything is sent. */
   const configured = slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:11434/v1/chat/completions' }, { operatorKey: false });
   assert.ok(slashInferenceOf(configured, deps) !== undefined);

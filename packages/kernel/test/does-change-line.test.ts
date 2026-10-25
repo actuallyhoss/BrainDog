@@ -12,7 +12,7 @@ import { test } from 'node:test';
 
 import { doesOf, type DoesNames } from '../src/does.ts';
 
-const LISTS: Readonly<Record<string, string>> = { skills: 'Skills', things: 'Projects', tasks: 'Tasks', invoices: 'Invoices', vault: 'Keys' };
+const LISTS: Readonly<Record<string, string>> = { skills: 'Skills', things: 'Projects', tasks: 'Tasks', invoices: 'Invoices', keychain: 'Keys' };
 const LABELS: Readonly<Record<string, string>> = { body: 'Text', rev: 'Revision', stage: 'Stage', amount: 'Amount', token: 'Token', due: 'Due on', plan: 'The plan', thing: 'Project', done: 'Done', folder: 'Folder' };
 const TITLES: Readonly<Record<string, string>> = { 'things#1': 'Kiln', 'things#3': 'Portage', 'skills#2': 'ponytail-review' };
 
@@ -46,7 +46,7 @@ test('money is said in its own currency, from and to', () => {
 });
 
 test('a secret is named by its label and its value is never said', () => {
-  const line = doesOf('rowset', one('vault', 'vault#1', { token: 'sk_live_9f2c' }), names());
+  const line = doesOf('rowset', one('keychain', 'keychain#1', { token: 'sk_live_9f2c' }), names());
   assert.equal(line, 'Changes Token in Keys.');
   assert.ok(!line.includes('sk_live'));
 });
@@ -99,7 +99,7 @@ test('several entries are not each read for what they held: one is asked whether
   assert.equal(doesOf('rowset', rows({ stage: 'Live', folder: 'North' }), counted), 'Sets Stage to Live, sets Folder to North on 500 in Projects.');
   assert.equal(reads, 2);
   /* A SECRET IS STILL NEVER VALUED over several entries: the one asked says so for all of them. */
-  assert.equal(doesOf('rowset', { register: 'vault', rows: [1, 2].map((n) => ({ at: `vault#${n}`, patch: { token: 'sk_live_9f2c' } })) }, counted), 'Changes Token on 2 in Keys.');
+  assert.equal(doesOf('rowset', { register: 'keychain', rows: [1, 2].map((n) => ({ at: `keychain#${n}`, patch: { token: 'sk_live_9f2c' } })) }, counted), 'Changes Token on 2 in Keys.');
   /* AND AN ENTRY THAT IS NOT SENT THE FIELD stops the value being said for all, with no read at all. */
   reads = 0;
   const mixed = { register: 'things', rows: [{ at: 'things#1', patch: { stage: 'Live' } }, { at: 'things#3', patch: { folder: 'North' } }] };

@@ -170,7 +170,7 @@ const namedTiers = (tiers: readonly Tier[]): string => {
  * A grant id and not a key: `g_` and a 26-character ULID (`34 §4`).
  *
  * THIS IS THE ONLY DOOR A CREDENTIAL COULD WALK IN THROUGH, so it is the one place that checks. An
- * owner choosing his own key picks a grant the record's vault already holds; an owner who pastes the
+ * owner choosing his own key picks a grant the record's keychain already holds; an owner who pastes the
  * key itself into that box has handed a plaintext to a package whose entire boundary argument is
  * that it never holds one, and it would then sit in Slash's own SQLite, in a column called
  * `grant_id`, until somebody exported the database. The shape is cheap to check and the failure
@@ -273,7 +273,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
 
   const configure = (patch: SetupPatch, ctx: CallContext): Result<Setup> => {
     /* THE OWNER AND NOBODY ELSE (`46 §5.2`). Switching tiers spends somebody's money and names a
-       vault grant; a member with `write` on one register is not the person who decides either. */
+       keychain grant; a member with `write` on one register is not the person who decides either. */
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
       return no('FORBIDDEN', 'Only the record owner changes how Slash is set up.');
 
@@ -282,7 +282,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
 
     /* A SAVE OF NOTHING READS WHAT IS SAVED, AND WRITES NOTHING. Settings needs the address and the key he picked to draw
        his own key's form as he left it, and `status` is read by every signed-in person, so neither goes there: a
-       colleague is not told which vault grant the owner's key lives in. `updated_at` stays the last real save's. */
+       colleague is not told which keychain grant the owner's key lives in. `updated_at` stays the last real save's. */
     if (Object.keys(patch).length === 0) {
       const saved: Setup = { ...before, source: before.tier === 'b' ? 'key' : 'included', provider: stored.provider, base_url: stored.base_url };
       return ok(saved);
@@ -306,11 +306,11 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
 
     const grant = patch.grant_id === undefined ? before.grant_id : patch.grant_id;
     if (grant !== null && !GRANT_ID.test(grant))
-      return no('VALUE_MALFORMED', 'That is not a grant id. Put the key in the vault first, then name the grant here.', {
+      return no('VALUE_MALFORMED', 'That is not a grant id. Put the key in the keychain first, then name the grant here.', {
         at: 'grant_id',
       });
     if (tier === 'b' && grant === null)
-      return no('VALUE_MALFORMED', 'Your own key is a key in the vault, so pick the one Slash answers with.', {
+      return no('VALUE_MALFORMED', 'Your own key is a key in the keychain, so pick the one Slash answers with.', {
         at: 'grant_id',
       });
 

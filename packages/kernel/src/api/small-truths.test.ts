@@ -71,7 +71,7 @@ test('a Bearer token and a Basic header are keys, and a bare 32-hex string and t
   assert.equal(looksLikeCredential(`curl -H "${header}${['Bear', 'er'].join('')} ${token}" https://example.com`), true);
   assert.equal(looksLikeCredential(`${header}${['Bas', 'ic'].join('')} ${btoa(['ada', 'correct horse'].join(':'))}`), true);
   assert.equal(looksLikeCredential(`${header.toLowerCase()}basic ${btoa(['a', 'b'].join(':'))}`), true);
-  assert.equal(looksLikeCredential('Use Authorization: Bearer <token> with the key from the vault.'), false);
+  assert.equal(looksLikeCredential('Use Authorization: Bearer <token> with the key from the keychain.'), false);
   assert.equal(looksLikeCredential('Authorization: Basic auth is off for this door.'), false);
   assert.equal(looksLikeCredential(`The checksum is ${hex}.`), false);
 });

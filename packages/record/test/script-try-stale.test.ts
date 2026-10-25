@@ -1,14 +1,14 @@
 /**
- * What the record tells a host about a trial's caller: `owner` when the vault's own gate would let them in, and `stale`
+ * What the record tells a host about a trial's caller: `owner` when the keychain's own gate would let them in, and `stale`
  * when the one thing keeping it shut is a proof older than fifteen minutes.
  *
- * WHAT WAS MEASURED. `scriptTry` said `owner` on `level === 'owner'` alone, and the vault asks one thing more. On the
- * self-host a session proved two hours ago was planted: the vault refused it `listGrants` with `NEEDS_BROWSER_SESSION`,
+ * WHAT WAS MEASURED. `scriptTry` said `owner` on `level === 'owner'` alone, and the keychain asks one thing more. On the
+ * self-host a session proved two hours ago was planted: the keychain refused it `listGrants` with `NEEDS_BROWSER_SESSION`,
  * and the same cookie's trial sent a request carrying the owner's key and left a `grant.read` in her name. The host
- * builds a trial's `grantOf` from `owner`, so the record's word is the whole gate, and this holds it to `vault()`'s
+ * builds a trial's `grantOf` from `owner`, so the record's word is the whole gate, and this holds it to `keychain()`'s
  * answer. The HTTP join is `apps/selfhost/test/script-try-asker.test.ts`.
  *
- * NOT `vault() === null` ALONE, because `allows` lets `system` through everything and `vault` refuses only tokens, so a
+ * NOT `keychain() === null` ALONE, because `allows` lets `system` through everything and `keychain` refuses only tokens, so a
  * `system` caller would have been handed the key that the line before this change kept from it. The last case holds
  * that.
  */
@@ -50,7 +50,7 @@ const person = (level: 'owner' | 'decide', provedAt?: number): CallContext => ({
   ...(provedAt === undefined ? {} : { provedAt }),
 });
 
-test('AN OWNER WHOSE PROOF IS TWO HOURS OLD IS NOT HANDED THE VAULT, and the host is told the proof is why', async () => {
+test('AN OWNER WHOSE PROOF IS TWO HOURS OLD IS NOT HANDED THE KEYCHAIN, and the host is told the proof is why', async () => {
   assert.deepEqual(await handed(person('owner', NOW - 120 * MINUTE)), { owner: false, stale: true });
 });
 

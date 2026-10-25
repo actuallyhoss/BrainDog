@@ -2,7 +2,7 @@
  * The host's own model, handed in for one ask, so the host can key it for the person asking.
  *
  * WHY THIS FILE EXISTS. `createSlash` takes one `inference` for the life of the engine, and the host builds that once with
- * nobody asking. Where the host's model is keyed from the vault, every opening of that key is a `grant.read` event, and
+ * nobody asking. Where the host's model is keyed from the keychain, every opening of that key is a `grant.read` event, and
  * with one engine-wide adapter the owner's own read was logged `system`
  * (`apps/selfhost/test/slash-included-guard.test.ts`, "THE OWNER'S OWN READ IS SIGNED BY HER"). `propose` already took a
  * per-call adapter for tier `b`'s key; `read` took none, so the one place the asker could have been named was not there.

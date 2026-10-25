@@ -3,7 +3,7 @@
  *
  * THE BEARER IS A SHAPE GRANT AND NOTHING ELSE. A device grant of reach `shape`, approved once by the owner with six
  * digits, standing for ninety days (`shapeGrant` in the kernel's `device.ts`). The door hands the bearer to the record's
- * `shapeExport`, which checks it before it reads a row, so a login token, a vault grant, an operation grant or an
+ * `shapeExport`, which checks it before it reads a row, so a login token, a keychain grant, an operation grant or an
  * agent's key is refused there in one sentence, and the answer to a good one is the record's export with every value
  * scrambled: the lines of a `.brainl` file whose second line is `#shape: true`.
  *

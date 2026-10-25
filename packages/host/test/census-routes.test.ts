@@ -50,7 +50,7 @@ test('THE ROUTES COUNT BY GROUP: two more READ+ and nothing that writes', () => 
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => !NAMES.includes(r.name)));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 2);
-  for (const group of ['DATA', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A TOKEN REACHES EACH RECORD METHOD OF ITS NAME, a census by GET and a document by POST', async () => {

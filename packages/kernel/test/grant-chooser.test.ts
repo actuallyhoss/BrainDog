@@ -1,15 +1,15 @@
 /**
- * Which live vault entry a name opens, when the vault holds more than one under it: `grantChosen`, and the two SQL
+ * Which live keychain entry a name opens, when the keychain holds more than one under it: `grantChosen`, and the two SQL
  * readers that now hand their rows to it.
  *
- * ONE CHOOSER, NOT FIVE COPIES OF ITS ORDER. The vault admits two live grants under one label (`bindGrant` checks no
+ * ONE CHOOSER, NOT FIVE COPIES OF ITS ORDER. The keychain admits two live grants under one label (`bindGrant` checks no
  * label for uniqueness), and at `afb3b1b2` four places each wrote the newest-first order out for themselves: `keyNamed`
  * and `opensNamed` here as `ORDER BY created_at DESC, id DESC`, `grantNamed` in `@braindog/host/script` as a `sort`,
  * and `slashGrantOf` in `@braindog/host/slash` as a loop over `newerThan`. A fifth, Slash's `grants().find(...)`,
  * answered the OLDEST key while every action named `slash` sent the newest, and the only thing that had kept the other
  * four agreeing was that each author copied the same clause. This file holds the kernel's half of one chooser: the two
  * SQL readers filter and `grantChosen` orders. One more copy of the clause, `sealedGrant`'s for a signed post, asks the
- * chooser now too; `vault-webhook-grant.test.ts` holds it, over a tie that SQL and the chooser would have broken two
+ * chooser now too; `keychain-webhook-grant.test.ts` holds it, over a tie that SQL and the chooser would have broken two
  * ways.
  *
  * THE ORDER AS IT STOOD IS WRITTEN OUT BELOW (`BEFORE`), verbatim from `keyNamed` at `afb3b1b2`, and every case asserts the
@@ -39,7 +39,7 @@ const b = (n: number) => new Uint8Array([n, n + 1, 2, 3]);
 const BEFORE = (sql: NodeSql, name: string): string | null =>
   sql.one<{ id: string }>('SELECT id FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1', name, name)?.id ?? null;
 
-async function vault() {
+async function keychain() {
   const sql = openSqlite();
   const clock = fixedClock(NOW - 30 * DAY);
   const k: Kernel = await openRecord(sql, clock);
@@ -66,7 +66,7 @@ async function vault() {
     assert.ok(made.ok, fixOf(made));
     return (made.value as GrantRow).id;
   };
-  /** Every reader of one name, and the old query, answering the same vault. */
+  /** Every reader of one name, and the old query, answering the same keychain. */
   const readings = (name: string) => {
     const chosen = grantChosen(k.grants(), name);
     return {
@@ -88,7 +88,7 @@ async function vault() {
 }
 
 test('(1) TWO LIVE ENTRIES UNDER ONE LABEL, A DAY APART: every reader opens the newer', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     v.bind('goldapi', 'old.example.test');
     const newer = v.bind('goldapi', 'new.example.test');
@@ -99,7 +99,7 @@ test('(1) TWO LIVE ENTRIES UNDER ONE LABEL, A DAY APART: every reader opens the 
 });
 
 test('(2) BOUND IN THE SAME INSTANT, THE LARGER ID WINS, and the row bound second is not the newest when its id is smaller', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     /* THE IDS ARE CHOSEN AGAINST THE ORDER OF THE BINDS, so a chooser that fell back to the order the rows came back in
        (what Slash's `find` did) would open `SMALLER` here, and the tie-break is what decides. */
@@ -113,7 +113,7 @@ test('(2) BOUND IN THE SAME INSTANT, THE LARGER ID WINS, and the row bound secon
 });
 
 test('(3) A REVOKED NEWEST ENTRY IS PASSED OVER, and a label with nothing live opens nothing', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     const older = v.bind('goldapi', 'old.example.test');
     const newer = v.bind('goldapi', 'new.example.test');
@@ -128,7 +128,7 @@ test('(3) A REVOKED NEWEST ENTRY IS PASSED OVER, and a label with nothing live o
 });
 
 test('(4) A NAME THAT IS AN ID OPENS THAT ENTRY, whatever is newer under its label', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     const older = v.bind('goldapi', 'old.example.test');
     v.bind('goldapi', 'new.example.test');
@@ -139,9 +139,9 @@ test('(4) A NAME THAT IS AN ID OPENS THAT ENTRY, whatever is newer under its lab
 });
 
 test('(5) WHAT A CALLER PASSES OVER IS ITS OWN RULE, and among what it keeps the order is still this one', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
-    /* SLASH'S RULE, stated as `slashGrantOf` states it: a row of a kind the vault holds that is not a token is not a
+    /* SLASH'S RULE, stated as `slashGrantOf` states it: a row of a kind the keychain holds that is not a token is not a
        bearer. With a password bound after the token, the kind-blind readers take the password and Slash's the token. */
     const token = v.bind('slash', 'gateway.example.test');
     const password = v.bind('slash', 'gateway.example.test', { kind: 'password' });

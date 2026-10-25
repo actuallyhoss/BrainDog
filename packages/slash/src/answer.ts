@@ -115,7 +115,7 @@ const stoppedIn = (e: unknown): Stopped | null => {
 /**
  * The run's sentence for a status the provider will answer the same way on the next rung.
  *
- * 401 AND 403 NAME THE KEY, because they are facts about it and the owner's next step is the vault, which is the rule
+ * 401 AND 403 NAME THE KEY, because they are facts about it and the owner's next step is the keychain, which is the rule
  * `packages/kernel/src/actions.ts` `finishAction` keeps for a scheduled action's 401 ("refused the key ... with 401").
  * Every other status is named bare, since this package cannot tell a wrong model name from a wrong path, and the status
  * is what the owner can look up.
@@ -293,7 +293,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
            (`SlashKeyClosedError`, which only a host that asked for `keyRequired` throws). Returning here leaves the hold
            to `finally`, whose `release` deletes it, so the ledger reads as it does for a record with no key at all
            (`46 §5.2`). `FORBIDDEN` AND NOT `UNREACHABLE`, because the next rung would find the same key closed and open
-           the vault again for nothing. The sentence is the host's, since this package cannot say what the host's vault is
+           the keychain again for nothing. The sentence is the host's, since this package cannot say what the host's keychain is
            called; each host answers its own over it on his own key (`apps/worker/src/slash.ts`, `apps/selfhost/src/slash.ts`). */
         if (code === 'UNREACHABLE' && (unsent as boolean))
           return no('FORBIDDEN', `rule.${ask.rule} asked Slash at step ${step}: ${sentence(lost)}`, { at: 'grant' });

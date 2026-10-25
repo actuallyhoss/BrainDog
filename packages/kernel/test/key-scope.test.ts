@@ -2,7 +2,7 @@
  * A key inside its own scope, and the approval saying who opens it (SHL-C05, jobs 2 and 3).
  *
  * AT DECLARATION an action in project P may name a key kept for P or for every project, and no other
- * (`keyOutOfScope`). The project a key is kept for is read from the row holding its vault entry (`keyScopeOf`). The
+ * (`keyOutOfScope`). The project a key is kept for is read from the row holding its keychain entry (`keyScopeOf`). The
  * approval list ends with who else can open a key, and no longer says keys reach everything. A key whose entry names
  * no host is pinned by its first approval (`pinHost`), which the line says. Nothing here reads a key's value: the
  * sealed bytes are four made-up numbers, and every assertion is about a label, an `opens` or a project.
@@ -21,7 +21,7 @@ import {
   keyOutOfScope,
   keyScopeOf,
 } from '../src/actions.ts';
-import { pinHost } from '../src/vault.ts';
+import { pinHost } from '../src/keychain.ts';
 import { openRecord, type GrantRow, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 import { testSigner } from './signer.ts';
@@ -86,7 +86,7 @@ test('THE APPROVAL ENDS WITH WHO ELSE OPENS THE KEY, and never says keys reach e
   assert.equal(KEY_OPENED_UNATTENDED, 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.');
   assert.ok(!lines.includes(KEYS_REACH_ALL), 'the old sentence is still said');
   assert.equal(approvalLines([keyed], { passphrase: true }).at(-1), KEY_OPENED_UNATTENDED_PASSPHRASE);
-  assert.match(KEY_OPENED_UNATTENDED_PASSPHRASE, /your vault passphrase does not cover it\.$/);
+  assert.match(KEY_OPENED_UNATTENDED_PASSPHRASE, /your keychain password does not cover it\.$/);
 
   /* ONCE, however many lines send a key, and not at all when none does. */
   const twice = approvalLines([keyed, egressOf(POLL({ ingest: 'stock' }), nameOf, undefined, scopeOf)!]);

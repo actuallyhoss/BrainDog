@@ -41,7 +41,7 @@ const WRITE = [
   'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
 ] as const;
 
-/** Auth and vault — 7. */
+/** Auth and keychain — 7. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',

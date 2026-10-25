@@ -242,7 +242,7 @@ test('A 401 IS NEVER RETRIED: the action pauses, an event says so, the owner is 
   assert.equal(codeOf(k.resumeAction('balance', 'p_1')), 'OUT_OF_BOUNDS');
 });
 
-test('A 403 PAUSES THE SAME WAY, and a key that is not in the vault pauses before anything is sent', async () => {
+test('A 403 PAUSES THE SAME WAY, and a key that is not in the keychain pauses before anything is sent', async () => {
   const forbidden = await record(CALL());
   const stand = host(said(403));
   assert.equal((await forbidden.k.runActions(stand.execute)).paused, 1);
@@ -253,7 +253,7 @@ test('A 403 PAUSES THE SAME WAY, and a key that is not in the vault pauses befor
   await missing.k.runActions(idle.execute);
   assert.equal(idle.seen.length, 0, 'a request went out with no key to send');
   assert.equal(row(missing.sql, 'poll', 'balance')?.state, 'paused');
-  assert.match(missing.sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'")?.note ?? '', /not in the vault/);
+  assert.match(missing.sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'")?.note ?? '', /not in the keychain/);
 });
 
 test('A HOST WITH NO KEY STORE PAUSES THE ACTION ONCE: nothing is sent again, the key is not marked stale, and resuming re-arms it', async () => {
@@ -717,7 +717,7 @@ test('ACCEPTING A CONNECTOR WHOSE KEY WAS SEALED FOR A PERSON IS REFUSED BEFORE 
   /* THE FAILURE THIS STOPS. `sealedGrant` refuses a record-sealed key on the first run, and by then
      somebody has approved the action: it reads as approved, it is armed, and it does nothing. That
      is the same shape `REQUIRED_MISSING` already refuses a MISSING key to avoid, with a longer
-     fuse, and the vault is the only party that can tell the difference. */
+     fuse, and the keychain is the only party that can tell the difference. */
   const { k, sql, keys } = await record(INVOICES);
   const asked = k.propose(
     { question: 'Pull charges?', body_kind: 'change', body: { declaration_id: 'ingest.acme-charges', to: PAGER(keys['example read']!) } },

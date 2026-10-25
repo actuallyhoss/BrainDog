@@ -581,7 +581,7 @@ const WHOLE_SHAPES = ['running', 'trend'] as const;
  * on the argument that "adding to the month number rolls it into 3 March and nobody means that by a
  * month". A year is twelve of those months, so it is the same calendar date one year earlier at the
  * same time of day: 365 days in an ordinary year and 366 across a leap day. Subtracting a constant
- * `365 * DAY` instead, which is what `vault.spanMs('1y')` does for a grant's lifetime, lands on the
+ * `365 * DAY` instead, which is what `keychain.spanMs('1y')` does for a grant's lifetime, lands on the
  * wrong day of the month for good after every 29 February, and `08 §2.4` asks for the opposite in
  * so many words: the prior window is cut at the same day, "this month to the 14th against last
  * month to the 14th". A grant expiring a day early costs nobody anything; a comparison cut a day

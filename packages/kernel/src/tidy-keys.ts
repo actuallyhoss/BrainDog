@@ -1,8 +1,8 @@
 /**
  * `keys-unopened` (AGT-D17): the sealed keys nobody has opened in six months.
  *
- * WHAT WAS THERE BEFORE. Every opening adds one to its grant's `opened` and stamps `last_opened` (`vault.ts` `openGrant`,
- * and the lease a connector's run is handed), and nothing read the two but the Vault's own line for the key. A key
+ * WHAT WAS THERE BEFORE. Every opening adds one to its grant's `opened` and stamps `last_opened` (`keychain.ts` `openGrant`,
+ * and the lease a connector's run is handed), and nothing read the two but the Keychain's own line for the key. A key
  * sealed two years ago and never opened looked the same as one opened this morning.
  *
  * WHAT IS COUNTED. A thing on any list with a sealed field, not deleted and not finished, whose sealed field names a
@@ -15,7 +15,7 @@
  * one. It writes nothing, folds nothing and closes nothing. The question it would put is `askOfKeysUnopened`, here as
  * words only, for the part that later asks it once; until that part, the person's own revoke stays the only way out.
  *
- * NO NEW COLUMN: every day read here is one the vault already keeps.
+ * NO NEW COLUMN: every day read here is one the keychain already keeps.
  */
 
 import { unprivate } from '@braindog/where';

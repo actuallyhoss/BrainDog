@@ -322,10 +322,10 @@ export type Installed = {
    */
   nameOf?: (ref: string) => string | null;
   /**
-   * What the record's live vault entry for a label says it opens, so a script's line names the host each key goes to
-   * (`scriptEgress` in the kernel), as a proposal's line does when the kernel reads its own vault.
+   * What the record's live keychain entry for a label says it opens, so a script's line names the host each key goes to
+   * (`scriptEgress` in the kernel), as a proposal's line does when the kernel reads its own keychain.
    *
-   * OPTIONAL, as `nameOf` is: without it the line says "to the host its vault entry opens", which is where the answer is.
+   * OPTIONAL, as `nameOf` is: without it the line says "to the host its keychain entry opens", which is where the answer is.
    */
   opensOf?: (label: string) => string | null;
   /**
@@ -742,8 +742,8 @@ export type Host = {
   forget: (id: string) => void;
   claimed: (pack: string) => string[];
   /**
-   * Whether this key is one the install can actually be approved on: `null` when the vault holds it AND a scheduled
-   * run could open it, otherwise the sentence to show. OPTIONAL: a host without a vault checks nothing.
+   * Whether this key is one the install can actually be approved on: `null` when the keychain holds it AND a scheduled
+   * run could open it, otherwise the sentence to show. OPTIONAL: a host without a keychain checks nothing.
    *
    * TWO FAILURES, ONE ANSWER. A key that is missing and a key sealed for a person rather than a connector end the
    * same way — an install approved and an action that never runs — and the record is the only party that knows
@@ -3332,8 +3332,8 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] => {
     let before: Egress | null = null;
     if (was !== undefined)
       try {
-        /* WITH THE SAME VAULT, since a script is compared by its whole line (`egressChanged`) and a line read without it
-           says "the host its vault entry opens" where the new one names the host: every update would ask again. */
+        /* WITH THE SAME KEYCHAIN, since a script is compared by its whole line (`egressChanged`) and a line read without it
+           says "the host its keychain entry opens" where the new one names the host: every update would ask again. */
         before = egressOf({ kind: was.kind, body: JSON.parse(was.body) as unknown }, undefined, installed.opensOf);
       } catch {
         before = null;
@@ -3891,14 +3891,14 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     );
   /* THE SETTINGS ARE FILLED IN HERE, before either use below reads a declaration's body: the bodies staged are the
      bodies the plan compared, and a script's own `keys` are read filled too. Read unfilled, a script whose key is
-     `{{config:grant}}` (mercury's `mercury_ledger`) asked the vault for a key literally called `{{config:grant}}`
-     and refused every install, key in the vault or not (measured: `packs/mercury/mercury.test.ts`, "INSTALLED
+     `{{config:grant}}` (mercury's `mercury_ledger`) asked the keychain for a key literally called `{{config:grant}}`
+     and refused every install, key in the keychain or not (measured: `packs/mercury/mercury.test.ts`, "INSTALLED
      THROUGH THE RECORD'S OWN DOOR" and the self-host path). The colour rule for what a setting filled is asked in
      `installFault`. */
   const filled = settleWhen(filledWith(pack, diff.config), diff.waiting ?? []);
 
   /* A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
-     joined string, a script that sends two keys asked the vault for a key called "a, b" and could never install; the
+     joined string, a script that sends two keys asked the keychain for a key called "a, b" and could never install; the
      labels are the script declaration's own `keys`, as `labelsSent` in the kernel's `govern.ts` reads them for Decide. */
   const labelsOf = (c: Diff['calls_out'][number], grant: string): string[] => {
     if (c.channel !== 'script') return [grant];

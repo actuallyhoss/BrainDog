@@ -7,7 +7,7 @@
  * no line of `index.ts`.
  *
  * THE SHAPE A METHOD IS WRITTEN IN IS THE SHAPE THE GATES READ. Each is a method of the object its file returns, at four
- * spaces, and its first statement is its group's guard: `admin(ctx` for ADMIN, `vault(ctx` for VAULT, `guard(` or
+ * spaces, and its first statement is its group's guard: `admin(ctx` for ADMIN, `keychain(ctx` for KEYCHAIN, `guard(` or
  * `scoped(ctx` for READ+ and DATA (`tools/gates/guards.mjs`). A routed method's row is in `host/src/routes/<unit>.ts`
  * under the same name. A name `index.ts` or another file here already has is refused by the `guards` gate, because the
  * spread would otherwise let one hide the other.
@@ -30,7 +30,7 @@ import { methods as automationSentence } from './automation-sentence.ts';
 import { methods as todayReminders } from './today-reminders.ts';
 import { methods as slashDraft } from './slash-draft.ts';
 import { methods as comments } from './comments.ts';
-import { methods as vaultPassphrase } from './vault-passphrase.ts';
+import { methods as keychainPassphrase } from './keychain-passphrase.ts';
 import { methods as shares } from './shares.ts';
 import { methods as ownTokens } from './own-tokens.ts';
 import { methods as quiet } from './quiet.ts';
@@ -129,8 +129,8 @@ export type RecordDeps = {
   figure?: ((name: string, ctx: CallContext) => { amount: number; currency: string } | null) | undefined;
   /** An owner in a browser, and no token of any kind. */
   admin: (ctx: CallContext, reads?: string, method?: string) => Refusal | null;
-  /** The vault's gate: an owner in a browser, proved within `FRESH`. */
-  vault: (ctx: CallContext) => Refusal | null;
+  /** The keychain's gate: an owner in a browser, proved within `FRESH`. */
+  keychain: (ctx: CallContext) => Refusal | null;
   /** A list named at all, and a row number that is one, before anything is looked up. */
   named: (args: unknown, seq?: boolean) => Refusal | null;
   no: typeof no;
@@ -235,7 +235,7 @@ export function methods(deps: RecordDeps) {
     ...todayReminders(deps),
     ...slashDraft(deps),
     ...comments(deps),
-    ...vaultPassphrase(deps),
+    ...keychainPassphrase(deps),
     ...shares(deps),
     ...ownTokens(deps),
     ...quiet(deps),

@@ -31,7 +31,7 @@ export type ArgType = 'text' | 'integer' | 'json';
  * outside; naming it in the type is what lets `router-groups` say "no route carries this" instead of
  * hoping nobody adds one.
  */
-export const GROUPS = ['DATA', 'READ+', 'VAULT', 'JOBS', 'ADMIN', 'INTERNAL'] as const;
+export const GROUPS = ['DATA', 'READ+', 'KEYCHAIN', 'JOBS', 'ADMIN', 'INTERNAL'] as const;
 export type Group = (typeof GROUPS)[number];
 
 /** One method the host exposes: its name, its group, and what it does to the record. */
@@ -44,7 +44,7 @@ export type Route = {
    * EVERY ROUTE DECLARES ONE, and `30 §5` asks for exactly this: "the router asserts it: every
    * route declares its group, and a CI test walks the router and fails on a route with no group".
    * The rule it keeps is the one that stops the surface drifting: *if a screen needs something
-   * outside DATA and READ+, it is either a browser-session group (VAULT, JOBS, ADMIN) or it is a
+   * outside DATA and READ+, it is either a browser-session group (KEYCHAIN, JOBS, ADMIN) or it is a
    * design error.* There is no third case, and a group in the table is how a reviewer sees which
    * case a new method is claiming to be.
    */
@@ -163,8 +163,8 @@ const CORE_ROUTES: readonly Route[] = [
      names the figures its blocks draw, which on money-core as it ships was 18 of 36; nothing routed listed the rest, so
      neither could MCP's `record_index`. It takes nothing and evaluates nothing. */
   { name: 'figures', group: 'READ+', writes: false, what: 'Every figure you may read: its id, its name, how it is written, its list, its pack and whether it takes a parameter. Never a reading.' },
-  { name: 'listGrants', group: 'VAULT', writes: false, what: 'What each credential opens. Never the credential.' },
-  { name: 'revokeGrant', group: 'VAULT', writes: true, what: 'Take a credential out of service. The bytes go; the row stays, because what it opened is a fact.' },
+  { name: 'listGrants', group: 'KEYCHAIN', writes: false, what: 'What each credential opens. Never the credential.' },
+  { name: 'revokeGrant', group: 'KEYCHAIN', writes: true, what: 'Take a credential out of service. The bytes go; the row stays, because what it opened is a fact.' },
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
     takes: { rule: 'json', limit: 'integer' } },
   /* A DRAFT SCRIPT, RUN NOW (`script-try.ts`). READ+ AND NOT ADMIN, because `admin` refuses every token and the caller
@@ -269,7 +269,7 @@ const CORE_ROUTES: readonly Route[] = [
      its own. An owner's, for the mint's reason; the digest is never in it. */
   { name: 'doors', group: 'ADMIN', writes: false, what: 'Every webhook door this record declares: what it is, how it is verified, whether a token is held for it and the list it writes. Never the token.' },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event (12 §6's rule that a
-     vault whose reads are not audited cannot say whether anything got out) and a GET that mutates
+     keychain whose reads are not audited cannot say whether anything got out) and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
   { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
   /* `replace` IS A RESTORE AND NOT A MERGE: the file must be this record's own copy, and it replaces every row that travels.

@@ -1,5 +1,5 @@
 /**
- * The vault: what a key opens, never the key.
+ * The keychain: what a key opens, never the key.
  *
  * THE RECORD NEVER DECRYPTS. It holds sealed bytes and the fingerprint of the key that wrapped them,
  * and it has no way to open either — the unwrapping key lives somewhere the record cannot reach. That
@@ -134,12 +134,12 @@ export type BindGrantArgs = {
   sealed_for?: { id: string; version: number };
 };
 
-export type VaultDeps = {
+export type KeychainDeps = {
   /**
    * Send one interrupt, if the record has not already had one this hour. `09 §4`.
    *
    * INJECTED, because routing a notification is `digest.ts`'s — it knows what a channel is — and
-   * this file is the vault. A second copy of the rate limit here would be a second answer to "have
+   * this file is the keychain. A second copy of the rate limit here would be a second answer to "have
    * we interrupted this person already", and the two would disagree on the day it mattered.
    */
   interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
@@ -170,7 +170,7 @@ export const getGrant = (sql: Sql, id: string): GrantRow | null =>
  */
 export function bindGrant(
   sql: Sql,
-  deps: VaultDeps,
+  deps: KeychainDeps,
   args: BindGrantArgs,
   transaction: <T>(fn: () => T) => T,
 ): Result<GrantRow> {
@@ -347,7 +347,7 @@ export function bindGrant(
  */
 export function openGrant(
   sql: Sql,
-  deps: VaultDeps,
+  deps: KeychainDeps,
   args: { id: string; kek_id?: string | undefined },
   transaction: <T>(fn: () => T) => T,
 ): Result<SealedGrant> {
@@ -477,7 +477,7 @@ type SendsAKey = (typeof SENDS_A_KEY)[number];
  * the same double-run a lease exists to prevent, except this one would also hand out a credential.
  *
  * AND THE ROW MUST NAME THE GRANT. Without this the whole thing collapses: a lease on any job would
- * open any credential in the vault, and the narrow authorisation above would be a wide one wearing
+ * open any credential in the keychain, and the narrow authorisation above would be a wide one wearing
  * its clothes.
  *
  * THE RECORD STILL NEVER DECRYPTS. Sealed bytes and a wrapped key go out, exactly as they do to a
@@ -486,11 +486,11 @@ type SendsAKey = (typeof SENDS_A_KEY)[number];
  * AND A SIGNED POST IS THE SECOND JOB THAT MAY ASK. A `notify.webhook` whose payload names `grant` is a
  * digest whose POST is signed with that key (`09 §6`, `49 §5.12`), so the deliverer holding its lease
  * opens it here under the same three lease checks and the same payload check. It names the key by
- * label, and `test/vault-webhook-grant.test.ts` holds what that changes.
+ * label, and `test/keychain-webhook-grant.test.ts` holds what that changes.
  */
 export function sealedGrant(
   sql: Sql,
-  deps: VaultDeps,
+  deps: KeychainDeps,
   args: { outbox: string; leasedUntil: string; grant: string },
   transaction: <T>(fn: () => T) => T,
 ): Result<LeasedSeal> {
@@ -547,7 +547,7 @@ export function sealedGrant(
     sealed_under: 'record' | 'connector';
   };
   const COLUMNS = 'id, kind, version, ciphertext, nonce, kek_id, revoked_at, sealed_under';
-  /* A POST NAMES ITS KEY BY LABEL AND A CONNECTOR BY ID. `09 §6` makes `webhook.grant` a vault label and `digest.ts`
+  /* A POST NAMES ITS KEY BY LABEL AND A CONNECTOR BY ID. `09 §6` makes `webhook.grant` a keychain label and `digest.ts`
      copies it as written, so it resolves as `keyNamed` resolves a call's key: label or id, never a revoked grant,
      newest first and the tie on the id. Only when nothing live answers is a revoked row read, so the refusal can say
      the key was revoked rather than that it never existed.
@@ -556,7 +556,7 @@ export function sealedGrant(
      twice, one commit before `grantChosen` said the order was written once, and a second copy is the one the next
      change to the chooser misses. Nor were the two one comparison: SQLite orders text by its UTF-8 bytes and the
      chooser by UTF-16 code units, so over two ids that tie on `created_at` and differ past U+FFFF the post signed with
-     one key and a call naming the same label sent the other (`vault-webhook-grant.test.ts`). No id the vault mints
+     one key and a call naming the same label sent the other (`keychain-webhook-grant.test.ts`). No id the keychain mints
      reaches that, since `bindGrant` holds every id to `g_` and a ULID. The filter stays in SQL, as `liveNamed`'s does,
      and the revoked fallback asks the same chooser over the same rows read as if live, so the date the refusal names is
      that of the grant the order would have chosen.
@@ -574,7 +574,7 @@ export function sealedGrant(
     return no<LeasedSeal>(
       'OUT_OF_BOUNDS',
       job.kind === 'notify.webhook'
-        ? `There is no key "${args.grant}" in the vault, so the post it signs is not sent.`
+        ? `There is no key "${args.grant}" in the keychain, so the post it signs is not sent.`
         : `There is no grant ${args.grant}.`,
       { at: 'grant' },
     );
@@ -600,7 +600,7 @@ export function sealedGrant(
      open is only ever a connector's credential, even if a runner were compromised outright.
 
      A SIGNED POST GETS THE KEY ITS GRANT WAS SEALED UNDER. A digest is `paged: false` in `digestEgress`, so its
-     approval takes a key a person deposited at the vault door, and that key is sealed `record`. The key that door
+     approval takes a key a person deposited at the keychain door, and that key is sealed `record`. The key that door
      opens for a scheduled `call` is the same record key (`keyOpener`, `openGrant`), so this hands out nothing a
      scheduled run could not already open, and it hands it out under a lease on the one post that names it. Refusing
      it here would be a digest that was approved and dead-letters on its first post. */
@@ -658,7 +658,7 @@ export function sealedGrant(
  * is the thing that must not survive. Both prior versions go too: a revocation that left the
  * previous copy behind would be a revocation in name.
  */
-export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: <T>(fn: () => T) => T): Result<null> {
+export function revokeGrant(sql: Sql, deps: KeychainDeps, id: string, transaction: <T>(fn: () => T) => T): Result<null> {
   return attempt(sql, transaction, () => {
     const row = sql.one<{ kind: GrantKind }>('SELECT kind FROM grant WHERE id = ? AND revoked_at IS NULL', id);
     if (!row)
@@ -684,7 +684,7 @@ export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: 
 }
 
 /**
- * Hold a key whose vault entry names no host to the host an approved action sends it to, from now on.
+ * Hold a key whose keychain entry names no host to the host an approved action sends it to, from now on.
  *
  * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can (SHL-C05). An entry whose `opens` was "the Oxbow
  * test account" opened no host, so the host had nothing to hold the key to; once an approval sends it to
@@ -694,7 +694,7 @@ export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: 
  *
  * NOTHING SECRET IS READ OR WRITTEN: the label, the row's `opens` and the host. The words the person typed are replaced
  * by the host, which is what they meant once an action sends the key there. The event is `grant.bind`, the key bound to
- * a host (the record has forty kinds and no forty-first), and says the id and the kind, as every vault event does, and
+ * a host (the record has forty kinds and no forty-first), and says the id and the kind, as every keychain event does, and
  * never the label or what it opens.
  */
 export function pinHost(
@@ -712,7 +712,7 @@ export function pinHost(
     label,
   );
   const row = grantChosen(live, label);
-  if (row === undefined) return no('REQUIRED_MISSING', `There is no key called "${label}" to hold to ${to}. Add it to the vault first.`, { at: 'label' });
+  if (row === undefined) return no('REQUIRED_MISSING', `There is no key called "${label}" to hold to ${to}. Add it to the keychain first.`, { at: 'label' });
   const held = heldHost(row.opens);
   if (held !== null) return ok({ id: row.id, host: held, pinned: false });
   sql.exec('UPDATE grant SET opens = ? WHERE id = ? AND revoked_at IS NULL', to, row.id);
@@ -734,7 +734,7 @@ export function pinHost(
  * never what it opens. A notification that names "Stripe, live" is a notification that tells
  * whoever can see it exactly which credential is worth taking.
  */
-export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | null {
+export function rotateDue(sql: Sql, deps: KeychainDeps, payload: string): number | null {
   /* `urgent` WAS DESTRUCTURED AWAY. `bindGrant` arms this row forty-eight hours before a credential
      expires and writes `{ grant, urgent: true }` — 09 §5 names an expiring credential as one of the
      three things urgent BY DEFAULT — and this read only `{ grant }`. So the record wrote a `note`
@@ -767,7 +767,7 @@ export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | 
   return span === null ? null : deps.nowMs + span;
 }
 
-/* ── the vault passphrase: the record's own key behind a second factor ──── */
+/* ── the keychain password: the record's own key behind a second factor ──── */
 
 /**
  * How the record's own key is wrapped now, as a host needs it to open or re-wrap that key. Never the key.
@@ -794,7 +794,7 @@ export type RecordWrapping = {
  * derived with, or back under a root key, with that key's id.
  *
  * THE SAME TWO SHAPES `packages/host/src/passphrase.ts` BUILDS, written out again here because the kernel may not
- * import the host. The step reaches the record's method through `withVaultPassphrase`, which types it loosely, so no
+ * import the host. The step reaches the record's method through `withKeychainPassphrase`, which types it loosely, so no
  * compiler holds the two copies together: `rewrapRecordKey` checks every field it writes before it writes it.
  */
 export type WrappingChange =
@@ -805,7 +805,7 @@ export type WrappingChange =
 export const PASSPHRASE_SALT_BYTES = 16;
 
 /**
- * Wrong passphrases compared before the vault waits, and how long it waits: the limits sign-in keeps for a wrong
+ * Wrong passphrases compared before the keychain waits, and how long it waits: the limits sign-in keeps for a wrong
  * key or link (`dir_fail`, whose strikes and `WINDOW` are bound in `packages/record/src/identity.ts`).
  *
  * THE RECORD'S OWN `auth_fail`, NOT THE DIRECTORY'S, because the record is the one place both hosts can count in the
@@ -816,11 +816,11 @@ export const PASSPHRASE_TRIES = 10;
 export const PASSPHRASE_WAIT_MS = 15 * 60_000;
 
 /** The one `auth_fail` key a passphrase is counted under. */
-const STRIKES = 'vault:passphrase';
+const STRIKES = 'keychain:passphrase';
 
 /**
  * One strike reserved, before anything is compared: the first opens a window of `PASSPHRASE_WAIT_MS`, and the strike
- * past `PASSPHRASE_TRIES` locks the vault for that long from then. The count stops one past the limit, so waiting out a lock
+ * past `PASSPHRASE_TRIES` locks the keychain for that long from then. The count stops one past the limit, so waiting out a lock
  * is never pushed further away by asking again. `?1` the key, `?2` now plus the wait, `?3` the tries.
  */
 const RESERVE = `INSERT INTO auth_fail (key, n, until) VALUES (?1, 1, ?2)
@@ -869,7 +869,7 @@ const bytesOf = (x: unknown, length?: number): boolean =>
  */
 export function rewrapRecordKey(
   sql: Sql,
-  deps: Pick<VaultDeps, 'mint' | 'nowMs' | 'actor'>,
+  deps: Pick<KeychainDeps, 'mint' | 'nowMs' | 'actor'>,
   change: WrappingChange,
   heldNonce: Uint8Array,
   transaction: <T>(fn: () => T) => T,
@@ -904,7 +904,7 @@ export function rewrapRecordKey(
       return clash<Done>(0, { wrapped_by: now?.wrapped_by ?? null }, by?.actor ?? 'system');
     }
     /* A KIND THAT EXISTS: `grant.rotate`, on the record key, saying which wrapping it left and which it went to. The
-       salt and the bytes are not in it, because the event log is read by more people than the vault is. */
+       salt and the bytes are not in it, because the event log is read by more people than the keychain is. */
     sql.exec(
       "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, ?, 'grant.rotate', 'vault_key:record', 'vault_key', 'wrapped_by', ?, ?)",
       deps.mint(),
@@ -918,7 +918,7 @@ export function rewrapRecordKey(
 }
 
 /**
- * Reserve one strike before a passphrase is compared: the whole seconds to wait while the vault is locked, or `null`
+ * Reserve one strike before a passphrase is compared: the whole seconds to wait while the keychain is locked, or `null`
  * to go on and compare.
  *
  * RESERVED BEFORE THE COMPARE, AS SIGN-IN DOES, so a compare that is never reported back still counted. A right
@@ -978,7 +978,7 @@ export function spanMs(text: string): number | null {
 const dayMs = (text: string): number => Date.parse(text.length === 10 ? `${text}T12:00:00Z` : text);
 
 /** One schedule row, through the same `ON CONFLICT` every other insertion uses. */
-function arm(sql: Sql, deps: VaultDeps, key: string, dueMs: number, payload: unknown): void {
+function arm(sql: Sql, deps: KeychainDeps, key: string, dueMs: number, payload: unknown): void {
   /* A DATE ALREADY PAST IS STILL ARMED. A credential that expired last week is more urgent than one
      expiring next month, not less — and dropping it is how a lapsed key goes unmentioned. */
   sql.exec(
@@ -992,7 +992,7 @@ function arm(sql: Sql, deps: VaultDeps, key: string, dueMs: number, payload: unk
 }
 
 /** The id and the kind. Never the label, never what it opens. */
-function event(sql: Sql, deps: VaultDeps, kind: string, id: string, grantKind: GrantKind): void {
+function event(sql: Sql, deps: KeychainDeps, kind: string, id: string, grantKind: GrantKind): void {
   sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, ?, ?, 'grant', ?)",
     deps.mint(),

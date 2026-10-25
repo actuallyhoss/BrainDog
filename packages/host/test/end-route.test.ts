@@ -55,7 +55,7 @@ test('THE ROUTE COUNTS BY GROUP: end adds one DATA route and nothing a browser a
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'end'));
   assert.equal(all.DATA, (without.DATA ?? 0) + 1);
-  for (const group of ['READ+', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['READ+', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('IT REACHES THE RECORD METHOD OF ITS NAME as a POST, with the body as sent, and a GET is refused', async () => {

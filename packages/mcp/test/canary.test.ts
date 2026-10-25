@@ -7,7 +7,7 @@
  *
  * WHAT IS PLANTED:
  * - a value sealed into a `secret` field through the record's own deposit step, as a host's key door calls it;
- * - the record's vault key, made here so its bytes are known, and wrapped before the record is handed it;
+ * - the record's keychain key, made here so its bytes are known, and wrapped before the record is handed it;
  * - the title of a row in `obligations`, a list the member was never given.
  *
  * THE SEALED ONES ARE ALSO LOOKED FOR AS THE RECORD HOLDS THEM. With no host here, nothing opens a sealed value or
@@ -115,12 +115,12 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
 
-  /* THE VAULT KEY IS WRAPPED HERE, AS A HOST WRAPS ONE, under a wrapping key this test holds and the record never sees.
+  /* THE KEYCHAIN KEY IS WRAPPED HERE, AS A HOST WRAPS ONE, under a wrapping key this test holds and the record never sees.
      The record keeps the wrapped bytes, and both they and their unwrapped form are the canary. */
   const wrapping = await crypto.subtle.importKey('raw', new Uint8Array(randomBytes(32)), 'AES-GCM', false, ['encrypt']);
-  const vaultBytes = new Uint8Array(randomBytes(32));
+  const keychainBytes = new Uint8Array(randomBytes(32));
   const nonce = new Uint8Array(randomBytes(12));
-  const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, wrapping, vaultBytes));
+  const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, wrapping, keychainBytes));
   const made = await api.createRecord({
     id: REC,
     slug: 'the-studio',
@@ -140,7 +140,7 @@ async function record() {
   assert.ok(api.kernel.create('tasks', { what: 'Water the plants' }, { actor: OWNER }).ok);
 
   /* THE SECRET IS SEALED AS A HOST SEALS ONE: the record names what to seal for, and only the sealed bytes come back to
-     it. The owner is a browser session proved just now, which is what the vault gate asks for. */
+     it. The owner is a browser session proved just now, which is what the keychain gate asks for. */
   const value = ['bd_fake_canary_value_', randomBytes(24).toString('hex')].join('');
   const sealedBytes: Uint8Array[] = [];
   const seal = async (target: SealTarget) => {
@@ -183,7 +183,7 @@ async function record() {
       name: 'the value in a secret field',
       forms: [value, ...written(new TextEncoder().encode(value)), ...sealedBytes.flatMap((bytes) => written(bytes))],
     },
-    { name: 'a vault key', forms: [...written(vaultBytes), ...written(wrapped)] },
+    { name: 'a keychain key', forms: [...written(keychainBytes), ...written(wrapped)] },
     { name: 'the title of a row in obligations', forms: [mark] },
   ];
   return { sql, api, owner, member, scoped, mark, canaries };

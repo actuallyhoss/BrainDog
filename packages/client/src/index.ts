@@ -708,7 +708,7 @@ type ActionTotals = { runs: number; requests: number; bytes: number; failures: n
 /**
  * `actions`: one scheduled action. See `ActionRow` in `@braindog/kernel`.
  *
- * `key` IS THE KEY'S LABEL, never a value: the record builds the list from the vault's index and reads nothing sealed.
+ * `key` IS THE KEY'S LABEL, never a value: the record builds the list from the keychain's index and reads nothing sealed.
  */
 export type ActionRow = {
   ingest: string;
@@ -749,7 +749,7 @@ export type ScriptResumed = { script: string };
  * `scripts`: one installed script. See `ScriptRow` in `@braindog/record`.
  *
  * `refused.in_a_row` IS THE NUMBER THAT PAUSES IT: refused runs of the version now installed since its last good run or
- * resume, which pauses the script at `pauses_at`. A key is its vault label, and no run's log is here: the log quotes what
+ * resume, which pauses the script at `pauses_at`. A key is its keychain label, and no run's log is here: the log quotes what
  * the script read, and stays on the run's event for an owner who reads every list it touched.
  */
 export type ScriptRow = {
@@ -1178,7 +1178,7 @@ export type SlashStatus = {
 /**
  * `slashSettings`'s answer, `Setup` in the same file: the stored settings with the source, the provider and the address
  * his key is sent to. `model` is `null` on the included model, which has none of its own; `base_url` is `null` where he
- * named none and his provider's own address is used; `grant_id` names the vault key he picked, never the key.
+ * named none and his provider's own address is used; `grant_id` names the keychain key he picked, never the key.
  */
 export type SlashSettings = {
   source?: SlashSource;
@@ -2251,7 +2251,7 @@ export function createClient(options: ClientOptions) {
   return {
     call,
     /* THE TWO KEY DOORS. A browser session, no bearer, this origin, and an owner whose last proof is under
-       fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. While the vault is behind its
+       fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. While the keychain is behind its
        passphrase each carries `passphrase` too, and without it the answer is `REQUIRED_MISSING` at `passphrase`; a
        wrong one is `WRONG_KEY`, and past the kernel's `PASSPHRASE_TRIES` the answer is `RATE_LIMITED` with `retry_after`. */
     /** Put a key in, or replace the value of one named by `credential`. The host seals it; the record never sees it. */
@@ -2260,12 +2260,16 @@ export function createClient(options: ClientOptions) {
     /** Read one key back, once, by its label or by its spoken id. */
     openKey: (args: { label?: string; credential?: string; passphrase?: string }) =>
       hostDoor<KeyOpened>('keys/open', args as unknown as Record<string, unknown>),
-    /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"). VAULT, as the key doors are: an owner in a browser,
-       proved in the last fifteen minutes. The answer's `on` is whether the vault is behind a passphrase now; the
+    /* THE KEYCHAIN PASSPHRASE (`12 §6`, "The optional second factor"). KEYCHAIN, as the key doors are: an owner in a browser,
+       proved in the last fifteen minutes. The answer's `on` is whether the keychain is behind a passphrase now; the
        passphrase itself goes in the body and is taken off by the host before the record is called. */
-    /** Put the vault behind a passphrase. Forgotten, no key in it opens again, and nobody can open it for its owner. */
+    /** Put the keychain behind a passphrase. Forgotten, no key in it opens again, and nobody can open it for its owner. */
+    setKeychainPassphrase: (passphrase: string) => call<Answer<'setKeychainPassphrase'>>('setKeychainPassphrase', { passphrase }),
+    /** Take the passphrase off the keychain, with that passphrase. A wrong one counts towards the same limit. */
+    clearKeychainPassphrase: (passphrase: string) => call<Answer<'clearKeychainPassphrase'>>('clearKeychainPassphrase', { passphrase }),
+    /** @deprecated The old names of the two above, kept so a caller not yet renamed still compiles; they reach the same handlers. */
     setVaultPassphrase: (passphrase: string) => call<Answer<'setVaultPassphrase'>>('setVaultPassphrase', { passphrase }),
-    /** Take the passphrase off the vault, with that passphrase. A wrong one counts towards the same limit. */
+    /** @deprecated See setVaultPassphrase. */
     clearVaultPassphrase: (passphrase: string) => call<Answer<'clearVaultPassphrase'>>('clearVaultPassphrase', { passphrase }),
     /**
      * Ask Slash one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
@@ -2588,7 +2592,7 @@ export function createClient(options: ClientOptions) {
     /** Switch one webhook door off or on: off answers every arrival 410 and stores nothing, and on again is the same door. ADMIN. */
     doorSwitch: (args: { ingest: string; on: boolean }) => call<unknown>('doorSwitch', args as Record<string, unknown>),
     listGrants: () => call<unknown[]>('listGrants'),
-    /* VAULT, SO A BROWSER SESSION AND A SIGN-IN IN THE LAST FIFTEEN MINUTES. The bytes go and the row stays. */
+    /* KEYCHAIN, SO A BROWSER SESSION AND A SIGN-IN IN THE LAST FIFTEEN MINUTES. The bytes go and the row stays. */
     revokeGrant: (args: { id: string }) => call<null>('revokeGrant', args as Record<string, unknown>),
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>

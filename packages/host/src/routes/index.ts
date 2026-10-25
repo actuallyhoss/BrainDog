@@ -19,7 +19,7 @@ import { ROUTES as comments } from './comments.ts';
 import { ROUTES as members } from './members.ts';
 import { ROUTES as previewChange } from './preview-change.ts';
 import { ROUTES as slashDraft } from './slash-draft.ts';
-import { ROUTES as vaultPassphrase } from './vault-passphrase.ts';
+import { ROUTES as keychainPassphrase } from './keychain-passphrase.ts';
 import { ROUTES as ownTokens } from './own-tokens.ts';
 import { ROUTES as quiet } from './quiet.ts';
 import { ROUTES as pattern } from './pattern.ts';
@@ -78,7 +78,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...members,
   ...previewChange,
   ...slashDraft,
-  ...vaultPassphrase,
+  ...keychainPassphrase,
   ...ownTokens,
   ...quiet,
   ...pattern,

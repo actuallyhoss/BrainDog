@@ -82,7 +82,7 @@ test('A BLOB WRITTEN AS {} IS FILE_MALFORMED AT ITS TABLE AND COLUMN, and nothin
   const sql = openSqlite();
   const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
   const out = (await target.import(lines)) as { ok: boolean; refusal?: { code: string; at?: string; fix: string } };
-  assert.equal(out.ok, false, 'a file with no vault in it was imported');
+  assert.equal(out.ok, false, 'a file with no keychain in it was imported');
   assert.equal(out.refusal?.code, 'FILE_MALFORMED');
   assert.equal(out.refusal?.at, 'grant.ciphertext', `the refusal does not say which column is empty: ${JSON.stringify(out.refusal)}`);
   assert.match(out.refusal?.fix ?? '', /grant\.ciphertext/);

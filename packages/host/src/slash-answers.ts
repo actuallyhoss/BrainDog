@@ -10,7 +10,7 @@
  * NEITHER PUMP COULD CARRY THIS JOB, which is why it is a pass of its own. Both hand a job to a `Deliver` that returns
  * `void` and ack `done` with no `result` (`apps/worker/src/pump.ts`, `apps/selfhost/src/server.ts`), so an `infer.ask` on
  * either list would be acked with no text and every run would end on *"Slash answered job … with no text"*. The Worker
- * calls this in `alarm()` after `#act`, inside the object that holds the vault, and sets the next alarm for now when a pass
+ * calls this in `alarm()` after `#act`, inside the object that holds the keychain, and sets the next alarm for now when a pass
  * leased its full `n`, since nothing rings for the rest; the self-host calls it in `poll`, after `act()` and not inside it,
  * because `act()` returns on its first line where no actions runner is configured (Briefs E and D).
  *

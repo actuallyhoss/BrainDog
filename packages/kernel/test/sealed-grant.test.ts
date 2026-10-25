@@ -1,7 +1,7 @@
 /**
  * Handing a credential to a runner, on the strength of a lease.
  *
- * EVERY TEST HERE IS ABOUT SOMETHING NOT COMING OUT. `sealedGrant` is the one door in the vault that
+ * EVERY TEST HERE IS ABOUT SOMETHING NOT COMING OUT. `sealedGrant` is the one door in the keychain that
  * no person walks through: a scheduled connector run asks for a credential with nobody on a screen
  * to say yes, and what stands in for that person is an unexpired lease on the job that needs it.
  * If the lease can be weakened — held on the wrong job, held after it lapsed, held after another

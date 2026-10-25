@@ -37,7 +37,7 @@ const refusedAs = (type: FieldDecl['type'], value: unknown): string => {
   const out = coerce({ id: 'x', type }, value);
   return out.ok ? 'STORED' : `${out.refusal.code}: ${out.refusal.fix}`;
 };
-const KEY = 'VALUE_MALFORMED: x holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.';
+const KEY = 'VALUE_MALFORMED: x holds what looks like a key, and a key never goes in a row. Deposit it in the keychain, and write here what it opens.';
 
 /* ── what got through ─────────────────────────────────────────────────────── */
 
@@ -103,9 +103,9 @@ test('A URL, AN EMAIL AND A JSON FIELD GET THE CHECK A TEXT FIELD GETS', () => {
 const SENTENCES = [
   'Paid the landlord 4,250,000.00 EGP on 1 November, and the receipt is in the drawer.',
   'Company operating account: 12,500.00 USD after the transfer cleared on 2026-09-17.',
-  'The API key lives in the vault under "Stripe live"; rotate it before the audit.',
+  'The API key lives in the keychain under "Stripe live"; rotate it before the audit.',
   'Set the token and the secret in the dashboard, then press Save. The key is not in this note.',
-  'Use Authorization: Bearer <token> with the key from the vault.',
+  'Use Authorization: Bearer <token> with the key from the keychain.',
   'api_key=YOUR_KEY_HERE and secret=CHANGE_ME in the example config.',
   'The monkey: 0123456789 is the phone number on the invoice.',
   'قال إنه سيدفع \u200f٤٬٢٥٠ جنيه\u200f يوم الخميس، والإيصال مع المحاسب.',

@@ -1,8 +1,8 @@
 /**
- * What a trial tells a fetch naming a key when the record gave it no vault (`src/script-try.ts`).
+ * What a trial tells a fetch naming a key when the record gave it no keychain (`src/script-try.ts`).
  *
- * ONE SENTENCE WAS SAID TO EVERY CALLER WITHOUT A KEY, AND IT NAMED AN AGENT. The record gives a trial the vault only
- * when the vault itself would open for the caller: an owner, in a browser, proved within fifteen minutes. The owner whose
+ * ONE SENTENCE WAS SAID TO EVERY CALLER WITHOUT A KEY, AND IT NAMED AN AGENT. The record gives a trial the keychain only
+ * when the keychain itself would open for the caller: an owner, in a browser, proved within fifteen minutes. The owner whose
  * proof is two hours old is refused for that reason alone, and "a trial opens no key for an agent" tells her she is
  * something she is not and leaves her nothing to do. Slash's included key, gated the same way, says what opens it
  * (`SLASH_HOST_KEY_CLOSED` in `src/slash.ts`), and so does this, once the record says the proof is the reason.
@@ -46,7 +46,7 @@ test('AN OWNER WHOSE PROOF IS STALE IS TOLD TO SIGN IN AGAIN, not that a trial o
   assert.doesNotMatch(why(answer), /agent/);
 });
 
-test('A CALLER GIVEN NO VAULT FOR ANY OTHER REASON KEEPS THE SENTENCE IT HAD', async () => {
+test('A CALLER GIVEN NO KEYCHAIN FOR ANY OTHER REASON KEEPS THE SENTENCE IT HAD', async () => {
   const answer = await scriptTrial({ sandbox: asksForKey, ledger: null })(draft({}));
   assert.match(why(answer), /A trial opens no key for an agent/);
   assert.doesNotMatch(why(answer), /Sign in again/);

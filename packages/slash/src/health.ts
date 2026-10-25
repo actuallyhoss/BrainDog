@@ -303,7 +303,7 @@ export function said(h: EngineHealth, nowMs: number): EngineSaid {
       };
     case 'key_closed':
       return {
-        text: `${h.since === null ? 'Your own key for Slash will not open.' : `Your own key for Slash has not opened since ${day(h.since)}.`} Open it in the vault, or switch to the included model.`,
+        text: `${h.since === null ? 'Your own key for Slash will not open.' : `Your own key for Slash has not opened since ${day(h.since)}.`} Open it in the keychain, or switch to the included model.`,
         whose: 'yours',
       };
     case 'never_asked':

@@ -415,7 +415,7 @@ test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT'
   };
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify(body));
   const k = await openRecord(sql, clock, { answersSlash: true });
-  /* ONLY THE VAULT WRITES A SECRET FIELD, so `pin` is put in the row as the vault would leave a value there, before the
+  /* ONLY THE KEYCHAIN WRITES A SECRET FIELD, so `pin` is put in the row as the keychain would leave a value there, before the
      drain takes the run. `note` holds the words `{{pin}}`, which a question filled twice would read a second time. */
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: '{{pin}}' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);

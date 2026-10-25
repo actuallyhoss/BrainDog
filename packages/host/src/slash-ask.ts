@@ -37,7 +37,7 @@
  * gate can account for, and `docs/30-BLUEPRINT.md` §5 would have to grow a forty-first ADMIN method
  * for a method the record has not got.
  *
- * SO IT IS THE SHAPE THE TREE ALREADY HAS FOR EXACTLY THIS, in `vault.ts`, `keys.ts` and
+ * SO IT IS THE SHAPE THE TREE ALREADY HAS FOR EXACTLY THIS, in `keychain.ts`, `keys.ts` and
  * `ingest.ts`, and `packages/client/src/index.ts` says the rule in as many words over its own two key
  * doors: *"NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these
  * are a host step in front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor`
@@ -82,7 +82,7 @@ import { httpStatus } from './index.ts';
 import { mayThink, sendable, type Reads } from './infer.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
-import { VAULT_HEADERS } from './vault.ts';
+import { KEYCHAIN_HEADERS } from './keychain.ts';
 import { turnedAway } from './slash-turned-away.ts';
 
 /**
@@ -125,14 +125,14 @@ export type SlashAskEngine<C> = {
  * sentence.
  *
  * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE ASK, built on both hosts wherever a
- * key store is, and handed the asker's context so the vault's own gate runs on it (`slashOwnKeyFor`
+ * key store is, and handed the asker's context so the keychain's own gate runs on it (`slashOwnKeyFor`
  * in `slash.ts`). The door reads nothing about tiers: it hands every ask whatever `byok` answers for
  * this session, as the model for both passes, and when that answer is a refusal it is the answer,
- * before the engine is called, so a caller the vault turns away costs no model call. Where `byok` is
+ * before the engine is called, so a caller the keychain turns away costs no model call. Where `byok` is
  * absent the settings door refuses his own key outright, because a stored choice no host can serve
  * would make every later ask answer `FORBIDDEN`.
  *
- * `vault` IS THE VAULT'S OWN GATE, which a save that points his key somewhere must pass (`slashKeySave`):
+ * `keychain` IS THE KEYCHAIN'S OWN GATE, which a save that points his key somewhere must pass (`slashKeySave`):
  * the owner, in a browser, proved in the last fifteen minutes. `samples` reads the inbox arrivals a
  * pattern is asked for, under the asker's own context, so the record decides who may read them.
  */
@@ -140,7 +140,7 @@ export type SlashAskDoor<C> = {
   origins: ReadonlySet<string>;
   engine?: (() => Promise<SlashAskEngine<C> | undefined>) | undefined;
   byok?: ((ctx: C) => Promise<unknown>) | undefined;
-  vault?: ((ctx: C) => Promise<Refusal | null>) | undefined;
+  keychain?: ((ctx: C) => Promise<Refusal | null>) | undefined;
   samples?: ((ids: readonly string[], ctx: C) => Promise<Result<unknown[]>>) | undefined;
   /**
    * Whether Slash's model answers, read from its own ledger (`engine-health.ts` `engineHealthRead`). Asked even where the
@@ -151,8 +151,8 @@ export type SlashAskDoor<C> = {
   day?: (() => Promise<Refusal | null>) | undefined;
 };
 
-/** What a host hands `slashAskDoor` beside the builder: the vault's gate, the inbox's reader and the day's ceiling (`SlashAskDoor`). */
-export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples' | 'health' | 'day'>;
+/** What a host hands `slashAskDoor` beside the builder: the keychain's gate, the inbox's reader and the day's ceiling (`SlashAskDoor`). */
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'keychain' | 'samples' | 'health' | 'day'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -169,7 +169,7 @@ export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples' | 'hea
  * AND A REJECTED PROMISE IS NOT A CACHED ANSWER, which `apps/worker/src/index.ts` `#record()` states the cost of
  * in its own words: `??=` stored whatever the opener returned, rejection included, so one transient failure at
  * cold start was remembered as this record's permanent state until the object was evicted. The first ask of the
- * day opens a vault grant, which can fail for a reason that has passed by the second ask, so a failure is
+ * day opens a keychain grant, which can fail for a reason that has passed by the second ask, so a failure is
  * forgotten here and the next ask is a retry rather than an echo.
  */
 export function slashAskDoor<C>(
@@ -189,7 +189,7 @@ export function slashAskDoor<C>(
       return built;
     },
     ...(byok === undefined ? {} : { byok }),
-    ...(reads.vault === undefined ? {} : { vault: reads.vault }),
+    ...(reads.keychain === undefined ? {} : { keychain: reads.keychain }),
     ...(reads.samples === undefined ? {} : { samples: reads.samples }),
     ...(reads.health === undefined ? {} : { health: reads.health }),
     ...(reads.day === undefined ? {} : { day: reads.day }),
@@ -237,7 +237,7 @@ export const PATTERN_SAMPLES_MOST = 10;
  *
  * IT IS A CEILING ON THE READ AND NOT A SECOND OPINION ABOUT THE QUESTION. The engine truncates to
  * its own budget and says so; what this stops is a stranger posting a megabyte at a door that is
- * about to run a model call, which is the same reason `keys.ts` caps its body at the vault's limit.
+ * about to run a model call, which is the same reason `keys.ts` caps its body at the keychain's limit.
  * ONE CALL AND NOT TWO: `46 §13` D12's second pass is `propose`, which is its own door, so a `read`
  * never proposes, and the test measures `sent.length === 1` for a `read` that answered rows.
  */
@@ -253,7 +253,7 @@ type Header = readonly [string, string];
 
 function reply(status: number, payload: object, extra: readonly Header[] = []): Response {
   const headers = new Headers();
-  for (const [k, v] of [...VAULT_HEADERS, ...extra]) headers.append(k, v);
+  for (const [k, v] of [...KEYCHAIN_HEADERS, ...extra]) headers.append(k, v);
   return new Response(JSON.stringify(payload), { status, headers });
 }
 
@@ -306,7 +306,7 @@ const NO_HEALTH: Refusal = {
  * Answer the ask, for the session this host has already resolved.
  *
  * NOTHING THROWS ACROSS THIS BOUNDARY, and the engine builder is the reason the promise has to be
- * kept here rather than left to the host's outer catch. The builder opens a vault grant and
+ * kept here rather than left to the host's outer catch. The builder opens a keychain grant and
  * `import()`s a package, so a failure in it is a rejected promise on the first ask of the day, and
  * `serveApi`'s own comment records what an escaped throw cost: *"the caller never wrote a response at
  * all: the socket stayed open, the request hung, and on the self-host the SERVER then never closed."*
@@ -410,14 +410,14 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
       if (!checked.ok) return slashReply(checked);
       patch['base_url'] = checked.value;
     }
-    /* AND A SAVE THAT POINTS HIS KEY SOMEWHERE PASSES THE VAULT'S OWN GATE FIRST (`slashKeySave`), in the vault's own
+    /* AND A SAVE THAT POINTS HIS KEY SOMEWHERE PASSES THE KEYCHAIN'S OWN GATE FIRST (`slashKeySave`), in the keychain's own
        sentence, so a month-old cookie cannot send his key to an address of somebody else's choosing. */
-    if (door.vault !== undefined && slashKeySave(patch)) {
+    if (door.keychain !== undefined && slashKeySave(patch)) {
       let stop: Refusal | null;
       try {
-        stop = await door.vault(ctx);
+        stop = await door.keychain(ctx);
       } catch (e) {
-        return refusal(500, { code: 'INTERNAL', fix: `The vault could not be asked about your key: ${e instanceof Error ? e.message : String(e)}.` });
+        return refusal(500, { code: 'INTERNAL', fix: `The keychain could not be asked about your key: ${e instanceof Error ? e.message : String(e)}.` });
       }
       if (stop !== null) return slashReply({ ok: false, refusal: stop });
     }
@@ -548,7 +548,7 @@ async function firstRun<C>(route: 'setup' | 'mapping', body: Record<string, unkn
 
 /**
  * His own key for this asker, as the host's `byok` answers it: an adapter, `undefined` on the included model, or the
- * refusal as the door's answer. A throw is a 500 with its sentence, since the vault was asked and did not answer.
+ * refusal as the door's answer. A throw is a 500 with its sentence, since the keychain was asked and did not answer.
  */
 async function opened<C>(door: SlashAskDoor<C>, ctx: C): Promise<unknown> {
   let own: unknown;

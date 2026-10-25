@@ -2,7 +2,7 @@
  * A script's egress reaches a person: in a proposal's approval lines, and in what turning its pack back on would call out.
  *
  * `egressOf` read a script's `CALLS OUT` line and every caller threw it away, because each kept only `kind = 'ingest'`.
- * So a script an agent proposed, reaching an origin with a vault key, was filed with no approval lines at all, and a
+ * So a script an agent proposed, reaching an origin with a keychain key, was filed with no approval lines at all, and a
  * pack of scripts turned back on said nothing about where they fetch.
  */
 
@@ -40,7 +40,7 @@ const GOLD = (over: Record<string, unknown> = {}): Declaration =>
     },
   }) as unknown as Declaration;
 
-const LINE = 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens';
+const LINE = 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its keychain entry opens';
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();

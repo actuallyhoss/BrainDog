@@ -46,7 +46,7 @@ export function isControlMark(name: unknown): boolean {
  * all the record asks.
  */
 export const MARK_GLYPHS = [
-  'home', 'decide', 'inbox', 'search', 'packs', 'vault', 'settings', 'plus', 'chevron', 'chevronDown', 'close',
+  'home', 'decide', 'inbox', 'search', 'packs', 'vault', 'keychain', 'settings', 'plus', 'chevron', 'chevronDown', 'close',
   'check', 'filter', 'copy', 'link', 'clock', 'alert', 'sun', 'moon', 'monitor', 'arrow', 'back', 'external', 'stop',
   'play', 'money', 'calendar', 'board', 'rows', 'obligation', 'service', 'thing', 'people', 'task', 'doc', 'tag',
   'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download', 'refresh',

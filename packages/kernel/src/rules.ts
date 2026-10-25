@@ -32,7 +32,7 @@ import { exponentOf, moneyText } from './ingest.ts';
 import { fold } from './ingest.ts';
 import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
-import { spanMs } from './vault.ts';
+import { spanMs } from './keychain.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
 import { isMoneyFormat } from './metrics.ts';
 import { inlineFault, rowlessCreate } from './flow-lint.ts';
@@ -1294,7 +1294,7 @@ function dayWords(value: unknown, nowMs: number): string | null {
  * THE AGGREGATE ONLY, NEVER A ROW. `value` and its unit are the whole figure; `groups` is never read, so a figure
  * grouped by a field hands no row's word into a run. Over a list with a secret field, measured, `sum`, `min`, `max` and
  * `avg` of the secret are refused at install ("max reads a number, and pin is a secret"), and `count` and `distinct` of
- * it install, which are numbers of rows. So the run's `sealed` answers `false` for a figure: the number of keys a vault
+ * it install, which are numbers of rows. So the run's `sealed` answers `false` for a figure: the number of keys a keychain
  * holds is not a key. `group_by` a secret field installs too, and is why `groups` stays unread here.
  */
 export function figureText(deps: Pick<RulesDeps, 'sql' | 'ctx'>, id: string): string {

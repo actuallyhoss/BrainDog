@@ -32,7 +32,7 @@ const KEY = {
   hint: 'a 64-character value',
 };
 
-async function vault() {
+async function keychain() {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW), { sign: testSigner() });
   const made = k.createRecord({
@@ -61,7 +61,7 @@ const conflicted = (r: unknown) => {
 };
 
 test('A FRESH GRANT TAKES THE ID ITS BYTES WERE SEALED FOR, at version one, and the AAD names both', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = granted(k.bindGrant({ ...KEY, sealed_for: { id: GRANT, version: 1 } }, 'S1'));
   assert.equal(made.id, GRANT);
   assert.equal(made.version, 1);
@@ -72,7 +72,7 @@ test('A FRESH GRANT TAKES THE ID ITS BYTES WERE SEALED FOR, at version one, and 
 });
 
 test('AN ID ANOTHER DEPOSIT TOOK FIRST IS A CONFLICT, and nothing is written over it', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   granted(k.bindGrant({ ...KEY, sealed_for: { id: GRANT, version: 1 } }, 'S1'));
   conflicted(k.bindGrant({ ...KEY, ciphertext: b(30), sealed_for: { id: GRANT, version: 1 } }, 'S2'));
   assert.equal(k.grants().length, 1);
@@ -80,7 +80,7 @@ test('AN ID ANOTHER DEPOSIT TOOK FIRST IS A CONFLICT, and nothing is written ove
 });
 
 test('A ROTATION SEALED FOR THE NEXT VERSION BINDS; ONE SEALED FOR A VERSION ALREADY PASSED IS A CONFLICT', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   granted(k.bindGrant({ ...KEY, sealed_for: { id: GRANT, version: 1 } }, 'S1'));
   const two = granted(k.bindGrant({ ...KEY, id: GRANT, ciphertext: b(40), sealed_for: { id: GRANT, version: 2 } }, 'S1'));
   assert.equal(two.version, 2);
@@ -94,7 +94,7 @@ test('A ROTATION SEALED FOR THE NEXT VERSION BINDS; ONE SEALED FOR A VERSION ALR
 });
 
 test('A SEALED_FOR THAT COULD NAME NO GRANT IS REFUSED', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   for (const sealed_for of [{ id: 'stripe', version: 1 }, { id: GRANT, version: 0 }, { id: GRANT, version: 1.5 }]) {
     const out = k.bindGrant({ ...KEY, sealed_for }, 'S1') as { ok: boolean; refusal?: { code: string; at?: string } };
     assert.equal(out.ok, false);

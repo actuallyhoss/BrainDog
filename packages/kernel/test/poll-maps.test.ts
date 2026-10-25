@@ -1,6 +1,6 @@
 /**
  * One poll, one request, several rows (the live feed add-on, `packs/live-feed`): a poll whose `map` is a list reads each
- * number out of the same answer, and a poll of an address that needs no key names none and runs without the vault.
+ * number out of the same answer, and a poll of an address that needs no key names none and runs without the keychain.
  *
  * The host is a stand-in, so nothing leaves the machine and no key is real.
  */
@@ -108,7 +108,7 @@ test('A LIST OF MAPS IS HELD TO WHAT ONE MAP IS, and to its length; a named key 
   assert.equal(await install({}), 'accepted');
 });
 
-test('A POLL THAT NAMES A KEY THE VAULT DOES NOT HOLD STILL PAUSES, and sends nothing', async () => {
+test('A POLL THAT NAMES A KEY THE KEYCHAIN DOES NOT HOLD STILL PAUSES, and sends nothing', async () => {
   const { k, sql } = await record(POLL({ grant: 'stats read' }));
   let sent = 0;
   const run = await k.runActions(async () => (sent++, said('{}')));

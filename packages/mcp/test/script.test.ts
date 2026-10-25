@@ -140,7 +140,7 @@ test('A SCRIPT FILED THROUGH propose CARRIES THE RECORD\'S OWN CALLS OUT LINE, a
     egress: { line: string }[];
     approve: string[];
   };
-  assert.deepEqual(body.egress.map((e) => e.line), ['CALLS OUT api.example.com · every 1h · key "rates-api" to the host its vault entry opens']);
+  assert.deepEqual(body.egress.map((e) => e.line), ['CALLS OUT api.example.com · every 1h · key "rates-api" to the host its keychain entry opens']);
   assert.ok(!JSON.stringify(body).includes('nothing at all'), 'the proposer wrote its own approval line');
 
   const accepted = (await api.decide({ id, decide: { option: 'accept', reason: 'it is useful' } }, owner)) as {

@@ -65,7 +65,7 @@ const scripted = (call: string): Scripted => ({
 
 /**
  * Acme live, Bolt deleted by the record's own update, and each holding a grant id where a deposit would have put it,
- * because a secret is written by the vault alone.
+ * because a secret is written by the keychain alone.
  */
 async function record() {
   const sql = openSqlite();

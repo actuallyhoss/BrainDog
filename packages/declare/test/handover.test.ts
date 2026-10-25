@@ -170,7 +170,7 @@ test('GUARDS: a drop without hands still orphans, and a pack hands did not name 
   assert.equal(stranger.out.refusal?.fix, 'register.holdings belongs to money-core, and two packs cannot own one declaration.');
 
   said((await put(api, moneyCore('holdings'))).out);
-  const other = await put(api, holdingsPack('vault-list', {}));
+  const other = await put(api, holdingsPack('keychain-list', {}));
   assert.deepEqual(other.diff.conflicts, [{ id: 'register.holdings', pack: 'holdings' }]);
   assert.equal(other.out.refusal?.code, 'PROVIDES_CONFLICT');
   sql.close();

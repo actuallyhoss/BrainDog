@@ -219,7 +219,7 @@ export function methods(deps: RecordDeps) {
       USED_BY_MOST,
     );
 
-  /** What a key's uses are: every open of its sealed value, which the vault writes as `grant.read` on the grant. */
+  /** What a key's uses are: every open of its sealed value, which the keychain writes as `grant.read` on the grant. */
   const keyUses = (row: Entry): Use[] => {
     const held = row.fields[KEY_FIELD];
     return typeof held === 'string' && held !== '' ? usesOf(`grant:${held}`, "kind = 'grant.read'") : [];
@@ -464,7 +464,7 @@ export function methods(deps: RecordDeps) {
      * Which runs used a key or a tool, the one that used it last first: at most `USED_BY_MOST`, each with its agent, its
      * machine, when it last used it and how many times among the newest `USED_BY_WALK` uses.
      *
-     * A KEY'S ROW SAYS WHAT IT OPENS AND NOTHING ABOUT WHO OPENED IT. The vault counts every open and signs each with
+     * A KEY'S ROW SAYS WHAT IT OPENS AND NOTHING ABOUT WHO OPENED IT. The keychain counts every open and signs each with
      * the run that asked, so the answer was in the log and nothing read it back; a key's row and a tool's row can now
      * say "last used by S47 (Claude) 2 days ago".
      *

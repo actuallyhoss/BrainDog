@@ -1,5 +1,5 @@
 /**
- * A key goes only to the host its vault entry opens (SHL-C05, job 1).
+ * A key goes only to the host its keychain entry opens (SHL-C05, job 1).
  *
  * TWO ORIGINS, BOTH DECLARED, so the origin check passes for each and the only thing that can refuse is the key's own
  * host. The refusal comes before the key is opened and before anything is fetched: `openKey` and `send` count their
@@ -84,7 +84,7 @@ test('A KEY WITH NO HOST IS SENT, and once its approval pins the host it is held
   const unsaid = counted();
   assert.equal(codeOf(await unsaid.run(request(OXBOW, undefined))), 200, 'a request built before `opens` was carried stopped sending');
 
-  /* PINNED: `pinHost` writes the host on the entry (kernel `vault.ts`), and `keyNamed` carries it on the next request. */
+  /* PINNED: `pinHost` writes the host on the entry (kernel `keychain.ts`), and `keyNamed` carries it on the next request. */
   const pinned = 'oxbow.example';
   const again = counted();
   assert.equal(codeOf(await again.run(request(OXBOW, pinned))), 200);

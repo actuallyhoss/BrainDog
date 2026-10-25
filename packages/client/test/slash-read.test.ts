@@ -33,7 +33,7 @@ const answering = (status: number, body: unknown, token?: string) => {
   return { client, sent };
 };
 
-/** A Reading as the engine builds it (`packages/slash/src/types.ts`), with the fold ending on the vault as it always does. */
+/** A Reading as the engine builds it (`packages/slash/src/types.ts`), with the fold ending on the keychain as it always does. */
 const READING: Reading = {
   ask_id: '01M33H56ZCMM62YT38ARN8JRM8',
   predicate: { field: 'state', is: 'open' },

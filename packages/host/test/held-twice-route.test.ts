@@ -61,7 +61,7 @@ test('THE ROUTE COUNTS BY GROUP: heldTwice is routed once from routes/, adds one
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'heldTwice'));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
-  for (const group of ['DATA', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A GET REACHES THE RECORD METHOD OF ITS NAME with the list as sent, for a person and for a token that reads', async () => {

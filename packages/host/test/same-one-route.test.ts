@@ -82,7 +82,7 @@ test('THE ROUTE COUNTS BY GROUP: sameOne is routed once from routes/, adds one D
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'sameOne'));
   assert.equal(all.DATA, (without.DATA ?? 0) + 1);
-  for (const group of ['READ+', 'VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['READ+', 'KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A POST REACHES THE RECORD METHOD OF ITS NAME with the list and the entries as sent, and answers its question', async (t) => {

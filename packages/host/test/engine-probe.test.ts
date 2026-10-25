@@ -161,7 +161,7 @@ test('NO SECRET IN ANY ANSWER: a model named like a key and a refusal that quote
 });
 
 test('HIS OWN KEY THAT WILL NOT OPEN is said so, and nothing is sent', async () => {
-  const closed = Object.assign(new Error(`vault: ${SECRET}`), { name: 'SlashKeyClosedError' });
+  const closed = Object.assign(new Error(`keychain: ${SECRET}`), { name: 'SlashKeyClosedError' });
   const b = bench(() => closed, { form: 'key', models: { key: KEY }, large: false, machine: false });
   const out = await b.probe();
   assert.deepEqual(out.candidates, [{ model: 'her-model', served: false, strict: false, ms: 1200, why: 'Your own key would not open, so it was not asked.' }]);

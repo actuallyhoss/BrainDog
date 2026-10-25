@@ -629,7 +629,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
   /**
    * `null` when the session proved itself within `FRESH`, or the one 401 that says it did not.
    *
-   * A PASSKEY IS A WAY IN, SO ADDING OR REMOVING ONE ASKS FOR A RECENT PROOF, as the vault does. Without it a
+   * A PASSKEY IS A WAY IN, SO ADDING OR REMOVING ONE ASKS FOR A RECENT PROOF, as the keychain does. Without it a
    * browser left signed in for a month, or a cookie copied off it, could add the taker's own passkey and keep the
    * account after the cookie was gone. The rotation still rides on the answer, and the cookie is not cleared: the
    * person is who they say they are, and signing in again is the whole of the fix.

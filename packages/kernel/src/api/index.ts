@@ -18,7 +18,7 @@ import { extension as rehearse } from './rehearse.ts';
 import { extension as moneyFigures } from './money-figures.ts';
 import { extension as keys } from './keys.ts';
 import { extension as comments } from './comments.ts';
-import { extension as vaultPassphrase } from './vault-passphrase.ts';
+import { extension as keychainPassphrase } from './keychain-passphrase.ts';
 import { extension as jobs } from './jobs.ts';
 import { extension as quiet } from './quiet.ts';
 import { extension as retype } from './retype.ts';
@@ -33,7 +33,7 @@ export function extensions(parts: KernelParts) {
     ...moneyFigures(parts),
     ...keys(parts),
     ...comments(parts),
-    ...vaultPassphrase(parts),
+    ...keychainPassphrase(parts),
     ...jobs(parts),
     ...quiet(parts),
     ...retype(parts),

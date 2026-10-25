@@ -1,5 +1,5 @@
 /**
- * The declaration features the agents pack needs: bounds, conditions, who changes what, the vault
+ * The declaration features the agents pack needs: bounds, conditions, who changes what, the keychain
  * door, and the refusal that keeps a key out of every row.
  *
  * Each feature is asserted where it has each: it installs, its lint refuses a malformed declaration
@@ -264,7 +264,7 @@ test('A FIELD `by: decide` IS SET AT CREATE AND CHANGED ONLY BY AN ACCEPTED PROP
   sql.close();
 });
 
-/* ── secret fields and the vault door ────────────────────────────────────── */
+/* ── secret fields and the keychain door ────────────────────────────────────── */
 
 /** What a host's door hands the kernel: sealed bytes and what they open, never a value. */
 const SEALED = {
@@ -286,7 +286,7 @@ test('A SECRET FIELD IS WRITTEN BY NO CALLER, however it asks', async () => {
 
   const person = refusal(k.create('credentials', { ...INDEX, value: grant.id }, OWNER));
   assert.equal(`${person.code} at ${person.at}`, 'IMMUTABLE_FIELD at value');
-  assert.match(person.fix, /only the vault writes it/);
+  assert.match(person.fix, /only the keychain writes it/);
   assert.equal(said(k.create('credentials', { ...INDEX, value: grant.id }, agent())), 'IMMUTABLE_FIELD at value');
 
   const row = value<Entry>(k.create('credentials', INDEX, OWNER));
@@ -308,7 +308,7 @@ test('AND ITS LINT: nothing may put a value in a secret field, search it, or cal
 const kindsOf = (sql: NodeSql, target: string): string[] =>
   sql.all<{ actor: string; kind: string }>('SELECT actor, kind FROM event WHERE target = ? ORDER BY rowid', target).map((e) => `${e.actor} ${e.kind}`);
 
-test('THE VAULT DOOR SEALS A KEY AND POINTS THE ROW AT IT, in one write signed by the run', async () => {
+test('THE KEYCHAIN DOOR SEALS A KEY AND POINTS THE ROW AT IT, in one write signed by the run', async () => {
   const { k, sql } = await record();
 
   const out = value<{ entry: Entry; grant: { id: string; version: number; label: string } }>(
@@ -406,7 +406,7 @@ test('TEXT THAT LOOKS LIKE A KEY IS REFUSED, from every caller and in every text
     assert.equal(`${out.code} at ${out.at}`, 'VALUE_MALFORMED at lesson', issuer);
     assert.equal(out.found, undefined, `${issuer}: the refusal carried the value`);
     assert.ok(!out.fix.includes(key), `${issuer}: the sentence carried the value`);
-    assert.match(out.fix, /looks like a key, and a key never goes in a row\. Deposit it in the vault/);
+    assert.match(out.fix, /looks like a key, and a key never goes in a row\. Deposit it in the keychain/);
   }
 
   const token = noise(48, 7);

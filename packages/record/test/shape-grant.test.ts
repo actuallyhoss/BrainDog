@@ -75,13 +75,13 @@ test("AN OWNER'S SHAPE GRANT TAKES A COPY, AGAIN AND AGAIN, and the copy is mark
 test('ANY OTHER KEY IS REFUSED, in one sentence, before a row is read', async () => {
   const r = await record();
   const login = await r.grant('login');
-  const vault = await r.grant('vault', '*');
+  const keychain = await r.grant('vault', '*');
   const token = await r.api.createToken({ scope: 'write', label: 'an agent' }, r.owner);
   if (!token.ok) return assert.fail(JSON.stringify(token));
   const shaped = await r.grant('shape');
   const otherRecord = `rec_01JZ8QK3F7R2M9V4XN6TCB5HAE${shaped.slice(shaped.indexOf('.'))}`;
 
-  for (const [what, bearer] of Object.entries({ login, vault, token: (token.value as { bearer: string }).bearer, otherRecord, nothing: '', junk: 'not-a-bearer' })) {
+  for (const [what, bearer] of Object.entries({ login, keychain, token: (token.value as { bearer: string }).bearer, otherRecord, nothing: '', junk: 'not-a-bearer' })) {
     const out = await r.shape.shapeExport(bearer);
     assert.equal(out.ok, false, `a ${what} bearer took a shape copy`);
     const refusal = 'refusal' in out ? out.refusal : null;

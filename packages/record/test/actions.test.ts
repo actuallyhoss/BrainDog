@@ -183,7 +183,7 @@ test('A PACK THAT CALLS OUT ARMS NOTHING UNTIL THE OWNER APPROVES ITS LINES, in 
   assert.equal(refusal(await api.installPack({ doc, planHash: planned.planHash, approve: planned.approve }, token)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(armed('ping'), null);
 
-  /* The key it sends is in the vault before anything is armed, as accepting a proposal asks. */
+  /* The key it sends is in the keychain before anything is armed, as accepting a proposal asks. */
   const keyless = refusal(await api.installPack({ doc, planHash: planned.planHash, approve: planned.approve }, owner));
   assert.equal(keyless.code, 'REQUIRED_MISSING');
   assert.match(keyless.fix, /"hook key"/);

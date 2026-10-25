@@ -38,7 +38,7 @@ import { configValue, readPackConfig } from './declare.ts';
 import { dayIn } from './finished.ts';
 import { recordIdentity } from './provision.ts';
 import { access } from './members.ts';
-import { pinHost, recordWrapping } from './vault.ts';
+import { pinHost, recordWrapping } from './keychain.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -1310,7 +1310,7 @@ const declared = (to: unknown): { id?: unknown; kind: string; body: unknown }[] 
  * AGAINST THE LIVE BODY UNDER THE SAME ID, so an ingest or a digest filed again as it is installed asks the owner nothing
  * new, and a new host, key or source does. A body with no id (Slash's bare ingest) has nothing installed to compare with,
  * and says all it sends. `nameOf` and `opensOf` are the kernel's and this file has neither: an ingest says a project by
- * its row id, and only a script's line reads the vault, which `review` works out.
+ * its row id, and only a script's line reads the keychain, which `review` works out.
  */
 function newEgress(sql: Sql, members: readonly { id?: unknown; kind: string; body: unknown }[]): Egress[] {
   return members.flatMap((m) => {
@@ -3013,7 +3013,7 @@ export type Verdict =
 type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: unknown };
 
 /**
- * The vault labels one approved line sends, each to be looked up alone.
+ * The keychain labels one approved line sends, each to be looked up alone.
  *
  * A SCRIPT'S LINE HOLDS ITS KEYS JOINED, "a, b", because `Egress.key` is one string (`scriptEgress` in `actions.ts`),
  * and accept looked the joined text up as one label, so a script that sends two keys could never be accepted: the
@@ -3378,15 +3378,15 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
           }
         }
       }
-      /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
+      /* EVERY KEY IT SENDS IS IN THE KEYCHAIN BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
-      /* A PATTERN'S TOO, since it files the same lines: an ingest polling on a key the vault does not hold is the same
+      /* A PATTERN'S TOO, since it files the same lines: an ingest polling on a key the keychain does not hold is the same
          approved clock that pauses on its first run (`egress-digest-pattern.test.ts`). */
       if ((row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.egress))
         for (const { out, label } of (body.egress as unknown[]).flatMap((out) => labelsSent(out, install).map((label) => ({ out: out as SentLine, label })))) {
           const key = keyNamed(deps.sql, label);
           if (key === null)
-            return no<Decided>('REQUIRED_MISSING', `Add the key called "${label}" to the vault, then accept.`, { at: 'body.egress' });
+            return no<Decided>('REQUIRED_MISSING', `Add the key called "${label}" to the keychain, then accept.`, { at: 'body.egress' });
           /* AND A CONNECTOR'S KEY MUST BE ONE A RUN CAN OPEN, checked here for the same reason the
              line above checks it exists at all. `12 §6` keeps two data keys apart, and a credential
              sealed under the record's — the ordinary deposit, opened on a screen with the person

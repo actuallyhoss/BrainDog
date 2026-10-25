@@ -1,8 +1,8 @@
 /**
  * `47 §13` D9's bytes, in one place. `12 §6`, ADR-062.
  *
- * ITS OWN FILE AND NOT `vault.ts`. D9 says these live in this package, and the door next door says in its
- * own header that no value is named in it: the body is parsed and handed whole to the host's vault module.
+ * ITS OWN FILE AND NOT `keychain.ts`. D9 says these live in this package, and the door next door says in its
+ * own header that no value is named in it: the body is parsed and handed whole to the host's keychain module.
  * That sentence is worth keeping true, so the HTTP door and the bytes sit side by side rather than in one
  * file, and only this one ever holds a value in the clear.
  *

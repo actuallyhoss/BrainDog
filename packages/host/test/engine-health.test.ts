@@ -61,7 +61,7 @@ test('THREE FAILURES ON THE INCLUDED MODEL are ours, with the date of the first'
   } satisfies EngineHealthRead);
 });
 
-test('HIS OWN KEY, REVOKED IN THE VAULT, is key_closed and his to fix, with no row in the ledger', async () => {
+test('HIS OWN KEY, REVOKED IN THE KEYCHAIN, is key_closed and his to fix, with no row in the ledger', async () => {
   const sql = openSqlite();
   const clock = fixedClock(T0);
   createSlash({ sql, clock, inference: { complete: () => Promise.reject(new Error('unused')) }, record: {} as never });
@@ -70,7 +70,7 @@ test('HIS OWN KEY, REVOKED IN THE VAULT, is key_closed and his to fix, with no r
   const out = await engineHealthRead({ sql, clock, model: true, load, grants: () => grants })();
   assert.equal(out.health.state, 'key_closed');
   assert.equal(out.said.whose, 'yours');
-  assert.equal(out.said.text, 'Your own key for Slash will not open. Open it in the vault, or switch to the included model.');
+  assert.equal(out.said.text, 'Your own key for Slash will not open. Open it in the keychain, or switch to the included model.');
   /* A live key with nothing asked yet is a quiet engine, not a closed key. */
   grants[0] = { id: 'g_1', kind: 'api_token', revoked_at: null as unknown as string };
   assert.equal((await engineHealthRead({ sql, clock, model: true, load, grants: () => grants })()).health.state, 'never_asked');

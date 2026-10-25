@@ -1,5 +1,5 @@
 /**
- * The vault passphrase, the kernel's half: `changeVaultWrapping` and `unlockVault`, over `vault.ts` (`12 §6` "The
+ * The keychain password, the kernel's half: `changeKeychainWrapping` and `unlockKeychain`, over `keychain.ts` (`12 §6` "The
  * optional second factor").
  *
  * THE KERNEL NEVER HOLDS THE PASSPHRASE OR A KEY. Each method is handed a host's step, a function that does the
@@ -8,12 +8,12 @@
  * closure and the unwrapped key never leaves it.
  *
  * WHO MAY ASK IS THE RECORD'S QUESTION, NOT THIS FILE'S. The record's methods (`packages/record/src/methods/
- * vault-passphrase.ts`) put the vault gate in front of both, so by the time anything here runs the caller is an owner
+ * keychain-passphrase.ts`) put the keychain gate in front of both, so by the time anything here runs the caller is an owner
  * in a browser, proved within fifteen minutes.
  *
  * A WRONG PASSPHRASE IS COUNTED BEFORE IT IS COMPARED (`passphraseStrike`), `PASSPHRASE_TRIES` to a window and then a
- * wait of `PASSPHRASE_WAIT_MS` (`vault.ts`), as sign-in counts. Putting a passphrase on compares nothing, so it is not counted; taking one off and opening the
- * vault with one each compare it.
+ * wait of `PASSPHRASE_WAIT_MS` (`keychain.ts`), as sign-in counts. Putting a passphrase on compares nothing, so it is not counted; taking one off and opening the
+ * keychain with one each compare it.
  */
 
 import type { Result } from '@braindog/ports';
@@ -28,10 +28,10 @@ import {
   rewrapRecordKey,
   type RecordWrapping,
   type WrappingChange,
-} from '../vault.ts';
+} from '../keychain.ts';
 
 /** Whether the record key is behind a passphrase, once a change or an unlock has answered. */
-export type VaultPassphrase = { on: boolean };
+export type KeychainPassphrase = { on: boolean };
 
 /** A host's re-wrap of the record key: under the passphrase it was given, or back under a root key once that opens it. */
 export type PassphraseRewrap = (held: RecordWrapping) => Promise<Result<WrappingChange>>;
@@ -45,7 +45,7 @@ export type PassphraseUnlock = (held: RecordWrapping) => Promise<boolean | null>
 export function extension(parts: KernelParts) {
   const { sql } = parts;
 
-  /** The vault is locked for `wait` seconds: the refusal, with the seconds a host sends as `Retry-After`. */
+  /** The keychain is locked for `wait` seconds: the refusal, with the seconds a host sends as `Retry-After`. */
   const locked = <T>(wait: number): Result<T> =>
     no<T>('RATE_LIMITED', 'Too many wrong passphrases. Wait a while, then try again.', { at: 'passphrase', retry_after: wait });
 
@@ -57,16 +57,16 @@ export function extension(parts: KernelParts) {
      * set over the first would be a re-wrap the owner could only undo with a passphrase they have just replaced. To
      * change it, it is taken off with the old one and put on with the new one.
      */
-    async changeVaultWrapping(to: 'passphrase' | 'kek', rewrap: PassphraseRewrap, actor: string): Promise<Result<VaultPassphrase>> {
+    async changeKeychainWrapping(to: 'passphrase' | 'kek', rewrap: PassphraseRewrap, actor: string): Promise<Result<KeychainPassphrase>> {
       const held = recordWrapping(sql);
       if (held === null)
         /* NOT ON THIS BRAINDOG, said as that (audit 25 October, X24): a record with no key of its own has nothing a
-           passphrase could be put on, and "keys here have no stored value" stood under a vault whose keys had values. */
+           passphrase could be put on, and "keys here have no stored value" stood under a keychain whose keys had values. */
         return no('NOT_IN_THIS_BUILD', 'Locking keys with a passphrase isn’t on this BrainDog yet.', { at: 'passphrase' });
       if (to === 'passphrase' && held.wrapped_by === 'passphrase')
-        return no('ALREADY_KNOWN', 'This vault already has a passphrase. Take it off with that passphrase, then set the new one.', { at: 'passphrase' });
+        return no('ALREADY_KNOWN', 'This keychain already has a passphrase. Take it off with that passphrase, then set the new one.', { at: 'passphrase' });
       if (to === 'kek' && held.wrapped_by === 'kek')
-        return no('ALREADY_KNOWN', 'This vault has no passphrase to take off.', { at: 'passphrase' });
+        return no('ALREADY_KNOWN', 'This keychain has no passphrase to take off.', { at: 'passphrase' });
 
       /* TAKING IT OFF COMPARES THE PASSPHRASE, SO IT IS COUNTED; putting one on compares nothing. */
       const compares = to === 'kek';
@@ -96,17 +96,17 @@ export function extension(parts: KernelParts) {
 
     /**
      * Whether the record key opens for this request: at once when it is on the root key, and through the host's `unlock`
-     * when it is behind a passphrase. `person` is whether a person asks: an agent's vault grant carries no passphrase,
+     * when it is behind a passphrase. `person` is whether a person asks: an agent's keychain grant carries no passphrase,
      * so behind one it opens nothing, and it is told so without a strike.
      *
      * NOTHING IS WRITTEN BUT THE COUNT. The key the host opened stays in the host for the one request that asked, and
      * the reading it goes on to make is `openGrant`'s own `grant.read`.
      */
-    async unlockVault(unlock: PassphraseUnlock, person: boolean): Promise<Result<VaultPassphrase>> {
+    async unlockKeychain(unlock: PassphraseUnlock, person: boolean): Promise<Result<KeychainPassphrase>> {
       const held = recordWrapping(sql);
       if (held === null || held.wrapped_by === 'kek') return ok({ on: false });
       if (!person)
-        return no('WRONG_KEY', 'This vault is behind a passphrase, which only its owner types, in the app. A vault grant opens nothing in it.', {
+        return no('WRONG_KEY', 'This keychain is behind a passphrase, which only its owner types, in the app. A keychain grant opens nothing in it.', {
           at: 'passphrase',
         });
       const wait = passphraseStrike(sql, parts.clock.now());
@@ -120,9 +120,9 @@ export function extension(parts: KernelParts) {
       }
       if (opened === null) {
         passphraseRefund(sql);
-        return no('REQUIRED_MISSING', 'This vault is behind a passphrase. Type it to open or put a key.', { at: 'passphrase' });
+        return no('REQUIRED_MISSING', 'This keychain is behind a passphrase. Type it to open or put a key.', { at: 'passphrase' });
       }
-      if (!opened) return no('WRONG_KEY', 'That is not this vault’s passphrase.', { at: 'passphrase' });
+      if (!opened) return no('WRONG_KEY', 'That is not this keychain’s passphrase.', { at: 'passphrase' });
       passphraseCleared(sql);
       return ok({ on: true });
     },

@@ -65,7 +65,7 @@ import type {
 /**
  * The last line of the fold, on every ask, whatever happened (`46 §4.2`).
  *
- * IT IS A CLAIM THE PERSON CAN CHECK, not a reassurance. "Slash read nothing from the vault" is a
+ * IT IS A CLAIM THE PERSON CAN CHECK, not a reassurance. "Slash read nothing from the keychain" is a
  * sentence in marketing copy; a row in the same list as the registers it DID read, saying zero and
  * refused, is the same sentence somewhere a lie would be visible.
  */
@@ -356,7 +356,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * Steps 3 to 6 of `46 §5.4`, and with `stored` step 5 alone.
    *
    * PASS 2 DOES NOT READ THE INDEX AGAIN EITHER (`46 §5.5` step 1: re-run step 5.4-5 with the stored
-   * predicate). Pass 1 already dropped the vault, fitted the predicate to the registers that take it
+   * predicate). Pass 1 already dropped the keychain, fitted the predicate to the registers that take it
    * and wrote the result on the `call` row, so a second index projection would spend the record's
    * budget twice to arrive back at the same few ids. The registers the rows come back under are the
    * index pass 2 needs, and the projection carries them.
@@ -557,7 +557,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
   };
 
   /* `inference` IS THE HOST'S MODEL FOR THIS ASK ALONE, and `fallback` is what answers when the host hands none. The host
-     keys it for the asker, so the opening of a vault key it makes is signed by them (`types.ts`, `Slash`). It is threaded
+     keys it for the asker, so the opening of a keychain key it makes is signed by them (`types.ts`, `Slash`). It is threaded
      through as an argument down to the one `core.run` that drafts, and nothing here stores it. */
   const read = async (question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>> => {
     const stop = spent();
@@ -610,7 +610,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
        `ask_id` would otherwise call a model for nothing the meter sees. The first pass 2 for an `ask_id` reserves its
        proposal under `<ask_id>:propose` rather than a fresh ulid (`core.reserve`'s `id`), so that row is still there
        to find here, whether the first pass 2 finished `ok` or failed after it held it; only a hold `release` deleted
-       (the vault-closed `FORBIDDEN` arm below, among others) leaves nothing, and that pass 2 never happened. */
+       (the keychain-closed `FORBIDDEN` arm below, among others) leaves nothing, and that pass 2 never happened. */
     if (askId !== undefined && earlier !== undefined && core.sql.one('SELECT 1 AS n FROM slash_call WHERE id = ?', `${askId}:propose`) !== undefined)
       return no('ALREADY_KNOWN', 'This question already has an answer. Ask it again to draft a new one.', { at: 'ask_id' });
 
@@ -676,14 +676,14 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     /* TIER `b` IS THE CUSTOMER'S OWN KEY AND THIS PACKAGE HAS NEVER SEEN IT (`46 §5.9`). The host opens
        the grant under the asker's own browser session, decrypts it where key material belongs, and
        hands in an adapter for the ask, the same one pass one drafted on. No adapter means no open key,
-       which is a sentence about the vault and not a fault in the question, and the included model is
+       which is a sentence about the keychain and not a fault in the question, and the included model is
        never asked in its place: the owner chose where his questions go. On `a` and `byo` the proposal
        is the host's model, handed in for this ask. */
     const engine = s.tier === 'b' ? byok : host;
     if (engine === undefined)
       return no(
         'FORBIDDEN',
-        'Your key is not open in this session. Open the vault, or switch Slash to the included model.',
+        'Your key is not open in this session. Open the keychain, or switch Slash to the included model.',
       );
 
     const kept = { rows: it.rows.length };
@@ -821,7 +821,7 @@ const readBack = (
   question: string,
 ): Drafted => {
   const named = strings(out['registers']);
-  /* THE VAULT IS DROPPED BEFORE THE CALL AND NOT REFUSED AFTER IT (`46 §5.4` step 5). A model naming
+  /* THE KEYCHAIN IS DROPPED BEFORE THE CALL AND NOT REFUSED AFTER IT (`46 §5.4` step 5). A model naming
      `grant` has guessed a register id, which is not misconduct; projecting it would be. */
   const registers = known.filter((r) => named.includes(r.id)).map((r) => r.id);
   const where = registers.length > 0 && isRecord(out['where']) ? (out['where'] as Where) : null;
@@ -973,10 +973,10 @@ const checkText = (
 
   if (kind === 'rowset') {
     const register = String(body['register']);
-    /* THE VAULT IS NEVER WRITTEN THROUGH SLASH, as it is never read: a row proposed into it is a credential a model
+    /* THE KEYCHAIN IS NEVER WRITTEN THROUGH SLASH, as it is never read: a row proposed into it is a credential a model
        made up, filed for a person to accept. */
     if (FORBIDDEN_REGISTERS.has(register))
-      return no('PROPOSAL_SCHEMA', 'Slash does not propose rows for the vault. Nothing was filed.', { at: 'body.register' });
+      return no('PROPOSAL_SCHEMA', 'Slash does not propose rows for the keychain. Nothing was filed.', { at: 'body.register' });
     const bySpoken = new Map(read.map((r) => [r.spoken, r] as const));
     const rows: Record<string, unknown>[] = [];
     const from: string[][] = [];

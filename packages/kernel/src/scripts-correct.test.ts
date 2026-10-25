@@ -81,7 +81,7 @@ const bind = (k: Kernel, label: string): void => {
   assert.ok(put.ok, JSON.stringify(put));
 };
 
-test('A SCRIPT SENDING TWO KEYS IS ACCEPTED ONCE BOTH ARE IN THE VAULT, and refused naming the one that is not', async () => {
+test('A SCRIPT SENDING TWO KEYS IS ACCEPTED ONCE BOTH ARE IN THE KEYCHAIN, and refused naming the one that is not', async () => {
   const { k, sql } = await record();
   const both = script('two-keys', { egress: ['https://api.example.com'], keys: ['alpha', 'beta'] });
   const filed = k.propose({ question: 'Run it?', body_kind: 'change', body: { declaration_id: both.id, to: both } }, 'p_1');
@@ -89,7 +89,7 @@ test('A SCRIPT SENDING TWO KEYS IS ACCEPTED ONCE BOTH ARE IN THE VAULT, and refu
   bind(k, 'alpha');
   const missing = refusal(k.decide(filed.value.id, accept, 'p_1'));
   assert.equal(missing.code, 'REQUIRED_MISSING');
-  assert.equal(missing.fix, 'Add the key called "beta" to the vault, then accept.');
+  assert.equal(missing.fix, 'Add the key called "beta" to the keychain, then accept.');
   bind(k, 'beta');
   const out = k.decide(filed.value.id, accept, 'p_1');
   assert.ok(out.ok, JSON.stringify(out));

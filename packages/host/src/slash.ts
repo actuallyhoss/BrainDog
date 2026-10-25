@@ -2,7 +2,7 @@
  * A model for Slash at an endpoint: the adapter a host builds behind `@braindog/record`'s `SlashModel` port.
  *
  * THE RECORD NEVER SEES THE ADDRESS OR THE KEY. It is handed an object with a name and `draft()`. The key is asked for on each
- * call (`key()`), from the host's environment or from the key the owner picked in the record's vault, and dropped when the
+ * call (`key()`), from the host's environment or from the key the owner picked in the record's keychain, and dropped when the
  * call returns: it is never kept in a variable here, logged, thrown or put in what the model is sent.
  *
  * TWO SHAPES ON THE WIRE: the chat-completions request most endpoints speak (a self-hosted server, a gateway, a provider),
@@ -425,7 +425,7 @@ export class SlashRefusedError extends Error {
 const retried = (status: number): boolean => status === 408 || status === 425 || status === 429 || status >= 500;
 
 /**
- * A key the vault holds and this host could not open, thrown before anything is sent (`keyRequired`).
+ * A key the keychain holds and this host could not open, thrown before anything is sent (`keyRequired`).
  *
  * `sent: false` IS THE MARK THE PACKAGE READS, structurally, as it reads `answered`: nothing left this host, so `answer`
  * releases its hold and writes no ledger row, which is what the Worker's no-key refusal already leaves.
@@ -870,7 +870,7 @@ export function anthropicModel(options: EndpointModelOptions): SlashUnderstandin
 /* ── the model a host hands the record: the host's own endpoint ───────────── */
 
 /**
- * The vault label the included model's key was once found under, and which no script may name (`script.ts`).
+ * The keychain label the included model's key was once found under, and which no script may name (`script.ts`).
  *
  * NO KEY IS CHOSEN BY IT ANY MORE. Slash's key is the grant the owner picked, by its id
  * (`slashOwnKeyOf`); a host's own endpoint is called with its operator's `SLASH_KEY` or with none. The name stays because
@@ -882,13 +882,13 @@ export const SLASH_KEY_LABEL = 'slash';
 const SLASH_GRANT_KIND = 'api_token';
 
 /**
- * A vault row as a host reads it off `kernel.grants()`, which hands every column a person may see.
+ * A keychain row as a host reads it off `kernel.grants()`, which hands every column a person may see.
  *
  * `kind` AND `created_at` ARE OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW. The kernel's `GrantRow` carries both on every
  * grant, and a row that says neither is a test's double; requiring them would turn a narrower type into a compile error in
  * every fixture that only needed a label.
  */
-export type SlashVaultRow = { id: string; label: string; revoked_at: string | null; kind?: string | undefined; created_at?: string | undefined };
+export type SlashKeychainRow = { id: string; label: string; revoked_at: string | null; kind?: string | undefined; created_at?: string | undefined };
 
 export type SlashHostConfig = {
   url: string;
@@ -902,8 +902,8 @@ export type SlashHostConfig = {
 };
 
 export type SlashHostDeps = {
-  /** The record's vault rows, read on each call so a key put in or revoked after boot counts. */
-  grants: () => readonly SlashVaultRow[];
+  /** The record's keychain rows, read on each call so a key put in or revoked after boot counts. */
+  grants: () => readonly SlashKeychainRow[];
   /** How this host opens a sealed key, or `null` when it cannot open any (a Worker with no `KEK` bound). */
   openKey: ((grant: { id: string; label: string }) => Promise<string | null>) | null;
   send: (input: URL, init: RequestInit) => Promise<Response>;
@@ -944,7 +944,7 @@ export function slashFromEnv(env: Readonly<Record<string, unknown>>, options: { 
  * for the package's engine: the two builders below read the same answer, because that flag is what makes the client draw
  * Slash's rows at all (`23 §8`).
  *
- * THE VAULT IS NOT READ HERE. It was, for the newest live grant labelled `slash`, whenever no `SLASH_KEY` was set, so any key
+ * THE KEYCHAIN IS NOT READ HERE. It was, for the newest live grant labelled `slash`, whenever no `SLASH_KEY` was set, so any key
  * a person labelled `slash` for another reason went to this endpoint as its bearer. Now the
  * endpoint has the operator's key or none, and the owner's key is his own key, picked by its id.
  */
@@ -1065,7 +1065,7 @@ const publicHost = (hostname: string): boolean => {
  *
  * `https:` ONLY, NO NAME OR PASSWORD IN IT, AND A PUBLIC HOST. The key rides in the request's headers, so an address over
  * plain http hands it to every network between; a name and password in the address are a second credential stored where
- * no vault seals it; and a private or loopback host is a server inside somebody's network, where a key that opened the
+ * no keychain seals it; and a private or loopback host is a server inside somebody's network, where a key that opened the
  * owner's provider has no business going. Checked at the settings door and again on every
  * call (`ownAddressOf`), so an address stored before a rule here changed is held to the rule as it is now.
  *
@@ -1082,7 +1082,7 @@ export const slashBaseUrlOf = (raw: string): Result<string> => {
   }
   if (url.protocol !== 'https:') return no('VALUE_MALFORMED', 'Slash sends your key only over https, so the address starts with https://.', { at: 'base_url' });
   if (url.username !== '' || url.password !== '')
-    return no('VALUE_MALFORMED', 'Leave the key out of the address: Slash sends the one you picked from the vault.', { at: 'base_url' });
+    return no('VALUE_MALFORMED', 'Leave the key out of the address: Slash sends the one you picked from the keychain.', { at: 'base_url' });
   if (!publicHost(url.hostname))
     return no('VALUE_MALFORMED', 'That address is on a private network or on this machine, and Slash sends your key only to a provider on the public internet.', {
       at: 'base_url',
@@ -1112,7 +1112,7 @@ const ownAddressOf = (own: SlashOwnKey, hostUrl: string | undefined): string | n
 };
 
 /**
- * The sentence for his own key when the vault would not open it, thrown before anything is sent, in plain words.
+ * The sentence for his own key when the keychain would not open it, thrown before anything is sent, in plain words.
  *
  * HIS OWN KEY IS A ROUTE OF ONE CANDIDATE. `routeFor` answers `[m.key]` alone for the `key` form (`infer.ts`), each host's
  * `chosen()` throws where his key is gone rather than hand back the included model, and `infer` throws a closed key on as
@@ -1132,7 +1132,7 @@ export const OWN_KEY_FAILED = 'Your own key did not open. Put it back in Keys, o
  * bill the name he typed is sent for every call, the package's short names included.
  *
  * `undefined` WHEN NO KEY COULD BE HAD: a host that cannot open keys (a Worker with no `KEK`), a grant that is revoked, was
- * never in the vault or is not an API token, or an address the rules above refuse. Nothing is opened here.
+ * never in the keychain or is not an API token, or an address the rules above refuse. Nothing is opened here.
  */
 const ownOptionsOf = (own: SlashOwnKey, deps: SlashHostDeps, hostUrl: string | undefined): EndpointModelOptions | undefined => {
   const open = deps.openKey;
@@ -1147,7 +1147,7 @@ const ownOptionsOf = (own: SlashOwnKey, deps: SlashHostDeps, hostUrl: string | u
     model: own.model,
     key: async () => {
       const grant = live();
-      /* A VAULT THAT THROWS IS A KEY THAT DID NOT OPEN: the same sentence, and nothing sent. */
+      /* A KEYCHAIN THAT THROWS IS A KEY THAT DID NOT OPEN: the same sentence, and nothing sent. */
       const key = grant ? await open(grant).catch(() => null) : null;
       if (!key) throw new SlashKeyClosedError(OWN_KEY_FAILED);
       return key;
@@ -1174,38 +1174,38 @@ export function slashOwnModel(own: SlashOwnKey, deps: SlashHostDeps, hostUrl?: s
 }
 
 /**
- * `46 §5.5` step 3's sentence for his own key when the vault will not open it for this asker, which `§5.9` step 4 has the
- * host answer when the vault refuses.
+ * `46 §5.5` step 3's sentence for his own key when the keychain will not open it for this asker, which `§5.9` step 4 has the
+ * host answer when the keychain refuses.
  *
  * THE HOST SAYS IT BEFORE ANY MODEL IS ASKED. On his own key both passes go to that key, so a refusal here stands in front
  * of the read as well as the proposal, and nothing is drafted on another model in its place.
  */
 export const SLASH_KEY_CLOSED: Refusal = {
   code: 'FORBIDDEN',
-  fix: 'Your key is not open in this session. Open the vault, or switch Slash to the included model.',
+  fix: 'Your key is not open in this session. Open the keychain, or switch Slash to the included model.',
 };
 
 /** The sentence for his own key when the grant he picked is revoked, gone, or no longer an API token. */
 export const SLASH_KEY_GONE: Refusal = {
   code: 'FORBIDDEN',
-  fix: 'The key Slash was set to answer with is no longer a key in the vault. Pick your key again in Settings, or switch Slash to the included model.',
+  fix: 'The key Slash was set to answer with is no longer a key in the keychain. Pick your key again in Settings, or switch Slash to the included model.',
   at: 'grant_id',
 };
 
 /** A refusal from `slashOwnKeyFor`, which the door answers in place of the engine, on a read and a proposal alike. */
 export type SlashKeyRefused = { ok: false; refusal: Refusal };
 
-/** What `slashOwnKeyFor` needs of the record: the vault gate, asked through a read that writes no event, and the kernel. */
-export type SlashVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
+/** What `slashOwnKeyFor` needs of the record: the keychain gate, asked through a read that writes no event, and the kernel. */
+export type SlashKeychainApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
 
 /**
- * His own key FOR THIS ASKER: the vault's own check on their session first, and every `grant.read` signed by them.
+ * His own key FOR THIS ASKER: the keychain's own check on their session first, and every `grant.read` signed by them.
  *
  * `46 §5.9` step 2 HAS THE HOST OPEN THE GRANT "UNDER THE ASKER'S BROWSER SESSION". Measured in
  * `apps/selfhost/test/slash-byok-guard.test.ts` before the gate existed: a `read` colleague whose last proof was fifty minutes
  * old proposed, got 200, and the proposal went out on the owner's key, with one `grant.read` whose actor was `system`.
  *
- * SO THE VAULT GATE RUNS FIRST, AND IT IS THE RECORD'S AND NOT A COPY. `listGrants(ctx)` is the record's `vault(ctx)` and
+ * SO THE KEYCHAIN GATE RUNS FIRST, AND IT IS THE RECORD'S AND NOT A COPY. `listGrants(ctx)` is the record's `keychain(ctx)` and
  * nothing else: a person at `owner`, never a bearer, and a proof in the last fifteen minutes. It writes no event, which is
  * why it is the probe and `openGrant` is not: an ask that finds no rows opens no key, and should leave no `grant.read`.
  * Refused, the door answers `SLASH_KEY_CLOSED` and the engine is never called, so nothing is drafted either.
@@ -1221,7 +1221,7 @@ export type SlashVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
  * `undefined` WHERE SLASH IS NOT ON HIS OWN KEY (`own` is `null`), and nothing is gated then: the included model opens
  * nothing of the owner's.
  */
-export async function slashOwnKeyFor<A extends SlashVaultApi>(
+export async function slashOwnKeyFor<A extends SlashKeychainApi>(
   own: SlashOwnKey | null,
   api: A,
   ctx: CallContext,
@@ -1238,11 +1238,11 @@ export async function slashOwnKeyFor<A extends SlashVaultApi>(
 const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
 
 /**
- * A save the settings door must hold to the vault's own gate before the engine sees it, or `false`.
+ * A save the settings door must hold to the keychain's own gate before the engine sees it, or `false`.
  *
  * POINTING HIS KEY AT AN ADDRESS IS OPENING IT THERE. A save that chooses his own key, picks a grant or names an address is
  * the act that decides where his key is sent on every ask after it, so it asks what opening the key asks: the owner, in a
- * browser, proved in the last fifteen minutes (`vault(ctx)`). A cookie a laptop left signed in for a month may still ask
+ * browser, proved in the last fifteen minutes (`keychain(ctx)`). A cookie a laptop left signed in for a month may still ask
  * Slash; it may not redirect his key.
  */
 export const slashKeySave = (patch: Readonly<Record<string, unknown>>): boolean =>
@@ -1310,7 +1310,7 @@ export type SlashGuardDeps = {
   /** Slash's own SQLite, the one the app handed `createSlash`. */
   sql: Sql;
   clock: { now(): number };
-  /** The record's vault rows, read on each settings save so a grant revoked a second ago counts, with the kind each holds. */
+  /** The record's keychain rows, read on each settings save so a grant revoked a second ago counts, with the kind each holds. */
   grants: () => readonly { id: string; kind: string; label: string; revoked_at: string | null }[];
   /**
    * The tiers this host runs, the list it handed `createSlash` as `tiers`; unset is every tier. A stored tier outside it is
@@ -1359,7 +1359,7 @@ const dayOf = (iso: string): string => {
 /**
  * The package's engine, with the host-side rules it cannot keep itself: `byo`'s asks counted against `ask_cap`, since they
  * are on this host's endpoint and the package meters tier `a` alone, and a save refused when the key it picks is not a
- * live API token in the vault.
+ * live API token in the keychain.
  *
  * THE CHECK IS SYNCHRONOUS AND RIGHT BEFORE THE ENGINE'S OWN, AND THAT IS WHAT MAKES IT A CAP. The package writes a hold
  * row (`core.reserve`) before its first `await`, so the count here, taken with no `await` before the call, includes every
@@ -1444,13 +1444,13 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
       });
     };
   }
-  /* A SAVE ON HIS OWN KEY MUST PICK A KEY THE VAULT HOLDS. `configure` checks a grant id's shape and never the vault, so an
+  /* A SAVE ON HIS OWN KEY MUST PICK A KEY THE KEYCHAIN HOLDS. `configure` checks a grant id's shape and never the keychain, so an
      id that is not there saved with 200 and every ask after it was 403. The
      grant it checks is the one his key would open: the patch's, or the one already stored when the patch names none,
      which is how a revoked key reached the save. A caller who is not the owner is left to `configure`, which refuses them
      in its own sentence, so this check never tells a colleague whether a grant id exists.
      AND IT MUST HOLD AN API TOKEN. A live password opens like any other grant, so before the kind was read an owner who
-     chose her bank login from the vault saved 200, and the next ask sent it as the bearer (measured in
+     chose her bank login from the keychain saved 200, and the next ask sent it as the bearer (measured in
      `apps/selfhost/test/slash-byok-guard.test.ts`). The sentence names the kind and never the value.
      WHAT IT IS LABELLED NO LONGER MATTERS. This refused the key labelled `slash` while that label keyed the host's own
      model for everybody; no key is chosen by its label now (`slashOwnKeyOf`), so the one he picked is his, whatever he
@@ -1471,7 +1471,7 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
         ok: false,
         refusal: {
           code: 'VALUE_MALFORMED',
-          fix: 'That grant holds no key in this record. Put the key in the vault first, then choose it here.',
+          fix: 'That grant holds no key in this record. Put the key in the keychain first, then choose it here.',
           at: 'grant_id',
         },
       };
@@ -1614,7 +1614,7 @@ const figuresKept = async (api: SlashRecordDeps, ctx: CallContext): Promise<{ id
 };
 
 /** `12 §5`: the register that holds credentials is not one Slash reads, so it never reaches a projection to be dropped later. */
-const VAULT_REGISTER = 'grant';
+const KEYCHAIN_REGISTER = 'grant';
 
 /** Rows per register in one projection. `list`'s own default, and the ceiling the budget then trims against. */
 const ROWS = 50;
@@ -1683,7 +1683,7 @@ export function slashRecord(api: SlashRecordDeps): SlashRecordApi {
       const decls = new Map<string, RegisterDecl>();
       const registers: SlashProjectionRegister[] = [];
       for (const register of boot.value.registers) {
-        if (register.id === VAULT_REGISTER) continue;
+        if (register.id === KEYCHAIN_REGISTER) continue;
         const decl = await api.schema({ register: register.id }, ctx);
         if (!decl.ok) continue;
         decls.set(register.id, decl.value);

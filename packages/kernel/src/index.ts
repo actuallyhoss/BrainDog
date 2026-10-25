@@ -277,8 +277,8 @@ import {
   type GrantRow,
   type LeasedSeal,
   type SealedGrant,
-  type VaultDeps,
-} from './vault.ts';
+  type KeychainDeps,
+} from './keychain.ts';
 import { slashMayWrite } from './slash.ts';
 import { meetPatternedSender, readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
@@ -358,14 +358,14 @@ import {
   operationGrant,
   renameDevice,
   shapeGrant,
-  vaultGrant,
+  keychainGrant,
   type Approved,
   type DeviceCode,
   type DeviceRow,
   type Exchanged,
   type OperationGrant,
   type ShapeGrant,
-  type VaultGrant,
+  type KeychainGrant,
   type Waiting,
 } from './device.ts';
 import {
@@ -519,7 +519,7 @@ export {
   type ProfileRow,
   type ProfileWho,
 } from './agent-profile.ts';
-export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type VaultGrant, type Waiting } from './device.ts';
+export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -561,7 +561,7 @@ export type { PushJob, PushSettled, PushTarget } from './push.ts';
 export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
-export { GRANT_KINDS, spanMs } from './vault.ts';
+export { GRANT_KINDS, spanMs } from './keychain.ts';
 import { GROUP_CAP } from './buckets.ts';
 import { RATE_STALE_DAYS, ratesFrom } from './fx.ts';
 import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
@@ -788,7 +788,7 @@ export {
   type Scripted,
 } from './script-run.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, type KeyOutOfScope } from './actions.ts';
-export { pinHost } from './vault.ts';
+export { pinHost } from './keychain.ts';
 /* RUN NOW (`nudge.ts`): an action's waiting run moved to now, at most once a minute an action and twenty an hour a record. */
 export { nudgeAction, nudgeRate, NUDGE_ACTION_MS, NUDGE_RECORD_MOST, NUDGE_RECORD_MS, NUDGE_FIELD, type NudgeDeps, type Nudged } from './nudge.ts';
 export type {
@@ -799,7 +799,7 @@ export type {
   Budget,
   /* Why a key cannot carry an approval, and what to do about it. */
   KeyNotReady,
-  /* A vault row as far as choosing the newest live one under a name needs it. */
+  /* A keychain row as far as choosing the newest live one under a name needs it. */
   GrantChoosable,
 } from './actions.ts';
 
@@ -817,7 +817,7 @@ export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSect
 export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, PageSees, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
-export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
+export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './keychain.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, Known, Owners, PackConfig, PackToggle, PlannedRecord } from './declare.ts';
@@ -1213,8 +1213,8 @@ const RESERVED =new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'v
  */
 type DeclaredField = RegisterDecl['fields'][number];
 const TAGS: DeclaredField = { id: 'tags', type: 'list', of: 'text' };
-/** The vault's index list, which a share reaches only by naming it (`lens.ts`'s `keys` role). */
-const VAULT_LIST = 'credentials';
+/** The keychain's index list, which a share reaches only by naming it (`lens.ts`'s `keys` role). */
+const KEYCHAIN_LIST = 'credentials';
 
 const withTags = (fields: readonly DeclaredField[]): readonly DeclaredField[] =>
   fields.some((f) => f.id === 'tags') ? fields : [...fields, TAGS];
@@ -1334,7 +1334,7 @@ const navOf = (nav: unknown): { section: string; order: number; place?: number; 
  *
  *   `decided`  the write carries out an accepted proposal: the one way a field or a move declared
  *              `by: 'decide'` changes. Governance's accept path sets it.
- *   `seal`     the vault door. `depositGrant` binds the key's grant inside the write, once the run
+ *   `seal`     the keychain door. `depositGrant` binds the key's grant inside the write, once the run
  *              signing it is known, and points `field` at it. No patch names a secret field.
  *   `merge`    the write is one the record makes to fold a row into another or to undo that: `meet`'s strong
  *              rules, the merge's own carry, and `undoMerge`. With `decided`, the only way `merged_into` is set
@@ -1767,7 +1767,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const catalogNow = (): Catalog =>
     (catalogMemo ??= catalogOf(
       [...registers.values()].map((d) => ({ ...d, fields: withTags(d.fields) as unknown as ListLike['fields'] })),
-      { keys: VAULT_LIST, people: meetsRole(registers.values())?.register ?? null, kernel: kernelListsNow() },
+      { keys: KEYCHAIN_LIST, people: meetsRole(registers.values())?.register ?? null, kernel: kernelListsNow() },
     ));
 
   /** What `access` needs to merge shares, for one call. */
@@ -1960,7 +1960,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** A sentence with the spoken ids in it said as the rows' names; one nothing answers to stays as written. */
   const nameSpoken = (text: string): string => nameSpokenIn(text, titleOfRow);
 
-  /** What a vault label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
+  /** What a keychain label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
   function opensOf(label: string): string | null {
     return opensNamed(sql, label);
   }
@@ -1976,7 +1976,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         }),
     );
 
-  /** The projects a vault label's key is kept to, read for an action's line (`egressOf`) and its refusal (`keyOutOfScope`). */
+  /** The projects a keychain label's key is kept to, read for an action's line (`egressOf`) and its refusal (`keyOutOfScope`). */
   function keyScope(label: string): readonly string[] | null | undefined {
     return keyScopeOf(sql, label, keyHolders());
   }
@@ -3520,7 +3520,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /**
    * An action or a script in the batch that names a key kept for another project (`keyOutOfScope`, D0b.23).
    *
-   * HERE AND NOT IN `declare.ts`, for the reason `unserved` is: which projects a key is kept to is read off the vault and
+   * HERE AND NOT IN `declare.ts`, for the reason `unserved` is: which projects a key is kept to is read off the keychain and
    * the lists that hold keys, which the context-free lint never sees. Asked on every install path right after it.
    */
   function keysKept(batch: readonly Declaration[]): Refusal | null {
@@ -4316,7 +4316,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * THE VAULT DOOR, the record's half, and INTERNAL: no route reaches it.
+   * THE KEYCHAIN DOOR, the record's half, and INTERNAL: no route reaches it.
    *
    * A host's door seals a key with the record's key store and drops the value; this binds the sealed
    * bytes into a grant and points one row's `secret` field at it, in one transaction, through the
@@ -4341,7 +4341,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     let bound: GrantRow | undefined;
     const bind = (actor: string, held: string | null): Result<GrantRow> => {
       const live = held !== null && getGrant(sql, held)?.revoked_at === null;
-      const out = bindGrant(sql, vaultDeps(actor), { ...args.grant, ...(live && held !== null ? { id: held } : {}) }, transaction);
+      const out = bindGrant(sql, keychainDeps(actor), { ...args.grant, ...(live && held !== null ? { id: held } : {}) }, transaction);
       if (out.ok) bound = out.value;
       return out;
     };
@@ -4626,14 +4626,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* WHAT A RUN REPORTED ABOUT ITSELF (`RUN_FACTS`): its agent sets it through a token, and a person never does. */
         if (register === SESSION && RUN_FACTS.includes(key) && w.principal?.kind === 'person')
           return no<Entry>('IMMUTABLE_FIELD', `${key} is what the run reported about itself, and only its agent sets it.`, { at: key });
-        /* A SECRET FIELD IS THE VAULT DOOR'S, from every caller. It names the grant a key was sealed
+        /* A SECRET FIELD IS THE KEYCHAIN DOOR'S, from every caller. It names the grant a key was sealed
            into, and `depositGrant` writes it in the transaction that seals the key, so a caller naming
            a grant could only point a row at a key sealed for another. `IMMUTABLE_FIELD`, the answer a
            kernel-written field gives, because the refusal is about the field and not about who asks. */
         if (field.type === 'secret' || field.of === 'secret')
           return no<Entry>(
             'IMMUTABLE_FIELD',
-            `${key} says where a key is sealed, and only the vault writes it. Deposit the key, and the record points this field at it.`,
+            `${key} says where a key is sealed, and only the keychain writes it. Deposit the key, and the record points this field at it.`,
             { at: key },
           );
         /* A MARK IS A PICTURE, NEVER A CONTROL (PGS-A06): a project drawn as the close cross reads as a button. */
@@ -4916,7 +4916,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         w = { ...w, actor: run.actor };
       }
 
-      /* THE VAULT DOOR'S KEY, bound here and not earlier: after every check, so a refused write seals
+      /* THE KEYCHAIN DOOR'S KEY, bound here and not earlier: after every check, so a refused write seals
          nothing, and after the ladder, so `grant.add` is signed by the run that deposited it. */
       if (door.seal) {
         const held = current?.fields[door.seal.field];
@@ -8664,9 +8664,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     lookup: actionDecl,
     arrive: (decl, body, sha256) =>
       kernel.arrive({ channel: 'pull', body, sha256 }, { ...(decl as unknown as IngestDecl), channel: 'pull' } as IngestDecl),
-    /* THE VAULT DECIDES WHETHER A LEASE IS GOOD ENOUGH, not the runner. The actor is the connector
+    /* THE KEYCHAIN DECIDES WHETHER A LEASE IS GOOD ENOUGH, not the runner. The actor is the connector
        rather than a person, which is what the `grant.read` event will say. */
-    seal: ({ actor, ...args }) => sealedGrant(sql, vaultDeps(actor), args, transaction),
+    seal: ({ actor, ...args }) => sealedGrant(sql, keychainDeps(actor), args, transaction),
     tz: recordIdentity(sql)?.tz ?? 'UTC',
   });
 
@@ -8864,7 +8864,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
-  const vaultDeps = (actor: string): VaultDeps => ({
+  const keychainDeps = (actor: string): KeychainDeps => ({
     mint,
     nowMs: clock.now(),
     actor,
@@ -9372,7 +9372,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
-    rotate: (row) => rotateDue(sql, vaultDeps('system'), row.payload),
+    rotate: (row) => rotateDue(sql, keychainDeps('system'), row.payload),
 
     /**
      * A rule came back to a row it asked to see again. `07 §6`'s `schedule` action.
@@ -10267,7 +10267,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     actions: () => listActions(sql, clock.now()),
 
     /**
-     * Whether a key can carry an approval: held by the vault, and openable by a scheduled run.
+     * Whether a key can carry an approval: held by the keychain, and openable by a scheduled run.
      * `null` for fine, otherwise the code and the sentence. The row is looked at, never its bytes.
      */
     keyReady: (name: string, paged = false): KeyNotReady | null => keyReady(sql, name, paged),
@@ -10276,7 +10276,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     titleOfRow: (ref: string): string | null => titleOfRow(ref),
 
     /**
-     * What the live vault entry a label names says it opens, or `null`: the host a script's install line names beside
+     * What the live keychain entry a label names says it opens, or `null`: the host a script's install line names beside
      * that key. A plan built outside the kernel hands this to `declare` as `Installed.opensOf`, so a pack's line and a
      * proposal's say the same thing.
      */
@@ -10387,7 +10387,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         decl,
       ),
 
-    /* ── the vault: what a key opens, never the key ───────────────────── */
+    /* ── the keychain: what a key opens, never the key ───────────────────── */
 
     /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
     grants: (): GrantRow[] => listGrants(sql),
@@ -10395,9 +10395,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Mint a grant, or rotate one — which differ by one column and a version number. */
     bindGrant: (args: BindGrantArgs, actor: string): Result<GrantRow> =>
-      bindGrant(sql, vaultDeps(actor), args, transaction),
+      bindGrant(sql, keychainDeps(actor), args, transaction),
 
-    /** Seal a key into a grant and point a row's secret field at it, in one write. INTERNAL: the vault door's. */
+    /** Seal a key into a grant and point a row's secret field at it, in one write. INTERNAL: the keychain door's. */
     depositGrant,
 
     /**
@@ -10408,19 +10408,19 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * about the code rather than a promise about our intentions.
      */
     openGrant: (args: { id: string; kek_id?: string | undefined }, actor: string): Result<SealedGrant> =>
-      openGrant(sql, vaultDeps(actor), args, transaction),
+      openGrant(sql, keychainDeps(actor), args, transaction),
 
     /**
      * Hand a credential to a runner that is holding a live lease on the job needing it.
      *
      * NOT `openGrant` WITH A DIFFERENT ACTOR. What authorises this is the lease, not a person, and
-     * it authorises one credential for as long as the lease lasts. The refusals are in `vault.ts`.
+     * it authorises one credential for as long as the lease lasts. The refusals are in `keychain.ts`.
      */
     sealedGrant: (args: { outbox: string; leasedUntil: string; grant: string }, actor: string): Result<LeasedSeal> =>
-      sealedGrant(sql, vaultDeps(actor), args, transaction),
+      sealedGrant(sql, keychainDeps(actor), args, transaction),
 
     /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
-    revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, vaultDeps(actor), id, transaction),
+    revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, keychainDeps(actor), id, transaction),
 
     /**
      * What a digest would say if it went now. It sends nothing.
@@ -11117,8 +11117,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** Rename one machine by its handle: its sign-in and its key read the new name. */
     renameDevice: (handle: string, label: string): Promise<Result<DeviceRow>> => renameDevice(tokenDeps(), handle, label),
 
-    /** A vault bearer, checked. INTERNAL. */
-    vaultGrant: (bearer: string, validFrom?: string): Promise<Result<VaultGrant>> => vaultGrant({ ...tokenDeps(), validFrom }, bearer),
+    /** A keychain bearer, checked. INTERNAL. */
+    keychainGrant: (bearer: string, validFrom?: string): Promise<Result<KeychainGrant>> => keychainGrant({ ...tokenDeps(), validFrom }, bearer),
     /** A shape bearer, checked and not spent: who approved it and until when. INTERNAL. */
     shapeGrant: (bearer: string, validFrom?: string): Promise<Result<ShapeGrant>> => shapeGrant({ ...tokenDeps(), validFrom }, bearer),
 
@@ -11510,7 +11510,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * hash of rows nobody can safely read into the file a customer keeps.
      */
     /**
-     * The id of the key this record's vault is wrapped by, or `null` when it has no vault.
+     * The id of the key this record's keychain is wrapped by, or `null` when it has no keychain.
      *
      * IT IS NOT THE KEY. `kek_id` is a fingerprint — 12 §6 — and naming it proves nothing except
      * that you know which key you are asking about, which is exactly the bar an export carrying the
@@ -11531,7 +11531,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* AN EXPORT IS AN EVENT, and 45 §5.6 says so. `openGrant` writes `grant.read` for ONE
          credential; `export` copies every one of them and wrote nothing at all — so the one read
          that gets the most out was the one read that could not answer "did anything leave". 12 §6's
-         first rule is that a vault whose reads are not audited cannot answer that question. */
+         first rule is that a keychain whose reads are not audited cannot answer that question. */
       exportEvent(opts);
       return exportBrainl(sql, transaction, opts)
         .then((lines) => (signer ? signBrainl(lines, signer) : lines))
@@ -11647,7 +11647,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          every grant's `ciphertext` (`brainl.ts`, `SEALED`), so replacing with the file an export hands out unless told
          otherwise answered `ok` with the record key and the signing key gone, and every credential sealed under them
          with them (measured). Refused while the record holds bytes of either kind and the file holds none; a record
-         with no vault loses nothing to a redacted file, and it is still taken. */
+         with no keychain loses nothing to a redacted file, and it is still taken. */
       const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
       const sealed = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM grant WHERE ciphertext IS NOT NULL')?.n ?? 0);
       const fileKeys = fileColumn(all, 'vault_key', 'purpose')?.length ?? 0;

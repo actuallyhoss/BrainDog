@@ -15,13 +15,13 @@
  * A KEY IS OPENED ONLY FOR A CALLER THE RECORD CALLS `owner`. A scheduled run sends a key to an origin the owner
  * approved in Decide; a draft has been approved by nobody, so a token that could try one could send the owner's key to
  * the provider it opens with any request the token cared to write, which is acting on that provider as the owner. The
- * record says `owner` only for a person its vault gate would let in (`scriptTry` in `packages/record`), each host builds
+ * record says `owner` only for a person its keychain gate would let in (`scriptTry` in `packages/record`), each host builds
  * `grantOf` from that word and passes `null` for everybody else, and then a fetch naming a key is a rejected promise
  * inside the run: the script may catch it and go on, and the caller sees how far it got.
  *
- * THE VAULT GATE, NOT `level === 'owner'`. A probe planted a session proved two hours ago: the
- * vault refused it `listGrants` with `NEEDS_BROWSER_SESSION`, and the same cookie's trial sent a request carrying the
- * owner's key and left a `grant.read` in her name. So `owner` is the record's `vault()` answer, held to a person. A trial
+ * THE KEYCHAIN GATE, NOT `level === 'owner'`. A probe planted a session proved two hours ago: the
+ * keychain refused it `listGrants` with `NEEDS_BROWSER_SESSION`, and the same cookie's trial sent a request carrying the
+ * owner's key and left a `grant.read` in her name. So `owner` is the record's `keychain()` answer, held to a person. A trial
  * refused the key for that reason alone still runs, keyless: the record says `stale` when the proof's age is the only
  * reason, the self-host hands it on as `ScriptDraft.stale`, and the fetch is told to sign in again, because the draft is
  * not what is wrong. The Worker's `Record$` does not pass `stale` yet, so its owner is refused the key all the same and
@@ -72,10 +72,10 @@ export type ScriptDraft = {
   config?: Record<string, Json> | undefined;
   /** The caller's own reads, built by the record under the caller's context. Absent is a caller who reads nothing. */
   reads?: ScriptReads | undefined;
-  /** The vault by label, for a caller the record lets open a key; `null` for every other caller. */
+  /** The keychain by label, for a caller the record lets open a key; `null` for every other caller. */
   grantOf: GrantOf | null;
   /**
-   * `true` when `grantOf` is `null` for one reason only: the owner's last proof is older than the vault allows. It
+   * `true` when `grantOf` is `null` for one reason only: the owner's last proof is older than the keychain allows. It
    * changes what a fetch naming a key is told, never whether a key opens, which `grantOf` alone decides.
    */
   stale?: boolean | undefined;
@@ -90,7 +90,7 @@ export type ScriptDraft = {
  * Whether a trial only reads (`readOnlyRefused` in `script.ts`): for every caller the record does not call `owner`.
  *
  * THE OWNER WHOSE PROOF IS STALE KEEPS ANY METHOD AND NO KEY. Her draft is hers to send, and the proof's age is a
- * reason to keep the vault shut, which `grantOf` already does, not a reason to treat her as an agent.
+ * reason to keep the keychain shut, which `grantOf` already does, not a reason to treat her as an agent.
  */
 export const readsOnly = (draft: Pick<ScriptDraft, 'grantOf' | 'stale' | 'owner'>): boolean =>
   !(draft.owner ?? draft.grantOf !== null) && draft.stale !== true;
@@ -120,7 +120,7 @@ export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: Scrip
  *
  * A TRIAL HAS AN ASKER AND BOTH HOSTS OPENED ITS KEY AS NOBODY. Each handed the trial the opener it builds for the
  * scheduled pass, whose actor is `system` because a scheduled run has no person behind it, so the owner trying her own
- * draft left a `grant.read` the vault's log could not tell from the nightly run's: measured in
+ * draft left a `grant.read` the keychain's log could not tell from the nightly run's: measured in
  * `apps/selfhost/test/script-try-asker.test.ts`, one key sent and `grant.read ["system"]`. Slash's included key had the
  * same fault and the same repair (`slashOwnKeyFor` in `slash.ts`), the asker's id handed to `keyOpener` per ask.
  *
@@ -138,7 +138,7 @@ const NO_KEYS = (label: string): string =>
   `A trial opens no key for an agent, so the fetch naming "${label}" was not sent. Once the owner accepts the script, its runs send the key.`;
 
 /**
- * The sentence for the owner whose last proof is too old for the vault, in Slash's words for the same gate
+ * The sentence for the owner whose last proof is too old for the keychain, in Slash's words for the same gate
  * (`SLASH_KEY_CLOSED` in `slash.ts`), because "for an agent" would tell her she is one and leave her nothing to do.
  */
 const STALE = (label: string): string =>

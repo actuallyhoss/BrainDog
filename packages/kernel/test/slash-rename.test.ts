@@ -1,6 +1,6 @@
 /**
  * Spark is called Slash now, and a record written before the rename still holds the old name in eight places: the actor
- * on a model's events, `opened_by` on its suggestions, its person's prefs and their two keys, the vault label of the
+ * on a model's events, `opened_by` on its suggestions, its person's prefs and their two keys, the keychain label of the
  * included model's key, a parked run's step kind, inside two kinds of declaration body, and inside an open change's
  * `to` holding either kind of body.
  *

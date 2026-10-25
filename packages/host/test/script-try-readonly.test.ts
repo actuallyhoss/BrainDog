@@ -78,7 +78,7 @@ test("THE OWNER'S TRIAL POSTS, and so does the owner whose proof is stale, who k
     assert.deepEqual(echo.reached.map((r) => r.method), ['POST', 'GET'], JSON.stringify(who));
     assert.equal(echo.reached[0]!.body, '{"note":"Brightwater"}');
   }
-  assert.equal(readsOnly({ grantOf: () => null, owner: false }), true, 'the record saying no wins over a vault handed in');
+  assert.equal(readsOnly({ grantOf: () => null, owner: false }), true, 'the record saying no wins over a keychain handed in');
 });
 
 test('ONLY A GET OR A HEAD WITHOUT A BODY IS A READ', () => {

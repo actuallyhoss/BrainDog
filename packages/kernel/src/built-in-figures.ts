@@ -824,7 +824,7 @@ const PROJECTS_UNPLACED: MetricDecl = {
   format: 'int',
 };
 
-/** The source of `keys-unopenable`: every list with a sealed field, against the vault's grants. */
+/** The source of `keys-unopenable`: every list with a sealed field, against the keychain's grants. */
 export const RECORD_KEYS = 'record.keys';
 
 /** Keys whose sealed value cannot be opened: the field names a grant that was revoked, or that is gone. */

@@ -11,7 +11,7 @@
  * pattern list here, so a shape added there is looked for here the next night.
  *
  * A FINDING NEVER HOLDS WHAT IT FOUND. It is where: the list's name and the row's number, a note on one, or a
- * question's number, so a person can open it and move the key to the vault. The figure's `why` says the first.
+ * question's number, so a person can open it and move the key to the keychain. The figure's `why` says the first.
  *
  * THE COUNT IS ROLLING. A finding stays until its place is walked again and holds no key, and a pass that ends drops
  * what it did not see (a row deleted since). Before the first pass ends and with nothing found, the figure holds

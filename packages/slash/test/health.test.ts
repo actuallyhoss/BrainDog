@@ -106,16 +106,16 @@ test('HIS OWN KEY TURNED AWAY, or a host that says it will not open, is key_clos
   const h: EngineHealth = engineHealth(sql, clock, { model: true, own_key: true });
   assert.deepEqual(base(h), { state: 'key_closed', last_ok: at(first - HOUR), since: at(first) });
   assert.deepEqual(engineSaid(h, clock.now()), {
-    text: 'Your own key for Slash has not opened since 6 October. Open it in the vault, or switch to the included model.',
+    text: 'Your own key for Slash has not opened since 6 October. Open it in the keychain, or switch to the included model.',
     whose: 'yours',
   });
   /* The same row on the included model is not his key's. */
   assert.equal(engineHealth(sql, clock, MODEL).state, 'answering');
-  /* A key the vault will not open leaves no row, so the host says it. */
+  /* A key the keychain will not open leaves no row, so the host says it. */
   const empty = ledger();
   const shut = engineHealth(empty.sql, clock, { model: true, own_key: true, key_open: false });
   assert.equal(shut.state, 'key_closed');
-  assert.equal(engineSaid(shut, clock.now()).text, 'Your own key for Slash will not open. Open it in the vault, or switch to the included model.');
+  assert.equal(engineSaid(shut, clock.now()).text, 'Your own key for Slash will not open. Open it in the keychain, or switch to the included model.');
 });
 
 test('HOLDS IN FLIGHT ARE NEITHER, and a refusal on the included model is never his key', () => {

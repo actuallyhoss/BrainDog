@@ -44,7 +44,7 @@ const PARTS = reg('parts', 'Parts', 'name', [
 ]);
 const BINS = reg('bins', 'Bins', 'name', [{ id: 'name', type: 'text', required: true }]);
 /* A LIST WITH NOTHING A TABLE MAY DRAW, which is offered no page rather than a table of its secret. */
-const VAULTED = reg('vaulted', 'Vaulted', 'label', [
+const KEYCHAINED = reg('keychained', 'Keychained', 'label', [
   { id: 'label', type: 'document' },
   { id: 'key', type: 'secret' },
 ]);
@@ -57,11 +57,11 @@ const PARTS_COUNT: Declaration = {
 async function small() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
-  value(await api.kernel.install([PARTS, BINS, VAULTED, PARTS_COUNT]));
+  value(await api.kernel.install([PARTS, BINS, KEYCHAINED, PARTS_COUNT]));
   for (const [i, name] of ['Bolt', 'Nut', 'Washer', 'Hinge', 'Bracket', 'Spring', 'Pin'].entries())
     value(api.kernel.create('parts', { name, bought: `2026-09-0${i + 1}` }, { actor: 'p_1' }));
   value(api.kernel.create('bins', { name: 'Top shelf' }, { actor: 'p_1' }));
-  value(api.kernel.create('vaulted', { label: 'The safe' }, { actor: 'p_1' }));
+  value(api.kernel.create('keychained', { label: 'The safe' }, { actor: 'p_1' }));
   return { api, sql };
 }
 

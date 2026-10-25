@@ -3,7 +3,7 @@
  *
  * WHAT IS PROVED IS THE KERNEL'S HALF, WHICH IS ALL OF THE RULE. Both hosts read their setting (`TOKENS_VALID_FROM`,
  * `BRAINDOG_TOKENS_VALID_FROM`) and hand it down per call, and every bearer either host takes is checked by one of the
- * readers below: a token by `verifyToken`, an operation by `operationGrant`, a vault grant by `vaultGrant`. A credential
+ * readers below: a token by `verifyToken`, an operation by `operationGrant`, a keychain grant by `keychainGrant`. A credential
  * made before the instant is refused in the sentence an unknown one gets, one made at it or after passes, and nothing is
  * written, so an earlier instant gives every one of them back.
  *
@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import { fixOf, type Result } from '@braindog/ports';
 
-import { deviceApprove, deviceList, devicePoll, deviceStart, operationGrant, vaultGrant, type Exchanged } from '../device.ts';
+import { deviceApprove, deviceList, devicePoll, deviceStart, operationGrant, keychainGrant, type Exchanged } from '../device.ts';
 import { applyMigrations, instant } from '../migrate.ts';
 import { createToken, cutOffReadable, listTokens, revokeToken, verifyToken, type TokenDeps } from '../token.ts';
 import { fixedClock, openSqlite } from '../../test/sqlite.ts';
@@ -118,16 +118,16 @@ test('AN OPERATION GRANT APPROVED BEFORE THE CUT-OFF IS REFUSED UNSPENT, AND ONE
   assert.equal(value(await operationGrant(deps(), before)).reach, 'export');
 });
 
-test('A VAULT GRANT APPROVED BEFORE THE CUT-OFF IS REFUSED, AND ONE APPROVED AFTER IS NOT', async () => {
+test('A KEYCHAIN GRANT APPROVED BEFORE THE CUT-OFF IS REFUSED, AND ONE APPROVED AFTER IS NOT', async () => {
   const { clock, deps, grant } = await setup();
   const before = await grant('vault', '*');
   const cut = instant(NOW + MINUTE);
   clock.advance(2 * MINUTE);
   const after = await grant('vault', '*');
 
-  assert.equal(refusalOf(await vaultGrant(deps(cut), before)).code, 'FORBIDDEN');
-  assert.equal(value(await vaultGrant(deps(cut), after)).scope, '*');
-  assert.equal(value(await vaultGrant(deps(), before)).scope, '*');
+  assert.equal(refusalOf(await keychainGrant(deps(cut), before)).code, 'FORBIDDEN');
+  assert.equal(value(await keychainGrant(deps(cut), after)).scope, '*');
+  assert.equal(value(await keychainGrant(deps(), before)).scope, '*');
 });
 
 test('A CODE APPROVED BEFORE THE CUT-OFF IS NOT EXCHANGED FOR A TOKEN THE CUT-OFF WOULD PASS', async () => {

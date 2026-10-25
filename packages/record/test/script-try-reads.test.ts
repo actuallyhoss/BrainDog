@@ -102,7 +102,7 @@ async function record(run: (reads: Reads) => Promise<string[]> = probe) {
   assert.ok((await api.kernel.install([CLIENTS, SEEN])).ok);
   for (const name of ['Acme', 'Bolt']) assert.ok((await api.create({ register: 'clients', fields: { name } }, owner)).ok);
   assert.ok((await api.create({ register: 'seen', fields: { said: 'a row of a list the script does not read' } }, owner)).ok);
-  /* A SECRET IS WRITTEN BY THE VAULT ALONE, so the grant id is put where a deposit would have put it. */
+  /* A SECRET IS WRITTEN BY THE KEYCHAIN ALONE, so the grant id is put where a deposit would have put it. */
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', ?) WHERE register = 'clients' AND json_extract(fields, '$.name') = 'Acme'", GRANT);
   const scheduled = scriptReads(api)({
     job: null as never,

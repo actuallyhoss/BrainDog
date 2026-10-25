@@ -73,7 +73,7 @@ test('ONCE WIRED THE TABLE SERVES THESE ROWS, each once, adding one READ+ and on
   const without = by(ROUTES.filter((r) => !OWN.some((o) => o.name === r.name)));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
   assert.equal(all.DATA, (without.DATA ?? 0) + 1);
-  for (const group of ['VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A GET REACHES huesWanted with the list as sent, and giveHues takes a POST only', untilWired, async () => {

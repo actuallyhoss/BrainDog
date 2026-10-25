@@ -173,7 +173,7 @@ export type Conflict = {
  * minted their own word for a route that does not exist.
  *
  * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-five, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 24 write path · 11 auth and vault · 8 format and
+ * families — 54 pack and declaration · 14 grammar · 24 write path · 11 auth and keychain · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -258,7 +258,7 @@ const WRITE = [
   'NOT_FOUND',
 ] as const;
 
-/** Auth and vault — 11. */
+/** Auth and keychain — 11. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',

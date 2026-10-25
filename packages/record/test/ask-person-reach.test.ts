@@ -413,7 +413,7 @@ test('A run AFTER THE ASK IS ANSWERED BY A MEMBER WHO READS THE LIST: the call i
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const put = await api.kernel.install([MONEY, POST, rule('postit', [ASK, { if: 'answer is yes', then: [{ run: 'post_money' }], else: [] }])]);
   assert.ok(put.ok, JSON.stringify(put));
-  /* A call whose key is missing pauses instead of queueing, so the key is in the vault. */
+  /* A call whose key is missing pauses instead of queueing, so the key is in the keychain. */
   const key = { label: 'hook key', opens: 'hooks.example.test', kind: 'api_token' as const, ciphertext: new Uint8Array([1]), nonce: new Uint8Array([9]), kdf: 'hkdf', wrapped_by: 'kek' as const, kek_id: 'kek_2f' };
   assert.ok(api.kernel.bindGrant(key, 'p_owner').ok);
   assert.ok(api.kernel.create('money', { what: 'Salary: Omar', amount: 91000 }, { actor: 'p_owner' }).ok);

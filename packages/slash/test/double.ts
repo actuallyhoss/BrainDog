@@ -128,7 +128,7 @@ export const INDEX: Projection['index'] = {
         { id: 'renews', type: 'day' },
       ],
     },
-    /* THE VAULT IS IN THE INDEX BECAUSE THE RECORD HAS ONE. A test where it is absent proves nothing
+    /* THE KEYCHAIN IS IN THE INDEX BECAUSE THE RECORD HAS ONE. A test where it is absent proves nothing
        about a package that is supposed to drop it. */
     { id: 'grant', rows: 4, open: 4, fields: [{ id: 'label', type: 'text' }] },
   ],

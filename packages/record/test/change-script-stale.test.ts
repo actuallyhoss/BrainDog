@@ -1,7 +1,7 @@
 /**
  * A `change` that carries a script's line is refused at acceptance when the line now reads differently.
  *
- * WHAT WAS MEASURED. A script's line names the host its key goes to, which is what the key's vault entry opens, and
+ * WHAT WAS MEASURED. A script's line names the host its key goes to, which is what the key's keychain entry opens, and
  * that is read once, when the change is filed. Measured: `script.gold-rate` was filed (egress `api.goldapi.io` and
  * `collector.test`, key `goldapi`) while the `goldapi` entry opened `api.goldapi.io`, so the owner read "key "goldapi"
  * to api.goldapi.io". It then revoked the entry, bound a new `goldapi` that opens `collector.test`, and pressed accept:
@@ -9,7 +9,7 @@
  * A pack's plan is refused `PLAN_STALE` for the same drift, and this holds a change to the same rule.
  *
  * ONLY THE LINES THE CHANGE SHOWED ARE ASKED AGAIN, so the second case is the witness that nothing else is refused: the
- * same change, with the vault left alone, accepts and installs.
+ * same change, with the keychain left alone, accepts and installs.
  */
 
 import { test } from 'node:test';
@@ -70,10 +70,10 @@ async function filed() {
   return { sql, api, grant: (first as { value: { id: string } }).value.id, accept, installed, status };
 }
 
-test('A CHANGE WHOSE KEY LINE MOVED WITH THE VAULT BETWEEN FILING AND THE PRESS IS REFUSED PLAN_STALE, and stays open', async () => {
+test('A CHANGE WHOSE KEY LINE MOVED WITH THE KEYCHAIN BETWEEN FILING AND THE PRESS IS REFUSED PLAN_STALE, and stays open', async () => {
   const { sql, api, grant, accept, installed, status } = await filed();
 
-  /* THE VAULT MOVES UNDER THE QUESTION: the entry the line named is revoked, and a new `goldapi` opens `collector.test`. */
+  /* THE KEYCHAIN MOVES UNDER THE QUESTION: the entry the line named is revoked, and a new `goldapi` opens `collector.test`. */
   assert.ok(api.kernel.revokeGrant(grant, 'p_1').ok);
   assert.ok(api.kernel.bindGrant(KEY('collector.test'), 'p_1').ok);
   assert.equal(
@@ -90,7 +90,7 @@ test('A CHANGE WHOSE KEY LINE MOVED WITH THE VAULT BETWEEN FILING AND THE PRESS 
   sql.close();
 });
 
-test('THE SAME CHANGE WITH THE VAULT LEFT ALONE ACCEPTS, so only a line that moved is refused', async () => {
+test('THE SAME CHANGE WITH THE KEYCHAIN LEFT ALONE ACCEPTS, so only a line that moved is refused', async () => {
   const { sql, accept, installed, status } = await filed();
   const out = await accept();
   assert.ok(out.ok, JSON.stringify(out));

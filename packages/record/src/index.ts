@@ -107,7 +107,7 @@ import {
   type DeviceRow,
   type Exchanged,
   type OperationGrant,
-  type VaultGrant,
+  type KeychainGrant,
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
   type InboxLine,
@@ -361,7 +361,7 @@ export type IngestVerification = (
 ) & { off?: true };
 
 /**
- * Opens the vault key a door's `verify:` names, or answers `null`: the host's `OpenKey`, which the record may not
+ * Opens the keychain key a door's `verify:` names, or answers `null`: the host's `OpenKey`, which the record may not
  * import for `IngestVerification`'s reason, so it is spelled here and the host's opener is what checks the two agree.
  */
 export type OpenDoorKey = (grant: { id: string; label: string }) => Promise<string | null>;
@@ -607,7 +607,7 @@ export type CallContext = {
    *
    * SET ONLY BY A HOST, AND ONLY AFTER `operationGrant` HAS SPENT THE BEARER, with `principal` the person who approved it
    * at the level they hold now. `admin` admits it for that method and every other gate refuses it, so a bearer approved
-   * for an import cannot export, list, write or open the vault on the approver's behalf.
+   * for an import cannot export, list, write or open the keychain on the approver's behalf.
    */
   operation?: string | undefined;
 
@@ -616,7 +616,7 @@ export type CallContext = {
    * ChatGPT (`methods/chat-answer.ts`): `principal` is then the person whose card it was, at the level they hold now.
    *
    * SET ONLY BY `chatAnswer`, AFTER IT HAS SPENT THE CARD'S ONE-TIME GRANT, and for one `decide` and nothing else. It
-   * answers a question as the person's own press, and `admin` and `vault` refuse it, so a press in a chat can never
+   * answers a question as the person's own press, and `admin` and `keychain` refuse it, so a press in a chat can never
    * install, change what runs unattended, or open a key, which stay a browser session's (ADR-060).
    */
   pressedIn?: string | undefined;
@@ -626,7 +626,7 @@ export type CallContext = {
    * `methods/instructions.ts`): `principal` is then the person who sent the order, at the level they hold now.
    *
    * SET ONLY BY `instructionsMine`, AFTER IT HAS FOUND THE ORDER THE CALLING RUN TOOK, NAMING THAT QUESTION AND THAT
-   * ANSWER, and for one `decide` and nothing else. `admin` and `vault` refuse it as they refuse `pressedIn`, so an order
+   * ANSWER, and for one `decide` and nothing else. `admin` and `keychain` refuse it as they refuse `pressedIn`, so an order
    * never installs, changes what runs unattended, or opens a key.
    */
   ordered?: string | undefined;
@@ -634,9 +634,9 @@ export type CallContext = {
   /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
    *
-   * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The vault
+   * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The keychain
    * asks for a proof in the last fifteen minutes (`12 §6`: reveal is deliberate). Absent is a caller with
-   * no session at all, a bearer or a self-host's open mode, which the vault answers exactly as before.
+   * no session at all, a bearer or a self-host's open mode, which the keychain answers exactly as before.
    */
   provedAt?: number;
 
@@ -649,7 +649,7 @@ export type CallContext = {
 };
 
 /**
- * How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`.
+ * How recent a session's last proof must be for the keychain and for approving a device: `12 §6`, `33 §10`.
  *
  * EXPORTED FOR THE FILES UNDER `methods/`, so a method that asks for a recent proof asks this one window and none
  * declares its own.
@@ -703,7 +703,7 @@ const WINDOW = 15 * 60_000;
 export type Limited = { ok: false; retryAfter: number };
 
 /**
- * What a host's vault door seals a deposited key for: the grant id and version the bytes will belong to, the
+ * What a host's keychain door seals a deposited key for: the grant id and version the bytes will belong to, the
  * additional data that binds them there, and the record's wrapped key. The record hands this out and cannot use it.
  */
 export type SealTarget = {
@@ -728,7 +728,7 @@ export type Deposited = { credential: string; label: string; version: number; ro
 /** A key's sealed material for the door to open, and the row it belongs to. */
 export type OpenedForGrant = SealedGrant & { credential: string; label: string };
 
-/** The register a vault door deposits into and opens from, and its sealed field. */
+/** The register a keychain door deposits into and opens from, and its sealed field. */
 const KEYS = 'credentials';
 const KEY_FIELD = 'value';
 
@@ -948,7 +948,7 @@ const LEVEL_REACH: Record<HeldLevel, Need[]> = {
  */
 export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => string = (list) => list): Refusal | null {
   /* AN OPERATION GRANT REACHES ITS ONE ADMIN METHOD AND NOTHING THAT ASKS HERE. The context carries the approver as a
-     person at their own level, so without this line it would read, write and reach the vault as they do. `admin` asks
+     person at their own level, so without this line it would read, write and reach the keychain as they do. `admin` asks
      this function with `operation` taken off, and only for the method the grant names. */
   if (ctx.operation !== undefined)
     return { code: 'FORBIDDEN', fix: `This bearer was approved for one ${ctx.operation} and reaches nothing else. Sign in, or start the device again for this.`, at: 'operation' };
@@ -959,7 +959,7 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
   const p = ctx.principal;
   if (p.kind === 'system') return null;
   /* A RUNNER REACHES NO RUNG, and this is the one place that says so for every guard: `guard`, `scoped`, `readable`,
-     `vault` and `admin` all come here. What a runner may do is claim, report on and stop a job, which the JOBS methods
+     `keychain` and `admin` all come here. What a runner may do is claim, report on and stop a job, which the JOBS methods
      admit by the principal's kind and nothing on this ladder does. */
   if (p.kind === 'runner')
     return { code: 'FORBIDDEN', fix: 'A runner claims and runs jobs, and reaches nothing else on the record.', at: 'principal' };
@@ -2171,8 +2171,8 @@ export type RecordDeps = {
   catalogueShelf?: CatalogueShelf | undefined;
   /**
    * A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`.
-   * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
-   * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
+   * `owner` is whether the keychain's own gate would open for this caller, and the host opens a key only on it; `stale` is
+   * `true` when the one thing keeping it shut is a proof older than the keychain allows, which changes what the run is told.
    * `config` is the draft's own pack's settings values, the record's alone to read (`kernel.packConfig`), which the
    * host passes the run through as `ctx.config`.
    */
@@ -2539,7 +2539,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * Whether a list is the owner's, which a record-wide "Adds only" does not reach (`20 §1`, `42 §4.4`).
    *
-   * KEYS AND PEOPLE BY THEIR ROLES, AND ANY OTHER LIST BY ITS OWN WORD. Keys is the vault's list; People is the list
+   * KEYS AND PEOPLE BY THEIR ROLES, AND ANY OTHER LIST BY ITS OWN WORD. Keys is the keychain's list; People is the list
    * `meet` writes, found by the kernel's own rule (`meetsList`: the list declaring `meets`, else the list `people`); a
    * list declaring `owner_only: true` asks for the same. A contractor asked to file expenses could file a key and a
    * person. A list that is not there is not one, so a missing Keys is still answered as a missing list.
@@ -2608,7 +2608,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
     /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
-       so refusing it here is refusing it everywhere; `admin` and `vault` already refuse every token. */
+       so refusing it here is refusing it everywhere; `admin` and `keychain` already refuse every token. */
     const binding = reportKeyOf(ctx);
     if (binding !== null && asked !== BOUND) return reportOnly(binding);
     if (binding === null && asked === BOUND)
@@ -2857,51 +2857,51 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const sight = sightOver({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
 
   /**
-   * The vault gate: a person at `owner`, and never a bearer of any kind.
+   * The keychain gate: a person at `owner`, and never a bearer of any kind.
    *
-   * NO TOKEN REACHES THE VAULT, AND IT IS NOT A SCOPE PROBLEM. An agent holding a write token can do
+   * NO TOKEN REACHES THE KEYCHAIN, AND IT IS NOT A SCOPE PROBLEM. An agent holding a write token can do
    * everything else this record does; it cannot read a credential, because a credential read by a
    * process is a credential that has left the room. Saying `SCOPE_INSUFFICIENT` would send somebody
    * looking for a bigger token, and there is not one — so the refusal names the thing that IS
    * missing: a person, in a browser, signed in.
    */
-  /** What `admin` and `vault` say to a press on a card inside a chat app: that one is the app's to do. */
+  /** What `admin` and `keychain` say to a press on a card inside a chat app: that one is the app's to do. */
   const pressedNot: Refusal = {
     code: 'NEEDS_BROWSER_SESSION',
     fix: 'A press on the card in a chat answers a question and nothing more. Open this one in BrainDog.',
     at: 'principal',
   };
 
-  /** What `admin` and `vault` say to an answer given on his order: the order answers its questions and nothing more. */
+  /** What `admin` and `keychain` say to an answer given on his order: the order answers its questions and nothing more. */
   const orderedNot: Refusal = {
     code: 'NEEDS_BROWSER_SESSION',
     fix: 'An order sent from BrainDog answers the questions it names and nothing more. Open this one in BrainDog.',
     at: 'principal',
   };
 
-  const vault = (ctx: CallContext): Refusal | null => {
+  const keychain = (ctx: CallContext): Refusal | null => {
     if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.ordered !== undefined) return orderedNot;
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
-        fix: 'Open this from the app; a token cannot reach the vault.',
+        fix: 'Open this from the app; a token cannot reach the keychain.',
         at: 'principal',
       };
     const stop = allows(ctx, 'owner', listName);
     if (stop) return stop;
     /* AND A SESSION WHOSE LAST PROOF IS OLDER THAN FIFTEEN MINUTES IS SENT BACK TO PROVE IT AGAIN. A
-       cookie is thirty days of standing access; the vault is the one place a laptop left open on a desk
+       cookie is thirty days of standing access; the keychain is the one place a laptop left open on a desk
        should not be enough. After the owner check, so somebody who is not an owner is told that instead. */
     if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the vault.', at: 'principal' };
+      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' };
     return null;
   };
 
   /**
    * The ADMIN gate: an owner, in a browser, and no token of any kind.
    *
-   * IT IS THE VAULT'S ARGUMENT APPLIED TO SHAPE. A pack changes what the record IS — the registers,
+   * IT IS THE KEYCHAIN'S ARGUMENT APPLIED TO SHAPE. A pack changes what the record IS — the registers,
    * the pages, the rules that run while nobody is looking — and ADR-060 says there is no `admin`
    * scope to issue for that. The refusal names the thing that IS missing rather than a bigger token
    * somebody would then go looking for.
@@ -3025,7 +3025,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
   };
 
-  /* ── the vault doors' half ── */
+  /* ── the keychain doors' half ── */
 
   const mintGrant = ulids(() => clock.now());
   /* A BATCH THE RECORD WRITES UNDER ITSELF, as the kernel mints its own, so several writes are one change to Undo. */
@@ -3042,10 +3042,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * A `null` GRANT IS AN OWNER IN A BROWSER, WHO REACHES EVERY KEY THIS RECORD HOLDS. Scope is what an agent is
    * held to, because a grant is issued for one project and lives on a machine; a person who may see the whole
-   * record is not narrowed by a credential they were never issued. Who they are was settled by `vault(ctx)`
+   * record is not narrowed by a credential they were never issued. Who they are was settled by `keychain(ctx)`
    * before this is asked.
    */
-  const keyFor = (by: { label: string } | { credential: string }, grant: Pick<VaultGrant, 'scope'> | null): Entry | null => {
+  const keyFor = (by: { label: string } | { credential: string }, grant: Pick<KeychainGrant, 'scope'> | null): Entry | null => {
     const within = (row: Entry | null): row is Entry => {
       if (!row || row.register !== KEYS || row.deleted_at) return false;
       if (grant === null) return true;
@@ -3076,14 +3076,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * there is, so the only way they can miss is by naming one that is not there, which is `REF_UNKNOWN` and a
    * sentence they can act on.
    */
-  const unreached = <T>(grant: Pick<VaultGrant, 'scope'> | null): Result<T> =>
+  const unreached = <T>(grant: Pick<KeychainGrant, 'scope'> | null): Result<T> =>
     grant === null
       ? no<T>('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' })
       : no<T>(
           'FORBIDDEN',
           grant.scope === '*'
-            ? 'This vault grant opens only the keys that belong to no project, and none of those is that key.'
-            : "This vault grant opens only its own project's keys, and none of those is that key.",
+            ? 'This keychain grant opens only the keys that belong to no project, and none of those is that key.'
+            : "This keychain grant opens only its own project's keys, and none of those is that key.",
           { at: 'credential' },
         );
 
@@ -3091,7 +3091,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Who a door's deposit or read is by: the run the caller names, `S12`, while it is live, and otherwise the
    * agent. Never the person who approved the grant, whose name on an agent's act is the attribution a run replaces.
    */
-  const vaultActor = (hints: SessionHints): string => {
+  const keychainActor = (hints: SessionHints): string => {
     const run = hints.spoken ? kernel.findRun({ spoken: hints.spoken }) : null;
     return run && run.seq !== null ? `${PREFIX}${run.seq}` : `agent:${hints.agent ?? 'other'}`;
   };
@@ -7517,7 +7517,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * THE SAME QUESTIONS THE OTHER READS ASK, one event at a time. A row's event goes to whoever may `list` its register,
    * a question's to whoever `governance` shows it to, and a line about keys, access, links or sealed files to an owner
-   * only, because the vault, the members list and the sealed files are theirs. Everything else is about the record as a whole, so somebody invited to
+   * only, because the keychain, the members list and the sealed files are theirs. Everything else is about the record as a whole, so somebody invited to
    * named registers does not see it.
    */
   const lineOf = (ctx: CallContext, e: LogLine, seen: LineSight = sight.lines(ctx, [e])): Walked | null => {
@@ -8078,10 +8078,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * Each script line a `change` showed that reads differently with the vault as it is now, as it would now read.
+   * Each script line a `change` showed that reads differently with the keychain as it is now, as it would now read.
    *
    * ONLY THE LINES IT SHOWED. `body.egress` is what `review` worked out when the change was filed, so a script already
-   * installed unchanged is not in it and cannot be refused here by mistake. Only a script's line reads the vault (its key
+   * installed unchanged is not in it and cannot be refused here by mistake. Only a script's line reads the keychain (its key
    * is said with the host its entry opens); an action's line is its declaration alone, and cannot move under a question.
    */
   const staleScriptLines = (body: unknown): string[] => {
@@ -9626,7 +9626,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -11769,14 +11769,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return row.value === null ? null : unsealed(row.value);
         },
       };
-      /* THE VAULT'S OWN GATE, AND NOT `level === 'owner'`. The host opens a key for a
+      /* THE KEYCHAIN'S OWN GATE, AND NOT `level === 'owner'`. The host opens a key for a
          trial on `owner` alone, and this said it for any person at owner: a session proved two hours ago, which the
-         vault refuses `listGrants` with `NEEDS_BROWSER_SESSION`, tried a draft that sent her key and left a `grant.read`
-         in her name. `vault()` is asked, and held to a person, because `allows` lets `system` through everything and
-         `vault` refuses only tokens, so `vault() === null` alone would hand `system` the key the old line kept from it
+         keychain refuses `listGrants` with `NEEDS_BROWSER_SESSION`, tried a draft that sent her key and left a `grant.read`
+         in her name. `keychain()` is asked, and held to a person, because `allows` lets `system` through everything and
+         `keychain` refuses only tokens, so `keychain() === null` alone would hand `system` the key the old line kept from it
          (`test/script-try-stale.test.ts`). A person at owner always passes `allows(ctx, 'owner')`, so for her a refusal
          can only be the proof's age, and `stale` says so to the host, which tells the run to sign in again. */
-      const shut = vault(ctx);
+      const shut = keychain(ctx);
       const p = ctx.principal;
       const who = kernel.identity();
       /* TWENTY TRIALS AN AGENT A RECORD A DAY (`script-try-cap.ts`): a token's trial is counted by the host's ledger,
@@ -12807,8 +12807,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }
-        /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE VAULT AS IT IS NOW. A script's line
-           names the host its key's vault entry opens, read when the change was filed, and nothing read it again: a
+        /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE KEYCHAIN AS IT IS NOW. A script's line
+           names the host its key's keychain entry opens, read when the change was filed, and nothing read it again: a
            probe filed "key "goldapi" to api.goldapi.io", replaced the entry with one that opens `collector.test`, and
            the accept installed a script whose key went to `collector.test`. A pack's plan is refused `PLAN_STALE` for
            the same drift (`arrange.ts`), and so is this. It is asked before the kernel decides, so nothing is decided
@@ -13088,7 +13088,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * Every scheduled action: what it calls and how often, its state, its last run, its next run, and this month's
      * counts from its own `pull` events. READ+.
      *
-     * A KEY BY ITS LABEL. The list is built from the schedule, the vault's index and the run events, and nothing
+     * A KEY BY ITS LABEL. The list is built from the schedule, the keychain's index and the run events, and nothing
      * sealed is read to build it, so a token that may read the record may read this.
      */
     async actions(ctx: CallContext) {
@@ -13864,12 +13864,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             allowed: TRAVELS,
           });
       }
-      /* THE SEALED BYTES ARE A VAULT READ, WHEREVER THEY LEAVE FROM. `openGrant` is unrouted so a
+      /* THE SEALED BYTES ARE A KEYCHAIN READ, WHEREVER THEY LEAVE FROM. `openGrant` is unrouted so a
          credential cannot be reached by anything holding a token, and this method handed out every
          grant's `ciphertext` at once. So the default is redacted.
 
          AND THE FULL FILE NEEDS THE WRAPPING KEY NAMED. An earlier version of this gated it on
-         `vault(ctx)`, which is the SAME PREDICATE as the `admin(ctx)` two lines above — both refuse
+         `keychain(ctx)`, which is the SAME PREDICATE as the `admin(ctx)` two lines above — both refuse
          a token and then ask for owner — so it was not a second bar at all: any caller who reached
          this line had already cleared it, and the flag was the whole of the permission. Naming the
          `kek_id` is a bar `admin` cannot clear by definition: the bytes are wrapped by that key, so
@@ -13879,15 +13879,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          The rows still travel under redaction: labels, what each key opens, its kind, its rotation
          dates and its scopes. What is missing is the bytes.
 
-         A RECORD WITH NO VAULT HAS NO BYTES TO GUARD, SO THE FULL FILE IS NOT BARRED. This refused every such record
-         `WRONG_KEY` with "This record has no vault", and there is no key it could have been given, so
+         A RECORD WITH NO KEYCHAIN HAS NO BYTES TO GUARD, SO THE FULL FILE IS NOT BARRED. This refused every such record
+         `WRONG_KEY` with "This record has no keychain", and there is no key it could have been given, so
          `braindog export`, which asks for the full file so a backup can put the record back, could not take one at all
-         (`brainfile-novault.test.ts` in the CLI). "No vault" is the replacing import's own two counts, no `vault_key`
+         (`brainfile-nokeychain.test.ts` in the CLI). "No keychain" is the replacing import's own two counts, no `vault_key`
          row and no grant holding a `ciphertext`: a record with a sealed credential and no key row is not waved through
          on the strength of the missing row.
 
-         A VAULT WHOSE KEY HAS NO ID is one wrapped by a passphrase (`vault_key.kek_id` is null there),
-         and it used to be told it had no vault. It is refused at `vault_key` rather than `kek_id`, so
+         A KEYCHAIN WHOSE KEY HAS NO ID is one wrapped by a passphrase (`vault_key.kek_id` is null there),
+         and it used to be told it had no keychain. It is refused at `vault_key` rather than `kek_id`, so
          a caller is not sent to name a key that does not exist. */
       if (args?.redactGrants === false) {
         const held = kernel.wrappingKey();
@@ -14070,32 +14070,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const answer = await destroy();
       return ok({ slug, deleted: true as const, ...(answer ?? {}) });
     },
-    /* ── VAULT ────────────────────────────────────────────────── */
+    /* ── KEYCHAIN ────────────────────────────────────────────────── */
 
     /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
     async listGrants(ctx: CallContext) {
-      const stop = vault(ctx);
+      const stop = keychain(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.grants());
     },
 
     /** Mint a grant, or rotate one. */
     async bindGrant(args: BindGrantArgs, ctx: CallContext) {
-      const stop = vault(ctx);
+      const stop = keychain(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return tail(kernel.bindGrant(args, actorOf(ctx)));
     },
 
     /** The sealed bytes, and the reading counted. The record cannot open them. */
     async openGrant(args: { id: string; kek_id?: string | undefined }, ctx: CallContext) {
-      const stop = vault(ctx);
+      const stop = keychain(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       return kernel.openGrant(args, actorOf(ctx));
     },
 
     /** Out of service, and the bytes destroyed. The row stays: what it opened is a fact. */
     async revokeGrant(args: { id: string }, ctx: CallContext) {
-      const stop = vault(ctx);
+      const stop = keychain(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (typeof args?.id !== 'string' || args.id === '') return no('REQUIRED_MISSING', 'A credential is taken out of service by its id.', { at: 'id' });
       return tail(kernel.revokeGrant(args.id, actorOf(ctx)));
@@ -14162,7 +14162,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * (`heldDigest`, which deletes it). Both store every arrival `untriaged` and match none of them:
      * `12 §3` applied to a verifier nobody can check, which is better than treating the URL as proof.
      *
-     * A SIGNED DOOR IS ANSWERED WITH ITS KEY OPENED, AND ONLY THROUGH `open`. The key is the live vault entry
+     * A SIGNED DOOR IS ANSWERED WITH ITS KEY OPENED, AND ONLY THROUGH `open`. The key is the live keychain entry
      * the declaration's `key:` names, chosen as every action chooses one (`grantChosen`, the newest), and `open` is the
      * host's opener, which writes the `grant.read` that is the audit trail of every check. No opener, no key under that
      * label, or a key that does not open are all `none`: the arrival is stored `untriaged` and matches nothing, which
@@ -14346,13 +14346,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it.
+     * A keychain-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it.
      *
      * THE HOST'S CUT-OFF (`RecordDeps.validFrom`) IS READ HERE, so neither host's key door has to carry it: a grant
      * approved before it is refused as a grant nobody made (`TokenDeps.validFrom` in the kernel).
      */
-    async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
-      return kernel.vaultGrant(bearer, deps.validFrom?.());
+    async keychainGrant(bearer: string): Promise<Result<KeychainGrant>> {
+      return kernel.keychainGrant(bearer, deps.validFrom?.());
     },
 
     /**
@@ -14362,7 +14362,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * operation: method, credentialed: true }`, with `level` read from the record as for a session, and that context
      * handed to `method` and to nothing else. `admin` admits it there, and `allows` refuses it everywhere.
      *
-     * THE HOST'S CUT-OFF, as for `vaultGrant`: an operation approved before it is refused, unspent.
+     * THE HOST'S CUT-OFF, as for `keychainGrant`: an operation approved before it is refused, unspent.
      */
     async operationGrant(bearer: string): Promise<Result<OperationGrant>> {
       return kernel.operationGrant(bearer, deps.validFrom?.());
@@ -14388,9 +14388,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * A key deposited through a host's key door. INTERNAL: a door calls it once it knows who is asking, and no
      * route reaches it.
      *
-     * TWO CALLERS AND ONE TRANSACTION. `/api/vault/deposit` calls it with a vault grant an agent holds, after
-     * `vaultGrant`; the app's own `/api/keys/put` calls it with a browser session. The session is held to the
-     * vault gate here rather than at the door, so the rule is the record's: an owner, no token of any kind, and
+     * TWO CALLERS AND ONE TRANSACTION. `/api/vault/deposit` calls it with a keychain grant an agent holds, after
+     * `keychainGrant`; the app's own `/api/keys/put` calls it with a browser session. The session is held to the
+     * keychain gate here rather than at the door, so the rule is the record's: an owner, no token of any kind, and
      * a proof under fifteen minutes old (`12 §6` rules 2 and 3).
      *
      * THE VALUE NEVER COMES HERE. This names the grant id, version and additional data the bytes must be sealed
@@ -14403,12 +14403,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * when the host passes `agentDeposit`, which it sets on that one path and never from anything in a request. The
      * token needs `write` on the keys list; the key goes to the project its run is in, or to no project when the run is
      * in none, and it is signed by that run. A label already within that reach is refused, because replacing a value is
-     * rotation and rotation still needs a vault grant or the owner: a login token that leaks can add a key and can
+     * rotation and rotation still needs a keychain grant or the owner: a login token that leaks can add a key and can
      * never swap one.
      */
     async depositGrant(
       args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown },
-      by: VaultGrant | CallContext,
+      by: KeychainGrant | CallContext,
       hints: SessionHints,
       seal: (target: SealTarget) => Promise<Result<Sealed>>,
       opts?: { agentDeposit?: true | undefined },
@@ -14418,7 +14418,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          AND the host said this is the agent door.
 
          AND THAT DOOR TAKES A TOKEN AND NOTHING ELSE. Anything else the host hands down with the flag is refused here
-         rather than sent on to the vault gate, because `allows` admits a `system` context on every rung, so a host
+         rather than sent on to the keychain gate, because `allows` admits a `system` context on every rung, so a host
          whose bearer check answered with its own server key's context would have given that key the owner's reach:
          naming the project, naming the key, and replacing its value. */
       const ctx = 'principal' in by ? by : null;
@@ -14427,7 +14427,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (opts?.agentDeposit === true && agent === null)
         return no('FORBIDDEN', 'This door adds a key for a login token, and the bearer sent is not one.', { at: 'principal' });
       if (ctx && agent === null) {
-        const stop = vault(ctx);
+        const stop = keychain(ctx);
         if (stop) return { ok: false as const, refusal: stop };
       }
       if (agent) {
@@ -14455,10 +14455,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('ENUM_VALUE_UNKNOWN', 'That is not a kind of key.', { at: 'kind', allowed: GRANT_KINDS });
 
       /* AN AGENT'S REACH IS ITS RUN'S PROJECT, found or opened by the ladder as every write of that token is, and
-         held as the row id a key's `project` holds, so it compares as a vault grant's scope does: a project reaches
+         held as the row id a key's `project` holds, so it compares as a keychain grant's scope does: a project reaches
          its own keys, and `*` the keys of no project. Resolved after the checks above, so a malformed deposit opens
          no run. */
-      let reach: Pick<VaultGrant, 'scope'> | null = grant;
+      let reach: Pick<KeychainGrant, 'scope'> | null = grant;
       let signer: string | null = null;
       let origin: string | null = null;
       if (agent) {
@@ -14489,7 +14489,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return tail(
           no<Deposited>(
             'FORBIDDEN',
-            "Replacing a key's value needs a vault grant for its project (braindog login <host> --vault <project>) or the owner on the Keys screen.",
+            "Replacing a key's value needs a keychain grant for its project (braindog login <host> --keychain <project>) or the owner on the Keys screen.",
             { at: 'label' },
           ),
         );
@@ -14539,7 +14539,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
            act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */
-        { actor: signer ?? (ctx ? actorOf(ctx) : vaultActor(hints)) },
+        { actor: signer ?? (ctx ? actorOf(ctx) : keychainActor(hints)) },
       );
       if (!out.ok) return tail(out);
       return tail(ok({ credential: kernel.nameOf(out.value.entry.id), label, version: out.value.grant.version, rotated: version > 1 }));
@@ -14547,17 +14547,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * A key's sealed material for a host's key door to open. INTERNAL, like `depositGrant`, and the same two
-     * callers: an agent's vault grant, or a person's browser session held to the vault gate.
+     * callers: an agent's keychain grant, or a person's browser session held to the keychain gate.
      *
      * The key must be within reach; then the kernel counts the read and writes `grant.read`, signed by the run an
      * agent names or by the person themselves. The host unwraps and decrypts, and the record never holds what it
      * opens. This is the whole of `12 §6.1`'s "reveal is never a readable address": it is a call that is counted.
      */
-    async openForGrant(args: { label?: unknown; credential?: unknown }, by: VaultGrant | CallContext, hints: SessionHints, kek_id: string): Promise<Result<OpenedForGrant>> {
+    async openForGrant(args: { label?: unknown; credential?: unknown }, by: KeychainGrant | CallContext, hints: SessionHints, kek_id: string): Promise<Result<OpenedForGrant>> {
       const ctx = 'principal' in by ? by : null;
       const grant = 'principal' in by ? null : by;
       if (ctx) {
-        const stop = vault(ctx);
+        const stop = keychain(ctx);
         if (stop) return { ok: false as const, refusal: stop };
       }
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
@@ -14567,7 +14567,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!row) return unreached(grant);
       const held = typeof row.fields[KEY_FIELD] === 'string' ? String(row.fields[KEY_FIELD]) : '';
       if (!held) return no('GRANT_REVOKED', `${kernel.nameOf(row.id)} holds no sealed value.`, { at: 'credential' });
-      const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : vaultActor(hints));
+      const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : keychainActor(hints));
       if (!out.ok) return out;
       return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });
     },
@@ -15014,12 +15014,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */
-    ...jobMethods({ kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
+    ...jobMethods({ kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock }),
     /* AND `previewChange`, WHICH IS UNDER `methods/` BUT SPREAD HERE, as `jobs.ts` is, because it is handed the functions
        above that hold a page to its reader as well as the guards: a change is drawn through `page`'s own reader and held
        as `page` and `previewPage` hold a block, never by a second copy of who may see what (`methods/preview-change.ts`). */
     ...previewChangeMethods(
-      { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock },
+      { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock },
       { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList, seesFor },
     ),
   };

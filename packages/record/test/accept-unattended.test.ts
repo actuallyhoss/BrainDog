@@ -32,7 +32,7 @@ type Out = { ok: boolean; value?: { id?: string } & Record<string, unknown>; ref
 
 const NOTES = { id: 'register.notes', kind: 'register', body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } };
 const NOTES_WITH_DUE = { ...NOTES, body: { ...NOTES.body, fields: [...NOTES.body.fields, { id: 'due', type: 'day' }] } };
-/** A vault entry the owner bound, opening one host: the key every unattended road below would spend. */
+/** A keychain entry the owner bound, opening one host: the key every unattended road below would spend. */
 const KEY = { label: 'goldapi', opens: 'api.goldapi.io', kind: 'api_token' as const, ciphertext: new Uint8Array([1]), nonce: new Uint8Array([9]), kdf: 'hkdf', wrapped_by: 'kek' as const, kek_id: 'kek_2f' };
 
 const SCRIPT = (source = 'export default async function run(ctx) {}') => ({

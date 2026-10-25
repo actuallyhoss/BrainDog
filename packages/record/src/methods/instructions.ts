@@ -17,7 +17,7 @@
  * AN ORDER MAY NAME QUESTIONS AND HIS ANSWER TO EACH (D8). "Accept SG243", sent from BrainDog, where it is provably him,
  * lets the run that takes it answer SG243 with Accept, once, and nothing else: `instructionsMine`'s `answer`. The
  * answer is his own `decide`, made as him and said as his order's (`ordered`), so Undo takes it back as any decision,
- * and `admin` and `vault` refuse it. Only the run that took the order, under his own key, while it holds it; only the
+ * and `admin` and `keychain` refuse it. Only the run that took the order, under his own key, while it holds it; only the
  * answer he named; only a choice or a set of rows; and only the question as he saw it. A run that read outside text
  * still files every other write as a question: the order names what it may answer, and the run chooses nothing.
  */

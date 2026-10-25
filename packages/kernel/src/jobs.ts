@@ -274,7 +274,7 @@ export function jobBody(decl: { id: string; body: Record<string, unknown> }): Re
     return bad(`${id}'s prompt is what the run is asked to do, and it says nothing.`, 'prompt');
   if (body.prompt.length > JOB_PROMPT_CHARS_MOST) return bad(`${id}'s prompt is at most ${JOB_PROMPT_CHARS_MOST} characters.`, 'prompt');
   if (looksLikeCredential(body.prompt))
-    return bad(`${id}'s prompt holds what looks like a key. A prompt is shown in Decide and sent to a machine; a key belongs in the vault.`, 'prompt');
+    return bad(`${id}'s prompt holds what looks like a key. A prompt is shown in Decide and sent to a machine; a key belongs in the keychain.`, 'prompt');
 
   /* THE ARGUMENTS, and every slot the prompt says against them. A slot naming no argument would reach the run as its
      own words; an argument no slot names would be asked of a person and sent nowhere. */
@@ -639,7 +639,7 @@ function argsFor(kind: string, body: JobBody, given: unknown): Result<Record<str
       return no('OUT_OF_BOUNDS', `${a.label} is at most ${Math.min(a.max, JOB_ARG_CHARS_MOST)} characters.`, { at: `args.${a.id}` });
     if (/[\p{Cc}]/u.test(value)) return no('VALUE_MALFORMED', `${a.label} is one line.`, { at: `args.${a.id}` });
     if (looksLikeCredential(value))
-      return no('VALUE_MALFORMED', `${a.label} looks like a key. A job's words are sent to a machine and a model; a key belongs in the vault.`, { at: `args.${a.id}` });
+      return no('VALUE_MALFORMED', `${a.label} looks like a key. A job's words are sent to a machine and a model; a key belongs in the keychain.`, { at: `args.${a.id}` });
     out[a.id] = value;
   }
   return ok(out);
@@ -843,7 +843,7 @@ export function jobEvents(deps: TokenDeps, args: { id?: unknown; after?: unknown
 /**
  * A runner's bearer, checked: the machine it names, or one sentence for every way it is not one.
  *
- * AS `vaultGrant` CHECKS ITS OWN (`device.ts`): the record the bearer names, an active grant of reach `runner` holding its
+ * AS `keychainGrant` CHECKS ITS OWN (`device.ts`): the record the bearer names, an active grant of reach `runner` holding its
  * hash, an approver still on the record and not suspended, a grant not past its time, and one approved after the
  * operator's cut-off. The use is written, so a machine that keeps asking is never swept as silent.
  */

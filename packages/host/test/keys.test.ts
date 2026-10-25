@@ -1,8 +1,8 @@
 /**
  * The app's own key doors, `/api/keys/put` and `/api/keys/open`: the order they refuse in, and what they hand on.
  *
- * WHAT IS PROVED HERE IS THE DOOR AND NOT THE VAULT. Whether a session may reach a key at all is the record's
- * question, asked by `vault(ctx)` behind this; what this file holds is the part that is the host's, which is the
+ * WHAT IS PROVED HERE IS THE DOOR AND NOT THE KEYCHAIN. Whether a session may reach a key at all is the record's
+ * question, asked by `keychain(ctx)` behind this; what this file holds is the part that is the host's, which is the
  * method, the bearer, the origin and the body, in that order. The context goes through untouched, which is the
  * one thing a door must not decide for the record.
  */

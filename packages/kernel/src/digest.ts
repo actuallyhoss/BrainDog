@@ -374,7 +374,7 @@ export type Assembled = {
   held?: string[];
   webhook?: string;
   /**
-   * The vault label the webhook's POST is signed with, as the declaration's `webhook.grant` says it (09 §6).
+   * The keychain label the webhook's POST is signed with, as the declaration's `webhook.grant` says it (09 §6).
    *
    * ON THE ASSEMBLY AND NOT READ AGAIN AT THE SEND, because the prose path sends from this payload after a model
    * answers, and nothing on that path reads the declaration: a grant the alarm did not put here never reached the post
@@ -449,9 +449,9 @@ ${sent.text}` : sent.text;
          without one is a record written by an older build — and posting nowhere while reporting a
          send is the failure this whole pass is about, not one to repeat quietly.
 
-         AND THE KEY THAT SIGNS IT IS NAMED BESIDE THE BODY, BY ITS LABEL. 09 §6 promises `webhook.grant` is "the vault
+         AND THE KEY THAT SIGNS IT IS NAMED BESIDE THE BODY, BY ITS LABEL. 09 §6 promises `webhook.grant` is "the keychain
          label of the secret that signs the POST", `install` prints it on the CALLS OUT line and the accept refuses a
-         digest until the vault holds it, and this queued the url and the body alone: measured, the
+         digest until the keychain holds it, and this queued the url and the body alone: measured, the
          `notify.webhook` for `grant: 'collector'` held two keys and no deliverer could have signed anything. The label
          is the reference a host resolves, as a call's `pull.fetch` names its key, and the key's value never enters
          the record, so it cannot enter the body; the body is what the endpoint reads. */

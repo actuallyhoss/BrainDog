@@ -24,13 +24,13 @@ import { crashed } from './crash.ts';
 import { EXTRA_ROUTES } from './routes/index.ts';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
-export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen, type VaultTokenAsk } from './vault.ts';
+export { serveKeychain, servesKeychain, KEYCHAIN_HEADERS, keychainReply, type KeychainAsk, type KeychainDoor, type KeychainGrantSeen, type KeychainTokenAsk } from './keychain.ts';
 export { keysReply, purposeOf, sealedUnderOf, serveKeys, servesKeys, type KeysAsk, type KeysDoor, type SealedUnder } from './keys.ts';
-/* THE SHAPE DOOR (PRF-A13), for the vault door's reason: both hosts take the whole surface from this one module. */
+/* THE SHAPE DOOR (PRF-A13), for the keychain door's reason: both hosts take the whole surface from this one module. */
 export { SHAPE_HEADERS, serveShape, servesShape, type ShapeDoor } from './shape.ts';
 /* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
-   this answer comes out of the engine the HOST built. It is exported from here for the reason the vault, key, session and
+   this answer comes out of the engine the HOST built. It is exported from here for the reason the keychain, key, session and
    ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
    is the drift this file's header is about. */
 export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, type SlashAskEngine } from './slash-ask.ts';
@@ -46,7 +46,7 @@ export { engineLedgerRead, mentionsAttached, type EngineLedger, type EngineLedge
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
-   the vault, key and session doors are: both hosts import one module to get the whole surface, and a door
+   the keychain, key and session doors are: both hosts import one module to get the whole surface, and a door
    one host can find and the other cannot is exactly the drift this file's header is about. */
 export { EMAIL_LIMIT, FILES_HEADER, messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestFile, type IngestPath, type IngestVerify, type IngestInbound, type IngestTurnedAway } from './ingest.ts';
 export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
@@ -54,7 +54,7 @@ export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, sea
    `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this
    file's header is about. */
 export { crashed, type CrashLog, type Crashed } from './crash.ts';
-/* A SHARED LINK'S DOOR IS NOT A ROW IN `ROUTES` EITHER, for the vault's reason: its credential is `Authorization: Share
+/* A SHARED LINK'S DOOR IS NOT A ROW IN `ROUTES` EITHER, for the keychain's reason: its credential is `Authorization: Share
    <token>`, which each host checks before any bearer is read, and it opens `sharedPage` and nothing else. Exported from
    here so both hosts sign and check a link with one function; the owner's methods for links are rows in
    `routes/shares.ts`. */
@@ -84,12 +84,12 @@ export {
 } from './share.ts';
 /* A RUNNER'S BEARER IS NOT A ROW IN `ROUTES` EITHER, and its methods are (`routes/agents.ts`): what is shared here
    is how a host turns the bearer into the runner's context, which both hosts ask where a bearer on `/api` is not a
-   token's, and the wait a claim may be held for. Exported from here, for the vault's reason, so neither host can reach
+   token's, and the wait a claim may be held for. Exported from here, for the keychain's reason, so neither host can reach
    one without the other. */
 export { CLAIM_ASKS_MOST, CLAIM_EVERY_MS, CLAIM_WAIT_MOST_MS, claimIdle, claimWaitMs, holdClaim, runnerContext } from './jobs.ts';
-/* THE VAULT PASSPHRASE'S HOST HALF, for the vault's reason: both hosts derive the key from a passphrase and wrap the
+/* THE KEYCHAIN PASSPHRASE'S HOST HALF, for the keychain's reason: both hosts derive the key from a passphrase and wrap the
    record key under it with one function, so a record exported from one opens on the other with the same passphrase.
-   Its two methods are rows in `routes/vault-passphrase.ts`, answered through `withVaultPassphrase`. */
+   Its two methods are rows in `routes/keychain-passphrase.ts`, answered through `withKeychainPassphrase`. */
 export {
   openUnderPassphrase,
   PASSPHRASE_ITERATIONS,
@@ -98,14 +98,14 @@ export {
   PASSPHRASE_SALT_BYTES,
   passphraseOf,
   unlockedKey,
-  withVaultPassphrase,
+  withKeychainPassphrase,
   wrapUnderPassphrase,
   type PassphraseMethods,
   type PassphraseRewrap,
   type PassphraseUnlock,
   type RecordWrapping,
   type RootKeys,
-  type VaultPassphrase,
+  type KeychainPassphrase,
   type WrappingChange,
 } from './passphrase.ts';
 
@@ -114,10 +114,10 @@ import { ROUTES } from './table.ts';
 export { GROUPS, ROUTES, type ArgType, type Group, type Route } from './table.ts';
 
 /**
- * The two vault methods that CARRY sealed material are DELIBERATELY NOT HERE.
+ * The two keychain methods that CARRY sealed material are DELIBERATELY NOT HERE.
  *
  * BOTH HOSTS CAN NOW PROVE A SESSION. `withSession` puts `provedAt` on the context from the session
- * row and from nowhere else, so the record's vault gate refuses every bearer `NEEDS_BROWSER_SESSION`
+ * row and from nowhere else, so the record's keychain gate refuses every bearer `NEEDS_BROWSER_SESSION`
  * and sends a session older than fifteen minutes back to sign in (`12 §6` rules 2 and 3). That is why
  * `listGrants` and `revokeGrant` are routed: neither carries a byte of a credential in either
  * direction, and `revokeGrant` takes an id and destroys bytes.
@@ -130,7 +130,7 @@ export { GROUPS, ROUTES, type ArgType, type Group, type Route } from './table.ts
  * `keys.ts`, which take a browser session, no bearer of any kind, and an `Origin` this host answers for.
  *
  * THAT IS A SECOND DOOR AND NOT A LOOSENING OF THE FIRST. `/api/vault/deposit` and `/api/vault/open`
- * still take a vault grant's bearer and still refuse any request carrying an `Origin`, which every page
+ * still take a keychain grant's bearer and still refuse any request carrying an `Origin`, which every page
  * sends (`12 §6` rule 9). The two doors share the host's key step and no credential at all, so neither
  * one is a way round the other.
  */
@@ -142,8 +142,8 @@ export const UNROUTED = [
   'devicePoll',
   /* Whoever calls it with a person puts that person on the record. `/auth/invite` calls it, after a sign-in. */
   'acceptInvite',
-  'vaultGrant',
-  /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
+  'keychainGrant',
+  /* The key doors' record half: `keychain.ts` calls them after `keychainGrant`, with sealed bytes only. */
   'depositGrant',
   'openForGrant',
   /* The shape door's record half (PRF-A13): host shape.ts hands it the bearer, and it reads the grant before a row. */
@@ -174,7 +174,7 @@ if (BY_NAME.size !== ROUTES.length) {
  */
 for (const name of UNROUTED)
   if (BY_NAME.has(name))
-    throw new TypeError(`${name} is in UNROUTED and in ROUTES. One of the two is wrong, and it is not the vault.`);
+    throw new TypeError(`${name} is in UNROUTED and in ROUTES. One of the two is wrong, and it is not the keychain.`);
 
 /**
  * The answer's HTTP status, from its SHAPE.

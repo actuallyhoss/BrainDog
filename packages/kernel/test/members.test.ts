@@ -14,7 +14,7 @@
  *
  *   1. `access()` promoted the highest SCOPED level to the record-wide one, so
  *      `invite({ registers: { payroll: 'owner' } })` made somebody an owner of the record — the
- *      vault, the export, `invite` itself.
+ *      keychain, the export, `invite` itself.
  *   2. Then it gave a scoped-only member `read` on the record, which hands an APPENDER a record-wide
  *      read: `append`'s entire point is that it does not read, and every method naming no register
  *      asks `guard(ctx, 'read')` with nothing to scope it.
@@ -133,8 +133,8 @@ test('SOMEBODY WITH ONLY SCOPED ROWS HOLDS NOTHING ON THE RECORD', async () => {
    * Two defects, in opposite directions, both shipped.
    *
    * It PROMOTED the highest scoped level: `invite({ registers: { payroll: 'owner' } })` produced
-   * `level: 'owner'` — which is what `vault()` and `admin()` read, and neither consults the ceiling
-   * because ADMIN and VAULT are not about a register. Owner of one register was owner of the record:
+   * `level: 'owner'` — which is what `keychain()` and `admin()` read, and neither consults the ceiling
+   * because ADMIN and KEYCHAIN are not about a register. Owner of one register was owner of the record:
    * the credential index, the export, `invite`, `createToken`, `setDeclaration`.
    *
    * The fix then gave them `read`, which hands an APPENDER a record-wide read — and `append`'s whole
@@ -168,7 +168,7 @@ test('A `member` ROW WITH NO PERSON IS NOT A LEVEL', async () => {
   /**
    * `access()` filtered with `NOT EXISTS (… p.suspended_at IS NOT NULL)`, which with no `person` row
    * finds nothing and is therefore TRUE — so every row came back and a `member('p_ghost','*','owner')`
-   * with no person made its holder an owner of the record: the vault, the export, `invite`.
+   * with no person made its holder an owner of the record: the keychain, the export, `invite`.
    *
    * And the record could not be got out of it. `owners()` DOES join `person`, so it did not count
    * the ghost — `suspend` answered `OUT_OF_BOUNDS`, `remove` answered `LEVEL_REQUIRED`, and demoting

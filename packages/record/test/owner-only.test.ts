@@ -25,7 +25,7 @@ const list = (id: string, name: string, extra: Record<string, unknown> = {}) => 
   body: { id, name, title: 'what', fields: [{ id: 'what', type: 'text', required: true }], ...extra } as never,
 });
 
-/* KEYS AND PEOPLE BY THE IDS THEIR ROLES ARE FOUND BY: the vault's `credentials`, and `people`, which plays `meets` on a
+/* KEYS AND PEOPLE BY THE IDS THEIR ROLES ARE FOUND BY: the keychain's `credentials`, and `people`, which plays `meets` on a
    record where no list declares it (`packages/kernel/src/roles.ts`). */
 const KEYS = list('credentials', 'Keys');
 const PEOPLE = list('people', 'People');

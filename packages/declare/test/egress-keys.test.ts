@@ -1,7 +1,7 @@
 /**
- * A pack's plan says which host each script key goes to, from the record's vault, as a proposal's approval line does.
+ * A pack's plan says which host each script key goes to, from the record's keychain, as a proposal's approval line does.
  *
- * THE LINE NAMED THE ORIGINS AND THE KEYS AS TWO LISTS. The host sends a key only where its vault entry opens
+ * THE LINE NAMED THE ORIGINS AND THE KEYS AS TWO LISTS. The host sends a key only where its keychain entry opens
  * (`keyRefused` in `@braindog/host`), so a script with two origins and one key was approved without the owner being told
  * which origin gets the key. The kernel's `scriptEgress` now says it beside each key when it is handed what a label
  * opens; `plan` hands it `Installed.opensOf`, and a record that cannot say still gets a line saying where the answer is.
@@ -50,18 +50,18 @@ test('THE WRAPPER HANDS WHAT A KEY OPENS THROUGH, and says where to look without
   );
   assert.equal(
     egressOf({ kind: 'script', body: GOLD })?.line,
-    'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to the host its vault entry opens',
+    'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to the host its keychain entry opens',
   );
 });
 
-test("A PACK'S PLAN NAMES THE HOST THE RECORD'S VAULT ENTRY OPENS, and approves that line", async () => {
+test("A PACK'S PLAN NAMES THE HOST THE RECORD'S KEYCHAIN ENTRY OPENS, and approves that line", async () => {
   const diff = await plan(await packOf(DOC(GOLD)), { ...EMPTY, opensOf });
   const line = 'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to api.goldapi.io';
   assert.deepEqual(diff.calls_out.map((c) => c.line), [line]);
   assert.ok(diff.approve.includes(line), `the approval lines were ${JSON.stringify(diff.approve)}`);
 });
 
-test('THE INSTALLED SCRIPT IS READ WITH THE SAME VAULT, so an update that changes nothing it sends asks nothing again', async () => {
+test('THE INSTALLED SCRIPT IS READ WITH THE SAME KEYCHAIN, so an update that changes nothing it sends asks nothing again', async () => {
   const pack = await packOf(DOC(GOLD));
   const script = pack.declarations.find((d) => d.kind === 'script')!;
   const held: Installed = {

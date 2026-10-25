@@ -35,7 +35,7 @@ const GOVERNANCE = ['decide', 'supersede', 'suggest', 'resolve', 'predict', 'sco
 /** The five a declaration's life earns, `42 §2`. */
 const DECLARATION = ['install', 'uninstall', 'upgrade', 'declare', 'retire'] as const;
 
-/** The five a credential earns, `12 §6` — and `grant.read` is the one that makes a vault auditable. */
+/** The five a credential earns, `12 §6` — and `grant.read` is the one that makes a keychain auditable. */
 const CREDENTIAL = ['grant.add', 'grant.read', 'grant.rotate', 'grant.revoke', 'grant.bind'] as const;
 
 /** The five an arrival earns, `07 §3`. */

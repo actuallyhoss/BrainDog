@@ -11,7 +11,7 @@
  *
  * Two things install cannot answer and does not pretend to: whether a `ref` default points at a row
  * that exists, and whether a `secret` default names a grant. The first is the create path's, and the
- * second is refused outright by the rule that says only the vault door writes a secret.
+ * second is refused outright by the rule that says only the keychain door writes a secret.
  */
 
 import { test } from 'node:test';
@@ -105,7 +105,7 @@ test('A REF DEFAULT IS CHECKED FOR SHAPE AND REGISTER, and never for a row insta
   assert.equal(linted(to({ default: 'invoices#3' })), 'REF_REGISTER_MISMATCH at owner', 'the declared register is known here');
 });
 
-test('AND A SECRET DEFAULT IS STILL THE VAULT DOOR RULE, not a coercion', () => {
+test('AND A SECRET DEFAULT IS STILL THE KEYCHAIN DOOR RULE, not a coercion', () => {
   assert.equal(linted(probe({ id: 'value', type: 'secret', default: GRANT })), 'DECLARATION_INVALID at value');
   assert.equal(linted(probe({ id: 'value', type: 'secret', default: 'not-a-grant' })), 'DECLARATION_INVALID at value');
 });

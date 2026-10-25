@@ -48,7 +48,7 @@ function whoOf(s: Share, n: ShareNames): string {
 
 const listName = (id: string, n: ShareNames): string => n.list?.(id) ?? 'a list';
 
-/** The list playing a role, by the name it was declared with: the vault's index is keys, the list `meet` writes its own. */
+/** The list playing a role, by the name it was declared with: the keychain's index is keys, the list `meet` writes its own. */
 const roleName = (role: 'keys' | 'meets', n: ShareNames): string => (role === 'keys' ? 'keys' : (n.meets?.() ?? 'the people you meet'));
 
 /** What a target is, as the object of a sentence. */

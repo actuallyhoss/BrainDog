@@ -210,7 +210,7 @@ test('A QUESTION THAT INSTALLS IS ANSWERED IN BRAINDOG, never on the card', asyn
   assert.equal(refusal(await api.chatAnswerMint({ id, options: ['accept', 'reject'] }, key())).code, 'FORBIDDEN');
 });
 
-test('A PRESS REACHES NOTHING AN OWNER DOES IN A BROWSER: admin and vault refuse it', async () => {
+test('A PRESS REACHES NOTHING AN OWNER DOES IN A BROWSER: admin and keychain refuse it', async () => {
   const { api } = await record();
   const pressed: CallContext = { principal: { kind: 'person', id: 'p_seed', level: 'owner' }, registers: '*', pressedIn: 'Claude' };
   assert.equal(refusal(await api.setPref({ key: 'agents.answer_in_chat', value: false }, pressed)).code, 'NEEDS_BROWSER_SESSION');

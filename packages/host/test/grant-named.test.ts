@@ -1,5 +1,5 @@
 /**
- * The same vault answers the same key to a scheduled action and to a script. A guard against drift. Slash was a third
+ * The same keychain answers the same key to a scheduled action and to a script. A guard against drift. Slash was a third
  * caller until its key became the one the owner picks by id, and the paragraphs below keep
  * the history as it was measured.
  *
@@ -10,7 +10,7 @@
  * `slash` key while every action named `slash` sent the newest (`slash-grant-chooser.test.ts` case 1). Nothing but four
  * authors copying the same clause kept the rest in step.
  *
- * SO EVERY CASE ASKS ALL OF THEM ABOUT ONE REAL VAULT and asserts one answer. A real kernel, because the order the rows come
+ * SO EVERY CASE ASKS ALL OF THEM ABOUT ONE REAL KEYCHAIN and asserts one answer. A real kernel, because the order the rows come
  * back in from `listGrants` (`ORDER BY label` and nothing within it) is exactly what a chooser that forgot to order would
  * return, and a fixture array is in whatever order its author typed.
  *
@@ -45,7 +45,7 @@ const NOW = Date.parse('2026-09-23T12:00:00.000Z');
 const DAY = 86_400_000;
 const b = (n: number) => new Uint8Array([n, n + 1, 2, 3]);
 
-async function vault() {
+async function keychain() {
   const sql = openSqlite();
   const clock = fixedClock(NOW - 30 * DAY);
   const k: Kernel = await openRecord(sql, clock);
@@ -94,7 +94,7 @@ async function vault() {
 
 for (const label of [SLASH_KEY_LABEL, 'goldapi']) {
   test(`(1) ${label}: TWO LIVE TOKENS A DAY APART, and every caller opens the newer`, async () => {
-    const v = await vault();
+    const v = await keychain();
     try {
       v.bind(label);
       const newer = v.bind(label);
@@ -105,7 +105,7 @@ for (const label of [SLASH_KEY_LABEL, 'goldapi']) {
   });
 
   test(`(2) ${label}: BOUND IN ONE INSTANT, the larger id is the newest for every caller, whichever was bound second`, async () => {
-    const v = await vault();
+    const v = await keychain();
     try {
       const larger = v.bind(label, { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5ZZZ' });
       v.bind(label, { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5AAA', after: 0 });
@@ -116,7 +116,7 @@ for (const label of [SLASH_KEY_LABEL, 'goldapi']) {
   });
 
   test(`(3) ${label}: A REVOKED NEWEST IS PASSED OVER BY EVERY CALLER, and then nothing is left`, async () => {
-    const v = await vault();
+    const v = await keychain();
     try {
       const older = v.bind(label);
       const newer = v.bind(label);
@@ -131,7 +131,7 @@ for (const label of [SLASH_KEY_LABEL, 'goldapi']) {
 }
 
 test('(4) THREE TOKENS UNDER `slash`, THE LAST BOUND NOT THE NEWEST: the order is the instant, not the order of the binds', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     v.bind(SLASH_KEY_LABEL);
     const newest = v.bind(SLASH_KEY_LABEL, { after: 2 * DAY });
@@ -144,7 +144,7 @@ test('(4) THREE TOKENS UNDER `slash`, THE LAST BOUND NOT THE NEWEST: the order i
 });
 
 test('(5) ACROSS KINDS AN ACTION AND A SCRIPT TAKE THE NEWEST ENTRY: a password bound after the token is what both send', async () => {
-  const v = await vault();
+  const v = await keychain();
   try {
     v.bind(SLASH_KEY_LABEL);
     const password = v.bind(SLASH_KEY_LABEL, { kind: 'password' });

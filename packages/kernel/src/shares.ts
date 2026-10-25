@@ -172,7 +172,7 @@ export type ListLike = {
 
 /**
  * The record's lists as the lens knows them: each field as the `where` package's spec, the title and scope fields
- * marked, and the roles. `keys` is the vault's index list, `people` the list `meet` writes, and the projects list is the
+ * marked, and the roles. `keys` is the keychain's index list, `people` the list `meet` writes, and the projects list is the
  * one declaring `scopes:`.
  */
 export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; people: string | null; kernel?: readonly string[] }): Catalog {

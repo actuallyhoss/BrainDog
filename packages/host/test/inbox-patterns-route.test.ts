@@ -50,7 +50,7 @@ test('THE ROUTE COUNTS BY GROUP: one READ+ read and one ADMIN write, and nothing
   const without = by(ROUTES.filter((r) => r.name !== 'inboxPatterns' && r.name !== 'fileAsSecond'));
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
   assert.equal(all.ADMIN, (without.ADMIN ?? 0) + 1);
-  for (const group of ['DATA', 'VAULT', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'KEYCHAIN', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('A TOKEN’S GET REACHES THE REPORT WITH ITS WINDOW AS A NUMBER, and answers what the record said', async () => {

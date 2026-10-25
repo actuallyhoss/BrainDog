@@ -111,7 +111,7 @@ const NOPE: Result<never> = { ok: false, refusal: { code: 'NOPE', fix: 'no' } };
 const probe = (sql: Sql) => sql.all<{ x: string }>('SELECT x FROM probe ORDER BY rowid').map((r) => r.x);
 const GRANT = { label: 'stats read', opens: 'stats.example.test', kind: 'api_token', ciphertext: new Uint8Array([1, 2, 3]), nonce: new Uint8Array([9, 9]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_fake' } as const;
 
-test('A SEALING WRITE WORKS ON A HOST THAT REFUSES SAVEPOINT, which is the vault 500 on the Cloud', async () => {
+test('A SEALING WRITE WORKS ON A HOST THAT REFUSES SAVEPOINT, which is the keychain 500 on the Cloud', async () => {
   const { k, refused } = await record();
   const made = k.bindGrant({ ...GRANT }, 'p_1');
   assert.ok(made.ok, `bindGrant was refused: ${fixOf(made)}`);

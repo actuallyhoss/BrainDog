@@ -16,8 +16,8 @@
  * The kept dash left in place when an answer overwrites its variable: the second question reads `Then — and —?` where it
  * expects `Then four and —?`.
  *
- * `hunter2` IS PUT IN BY SQL, as `flow-waits.test.ts` puts it. In use a secret field holds only a vault grant's id, since
- * `coerce` refuses anything else and the vault door writes nothing else, so what leaves in use is that id. The rule
+ * `hunter2` IS PUT IN BY SQL, as `flow-waits.test.ts` puts it. In use a secret field holds only a keychain grant's id, since
+ * `coerce` refuses anything else and the keychain door writes nothing else, so what leaves in use is that id. The rule
  * `UNSENDABLE` states is that it does not leave at all, and a plaintext is the plainest way to see whether it did.
  */
 

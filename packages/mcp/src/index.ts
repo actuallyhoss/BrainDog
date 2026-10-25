@@ -9,7 +9,7 @@
  * `context` is the briefing for where it stands, `handoff`
  * keeps its session's next step true, and `meet` records a person it came across. Five went to pay
  * for them: `pages`, `page` and `metric` were already resources, `credentials` could never answer a
- * token because the vault refuses every one, and `dry_run` previews a rule, which only a person
+ * token because the keychain refuses every one, and `dry_run` previews a rule, which only a person
  * installs.
  *
  * AND `activity` IS THE FIFTEENTH, WHICH PAID FOR ITSELF. An agent used to a record-wide activity
@@ -3785,7 +3785,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'sessions' && rest === 'live')
       return surface.sessionsLive ? surface.sessionsLive({}, ctx) : unbuilt('sessions/live', 'Nothing else lists live sessions yet.');
     if (head === 'decisions' && !rest) return surface.governance({ register: 'suggestion' } as never, ctx);
-    /* THE RECORD'S LIST AS IT ANSWERS IT. Its `key` is the vault's label and nothing sealed is read to build it, so
+    /* THE RECORD'S LIST AS IT ANSWERS IT. Its `key` is the keychain's label and nothing sealed is read to build it, so
        there is nothing here to take out; a second filter would be a second place to keep in step. */
     if (head === 'actions' && !rest)
       return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');

@@ -46,7 +46,7 @@ export type ScriptBody = {
   runs: { every?: string; door?: string; rule?: true };
   /** Literal `https://` origins, compared as origins. Printed in the install diff, one line per script. */
   egress: string[];
-  /** Vault labels. The host opens each for one request; the sandbox never holds a key's bytes. */
+  /** Keychain labels. The host opens each for one request; the sandbox never holds a key's bytes. */
   keys: string[];
   reads: string[];
   writes: string[];
@@ -66,9 +66,9 @@ const LIMITS = ['cpu_ms', 'fetches', 'wall_ms', 'writes'] as const;
 const NAME = /^[a-z][a-z0-9_-]{0,31}$/u;
 /** A register a script reads or writes. `series.<id>` is the design's own example of a write target. */
 const TARGET = /^(?:series\.)?[a-z][a-z0-9_-]{0,31}$/u;
-/** A vault label's length, as `ingestBody` holds a `grant:` to it. */
+/** A keychain label's length, as `ingestBody` holds a `grant:` to it. */
 const LABEL_BYTES = 40;
-/** The vault label of the included model's key, `SLASH_KEY_LABEL` in `@braindog/host/slash`, which no script may name. */
+/** The keychain label of the included model's key, `SLASH_KEY_LABEL` in `@braindog/host/slash`, which no script may name. */
 const SLASH_KEY = 'slash';
 
 const bad = (code: string, fix: string, at: string): Refusal => ({ code, fix, at });
@@ -132,13 +132,13 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
       );
   }
 
-  if (!strings(body.keys)) return bad('DECLARATION_INVALID', `${id}'s keys is a list of vault labels, empty when it sends none.`, 'keys');
+  if (!strings(body.keys)) return bad('DECLARATION_INVALID', `${id}'s keys is a list of keychain labels, empty when it sends none.`, 'keys');
   for (const [i, label] of body.keys.entries())
     if (label.trim() === '' || label.length > LABEL_BYTES)
-      return bad('DECLARATION_INVALID', `${id}'s key ${i + 1} is the label of a key in the vault, at most ${LABEL_BYTES} characters.`, `keys[${i}]`);
+      return bad('DECLARATION_INVALID', `${id}'s key ${i + 1} is the label of a key in the keychain, at most ${LABEL_BYTES} characters.`, `keys[${i}]`);
   if (body.keys.length > 0 && body.egress.length === 0)
     return bad('DECLARATION_INVALID', `${id} names a key and fetches from nowhere, so the key would be opened for nothing. Write the origin it is for.`, 'keys');
-  /* THE VAULT'S `slash` KEY, REFUSED HERE AND NOT ONLY AT RUN TIME. Both hosts refuse a run that declares it
+  /* THE KEYCHAIN'S `slash` KEY, REFUSED HERE AND NOT ONLY AT RUN TIME. Both hosts refuse a run that declares it
      (`slashDeclared` in `@braindog/host/script`), because on a host with no `SLASH_KEY` it is the key the included model
      answers everybody with. Refused only there, the owner was still asked in Decide to approve a script that could never
      run, and accepting it installed a clock that failed every hour. The label is the host's `SLASH_KEY_LABEL`, written
@@ -147,7 +147,7 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
   if (slashed >= 0)
     return bad(
       'FORBIDDEN',
-      `${id} names the vault's "${SLASH_KEY}" key, which is the key this host's included model answers with, and a script may not send it anywhere. Put the provider's own key in the vault under another label.`,
+      `${id} names the keychain's "${SLASH_KEY}" key, which is the key this host's included model answers with, and a script may not send it anywhere. Put the provider's own key in the keychain under another label.`,
       `keys[${slashed}]`,
     );
 

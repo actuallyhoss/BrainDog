@@ -1,5 +1,5 @@
 /**
- * A vault key opened for a scheduled action, logged when the send fails. It is called `key` here, which is on no
+ * A keychain key opened for a scheduled action, logged when the send fails. It is called `key` here, which is on no
  * list; what makes it one is that it came from `openKey(`. The decoy is a sentence that says "opened", which is text.
  */
 type Grant = { id: string; label: string };

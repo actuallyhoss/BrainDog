@@ -6,7 +6,7 @@ import { grantAad, grantKey, openSealed, seal } from '../src/sealing.ts';
 
 const b64u = (b: Uint8Array) => Buffer.from(b).toString('base64url');
 const un64u = (s: string) => new Uint8Array(Buffer.from(s, 'base64url'));
-const V = JSON.parse(readFileSync(new URL('./vault-vectors.json', import.meta.url), 'utf8')) as {
+const V = JSON.parse(readFileSync(new URL('./keychain-vectors.json', import.meta.url), 'utf8')) as {
   dek: string; nonce: string;
   cases: { grant: string; record: string; version: string; value: string; aad: string; ciphertext: string }[];
 };

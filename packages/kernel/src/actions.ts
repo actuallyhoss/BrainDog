@@ -36,7 +36,7 @@ import type { Ack, OutboxRow } from './outbox.ts';
 import { FLOOR_MS, cursorOf, intervalMs, jitterMs, keyNameOf, type PullCursor } from './pull.ts';
 import type { Drained } from './schedule.ts';
 import { clockOf, nextSlotMs } from './slot.ts';
-import type { LeasedSeal } from './vault.ts';
+import type { LeasedSeal } from './keychain.ts';
 /* TYPES ONLY, so there is no cycle at run time: `script-run.ts` imports `meter` and `pause` from this file. */
 import type { ScriptAnswer, ScriptRunner, ScriptUnrun, Scripted } from './script-run.ts';
 
@@ -94,7 +94,7 @@ export type ActionDecl = {
   channel: string;
   /** A literal `https://` address. `{since}` and `{until}` may stand in its path and query. */
   url?: string;
-  /** `call` and `poll`: the key's vault label. `pull`: the grant's id, as `25 §9` has it. */
+  /** `call` and `poll`: the key's keychain label. `pull`: the grant's id, as `25 §9` has it. */
   grant?: string;
   /** Absent only on a `call` whose `trigger` is `rule`, which runs when a rule says so and on no clock. */
   every?: string;
@@ -144,7 +144,7 @@ export type ActionRequest = {
   /** Which key to send, by reference. The executor opens it outside the record, or sends nothing. */
   grant: { id: string; label: string } | null;
   /**
-   * What `grant`'s vault entry says it opens, the words and never the value, so the executor can refuse a request whose
+   * What `grant`'s keychain entry says it opens, the words and never the value, so the executor can refuse a request whose
    * host is not the one the key opens BEFORE it opens the key (`hostOpened`). Absent with no key, and on a request built
    * before it was carried, which is held to nothing new.
    */
@@ -249,11 +249,11 @@ export type ActionDeps = {
   /** Hand an answer to the ingest pipeline as this one declaration's arrival, so a write fires its rules. */
   arrive: (decl: ActionDecl, body: string, sha256: string) => Result<unknown>;
   /**
-   * Open a credential for a job this runner is holding the lease on. `vault.ts`'s `sealedGrant`.
+   * Open a credential for a job this runner is holding the lease on. `keychain.ts`'s `sealedGrant`.
    *
    * INJECTED RATHER THAN IMPORTED for the same reason every other write here is: this file decides
-   * what a run needs, and the vault decides whether a lease is good enough to get it. Keeping the
-   * second decision in the vault is what keeps it in one place.
+   * what a run needs, and the keychain decides whether a lease is good enough to get it. Keeping the
+   * second decision in the keychain is what keeps it in one place.
    */
   seal: (args: { outbox: string; leasedUntil: string; grant: string; actor: string }) => Result<LeasedSeal>;
   /** The record's timezone, which a connector's window is measured in. */
@@ -281,17 +281,17 @@ type Key = { id: string; label: string; sealed_under: 'record' | 'connector'; op
 const referenceOf = ({ opens: _opens, ...reference }: Key): Omit<Key, 'opens'> => reference;
 
 /**
- * A vault row as far as choosing among several needs it: `kernel.grants()` hands every one of these columns.
+ * A keychain row as far as choosing among several needs it: `kernel.grants()` hands every one of these columns.
  *
- * `created_at` IS OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW, for the reason `SlashVaultRow` gives in `@braindog/host`:
+ * `created_at` IS OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW, for the reason `SlashKeychainRow` gives in `@braindog/host`:
  * a test's double that only needed a label would otherwise be a compile error. A row that states none sorts as oldest.
  */
 export type GrantChoosable = { id: string; label: string; revoked_at: string | null; created_at?: string | undefined };
 
 /**
- * The live vault entry a name opens, by label or id: the NEWEST, `created_at` and then `id`, both descending.
+ * The live keychain entry a name opens, by label or id: the NEWEST, `created_at` and then `id`, both descending.
  *
- * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The vault admits two live grants
+ * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The keychain admits two live grants
  * under one label, and at `afb3b1b2` the newest-first clause was spelled out in `keyNamed` and `opensNamed` here, in
  * `grantNamed` (`@braindog/host/script`) and in `slashOwnKeyFor` (`@braindog/host/slash`). Slash's own path was found
  * taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action named `slash` sent
@@ -319,7 +319,7 @@ export function grantChosen<G extends GrantChoosable>(grants: readonly G[], name
 /**
  * The live rows a name could mean, in no order: `grantChosen` orders them. `revoked_at` and `created_at` are read for it.
  *
- * THE FILTER STAYS IN SQL, so a vault of many labels hands the chooser the one or two rows under this name and not the lot.
+ * THE FILTER STAYS IN SQL, so a keychain of many labels hands the chooser the one or two rows under this name and not the lot.
  */
 const liveNamed = <R>(sql: Sql, columns: string, name: string): (R & GrantChoosable)[] =>
   sql.all<R & GrantChoosable>(`SELECT ${columns}, id, label, revoked_at, created_at FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL`, name, name);
@@ -334,7 +334,7 @@ export function keyNamed(sql: Sql, name: string | undefined): Key | null {
 }
 
 /**
- * What the live vault entry a label names says it opens, found as `keyNamed` finds the key, or `null` when none is live.
+ * What the live keychain entry a label names says it opens, found as `keyNamed` finds the key, or `null` when none is live.
  * The words as the entry holds them: the host reads a host out of them at run time, and this is what a person reads.
  */
 export function opensNamed(sql: Sql, name: string): string | null {
@@ -345,7 +345,7 @@ export function opensNamed(sql: Sql, name: string): string | null {
 /**
  * The host a grant's `opens` names, or `null` when it names none.
  *
- * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the vault's own refusal puts it, so it is read as a
+ * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the keychain's own refusal puts it, so it is read as a
  * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
  * `api.gold.test`, and "the Oxbow test account" names nothing. Not a string at all names nothing either, so a lookup that
  * forgot to carry `opens` sends no key rather than every key.
@@ -414,14 +414,14 @@ export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action 
  */
 export const KEY_OPENED_UNATTENDED = 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.';
 
-/** The same sentence on a record whose vault has a passphrase on: the passphrase guards a person's own keys, not this one. */
+/** The same sentence on a record whose keychain has a passphrase on: the passphrase guards a person's own keys, not this one. */
 export const KEY_OPENED_UNATTENDED_PASSPHRASE =
-  'A scheduled action opens this key with nobody present, so the server that runs it can open it too, and your vault passphrase does not cover it.';
+  'A scheduled action opens this key with nobody present, so the server that runs it can open it too, and your keychain password does not cover it.';
 
 /**
  * An approval list, ending with who else can open a key when anything in it sends one.
  *
- * `passphrase` IS THE CALLER'S TO SAY, because whether the record's key is wrapped by a passphrase is the vault's fact
+ * `passphrase` IS THE CALLER'S TO SAY, because whether the record's key is wrapped by a passphrase is the keychain's fact
  * (`recordWrapping`), and this function reads nothing. Left out, the sentence says nothing about one.
  */
 export const approvalLines = (
@@ -434,7 +434,7 @@ export const approvalLines = (
 };
 
 /**
- * The projects a key is kept for, read from the row that holds its vault entry: `null` is every project, and `undefined`
+ * The projects a key is kept for, read from the row that holds its keychain entry: `null` is every project, and `undefined`
  * is that no row says, which a caller reads as every project too (`§2.7`, a key with no scope counts as global).
  *
  * `holders` IS THE CALLER'S: each register with a secret field and a scope field, and that scope field's id. The kernel's
@@ -477,7 +477,7 @@ export type KeyOutOfScope = { code: 'FORBIDDEN'; fix: string; at: 'grant' };
  *
  * AN ACTION IN PROJECT P MAY NAME A KEY KEPT FOR P OR FOR EVERY PROJECT, and nothing else ("within that key's scope",
  * D0b.23). An action for every project may name only a key for every project, since a key kept for one project is
- * offered only there. A key no row places counts as every project's, as the vault list says it.
+ * offered only there. A key no row places counts as every project's, as the keychain list says it.
  *
  * `FORBIDDEN` FOR NOW, the nearest code the registry holds: `KEY_OUT_OF_SCOPE` is the code this is, and it waits on the
  * registry (`packages/ports`). Names, never ids: `nameOf` says a project, and one it cannot name is "another project".
@@ -520,7 +520,7 @@ export type KeyNotReady = { code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: str
 export const keyReady = (sql: Sql, name: string | undefined, paged = false): KeyNotReady | null => {
   const key = keyNamed(sql, name);
   if (key === null)
-    return { code: 'REQUIRED_MISSING', fix: `Add the key called "${name ?? ''}" to the vault, then install.` };
+    return { code: 'REQUIRED_MISSING', fix: `Add the key called "${name ?? ''}" to the keychain, then install.` };
   /* AND ONLY A CONNECTOR IS HELD TO THE CONNECTOR KEY. A `call`, a `poll` and a single-request
      `pull` open theirs through `openGrant`, which unwraps the RECORD key, so requiring the other
      one of them would refuse every action in the record that is not a connector. */
@@ -570,14 +570,14 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
   if (decl.trigger === 'rule') return null;
   const every = Math.max(intervalMs(decl.every ?? '') ?? FLOOR_MS, FLOOR_MS);
 
-  /* A POLL THAT NAMES NO KEY SENDS NONE, so there is nothing in the vault to miss. */
+  /* A POLL THAT NAMES NO KEY SENDS NONE, so there is nothing in the keychain to miss. */
   const keyless = decl.channel === 'poll' && (decl.grant === undefined || decl.grant === '');
   const key = keyless ? null : keyNamed(deps.sql, decl.grant);
   if (!keyless && !key) {
     deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE id = ?", row.id);
     deps.notify({
       actor: `ingest:${row.key}`,
-      say: `${row.key} is paused: the key "${decl.grant ?? ''}" it sends is not in the vault.`,
+      say: `${row.key} is paused: the key "${decl.grant ?? ''}" it sends is not in the keychain.`,
       because: 'Bind the key, then resume the action.',
     });
     return 'kept';
@@ -708,7 +708,7 @@ const pages = (decl: ActionDecl): boolean =>
  * A leased job becomes a request, or is finished here because it cannot become one.
  *
  * THE KEY IS LOOKED UP BY ITS ID AND ITS LABEL AND NOTHING ELSE. `grant` in the request is a reference the
- * host resolves, and the columns this reads are the two a person already sees on the vault screen.
+ * host resolves, and the columns this reads are the two a person already sees on the keychain screen.
  */
 export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged | Metered {
   let payload: { channel?: string; ingest?: string; grant?: string; row?: unknown };
@@ -774,13 +774,13 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
      second answer to a question with one. What differs starts here, and only here. */
   if (pages(decl)) {
     /* THE CREDENTIAL IS OPENED UNDER THIS JOB'S OWN LEASE, which is the whole of the authorisation:
-       the vault checks that the lease is live, that it is still ours, and that this job is the one
+       the keychain checks that the lease is live, that it is still ours, and that this job is the one
        that sends this key. A refusal is the run not happening, never the run happening unsigned. */
     let seal: LeasedSeal | null = null;
     if (key) {
       const got = deps.seal({ outbox: job.id, leasedUntil: job.leasedUntil, grant: key.id, actor: `ingest:${ingest}` });
       if (!got.ok) {
-        /* A CONFLICT CANNOT COME BACK FROM HERE — the vault only refuses — but `Result` allows one,
+        /* A CONFLICT CANNOT COME BACK FROM HERE — the keychain only refuses — but `Result` allows one,
            and reading `.refusal` off a conflict is how a type assertion becomes a crash in a queue
            consumer. Name it rather than cast it. */
         const refused = 'refusal' in got ? got.refusal : { code: 'PULL_LEASE_EDGE', fix: 'Another write moved this job.' };
@@ -1477,7 +1477,7 @@ type Totals = { runs: number; requests: number; bytes: number; ms: number; failu
 /**
  * One scheduled action, as the record's `actions` read answers it.
  *
- * THE KEY IS ITS LABEL, from the vault's index. Nothing sealed is read to build this, and the run sentences are the
+ * THE KEY IS ITS LABEL, from the keychain's index. Nothing sealed is read to build this, and the run sentences are the
  * `pull` events' own notes, which carry a host, a status and a label and never a value.
  */
 export type ActionRow = {
@@ -1693,7 +1693,7 @@ export type Egress = {
   line: string;
   /**
    * An action sending a key gets a line of its own (question 8). A project's action names the project and the key, and
-   * says when the key is kept for every project (H.762); a key whose vault entry names no host says the host this
+   * says when the key is kept for every project (H.762); a key whose keychain entry names no host says the host this
    * approval pins it to. `null` when there is neither.
    */
   key_line: string | null;
@@ -1719,7 +1719,7 @@ const joinedList = (items: readonly string[]): string =>
  * rule says so, or both. Nothing here reads the record, so a pack's plan and a proposal print the same lines. The one
  * exception is a project's name: `nameOf` turns the row id a declaration holds into the words its owner gave it, so the
  * key line says "the project Lanternly", not a row id. Without one, or for a row it cannot find, the id is said as written.
- * The other is `opensOf`, what a vault label's live entry opens, which a script's line names beside each key
+ * The other is `opensOf`, what a keychain label's live entry opens, which a script's line names beside each key
  * (`scriptEgress`); an action has one host and says it already.
  */
 export function egressOf(
@@ -1766,7 +1766,7 @@ export function egressOf(
       `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}"${scopeOf?.(key) === null ? ', which is kept for every project' : ''}.`,
     );
   /* A KEY WHOSE ENTRY NAMES NO HOST IS PINNED BY THIS APPROVAL to the host this action calls (`pinHost`), so the line
-     says so: from then on the host refuses to send it anywhere else. Only when the vault was asked and holds an entry. */
+     says so: from then on the host refuses to send it anywhere else. Only when the keychain was asked and holds an entry. */
   const pinTo = key !== null && host !== null ? hostOpened(host) : null;
   const opens = pinTo === null || key === null ? null : (opensOf?.(key) ?? null);
   if (pinTo !== null && opens !== null && heldHost(opens) === null) said.push(`This key will be sent to ${pinTo} only from now on.`);
@@ -1791,11 +1791,11 @@ type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; 
  * `trigger` HAS NO WORD FOR A DOOR. It is the plan diff's closed union, owned by `@braindog/declare`, and a door-started
  * script is reported as rule-started there. The line says `when <door> receives an arrival`, which is the truth.
  *
- * EACH KEY IS SAID WITH THE HOST IT GOES TO, because the host sends a key only where its vault entry opens
+ * EACH KEY IS SAID WITH THE HOST IT GOES TO, because the host sends a key only where its keychain entry opens
  * (`keyRefused` in `@braindog/host`) and the line named the origins and the keys as two lists. A script with two
  * origins and one key was approved without anybody being told which origin gets the key, which is the pairing that was
- * found broken at run time. `opensOf` reads the vault by label, as the host resolves it; a caller that cannot reach the
- * vault, or a label it holds no live entry for, says "to the host its vault entry opens", which is where the answer is.
+ * found broken at run time. `opensOf` reads the keychain by label, as the host resolves it; a caller that cannot reach the
+ * keychain, or a label it holds no live entry for, says "to the host its keychain entry opens", which is where the answer is.
  */
 function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | null): Egress | null {
   const origins = Array.isArray(d.egress) ? d.egress.filter((o): o is string => typeof o === 'string') : [];
@@ -1819,9 +1819,9 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
   const called = new Set(origins.map((o) => hostOpened(o)).filter((h): h is string => h !== null));
   const to = (label: string): string => {
     const opens = opensOf?.(label)?.trim();
-    if (!opens) return 'the host its vault entry opens';
+    if (!opens) return 'the host its keychain entry opens';
     const host = hostOpened(opens);
-    return host !== null && called.has(host) ? host : `no host it calls (its vault entry opens ${JSON.stringify(opens)}), so every fetch with it is refused`;
+    return host !== null && called.has(host) ? host : `no host it calls (its keychain entry opens ${JSON.stringify(opens)}), so every fetch with it is refused`;
   };
   const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${joinedList(keys.map((k) => `"${k}" to ${to(k)}`))}`}`;
   const key_line = reads.length > 0 ? `${d.script} reads ${joinedList(reads)} and may send what it reads to ${joinedList(hosts)}.` : null;
@@ -1958,8 +1958,8 @@ export function queueCall(
 
   const key = keyNamed(deps.sql, decl.grant);
   if (!key) {
-    pause(deps, 'call', ingest, `${ingest} is paused: the key "${decl.grant ?? ''}" it sends is not in the vault.`);
-    return { ingest, outcome: 'paused', say: `${ingest} is paused, because the key "${decl.grant ?? ''}" it sends is not in the vault.` };
+    pause(deps, 'call', ingest, `${ingest} is paused: the key "${decl.grant ?? ''}" it sends is not in the keychain.`);
+    return { ingest, outcome: 'paused', say: `${ingest} is paused, because the key "${decl.grant ?? ''}" it sends is not in the keychain.` };
   }
 
   const day = instant(deps.nowMs).slice(0, 10);
@@ -2050,9 +2050,9 @@ export function queueCall(
   /* AND EVERY VALUE THE FIELD HAS HELD, NOT ONLY TODAY'S. A copy made before the key changed was sent: with `party`
      copied from `token` on create and a clean rule posting on paid, a grant revoked and deposited again between the
      two, and a token cleared from the row, each queued `party: '<the old grant id>'` (measured in `secret-out.test.ts`,
-     2 of 2). A SECRET FIELD'S HISTORY IS THE VAULT'S IDS. `coerce.ts` takes a grant id and nothing else and only the
-     vault door writes the field, so whatever it ever held is a row of `grant`, and no row of `grant` is deleted; the
-     ledger cannot say which, because it writes `--redacted--` for a secret. Holding every id the vault has issued is
+     2 of 2). A SECRET FIELD'S HISTORY IS THE KEYCHAIN'S IDS. `coerce.ts` takes a grant id and nothing else and only the
+     keychain door writes the field, so whatever it ever held is a row of `grant`, and no row of `grant` is deleted; the
+     ledger cannot say which, because it writes `--redacted--` for a secret. Holding every id the keychain has issued is
      wider than this field's own, and a grant id in a field that leaves is the thing the rule says never leaves,
      whichever key it names. What this cannot reach is a plaintext an earlier build left in the field and then replaced:
      nothing kept it. A FILE FIELD'S HISTORY IS IN THE LEDGER, which keeps a file's value on the `create` row and on

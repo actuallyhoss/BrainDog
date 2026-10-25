@@ -60,8 +60,8 @@ function slash() {
   return { engine, rows, close: () => sql.close() };
 }
 
-/** The Worker's shape of deps: the vault holding the grant he picked, opened by `open`, over `send`. */
-const vault = (send: SlashHostDeps['send'], open: SlashHostDeps['openKey'], extra: Partial<SlashHostDeps> = {}): SlashHostDeps => ({
+/** The Worker's shape of deps: the keychain holding the grant he picked, opened by `open`, over `send`. */
+const keychain = (send: SlashHostDeps['send'], open: SlashHostDeps['openKey'], extra: Partial<SlashHostDeps> = {}): SlashHostDeps => ({
   grants: () => [HIS_GRANT],
   openKey: open,
   send,
@@ -106,7 +106,7 @@ test('A 401 ON HIS OWN KEY IS ONE POST, SETTLED UNDER THE DASH, and the sentence
   const s = slash();
   try {
     const net = endpoint(status(401));
-    const inference = slashOwnInference(OWN, vault(net.send, async () => FAKE_KEY))!;
+    const inference = slashOwnInference(OWN, keychain(net.send, async () => FAKE_KEY))!;
     const out = await s.engine.answer(RATE, inference as never);
     assert.equal(net.sent.length, 1);
     assert.equal(net.sent[0]!.authorization, `Bearer ${FAKE_KEY}`);
@@ -126,7 +126,7 @@ test('A 400 AND A 404 ARE FINAL TOO, and the sentence names the status and says 
     const s = slash();
     try {
       const net = endpoint(status(n));
-      const out = await s.engine.answer(RATE, slashOwnInference(OWN, vault(net.send, async () => FAKE_KEY)) as never);
+      const out = await s.engine.answer(RATE, slashOwnInference(OWN, keychain(net.send, async () => FAKE_KEY)) as never);
       assert.equal(codeOf(out), 'PULL_REQUEST_REFUSED', fixOf(out));
       assert.equal(
         fixOf(out),
@@ -142,7 +142,7 @@ test('A 400 AND A 404 ARE FINAL TOO, and the sentence names the status and says 
 test('A 503 IS STILL UNREACHABLE, and so still the one code the ladder asks again', async () => {
   const s = slash();
   try {
-    const out = await s.engine.answer(RATE, slashOwnInference(OWN, vault(endpoint(status(503)).send, async () => FAKE_KEY)) as never);
+    const out = await s.engine.answer(RATE, slashOwnInference(OWN, keychain(endpoint(status(503)).send, async () => FAKE_KEY)) as never);
     assert.equal(codeOf(out), 'UNREACHABLE', fixOf(out));
   } finally {
     s.close();
@@ -155,7 +155,7 @@ test('HIS OWN KEY THAT WILL NOT OPEN SENDS NOTHING AND WRITES NO LEDGER ROW, wha
   const s = slash();
   try {
     const net = endpoint(status(401));
-    const inference = slashOwnInference(OWN, vault(net.send, async () => null))!;
+    const inference = slashOwnInference(OWN, keychain(net.send, async () => null))!;
     await assert.rejects(inference.complete(CALL), (e: unknown) => {
       assert.equal((e as { sent?: unknown }).sent, false, 'the throw does not say that nothing was sent');
       return true;

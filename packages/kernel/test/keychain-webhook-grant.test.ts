@@ -6,13 +6,13 @@
  * `SELECT ... FROM outbox WHERE id = ? AND kind = 'pull.fetch'`, so a leased `notify.webhook` answered OUT_OF_BOUNDS,
  * "There is no connector job ob_1.", and the Worker posted the body unsigned because nothing could have signed it.
  *
- * THE DIGEST NAMES ITS KEY BY LABEL, NOT BY ID. `09 §6` calls `webhook.grant` "the vault label of the secret that signs
+ * THE DIGEST NAMES ITS KEY BY LABEL, NOT BY ID. `09 §6` calls `webhook.grant` "the keychain label of the secret that signs
  * the POST", and `digest.ts` copies it onto the payload as written. So the door resolves the label the way `keyNamed`
  * resolves a call's: by label or id, never a revoked grant, newest first and the tie on the id. A connector's
  * `pull.fetch` still names a grant id and is resolved by id alone, as before.
  *
  * AND A DIGEST'S KEY IS SEALED UNDER THE RECORD KEY. A digest is `paged: false` in `digestEgress`, so an approval takes
- * a key a person deposited at the vault door, which is sealed `record`. Refusing that here, as a connector's door must,
+ * a key a person deposited at the keychain door, which is sealed `record`. Refusing that here, as a connector's door must,
  * would be an approved digest that dead-letters at its first post. So the door hands back the data key the grant was
  * sealed under and says which one, and the host unwraps that one.
  */
@@ -45,7 +45,7 @@ const refusal = (r: unknown) => {
   return x.refusal;
 };
 
-/** The signing secret a person deposited at the vault door: sealed under the record key. */
+/** The signing secret a person deposited at the keychain door: sealed under the record key. */
 const COLLECTOR = {
   label: 'collector',
   opens: 'collector.example.com',
@@ -118,7 +118,7 @@ test('THE NEWEST LIVE KEY UNDER THE LABEL, as a call finds it, and a revoked one
 
   assert.equal(value<LeasedSeal>(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday')).grant.grant_id, fresh.id);
 
-  /* REVOKE THE NEWER ONE AND THE OLDER ONE SIGNS, which is what the vault screen says: the label still has a live key. */
+  /* REVOKE THE NEWER ONE AND THE OLDER ONE SIGNS, which is what the keychain screen says: the label still has a live key. */
   value(k.revokeGrant(fresh.id, 'p_1'));
   assert.equal(value<LeasedSeal>(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday')).grant.grant_id, old.id);
 
@@ -138,7 +138,7 @@ const signs = (k: Kernel): string => {
 
 test('A TIE ON created_at IS BROKEN BY THE ID, and the post signs with the key a call naming the label sends', async () => {
   /* BOUND IN ONE INSTANT, THE LARGER ID FIRST, so a reader that fell back to the order the rows came back in would sign
-     with the smaller. This one passed before `sealedGrant` asked `grantChosen` and passes after: over ids the vault
+     with the smaller. This one passed before `sealedGrant` asked `grantChosen` and passes after: over ids the keychain
      mints, `ORDER BY created_at DESC, id DESC` and the chooser answer alike. */
   const { k, sql } = await record();
   const larger = value<GrantRow>(k.bindGrant({ ...COLLECTOR, sealed_for: { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5ZZZ', version: 1 } }, 'p_1'));
@@ -153,7 +153,7 @@ test('A TIE ON created_at IS BROKEN BY THE ID, and the post signs with the key a
 test('THE POST AND A CALL CHOOSE BY ONE ORDER, even over ids that SQL and the chooser would sort two ways', async () => {
   /* THE STATE THAT TELLS ONE ORDER FROM TWO. SQLite compares text as UTF-8 bytes and `grantChosen` compares UTF-16 code
      units, and the two disagree past the surrogates: an id ending U+FFFF is the larger in UTF-16, and one ending
-     U+10000 the larger in UTF-8. No id the vault mints holds either (`bindGrant` holds an id to `g_` and a ULID, and is
+     U+10000 the larger in UTF-8. No id the keychain mints holds either (`bindGrant` holds an id to `g_` and a ULID, and is
      the one writer of `grant`), so the ids are put in by SQL; what this holds is that the post does not keep an order of
      its own. Measured before the repair: the post signed with the id ending U+10000 and `keyNamed` sent the one ending
      U+FFFF. */
@@ -169,7 +169,7 @@ test('THE POST AND A CALL CHOOSE BY ONE ORDER, even over ids that SQL and the ch
   sql.close();
 });
 
-test('A LABEL THE VAULT HAS NEVER HELD OPENS NOTHING, and says the label', async () => {
+test('A LABEL THE KEYCHAIN HAS NEVER HELD OPENS NOTHING, and says the label', async () => {
   const { k, sql } = await record();
   leasedPost(sql, 'collector');
   const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday'));

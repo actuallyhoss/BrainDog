@@ -28,7 +28,7 @@
  * field that merely holds the same words as the secret.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-launder-row.test.ts` puts it: in
- * use a secret field holds a vault grant's id, and a plaintext is the plainest way to see where it went.
+ * use a secret field holds a keychain grant's id, and a plaintext is the plainest way to see where it went.
  */
 
 import { test } from 'node:test';
@@ -178,7 +178,7 @@ async function opened(...more: Declaration[]): Promise<{ k: Kernel; sql: NodeSql
 
 /**
  * Every row of every table holding `needle`, as `table: row`, leaving out the automation tables, whose step rows
- * record what a `set_var` took (a known limit, reported, not this file's). The row's own `pin` is where the vault put
+ * record what a `set_var` took (a known limit, reported, not this file's). The row's own `pin` is where the keychain put
  * it, so it is taken out of each entry before the row is read.
  */
 function holding(sql: NodeSql, needle: string): Set<string> {
@@ -383,7 +383,7 @@ test('A RULE ON THE INLINE PATH STORED PAST THE LINT WRITES THE SECRET NOWHERE, 
 });
 
 test('A COPY INTO A FIELD THAT NEVER LEAVES EITHER IS NOT THE COPY CHECK AT RUN TIME, as the lint lets it install', async () => {
-  /* ONLY THE VAULT WRITES A SECRET FIELD, so the write path refuses these on its own sentence; what this holds is that
+  /* ONLY THE KEYCHAIN WRITES A SECRET FIELD, so the write path refuses these on its own sentence; what this holds is that
      the copy check is not what stopped them. */
   const wrong: string[] = [];
   for (const verb of VERBS) {

@@ -49,7 +49,7 @@ export const BODY_MOST = {
   auth: { bytes: 65_536, why: 'A passkey ceremony is a few kilobytes; nothing at sign-in is larger.' },
   oauth: { bytes: 16_384, why: 'A registration, a consent and a token form are a few hundred bytes.' },
   account: { bytes: 1_048_576, why: 'Billing and the operator doors; a payment event is the largest at one megabyte.' },
-  vault: { bytes: 65_536, why: 'A key and its label.' },
+  keychain: { bytes: 65_536, why: 'A key and its label.' },
   mcp: { bytes: 1_048_576, why: 'A tool call carries what an API call does, so it is capped the same.' },
   seen: { bytes: 2_048, why: 'A path and a referrer host.' },
 } as const satisfies Record<string, { bytes: number; why: string }>;

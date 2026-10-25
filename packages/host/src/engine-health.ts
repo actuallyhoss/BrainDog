@@ -3,16 +3,16 @@
  * signed-in person, and the one the record's `engineHealth` hands a read token, the command line and the daily vital sign.
  *
  * ONE BUILDER FOR BOTH, so the door and the record say the same sentence about the same ledger. Each host hands it Slash's
- * own SQLite, whether it has a model at all, its vault rows, and the package's two functions (`engineHealth` and
+ * own SQLite, whether it has a model at all, its keychain rows, and the package's two functions (`engineHealth` and
  * `engineSaid` in `@braindog/slash`), loaded the way the host already loads that package.
  *
  * STRUCTURAL, AS `slash-ask.ts` IS: this package must not depend on `@braindog/slash` (`46 §5.1`), so the two functions are
  * handed in and their shapes restated here, and a host with no model never loads them: `off` is answered here, in the
  * package's own sentence, without importing anything.
  *
- * WHAT ONLY THE HOST KNOWS. Whether a model is configured, and whether the owner's own key is still a live key in the vault.
- * A key the vault will not open leaves no ledger row, so the ledger alone cannot say `key_closed` for it. Whether the key
- * would open for this session is the vault's gate and needs a fresh proof, so it is not asked here: a revoked or missing
+ * WHAT ONLY THE HOST KNOWS. Whether a model is configured, and whether the owner's own key is still a live key in the keychain.
+ * A key the keychain will not open leaves no ledger row, so the ledger alone cannot say `key_closed` for it. Whether the key
+ * would open for this session is the keychain's gate and needs a fresh proof, so it is not asked here: a revoked or missing
  * grant is the one closed key a read can see without opening anything.
  */
 
@@ -56,7 +56,7 @@ export type EngineHealthDeps = {
   model: boolean;
   /** The package's two functions, loaded only where `model` is true. */
   load: () => Promise<EngineHealthFns>;
-  /** The record's vault rows, to say whether the key the owner picked for Slash is still a live one. Absent, nobody can tell. */
+  /** The record's keychain rows, to say whether the key the owner picked for Slash is still a live one. Absent, nobody can tell. */
   grants?: (() => readonly { id: string; kind?: string | undefined; revoked_at: string | null }[]) | undefined;
 };
 
@@ -66,7 +66,7 @@ const OFF: EngineHealthRead = {
   said: { text: 'Slash has no model on this host, so BrainDog works from its rules.', whose: null },
 };
 
-/** The kind of vault row a key for Slash is (`SLASH_GRANT_KIND` in `slash.ts`). */
+/** The kind of keychain row a key for Slash is (`SLASH_GRANT_KIND` in `slash.ts`). */
 const API_TOKEN = 'api_token';
 
 /** The read, built once per host and asked on every look: nothing is cached, so a failure a second ago is in it. */

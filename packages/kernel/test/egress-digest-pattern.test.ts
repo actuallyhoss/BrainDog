@@ -35,7 +35,7 @@ const HOOK = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** An ingest that polls the gold price every hour, sending the vault's `goldapi`. */
+/** An ingest that polls the gold price every hour, sending the keychain's `goldapi`. */
 const POLL = {
   id: 'ingest.gold',
   kind: 'ingest',
@@ -109,11 +109,11 @@ test("A PATTERN WHOSE INGEST POLLS IS FILED WITH ITS LINE AND ITS KEY, worked ou
   sql.close();
 });
 
-test('AND ITS KEY IS IN THE VAULT BEFORE IT IS ACCEPTED, and the decision keeps the lines that press approved', async () => {
+test('AND ITS KEY IS IN THE KEYCHAIN BEFORE IT IS ACCEPTED, and the decision keeps the lines that press approved', async () => {
   const { k, sql } = await record();
   const id = file(k, 'pattern', { ingest: POLL, samples: ['raw_1'] });
   const missing = k.decide(id, { decide: { option: 'accept', reason: 'It is the gold price.' } }, 'p_1');
-  assert.equal(missing.ok, false, 'a poll whose key is not in the vault was accepted, to be armed and paused on its first run');
+  assert.equal(missing.ok, false, 'a poll whose key is not in the keychain was accepted, to be armed and paused on its first run');
   if (!missing.ok && 'refusal' in missing) assert.match(missing.refusal.fix, /"goldapi"/u);
   assert.equal(k.governanceRow('suggestion', id)?.status, 'open');
 

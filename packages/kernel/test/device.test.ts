@@ -14,14 +14,14 @@ import { fixOf, type Result } from '@braindog/ports';
 import {
   CODE_MS,
   SILENT_MS,
-  VAULT_ALL_DAYS,
+  KEYCHAIN_ALL_DAYS,
   deviceApprove,
   deviceList,
   devicePoll,
   deviceRevoke,
   deviceStart,
   deviceSweep,
-  vaultGrant,
+  keychainGrant,
   type Exchanged,
 } from '../src/device.ts';
 import { openRecord, type Declaration } from '../src/index.ts';
@@ -225,7 +225,7 @@ test('A GRANT IS REVOKED BY ITS HANDLE, takes its token with it, and a second re
   sql.close();
 });
 
-/* ── the vault reach ─────────────────────────────────────────────────────── */
+/* ── the keychain reach ─────────────────────────────────────────────────────── */
 
 const PROJECTS: Declaration = {
   id: 'register.things',
@@ -242,7 +242,7 @@ const PROJECTS: Declaration = {
   },
 };
 
-test('A VAULT GRANT NAMES ITS SCOPE, mints no token, and its bearer is checked by vaultGrant alone', async () => {
+test('A KEYCHAIN GRANT NAMES ITS SCOPE, mints no token, and its bearer is checked by keychainGrant alone', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS]));
@@ -257,27 +257,30 @@ test('A VAULT GRANT NAMES ITS SCOPE, mints no token, and its bearer is checked b
   const scoped = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: project.id }));
   const approved = value(await deviceApprove(deps(), OWNER, { user_code: scoped.user_code }));
   assert.deepEqual([approved.reach, approved.scope], ['vault', project.id]);
+  /* `keychain` is accepted as the reach and stored as `vault`. */
+  const named = value(await deviceStart(deps(), { reach: 'keychain', label: 'box2', scope: project.id }));
+  assert.equal(value(await deviceApprove(deps(), OWNER, { user_code: named.user_code })).reach, 'vault');
   const out = value(await devicePoll(deps(), { device_code: scoped.device_code })) as Exchanged;
   assert.equal(out.scope, project.id);
-  assert.equal(sql.all('SELECT id FROM token').length, 0, 'a vault grant minted a token');
+  assert.equal(sql.all('SELECT id FROM token').length, 0, 'a keychain grant minted a token');
   assert.equal(refusalOf(await verifyToken(deps(), out.bearer)).code, 'FORBIDDEN');
 
-  const grant = value(await vaultGrant(deps(), out.bearer));
+  const grant = value(await keychainGrant(deps(), out.bearer));
   assert.deepEqual([grant.scope, grant.person, grant.handle], [project.id, OWNER, approved.handle]);
 
   const everything = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: '*' }));
   value(await deviceApprove(deps(), OWNER, { user_code: everything.user_code }));
   const wide = value(await devicePoll(deps(), { device_code: everything.device_code })) as Exchanged;
-  assert.equal(wide.expires, new Date(NOW + VAULT_ALL_DAYS * DAY).toISOString());
+  assert.equal(wide.expires, new Date(NOW + KEYCHAIN_ALL_DAYS * DAY).toISOString());
 
-  /* A login bearer is not a vault grant, and a revoked vault grant opens nothing. */
+  /* A login bearer is not a keychain grant, and a revoked keychain grant opens nothing. */
   const login = value(await deviceStart(deps(), { reach: 'login', label: 'box' }));
   value(await deviceApprove(deps(), OWNER, { user_code: login.user_code }));
   const token = value(await devicePoll(deps(), { device_code: login.device_code })) as Exchanged;
-  assert.equal(refusalOf(await vaultGrant(deps(), token.bearer)).code, 'FORBIDDEN');
+  assert.equal(refusalOf(await keychainGrant(deps(), token.bearer)).code, 'FORBIDDEN');
   value(await deviceRevoke(deps(), OWNER, grant.handle));
-  assert.equal(refusalOf(await vaultGrant(deps(), out.bearer)).code, 'FORBIDDEN');
-  assert.equal(refusalOf(await vaultGrant(deps(), `rec_other.${out.bearer.split('.')[1]}`)).code, 'FORBIDDEN');
+  assert.equal(refusalOf(await keychainGrant(deps(), out.bearer)).code, 'FORBIDDEN');
+  assert.equal(refusalOf(await keychainGrant(deps(), `rec_other.${out.bearer.split('.')[1]}`)).code, 'FORBIDDEN');
   sql.close();
 });
 

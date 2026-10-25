@@ -55,7 +55,7 @@ test('THE ROUTES COUNT BY GROUP: DATA grows by one, READ+ by one, and nothing a 
   const without = by(ROUTES.filter((r) => r.name !== 'heard' && r.name !== 'doorSigns'));
   assert.equal(all.DATA, (without.DATA ?? 0) + 1);
   assert.equal(all['READ+'], (without['READ+'] ?? 0) + 1);
-  for (const group of ['VAULT', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['KEYCHAIN', 'JOBS', 'ADMIN']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('EACH REACHES THE RECORD METHOD OF ITS NAME: the mark as sent, days as a whole number', async () => {

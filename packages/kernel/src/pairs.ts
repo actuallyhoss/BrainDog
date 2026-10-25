@@ -209,7 +209,7 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
     if (!f) return unknown('on', e.field);
     if (e.abs && !NUMERIC.has(f.type))
       return bad('DECLARATION_INVALID', `${id}'s pairs.on says abs(${f.id}), and ${f.id} is a ${f.type}. abs() takes a money, int or decimal field.`, 'pairs.on');
-    if (f.type === 'secret') return bad('DECLARATION_INVALID', `${id}'s pairs.on names ${f.id}, a secret, which nothing outside the vault reads.`, 'pairs.on');
+    if (f.type === 'secret') return bad('DECLARATION_INVALID', `${id}'s pairs.on names ${f.id}, a secret, which nothing outside the keychain reads.`, 'pairs.on');
   }
   if (entries.filter((e) => e.abs).length > 1)
     return bad('DECLARATION_INVALID', `${id}'s pairs.on takes one abs() amount, and names ${entries.filter((e) => e.abs).length}.`, 'pairs.on');

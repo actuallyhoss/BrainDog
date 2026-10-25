@@ -105,7 +105,7 @@ test('BUT `pack:` IS READ, by the record, so a script a first-party pack owns th
   sql.close();
 });
 
-test("THE VAULT'S `slash` KEY IS REFUSED AT INSTALL, with a sentence, so the owner is never asked to approve sending it", async () => {
+test("THE KEYCHAIN'S `slash` KEY IS REFUSED AT INSTALL, with a sentence, so the owner is never asked to approve sending it", async () => {
   const r = await refusal(GOLD({ keys: ['goldapi', 'slash'] }));
   assert.equal(r.code, 'FORBIDDEN');
   assert.equal(r.at, 'keys[1]');
@@ -123,26 +123,26 @@ test('THE EGRESS IS PRINTED FROM THE SCRIPT BODY, with every origin and every ke
   assert.equal(e.channel, 'script');
   assert.equal(e.host, 'api.goldapi.io');
   assert.equal(e.key, 'goldapi');
-  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens');
+  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its keychain entry opens');
   assert.equal(e.key_line, 'gold-rate reads obligations and may send what it reads to api.goldapi.io.');
   assert.equal(egressOf(GOLD({ egress: [] }).body), null, 'a script that fetches nothing calls nothing out');
 });
 
-/* WHICH HOST EACH KEY GOES TO WAS NOT ON THE LINE. The host sends a key only where its vault entry opens
+/* WHICH HOST EACH KEY GOES TO WAS NOT ON THE LINE. The host sends a key only where its keychain entry opens
    (`keyRefused`), and the line the owner approves named the origins and the keys as two lists, so a script with two
-   origins and one key never said which of the two would get it. The vault holds the answer by label; a caller that
+   origins and one key never said which of the two would get it. The keychain holds the answer by label; a caller that
    cannot read it says where the answer is instead. */
-test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its vault entry opens, and where to look when it cannot', () => {
+test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its keychain entry opens, and where to look when it cannot', () => {
   const two = GOLD({ egress: ['https://api.goldapi.io', 'https://metals.example.org'], keys: ['goldapi', 'metals'] }).body;
   const opens = (label: string) => (label === 'goldapi' ? 'api.goldapi.io' : null);
   assert.equal(
     egressOf(two, undefined, opens)?.line,
-    'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to api.goldapi.io and "metals" to the host its vault entry opens',
+    'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to api.goldapi.io and "metals" to the host its keychain entry opens',
   );
   assert.equal(egressOf(GOLD({ keys: [] }).body, undefined, opens)?.line, 'CALLS OUT api.goldapi.io · every 1h · no key');
 });
 
-/* THE LINE PRINTED THE VAULT'S WORDS AND THE HOST SENT THE KEY BY A PARSE OF THEM, and the two disagreed. Measured:
+/* THE LINE PRINTED THE KEYCHAIN'S WORDS AND THE HOST SENT THE KEY BY A PARSE OF THEM, and the two disagreed. Measured:
    four proposals of this script filed against one `goldapi` entry, with the host's own `keyRefused` run over each. The
    first printed the URL the entry holds and the key was sent; the second printed "the GoldAPI account" and the third
    printed a host the script never calls, as destinations for a key every run refuses, so the owner approved a pairing
@@ -155,12 +155,12 @@ test('THE LINE NAMES THE HOST THE KEY IS SENT TO, parsed as the host parses it, 
   assert.equal(line('https://api.goldapi.io/v1'), 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io', 'a URL names its host');
   assert.equal(
     line('the GoldAPI account'),
-    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "the GoldAPI account"), so every fetch with it is refused',
+    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its keychain entry opens "the GoldAPI account"), so every fetch with it is refused',
     'prose names no host',
   );
   assert.equal(
     line('metals.example.org'),
-    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "metals.example.org"), so every fetch with it is refused',
+    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its keychain entry opens "metals.example.org"), so every fetch with it is refused',
     'a host the script does not call',
   );
   assert.equal(
@@ -189,7 +189,7 @@ test('hostOpened READS A HOST, A PORT OR A URL AS ITS HOST, and prose, blank or 
   );
 });
 
-test("A PROPOSED SCRIPT'S APPROVAL LINE NAMES THE HOST ITS KEY'S LIVE VAULT ENTRY OPENS, and a key re-read gives the same line", async () => {
+test("A PROPOSED SCRIPT'S APPROVAL LINE NAMES THE HOST ITS KEY'S LIVE KEYCHAIN ENTRY OPENS, and a key re-read gives the same line", async () => {
   const { k, sql } = await record();
   const made = k.bindGrant(
     { label: 'goldapi', opens: 'api.goldapi.io', kind: 'api_token', ciphertext: new Uint8Array([1]), nonce: new Uint8Array([9]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
@@ -201,7 +201,7 @@ test("A PROPOSED SCRIPT'S APPROVAL LINE NAMES THE HOST ITS KEY'S LIVE VAULT ENTR
   const approve = (id: string) => (JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as { approve?: string[] }).approve;
   assert.ok(approve((filed.value as { id: string }).id)?.includes('CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io'));
 
-  /* AND THE INSTALLED ONE IS READ WITH THE SAME VAULT, so resending it unchanged asks nothing again. */
+  /* AND THE INSTALLED ONE IS READ WITH THE SAME KEYCHAIN, so resending it unchanged asks nothing again. */
   assert.ok((await k.install([GOLD()])).ok);
   const again = k.propose({ question: 'Retitle it?', body_kind: 'change', body: { declaration_id: 'script.gold-rate', to: GOLD({ title: 'Gold, 24k' }) } }, 'p_1');
   assert.ok(again.ok, fixOf(again));

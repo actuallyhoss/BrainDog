@@ -161,7 +161,7 @@ test('A FIGURE OVER A LIST WITH A SECRET IS ITS AGGREGATE: the count goes into a
     rule({ rule: 'count', on: { written: { register: 'keys', op: ['create'] } }, steps: [{ set_var: { name: 'c', to: '{{metric.held}}' } }, { set: { field: 'note', to: '{{vars.c}} keys' } }] }),
   );
   /* THE SECRET IS PUT IN BY SQL, as `flow-secret-verbs.test.ts` puts it: a secret field written through the record holds
-     a vault grant's id, and a plaintext is the plainest way to see that it went nowhere. */
+     a keychain grant's id, and a plaintext is the plainest way to see that it went nowhere. */
   assert.ok(k.create('keys', { what: 'Bank' }, { actor: 'p_1' }).ok);
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE register = 'keys'");
   await k.drain();

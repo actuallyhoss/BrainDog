@@ -394,7 +394,7 @@ const USED_UP = {
  * A BACKGROUND ASK IS HIS TO SWITCH OFF (`mayThink`), and a refused one walks no route and writes no row.
  *
  * A KEY THAT WILL NOT OPEN IS THROWN ON AS THE HOST THREW IT, with the hold given back and no row: nothing was sent, and
- * the callers that already say so in their own words keep doing it (`engine-health.ts` reads that from the vault).
+ * the callers that already say so in their own words keep doing it (`engine-health.ts` reads that from the keychain).
  *
  * KEPT, THOUGH ONLY ITS TESTS CALL IT TODAY. The asks that go through `@braindog/slash` walk their route inside the engine
  * (`core.run`), and that walk now reads the same pause. This walk is for the asks that do not: the record's port and an

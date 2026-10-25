@@ -22,7 +22,7 @@
  * left it.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Slash tests put their pin, because in use a secret field
- * holds a vault grant's id and a plaintext is the plainest way to see whether it left.
+ * holds a keychain grant's id and a plaintext is the plainest way to see whether it left.
  */
 
 import { test } from 'node:test';

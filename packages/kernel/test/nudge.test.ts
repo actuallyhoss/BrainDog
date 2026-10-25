@@ -23,7 +23,7 @@ const NOTES: Declaration = {
   body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never,
 };
 
-/** A poll that sends no key, so the vault holds nothing a test must bind. */
+/** A poll that sends no key, so the keychain holds nothing a test must bind. */
 const POLL = (name: string, over: Record<string, unknown> = {}): Declaration => ({
   id: `ingest.${name}`,
   kind: 'ingest',

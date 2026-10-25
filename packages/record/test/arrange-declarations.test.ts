@@ -76,7 +76,7 @@ async function founder() {
   value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }));
   const planned = value<{ diff: { planHash: string; approve: string[] } }>(await api.planPack({ doc: BOOKS } as never, owner));
   value(await api.installPack({ doc: BOOKS, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
-  /* THE TWO KEYS IT CALLS OUT WITH ARE IN THE VAULT, as accepting asks. */
+  /* THE TWO KEYS IT CALLS OUT WITH ARE IN THE KEYCHAIN, as accepting asks. */
   for (const [label, opens] of [['Stripe', 'api.stripe.com'], ['Rates', 'rates.example.org']] as const)
     assert.ok(api.kernel.bindGrant({ label, opens, kind: 'api_token', ciphertext: new Uint8Array([1]), nonce: new Uint8Array([2]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_1' } as never, 'p_owner').ok);
   const cash = api.kernel.create('accounts', { what: 'Cash' } as never, { actor: 'p_owner' });
@@ -260,7 +260,7 @@ test('A DIGEST THAT POSTS OUT IS ASKED ABOUT, as a change asks: its host and whe
 test('TWO PARTS TAKEN, THE LATER ONE FAILING: the earlier is taken back, nothing of the take stays, and the question stays open', async () => {
   const { api, sql, at, version } = await founder();
   const filed = await fileFour(api, at, version);
-  /* THE FEED WILL NOT GO IN at the yes, after the add-on has: the host refuses it, as it would a vault that moved. */
+  /* THE FEED WILL NOT GO IN at the yes, after the add-on has: the host refuses it, as it would a keychain that moved. */
   const k = api.kernel as { install: (...a: unknown[]) => Promise<unknown> };
   const real = k.install.bind(k);
   k.install = async (batch, ...rest) =>

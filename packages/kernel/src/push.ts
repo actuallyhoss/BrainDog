@@ -99,7 +99,7 @@ export function pushSubOf(payload: string): string | null {
 /**
  * The endpoint a leased `notify.push` rings, for the host holding its lease, or `null` when nobody is left to ring.
  *
- * THE LEASE IS THE AUTHORITY, CHECKED THE THREE WAYS `sealedGrant` CHECKS IT (`vault.ts`), for the same three attacks: a
+ * THE LEASE IS THE AUTHORITY, CHECKED THE THREE WAYS `sealedGrant` CHECKS IT (`keychain.ts`), for the same three attacks: a
  * finished job replayed, a lease another host has since taken, and a lease that has run out. An endpoint is not a key,
  * but it is the one thing that rings a person's phone, and it stays in `push_sub` (`local`) precisely so that nothing
  * outside the record reads it except a host that is delivering to it right now.

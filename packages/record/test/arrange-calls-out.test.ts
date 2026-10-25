@@ -59,7 +59,7 @@ const CATALOGUE: CatalogueEntry[] = [
   { id: 'notes', kind: 'pack', title: 'Notes', summary: NOTES.summary, modules: [], doc: () => NOTES },
 ];
 
-/** A fresh record with Books in and both keys in the vault. */
+/** A fresh record with Books in and both keys in the keychain. */
 async function founder() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW), catalogue: CATALOGUE });

@@ -141,7 +141,7 @@ export type SignupVerified = { person: string; email: string; slug: string; name
  * holds one opaque id rather than an id and a slug. `null` when the person reaches no open record yet.
  *
  * `provedAt` IS WHEN THEY LAST PROVED IT, in epoch milliseconds: a passkey, a link or the server key. Rotation
- * never moves it, which is what lets the vault and the passkey flows ask for a proof in the last fifteen minutes,
+ * never moves it, which is what lets the keychain and the passkey flows ask for a proof in the last fifteen minutes,
  * and what ends a session ninety days after it however often it has rotated.
  *
  * `passkey` IS WHETHER THEY HAVE ONE, said by the session flow alone, so a share that widens can ask them to confirm it
@@ -248,7 +248,7 @@ export type InviteProved = { email: string; invite: string; name: string | null 
  * `reason: 'stale'` IS THE ONE 401 THAT IS NOT A SIGN-IN FAILURE. The session is good and its last proof is more
  * than fifteen minutes old, so changing a passkey asks for a fresh one. It says so, because the person is who they
  * say they are and needs to know to sign in again rather than that something failed; its refusal is
- * `NEEDS_BROWSER_SESSION`, the vault's code for the same fact, and the cookie is kept.
+ * `NEEDS_BROWSER_SESSION`, the keychain's code for the same fact, and the cookie is kept.
  */
 export type AuthResult<B = unknown> =
   | { status: 200; body: B; session?: { sid: string } | 'clear'; mail?: Mail }

@@ -37,7 +37,7 @@
  *
  * A PATH TOKEN OR A SIGNATURE, SINCE DOR-3. `12 §3` names a random path token and `25 §3.2` an HMAC;
  * `declare.ts` takes `verify: { kind: path }` on a webhook, and `hmac_sha256`, `stripe` and `github`
- * with `key:` naming a vault label. For a token the record keeps the minted token's digest and answers
+ * with `key:` naming a keychain label. For a token the record keeps the minted token's digest and answers
  * it, and `hook` digests the URL's segment and compares. For a signature the host hands `ingestVerify`
  * its opener, the record answers the key opened, and `hook` checks the raw bytes against the header:
  * `signed` for an HMAC (a GitHub door is one, under `X-Hub-Signature-256`) and `verifyStripe` for

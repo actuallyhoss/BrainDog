@@ -31,7 +31,7 @@ export const SCRIPT_GRAMMAR = {
     title: 'text',
     runs: '{"every":"1h"}, no more often than every 15m; {"door":"<ingest id>"} whose verified arrivals start it; or {"rule":true} so a rule may run it. At least one (required)',
     egress: '["https://<host>"], each an origin written out in full with no path, port or placeholder; [] when it fetches nothing (required)',
-    keys: '["<vault label>"], the keys it sends, by label; [] for none. A key needs an egress to go to (required)',
+    keys: '["<keychain label>"], the keys it sends, by label; [] for none. A key needs an egress to go to (required)',
     reads: '["<register>"], what ctx.record may read; [] for none (required)',
     writes: '["<register>"], what ctx.write and ctx.update may change; [] for none (required)',
     limits: '{"cpu_ms","fetches","wall_ms","writes"}, whole numbers above 0; see limits for the defaults and the most it may ask',
@@ -91,7 +91,7 @@ export const SCRIPT_GRAMMAR = {
     },
   ],
   to_propose:
-    'propose body_kind change with {"declaration_id":"script.<name>","to":<the declaration>}. The owner approves each origin and key in Decide, and a key must be in the vault before they can accept.',
+    'propose body_kind change with {"declaration_id":"script.<name>","to":<the declaration>}. The owner approves each origin and key in Decide, and a key must be in the keychain before they can accept.',
   to_try:
     'the same change with "try":true beside "to", or "try":{"input":...} to hand it what a door would. It runs now and answers script_try: the writes it would make, its log and any refusal. Nothing is written and nothing is proposed, so send it again without try when it works. It fetches for real and counts as a run of the plan. For an agent it opens no key and only reads, a GET or a HEAD without a body, twenty trials a record a day; the owner\'s trial sends what the draft asks.',
   in_this_build:

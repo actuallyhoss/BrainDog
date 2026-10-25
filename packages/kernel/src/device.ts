@@ -24,7 +24,7 @@ import { DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps }
  *
  * `shape` IS A STANDING GRANT FOR SHAPE COPIES (PRF-A13): approved once with six digits, it lives as a runner's does and
  * is not spent on use, so the loop on the owner's machine takes a scrambled copy of the record with no prompt. It opens
- * that and nothing else: its bearer is held on this table alone, so `verifyToken` never finds it, and `vaultGrant`,
+ * that and nothing else: its bearer is held on this table alone, so `verifyToken` never finds it, and `keychainGrant`,
  * `operationGrant` and the runner's check each match their own reach. `shapeGrant` is its one reader.
  */
 export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault', 'shape'] as const;
@@ -42,11 +42,11 @@ export const SILENT_MS = 14 * 86_400_000;
 export const POLL_INTERVAL = 5;
 
 /**
- * A vault grant's life. Shorter for `*`, because a grant over every key that belongs to no project is
+ * A keychain grant's life. Shorter for `*`, because a grant over every key that belongs to no project is
  * the wider of the two, and a wider grant should run out sooner.
  */
-export const VAULT_DAYS = 30;
-export const VAULT_ALL_DAYS = 7;
+export const KEYCHAIN_DAYS = 30;
+export const KEYCHAIN_ALL_DAYS = 7;
 
 /** The reaches that approve one ADMIN operation, spent within the code's ten minutes (`30` §10). */
 const OPERATIONS: readonly Reach[] = ['export', 'import', 'pack', 'token'];
@@ -87,7 +87,7 @@ export type DeviceRow = {
   ended_by?: 'operator';
 };
 
-export type VaultGrant = { handle: string; scope: string; person: string; expires: string };
+export type KeychainGrant = { handle: string; scope: string; person: string; expires: string };
 /** A shape grant, checked: whose approval it carries and until when. It names no scope, since it reads one thing. */
 export type ShapeGrant = { handle: string; person: string; expires: string };
 
@@ -158,6 +158,8 @@ export async function deviceStart(
   deps: TokenDeps,
   args: { reach: string; label: string; ua?: string; scope?: string },
 ): Promise<Result<DeviceCode>> {
+  /* `keychain` IS THE NAME A PERSON READS AND `vault` THE STORED ONE (the CHECK, and every installed CLI): it is accepted and kept as `vault`. */
+  if (args?.reach === 'keychain') args = { ...args, reach: 'vault' };
   if (!(REACHES as readonly string[]).includes(args?.reach))
     return no('ENUM_VALUE_UNKNOWN', `${String(args?.reach)} is not a reach a device can ask for.`, { at: 'reach', allowed: REACHES });
   const label = typeof args.label === 'string' ? args.label.trim() : '';
@@ -171,10 +173,10 @@ export async function deviceStart(
   const reach = args.reach as Reach;
   const scope = args.scope ?? null;
   if (reach === 'vault') {
-    if (!scope) return no('REQUIRED_MISSING', 'A vault grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
+    if (!scope) return no('REQUIRED_MISSING', 'A keychain grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
     if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project in this record.`, { at: 'scope' });
   } else if (scope !== null) {
-    return no('OUT_OF_BOUNDS', 'Only a vault grant carries a scope.', { at: 'scope' });
+    return no('OUT_OF_BOUNDS', 'Only a keychain grant carries a scope.', { at: 'scope' });
   }
 
   const id = b64url(deps.random(32));
@@ -266,7 +268,7 @@ export function machineOf(label: string | null): string | null {
 
 /** How long an exchanged grant lasts, by what it reaches. */
 function lifeMs(row: Stored): number {
-  if (row.reach === 'vault') return (row.scope === '*' ? VAULT_ALL_DAYS : VAULT_DAYS) * 86_400_000;
+  if (row.reach === 'vault') return (row.scope === '*' ? KEYCHAIN_ALL_DAYS : KEYCHAIN_DAYS) * 86_400_000;
   if (OPERATIONS.includes(row.reach)) return CODE_MS;
   return DEFAULT_DAYS * 86_400_000;
 }
@@ -419,16 +421,16 @@ export async function renameDevice(deps: TokenDeps, handle: string, label: strin
 }
 
 /**
- * A vault-grant bearer, checked. INTERNAL: the host calls it before it opens a key for an agent.
+ * A keychain-grant bearer, checked. INTERNAL: the host calls it before it opens a key for an agent.
  *
  * The same one sentence for every way it fails, as `verifyToken` does, and the approver's suspension
  * stops the grant with them.
  */
-export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Result<VaultGrant>> {
+export async function keychainGrant(deps: TokenDeps, bearer: string): Promise<Result<KeychainGrant>> {
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<VaultGrant>('FORBIDDEN', 'That vault grant is not one this record knows.', { at: 'vault' });
+  const wrong = no<KeychainGrant>('FORBIDDEN', 'That keychain grant is not one this record knows.', { at: 'vault' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
   const row = deps.sql.one<{
@@ -459,7 +461,7 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
  *
  * STANDING, NOT SPENT. Unlike an operation grant it is read again and again for its ninety days, and each read writes
  * `last_used`, so the sweep's fourteen silent days count from the last copy taken. The same one sentence for every way it
- * fails, as `vaultGrant` gives it: another record, another reach, past its life, an approver since suspended, or approved
+ * fails, as `keychainGrant` gives it: another record, another reach, past its life, an approver since suspended, or approved
  * before the operator's cut-off.
  */
 export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Result<ShapeGrant>> {
@@ -487,7 +489,7 @@ export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Resul
  * the reach names (`OPERATION_METHOD`), and the record's gate admits that context for that method and no other.
  *
  * NOTHING READ THESE BEARERS BEFORE. `devicePoll` minted one for reach `export` or `import` and gave it ten minutes,
- * and the only reader of `token_hash` was `vaultGrant`, which matches `reach = 'vault'` alone, so the CLI could be
+ * and the only reader of `token_hash` was `keychainGrant`, which matches `reach = 'vault'` alone, so the CLI could be
  * handed a bearer that no door on either host would take (`test/operation-grant.test.ts`).
  *
  * SPENT ON FIRST USE, IN THE SAME TURN IT IS READ. The digest is awaited first, then the row is read and
@@ -495,7 +497,7 @@ export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Resul
  * when the two arrive together. `expires` and `last_used` are both set to now, which is how the device listing tells a
  * grant that was used from one that ran out.
  *
- * ONE SENTENCE FOR EVERY WAY IT FAILS, as `vaultGrant` and `verifyToken` give it: spent, past its ten minutes, for
+ * ONE SENTENCE FOR EVERY WAY IT FAILS, as `keychainGrant` and `verifyToken` give it: spent, past its ten minutes, for
  * another record, of another reach, approved by somebody since suspended, or approved before the operator's cut-off
  * (`TokenDeps.validFrom`). A caller replaying a bearer learns nothing
  * a caller guessing one does not.

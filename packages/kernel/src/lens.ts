@@ -65,7 +65,7 @@ export type Narrow = Target | { share: string };
 export type CatalogField = FieldSpec & { id: string; retired?: boolean; scope?: ScopeDecl; title?: boolean };
 
 /**
- * One list, as the lens needs to know it. `role` marks the vault's index list (`keys`), the meets list (`people`) and
+ * One list, as the lens needs to know it. `role` marks the keychain's index list (`keys`), the meets list (`people`) and
  * the list whose rows are projects (`projects`). `ownerOnly` is a list a role never reaches; Keys and People are such
  * lists too, and like them it is reached only by a share that names it.
  */

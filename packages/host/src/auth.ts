@@ -716,7 +716,7 @@ export function heldContext<L extends string>(held: HeldAccess<L>): HeldParts<L>
  * The context a live session is, in the shape the bearer path builds, from the Directory's `Who` and the
  * record's own `access(person)`.
  *
- * `provedAt` COMES FROM THE SESSION ROW AND FROM NOWHERE ELSE, which is what lets the vault ask for a proof
+ * `provedAt` COMES FROM THE SESSION ROW AND FROM NOWHERE ELSE, which is what lets the keychain ask for a proof
  * in the last fifteen minutes. `credentialed`, because a cookie is a credential of the person's own.
  *
  * WHAT THE PERSON HOLDS IS `heldContext`'s, as at every other door, so a narrowed grant reaches every reader the same

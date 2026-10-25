@@ -1,9 +1,9 @@
 /**
- * The vault: what a key opens, never the key.
+ * The keychain: what a key opens, never the key.
  *
  * Every assertion here is about something NOT happening. The sealed bytes not coming back through a
  * list. The label not appearing in an audit trail. The record not being able to decrypt what it
- * holds. A vault whose tests only checked that a credential goes in and comes out would pass while
+ * holds. A keychain whose tests only checked that a credential goes in and comes out would pass while
  * being a database of plaintext secrets with a nice name.
  */
 
@@ -29,7 +29,7 @@ const b = (n: number) => new Uint8Array([n, n + 1, n + 2, 255]);
 
 type Clockish = ReturnType<typeof fixedClock>;
 
-async function vault(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
+async function keychain(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock, { sign: SIGNER });
@@ -75,7 +75,7 @@ const STRIPE = {
 /* ── what a person sees ──────────────────────────────────────────────────── */
 
 test('A GRANT IS AN INDEX OF WHAT A KEY OPENS, and the key is not in it', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
 
   assert.match(made.id, /^g_[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -98,7 +98,7 @@ test('A GRANT IS AN INDEX OF WHAT A KEY OPENS, and the key is not in it', async 
 });
 
 test('the things that are not a grant are refused with the sentence', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   assert.equal(refusal(k.bindGrant({ ...STRIPE, kind: 'passphrase' as never }, 'p_1')).at, 'kind');
   assert.equal(refusal(k.bindGrant({ ...STRIPE, label: '  ' }, 'p_1')).at, 'label');
   assert.equal(refusal(k.bindGrant({ ...STRIPE, opens: '' }, 'p_1')).at, 'opens');
@@ -118,8 +118,8 @@ test('the things that are not a grant are refused with the sentence', async () =
 
 test('AN EVENT NAMES THE GRANT AND ITS KIND, and never the label or what it opens', async () => {
   /* An audit trail that says "Stripe, live" on every read tells whoever can read events exactly
-     which credential is worth taking — and events are readable at a lower level than the vault. */
-  const { k, sql } = await vault();
+     which credential is worth taking — and events are readable at a lower level than the keychain. */
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
   value(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1'));
   value(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(30), nonce: b(40) }, 'p_1'));
@@ -144,7 +144,7 @@ test('AN EVENT NAMES THE GRANT AND ITS KIND, and never the label or what it open
 
 test('every opening is counted, and WHO opened it is the event rather than a column', async () => {
   // A column holds one answer and the question is a list.
-  const { k, sql, clock } = await vault();
+  const { k, sql, clock } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
 
   clock.set(NOW + DAY);
@@ -164,7 +164,7 @@ test('every opening is counted, and WHO opened it is the event rather than a col
 /* ── the record cannot open what it holds ────────────────────────────────── */
 
 test('OPENING A GRANT HANDS BACK SEALED BYTES AND THE KEY THAT WRAPS THEM, both still sealed', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
   const out = value<SealedGrant>(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1'));
 
@@ -189,7 +189,7 @@ test('OPENING A GRANT HANDS BACK SEALED BYTES AND THE KEY THAT WRAPS THEM, both 
 test('A ROTATED WRAPPING KEY IS `WRONG_KEY`, never corruption', async () => {
   // They look identical from inside a failed decrypt, and the difference is everything: one is "try
   // the other key" and the other is "your credentials are gone".
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
   const out = refusal(k.openGrant({ id: made.id, kek_id: 'kek_ff' }, 'p_1'));
   assert.equal(out.code, 'WRONG_KEY');
@@ -209,7 +209,7 @@ test('A ROTATED WRAPPING KEY IS `WRONG_KEY`, never corruption', async () => {
 /* ── rotation and revocation ─────────────────────────────────────────────── */
 
 test('A ROTATION KEEPS EXACTLY ONE PRIOR VERSION, which is what the schema says', async () => {
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
   value(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(30), nonce: b(40) }, 'p_1'));
   value(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(50), nonce: b(60) }, 'p_1'));
@@ -227,7 +227,7 @@ test('A ROTATION KEEPS EXACTLY ONE PRIOR VERSION, which is what the schema says'
 
 test('REVOKING DESTROYS THE BYTES AND KEEPS THE ROW, because what it opened is a fact', async () => {
   // "This used to reach the production database" is the sentence somebody needs a year later.
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant({ ...STRIPE, rotate_every: '90d' }, 'p_1'));
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'rotate'").length, 1);
 
@@ -257,7 +257,7 @@ test('REVOKING DESTROYS THE BYTES AND KEEPS THE ROW, because what it opened is a
 /* ── the reminders it derives ────────────────────────────────────────────── */
 
 test('NOBODY SETS A ROTATION REMINDER: `rotate_every` and `expires_at` derive them', async () => {
-  const { k, sql, clock } = await vault();
+  const { k, sql, clock } = await keychain();
   const made = value<GrantRow>(
     k.bindGrant({ ...STRIPE, rotate_every: '90d', expires_at: new Date(NOW + 120 * DAY).toISOString().slice(0, 10) }, 'p_1'),
   );
@@ -282,7 +282,7 @@ test('NOBODY SETS A ROTATION REMINDER: `rotate_every` and `expires_at` derive th
 });
 
 test('and when one fires it says the id and the kind, not the label', async () => {
-  const { k, sql, clock } = await vault();
+  const { k, sql, clock } = await keychain();
   const made = value<GrantRow>(k.bindGrant({ ...STRIPE, rotate_every: '90d' }, 'p_1'));
 
   clock.set(NOW + 91 * DAY);
@@ -305,7 +305,7 @@ test('and when one fires it says the id and the kind, not the label', async () =
 });
 
 test('a rotate row about a revoked grant is dropped rather than fired', async () => {
-  const { k, sql, clock } = await vault();
+  const { k, sql, clock } = await keychain();
   const made = value<GrantRow>(k.bindGrant({ ...STRIPE, rotate_every: '90d' }, 'p_1'));
   // Revoke leaves no pending row, so reach past it: the drain is the last line of defence.
   sql.exec("UPDATE grant SET revoked_at = ? WHERE id = ?", new Date(NOW).toISOString(), made.id);
@@ -325,7 +325,7 @@ test('a span is a span, and anything else is a refusal', async () => {
   assert.equal(spanMs('quarterly'), null);
   assert.equal(spanMs('90'), null);
 
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   assert.equal(refusal(k.bindGrant({ ...STRIPE, rotate_every: 'quarterly' }, 'p_1')).at, 'rotate_every');
   assert.equal(refusal(k.bindGrant({ ...STRIPE, expires_at: 'next spring' }, 'p_1')).at, 'expires_at');
   assert.equal(k.grants().length, 0, 'a refused bind left a grant behind');
@@ -337,7 +337,7 @@ test('a span is a span, and anything else is a refusal', async () => {
 test('A GRANT TRAVELS IN A `.brain` FILE, SEALED, and comes back as itself', async () => {
   // Sealed material travels because a record you can take with you that leaves the credentials index
   // behind is not the record. It travels SEALED, which is what makes that safe.
-  const source = await vault();
+  const source = await keychain();
   value<GrantRow>(source.k.bindGrant(STRIPE, 'p_1'));
   const lines = value<string[]>(await source.k.export());
 
@@ -361,7 +361,7 @@ test('A RECORD THAT WILL NOT NAME ITS WRAPPING KEY OPENS NOTHING', async () => {
      NULL, and `null !== null` is false: `openGrant` with no key at all sailed past the guard and
      returned the sealed bytes. That is the opt-out the comment above it says was removed, arrived
      at through the check written to remove it. An empty string failed closed; only NULL failed open. */
-  const { k, sql } = await vault();
+  const { k, sql } = await keychain();
   const made = value<GrantRow>(k.bindGrant(STRIPE, 'p_1'));
   sql.exec("UPDATE vault_key SET kek_id = NULL WHERE wrapped_by = 'kek'");
 

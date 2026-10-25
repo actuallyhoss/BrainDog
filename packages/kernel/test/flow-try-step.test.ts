@@ -156,7 +156,7 @@ test('A SECRET IS WITHHELD: a variable set from a secret field, and an earlier a
       { set_var: { name: 'e', to: 'echo {{vars.a.echo}}' } },
     ],
   };
-  /* THE SECRET IS PUT IN BY SQL, where the vault would have put it, since no write path takes one from a person. */
+  /* THE SECRET IS PUT IN BY SQL, where the keychain would have put it, since no write path takes one from a person. */
   const made = value(k.create('bills', { what: 'Gold' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter22') WHERE id = ?", made.id);
   const o = { upTo: 'steps[2]', given: { a: { echo: 'hunter22', rate: 2 } } };

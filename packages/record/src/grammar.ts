@@ -464,7 +464,7 @@ const INGEST = {
   },
   action: {
     url: 'call and poll: the whole https:// address, its host written out with nothing computed; {since} and {until} may stand in the path or query',
-    grant: 'the label of the vault key it sends. Required on a call; a poll of a public address names none',
+    grant: 'the label of the keychain key it sends. Required on a call; a poll of a public address names none',
     every: '15m or longer, or the provider floor; not on a call only a rule runs',
     trigger: 'call only: schedule (the default), rule or both',
     sends: 'call only, with trigger rule or both: the fields of the rule row it sends, each register.field, never a secret or a file',
@@ -475,7 +475,7 @@ const INGEST = {
     fetch:
       'pull only: {base: an https:// host alone, path, auth: {kind: bearer, basic, header or query_param, grant, name?}, schedule: {every} (the same interval as every, or left out), read: {rows: <path>}}; the map reads each row',
   },
-  never: 'a token, a key or a password: a key is named by its vault label and nothing else',
+  never: 'a token, a key or a password: a key is named by its keychain label and nothing else',
   examples: [
     {
       id: 'ingest.orders_in',

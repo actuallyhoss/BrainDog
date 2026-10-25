@@ -19,7 +19,7 @@
  * SQL as that build left them, and this build takes the steps after.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-vars-hidden.test.ts` puts it, so the
- * pin is in the row before the run takes its first step. In use a secret field holds a vault grant's id and nothing
+ * pin is in the row before the run takes its first step. In use a secret field holds a keychain grant's id and nothing
  * else, and a plaintext is the plainest way to see whether it left.
  */
 

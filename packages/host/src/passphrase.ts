@@ -1,5 +1,5 @@
 /**
- * The vault passphrase, the half both hosts share: the key derived from it, the record key wrapped and opened under
+ * The keychain password, the half both hosts share: the key derived from it, the record key wrapped and opened under
  * that, and the two steps the record's methods are handed (`12 §6` "The optional
  * second factor").
  *
@@ -9,7 +9,7 @@
  * key is wrapped with AES-256-GCM under the derived key, with the same additional data it has under the root key,
  * `record_id ‖ 0x1F ‖ "record"`, so a wrapping copied into another record or another purpose does not open.
  *
- * THE RECORD NEVER SEES THE PASSPHRASE OR A KEY. `withVaultPassphrase` takes the passphrase off the arguments before
+ * THE RECORD NEVER SEES THE PASSPHRASE OR A KEY. `withKeychainPassphrase` takes the passphrase off the arguments before
  * the record's method is called and hands the method a step that holds it; `unlockedKey` does the same for the key
  * doors. What the record is handed back is wrapped bytes and a salt, or whether the key opened.
  *
@@ -29,11 +29,11 @@ import { NONCE_BYTES, recordAad, type Bytes } from './sealing.ts';
  */
 export const PASSPHRASE_ITERATIONS = 600_000;
 
-/** PBKDF2's salt: sixteen random bytes, as `vault_key.salt` holds it (`PASSPHRASE_SALT_BYTES` in the kernel's `vault.ts`). */
+/** PBKDF2's salt: sixteen random bytes, as `vault_key.salt` holds it (`PASSPHRASE_SALT_BYTES` in the kernel's `keychain.ts`). */
 export const PASSPHRASE_SALT_BYTES = 16;
 
 /**
- * The shortest passphrase a vault takes, in characters, and the longest any request may carry.
+ * The shortest passphrase a keychain takes, in characters, and the longest any request may carry.
  *
  * THE SHORTEST IS ASKED ONLY WHEN ONE IS SET. A passphrase typed to open or take off is compared as it is, however
  * short, because a short one is simply wrong and is counted as that. The longest bounds the bytes one request hands
@@ -43,10 +43,10 @@ export const PASSPHRASE_LEAST = 12;
 export const PASSPHRASE_MOST = 1_024;
 
 /**
- * How the record key is wrapped now, as the kernel hands it to a step (`RecordWrapping` in the kernel's `vault.ts`).
+ * How the record key is wrapped now, as the kernel hands it to a step (`RecordWrapping` in the kernel's `keychain.ts`).
  *
  * THE SAME SHAPE WRITTEN TWICE, because the kernel may not import this package. Each host hands `unlockedKey`'s step
- * to the record's `unlockVault`, which is typed from the kernel, so a field the kernel stops sending is a host key
+ * to the record's `unlockKeychain`, which is typed from the kernel, so a field the kernel stops sending is a host key
  * module that stops compiling there.
  */
 export type RecordWrapping = {
@@ -58,18 +58,18 @@ export type RecordWrapping = {
   beside: string | null;
 };
 
-/** One re-wrap of the record key, as a step makes it (`WrappingChange` in the kernel's `vault.ts`). */
+/** One re-wrap of the record key, as a step makes it (`WrappingChange` in the kernel's `keychain.ts`). */
 export type WrappingChange =
   | { to: 'passphrase'; wrapped: Uint8Array; nonce: Uint8Array; salt: Uint8Array }
   | { to: 'kek'; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string };
 
-/** What `setVaultPassphrase` and `clearVaultPassphrase` answer: whether the vault is behind a passphrase now. */
-export type VaultPassphrase = { on: boolean };
+/** What `setKeychainPassphrase` and `clearKeychainPassphrase` answer: whether the keychain is behind a passphrase now. */
+export type KeychainPassphrase = { on: boolean };
 
-/** The step the record's two methods are handed (`PassphraseRewrap` in the kernel's `api/vault-passphrase.ts`). */
+/** The step the record's two methods are handed (`PassphraseRewrap` in the kernel's `api/keychain-passphrase.ts`). */
 export type PassphraseRewrap = (held: RecordWrapping) => Promise<Result<WrappingChange>>;
 
-/** The step the record's `unlockVault` is handed: `null` when the request carried no passphrase. */
+/** The step the record's `unlockKeychain` is handed: `null` when the request carried no passphrase. */
 export type PassphraseUnlock = (held: RecordWrapping) => Promise<boolean | null>;
 
 /**
@@ -90,11 +90,13 @@ export type RootKeys = {
 /**
  * The record's two methods as this file calls them, typed by shape as `RecordSurface` types the rest.
  *
- * `withVaultPassphrase` TAKES THE RECORD AS ANY OBJECT AND LOOKS THESE UP WHEN IT IS CALLED, as `handlersFor` looks up a
+ * `withKeychainPassphrase` TAKES THE RECORD AS ANY OBJECT AND LOOKS THESE UP WHEN IT IS CALLED, as `handlersFor` looks up a
  * row under `routes/`: a type whose every member is optional is one the compiler refuses a record without either
  * method for, and a record that has not got them is answered `NOT_IN_THIS_BUILD`, which is the truth.
  */
 export type PassphraseMethods = {
+  setKeychainPassphrase?(args: never, ctx: never, rewrap: PassphraseRewrap): Promise<Result<unknown>>;
+  clearKeychainPassphrase?(args: never, ctx: never, rewrap: PassphraseRewrap): Promise<Result<unknown>>;
   setVaultPassphrase?(args: never, ctx: never, rewrap: PassphraseRewrap): Promise<Result<unknown>>;
   clearVaultPassphrase?(args: never, ctx: never, rewrap: PassphraseRewrap): Promise<Result<unknown>>;
 };
@@ -210,14 +212,14 @@ export function passphraseOf(said: unknown, setting: boolean): Result<string | n
   if (length > PASSPHRASE_MOST)
     return no('OUT_OF_BOUNDS', `A passphrase is at most ${PASSPHRASE_MOST.toLocaleString('en-GB')} characters.`, { at: 'passphrase' });
   if (setting && length < PASSPHRASE_LEAST)
-    return no('OUT_OF_BOUNDS', `A vault passphrase is at least ${PASSPHRASE_LEAST} characters. A short sentence is easier to remember than a short password.`, {
+    return no('OUT_OF_BOUNDS', `A keychain password is at least ${PASSPHRASE_LEAST} characters. A short sentence is easier to remember than a short password.`, {
       at: 'passphrase',
     });
   return ok(said);
 }
 
 /** The sentence a host with no key store gives, which is also the sentence for a record its root key does not open. */
-const NO_STORE = 'This host holds no key store, so a vault passphrase cannot be set or taken off here.';
+const NO_STORE = 'This host holds no key store, so a keychain password cannot be set or taken off here.';
 const NOT_OPENED = 'This host key store does not open this record, so nothing was changed.';
 
 /** The step for one change, holding the passphrase the request carried and asking the root key only when it runs. */
@@ -228,7 +230,7 @@ function rewrapFor(to: 'passphrase' | 'kek', said: unknown, root: () => Promise<
     if (passphrase.value === null)
       return no(
         'REQUIRED_MISSING',
-        to === 'passphrase' ? 'Type the passphrase to put on the vault.' : 'Type the vault’s passphrase to take it off.',
+        to === 'passphrase' ? 'Type the passphrase to put on the keychain.' : 'Type the keychain’s passphrase to take it off.',
         { at: 'passphrase' },
       );
     const keys = await root();
@@ -244,7 +246,7 @@ function rewrapFor(to: 'passphrase' | 'kek', said: unknown, root: () => Promise<
       }
     }
     const key = await openUnderPassphrase(keys.record, held, passphrase.value);
-    if (key === null) return no('WRONG_KEY', 'That is not this vault’s passphrase, so it stays on.', { at: 'passphrase' });
+    if (key === null) return no('WRONG_KEY', 'That is not this keychain’s passphrase, so it stays on.', { at: 'passphrase' });
     try {
       return ok({ to: 'kek' as const, ...(await keys.close(key, held.beside)) });
     } finally {
@@ -257,20 +259,20 @@ function rewrapFor(to: 'passphrase' | 'kek', said: unknown, root: () => Promise<
  * The handlers with the two passphrase routes answered through the host's root key.
  *
  * THE RECORD'S METHOD STILL ANSWERS, AND ITS GATE STILL COMES FIRST. This hands the method the step and the caller's
- * context, and the method puts the vault gate before the step is ever called, so nobody but an owner in a browser,
+ * context, and the method puts the keychain gate before the step is ever called, so nobody but an owner in a browser,
  * proved within fifteen minutes, reaches a root key or a derivation. What the method is handed as its arguments is an
  * empty object: the passphrase is in the step's closure and never on the record's side of the call.
  *
  * A ROUTE THAT IS NOT IN `handlers` IS LEFT OUT, so a host whose route table has not got the two rows is unchanged.
  */
-export function withVaultPassphrase(
+export function withKeychainPassphrase(
   handlers: Record<string, Handler>,
   record: object,
   root: () => Promise<RootKeys | null>,
 ): Record<string, Handler> {
   const surface = record as PassphraseMethods;
   const answer =
-    (name: 'setVaultPassphrase' | 'clearVaultPassphrase', to: 'passphrase' | 'kek'): Handler =>
+    (name: 'setKeychainPassphrase' | 'clearKeychainPassphrase' | 'setVaultPassphrase' | 'clearVaultPassphrase', to: 'passphrase' | 'kek'): Handler =>
     async (args, ctx) => {
       const method = surface[name];
       if (typeof method !== 'function')
@@ -279,29 +281,31 @@ export function withVaultPassphrase(
     };
   return {
     ...handlers,
+    ...(handlers.setKeychainPassphrase === undefined ? {} : { setKeychainPassphrase: answer('setKeychainPassphrase', 'passphrase') }),
+    ...(handlers.clearKeychainPassphrase === undefined ? {} : { clearKeychainPassphrase: answer('clearKeychainPassphrase', 'kek') }),
     ...(handlers.setVaultPassphrase === undefined ? {} : { setVaultPassphrase: answer('setVaultPassphrase', 'passphrase') }),
     ...(handlers.clearVaultPassphrase === undefined ? {} : { clearVaultPassphrase: answer('clearVaultPassphrase', 'kek') }),
   };
 }
 
 /**
- * The record key for one request at a key door, opened with the passphrase its body carries when the vault is behind
- * one: `null` when the vault is on the root key and the host opens it as it always has.
+ * The record key for one request at a key door, opened with the passphrase its body carries when the keychain is behind
+ * one: `null` when the keychain is on the root key and the host opens it as it always has.
  *
- * `ask` IS THE RECORD'S `unlockVault`, which puts the vault gate first, counts the try, and calls the step this builds.
+ * `ask` IS THE RECORD'S `unlockKeychain`, which puts the keychain gate first, counts the try, and calls the step this builds.
  * The key the step opens stays here, in the host, and the caller zero-fills it when its request is answered.
  */
 export async function unlockedKey(
   body: Record<string, unknown>,
   record: string,
-  ask: (unlock: PassphraseUnlock) => Promise<Result<VaultPassphrase>>,
+  ask: (unlock: PassphraseUnlock) => Promise<Result<KeychainPassphrase>>,
 ): Promise<Result<Uint8Array | null>> {
   const said = passphraseOf(body.passphrase, false);
   if (!said.ok) return said;
   const passphrase = said.value;
   /* A BOX AND NOT A `let`, because the step writes it from inside a closure the compiler cannot follow. */
   const box: { key: Uint8Array | null } = { key: null };
-  let out: Result<VaultPassphrase>;
+  let out: Result<KeychainPassphrase>;
   try {
     out = await ask(async (held) => {
       if (passphrase === null) return null;
@@ -318,5 +322,5 @@ export async function unlockedKey(
     box.key?.fill(0);
     return out.ok ? ok(null) : out;
   }
-  return box.key === null ? no('WRONG_KEY', 'That is not this vault’s passphrase.', { at: 'passphrase' }) : ok(box.key);
+  return box.key === null ? no('WRONG_KEY', 'That is not this keychain’s passphrase.', { at: 'passphrase' }) : ok(box.key);
 }

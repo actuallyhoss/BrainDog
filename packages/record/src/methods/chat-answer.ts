@@ -24,7 +24,7 @@
  * off until he turns it on); the key's person owns the record; the question is open, one he sees, and a choice of options
  * or a set of rows. A pack, an arrangement, settings, a pattern or a change are installs, which stay a browser session's.
  * The press runs the record's own `decide` as the person (`pressedIn`), so every check a press in the app meets it meets
- * too, and `admin` and `vault` refuse it. The decision then keeps where it was pressed (`answeredIn`): History says
+ * too, and `admin` and `keychain` refuse it. The decision then keeps where it was pressed (`answeredIn`): History says
  * "Answered in Claude, on the card."
  */
 
@@ -277,7 +277,7 @@ export function methods(deps: RecordDeps) {
       /* SPENT BEFORE IT IS USED, so two presses at once answer once, and a press the record refuses is not tried again. */
       spent.set(g.j, g.x);
       /* THE PERSON, AS THEY HOLD THE RECORD NOW, PRESSING IN THIS APP: `decide` asks every check it asks of a press in the
-         app, and `admin` and `vault` refuse `pressedIn`, so nothing this press reaches is an install or a key. */
+         app, and `admin` and `keychain` refuse `pressedIn`, so nothing this press reaches is an install or a key. */
       const pressed: CallContext = {
         principal: { kind: 'person', id: g.p, level: 'owner' },
         registers: '*',

@@ -875,7 +875,7 @@ test('AND A DIGEST IS HELD TO THE CALLER’S CEILING, like the list it is made o
     ).ok,
   );
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));
-  value(await api.create({ register: 'notes', fields: { body: 'the vault combination' } }, owner));
+  value(await api.create({ register: 'notes', fields: { body: 'the keychain combination' } }, owner));
 
   const all = value<{ sections: { heading: string }[] }[]>(await api.digestToday({}, owner));
   assert.deepEqual(all[0]?.sections.map((s) => s.heading), ['Obligations', 'Notes']);
@@ -1149,7 +1149,7 @@ test('and somebody with only a named register holds nothing on the record itself
   const listed = value<{ person_id: string; level: string | null }[]>(await api.members(owner));
   assert.equal(listed.find((m) => m.person_id === 'p_3')?.level, null);
   /* `null` ON THE RECORD. This used to promote the highest SCOPED level to the record-wide one —
-     the wrong direction and the expensive one, because `vault()` and `admin()` read
+     the wrong direction and the expensive one, because `keychain()` and `admin()` read
      `principal.level` and neither consults the ceiling: owner of one register was owner of the
      record. `read` was a second wrong answer in the other direction, because `append` is the one
      rung whose point is that it does not read, and every method that names no register asks for
@@ -1160,7 +1160,7 @@ test('and somebody with only a named register holds nothing on the record itself
 });
 
 test('AND OWNER OF ONE REGISTER IS NOT OWNER OF THE RECORD', async () => {
-  /* The vault holds what every credential in the business opens. `invite({ registers: { payroll:
+  /* The keychain holds what every credential in the business opens. `invite({ registers: { payroll:
      'owner' } })` is a legitimate thing to write, and it used to hand over the credential index,
      the export, `invite`, `createToken` and `setDeclaration` with it. */
   const { api, sql } = await studio();
@@ -1193,7 +1193,7 @@ test('AND AN EXPORT OF NOTHING IS NOT AN EXPORT', async () => {
 
 /* ── what leaves, and who may take it ──────────────────────────────────── */
 
-test('AN EXPORT DOES NOT CARRY THE SEALED BYTES, and ADMIN is not the vault', async () => {
+test('AN EXPORT DOES NOT CARRY THE SEALED BYTES, and ADMIN is not the keychain', async () => {
   /* `openGrant` is unrouted on the grounds that routing it would make a credential reachable by
      anything holding a token — and `export` is routed and carried the same `ciphertext` for every
      grant in the record, plus the wrapped record key and its salt. Wrapped by a KEK that is bytes
@@ -1216,7 +1216,7 @@ test('AN EXPORT DOES NOT CARRY THE SEALED BYTES, and ADMIN is not the vault', as
 });
 
 test('and the full file needs the wrapping key named, which ADMIN does not clear', async () => {
-  /* An earlier version gated this on `vault(ctx)`, which is the SAME PREDICATE as `admin(ctx)` —
+  /* An earlier version gated this on `keychain(ctx)`, which is the SAME PREDICATE as `admin(ctx)` —
      both refuse a token and then ask for owner — so it was not a second bar at all: every caller who
      reached the check had already passed it, and the flag was the whole of the permission. This test
      asserted a token was refused, which `admin` does one line earlier, so it passed with the entire
@@ -1240,7 +1240,7 @@ test('and the full file needs the wrapping key named, which ADMIN does not clear
 
 test('A REDACTED EXPORT IMPORTS, which is what makes it an export', async () => {
   /* Blanking `vault_key.wrapped` produced a file that could not be read back — the column is
-     `NOT NULL`, so every vault-provisioned record made a default export no record could restore.
+     `NOT NULL`, so every keychain-provisioned record made a default export no record could restore.
      That is a worse failure than the one it was fixing. */
   const { api, sql } = await record();
   sql.exec(
@@ -1263,7 +1263,7 @@ test('A REDACTED EXPORT IMPORTS, which is what makes it an export', async () => 
 
 test('AND AN EXPORT IS AN EVENT, because it is the read that gets the most out', async () => {
   /* `openGrant` writes `grant.read` for ONE credential; `export` copies every one of them and wrote
-     nothing at all. 12 §6's first rule is that a vault whose reads are not audited cannot answer
+     nothing at all. 12 §6's first rule is that a keychain whose reads are not audited cannot answer
      "did anything get out". */
   const { api, sql } = await record();
   value(await api.export({}, owner));

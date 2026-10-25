@@ -51,7 +51,7 @@ test('THE ROUTE COUNTS BY GROUP: understand adds one ADMIN route and nothing a t
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => r.name !== 'understand'));
   assert.equal(all.ADMIN, (without.ADMIN ?? 0) + 1);
-  for (const group of ['DATA', 'READ+', 'VAULT', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['DATA', 'READ+', 'KEYCHAIN', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('IT REACHES THE RECORD METHOD OF ITS NAME, with the arguments as sent, and a GET is refused', async () => {

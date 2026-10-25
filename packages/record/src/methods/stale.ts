@@ -344,7 +344,7 @@ export const staleCount = (lines: readonly StaleLine[]): number => lines.reduce(
  * `scope-propose.ts`'s, pure; what is here gathers what they read, with reads the record already makes, under the
  * caller's own grant, and files what they answer.
  *
- * NOTHING ASKS BY ITSELF. No clock and no night calls `proposeScopes`: a person presses for it (the Vault's note, or
+ * NOTHING ASKS BY ITSELF. No clock and no night calls `proposeScopes`: a person presses for it (the Keychain's note, or
  * `braindog tidy --ask`), and the question is signed by her. A token is refused, since an agent proposes one move with
  * `propose` and never the whole record's.
  *

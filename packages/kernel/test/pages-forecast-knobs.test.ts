@@ -194,7 +194,7 @@ test('ONE WALK A CURRENCY CARRIES NO SELLS ON THE BLOCK, since each walk is draw
 });
 
 /** A second store of value, held in dollars, so a record holds one sellable figure in each of two currencies. */
-const VAULT: Declaration = { id: 'register.vault', kind: 'register', body: { ...(STORE.body as object), id: 'vault', name: 'Vault' } } as never;
+const KEYCHAIN: Declaration = { id: 'register.keychain', kind: 'register', body: { ...(STORE.body as object), id: 'keychain', name: 'Keychain' } } as never;
 
 /** A figure a sell knob may offer without a page naming it: `sellable: true` beside the rest. */
 const sellable = (metric: string, name: string, source: string, format: string): Declaration => {
@@ -210,10 +210,10 @@ async function twoMoneys(): Promise<Kernel> {
       ACCOUNTS,
       BILLS,
       STORE,
-      VAULT,
+      KEYCHAIN,
       figure('cash-now', 'Cash now', 'register.accounts', 'balance', 'money'),
       sellable('coins-value', 'Coins', 'register.store', 'money.GBP'),
-      sellable('bonds-value', 'Bonds', 'register.vault', 'money.USD'),
+      sellable('bonds-value', 'Bonds', 'register.keychain', 'money.USD'),
     ]),
   );
   value(k.create('accounts', { name: 'Current', balance: { amount: 412_345, currency: 'GBP' } }, OWNER));
@@ -221,7 +221,7 @@ async function twoMoneys(): Promise<Kernel> {
   value(k.create('bills', { what: 'Rent', amount: { amount: 600_000, currency: 'GBP' }, due: '2026-10-01' }, OWNER));
   value(k.create('bills', { what: 'Hosting', amount: { amount: 1_000, currency: 'USD' }, due: '2026-09-20' }, OWNER));
   value(k.create('store', { what: 'Coins', worth: { amount: 150_075, currency: 'GBP' } }, OWNER));
-  value(k.create('vault', { what: 'Bond', worth: { amount: 99_901, currency: 'USD' } }, OWNER));
+  value(k.create('keychain', { what: 'Bond', worth: { amount: 99_901, currency: 'USD' } }, OWNER));
   return k;
 }
 
@@ -254,7 +254,7 @@ test('A WALK OF A GROUP THAT HOLDS NOTHING TO SELL IS OFFERED AN EMPTY LIST, and
   assert.deepEqual(named.refusals, []);
   assert.deepEqual(named.walks?.map((w) => [w.currency, w.sells]), [['GBP', [{ label: 'Coins', value: 150_075 }]], ['USD', []]]);
   /* THE BOND IS SOLD FOR REAL, so the dollar walk has nothing left to offer and the pound walk is as it was. */
-  value(k.create('vault', { what: 'Bond sold', worth: { amount: -99_901, currency: 'USD' } }, OWNER));
+  value(k.create('keychain', { what: 'Bond sold', worth: { amount: -99_901, currency: 'USD' } }, OWNER));
   const after = k.block(walk({ knobs: ['sell'] }));
   assert.deepEqual(after.walks?.map((w) => [w.currency, w.sells]), [['GBP', [{ label: 'Coins', value: 150_075 }]], ['USD', []]]);
   /* A `sell:` NOBODY DECLARED IS STILL SAID ONCE, by the block, and no walk is drawn. */

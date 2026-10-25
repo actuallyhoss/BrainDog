@@ -250,7 +250,7 @@ test('THE ORDER IS HELD TO WHAT HE SAW AND NAMED: his answer, a choice or a set 
   sql.close();
 });
 
-test('WHAT AN ORDER ANSWERS AS NEVER INSTALLS OR OPENS A KEY: admin and the vault refuse it', async () => {
+test('WHAT AN ORDER ANSWERS AS NEVER INSTALLS OR OPENS A KEY: admin and the keychain refuse it', async () => {
   const { api, sql } = await record();
   const as: CallContext = { principal: { kind: 'person', id: 'p_seed', level: 'owner' }, registers: '*', credentialed: true, ordered: 'IN1' };
   const install = refusal(await api.setDeclaration({ id: 'register.x', kind: 'register', body: {} } as never, as));

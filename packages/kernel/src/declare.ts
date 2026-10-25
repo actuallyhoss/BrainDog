@@ -55,7 +55,7 @@ import { BYDAY, FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
 /* THE VALUES `delete:` TAKES, from the file that keeps the rule, so the check and the reader hold one list. */
 import { DELETE_RULES } from './referenced.ts';
-import { spanMs } from './vault.ts';
+import { spanMs } from './keychain.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_OPTIONS_FEWEST, FILTER_OPTIONS_MOST, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, kpisFault, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, lookPlacesFault, withoutHoles } from './compose.ts';
@@ -2627,7 +2627,7 @@ const SKIP_REASON_MOST = 120;
  * (`packages/host/src/ingest.ts`). Mail is verified by the forwarder's own `Authentication-Results`, and `pull`, `call`
  * and `poll` are fetched by the record itself, so a `verify:` on any of them would be a promise nothing keeps.
  *
- * A SIGNATURE NAMES ITS KEY BY THE VAULT LABEL, AND BY NOTHING ELSE. `hmac_sha256` was refused by name until a door
+ * A SIGNATURE NAMES ITS KEY BY THE KEYCHAIN LABEL, AND BY NOTHING ELSE. `hmac_sha256` was refused by name until a door
  * could open a key: nothing bound a grant to an ingest, so a declaration naming one installed and verified nothing,
  * which is the fault above. `ingestVerify` in `packages/record/src/index.ts` now finds the key the label names, the
  * host opens it and checks the raw body (`packages/host/src/ingest.ts`), and `stripe` and `github` are the same check
@@ -2663,7 +2663,7 @@ function verifyFault(id: string, channel: string, verify: unknown): Refusal | nu
   const kind = verify !== null && typeof verify === 'object' && !Array.isArray(verify) ? (verify as { kind?: unknown }).kind : undefined;
   if ((SIGNED_KINDS as readonly unknown[]).includes(kind)) return signedFault(id, kind as string, verify as Record<string, unknown>);
   if (kind !== 'path')
-    return bad('DECLARATION_INVALID', `${id}'s verify is { kind: path }, or a signature: { kind: hmac_sha256, stripe or github, key: <vault label> }.`, 'verify', VERIFY_KINDS);
+    return bad('DECLARATION_INVALID', `${id}'s verify is { kind: path }, or a signature: { kind: hmac_sha256, stripe or github, key: <keychain label> }.`, 'verify', VERIFY_KINDS);
   const stray = Object.keys(verify as object).find((k) => k !== 'kind');
   if (stray === 'token')
     return bad('DECLARATION_INVALID', `${id}'s verify carries a token, and a token is never in a declaration: it is minted and shown once. Keep { kind: path }.`, 'verify');
@@ -2683,7 +2683,7 @@ const SIGNED_KEYS: readonly string[] = ['kind', 'header', 'key', 'tolerance'];
 /** A header name as HTTP spells one. The host asks for it in any case, so the case written here does not matter. */
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/u;
 
-/** The vault's own ceiling on a label (`depositGrant` in `packages/record/src/index.ts`), so any label it takes fits. */
+/** The keychain's own ceiling on a label (`depositGrant` in `packages/record/src/index.ts`), so any label it takes fits. */
 const KEY_LABEL_MOST = 120;
 
 /**
@@ -2695,21 +2695,21 @@ const KEY_LABEL_MOST = 120;
 const TOLERANCE_MOST_MS = 3_600_000;
 
 /**
- * The fault in a signed `verify:`, or `null`: a key named by its vault label, a header if the sender's is not the usual
+ * The fault in a signed `verify:`, or `null`: a key named by its keychain label, a header if the sender's is not the usual
  * one, and a tolerance on Stripe's alone. The label is checked for shape here and for presence at the door, where a
  * key nobody has added verifies nothing and every arrival is stored `untriaged` (`ingestVerify`).
  */
 function signedFault(id: string, kind: string, verify: Record<string, unknown>): Refusal | null {
   const stray = Object.keys(verify).find((k) => !SIGNED_KEYS.includes(k));
   if (stray === 'token' || stray === 'secret')
-    return bad('DECLARATION_INVALID', `${id}'s verify carries a ${stray}, and a secret is never in a declaration. Put it in the vault and name it: key: <vault label>.`, 'verify');
+    return bad('DECLARATION_INVALID', `${id}'s verify carries a ${stray}, and a secret is never in a declaration. Put it in the keychain and name it: key: <keychain label>.`, 'verify');
   if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s verify declares ${stray}, and { kind: ${kind} } takes a key, a header and nothing else.`, 'verify', SIGNED_KEYS);
   const key = verify.key;
   if (typeof key !== 'string' || key.trim() === '')
-    return bad('DECLARATION_INVALID', `${id}'s verify names no key. Add the signing secret to the vault, then name it here: key: <vault label>.`, 'verify');
-  if (key.length > KEY_LABEL_MOST) return bad('DECLARATION_INVALID', `${id}'s verify key is a vault label, at most ${KEY_LABEL_MOST} characters.`, 'verify');
+    return bad('DECLARATION_INVALID', `${id}'s verify names no key. Add the signing secret to the keychain, then name it here: key: <keychain label>.`, 'verify');
+  if (key.length > KEY_LABEL_MOST) return bad('DECLARATION_INVALID', `${id}'s verify key is a keychain label, at most ${KEY_LABEL_MOST} characters.`, 'verify');
   if (looksLikeCredential(key))
-    return bad('DECLARATION_INVALID', `${id}'s verify key looks like the secret itself, and a secret is never in a declaration. Put it in the vault and name it by its label.`, 'verify');
+    return bad('DECLARATION_INVALID', `${id}'s verify key looks like the secret itself, and a secret is never in a declaration. Put it in the keychain and name it by its label.`, 'verify');
   if (verify.header !== undefined && (typeof verify.header !== 'string' || !HEADER_NAME.test(verify.header)))
     return bad('DECLARATION_INVALID', `${id}'s verify header is the name of the header the signature arrives in, such as X-Signature.`, 'verify');
   if (verify.tolerance === undefined) return null;
@@ -3264,11 +3264,11 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
   if (inUrl) return bad('ACTION_EVALUATES', inUrl, 'url');
 
   /* A POLL OF AN ADDRESS THAT NEEDS NO KEY SENDS NONE, so it names none: a public JSON answer is read as anybody reads
-     it, and making the owner put a key in the vault for it would be a key that opens nothing. A call always sends one,
+     it, and making the owner put a key in the keychain for it would be a key that opens nothing. A call always sends one,
      because it writes to somebody else's service. A key that is named is still held to its label's shape. */
   const keyless = channel === 'poll' && body.grant === undefined;
   if (!keyless && (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40))
-    return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the vault it sends.`, 'grant');
+    return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the keychain it sends.`, 'grant');
   const sending = authFault(id, body.auth, keyless);
   if (sending) return sending;
 
@@ -3341,7 +3341,7 @@ function intervalFault(decl: PullDecl): Refusal | null {
 /** A query parameter a key may go in, as a form names one. */
 const QUERY_NAME = /^[A-Za-z0-9_.~-]{1,64}$/u;
 
-/** The words a person reaching for a secret would write inside `auth:`, each refused with the vault's sentence. */
+/** The words a person reaching for a secret would write inside `auth:`, each refused with the keychain's sentence. */
 const AUTH_SECRETS: readonly string[] = ['token', 'secret', 'password', 'value', 'key'];
 
 /**
@@ -3349,7 +3349,7 @@ const AUTH_SECRETS: readonly string[] = ['token', 'secret', 'password', 'value',
  * `{ kind: basic }`, or absent for a bearer, which is what a bare `grant:` has always meant.
  *
  * THE KEY ITSELF IS STILL NAMED BY `grant:` AND BY NOTHING HERE. `auth:` says only where it goes, so the install diff
- * that names the key names it once, and a secret written into `auth:` is refused with the vault's sentence rather than
+ * that names the key names it once, and a secret written into `auth:` is refused with the keychain's sentence rather than
  * read as a name.
  *
  * A HEADER THE REQUEST SETS ITSELF IS REFUSED HERE, with the list connect's auth builder refuses again at run time
@@ -3365,7 +3365,7 @@ function authFault(id: string, auth: unknown, keyless: boolean): Refusal | null 
   const said = auth as { kind?: unknown; name?: unknown };
   const stray = Object.keys(said).find((k) => k !== 'kind' && k !== 'name');
   if (stray !== undefined && AUTH_SECRETS.includes(stray))
-    return bad('DECLARATION_INVALID', `${id}'s auth carries a ${stray}, and a secret is never in a declaration. Put it in the vault and name it with grant:.`, `auth.${stray}`);
+    return bad('DECLARATION_INVALID', `${id}'s auth carries a ${stray}, and a secret is never in a declaration. Put it in the keychain and name it with grant:.`, `auth.${stray}`);
   if (stray === 'grant') return bad('DECLARATION_INVALID', `${id} names its key with grant: beside auth, not inside it.`, 'auth.grant');
   if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s auth declares ${stray}, and auth takes a kind and a name and nothing else.`, `auth.${stray}`);
   if (typeof said.kind !== 'string' || !kinds.includes(said.kind))
@@ -4869,7 +4869,7 @@ function bandEdgesFault(f: Record<string, unknown>): Refusal | null {
  * The rules on each field that the write path keeps, checked once every field is known, because a
  * condition and a move's `requires` name other fields of the register.
  *
- * A `secret` field is the vault door's alone (`index.ts`'s `depositGrant`), so everything that would
+ * A `secret` field is the keychain door's alone (`index.ts`'s `depositGrant`), so everything that would
  * put a value in it from anywhere else is refused here: `required` and `required_when`, which no
  * create could meet, and a `default`, which is a value no door wrote. It is never searched and never
  * a row's title, because it holds where a key is sealed and says nothing about the row.
@@ -4963,7 +4963,7 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
           at,
         );
       /* TWO KINDS INSTALL CANNOT FULLY ANSWER FOR, and neither is waved through. A `secret` default
-         is refused outright below, by the rule that only the vault door writes one, so coercing it
+         is refused outright below, by the rule that only the keychain door writes one, so coercing it
          here would answer with the wrong sentence. A `ref` is coerced with a lookup that says every
          row exists, because whether `people#41` has been written yet is the create path's question
          and refusing it here would refuse a correct declaration; the shape and the declared
@@ -5057,11 +5057,11 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
     const sealed = type === 'secret' || (type === 'list' && f.of === 'secret');
     if (!sealed) continue;
     if (type === 'list')
-      return bad('DECLARATION_INVALID', `${said} is a list of secrets, and the vault seals one key into one field. Declare a secret field for each key.`, at);
+      return bad('DECLARATION_INVALID', `${said} is a list of secrets, and the keychain seals one key into one field. Declare a secret field for each key.`, at);
     if (f.required === true || f.required_when !== undefined)
-      return bad('DECLARATION_INVALID', `${said} is a secret, which only the vault door writes, so no create could supply it. Leave it optional.`, at);
+      return bad('DECLARATION_INVALID', `${said} is a secret, which only the keychain door writes, so no create could supply it. Leave it optional.`, at);
     if (f.default !== undefined)
-      return bad('DECLARATION_INVALID', `${said} is a secret, which only the vault door writes, and a default would be a value no door wrote.`, at);
+      return bad('DECLARATION_INVALID', `${said} is a secret, which only the keychain door writes, and a default would be a value no door wrote.`, at);
     if (f.search === true)
       return bad('SEARCH_FIELD_TYPE', `${said} is a secret, and search reads what a row says, never where its key is sealed.`, at, [...SEARCHABLE, 'list<text>']);
     if (title === f.id)
@@ -5656,7 +5656,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     if (enumeral && (f.values as readonly string[]).some((v) => looksLikeCredential(v)))
       return bad(
         'DECLARATION_INVALID',
-        `${id}.${f.id} lists a value that looks like a key, and a key never goes in a declaration. Deposit it in the vault, and list what it opens instead.`,
+        `${id}.${f.id} lists a value that looks like a key, and a key never goes in a declaration. Deposit it in the keychain, and list what it opens instead.`,
         f.id,
       );
 

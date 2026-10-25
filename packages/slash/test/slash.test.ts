@@ -130,7 +130,7 @@ test('configure refuses an ask cap that is not a whole number of asks', () => {
   assert.equal(slash.configure({ ask_cap: 0 }, OWNER).ok, true);
 });
 
-test('tier b needs a grant, and a grant is an id the vault holds', () => {
+test('tier b needs a grant, and a grant is an id the keychain holds', () => {
   const { slash } = build();
   assert.equal(codeOf(slash.configure({ tier: 'b', model: 'claude-x' }, OWNER)), 'VALUE_MALFORMED');
 });

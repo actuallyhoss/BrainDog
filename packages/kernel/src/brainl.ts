@@ -54,7 +54,7 @@ export type TableShape = { name: string; section: Section; columns: string[]; pk
  *
  * AN `export` EVENT IS A FACT ABOUT THIS INSTALLATION'S COPIES, not about the business — the same
  * argument the `local` section already makes for tokens, device grants and failed logins. It has to
- * be written, because 12 §6's first rule is that a vault whose reads are not audited cannot answer
+ * be written, because 12 §6's first rule is that a keychain whose reads are not audited cannot answer
  * *"did anything get out"*, and an export is the one read that copies every credential at once.
  *
  * AND IT CANNOT BE IN THE FILE, because then no two exports of an unchanged record are the same
@@ -155,7 +155,7 @@ export function decode(value: unknown, at?: string): string | number | null | Ui
     return unbase64(String((value as { b64: string }).b64));
   if (typeof value === 'object')
     throw new BadLine(
-      `${at ?? 'A column'} holds ${JSON.stringify(value)} where the format writes bytes as {"b64": ...}, so the bytes are not in this file. The Cloud wrote every BLOB this way until its export was repaired, and a copy it made before then holds no vault.`,
+      `${at ?? 'A column'} holds ${JSON.stringify(value)} where the format writes bytes as {"b64": ...}, so the bytes are not in this file. The Cloud wrote every BLOB this way until its export was repaired, and a copy it made before then holds no keychain.`,
       at,
     );
   return value as string | number;
@@ -201,7 +201,7 @@ const SEALED: Readonly<Record<string, ReadonlySet<string>>> = {
  * Tables a redacted export leaves out entirely.
  *
  * `vault_key.wrapped` IS `NOT NULL`, so blanking it produced a file that could not be imported — a
- * default export that every vault-provisioned record could make and no record could restore, which
+ * default export that every keychain-provisioned record could make and no record could restore, which
  * is a worse failure than the one being fixed. The row is the wrapped record key and its salt and
  * there is nothing left of it once those are gone, so the honest redaction is the row's absence: an
  * import into a fresh record provisions its own key, which is the operation somebody restoring was
@@ -1135,7 +1135,7 @@ export function importBrainl(
      * SEALED, so "no keys" and "keys I cannot open" look alike from outside — and it is a count of
      * rows in another table rather than a fact about who this record is. `vault_key` is in
      * `NEEDS_IDENTITY`, so a `sections: ['data']` file carries the claim and leaves the thing
-     * claimed behind: a fresh record with an empty vault, saying it holds three keys. That is worse
+     * claimed behind: a fresh record with an empty keychain, saying it holds three keys. That is worse
      * than the silence the row replaced, because somebody acts on it.
      *
      * RECOMPUTED AND NOT SKIPPED. An absent row is ambiguous between "no keys" and "written by a

@@ -9,7 +9,7 @@
  *
  * THE GRANT IS CHECKED HERE, NOT ONLY AT THE DOOR. `shapeExport` takes the bearer and reads it before it reads a row,
  * so a host that wires the door wrong, or a later route that calls the method by name, still hands out nothing without
- * the grant. `shapeGrant` is the check alone, as `vaultGrant` is, for a host that wants to know who approved one.
+ * the grant. `shapeGrant` is the check alone, as `keychainGrant` is, for a host that wants to know who approved one.
  *
  * THE EXPORT IS THE REDACTED ONE. The sealed bytes never leave for a shape copy (the scrambler would zero them anyway),
  * `local` never travels, and the kernel writes its `export` event under the person who approved the grant, so the
@@ -44,7 +44,7 @@ export function methods(deps: Pick<RecordDeps, 'kernel' | 'clock' | 'validFrom'>
      * The record's shape copy for a shape-grant bearer: the lines of a `.brainl` file whose second line is
      * `#shape: true`, with every value scrambled. INTERNAL: the host's shape door calls it, and no route reaches it.
      *
-     * ANY OTHER BEARER IS REFUSED BEFORE A ROW IS READ, in the kernel's one sentence: a login, a vault grant, an
+     * ANY OTHER BEARER IS REFUSED BEFORE A ROW IS READ, in the kernel's one sentence: a login, a keychain grant, an
      * operation grant, an agent's key, another record's grant, one past its life, one revoked.
      */
     async shapeExport(bearer: string, ask?: ShapeAsk): Promise<Result<string[]>> {

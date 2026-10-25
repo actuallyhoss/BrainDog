@@ -18,7 +18,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 const T0 = Date.UTC(2026, 9, 14, 9);
 const GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWN: SlashOwnKey = { provider: 'anthropic', base_url: null, model: 'his-model', grant_id: GRANT };
-const VAULT = [{ id: GRANT, label: 'kiln room key', revoked_at: null, kind: 'api_token' }];
+const KEYCHAIN = [{ id: GRANT, label: 'kiln room key', revoked_at: null, kind: 'api_token' }];
 
 const KEY: Candidate = { id: 'key', model: 'his-model', tier: 'b', source: 'key' };
 const FLASH: Candidate = { id: 'flash', model: 'flash-chat', tier: 'a', source: 'included' };
@@ -27,11 +27,11 @@ const PROVIDER: Candidate = { id: 'provider', model: 'other-chat', tier: 'a', so
 const SMALL: Candidate = { id: 'small', model: 'small-chat', tier: 'a', source: 'included' };
 const ON_KEY: RouteFacts = { form: 'key', models: { key: KEY, flash: FLASH, second: SECOND, provider: PROVIDER, small: SMALL }, large: true, machine: false };
 
-/** A wire that counts every request, and a vault whose key will not open: `null`, or a throw. */
+/** A wire that counts every request, and a keychain whose key will not open: `null`, or a throw. */
 const shut = (open: SlashHostDeps['openKey']) => {
   const sent: string[] = [];
   const deps: SlashHostDeps = {
-    grants: () => VAULT,
+    grants: () => KEYCHAIN,
     openKey: open,
     send: async (url) => (sent.push(url.href), new Response('{}', { status: 200 })),
   };
@@ -47,7 +47,7 @@ test('OWN_KEY_FAILED IS HIS SENTENCE, plain, with no dash and no id', () => {
   assert.ok(!/[—–]/u.test(OWN_KEY_FAILED));
 });
 
-test('A KEY THAT WILL NOT OPEN IS OWN_KEY_FAILED AT THE ADAPTER, and nothing is sent, for null and for a vault that throws', async () => {
+test('A KEY THAT WILL NOT OPEN IS OWN_KEY_FAILED AT THE ADAPTER, and nothing is sent, for null and for a keychain that throws', async () => {
   for (const open of [async () => null, async () => Promise.reject(new Error('sealed under another key'))]) {
     const { sent, deps } = shut(open);
     const inference = slashOwnInference(OWN, deps);

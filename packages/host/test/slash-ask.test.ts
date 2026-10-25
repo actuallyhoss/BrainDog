@@ -195,7 +195,7 @@ test('THE ASK ANSWERS ROWS OUT OF THE RECORD, over a real socket, through the en
   );
   assert.deepEqual(reading.predicate, { field: 'state', is: 'open' });
   assert.deepEqual(reading.read.at(0), { register: 'tasks', rows: 2, predicate: '{"field":"state","is":"open"}' });
-  /* THE FOLD'S LAST LINE IS THE VAULT, REFUSED, on every ask (`46 §4.2`), and it reaches a person through this door. */
+  /* THE FOLD'S LAST LINE IS THE KEYCHAIN, REFUSED, on every ask (`46 §4.2`), and it reaches a person through this door. */
   assert.deepEqual(reading.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
   assert.match(reading.ask_id, /^[0-9a-z_]+$/iu);
 
@@ -241,7 +241,7 @@ test('A BUILDER THAT THROWS MAKES THE ASK FAIL, which is the assertion a pass th
   assert.match(String(out.body.refusal?.fix), /the engine builder was not called/u);
   assert.equal(asked, 1, 'the door answered without asking the builder at all');
 
-  /* AND A FAILURE IS NOT KEPT. The first ask of the day opens a vault grant, which can fail for a reason that
+  /* AND A FAILURE IS NOT KEPT. The first ask of the day opens a keychain grant, which can fail for a reason that
      has passed by the second; a cached rejection would answer the same 500 until the process restarted. */
   const twice = await ask(host.origin, { question: 'Which tasks are open?' });
   assert.equal(twice.status, 500);
@@ -463,7 +463,7 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
  * 404 `ROUTE_UNKNOWN` "There is no method called slash/read." An in-process test cannot see that, so this one
  * reads the two dispatch files off disk instead.
  *
- * IT IS THE SHAPE `apps/worker/test/vault.test.ts:90` ALREADY USES for exactly this question, and for the same
+ * IT IS THE SHAPE `apps/worker/test/keychain.test.ts:90` ALREADY USES for exactly this question, and for the same
  * reason: whether a door is routed is a fact about a host's source, not about a function's behaviour, so the
  * source is what is asserted. Its right homes are `apps/worker/test/slash.test.ts` and
  * `apps/selfhost/test/slash.test.ts`, one assertion per host in the suite that owns the host. It is here

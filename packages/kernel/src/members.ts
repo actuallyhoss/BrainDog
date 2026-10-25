@@ -116,7 +116,7 @@ export function access(sql: Sql, person: string, token?: string | null, lens?: A
      comment above claimed to be about that case.
 
      Measured: a record carrying `member('p_ghost', '*', 'owner')` and no `person('p_ghost')` gave
-     `access('p_ghost') → owner` — the vault, the export, `invite`. `owners()` DOES join `person`, so
+     `access('p_ghost') → owner` — the keychain, the export, `invite`. `owners()` DOES join `person`, so
      it did not count the ghost: `suspend` answered `OUT_OF_BOUNDS`, `remove` answered
      `LEVEL_REQUIRED`, and demoting the real owner was refused because the ghost was invisible to the
      count and visible to the ladder. That is the state `owners()`'s own comment says there is *"no
@@ -188,10 +188,10 @@ function memberAccess(rows: readonly MemberRow[]): Held | null {
 
      THIS PROMOTED THE HIGHEST SCOPED LEVEL TO THE RECORD-WIDE ONE, which is the wrong direction and
      the expensive one: `invite({ registers: { payroll: 'owner' } })` is accepted, and the caller
-     then held `level: 'owner'` — which is what `vault()` and `admin()` read, and neither of them
-     consults the ceiling, because ADMIN and VAULT are not about a register. Owner of one register
+     then held `level: 'owner'` — which is what `keychain()` and `admin()` read, and neither of them
+     consults the ceiling, because ADMIN and KEYCHAIN are not about a register. Owner of one register
      was owner of the record: the credential index, the export, `invite`, `createToken`,
-     `setDeclaration`. 45 §5.1 is explicit that for VAULT and ADMIN *"the `'*'` level must be
+     `setDeclaration`. 45 §5.1 is explicit that for KEYCHAIN and ADMIN *"the `'*'` level must be
      owner"*, and the only honest reading of "no `'*'` row" is that there is no record-wide level.
 
      The per-register levels below still travel, which is where a scoped grant does its work. */

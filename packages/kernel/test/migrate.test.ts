@@ -539,7 +539,7 @@ test('MIGRATION 33 REBUILDS device_grant: every row copied with its scope, and a
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   await applyMigrations(sql, clock);
-  /* Back to the table migration 4 made, with a vault row in it, so migration 33 runs over something. */
+  /* Back to the table migration 4 made, with a keychain row in it, so migration 33 runs over something. */
   const four = statements(MIGRATIONS[3]!.sql).find((s) => s.startsWith('CREATE TABLE device_grant_next'))!;
   sql.exec('DROP TABLE device_grant');
   sql.exec(four);

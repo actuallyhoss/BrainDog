@@ -101,10 +101,10 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
 
-test('AND NO TOOL READS A CREDENTIAL, because there is no vault tool', () => {
-  /* The vault needs a person in a browser, and an agent holding a token is neither. What a key opens
+test('AND NO TOOL READS A CREDENTIAL, because there is no keychain tool', () => {
+  /* The keychain needs a person in a browser, and an agent holding a token is neither. What a key opens
      arrives through `context`, by name; the value never arrives at all. */
-  for (const t of TOOLS) assert.doesNotMatch(t.name, /grant|vault|credential|secret|key/i, `${t.name} would read a credential`);
+  for (const t of TOOLS) assert.doesNotMatch(t.name, /grant|keychain|credential|secret|key/i, `${t.name} would read a credential`);
 });
 
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {

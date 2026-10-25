@@ -79,6 +79,8 @@ export const SPELLINGS = {
   alarm: 'alarm-clock',
   loader: 'loader-circle',
   unlock: 'lock-open',
+  /* The Keychain's own name for the shield `vault` draws, kept beside it so an old mark still draws. */
+  keychain: 'shield',
 } as const satisfies Record<string, CoreGlyph | SetGlyph>;
 
 /**

@@ -148,7 +148,7 @@ test('A RULE STORED PAST THE LINT THAT COPIES THE KEY OR THE FILE INTO party IS 
 /* ── a copy made before the secret changed ────────────────────────────────── */
 
 /**
- * The row is made through the vault door, so `token` holds a real grant id, and `party` is given that id by SQL, as an
+ * The row is made through the keychain door, so `token` holds a real grant id, and `party` is given that id by SQL, as an
  * earlier build's `rule.copy` wrote it in the same write. What happens to `token` after that is the case.
  */
 async function copied(): Promise<{ k: Kernel; sql: NodeSql; made: Entry; first: string }> {
@@ -163,7 +163,7 @@ test('A COPY OF A KEY THE ROW NO LONGER NAMES IS NOT SENT: the grant revoked and
   const { k, sql, made, first } = await copied();
   value(k.revokeGrant(first, 'p_1'));
   const again = value(k.depositGrant({ register: 'invoices', ref: made.id, field: 'token', grant: SEALED('service key') }, { actor: 'p_1' }));
-  assert.notEqual(again.grant.id, first, 'the vault rotated the grant in place, so the row still names the copied id');
+  assert.notEqual(again.grant.id, first, 'the keychain rotated the grant in place, so the row still names the copied id');
   value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
   await k.drain();
   const calls = sent(sql);
@@ -214,7 +214,7 @@ test('AND NOT AFTER THE FILE WAS REPLACED: the name it held is in the log, and i
 /* ── the run's carried set ────────────────────────────────────────────────── */
 
 test('A RUN THAT WROTE A FIELD FROM THE SECRET DOES NOT SEND IT after the secret changed under its wait', async () => {
-  /* PLAINTEXT, NOT A GRANT ID, so the vault's ids cannot be what holds it back: the only thing left that says `party`
+  /* PLAINTEXT, NOT A GRANT ID, so the keychain's ids cannot be what holds it back: the only thing left that says `party`
      came from `token` is the run's `-unsent`.
 
      THE RUN IS PUT PAST ITS WRITE AS HEAD `b7409d2d` LEFT IT, since this build refuses the write: the step row says the

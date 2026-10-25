@@ -20,7 +20,7 @@ type Declared = { id: string; version: number; body: string; pack_id: string | n
  * One installed script as the `scripts` read answers it: what it may touch, whether it is paused, its last run and how
  * close it is to being paused.
  *
- * NOTHING SEALED AND NO LOG. A key is its vault label, which the declaration already names. A run's log quotes what the
+ * NOTHING SEALED AND NO LOG. A key is its keychain label, which the declaration already names. A run's log quotes what the
  * script read, so it stays on the run's event, where `lineOf` holds it to an owner who reads every list the version
  * touched; the `say` here is the event's note, which is the record's own sentence and which every whole-record reader
  * already sees in `recentHistory`.

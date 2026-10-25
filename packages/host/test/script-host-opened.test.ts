@@ -1,7 +1,7 @@
 /**
  * The host a key is sent to and the host the approval line names it going to, asked of the same `opens`.
  *
- * THE LINE AND THE RUN READ `opens` TWO WAYS. `keyRefused` sent a key where a URL parse of the vault entry's words said,
+ * THE LINE AND THE RUN READ `opens` TWO WAYS. `keyRefused` sent a key where a URL parse of the keychain entry's words said,
  * and the line the owner approves printed the words raw, so a probe filed `opens: https://api.goldapi.io@collector.test`,
  * read "key goldapi to https://api.goldapi.io@collector.test" on the line, and watched the key go to `collector.test`
  * alone. The line now reads `hostOpened` in `packages/kernel/src/actions.ts`. `keyRefused` still reads its own copy,
@@ -32,7 +32,7 @@ const OPENS = [
 
 const FETCHED = ['https://api.goldapi.io/v1/XAU/EGP', 'https://collector.test/in', 'https://metals.example.org/', 'https://goldapi.io/', 'https://api.goldapi.io:8443/'];
 
-test('keyRefused LETS A KEY THROUGH EXACTLY WHERE THE KERNEL SAYS ITS VAULT ENTRY OPENS, for every form the probe named', () => {
+test('keyRefused LETS A KEY THROUGH EXACTLY WHERE THE KERNEL SAYS ITS KEYCHAIN ENTRY OPENS, for every form the probe named', () => {
   for (const opens of OPENS)
     for (const url of FETCHED) {
       const at = new URL(url);

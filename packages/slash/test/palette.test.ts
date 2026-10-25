@@ -65,7 +65,7 @@ test('pass 1 asks for the index, then for the rows the drafted predicate names',
   assert.equal(inference.seen.length, 1);
 });
 
-test('the fold ends with the vault, read nothing, refused', async () => {
+test('the fold ends with the keychain, read nothing, refused', async () => {
   const { slash, inference } = build();
   inference.say(PREDICATE);
   const out = await slash.read('what is still open', OWNER);
@@ -78,7 +78,7 @@ test('the fold ends with the vault, read nothing, refused', async () => {
   });
 });
 
-test('a model that names the vault has it dropped before the call, not refused after it', async () => {
+test('a model that names the keychain has it dropped before the call, not refused after it', async () => {
   const { slash, record, inference } = build();
   inference.say(JSON.stringify({ registers: ['grant', 'obligations'], where: null, q: 'keys' }));
   await slash.read('what keys do I have', OWNER);
@@ -352,7 +352,7 @@ test('tier b answers on the adapter the host handed in, and bills no neurons', a
   assert.equal(propose?.neurons, 0);
 });
 
-test('tier b with no open key is a sentence about the vault, and costs no call', async () => {
+test('tier b with no open key is a sentence about the keychain, and costs no call', async () => {
   const { slash, inference } = build();
   slash.configure({ tier: 'b', model: 'claude-x', grant_id: 'g_01JRQ8Z0X1Y2Z3A4B5C6D7E8F9' }, OWNER);
   inference.say(PREDICATE);

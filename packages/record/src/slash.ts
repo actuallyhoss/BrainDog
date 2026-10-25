@@ -1766,7 +1766,7 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 /**
  * Whether any string in a change body and the declarations it carries, or any key of one of its objects, looks like a key.
  *
- * A KEY IS NAMED BY ITS LABEL AND NEVER WRITTEN OUT. A script's `keys` are vault labels the host opens for one request, and
+ * A KEY IS NAMED BY ITS LABEL AND NEVER WRITTEN OUT. A script's `keys` are keychain labels the host opens for one request, and
  * `scriptBody` checks only their length, so a model that wrote a provider's key into `source`, into a fetch's headers or
  * in place of a label would have filed it into the proposal's body, where Decide draws it and the record keeps it. Every
  * kind is read and not only a script, because an ingest's address and a page's note are text a model writes as freely.
@@ -1918,7 +1918,7 @@ function changeBody(
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
     return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.` };
-  /* A SCRIPT SLASH WRITES SENDS NONE OF HIS KEYS (H.735, "F8 Slash scripts proposal-only no vault keys"). The question
+  /* A SCRIPT SLASH WRITES SENDS NONE OF HIS KEYS (H.735, "F8 Slash scripts proposal-only no keychain keys"). The question
      used to say "sending your key ..." and file it; on any path, pressed or described, one naming a key is dropped. */
   if (listed.some((d) => d.kind === 'script' && namesKey(partOf(d.body).keys))) return { ok: false, why: KEYED_SCRIPT };
   /* THE WHOLE BODY AND NOT ONLY ITS DECLARATIONS, because every key a model writes beside `to` is filed with it (the
@@ -1927,7 +1927,7 @@ function changeBody(
   if (holdsKey(body))
     return {
       ok: false,
-      why: `Proposal ${n} holds something shaped like a key. A key stays in the vault and a change names it by its label, so Slash files none written out.`,
+      why: `Proposal ${n} holds something shaped like a key. A key stays in the keychain and a change names it by its label, so Slash files none written out.`,
     };
   const says: string[] = [];
   if (described) {

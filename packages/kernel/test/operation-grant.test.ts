@@ -4,7 +4,7 @@
  *
  * WHAT WAS MEASURED BEFORE THIS EXISTED. The kernel accepted a device start with reach `import`, an owner approved it,
  * and the exchange handed the device a bearer that lived ten minutes (`lifeMs`). Nothing read it again: the only reader
- * of `device_grant.token_hash` was `vaultGrant`, which matches `reach = 'vault'` alone, so the CLI could be given a
+ * of `device_grant.token_hash` was `keychainGrant`, which matches `reach = 'vault'` alone, so the CLI could be given a
  * bearer for an import that no door in either host would take.
  *
  * SPENT ON FIRST USE, and the second presentation is told what a stranger's bearer is told, so a replayed request and a
@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 
 import { fixOf, type Result } from '@braindog/ports';
 
-import { CODE_MS, deviceApprove, devicePoll, deviceStart, operationGrant, vaultGrant, type Exchanged } from '../src/device.ts';
+import { CODE_MS, deviceApprove, devicePoll, deviceStart, operationGrant, keychainGrant, type Exchanged } from '../src/device.ts';
 import { applyMigrations } from '../src/migrate.ts';
 import { verifyToken, type TokenDeps } from '../src/token.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
@@ -78,22 +78,22 @@ test('AN IMPORT GRANT, APPROVED AND EXCHANGED, IS ADMITTED ONCE FOR IMPORT, AND 
   assert.deepEqual({ ...row }, { status: 'expired', expires: new Date(NOW).toISOString(), last_used: new Date(NOW).toISOString() });
 });
 
-test('EACH REACH NAMES ITS ONE METHOD, and a vault or login bearer is no operation grant', async () => {
+test('EACH REACH NAMES ITS ONE METHOD, and a keychain or login bearer is no operation grant', async () => {
   const { deps, bearerFor } = await setup();
   for (const [reach, method] of [['export', 'export'], ['import', 'import'], ['pack', 'installPack'], ['token', 'createToken']] as const)
     assert.equal(value(await operationGrant(deps(), await bearerFor(reach))).method, method, reach);
 
-  /* A vault grant needs a scope, and `*` needs no project row. */
-  const vault = await bearerFor('vault', '*');
-  assert.equal(refusalOf(await operationGrant(deps(), vault)).code, 'FORBIDDEN');
-  assert.ok((await vaultGrant(deps(), vault)).ok, 'the vault grant stopped working as one');
+  /* A keychain grant needs a scope, and `*` needs no project row. */
+  const keychain = await bearerFor('vault', '*');
+  assert.equal(refusalOf(await operationGrant(deps(), keychain)).code, 'FORBIDDEN');
+  assert.ok((await keychainGrant(deps(), keychain)).ok, 'the keychain grant stopped working as one');
 
   const login = await bearerFor('login');
   assert.equal(refusalOf(await operationGrant(deps(), login)).code, 'FORBIDDEN');
   assert.ok((await verifyToken(deps(), login, 'api')).ok);
 
   /* And the other way round: an operation bearer opens no key. */
-  assert.equal(refusalOf(await vaultGrant(deps(), await bearerFor('export'))).code, 'FORBIDDEN');
+  assert.equal(refusalOf(await keychainGrant(deps(), await bearerFor('export'))).code, 'FORBIDDEN');
 });
 
 test('PAST ITS TEN MINUTES, FOR ANOTHER RECORD, OR APPROVED BY SOMEBODY SINCE SUSPENDED, IT IS REFUSED IN THE SAME WORDS', async () => {

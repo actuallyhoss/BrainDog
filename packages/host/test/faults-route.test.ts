@@ -55,7 +55,7 @@ test('THE ROUTES COUNT BY GROUP: one READ+, one ADMIN and one DATA, and nothing 
   const all = by(ROUTES);
   const without = by(ROUTES.filter((r) => !['faults', 'retryFault', 'withdraw'].includes(r.name)));
   for (const group of ['READ+', 'ADMIN', 'DATA']) assert.equal(all[group], (without[group] ?? 0) + 1, `${group} grew by one`);
-  for (const group of ['VAULT', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
+  for (const group of ['KEYCHAIN', 'JOBS']) assert.equal(all[group], without[group], `${group} grew`);
 });
 
 test('EACH REACHES THE RECORD METHOD OF ITS NAME, faults as a GET and the two writes as a POST with the body as sent', async () => {

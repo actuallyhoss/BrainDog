@@ -31,7 +31,7 @@
  * nothing, or match something the messages never said, is refused before anybody is asked about it.
  *
  * THE SAMPLES ARE UNTRUSTED AND ARE FENCED AS SUCH. They arrived from outside; a sample telling the
- * model to write to the vault register is the case this is shaped around, and the answer is not a
+ * model to write to the keychain register is the case this is shaped around, and the answer is not a
  * classifier. It is that the fence is JSON-encoded so it cannot be closed, the register has to be
  * one the projection listed, the confidence is not the model's to set, and a person decides.
  */

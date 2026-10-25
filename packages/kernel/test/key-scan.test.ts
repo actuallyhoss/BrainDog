@@ -97,7 +97,7 @@ test('THE FINDING CLEARS ONCE THE KEY IS MOVED, and a record with none reads nou
   const id = plant(sql, 'credentials', { label: 'Deploy token', where: KEY }, 2);
   scanKeys(sql, NOW);
   assert.equal(keysInText(sql)?.length, 1);
-  sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify({ label: 'Deploy token', where: 'the vault' }), id);
+  sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify({ label: 'Deploy token', where: 'the keychain' }), id);
   scanKeys(sql, NOW + DAY);
   const read = readKeysInText(sql, {}, KEYS_IN_TEXT);
   assert.ok(read.ok);
@@ -182,7 +182,7 @@ test('THE CURSOR SURVIVES A RECORD THAT SHRANK under it: the night ends the pass
   sql.close();
 });
 
-test('A SEALED FIELD\'S GRANT IS NOT A KEY: the vault handle a key row holds is not counted', async () => {
+test('A SEALED FIELD\'S GRANT IS NOT A KEY: the keychain handle a key row holds is not counted', async () => {
   const sql = await record();
   plant(sql, 'credentials', { label: 'Deploy token', value: 'g_01J9ZQ3XKT8M6Y4V2N0P5R7S9W' }, 18);
   scanKeys(sql, NOW);

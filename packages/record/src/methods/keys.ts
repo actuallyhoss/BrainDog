@@ -5,7 +5,7 @@
  * and the `router-groups` gate refuses a route that names one), and the one caller is the host that holds the root keys:
  * the Worker's re-wrap for its nightly walk (`apps/worker/src/rewrap.ts`) and the self-host as it starts
  * (`apps/selfhost/src/rewrap.ts`).
- * What it takes is bytes the host wrapped, never a key, so the record still holds nothing that opens its own vault.
+ * What it takes is bytes the host wrapped, never a key, so the record still holds nothing that opens its own keychain.
  *
  * A RECORD THIS BUILD REFUSES IS NOT RE-WRAPPED. Its schema disagrees with the code, so no write reaches it; the host's
  * re-wrap answers it as a straggler, and a later one re-wraps it once it opens again (`53 §5.6` step 6).
