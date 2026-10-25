@@ -36,11 +36,11 @@ test('each project takes its newest run, by its spoken id, its row id or its nam
 
 test('a card says one live line: who is on it, else the last run, else its work, else since when it is quiet', () => {
   const quiet = { worked: null, last: null, moved: '2026-09-28' };
-  assert.deepEqual(lifeOf(quiet, []), { kind: 'quiet', said: 'Quiet since 28 Sep' });
+  assert.deepEqual(lifeOf(quiet, []), { kind: 'quiet', said: 'Nothing changed since 28 Sep' });
   assert.deepEqual(lifeOf({ ...quiet, worked: { said: '2 days', quiet: false } }, []), { kind: 'worked', said: 'Worked on 2 days ago', quiet: false });
   assert.deepEqual(lifeOf({ ...quiet, worked: { said: '2 days', quiet: false }, last: { agent: 'claude', name: 'Claude', said: '2 hours ago' } }, []), {
     kind: 'run',
-    said: 'Claude worked on it 2 hours ago',
+    said: 'Worked on 2 hours ago',
     agent: 'claude',
   });
   assert.deepEqual(lifeOf(quiet, [{ name: 'Claude' }, { name: 'Codex' }]), { kind: 'working', said: 'Claude and Codex working' });

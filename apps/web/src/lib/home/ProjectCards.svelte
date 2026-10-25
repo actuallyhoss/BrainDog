@@ -275,6 +275,13 @@
     }
   }
 
+  /* A LONE TILE ON A LAST ROW OF FOUR is held back (17 projects leave one under sixteen); All projects has it. */
+  @media (width >= 1280px) {
+    .cards > li:last-child:nth-child(4n + 1):not(:first-child) {
+      display: none;
+    }
+  }
+
   /* A DRAFT IS THE SAME TILE, with its two presses where the figure would be. */
   .draft {
     display: grid;

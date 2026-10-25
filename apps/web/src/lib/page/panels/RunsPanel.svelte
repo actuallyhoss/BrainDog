@@ -63,7 +63,16 @@
   onMount(() => void load());
   listen(load, () => false);
 
-  const shown = $derived(all ? lines : lines.slice(0, SHOWN));
+  /* THE SAME RUN TITLE IN A ROW IS ONE ROW SAYING HOW MANY TIMES, with the newest one's time. */
+  const folded = $derived(
+    lines.reduce<{ line: RunLine; n: number }[]>((out, line) => {
+      const same = out.find((o) => o.line.name === line.name && o.line.project === line.project);
+      if (same) same.n += 1;
+      else out.push({ line, n: 1 });
+      return out;
+    }, []),
+  );
+  const shown = $derived(all ? folded : folded.slice(0, SHOWN));
 
   /** A sentence's first clause, without its full stop: "Refused 2h ago" of "Refused 2h ago. The script did not finish." */
   const firstOf = (said: string): string => (said.split(/(?<=\.)\s/u)[0] ?? said).replace(/\.$/u, '');
@@ -77,12 +86,13 @@
   <div class="runs">
     {#if short}<p class="runs-note">{runsWords.short}</p>{/if}
     <ul class="runs-list">
-      {#each shown as line (line.key)}
+      {#each shown as { line, n } (line.key)}
         {@const project = line.project ? (projects.get(line.project)?.name ?? null) : null}
         <li class="runs-line" data-bad={line.bad ? '' : undefined}>
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">
+            {#if n > 1}<span class="runs-proj num">{n} times</span>{/if}
             {#if project}<span class="runs-proj">{project}</span>{/if}
             {#if line.outcome}
               <span class="runs-said">{line.outcome}</span>
@@ -96,7 +106,7 @@
       {/each}
     </ul>
     <p class="runs-foot">
-      {#if lines.length > SHOWN && !all}<button type="button" class="runs-more" onclick={() => (all = true)}>{words.more(lines.length - SHOWN)}</button>{/if}
+      {#if folded.length > SHOWN && !all}<button type="button" class="runs-more" onclick={() => (all = true)}>{words.more(folded.length - SHOWN)}</button>{/if}
       <a class="runs-door" href={at('/r/session')}>{words.all(total)}<Icon name="arrow" size="s" /></a>
       <a class="runs-door" href={at('/jobs?start')}>{runsWords.runAJob}</a>
     </p>

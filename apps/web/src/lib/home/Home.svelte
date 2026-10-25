@@ -1280,6 +1280,12 @@
   /* ON A PHONE, NEEDS YOU'S FIRST QUESTION IS ANSWERED WHERE IT STANDS AND THE REST ARE ROWS (the Bento phone board): each
      after the first loses its buttons, its title wraps to three lines, and the whole row is the title's link to its page. */
   @media (width < 600px) {
+    /* THE FIRST QUESTION IS ANSWERED WHERE IT STANDS, so it is read whole enough to answer: five lines, not a cut at three. */
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa:first-child .queue-question) {
+      line-clamp: 6;
+      -webkit-line-clamp: 6;
+    }
+
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa :is(.dc-actions, .dr-actions)) {
       display: none;
     }

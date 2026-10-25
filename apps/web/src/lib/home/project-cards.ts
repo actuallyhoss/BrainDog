@@ -196,9 +196,9 @@ export type Life =
 export function lifeOf(card: Pick<ProjectCard, 'worked' | 'last' | 'moved'>, agents: readonly { name: string }[]): Life | null {
   const names = [...new Set(agents.map((a) => a.name))];
   if (names.length > 0) return { kind: 'working', said: `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]} working` };
-  if (card.last) return { kind: 'run', said: `${card.last.name} worked on it ${card.last.said}`, agent: card.last.agent };
+  if (card.last) return { kind: 'run', said: `Worked on ${card.last.said}`, agent: card.last.agent };
   if (card.worked) return { kind: 'worked', said: workedSaid(card.worked), quiet: card.worked.quiet };
-  if (card.moved) return { kind: 'quiet', said: `Quiet since ${daySaid(card.moved)}` };
+  if (card.moved) return { kind: 'quiet', said: `Nothing changed since ${daySaid(card.moved)}` };
   return null;
 }
 

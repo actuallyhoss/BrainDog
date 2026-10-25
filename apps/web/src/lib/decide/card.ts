@@ -382,10 +382,14 @@ export function askerOf(q: QueueQuestion, me: string | null = null, names: Reado
   const app = nameOrNull(field(q, 'app')) ?? (r ? (nameOrNull(r.app) ?? nameOrNull(r.client)) : null);
   /* A SIGNER THE READER HOLDS NO NAME FOR IS NAMED BY THE RUN THAT FILED IT where there is one, an agent or script by its
      title, and not "Someone on this record" over a question a named run asked (audit P21). */
-  if (who.name === copy.feedSomeone && runName !== null) return { name: app ?? runName, kind: 'agent', app: null, run: app === null ? null : runName };
+  /* A RUN'S OWN LABEL ("Kpi backfill script", "Bank from out sms") IS THE SCRIPT'S, NOT A NAME: with no app to name, it is
+     said as an agent, and the run is read on the question's own page. */
+  if (who.name === copy.feedSomeone && runName !== null) return { name: app ?? nameWords.agent, kind: 'agent', app: null, run: app === null ? null : runName };
   /* A RUN SIGNS AS ITS HANDLE (`S42`), which `actor` says as An agent: where the record names the app it ran in, that
      is the name, so the by-line reads "Claude Code · Tidy invoices" and not "An agent · Claude Code". */
   if (who.kind === 'agent' && who.name === nameWords.agent && app !== null) return { name: app, kind: 'agent', app: null, run: runName };
+  /* A SCRIPT'S OWN LABEL ("Kpi backfill script", "Bank from out sms") IS THE BUILDER'S WORD: it is said as what it is. */
+  if (who.kind === 'automation') return { name: nameWords.automation, kind: who.kind, app: null, run: null };
   return { name: who.name, kind: who.kind, app: app === who.name ? null : app, run: runName };
 }
 

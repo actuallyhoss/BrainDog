@@ -188,7 +188,7 @@
     sharedBefore(
       card.ways.flatMap((w) => {
         const v = w.shows ? null : visualOfWay(w);
-        return v?.kind === 'change' ? [{ what: v.what, before: v.before }] : [];
+        return v?.kind === 'change' ? [{ what: v.what, before: v.before }] : v?.kind === 'filing' ? [{ what: '', before: v.figure }] : [];
       }),
     ),
   );
@@ -604,7 +604,7 @@
     {#if way.because && !folded.has(way.because)}<span class="dc-choice-does" dir="auto">{plainReason(way.because)}</span>{/if}
     <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. A change every
          row shares is said once over the list (`fold.ts`), and its row keeps its name. -->
-    {#if !way.shows}{@const v = visualOfWay(way)}{#if !(v?.kind === 'change' && same !== null && v.before === same)}<OptionVisual visual={v} />{/if}{/if}
+    {#if !way.shows}{@const v = visualOfWay(way)}{#if !(v?.kind === 'change' && ((same !== null && v.before === same) || v.after === way.label)) && !(v?.kind === 'filing' && ((same !== null && v.figure === same) || v.list === way.label))}<OptionVisual visual={v} />{/if}{/if}
   </span>
 {/snippet}
 
@@ -779,7 +779,7 @@
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
         {#each foldLines as line (line)}<p class="dc-fold" dir="auto">{line}</p>{/each}
-        <ul class="queue-options dc-choices" role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
+        <ul class="queue-options dc-choices" data-long={card.ways.length > 6 ? '' : undefined} role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
           {#each card.ways as way, i (way.key)}
             {@const marked = way.recommended}
             {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
@@ -1464,13 +1464,7 @@
      its name alone, so the answers keep the room they need. */
   @media (width < 600px) {
     .dc-actions[data-inline] > :global(.dc-later) {
-      justify-content: center;
-      inline-size: var(--tap);
-      padding: 0;
-    }
-
-    .dc-actions[data-inline] > :global(.dc-later .dc-later-words) {
-      display: none;
+      inline-size: auto;
     }
   }
 

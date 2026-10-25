@@ -76,7 +76,7 @@
   import { aboutLine, aboutOf, sideOf, words as sideWords } from './side.ts';
   import { moneyRowOf } from '$lib/decide/money-row.ts';
   import { rowHref } from '$lib/record/row-href.ts';
-  import { listName, runByIn, type RunBy } from '$lib/record/names.ts';
+  import { listName, nameWords, runByIn, type RunBy } from '$lib/record/names.ts';
   import { readFiles, visualsOf } from './option-visual.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
@@ -1074,7 +1074,7 @@
         <!-- WHO ASKED AND WHEN, the quiet line over the answers, as a card's by-line is over its question. -->
         <p class="gate-by">
           <span class="dc-sr">{cardWords.askedBy}</span>
-          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
+          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.kind === 'automation' ? nameWords.automation : asker.name}</span>{/if}
           <span class="gate-when">{since(question.opened, now)}</span>
         </p>
         <!-- WHAT IT IS ASKED WITH TO LOOK AT, above the answers: a still or a quiet card, opened full width on a press. -->

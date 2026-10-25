@@ -38,7 +38,7 @@ test('A RUN TWENTY MINUTES AGO IS SAID THE SAME ON EVERY CARD, and a task writte
   );
   assert.deepEqual(
     cards.map((c) => lifeOf(c, [])?.said ?? null),
-    ['Claude worked on it 20 minutes ago', 'Worked on 4 days ago', null],
+    ['Worked on 20 minutes ago', 'Worked on 4 days ago', null],
     'the card did not say the figure',
   );
   assert.deepEqual(

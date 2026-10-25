@@ -483,7 +483,14 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
      it" and "Not yet" do, a label wrapping to two lines rather than pushing the other under it. Three or more take a line
      each. Ask me later keeps its square at the end. */
   .dc-actions[data-inline] {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+  }
+
+  /* Ask me later keeps its words, on a row of its own under the answers, where they start. */
+  .dc-actions[data-inline] > .dc-btn.dc-later {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-inline-start: 0;
   }
 
   .dc-actions[data-inline] > .dc-btn:not([data-weight='bare']) {
@@ -531,4 +538,16 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   color: var(--ink-2);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
+}
+
+/* A LONG LIST OF NAMES (thirteen accounts) is two columns of short rows on a wide tile, not a screen of tall ones. */
+@media (width >= 900px) {
+  .dc-choices[data-long] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-inline-size: none;
+  }
+
+  .dc-choices[data-long] .dc-choice {
+    padding-block: var(--sp-2);
+  }
 }

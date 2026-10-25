@@ -129,7 +129,7 @@
   };
 
   /* THE ONE-LINE ROW: what it is doing, how long it has run, and how it stands. */
-  const lineOf = (r: LiveRun): PresenceView => ({ ...viewOf(r), doing: doingSaid(r), time: spanSaid(r.for_s * 1000), stands: standsSaid(r) });
+  const lineOf = (r: LiveRun): PresenceView => ({ ...viewOf(r), doing: doingSaid(r), time: `Open ${spanSaid(r.for_s * 1000)}`, stands: standsSaid(r) });
 
   /* WHO IS AT WORK, AND WHO WAITS ON HIM BUT CALLED LATELY: the rail's count first, never the runs merely open. */
   const split = $derived(line ? deskSplit(rows) : { working: [], quiet: [] });
