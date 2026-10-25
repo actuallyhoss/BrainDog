@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from '../gates/lib.mjs';
-import { agesOf, countsIn, drawnIn, judge, pageFactsIn } from './checks.mjs';
+import { agesOf, blankOf, countsIn, drawnIn, judge, pageFactsIn } from './checks.mjs';
 import { pick, screensOf } from './screens.mjs';
 import { sheets } from './sheet.mjs';
 import { RAW, rawIn, slugsOf } from './words.mjs';
@@ -186,15 +186,38 @@ export function cannotOf(source, screen) {
 }
 
 /** The record's answer to one read, through the look's own server, or `null` for a refusal. */
-export const asker = (origin) => async (method, body = {}) => {
-  try {
-    const res = await fetch(`${origin}/api/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    const said = await res.json();
-    return said?.ok === true ? said.value : null;
-  } catch {
-    return null;
+export const asker = (origin, { tries = 1, backoffMs = 1500 } = {}) => async (method, body = {}) => {
+  for (let i = 0; i < tries; i += 1) {
+    if (i > 0) await new Promise((r) => setTimeout(r, backoffMs * i));
+    try {
+      const res = await fetch(`${origin}/api/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const said = await res.json();
+      if (said?.ok === true) return said.value;
+    } catch {
+      /* tried again, when tries allow */
+    }
   }
+  return null;
 };
+
+/** How long a live screen is waited for, and how often a live read is tried before it counts as refused. */
+export const LIVE_WAIT_MS = 30000;
+export const LIVE_TRIES = 3;
+/** The pause between two live pictures, so one look does not lean on the record. The look draws one page at a time. */
+export const LIVE_PAUSE_MS = 400;
+
+/**
+ * `--screens a,b,c`: keep the screens of the set that are named, by key or by name (any case). A name the set does not
+ * hold is said as missing, never dropped. `only` empty or absent keeps every screen.
+ */
+export function onlyScreens(screens, missing, only) {
+  if (!Array.isArray(only) || only.length === 0) return { screens, missing };
+  const want = only.map((n) => n.trim().toLowerCase()).filter(Boolean);
+  const is = (s, w) => String(s.key).toLowerCase() === w || String(s.name ?? '').toLowerCase() === w;
+  const hit = (s) => want.some((w) => is(s, w));
+  const lost = want.filter((w) => ![...screens, ...missing].some((s) => is(s, w)));
+  return { screens: screens.filter(hit), missing: [...missing.filter(hit), ...lost.map((n) => ({ key: n, name: n, missing: `The set has no screen called ${n}.` }))] };
+}
 
 /**
  * A tally's change across one picture, so writes blocked are counted against the screen that sent them. A nested
@@ -218,20 +241,38 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   heard.failed.length = 0;
   const before = source.counts();
   const started = Date.now();
-  await page.goto(`${app}${screen.path}`, { waitUntil: 'domcontentloaded' }).catch((e) => heard.errors.push(`did not open: ${e.message.split('\n')[0]}`));
-  let settled = await ready.settled(page);
-  /* A SCREEN THAT MOVES ON (`/SG2` opens the row it names) settles twice: the picture is of the screen it landed on,
-     so once the address has moved off the one asked for, its own `data-screen` is waited for (VERIFY P8). */
-  const asked = new URL(`${app}${screen.path}`).pathname;
-  if (new URL(page.url()).pathname !== asked) {
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
-    settled = await ready.settled(page);
+  /* ONE ATTEMPT: open, wait for the screen's own signal, then wait until no skeleton or loading placeholder is left in
+     `main` (`Waiting.svelte` and `ProjectWaiting.svelte`: `aria-busy`, `.waiting`, `data-shape-waiting`). The wait is capped
+     per screen by `timeoutMs`: 30 s for a live record, the gates' settle time for the seed. */
+  const attempt = async (again) => {
+    if (again) {
+      heard.errors.length = 0;
+      heard.failed.length = 0;
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch((e) => heard.errors.push(`did not reopen: ${e.message.split('\n')[0]}`));
+    } else await page.goto(`${app}${screen.path}`, { waitUntil: 'domcontentloaded' }).catch((e) => heard.errors.push(`did not open: ${e.message.split('\n')[0]}`));
+    let state = await ready.settled(page);
+    /* A SCREEN THAT MOVES ON (`/SG2` opens the row it names) settles twice: the picture is of the screen it landed on,
+       so once the address has moved off the one asked for, its own `data-screen` is waited for (VERIFY P8). */
+    const asked = new URL(`${app}${screen.path}`).pathname;
+    if (new URL(page.url()).pathname !== asked) {
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      state = await ready.settled(page);
+    }
+    const waiting = await page
+      .waitForFunction(() => document.querySelector('main [aria-busy="true"], main [data-shape-waiting], main .waiting') === null, null, { timeout: timeoutMs })
+      .then(() => 'none', () => 'still busy');
+    return { state, waiting };
+  };
+  let { state: settled, waiting: busy } = await attempt(false);
+  let retried = false;
+  /* A SCREEN THAT CAME OUT BLANK OR STILL WAITING IS OPENED ONCE MORE before it is a finding: a slow record can answer
+     after the first wait. A screen blank after the second is a real finding and is reported as before. */
+  const flawed = async () => busy !== 'none' || settled === null || blankOf(await page.evaluate(drawnIn).catch(() => null), screen.key) !== null;
+  if (await flawed()) {
+    retried = true;
+    ({ state: settled, waiting: busy } = await attempt(true));
   }
   const settleTook = Date.now() - started;
-  /* NOTHING STILL BUSY: a part of the screen that says it is reading is waited for, and one that never stops is said. */
-  const busy = await page
-    .waitForFunction(() => document.querySelector('main [aria-busy="true"]') === null, null, { timeout: timeoutMs })
-    .then(() => 'none', () => 'still busy');
   const fonts = await page.evaluate(async () => (await document.fonts.ready).status).catch(() => 'unknown');
   /* THE RECORD MAY KEEP A SCHEME OF ITS OWN (`look.scheme`), which the app adopts after it boots and which the browser's
      light or dark cannot move. The page's attribute is set to the theme asked for, which writes nothing, and the line
@@ -314,7 +355,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     full: `${base}-full.png`,
     settled,
     settleMs: settleTook,
-    waited: { screen: settled ?? 'never settled', busy, fonts },
+    waited: { screen: settled ?? 'never settled', busy, fonts, ...(retried ? { retried: true } : {}) },
     ...(kept !== null && kept !== theme ? { schemeKept: kept } : {}),
     consoleErrors: [...new Set(heard.errors)].slice(0, 12),
     failedRequests: [...new Set(heard.failed)].slice(0, 12),
@@ -335,18 +376,22 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
 }
 
 /** The look's pictures and its `said.json`. Called by `run.mjs` with the server already up. */
-export default async function capture({ origin, app, set, out, source }) {
-  const timeoutMs = budget('ready').settleTimeoutMs;
+export default async function capture({ origin, app, set, out, source, screens: only }) {
+  /* A LIVE RECORD ANSWERS SLOWLY AT TIMES (`/api/boot` took 4 to 12 s), so its screens are waited for up to LIVE_WAIT_MS each.
+     The seed keeps the gates' settle time. */
+  const live = source.name === 'live';
+  const timeoutMs = live ? Math.max(LIVE_WAIT_MS, budget('ready').settleTimeoutMs) : budget('ready').settleTimeoutMs;
   const height = budget('layout').viewportHeightPx;
   const settleMs = budget('layout').settleMs;
   const ready = readiness('look', timeoutMs, join(ROOT, 'apps', 'web', 'build'));
-  const ask = asker(origin);
+  const ask = asker(origin, live ? { tries: LIVE_TRIES } : {});
   const picked = await pick(ask);
   /* THE RECORD'S OWN CLOCK is what "today" means to the ages (`boot.now`: the seed's is pinned, a live record's is the host's). */
   const booted = Date.parse((await ask('boot'))?.now ?? '');
   const now = Number.isFinite(booted) ? booted : Date.now();
   const known = { slugs: slugsOf(picked.pages) };
-  const { screens, missing } = Array.isArray(source.screens) ? await namedScreens(source.screens, picked) : await screensOf(set, picked);
+  const got = Array.isArray(source.screens) ? await namedScreens(source.screens, picked) : await screensOf(set, picked);
+  const { screens, missing } = onlyScreens(got.screens, got.missing, only);
   const cannot = [];
   const drawn = [];
   for (const s of screens) {
@@ -389,6 +434,7 @@ export default async function capture({ origin, app, set, out, source }) {
         page.on('requestfailed', (r) => heard.failed.push(`${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText ?? 'failed'}`));
         page.on('response', (r) => r.status() >= 400 && heard.failed.push(`${r.request().method()} ${new URL(r.url()).pathname}: ${r.status()}`));
         for (const screen of drawn) {
+          if (live) await new Promise((r) => setTimeout(r, LIVE_PAUSE_MS));
           said.shots.push(await shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known, now }));
           console.log(`  ${screen.key} ${width} ${theme}: ${said.shots.at(-1).settled ?? 'never settled'}`);
           write();

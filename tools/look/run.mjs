@@ -1,7 +1,7 @@
 /**
  * The look: real screens of a record, with no one's hands (`loop/scope/area-proof-a.md` 2.4, PRF-A02).
  *
- *   node tools/look/run.mjs --source seed|lived|file:<path>|live:<record> --set six|nine|all [--out <dir>]
+ *   node tools/look/run.mjs --source seed|lived|file:<path>|live:<record> --set six|nine|all [--out <dir>] [--screens a,b,c]
  *
  * ONE SERVER, THE GATES' SHAPE. The built app is served from `apps/web/build` under `/app` exactly as the browser gates
  * serve it (`tools/gates/lib.mjs`, `APP_BASE` and `appShell`), with the SPA fallback to the app's shell, and every
@@ -66,8 +66,8 @@ export const recordPath = (pathname) => pathname.replace(/^\/app\/[a-z][a-z0-9-]
 export function parse(args) {
   const out = {};
   for (let i = 0; i < args.length; i += 1) {
-    const m = /^--(source|set|out)(?:=(.*))?$/u.exec(args[i]);
-    if (m === null) throw new Error(`The look takes --source, --set and --out, and not ${args[i]}.`);
+    const m = /^--(source|set|out|screens)(?:=(.*))?$/u.exec(args[i]);
+    if (m === null) throw new Error(`The look takes --source, --set, --out and --screens, and not ${args[i]}.`);
     out[m[1]] = m[2] ?? args[(i += 1)];
   }
   const raw = out.source ?? 'seed';
@@ -77,7 +77,9 @@ export function parse(args) {
   if (!/^[a-z][a-z-]*$/u.test(name)) throw new Error(`There is no source called ${raw}. Use seed, lived, file:<path> or live:<record>.`);
   const set = out.set ?? 'six';
   if (!SETS.includes(set)) throw new Error(`There is no set called ${set}. Use six, nine or all.`);
-  return { source: { name, arg }, set, out: out.out };
+  const screens = out.screens === undefined ? undefined : out.screens.split(',').map((n) => n.trim()).filter(Boolean);
+  if (screens?.length === 0) throw new Error('--screens needs names, as in --screens today,money.');
+  return { source: { name, arg }, set, out: out.out, screens };
 }
 
 /** The source's file, by name, and what its `open` hands back. */
@@ -134,6 +136,23 @@ export function outFor(source, given, root = ROOT, at = new Date()) {
   return out;
 }
 
+/**
+ * The first check, `answers`, refused the whole look for one failed boot read. A live record answers slowly at times, so
+ * for the live source it is tried up to three times with a growing pause; any other source is asked once, as before.
+ */
+export async function answersOf(source, origin, { check = answers, tries = source.name === 'live' ? 3 : 1, backoffMs = 2000 } = {}) {
+  let last;
+  for (let i = 0; i < tries; i += 1) {
+    if (i > 0) await new Promise((r) => setTimeout(r, backoffMs * i));
+    try {
+      return await check(origin);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 const report = (source, set, started) => ({
   source: source.name,
   record: source.record,
@@ -159,14 +178,14 @@ async function main() {
     const out = outFor(source, asked.out);
     mkdirSync(out, { recursive: true });
     served = await serve(source, { build });
-    await answers(served.origin);
+    await answersOf(source, served.origin);
     const started = new Date().toISOString();
     const write = (extra = {}) => writeFileSync(join(out, 'run.json'), `${JSON.stringify({ ...report(source, asked.set, started), ...extra }, null, 2)}\n`);
     write();
     const capture = join(here, 'capture.mjs');
     if (existsSync(capture)) {
       const { default: run } = await import(pathToFileURL(capture).href);
-      await run({ origin: served.origin, app: served.app, set: asked.set, out, source });
+      await run({ origin: served.origin, app: served.app, set: asked.set, out, source, screens: asked.screens });
       write({ closed: new Date().toISOString() });
       return;
     }
