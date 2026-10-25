@@ -15,7 +15,7 @@ const PAGES: Sign = { sign: 'pages-clean', state: 'red', said: 'Two pages print 
 
 test('WAITING MESSAGES OPEN WHERE THEY WAIT, said with their count', () => {
   const parts = healthSaid(null, null, { signs: [WAITING, PAGES], signsAt: '/p/health', inboxAt: '/inbox' });
-  assert.equal(text(parts), '3 messages have waited more than a day. Open them');
+  assert.equal(text(parts), '3 messages have waited more than a day. Open the inbox');
   assert.equal(parts?.find((p) => p.href)?.href, '/inbox');
 });
 

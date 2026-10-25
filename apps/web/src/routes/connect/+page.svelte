@@ -141,7 +141,7 @@
       <div class="state">
         <Empty kind="no-data-yet" title={copy.consentNone} body={copy.consentNoneWhy}>
           {#snippet actions()}
-            <Button weight="primary" href="/settings/agents">{copy.consentConnectAgent}</Button>
+            <Button weight="primary" href="/settings/agents">{copy.consentOpenAgents}</Button>
             <Button href="/">{copy.openBrainDog}</Button>
           {/snippet}
         </Empty>

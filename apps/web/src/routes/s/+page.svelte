@@ -445,6 +445,7 @@
 
   .made {
     display: flex;
+    justify-content: center;
     padding-block-start: var(--sp-5);
   }
 

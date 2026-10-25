@@ -155,9 +155,12 @@ export async function readWeek(base: string, list: string, play: readonly SideRo
  * was capped, or the read did not land, and the row then says no number.
  */
 export async function readOpenWork(base: string, list: string): Promise<number | null> {
+  const client = createClient({ base });
+  /* THE LIST'S DECLARATION MAY NOT BE LEARNED YET (Today, Needs you and Projects never open it), so it is asked, not skipped. */
+  if (REGISTERS[list] === undefined) await learn(client.schema, list, asked).catch(() => undefined);
   const d = REGISTERS[list] as { state?: string; done?: readonly string[] } | undefined;
   if (!d?.state) return null;
-  const out = await createClient({ base })
+  const out = await client
     .countBy({ register: list, by: d.state })
     .catch(() => null);
   if (!out?.ok) return null;

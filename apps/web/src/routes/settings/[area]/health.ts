@@ -81,7 +81,7 @@ export type More = {
 };
 
 /** The word of the link at the line's end when what needs a look is messages waiting: they open where they wait. */
-export const OPEN_THEM = 'Open them';
+export const OPEN_THEM = 'Open the inbox';
 
 /** The sign that counts messages waiting to be filed. */
 const ARRIVALS = 'arrivals-filed';

@@ -85,6 +85,7 @@
     /* THE LISTS TILE IS "Your lists" (SPEC agents F4): this is the page where lists are named, so it says the word the
        rail's "Your things" keeps out of everywhere else. */
     lists: 'Your lists',
+    listsHint: 'Click a name to rename it. Clear a box to put the original name back.',
     money: 'Money',
     currency: 'Home currency',
     currencyWhy: 'Sums in other currencies are added up in this one, where there is a rate.',
@@ -427,6 +428,7 @@
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
         {#if spoken.lists.length + others.length > 0}
           <Tile icon="rows" title={words.lists} count={spoken.lists.length + others.length}>
+            <p class="hint">{words.listsHint}</p>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">

@@ -61,8 +61,8 @@
     hintPending: 'On this device for now. It reaches this record the next time it can.',
     hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
-    said: '3 need you today,',
-    needs: '1 is late.',
+    /* THE REAL COUNT, the one the badge says, so the preview never contradicts the bar beside it. */
+    said: (n: number) => (n === 0 ? 'Nothing needs you today.' : `${n} need${n === 1 ? 's' : ''} you today.`),
     light: 'Light',
     dark: 'Dark',
     houseRed: 'House red',
@@ -457,7 +457,7 @@
               <IconWell name="today" />
               <span class="pv-title">{copy.today}</span>
             </div>
-            <p class="pv-said">{words.said} <span class="pv-needs">{words.needs}</span></p>
+            <p class="pv-said"><span class="pv-needs">{words.said(props.shell.open)}</span></p>
             <ul class="ledger ledger-lead pv-rows">
               {#each previewRows as row, i (i)}
                 <li>
@@ -593,10 +593,12 @@
     .choice {
       align-items: stretch;
     }
+  }
 
-    .segment .spacing {
-      display: none;
-    }
+  /* THE DENSITY'S PICTURE IS DROPPED AT EVERY WIDTH: with it "Compact, Comfortable, Roomy" wrapped to two rows in the
+     choices' column beside the previews. */
+  .segment .spacing {
+    display: none;
   }
 
   /* ── the segments ── */

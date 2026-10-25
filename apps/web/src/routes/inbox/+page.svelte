@@ -84,7 +84,8 @@
   const words = {
     /** A refused read, in a person's words (U-A14): the record's own sentence waits behind Read details. */
     refusedTitle: 'The messages could not be listed',
-    refusedBody: 'Nothing was changed. This sign-in may not be allowed to read the messages, so open the inbox in the app to see them. What the rules did is below.',
+    refusedBody: 'Nothing was changed. This sign-in may not be allowed to read the messages, so open the inbox in the app to see them.',
+    refusedBelow: ' What the rules did is below.',
     /** The press that asks for a rule drafted from a sender's alike messages (today F14): no internal name in it. */
     askPattern: 'Suggest a rule',
     asking: 'Drafting a rule',
@@ -886,7 +887,7 @@
           {/if}
           {#if refused}
             <!-- THE ARRIVALS WERE REFUSED, the rest of the screen was not: the tiles above and the patterns still draw. -->
-            <Empty kind="error" title={words.refusedTitle} body={words.refusedBody} detail={refused}>
+            <Empty kind="error" title={words.refusedTitle} body={words.refusedBody + (ways || figure || panel || repeats.length > 0 || patterns.length > 0 ? words.refusedBelow : "")} detail={refused}>
               {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
             </Empty>
           {:else}

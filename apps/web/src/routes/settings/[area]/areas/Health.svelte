@@ -36,6 +36,8 @@
     clearBody: 'Every page and note reads as it should, and nothing has gone stale.',
     pages: 'Pages and notes',
     notYet: 'Not checked yet, it runs at night.',
+    slow: 'The record is slow to answer',
+    slowBody: 'Nothing was found to tidy yet, and the rest did not answer in time. Open this page again in a moment.',
     clearBodyUnchecked: 'Nothing has gone stale, and nothing else waits to be tidied.',
   } as const;
 
@@ -61,6 +63,9 @@
   /** Whether the record has not walked its words yet: said as not checked, and the calm line does not vouch for them. */
   let unchecked = $state(false);
 
+  /** Whether the reads took longer than anyone waits: said in plain words, never left on Reading. */
+  let slow = $state(false);
+
   const any = $derived(Boolean(stale || matched || faults || learned || named || hues || imported));
 
   onMount(() => {
@@ -70,6 +75,13 @@
     }
     const base = apiBase();
     let here = true;
+    /* A SCREEN NEVER SITS ON READING FOR EVER: after 20 seconds it says what it has, or that the record is slow. */
+    const giveUp = setTimeout(() => {
+      if (!here || heard) return;
+      slow = true;
+      quick = true;
+      heard = true;
+    }, 20_000);
     /* A TAB BEING LEFT ASKS NOTHING MORE: WebKit refuses every call begun once a navigation starts and prints each as an
        error, and a failed part walks on to the next. `beforeunload` is the last event before that. */
     const leaving = new AbortController();
@@ -151,6 +163,7 @@
       removeEventListener('beforeunload', leave);
     })();
     return () => {
+      clearTimeout(giveUp);
       here = false;
       removeEventListener('beforeunload', leave);
     };
@@ -176,6 +189,8 @@
   {:else if !any && !heard}
     <!-- THE QUICK PARTS FOUND NOTHING, and the walk of pages and notes is still out: the calm line vouches only for them. -->
     <Empty kind="cleared" title={words.clear} body={words.clearBodyUnchecked} />
+  {:else if !any && slow}
+    <Empty kind="error" title={words.slow} body={words.slowBody} />
   {:else if !any}
     <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
   {/if}

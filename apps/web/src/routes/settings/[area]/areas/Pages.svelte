@@ -91,6 +91,7 @@
     show: 'Show in your nav',
     hidden: (title: string) => `${title} is hidden from your nav.`,
     opensFirst: 'Opens first',
+    fixed: 'Fixed in place, so it has no arrows or Hide',
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
     under: (section: string) => `In ${section}`,
@@ -406,7 +407,7 @@
   {@const hidden = p.inNav && navPrefs.isHidden(p.href)}
   {@const first = navPrefs.home === p.href || (p.href === '/' && navPrefs.home === null)}
   <li class="page-row" data-hidden={hidden ? '' : undefined}>
-    <div class="line" class:line-tall={first || hidden || title !== p.own || p.section !== undefined}>
+    <div class="line" class:line-tall={first || hidden || title !== p.own || p.section !== undefined || p.app === true}>
       <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
       <span class="line-main">
         <a class="line-title page-link" href={at(p.href)}>{title}</a>
@@ -418,6 +419,8 @@
           <span class="line-detail">{words.called(p.own)}</span>
         {:else if p.section}
           <span class="line-detail">{words.under(p.section)}</span>
+        {:else if p.app}
+          <span class="line-detail">{words.fixed}</span>
         {/if}
       </span>
       <span class="line-amount"></span>
