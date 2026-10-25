@@ -1992,9 +1992,9 @@ const DECLARED: Record<string, Version> = {
       rule.kind-offers-kpis rule.project-past-aim
       script.kind_drafts script.kpi_backfill
     `,
-    declares: '14d289b744c001d9',
+    declares: 'cc7b75097a35f4bc',
     history: [
-      "Portfolio 1.29.0 (the agents' reads): `register.things` flags a project's `mark`, `hue` and `draft` `hidden_from_agents`, so an agent's short answers leave them out and `format: full` and the app keep them; no id added or taken away -> 14d289b744c001d9",
+      "Portfolio 1.29.0 (the agents' reads): `register.things` flags a project's `mark`, `hue` and `draft` `hidden_from_agents`, so an agent's short answers leave them out and `format: full` and the app keep them; no id added or taken away -> cc7b75097a35f4bc",
     ],
   },
   'portfolio@1.28.0': {
