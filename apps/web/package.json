@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vite dev",
-    "build": "node ../../tools/catalogue/from-packs.mjs ${CI:+--check} && pnpm --filter @braindog/skin theme && vite build",
+    "build": "node ../../tools/catalogue/from-packs.mjs && pnpm --filter @braindog/skin theme && vite build",
     "preview": "vite preview",
     "test": "node --test",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"

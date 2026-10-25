@@ -287,7 +287,8 @@ const canonical = readCatalogue(JSON.parse(JSON.stringify(index)));
 if (!canonical.ok) fail(`the index this run made does not read back: ${canonical.refusal.fix}`);
 const indexText = `${JSON.stringify(canonical.value, null, 2)}\n`;
 
-if (values.check) {
+/* CI checks rather than writes; read here so the build script needs no POSIX shell. */
+if (values.check || process.env.CI) {
   const onDisk = (path) => {
     const target = join(to, ...path.split('/'));
     return existsSync(target) ? readFileSync(target, 'utf8') : null;
