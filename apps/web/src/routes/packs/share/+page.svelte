@@ -33,6 +33,7 @@
   import { useCase } from '@braindog/seed/usecases';
   import { useCaseName } from '@braindog/seed/usecases/names';
   import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
+  import { shippedTitle } from '$lib/market/shipped-addons.ts';
   import { catalogueTitles, readShippedCatalogue } from '../browse/catalogue.ts';
   import { changeLines, changesSince, kennelFetch, publishedHref, publishedLink, publishedSaid, publishedText, publishWords, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { titleOf } from '$lib/title.ts';
@@ -125,7 +126,7 @@
 
   /* A PACK THE BUILD HAS NO MODULE FOR IS NAMED BY THE CATALOGUE THIS BUILD SHIPS (, never ). */
   let shippedTitles = $state<ReadonlyMap<string, string>>(new Map());
-  const titleOfModule = (id: string): string => shippedTitles.get(id) ?? moduleTitle(id);
+  const titleOfModule = (id: string): string => shippedTitles.get(id) ?? shippedTitle(id) ?? moduleTitle(id);
 
   onMount(() => {
     void readShippedCatalogue(fetch).then((index) => catalogueTitles(index)).then((m) => (shippedTitles = m)).catch(() => undefined);
