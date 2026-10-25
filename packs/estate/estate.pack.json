@@ -1,9 +1,9 @@
 {
   "pack": "estate",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.",
+  "changes": "The Vault is now the Keychain, and a service page says its keys are kept there. Nothing you keep is moved or changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -258,7 +258,7 @@
           ],
           "limit": 1
         },
-        { "kind": "note", "heading": "Keys", "icon": "key", "span": 12, "body": "Keys for {{name}} are kept in the [Vault](/vault?q={{name}})." }
+        { "kind": "note", "heading": "Keys", "icon": "key", "span": 12, "body": "Keys for {{name}} are kept in the [Keychain](/keychain?q={{name}})." }
       ]
     },
     {
