@@ -53,6 +53,15 @@ const text = (v: unknown): string => (typeof v === 'string' ? v.replace(/\s+/gu,
 /* NO EM DASH in a line a person reads: the record's "Notes — Kickoff" is said "Notes, Kickoff". */
 const plain = (s: string): string => s.replace(/\s*—\s*/gu, ', ');
 
+/* A SLUG AFTER THE LIST'S NAME, "Keys: sketchpad-metrics", is said as a person writes it: "Keys: Sketchpad metrics". */
+const SLUG = /^([^:]{1,40}: )([a-z0-9]+(?:-[a-z0-9]+)+)$/u;
+const unslug = (s: string): string => {
+  const m = SLUG.exec(s);
+  if (!m) return s;
+  const words = m[2]!.replace(/-/gu, ' ');
+  return m[1]! + words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 /** The answer `about` gave, as what the panel draws, or `null` for anything that is not one thing seen somewhere. */
 export function seenOf(answer: unknown): Seen | null {
   const a = answer as { ok?: unknown; value?: unknown } | null | undefined;
@@ -64,7 +73,7 @@ export function seenOf(answer: unknown): Seen | null {
   const all: SeenPlace[] = [];
   for (const s of Array.isArray(is.seen) ? (is.seen as { at?: unknown; where?: unknown }[]) : []) {
     const day = DAY.exec(text(s?.at))?.[0];
-    const where = plain(text(s?.where));
+    const where = unslug(plain(text(s?.where)));
     if (!day || where === '' || ROW_ID.test(where) || ADDRESS.test(where)) continue;
     all.push({ day, where });
   }

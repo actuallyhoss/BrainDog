@@ -1977,6 +1977,25 @@ const DECLARED: Record<string, Version> = {
      added and nothing taken away. */
   /* THE AUDIT OF 25 OCTOBER (Z7): 1.25.0 IS MASTER'S, so a version of its own. One column changed, no id added. */
   /* AUDIT C OF 25 OCTOBER (X7): 1.26.0 IS MASTER'S, so a version of its own. A block added, no id added. */
+  /* THE LOOK OF 25 OCTOBER (P7, P11): 1.27.0 IS MASTER'S, so a version of its own. Words on Numbers and one filter on a figure, no id added. */
+  'portfolio@1.28.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: 'a8ec61d66a02d925',
+    history: [
+      "Portfolio 1.28.0 (the look of 25 October, P7 and P11): `page.all-numbers` opens on a plain line and its link to every reading says what it opens, and `metric.projects-by-lane` leaves Finished out so Where they are counts what Projects draws; no id added or taken away -> a8ec61d66a02d925",
+    ],
+  },
   'portfolio@1.27.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

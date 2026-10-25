@@ -188,7 +188,7 @@ export const allStale = (measures: readonly Measure[], nowMs: number): boolean =
  * NUMBERS THAT STOPPED ARRIVING, AS TILES THAT SAY THEIR AGE, SINCE the audit of 22 October (U6, U-B4): a project whose
  * numbers stopped 24 days ago drew five 30-day charts, each a short line in its first week and a dashed month after it,
  * so a reading from 28 Sep looked like this week's. Where every line in a block is older than a week, each measure is
- * a tile: its last reading, and under it the day and how long ago in words ("28 Sep, 4 weeks ago"). No small line: a
+ * a tile: its last reading, and under it how long ago in words ("4 weeks ago", once: the day is the row's). No small line: a
  * few points at the start of a month drew a stroke that read as a climb this week. As many `stat` fences as six tiles
  * a fence takes (`KINDS.stat.rows`).
  */
@@ -196,7 +196,7 @@ export function staleTilesText(measures: readonly Measure[], ago: (iso: string) 
   const shared = sharedNames(measures);
   const row = (m: Measure): string => {
     const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
-    const said = m.latest ? `${dayLabel(m.latest.day)}, ${ago(m.latest.at)}` : '';
+    const said = m.latest ? ago(m.latest.at) : '';
     return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(said)}`;
   };
   /* A GROUPED BLOCK (its sixth column) HEADS EACH GROUP, THE FIRST ONE TOO: its tiles sat above the first project's name

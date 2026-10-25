@@ -745,9 +745,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   in play, under a line of its own where the record holds no project at all; the line saying none is in play draws
  *   only while one is parked, and the one saying nothing needs a push only while one is in play, so a new record's
  *   Projects is one line and one box. 1.26.0 is master's (Z7). Blocks added and nothing taken away, so a minor step.
+ * - portfolio 1.28.0 (the look of 25 October, P7 and P11): Numbers opens on a plain line and its link to every reading says what it opens, and Where they
+ *   are counts the projects Projects draws, Finished left out. Words and one filter moved, no id added or taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.27.0',
+  portfolio: '1.28.0',
   people: '3.8.0',
   'money-core': '3.23.0',
   estate: '2.4.0',

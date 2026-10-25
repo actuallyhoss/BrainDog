@@ -30,8 +30,11 @@ const timeOf = (iso: string): number => Date.parse(iso);
  * "Imported again from Kiln Notes.", and the line read "An agent Imported again from Kiln Notes." A note that opens on
  * a name keeps it.
  */
-export const noteSaid = (note: string): string =>
-  note === 'created' ? 'added this' : /^[A-Z][a-z]+ed\b/u.test(note) ? `${note[0]!.toLowerCase()}${note.slice(1)}` : note;
+export const noteSaid = (note: string): string => {
+  /* AN OLD IMPORT SOURCE IS NEVER NAMED: the day heading says when, so "Imported again from Sam Brain." reads "imported again." */
+  const said = note.replace(/\s+from\s+Sam Brain\b/giu, '');
+  return said === 'created' ? 'added this' : /^[A-Z][a-z]+ed\b/u.test(said) ? `${said[0]!.toLowerCase()}${said.slice(1)}` : said;
+};
 
 /**
  * THE HISTORY AND THE COMMENTS AS ONE LIST, NEWEST FIRST.

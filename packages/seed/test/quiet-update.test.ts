@@ -1094,6 +1094,8 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
           ...raw,
           /* AND THE `draft` FIELD comes off with it, added in portfolio 1.18.0: a project the record formed from a first session. */
           declarations: (raw.declarations as Body[]).map((d) =>
+            /* AND WHERE THEY ARE COUNTS FINISHED AGAIN, as it did until portfolio 1.28.0 (the look of 25 October, P11). */
+            d.metric === 'projects-by-lane' ? { ...d, where: 'lane is set' } :
             d.register === 'things' ? (({ delete: _rule, ...rest }) => (Array.isArray(rest.fields) ? { ...rest, fields: (rest.fields as Body[]).filter((f) => f.id !== 'draft') } : rest))(d) : d,
           ),
         },

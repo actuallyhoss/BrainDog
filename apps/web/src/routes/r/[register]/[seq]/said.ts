@@ -193,5 +193,17 @@ export function agoSaid(at: string, now: number): string {
   return said === '1 day ago' ? 'yesterday' : said;
 }
 
+/**
+ * WHAT STANDS BESIDE A LINE UNDER ITS DAY HEADING: how long ago for today and yesterday, and the time of day for an
+ * older day, whose heading already says which day it was. "28 Sep" over "4 weeks ago" was one age said twice.
+ */
+export function whenSaid(at: string, now: number): string {
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return '';
+  const day = localDay(t);
+  if (day === localDay(now) || day === localDay(now - DAY_MS)) return agoSaid(at, now);
+  return new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
 /** The row's age with its label, so it is never read as the date beside it. */
 export const addedSaid = (created: string, now: number): string => rowWords.added(agoSaid(created, now));

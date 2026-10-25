@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.28.0',
+      notes: 'Numbers opens on a plain line, and its link says it opens every reading as a table. Where they are counts the projects Projects shows, so Finished is no longer in its total.',
+    },
+    {
       version: '1.27.0',
       notes: 'A record with no project in play opens Projects on a box to add one, under one line, and says how to set a parked one building only when one is parked.',
     },

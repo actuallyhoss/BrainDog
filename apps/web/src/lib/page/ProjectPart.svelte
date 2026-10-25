@@ -60,6 +60,18 @@
   };
   const RUNS_ICON: Record<string, 'key' | 'skill' | 'plug'> = { key: 'key', skill: 'skill' };
   const runsIcon = (kind: string | undefined) => RUNS_ICON[Object.keys(RUNS_ICON).find((k) => (kind ?? '').toLowerCase().includes(k)) ?? ''] ?? 'plug';
+  /* ONE LINE A NAME AND KIND: two keys of one name read as a row said twice. */
+  const onceEach = <T extends { title: string; kind?: string | undefined }>(rows: readonly T[]): T[] => {
+    const seen = new Set<string>();
+    return rows.filter((r) => {
+      const k = `${(r.kind ?? '').toLowerCase()}|${r.title.trim().toLowerCase()}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
+  /* AN OLD IMPORT SOURCE IS NEVER NAMED ON SCREEN: a run it made is an imported one. */
+  const unsourced = (t: string): string => t.replace(/Sam Brain/gu, 'Imported');
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
   const hereWords = {
     working: 'Working here now',
@@ -241,7 +253,7 @@
       </ul>
     </Tile>
   {:else if part === 'runs-on' && hold.runsOn.length > 0}
-    {@const runsOn = hold.runsOn}
+    {@const runsOn = onceEach(hold.runsOn)}
     <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsOn.length}>
       <ul class="r-list" data-wide={hold.todayAlone ? undefined : ''}>
         {#each runsOn.slice(0, RUNS_ON_SHOWN) as x (x.key)}
@@ -270,7 +282,7 @@
             <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
             <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
                  (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
-            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{s.doing || actor(s.agent).name}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
+            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{unsourced(s.doing || actor(s.agent).name)}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
           </li>
         {/each}
       </ul>

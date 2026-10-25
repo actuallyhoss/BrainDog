@@ -66,6 +66,7 @@
     best: 'Best match',
     jumpTo: 'Jump to',
     lists: 'Lists',
+    listsCount: 'Every row in each list, finished ones too.',
     recent: 'Changed lately',
     entries: (n: number) => n.toLocaleString('en'),
   } as const;
@@ -78,7 +79,12 @@
   const searchSaid = $derived(route.data.index?.name ? copy.searchIn(route.data.index.name) : copy.searchRecord);
   const nav = $derived<{ title: string; href: string; section: string; row?: boolean; hue?: number; icon: IconName }[]>(route.data.nav ?? []);
   /* EACH SECTION OF THINGS WEARS ITS OWN PAGE'S GLYPH, the one the rail draws for it. */
-  const things = $derived(thingsOf(nav).map((t) => ({ ...t, icon: nav.find((n) => n.section === t.section && n.row !== true)?.icon ?? ('projects' as IconName) })));
+  const things = $derived(
+    thingsOf(nav).map((t) => {
+      const page = nav.find((n) => n.section === t.section && n.row !== true);
+      return { ...t, icon: page?.icon ?? ('projects' as IconName), all: page?.href };
+    }),
+  );
   let read = $state.raw<{ icons: ReadonlyMap<string, IconName>; people: Place[]; met: { name: string; icon: IconName } | null; recent: Recent[] } | null>(null);
   const lists = $derived(listsOf(registers, read?.icons ?? new Map()));
   const people = $derived(read?.met ? read.people : []);
@@ -331,6 +337,9 @@
           {#each things as t (t.section)}
             <!-- A SECTION'S THINGS, EACH IN ITS OWN COLOUR, the dot the rail draws beside it. -->
             <Tile icon={t.icon} title={t.section}>
+              {#snippet actions()}
+                {#if t.total > t.items.length && t.all}<Button weight="bare" size="sm" href={at(t.all)}>{words.showAll(t.total)}</Button>{/if}
+              {/snippet}
               <ul class="places">
                 {#each t.items as p (p.href)}
                   <li>
@@ -359,6 +368,7 @@
           {/if}
           {#if lists.length > 0}
             <Tile icon="rows" title={words.lists}>
+              <p class="counts-say">{words.listsCount}</p>
               <ul class="places">
                 {#each lists as l (l.href)}
                   <li>
@@ -578,6 +588,13 @@
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .counts-say {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .quiet {

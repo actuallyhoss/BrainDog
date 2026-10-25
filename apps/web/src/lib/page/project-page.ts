@@ -100,7 +100,7 @@ export function onProject<T extends Block>(blocks: readonly T[], register: strin
   return [...kept.slice(0, at), section, ...ordered, ...kept.slice(end)].filter((_, n) => n !== plan);
 }
 
-/** "Bills and invoices 9, keeping it alive 2, notes, what changed, plan by date": what a folded More about holds. */
+/** "Bills and invoices 9, keeping it alive 2, notes, what changed and plan by date": what a folded More about holds. */
 export function moreSaid(blocks: readonly Block[]): string {
   const at = blocks.findIndex((b) => b.kind === 'section' && b.fold === true && b.box === true);
   if (at === -1) return '';
@@ -113,5 +113,6 @@ export function moreSaid(blocks: readonly Block[]): string {
     const words = b.heading.trim();
     parts.push(`${parts.length === 0 ? words : words.charAt(0).toLowerCase() + words.slice(1)}${count}`);
   }
-  return parts.join(', ');
+  /* "A, b and c": the last joined by and, so the line reads as a sentence and not a run of labels. */
+  return parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }

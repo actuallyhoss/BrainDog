@@ -1090,6 +1090,16 @@
     margin-block: var(--tile-gap);
   }
 
+  /* THE PAGE'S END SPACE MOVES UNDER THE OFFER, so the line sits one tile gap below the last block and not after a
+     100px empty band; the space is kept under the offer. */
+  .body-wrap:has(+ .page-offer:not(:has(> [data-lessons]))) :global(.page) {
+    padding-block-end: 0;
+  }
+
+  .body-wrap + .page-offer:not(:has(> [data-lessons])) {
+    padding-block-end: var(--sp-9);
+  }
+
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));

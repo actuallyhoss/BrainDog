@@ -602,7 +602,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      Overview says in one line where the projects are before it lists any of them. Over every project and not only
      those in play, because a strip of the whole is what says how much of it is parked. `lane` is required, so no
      project is in no part. */
-  'projects-by-lane': { ...counted('projects-by-lane', 'Where they are', 'lane is set'), group_by: 'lane' },
+  'projects-by-lane': { ...counted('projects-by-lane', 'Where they are', 'lane is not retired'), group_by: 'lane' },
 
   /* ── what they earn ───────────────────────────────────────────────────────
      OVER PROJECTS ALONE, AND THAT IS NOT A PREFERENCE. The Portfolio pack needs no other list, and
@@ -1388,7 +1388,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        body: 'Each kind of number your projects report, once, with its newest value and how old it is.',
+        body: 'What your projects report, newest first.',
       },
       {
         key: 'numbers-by-project',
@@ -1408,10 +1408,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       {
         key: 'numbers-rows',
         kind: 'link',
-        heading: 'Every reading',
+        heading: 'All readings',
         icon: 'rows',
         span: 12,
-        authored: [{ cells: ['Every reading, as a table', '/r/datapoints?rows=1', 'Each number on its own row, newest first'] }],
+        authored: [{ cells: ['Open every reading as a table', '/r/datapoints?rows=1', 'One reading a row, newest first'] }],
       },
     ],
   },

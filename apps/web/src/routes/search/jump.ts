@@ -29,15 +29,19 @@ type NavLike = { title: string; href: string; section: string; row?: boolean | u
  * Each section that holds pages about one thing (a project per page), by the section's name, in the rail's order, with
  * at most `most` things each. A section of views or of plain pages is not a section of things.
  */
-export function thingsOf(nav: readonly NavLike[], most: number = PER_TILE): { section: string; items: Place[] }[] {
-  const by = new Map<string, Place[]>();
+export function thingsOf(nav: readonly NavLike[], most: number = PER_TILE): { section: string; items: Place[]; total: number }[] {
+  const by = new Map<string, { items: Place[]; seen: Set<string> }>();
   for (const n of nav) {
     if (n.row !== true) continue;
-    const list = by.get(n.section) ?? [];
-    by.set(n.section, list);
-    if (list.length < most) list.push({ title: n.title, href: n.href, ...(n.hue === undefined ? {} : { hue: n.hue }) });
+    const got = by.get(n.section) ?? { items: [], seen: new Set<string>() };
+    by.set(n.section, got);
+    /* ONE NAME ONCE, WHATEVER ITS CASE: "Harbourview" and "harbourview" are one place said twice. */
+    const key = n.title.trim().toLowerCase();
+    if (got.seen.has(key)) continue;
+    got.seen.add(key);
+    if (got.items.length < most) got.items.push({ title: n.title, href: n.href, ...(n.hue === undefined ? {} : { hue: n.hue }) });
   }
-  return [...by].map(([section, items]) => ({ section, items }));
+  return [...by].map(([section, { items, seen }]) => ({ section, items, total: seen.size }));
 }
 
 /**

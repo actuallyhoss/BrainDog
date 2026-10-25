@@ -228,7 +228,7 @@ test('NUMBERS THAT STOPPED A WEEK AGO OR MORE ARE TILES THAT SAY THEIR AGE, neve
   assert.deepEqual(tiles.map((b) => b.kind), ['stat']);
   assert.deepEqual(
     tiles[0]!.rows.map((r) => r.cells.slice(0, 3).join(' | ')),
-    ['Players | 52 | 3 Sep, 25 days ago', 'Servers | 9 | 3 Sep, 25 days ago'],
+    ['Players | 52 | 25 days ago', 'Servers | 9 | 25 days ago'],
   );
   const many = measuresOf(
     Array.from({ length: 8 }, (_, i) => point(`Measure ${i + 1}`, i, day(3))),

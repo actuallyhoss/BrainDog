@@ -23,9 +23,14 @@ test('a section of things is the pages about one thing, in the rail order, cappe
         { title: 'Kiln', href: '/p/kiln', hue: 180 },
         { title: 'Marlow & Co', href: '/p/marlow-co', hue: 20 },
       ],
+      total: 2,
     },
   ]);
   assert.equal(thingsOf(nav, 1)[0]?.items.length, 1);
+  assert.equal(thingsOf(nav, 1)[0]?.total, 2);
+  /* ONE NAME ONCE, WHATEVER ITS CASE. */
+  const twice = [...nav, { title: 'kiln', href: '/p/kiln-2', section: 'Projects', row: true }];
+  assert.equal(thingsOf(twice)[0]?.items.length, 2);
 });
 
 test('the lists that hold something, most first, wearing the glyph each declares', () => {

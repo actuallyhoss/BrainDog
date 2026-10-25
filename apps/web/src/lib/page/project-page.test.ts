@@ -37,5 +37,5 @@ test('MORE ABOUT IS FOLDED, AND THE PLAN IS INSIDE IT AS PLAN BY DATE, keyed ane
   assert.equal(plan.length, 1, 'the plan is drawn once');
   assert.notEqual(plan[0]!.key, 'plan');
   assert.ok(got.indexOf(plan[0]!) > got.indexOf(more));
-  assert.equal(moreSaid(got), 'Bills and invoices 9, keeping it alive 7, notes, what changed, plan by date');
+  assert.equal(moreSaid(got), 'Bills and invoices 9, keeping it alive 7, notes, what changed and plan by date');
 });

@@ -24,7 +24,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { runOf } from '$lib/ui/face.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { agoSaid, daysOf } from './said.ts';
+  import { agoSaid, daysOf, whenSaid } from './said.ts';
   import { momentsOf, noteSaid, timelineWords as words } from './timeline.ts';
 
   let {
@@ -154,7 +154,7 @@
   {@const w = who(line.by)}
   <Face name={w.name} kind={w.kind} run={runOf(line.by)} size="s" />
   <div class="body">
-    <p class="head"><span class="by">{w.name}</span> <time class="when" datetime={line.at}>{agoSaid(line.at, now)}</time></p>
+    <p class="head"><span class="by">{w.name}</span> <time class="when" datetime={line.at}>{whenSaid(line.at, now)}</time></p>
     <p class="words" dir="auto">{line.body}</p>
   </div>
 {/snippet}
@@ -193,7 +193,7 @@
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
             <p class="event-line"><span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note)}</p>
-            <time class="when" datetime={m.event.at}>{agoSaid(m.event.at, now)}</time>
+            <time class="when" datetime={m.event.at}>{whenSaid(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}
           <!-- FOLDED: the line says how it ended, and opening it shows the whole of it. -->
