@@ -67,7 +67,7 @@
     type Source,
     type Unit,
   } from '$lib/record/packs.ts';
-  import { reprove } from '$lib/record/keychain.ts';
+  import { KEYS_REGISTER, reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -431,7 +431,7 @@
     const x = railOf(r);
     const parts: string[] = [];
     /* KEYS COUNT RETIRED ROWS IN THE RAIL'S COUNT; THE KEYCHAIN LEAVES THEM OUT, so the two said 176 and 83. Say no number rather than the wrong one. */
-    if (x && x.guessed !== true && r !== 'credentials') parts.push(x.count === 1 ? '1 entry' : `${x.count.toLocaleString('en-GB')} entries`);
+    if (x && x.guessed !== true && r !== KEYS_REGISTER) parts.push(x.count === 1 ? '1 entry' : `${x.count.toLocaleString('en-GB')} entries`);
     const at = changedAt[r];
     if (at) parts.push(`changed ${since(at, nowMs)}`);
     return parts.join(' · ');

@@ -40,7 +40,6 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { blocked, choose, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
-  import { shippedLine, shippedTitle } from '$lib/market/shipped-addons.ts';
   import { describe, listingHolds, moduleHolds } from '$lib/market/describe.ts';
   import { listingsOf, type ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
@@ -80,7 +79,7 @@
   /* AND THE ICON ITS CATALOGUE ENTRY CARRIES, unlisted entries too, since an installed add-on is one a record holds by id. */
   let catalogueIcons = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
-  const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? shippedTitle(id) ?? moduleName(id);
+  const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
   /* A LIST BY THE NAME THIS RECORD GIVES IT: `REGISTERS` holds what this tab has learnt of the record's declarations, and
      a use case's own lists read `datapoints` without the shell's names. */
   const listName = (r: string): string =>
@@ -178,7 +177,6 @@
       : (byId.get(state.id)?.blurb ??
         (state.id.startsWith('usecase-') ? useCase(state.id.slice('usecase-'.length))?.summary : undefined) ??
         catalogueSays.get(state.id) ??
-        shippedLine(state.id) ??
         listsLine(state.registers.map(listName)));
 
   /**
@@ -604,9 +602,12 @@
       .then(async (got) => {
         kennel = got.ok ? got.index : null;
         looked = true;
-        const index = got.ok && got.index ? got.index : await readShippedCatalogue(fetch);
-        [catalogueNames, catalogueSays] = await Promise.all([catalogueTitles(index), catalogueLines(index)]);
-        catalogueIcons = new Map((index?.entries ?? []).flatMap((e) => (e.kind === 'pack' && e.icon !== undefined ? [[e.id, e.icon] as const] : [])));
+        /* THE SHIPPED CATALOGUE UNDER THE KENNEL'S: it holds every pack in `packs/`, unlisted ones too, so an installed add-on the Kennel does not list is still named. */
+        const indexes = [await readShippedCatalogue(fetch), got.ok ? got.index : null];
+        const maps = await Promise.all(indexes.map(async (i) => [await catalogueTitles(i), await catalogueLines(i)] as const));
+        catalogueNames = new Map(maps.flatMap(([n]) => [...n]));
+        catalogueSays = new Map(maps.flatMap(([, l]) => [...l]));
+        catalogueIcons = new Map(indexes.flatMap((i) => (i?.entries ?? []).flatMap((e) => (e.kind === 'pack' && e.icon !== undefined ? [[e.id, e.icon] as const] : []))));
       })
       .catch(() => undefined);
     void read(async () => {
