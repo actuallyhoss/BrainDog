@@ -18,7 +18,7 @@
  * are the things that persist or transmit. A call that puts one inside the other is red, and the
  * sentence names both, because "you logged a secret" is only actionable if it says which.
  *
- * AND `Plaintext` LIVES IN THREE MODULES. `52 §5.2`: the brand appears in the two hosts' vault steps,
+ * AND `Plaintext` LIVES IN THREE MODULES. `52 §5.2`: the brand appears in the two hosts' keychain steps,
  * where a key is sealed and opened, and the agent path adds the CLI's `keys.ts`,
  * where an agent's key is read in and handed to one command. Anywhere else is a plaintext that has travelled,
  * and a type that has travelled is a value that has.
@@ -77,7 +77,7 @@ const WIRE = /\b(?:sid|linkToken|claimToken|serverKey)\b/;
 
 /**
  * AND THE TWO KEYS SEPTEMBER 17TH ADDED, which the key hierarchy's names never matched: a report key's bearer, which
- * `createReportKey` answers once (`packages/record/src/report.ts`), and a vault key opened for one scheduled action
+ * `createReportKey` answers once (`packages/record/src/report.ts`), and a keychain key opened for one scheduled action
  * (`packages/host/src/actions.ts`, where it is `opened` and then `secret`). Either opens something from anywhere.
  *
  * BY NAME, READ IN CODE ONLY. `bearer`, `opened` and `secret` are ordinary words in a sentence ("the key was not
@@ -135,7 +135,7 @@ const SINKS = [
    * *"A credential never goes in the record, and never in a log."* Five sinks, and every one of them
    * was the log half: `console`, `log`, `telemetry`, `push`, `dispatch`. A plaintext written into
    * the record through `sql.exec` was checked by nothing at all. That is `12 §6`'s promise, the
-   * one the vault exists to keep and the one ADR-062 is about. Measured against seven leak shapes,
+   * one the keychain exists to keep and the one ADR-062 is about. Measured against seven leak shapes,
    * this gate caught one.
    */
   { id: 'the record', re: /\bsql\.(?:exec|one|all|run)\s*\(/g, bound: true },
@@ -242,7 +242,7 @@ function walk(dir, out = []) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     /* `.svelte` TOO. A component that logs a grant it just opened is the same leak in a file this
-       gate would otherwise not read, and the vault screen is where an unwrapped value is nearest. */
+       gate would otherwise not read, and the keychain screen is where an unwrapped value is nearest. */
     else if (/\.(ts|mjs|js|svelte)$/.test(name)) out.push(full);
   }
   return out;
@@ -252,11 +252,11 @@ function walk(dir, out = []) {
  * Where the brand is allowed to be named.
  *
  * BY PATH, because the rule is about which MODULE holds it rather than which line. `52 §5.2` names
- * the two hosts' vault steps, and the agent path adds the CLI's key commands.
+ * the two hosts' keychain steps, and the agent path adds the CLI's key commands.
  */
 const BRAND_HOMES = [
-  /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/,
-  /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/,
+  /^apps[\\/]selfhost[\\/]src[\\/]keychain\.ts$/,
+  /^apps[\\/]worker[\\/]src[\\/]keychain\.ts$/,
   /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/,
 ];
 
@@ -273,8 +273,8 @@ const EXEMPT = [
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'depositOne', sinks: ['an outbound request', 'a serialisation'] },
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'execOne', sinks: ['a child process'] },
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'headersOne', sinks: ['standard output'] },
-  { file: /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
-  { file: /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
+  { file: /^apps[\\/]selfhost[\\/]src[\\/]keychain\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
+  { file: /^apps[\\/]worker[\\/]src[\\/]keychain\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
 ];
 
 /** A regex that finds any of `names` as a whole identifier, never as a property after a dot. */
@@ -435,7 +435,7 @@ export default function secretGrep(
         const at = text.search(/\bPlaintext\b/);
         findings.push({
           where: `${rel}:${lineOf(text, at)}`,
-          why: 'names the Plaintext brand outside a host vault step',
+          why: 'names the Plaintext brand outside a host keychain step',
           text: 'Plaintext',
         });
       }

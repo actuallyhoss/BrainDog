@@ -129,7 +129,7 @@ export default function refusals(
     ['Pack and declaration', 'PACK'],
     ['Grammar', 'GRAMMAR'],
     ['Write path', 'WRITE'],
-    ['Auth and vault', 'AUTH'],
+    ['Auth and vault', 'AUTH', 'Auth and keychain'],
     ['Format and lifecycle', 'LIFECYCLE'],
     ['Dialect', 'DIALECT'],
     ['Slash', 'SLASH'],
@@ -137,15 +137,21 @@ export default function refusals(
     ['Host and client', 'HOST'],
   ];
 
+  /* A family is headed by its old label or its new one in 30 §6: the keychain was the vault, and a document not yet reworded is still read. */
+  const head = (i) => {
+    const [old, , renamed] = FAMILIES[i];
+    return renamed !== undefined && !section.includes(`**${old}**`) && section.includes(`**${renamed}**`) ? renamed : old;
+  };
+
   const table = [];
   const tableSizes = [];
   for (let i = 0; i < FAMILIES.length; i++) {
-    const at = section.indexOf(`**${FAMILIES[i][0]}**`);
+    const at = section.indexOf(`**${head(i)}**`);
     if (at < 0) {
-      findings.push(`30 §6 has no ${FAMILIES[i][0]} family`);
+      findings.push(`30 §6 has no ${head(i)} family`);
       continue;
     }
-    const next = i + 1 < FAMILIES.length ? section.indexOf(`**${FAMILIES[i + 1][0]}**`) : section.length;
+    const next = i + 1 < FAMILIES.length ? section.indexOf(`**${head(i + 1)}**`) : section.length;
     const codes = [...section.slice(at, next).matchAll(/^\| `([A-Z][A-Z0-9_]*)` \|/gm)].map((m) => m[1]);
     tableSizes.push(codes.length);
     table.push(...codes);
@@ -264,7 +270,7 @@ export default function refusals(
      sounds like a defect in their change and is not. A gate that manufactures work is a gate people
      route around. `words()` below reads the range this sentence can plausibly occupy, it is tested
      by `spelled()` beneath it on every run, and it costs nothing per code from here on. */
-  const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families\s+\S\s+(\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) slash · (\d+) connector · (\d+) host and client/.exec(flat);
+  const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families\s+\S\s+(\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and (?:vault|keychain) · (\d+) format and lifecycle · (\d+) dialect · (\d+) slash · (\d+) connector · (\d+) host and client/.exec(flat);
   if (!counted) {
     findings.push("30 §6's counting sentence is not where this gate looks for it");
   } else {

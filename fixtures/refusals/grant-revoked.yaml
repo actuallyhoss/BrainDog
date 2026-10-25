@@ -1,5 +1,5 @@
 code:   GRANT_REVOKED
 via:    rpc
-raises: packages/kernel/src/vault.ts
+raises: packages/kernel/src/keychain.ts
 at:     id
 fix:    Bind a new grant.

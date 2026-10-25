@@ -1,5 +1,5 @@
 code:   WRONG_KEY
 via:    rpc
-raises: packages/kernel/src/vault.ts
+raises: packages/kernel/src/keychain.ts
 at:     kek_id
 fix:    Offer the key this record is wrapped by.

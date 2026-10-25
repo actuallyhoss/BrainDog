@@ -2,7 +2,7 @@ code:   ACTION_GRANT_MISSING
 via:    lint
 raises: packages/kernel/src/declare.ts
 at:     grant
-fix:    Name the key the action sends, by its label in the vault.
+fix:    Name the key the action sends, by its label in the keychain.
 pack: {
     "pack": "fixture-lint", "version": "1.0.0",
     "summary": "One pack built to trip exactly one lint refusal.",

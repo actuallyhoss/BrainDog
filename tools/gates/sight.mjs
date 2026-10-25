@@ -6,7 +6,7 @@
  * IT FINDS EVERY `kernel.(list|get|inScope|backlinks|history|searchMatched|metric|block|eventsBefore)(` in
  * `packages/record/src`, and asks of the function it sits in whether that function also calls `kernel.scope`, `sight.`
  * or a helper that asks sight itself (`GATED`). A call site that does is gated. One that does not is owner-only when the same function asks one of
- * the owner's gates (`admin`, `vault`, `team`, `ownerOnly`), allowed when `ALLOWED` below names it with a reason
+ * the owner's gates (`admin`, `keychain`, `team`, `ownerOnly`), allowed when `ALLOWED` below names it with a reason
  * (system, outbound and owner-only paths), and open otherwise.
  *
  * THE FUNCTION IS THE NEAREST NAMED ONE. An arrow handed to `map` is not a function anybody reads as one, so a call
@@ -41,7 +41,7 @@ export const READS = ['list', 'get', 'inScope', 'backlinks', 'history', 'searchM
 const GATED = /\bkernel\.scope\(|\bsight\.\w+\(|\b(?:sightOf|lineOf|heldBlock)\(/u;
 
 /** What a function calls to be the owner's alone, so no grantee reaches the read at all. */
-const OWNER_ONLY = /\b(?:admin|vault|team|ownerOnly)\(\s*ctx\b/u;
+const OWNER_ONLY = /\b(?:admin|keychain|team|ownerOnly)\(\s*ctx\b/u;
 
 /**
  * The call sites read for the system, for a read that leaves the record, for the owner or the decider alone, for a
@@ -81,8 +81,8 @@ export const ALLOWED = [
   { file: `${R}/methods/tools-seen.ts`, fn: '*', why: `${SYSTEM}the tools a run reported using, matched against the tools list as bookkeeping; nothing read is answered.` },
   { file: `${R}/methods/capture.ts`, fn: 'replayed', why: 'A capture replayed: the rows this same op wrote before, found by its op id, answered to the caller who wrote them.' },
 
-  /* THE OWNER'S AND THE DECIDER'S: the vault, and questions drawn for whoever `holds` lets answer them. */
-  { file: `${R}/index.ts`, fn: 'keyFor', why: `${OWNER}the vault's door, a key reached by a grant's project scope, asked only behind \`vault\` (depositGrant, the opener).` },
+  /* THE OWNER'S AND THE DECIDER'S: the keychain, and questions drawn for whoever `holds` lets answer them. */
+  { file: `${R}/index.ts`, fn: 'keyFor', why: `${OWNER}the keychain's door, a key reached by a grant's project scope, asked only behind \`keychain\` (depositGrant, the opener).` },
   { file: `${R}/index.ts`, fn: 'selfMarkedAgain', why: `${OWNER}"Mark X as you?" accepted again after an Undo, on the owner's Decide press.` },
   { file: `${R}/index.ts`, fn: 'candidate', why: "A merge question's people, drawn for whoever `holds` lets see the question (the decide path)." },
   { file: `${R}/index.ts`, fn: 'mergeAnswer', why: 'A merge question answered by whoever may decide it: the rows its own body names (the decide path).' },

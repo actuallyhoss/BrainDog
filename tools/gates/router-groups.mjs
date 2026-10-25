@@ -5,7 +5,7 @@
  *
  * `30 §5` splits the RPC surface by WHO MAY REACH IT rather than by convenience, and then states the
  * rule that keeps it honest: *if a screen needs something outside DATA and READ+, it is either a
- * browser-session group (VAULT, JOBS, ADMIN) or it is a design error. There is no third case, and
+ * browser-session group (KEYCHAIN, JOBS, ADMIN) or it is a design error. There is no third case, and
  * the router asserts it: every route declares its group, and a CI test walks the router and fails
  * on a route with no group.* This is that test.
  *
@@ -73,18 +73,20 @@ export default function routerGroups(
 ) {
   const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
   const findings = [];
+  /* THE KEYCHAIN WAS THE VAULT: a document or a route table that still says VAULT, `setVaultPassphrase` or `unlockVault` is read as the same group and method, so the rename can land in either half first. */
+  const modern = (name) => name.replace(/VAULT/g, 'KEYCHAIN').replace(/Vault/g, 'Keychain').replace(/^vault/, 'keychain');
 
   /* ── 30 §5's own table, as data ──────────────────────────────────────────── */
   const blueprint = read('docs/30-BLUEPRINT.md');
   const spec = {};
   const counts = {};
   for (const row of blueprint.matchAll(/^\|\s*\*\*([A-Z+]+)\*\*\s*\((\d+)\)\s*\|(.*?)\|\s*[^|]*\|$/gm)) {
-    const group = row[1];
+    const group = modern(row[1]);
     counts[group] = Number(row[2]);
-    spec[group] = [...row[3].matchAll(/`([a-zA-Z]+)`/g)].map((m) => m[1]);
+    spec[group] = [...row[3].matchAll(/`([a-zA-Z]+)`/g)].map((m) => modern(m[1]));
   }
 
-  const GROUPS = ['DATA', 'READ+', 'VAULT', 'JOBS', 'ADMIN', 'INTERNAL'];
+  const GROUPS = ['DATA', 'READ+', 'KEYCHAIN', 'JOBS', 'ADMIN', 'INTERNAL'];
   for (const group of GROUPS) if (!spec[group]) findings.push(`30 §5 has no ${group} row where this gate looks for it`);
 
   /* A COUNT IN PROSE IS A CLAIM. `30 §5` writes each group's size in its own heading and the six
@@ -118,7 +120,7 @@ export default function routerGroups(
         .map((name) => read('packages/host/src/routes', name))
     : [];
   const routes = [host, ...extra].flatMap((text) =>
-    [...text.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({ name: m[1], group: m[2] })),
+    [...text.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({ name: modern(m[1]), group: modern(m[2]) })),
   );
   if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
 
@@ -316,7 +318,7 @@ export default function routerGroups(
     for (const f of [...new Set(findings)]) console.error(`    ${f}`);
     console.error(
       '\n  The surface is split by who may reach it. If a screen needs something outside DATA and\n' +
-        '  READ+, it is a browser-session group (VAULT, JOBS, ADMIN) or it is a design error.\n',
+        '  READ+, it is a browser-session group (KEYCHAIN, JOBS, ADMIN) or it is a design error.\n',
     );
     return 1;
   }

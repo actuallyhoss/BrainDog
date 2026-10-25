@@ -36,7 +36,7 @@
  *   b · The first authorisation call in each method body is the one its group implies:
  *
  *         ADMIN  → `admin(ctx)`             owner, in a browser, no token of any kind (45 §5.6)
- *         VAULT  → `vault(ctx)`             the same ceiling, plus the vault's own rule
+ *         KEYCHAIN → `keychain(ctx)`    the same ceiling, plus the keychain's own rule
  *         READ+  → `guard` or `scoped`      any token, subject to scope
  *         DATA   → `guard` or `scoped`      the same requirement, and `SCOPED` below says why
  *
@@ -146,8 +146,8 @@ const SCOPED = ['guard', 'scoped'];
  */
 const IMPLIES = {
   ADMIN: ['admin', 'team'],
-  VAULT: ['vault'],
-  JOBS: ['vault', 'admin', 'runner'],
+  KEYCHAIN: ['keychain'],
+  JOBS: ['keychain', 'admin', 'runner'],
   'READ+': SCOPED,
   DATA: SCOPED,
 };
@@ -268,7 +268,7 @@ export default function guards(
   /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
   const guardOf = (body) => {
     const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    return /\b(admin|team|vault|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
+    return /\b(admin|team|keychain|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
   };
 
   /* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on
