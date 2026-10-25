@@ -615,6 +615,10 @@
     background: var(--ink-2);
   }
 
+  .series-key[data-paler] .series-swatch {
+    background: color-mix(in oklab, var(--ink) 40%, var(--tile));
+  }
+
   .series-key[data-under] .series-swatch {
     block-size: 2px;
     inline-size: 12px;
@@ -940,6 +944,7 @@
 
   .progress-figure {
     grid-area: figure;
+    justify-self: end;
     display: inline-flex;
     gap: var(--sp-1);
     color: var(--ink-3);
@@ -1670,13 +1675,21 @@
     translate: calc(-1 * var(--sp-2)) var(--sp-1);
   }
 
+  /* NEVER PAST THE CARD'S EDGE: at 390 a dot near the start put "EGP 668,304.22" half outside the tile ("GP"). The words
+     end at the dot and may reach back no further than the plot's own start plus a little of the tile's padding, which
+     the tile's width (`100cqw`) less the value axis and both paddings gives. */
   .forecast-now-label:is([data-place='start'], [data-place='start-under']) {
+    --reach: calc(var(--at) * (100cqw - var(--forecast-gutter) - 2 * var(--sp-4)) + var(--sp-3));
     text-align: end;
-    translate: calc(-100% - var(--sp-2)) calc(-100% - var(--sp-1));
+    /* WHERE THE CLAMP HOLDS IT OVER THE LINE, the words stand on the tile's own colour so they read over it. */
+    padding-inline: var(--sp-1);
+    background: color-mix(in srgb, var(--tile) 85%, transparent);
+    border-radius: var(--r-ctl);
+    translate: max(calc(-100% - var(--sp-2)), calc(-1 * var(--reach))) calc(-100% - var(--sp-1));
   }
 
   .forecast-now-label[data-place='start-under'] {
-    translate: calc(-100% - var(--sp-2)) var(--sp-1);
+    translate: max(calc(-100% - var(--sp-2)), calc(-1 * var(--reach))) var(--sp-1);
   }
 
   .forecast-now-label[data-place='start']:dir(rtl) {

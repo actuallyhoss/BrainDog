@@ -95,7 +95,7 @@ export function dayOf(when: string | number | Date | null | undefined): string |
 }
 
 /** What the fold's button says, shut and open. */
-export const FOLD_WORDS = { show: 'Show how to send numbers', hide: 'Hide' } as const;
+export const FOLD_WORDS = { show: 'Show how to send more', hide: 'Hide' } as const;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 86_400_000;
@@ -135,7 +135,7 @@ export function foldedLine(
   if (at.readings > 0) {
     const last = timeOf(at.lastReading);
     if (at.readings === 1) return last ? `1 number arrived here, on ${dated(last, today)}.` : '1 number arrived here.';
-    return last ? `${at.readings} numbers arrived here, the last on ${dated(last, today)}.` : `${at.readings} numbers arrived here.`;
+    return last ? `${at.readings.toLocaleString('en-GB')} numbers arrived here, the last on ${dated(last, today)}.` : `${at.readings.toLocaleString('en-GB')} numbers arrived here.`;
   }
   if (at.keys === 1) return 'A key is ready here and has not been used yet.';
   if (at.keys > 1) return `${keys} are ready here and none has been used yet.`;

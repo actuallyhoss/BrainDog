@@ -98,6 +98,6 @@ test('the folded line says what arrives here at one and at many, in words and ne
   for (const line of [...lines, FOLD_WORDS.show, FOLD_WORDS.hide]) {
     assert.doesNotMatch(line, /#\d|[0-9A-HJKMNP-TV-Z]{26}|\u2014|\//u, `no id, path or em dash in "${line}"`);
   }
-  assert.equal(FOLD_WORDS.show, 'Show how to send numbers');
+  assert.equal(FOLD_WORDS.show, 'Show how to send more');
   assert.equal(FOLD_WORDS.hide, 'Hide');
 });

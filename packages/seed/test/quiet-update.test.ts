@@ -885,6 +885,9 @@ const withoutRetired38 = (doc: Body): Body => ({
  * MONEY 3.23.0 COMES OFF BEFORE ALL (the look of 25 October): the Lasts tile's two cells say what 3.22.0 released, "With
  * what is due" and "If nothing comes in".
  */
+/** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October, R4): the Accounts split read six accounts at most. */
+const withoutLimit24 = (doc: Body): Body =>
+  withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
 const withoutLasts23 = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[]).map((d) =>
@@ -1061,7 +1064,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(raw))))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(raw)))))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

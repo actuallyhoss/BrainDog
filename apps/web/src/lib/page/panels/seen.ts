@@ -115,7 +115,7 @@ export function seenLines(found: Seen | null, now: number): SeenLines {
   return {
     lines,
     also: names === '' ? null : `Also known as ${names}${names.endsWith('.') ? '' : '.'}`,
-    more: rest > 0 ? `and ${rest.toLocaleString('en-GB')} more` : null,
+    more: rest > 0 ? `and ${rest.toLocaleString('en-GB')} more places` : null,
     none: null,
   };
 }

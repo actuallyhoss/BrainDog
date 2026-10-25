@@ -67,7 +67,7 @@ test('THREE PLACES, THEN "and N more"', () => {
   const out = seenLines(found, NOW);
   assert.equal(out.lines.length, 3);
   assert.equal(out.lines[0], '21 Aug · Notes: Call 12');
-  assert.equal(out.more, 'and 9 more');
+  assert.equal(out.more, 'and 9 more places');
   /* EXACTLY THREE has no rest to count. */
   assert.equal(seenLines(seenOf(answer(seen.slice(0, 3))), NOW).more, null);
 });

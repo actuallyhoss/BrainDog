@@ -41,7 +41,7 @@ import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, gly
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
-import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
+import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
@@ -1614,7 +1614,7 @@ function series(b: Block, o: RenderOptions): string {
   const legend = keyed
     ? `<ul class="series-legend">${plan.series
         .map((s) => `<li class="series-key" data-dir="${s.dir}" data-step="${s.step}"><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${escape(s.label)}</span></li>`)
-        .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}${plan.buckets.some((k) => k.under) ? `<li class="series-key" data-under=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_UNDER}</span></li>` : ''}</ul>`
+        .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}${plan.buckets.some((k) => k.under) ? `<li class="series-key" data-under=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_UNDER}</span></li>` : ''}${plan.buckets.some((k) => k.state !== '') ? `<li class="series-key" data-paler=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_PALER}</span></li>` : ''}</ul>`
     : '';
   const tip = (k: SeriesPlan['buckets'][number]): string =>
     `<span class="series-tip"><span class="series-tip-label">${escape(k.label)}${k.said ? ` ${escape(k.said)}` : ''}</span>${plan.series

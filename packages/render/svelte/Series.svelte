@@ -7,7 +7,7 @@
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
   import { MISSING } from '../src/format.ts';
-  import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan } from '../src/series.ts';
+  import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan } from '../src/series.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -25,6 +25,7 @@
       {/each}
       {#if net}<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_NET}</span></li>{/if}
       {#if plan.buckets.some((k) => k.under)}<li class="series-key" data-under=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_UNDER}</span></li>{/if}
+      {#if plan.buckets.some((k) => k.state !== '')}<li class="series-key" data-paler=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_PALER}</span></li>{/if}
     </ul>
   {/if}
   {#if plan.empty}

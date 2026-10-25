@@ -173,6 +173,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.24.0',
+      notes: 'Accounts lists every account the first line counts, where it stopped at six and the line said seven.',
+    },
+    {
       version: '3.23.0',
       notes: 'Money says what its Lasts figures assume: one is with what is due and expected, the other is if nothing more comes in.',
     },

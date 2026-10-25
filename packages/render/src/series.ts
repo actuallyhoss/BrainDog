@@ -315,6 +315,8 @@ export const SERIES_NONE = 'Nothing to draw yet: every bucket here is empty or z
 export const SERIES_NET = 'Net';
 /** The key of the red cap on a month whose net is below zero, so the red always has its word. */
 export const SERIES_UNDER = 'More out than in';
+/** The key for a bar drawn at half strength: a month not over yet, or still to come. */
+export const SERIES_PALER = 'Paler: not over yet';
 export const SERIES_PARTIAL = 'so far';
 export const SERIES_AHEAD = 'expected';
 /** The current bucket when it counts money due later in it beside what was paid so far. */
