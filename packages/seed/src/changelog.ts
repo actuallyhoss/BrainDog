@@ -165,6 +165,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.23.0',
+      notes: 'Money says what its Lasts figures assume: one is with what is due and expected, the other is if nothing more comes in.',
+    },
+    {
       version: '3.22.0',
       notes:
         'A plan is found by its name however it is written, so parts that say "desk" join the plan called Desk and no second plan is made beside it. Two plans already here under one name are asked about once in Needs you: make them one, which closes the second and keeps it, linked to the first, or keep them apart. Nothing is moved before you answer. Cash ahead counts a plan written two ways as one.',

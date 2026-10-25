@@ -105,9 +105,9 @@ test("MONEY'S PAGE DECLARES BOTH: Lasts, calm, while there is cash, and Runs out
   assert.deepEqual([runs!.kind, runs!.heading, runs!.area, runs!.tone], ['stat', 'Runs out', 'rail', 'bad']);
   /* THE SAME FIGURES BY THE SAME IDS: the day it runs out, with the days left under it. LASTS SAYS BESIDE IT HOW LONG
      THE CASH LASTS WITH NOTHING COMING IN (the UI pass of 20 October, money F3), which the line no longer says. */
-  const due = { metric: 'runs-out-on', label: 'With what is due', note: 'In {{runway-days}}' };
+  const due = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
   assert.deepEqual(runs!.cells, [due]);
-  assert.deepEqual(lasts!.cells, [due, { metric: 'lasts-no-income', label: 'If nothing comes in' }]);
+  assert.deepEqual(lasts!.cells, [due, { metric: 'lasts-no-income', label: 'If nothing more comes in' }]);
   /* ONE OR THE OTHER, never both: at or above nought, and below it. Lasts waits for an account, as the accounts do. */
   assert.deepEqual(lasts!.when, { all: [{ metric: 'cash-accounts', gt: 0 }, { metric: 'cash-now', gte: 0 }] });
   assert.deepEqual(runs!.when, { metric: 'cash-now', lt: 0 });

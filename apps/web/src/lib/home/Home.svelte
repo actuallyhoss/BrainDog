@@ -1533,13 +1533,15 @@
       grid-column: calc(var(--n) + 1) / -1;
     }
 
+    /* CASH ENDS ON THE LAST TRACK OF THE LEFT STACK (Needs you and its foot, three tracks) and never on a fourth, which
+       was a band of empty board under both tiles when the right column was the shorter. */
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 2 / span 3;
+      grid-row: 2 / span 2;
       grid-column: calc(var(--n) + 1) / -1;
     }
 
     .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 1 / span 4;
+      grid-row: 1 / span 3;
     }
 
     /* WITH WHAT IS LATE THE LEFT STACK IS FOUR TRACKS: the late tile beside who is working, then Needs you over two and
@@ -1584,8 +1586,12 @@
        cash, so nothing laid out later lands in one. It is no height and lies under the tiles. */
     .body[data-board] > .row-one-rest {
       display: block;
-      grid-row: 2 / span 3;
+      grid-row: 2 / span 2;
       grid-column: 1 / -1;
+    }
+
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])) > .row-one-rest {
+      grid-row: 2 / span 3;
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
@@ -1594,6 +1600,11 @@
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
       grid-column: span 4;
+    }
+
+    /* WITHOUT WHAT IS DUE BESIDE IT, the week's money is the whole row, not a lone small tile with a hole beside it. */
+    .body[data-board]:not(:has(:global(.block-slot[data-key='week-due']))) :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      grid-column: 1 / -1;
     }
 
     .body[data-board] > :global([data-landed]),
@@ -1814,9 +1825,10 @@
     text-align: start;
   }
 
+  /* THE NAME TAKES THE TILE'S WIDTH and the organisation after it gives way first: a 60% cap cut "Amira Hadd…" with room. */
   .body[data-board] :global(.block-slot[data-key='faces'] .cards-head) {
     flex: none;
-    max-inline-size: 60%;
+    max-inline-size: 100%;
   }
 
   .body[data-board] :global(.block-slot[data-key='faces'] .cards-facts) {

@@ -15,18 +15,17 @@ export const TITLE_HEAD_MOST = 80;
 /**
  * A TASK'S TITLE AS A SHORT NAME AND THE REST QUIET (E23), for both renderers. Work drew whole paragraphs as titles, six
  * lines a task: the first clause is the name, up to the first full stop, colon, semicolon or dash, and at most
- * `TITLE_HEAD_MOST` characters, cut at a space; what follows is drawn after it in the quiet colour. A title holding a
- * link or a marked phrase is left whole, since cutting it could split the mark. `rest` is `''` when there is none.
+ * `TITLE_HEAD_MOST` characters; what follows is drawn after it in the quiet colour. A title with no such clause inside the
+ * limit, or holding a link or a marked phrase, is left whole. `rest` is `''` when there is none.
  */
 export function todoTitle(title: string): { head: string; rest: string } {
   const said = title.trim();
   if (said.includes('{{') || said.includes('](') || said.length <= TITLE_HEAD_MOST) return { head: title, rest: '' };
-  const clause = /[.:;!?](?=\s)|\s[\u2013\u2014-]\s|\n/u.exec(said);
-  let at = clause ? clause.index + (/^[.:;!?]/u.test(clause[0]) ? 1 : 0) : said.length;
-  if (at > TITLE_HEAD_MOST) {
-    const space = said.lastIndexOf(' ', TITLE_HEAD_MOST);
-    at = space > 0 ? space : TITLE_HEAD_MOST;
-  }
+  const clause = /[.:;!?](?=\s)|\s[–—-]\s|\n/u.exec(said);
+  const at = clause ? clause.index + (/^[.:;!?]/u.test(clause[0]) ? 1 : 0) : said.length;
+  /* NO CLAUSE INSIDE THE LIMIT, NO SPLIT: cutting at a space left a lone last word ("… not just one") drawn grey as if it were
+     cut off, so a title with no real first clause is whole in the ink and the two lines clamp it. */
+  if (at > TITLE_HEAD_MOST) return { head: title, rest: '' };
   const head = said.slice(0, at).trim();
   const rest = said.slice(at).trim();
   return rest === '' || head === '' ? { head: title, rest: '' } : { head, rest };

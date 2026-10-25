@@ -257,8 +257,11 @@
     list-style: none;
   }
 
+  /* ITS ONE COLUMN IS THE CELL'S WIDTH, never the card's own: an auto column grew to the card's widest line and ran the
+     card out over its neighbour. */
   .cards > li {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     min-inline-size: 0;
   }
 

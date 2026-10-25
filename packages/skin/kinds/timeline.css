@@ -15,11 +15,8 @@
   /* ONE LINE AN ENTRY (the money review, F4): the day, the name, then the amount at the end in tabular figures, 44px
      tall, where the amount stood under the name and every entry was two lines and 64px. A name too long for the line
      ends in an ellipsis; its entry holds the rest. */
-  /* A COLUMN THE EYE RUNS DOWN, never a line across a 1100px tile: the amount stays near the name it belongs to. */
-  .list[data-kind='timeline'] {
-    max-inline-size: 720px;
-  }
-
+  /* THE AMOUNTS END ON THE TILE'S PADDING, as every other column does: a 720px cap ended them 50px short of the edge on a
+     wide tile, with the hairlines running on past. The name's own track still takes what the amount leaves. */
   .list[data-kind='timeline'] > .item {
     grid-template-areas: 'marker title detail state';
     grid-template-columns: 7ch minmax(0, 1fr) auto auto;

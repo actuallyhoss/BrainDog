@@ -1114,7 +1114,7 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
   }
 });
 
-test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and not a chart of one bar a currency', () => {
+test('EVERY CURRENCY A BOOK IS KEPT IN IS DRAWN THE SAME WAY, under its own code, a lone book too', () => {
   const MARA = '01M3VMPSHV07AM4S51WDTFM5XG';
   const ORCHARD = '01M3VMPSHV07AM4S51WDTFM5XH';
   const block = blockOf(
@@ -1148,11 +1148,10 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
     AT,
   );
   const segments = toSegments(block).filter((s) => s.type === 'block') as { kind: string; rows: { cells: string[] }[] }[];
-  assert.deepEqual(segments.map((s) => s.kind), ['stat'], 'one figure a book, not a chart a currency');
-  assert.deepEqual(segments[0]!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Mara Lindqvist | EGP 1,086,213.41', 'Orchardline | USD 12,000.00']);
+  assert.deepEqual(segments.map((s) => s.kind), ['bar', 'bar'], 'a chart a currency, none of them a bare figure');
+  assert.deepEqual(segments.map((s) => s.rows.map((r) => r.cells.slice(0, 2).join(' | '))), [['Mara Lindqvist | EGP 1,086,213.41'], ['Orchardline | USD 12,000.00']]);
 
-  /* TWO BOOKS IN POUNDS AND ONE IN DOLLARS: the pounds are a chart under their code, and the dollars one figure after it,
-     never a chart of one bar under "In USD". */
+  /* TWO BOOKS IN POUNDS AND ONE IN DOLLARS: each currency is a chart under its code, so the dollars read as the pounds do. */
   const PERSONAL = '01M3VMPSHV07AM4S51WDTFM5XJ';
   const three = blockOf(
     {
@@ -1188,12 +1187,12 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
   const drawn = toSegments(three);
   assert.deepEqual(
     drawn.map((s) => (s.type === 'block' ? s.kind : s.type)),
-    ['markdown', 'bar', 'stat'],
-    'the pounds under their code, then the dollars as a figure',
+    ['markdown', 'bar', 'markdown', 'bar'],
+    'each currency under its code',
   );
-  const [, bar, stat] = drawn as { rows: { cells: string[] }[] }[];
+  const [, bar, , usd] = drawn as { rows: { cells: string[] }[] }[];
   assert.deepEqual(bar!.rows.map((r) => r.cells[0]), ['Mara Lindqvist', 'Personal']);
-  assert.deepEqual(stat!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Orchardline | USD 12,000.00']);
+  assert.deepEqual(usd!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Orchardline | USD 12,000.00']);
 });
 
 test('A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS SO, and a zero over rows that exist does not', () => {

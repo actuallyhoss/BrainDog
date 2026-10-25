@@ -18,11 +18,10 @@ test('A LONG TITLE IS ITS FIRST CLAUSE, and the rest is kept, quiet, after it', 
   });
   /* A SHORT TITLE IS LEFT WHOLE, whatever its stops. */
   assert.deepEqual(todoTitle('Ship it. Then rest.'), { head: 'Ship it. Then rest.', rest: '' });
-  /* A FIRST CLAUSE PAST THE LIMIT IS CUT AT A SPACE before it. */
+  /* A FIRST CLAUSE PAST THE LIMIT IS NO SPLIT: a lone last word drawn grey read as cut off. */
   const run = `${'word '.repeat(30)}end`;
-  const { head, rest } = todoTitle(run);
-  assert.ok(head.length <= TITLE_HEAD_MOST && !head.endsWith(' '), head);
-  assert.equal(`${head} ${rest}`, run);
+  assert.deepEqual(todoTitle(run), { head: run, rest: '' });
+  assert.ok(TITLE_HEAD_MOST > 0);
   /* A MARKED PHRASE OR A LINK IS NEVER SPLIT. */
   const marked = `{{bad:Late}} ${LONG}`;
   assert.deepEqual(todoTitle(marked), { head: marked, rest: '' });

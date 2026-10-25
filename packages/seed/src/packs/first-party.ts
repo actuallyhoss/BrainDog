@@ -721,6 +721,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   under one name; `register.plans` gains `one_with`, which his yes sets on the second plan as it closes it, and
  *   `rule.plan-made-one` hands that plan's parts to the first. 3.21.0 is master's (Z14, Z18). A field and a rule added
  *   and nothing taken away, so a minor step.
+ * - money-core 3.23.0 (the look of 25 October): the Lasts tile's two cells say "With what is due and expected" and "If
+ *   nothing more comes in", where "Lasts past 25 Oct 2027" beside "If nothing comes in: 80 days" read as a contradiction.
+ *   3.22.0 is on production. Words only, no id added or taken away, so a minor step.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
@@ -733,7 +736,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.27.0',
   people: '3.8.0',
-  'money-core': '3.22.0',
+  'money-core': '3.23.0',
   estate: '2.4.0',
   work: '1.19.0',
 };

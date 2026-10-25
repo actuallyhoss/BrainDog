@@ -881,7 +881,24 @@ const withoutRetired38 = (doc: Body): Body => ({
  * MONEY 3.22.0 COMES OFF FIRST (the audit of 25 October, Y1): no "Made one with" on Plans, no rule that moves a plan's
  * parts once it is made one with another, and the plans script as 3.21.0 released it, matching names letter for letter.
  */
-const PLANS_3_21 = ((await import(new URL('./fixtures/plans-from-names-3.21.0.js', import.meta.url).href)) as { PLANS_FROM_NAMES_SCRIPT: Body }).PLANS_FROM_NAMES_SCRIPT;
+/**
+ * MONEY 3.23.0 COMES OFF BEFORE ALL (the look of 25 October): the Lasts tile's two cells say what 3.22.0 released, "With
+ * what is due" and "If nothing comes in".
+ */
+const withoutLasts23 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) =>
+    Array.isArray(d.cells)
+      ? {
+          ...d,
+          cells: (d.cells as Body[]).map((c) =>
+            c.label === 'With what is due and expected' ? { ...c, label: 'With what is due' } : c.label === 'If nothing more comes in' ? { ...c, label: 'If nothing comes in' } : c,
+          ),
+        }
+      : d,
+  ),
+});
+const PLANS_3_21 =((await import(new URL('./fixtures/plans-from-names-3.21.0.js', import.meta.url).href)) as { PLANS_FROM_NAMES_SCRIPT: Body }).PLANS_FROM_NAMES_SCRIPT;
 const withoutTwins22 = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
@@ -1044,7 +1061,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(raw)))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(raw))))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -1097,20 +1097,9 @@ function charted(block: BlockResult): Split | null {
         const amount = g.parts?.find((p) => p.currency === unit)?.amount;
         return amount === undefined ? [] : [{ key: g.key, ...(g.label === undefined ? {} : { label: g.label }), value: amount }];
       });
-    /* A PART ALONE IN ITS CURRENCY IS A FIGURE, NOT A CHART. A book kept in dollars beside books kept in pounds is read
-       in its own currency, and a chart of one full bar under "In USD" compared it with nothing. So each currency that
-       holds two parts or more is its chart, under its code, and each that holds one is a figure in it after them, which
-       says its own currency and needs no code over it. */
+    /* EVERY CURRENCY IS ITS OWN CHART UNDER ITS CODE, a lone part too: one drawn as a bare figure with no heading sat under
+       the others in another style, and a reader could not tell what currency it was in. */
     const each = units.map(inUnit);
-    const charts = units.flatMap((unit, n) => (each[n]!.length > 1 ? [{ currency: unit, block: { ...block, parts: { ...parts, unit, value: null, groups: each[n]! } } }] : []));
-    const lone = units.flatMap((unit, n) => (each[n]!.length === 1 ? [{ unit, part: each[n]![0]! }] : []));
-    if (units.length > 1 && lone.length > 0) {
-      const register = METRICS[parts.metric]?.source?.startsWith('register.') ? METRICS[parts.metric]!.source.slice('register.'.length) : '';
-      const field = METRICS[parts.metric]?.group_by ?? '';
-      const metrics = lone.map(({ unit, part }) => ({ id: part.key, label: partSaid(register, field, part), value: money(Math.round(part.value), unit), note: '' }));
-      const { parts: _parts, ...figures } = block;
-      return { charts: [...charts, { currency: null, block: { ...figures, kind: 'stat', metrics } }], converted: null };
-    }
     return {
       charts: units.map((unit, n) => ({ currency: unit, block: { ...block, parts: { ...parts, unit, value: null, groups: each[n]! } } })),
       converted: null,

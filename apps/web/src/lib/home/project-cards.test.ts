@@ -212,6 +212,13 @@ test('a key number nothing has arrived for leaves the card as it was', () => {
   assert.equal(withKpis(cards, [{ ...revenue, points: [] }], at)[0]?.kpi, null);
 });
 
+test('A FORECAST IS NEVER A CARD’S FIGURE: a scenario key number leaves the card with none, a measured one leads', () => {
+  const { cards } = cardsOf(decl, [{ seq: 1, id: 'row-kiln', fields: { name: 'Kiln', lane: 'earning' } }]);
+  const outlook = { ...revenue, name: 'Monthly revenue a year out: bear, Kiln' };
+  assert.equal(withKpis(cards, [outlook], at)[0]?.kpi, null);
+  assert.equal(withKpis(cards, [revenue], at)[0]?.kpi?.name, 'Licence revenue');
+});
+
 test('THE SIDEBAR READS A PROJECT BY THE FIELDS IT DRAWS, never its notes: name, mark, hue, lane and next step, as declared', () => {
   const full: CardDecl = { ...decl, fields: ['name', 'mark', 'hue', 'lane', 'next', 'about', 'notes'].map((id) => ({ id, type: 'text' })) };
   assert.deepEqual(drawnRead(full, 500), { register: 'ventures', limit: 500, fields: ['name', 'mark', 'hue', 'lane', 'next'] });

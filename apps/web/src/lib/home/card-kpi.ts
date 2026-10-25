@@ -40,6 +40,12 @@ export type CardKpi = {
 export type KpiAnswered = KpiInput & { thing?: string | undefined; project?: string | undefined };
 
 /**
+ * A FORECAST OR PLAN IS NO KEY NUMBER FOR A CARD TO LEAD WITH: "Monthly revenue a year out: bear" is what somebody expects,
+ * not what came in, and a card's big figure is a measured one. Named by the words a scenario carries.
+ */
+export const isForecast = (name: string): boolean => /\ba year out\b|:\s*(bear|base|bull)\b|\b(forecast|projected|projection|outlook|scenario)\b/iu.test(name);
+
+/**
  * One key number as a card draws it, or `null` when nothing has arrived for it: a number with no value is no figure,
  * and the card then says what it says without one.
  */
@@ -69,7 +75,7 @@ export function withKpis<C extends Pick<ProjectCard, 'name' | 'id' | 'kpi'>>(car
   if (answers.length === 0) return [...cards];
   return cards.map((c) => {
     const a = answers.find((x) => (c.id && x.thing ? x.thing === c.id : x.project === c.name));
-    const kpi = a ? cardKpiOf(a, opts) : null;
+    const kpi = a && !isForecast(a.name) ? cardKpiOf(a, opts) : null;
     return kpi ? { ...c, kpi } : c;
   });
 }

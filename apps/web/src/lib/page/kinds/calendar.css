@@ -57,6 +57,18 @@
     inset-block-start: -44px;
   }
 
+  /* UNDER A BOX'S HEADING (Money's Coming and going) THE CHOICE IS IN THAT HEADING'S ROW: the calendar has no head of its
+     own, so it was a row of its own with an empty band over it. The heading is 28 tall and a box's blocks are one step apart. */
+  .block-slot:has(> figure[data-kind='section']) + .block-slot:not(:has(> .block-bar)) .calendar {
+    position: relative;
+  }
+
+  .block-slot:has(> figure[data-kind='section']) + .block-slot:not(:has(> .block-bar)) .calendar > .calendar-views {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: calc(-28px - var(--sp-5));
+  }
+
   /* ── the month grid ─────────────────────────────────────────────────────── */
 
   /* FIXED COLUMNS, so a day with a long title is as wide as a day with none and the week reads as a week. */

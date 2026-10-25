@@ -183,6 +183,7 @@
     display: flex;
     flex-direction: column;
     block-size: 100%;
+    min-inline-size: 0;
     box-sizing: border-box;
     padding: 20px;
     border-radius: var(--r-tile);
@@ -309,6 +310,7 @@
     align-items: baseline;
     gap: 8px;
     min-block-size: 34px;
+    min-inline-size: 0;
     margin-block-start: 16px;
   }
 
@@ -445,6 +447,7 @@
 
   .pc-next-words {
     display: -webkit-box;
+    min-inline-size: 0;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;

@@ -378,6 +378,18 @@
   }
 
   .hd-line .hl-title {
+    display: -webkit-box;
     flex: 1;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* TWO ITEMS ON ONE DATE ARE TWO ITEMS: a rule and a step of air between them, each held to two lines. */
+  .hd-line + .hd-line {
+    margin-block-start: var(--sp-2);
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--rule);
   }
 </style>
