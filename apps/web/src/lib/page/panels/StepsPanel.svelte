@@ -329,7 +329,19 @@
       grid-column: 1;
       grid-row: auto;
       margin-block-start: var(--sp-1);
-      margin-inline-start: calc(-1 * var(--sp-2));
+    }
+
+    /* ON A PHONE the two presses are real buttons: a fill, 40px tall, a gap between them. */
+    .step-acts {
+      gap: var(--sp-2);
+    }
+
+    .step-acts .step-btn {
+      min-block-size: 40px;
+      min-inline-size: 72px;
+      padding-inline: var(--sp-4);
+      background: var(--tile-2);
+      color: var(--ink);
     }
   }
 

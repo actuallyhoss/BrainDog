@@ -253,6 +253,18 @@
       padding-block: var(--sp-2);
     }
 
+    .runs-name {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+    }
+
     .runs-end {
       grid-column: 2;
       flex-wrap: wrap;
@@ -279,6 +291,23 @@
     .runs-more,
     .runs-door {
       min-block-size: 44px;
+    }
+  }
+
+  /* THE THREE FOOT ACTIONS ARE SEPARATE BUTTONS on a phone: a fill each, 40px tall, the list door first. */
+  @container (width < 560px) {
+    .runs-foot {
+      gap: var(--sp-2);
+      margin-block-start: var(--sp-3);
+    }
+
+    .runs-more,
+    .runs-door {
+      min-block-size: 40px;
+      padding-inline: var(--sp-3);
+      border-radius: var(--r-ctl);
+      background: var(--tile-2);
+      color: var(--ink);
     }
   }
 </style>

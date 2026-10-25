@@ -371,7 +371,7 @@
 
 {#snippet link(l: SideLink, nested: boolean)}
   <li>
-    <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={under(l.href) ? 'page' : undefined}>
+    <a class="s-row s-link s-list-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={under(l.href) ? 'page' : undefined}>
       <Icon name={l.icon as IconName} size="s" /><span class="s-name">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
     </a>
@@ -854,6 +854,13 @@
     color: var(--ink-2);
   }
 
+  /* A LIST'S ROW HOLDS THE CARET'S PLACE A FOLD'S ROW DRAWS, so every count in a column ends on one edge. */
+  .s-list-link::after {
+    content: '';
+    flex: none;
+    inline-size: var(--icon-s, 16px);
+  }
+
   /* THE FOOT: suggested changes when any, then Settings, a hairline over them, at the bottom of the column. */
   .s-end {
     margin-block-start: auto;
@@ -939,6 +946,15 @@
 
   .s-phone .s-fold {
     min-block-size: 44px;
+  }
+
+  /* PARKED AND FINISHED ARE CARDS ON A PHONE, as every other group is, not grey rows on the page. */
+  .s-phone .s-fold:not(.s-group) {
+    margin-block-end: var(--sp-2);
+    padding-inline-end: var(--sp-3);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    color: var(--ink-2);
   }
 
   .s-phone-lists {

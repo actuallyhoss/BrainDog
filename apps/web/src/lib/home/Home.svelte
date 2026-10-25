@@ -1278,7 +1278,7 @@
   }
 
   /* ON A PHONE, NEEDS YOU'S FIRST QUESTION IS ANSWERED WHERE IT STANDS AND THE REST ARE ROWS (the Bento phone board): each
-     after the first loses its buttons, its title keeps one line, and the whole row is the title's link to its page. */
+     after the first loses its buttons, its title wraps to three lines, and the whole row is the title's link to its page. */
   @media (width < 600px) {
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa :is(.dc-actions, .dr-actions)) {
       display: none;
@@ -1290,8 +1290,8 @@
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .queue-question) {
       overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
     }
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .dc-open::after) {
@@ -1599,6 +1599,10 @@
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      grid-column: 1 / -1;
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']:not([hidden], :has([data-seen-none])) ~ .block-slot[data-key='week-money']) {
       grid-column: span 4;
     }
 
@@ -1809,6 +1813,14 @@
 
   .body[data-board] :global(.block-slot[data-key='cash'] .cell-note:empty) {
     display: none;
+  }
+
+  /* THE RATES' DAY IS SAID ONCE ON A PHONE, under the cash figure: coming in and going out are converted at the same
+     rates, and the same grey line three times was eight lines of nothing. */
+  @media (width < 640px) {
+    .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(n + 2) .cell-note) {
+      display: none;
+    }
   }
 
 

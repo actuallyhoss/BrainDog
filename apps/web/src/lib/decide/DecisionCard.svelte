@@ -1082,6 +1082,19 @@
     margin-block-start: var(--sp-1);
   }
 
+  /* ON A PHONE the question is 16 and not a heading: a card is its question, its answers and one line of care, not mostly title. */
+  @media (width < 600px) {
+    .dc-main > .queue-question {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .dc-main > .dc-hard,
+    .dc-main > .dc-does {
+      margin-block-start: calc(var(--sp-1) * -1);
+    }
+  }
+
   /* THE CARE A HARD ANSWER ASKS FOR, quiet, under the row of answers (audit Z28). */
   .dc-hard {
     margin: 0;
@@ -1449,7 +1462,7 @@
 
   /* WHERE TWO ANSWERS SHARE A PHONE'S LINE WITH IT (`form.css`, 400 to 600px), it keeps its square and its words go to
      its name alone, so the answers keep the room they need. */
-  @media (400px <= width < 600px) {
+  @media (width < 600px) {
     .dc-actions[data-inline] > :global(.dc-later) {
       justify-content: center;
       inline-size: var(--tap);

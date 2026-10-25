@@ -584,8 +584,8 @@
     }
 
     .pc-next-words {
-      -webkit-line-clamp: 1;
-      line-clamp: 1;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
     }
 
     /* THE LIVE LINE STAYS ON A PHONE, under no rule: it is the one thing an empty card says. */
