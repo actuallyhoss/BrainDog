@@ -35,7 +35,9 @@
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { TONES } from 'braindog-render';
+  import { TONES, since } from 'braindog-render';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
@@ -400,6 +402,40 @@
      "Relation", titled by the row) is not one of them, so it is not listed as a page the add-on adds. */
   const shownPages = $derived((pack?.pages ?? []).filter((p) => !(pack?.rowPages ?? []).includes(p)));
 
+  /* THE PAGES LISTED UNDER WHAT THE ADD-ON ADDED leave out the one that is the add-on itself: "Agents" inside Agents. */
+  const ledgerPages = $derived(shownPages.filter((p) => pageName(p).trim().toLowerCase() !== name.trim().toLowerCase()));
+
+  /* EACH LIST'S OWN ICON AND COUNT, as the rail draws it, and when it last changed, from the newest page of the log: a
+     list the log's newest page never touched says no age rather than a guess. */
+  const railOf = (r: string) => ((page.data.index?.registers ?? []) as { id: string; count: number; icon: IconName; guessed?: true }[]).find((x) => x.id === r);
+  let changedAt = $state<Record<string, string>>({});
+  const nowMs = $derived(recordNow());
+  $effect(() => {
+    if (!page.data.live) return;
+    untrack(() => {
+      void import('$lib/record/news-live.ts')
+        .then((m) => m.readLog(apiBase(), null))
+        .then((out) => {
+          if (out.from !== 'live') return;
+          const seen: Record<string, string> = {};
+          for (const e of out.events) {
+            const reg = typeof e.target === 'string' ? e.target.split('#')[0] : undefined;
+            if (reg && (seen[reg] === undefined || Date.parse(e.at) > Date.parse(seen[reg]))) seen[reg] = e.at;
+          }
+          changedAt = seen;
+        })
+        .catch(() => undefined);
+    });
+  });
+  const metaOf = (r: string): string => {
+    const x = railOf(r);
+    const parts: string[] = [];
+    if (x && x.guessed !== true) parts.push(x.count === 1 ? '1 row' : `${x.count.toLocaleString('en-GB')} rows`);
+    const at = changedAt[r];
+    if (at) parts.push(`changed ${since(at, nowMs)}`);
+    return parts.join(' · ');
+  };
+
   const pageName = (slug: string): string =>
     ((page.data.nav ?? []) as { id?: string; title?: string }[]).find((e) => e.id === slug)?.title || PAGES[slug]?.title || inWords(slug);
 </script>
@@ -716,13 +752,14 @@
             {#each pack.registers as r (r)}
               <li>
                 <a class="line added" href={at(`/r/${r}`)}>
-                  <span class="line-mark"><IconWell name="rows" size="l" /></span>
+                  <span class="line-mark"><IconWell name={railOf(r)?.icon ?? 'rows'} size="l" /></span>
                   <span class="line-title">{((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? REGISTERS[r]?.name ?? inWords(r)}</span>
+                  {#if metaOf(r)}<span class="added-meta">{metaOf(r)}</span>{/if}
                   <span class="added-go"><Icon name="chevron" size="s" /></span>
                 </a>
               </li>
             {/each}
-            {#each shownPages as p (p)}
+            {#each ledgerPages as p (p)}
               <li>
                 <a class="line added" href={at(`/p/${p}`)}>
                   <span class="line-mark"><IconWell name="doc" size="l" /></span>
@@ -1009,8 +1046,25 @@
 
   /* A ROW OF WHAT IT ADDED: its well, its name, and the chevron that says it opens. */
   .added {
-    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
     column-gap: var(--sp-3);
+  }
+
+  .added-meta {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+
+  /* A ROW WITH NO FIGURES KEEPS ITS CHEVRON AT THE END. */
+  .added > :global(.added-go) {
+    grid-column: -2 / -1;
+  }
+
+  @media (width < 640px) {
+    .added-meta {
+      display: none;
+    }
   }
 
   .added-go {
