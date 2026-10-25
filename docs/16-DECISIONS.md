@@ -1841,5 +1841,28 @@ in the same change.
 
 ---
 
+## ADR-077 · The Keychain asks before a machine opens a key, and locks itself
+
+**Decided.** A key may say, for one machine or for every machine, `always`, `ask` or `deny` (migration 46,
+`key_access`), and no rule is `always`. On `ask`, an agent's keychain grant is answered `KEY_ASKED` and the owner is
+told once; he allows it once, always, or denies it (`key_ask`), and the CLI waits up to two minutes on the same open
+door. The Keychain's gate reads the owner's `lock_after` (5, 15 or 60 minutes, 15 by default) where it read a fixed
+fifteen, and Lock now (`/auth/keychain/lock`) puts the session's proof behind the longest window. [12-SECURITY](12-SECURITY.md)
+§6.3 has the detail.
+
+**Why.** A keychain grant opened every key in its project for thirty days, so a leaked one, or an agent doing more than
+asked, could open the deploy key as easily as the test key. A Mac keychain answers this by asking per item, and that is
+the shape people already know. No rule meaning `always` keeps every installed CLI and every agent working unchanged.
+
+**Rejected:** a narrower grant per key (a grant per key is a sign-in per key, and the asks are what the owner wants to
+see); prompting scheduled runs and leases (nobody is there to answer, so a run would fail where it worked); a new event
+kind for asks (an ask is a notice, and the `note` event and the one router already carry it); a Directory column for the
+lock (moving the session's proof back says the same thing with no schema change).
+
+**Would reverse it:** asks so frequent that owners set every key to `always`, which would say the rule belongs on the
+grant instead.
+
+---
+
 *Next: [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md).*
 

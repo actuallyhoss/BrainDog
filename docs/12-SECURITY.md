@@ -378,8 +378,9 @@ FOR" is structural rather than remembered.
 
 1. **Every read is an event.** `grant.read` with the actor. A Keychain whose reads are not audited
    cannot answer "did anything get out".
-2. **Reveal is deliberate**: a click, a re-auth if the session is over 15 minutes old, a 30-second
-   auto-hide, and clipboard cleared after 60 seconds.
+2. **Reveal is deliberate**: a click, a re-auth if the session's last proof is older than the Keychain's
+   lock window (15 minutes until the owner chooses 5 or 60, §6.3), a 30-second auto-hide, and clipboard
+   cleared after 60 seconds.
 3. **No agent tool returns a secret.** Not scoped — absent. Agents see `label`, `opens`,
    `expires_at` and `rotate_every`, which is what they need to *tell you to rotate it*.
 4. **Rotation is scheduled.** `rotate_every` puts a row in `schedule`. The record cannot rotate
@@ -597,6 +598,45 @@ open one:
 - **Slash's tier `b` key is sent to `SLASH_ENDPOINT`**, the endpoint the host's operator configured, whatever
   provider issued the key, and its `opens` is not read on that path. Choosing a host is trusting its operator with
   that address, and nothing in the tree checks it.
+
+### 6.3 · Keychain access: which machine may open which key, and the lock
+
+*Added October 26th 2026 ([ADR-077](16-DECISIONS.md)), checked against `packages/kernel/src/keychain.ts`,
+`packages/record/src/methods/keychain-access.ts`, `packages/record/src/identity.ts` and `apps/cli/src/keys.ts`.*
+
+A Mac keychain asks before an app opens an item, and locks itself after a while. The Keychain does both.
+
+**Per-key access.** Each key may say, for one machine or for every machine (`*`), one of three rules: `always`,
+`ask` or `deny`. A machine is a keychain grant's handle, the one Settings lists. The machine's own rule wins over the
+key's `*` rule. **No rule is `always`**, which is how every key opened before October 26th, so a key nobody set a rule
+on, and every installed CLI and agent reading one, behaves exactly as before.
+
+| Rule | An agent's keychain grant opening the key (`openForGrant`) |
+|---|---|
+| `always`, or no rule | opens, as it always did |
+| `ask` | files one ask and tells the owner once (a time-sensitive notice naming the key by its spoken id and the machine by its name, never the key's label), then answers `403 KEY_ASKED` to that try and to every try while the ask waits. He answers **once** (the machine's next open goes through and spends it), **always** (the machine's rule for that key becomes `always`) or **deny** (the next open is `403 FORBIDDEN`, and the one after asks again). An ask runs out after ten minutes |
+| `deny` | `403 FORBIDDEN` at `credential`, and nothing is asked |
+
+- **Who sets it.** `keyAccess`, `setKeyAccess`, `keyAsks` and `answerKeyAsk` are KEYCHAIN: the owner in a browser,
+  inside the lock window. No token reaches them, so an agent cannot set its own access or answer its own ask.
+- **Who is never asked.** The owner in a browser, who is the one answering. A scheduled `call`, `poll` or `pull`, a
+  script's fetch and a leased runner, which open through the host's `keyOpener` and `sealedGrant` with nobody at the
+  keyboard to wait for: they keep the behaviour they had.
+- **The CLI waits.** `braindog keys exec`, `headers` and `helper` print one line, "Waiting for you to allow
+  <key> in BrainDog…", on a `KEY_ASKED`, and ask the same `/api/vault/open` door every three seconds for up to two
+  minutes. Nothing new is sent, so every installed host answers it.
+- **What is kept.** Migration 46's `key_access` and `key_ask`: credential row ids, machine handles, run ids, rules and
+  times. Never a value, a label or what a key opens. Both `local`, so a copy of the record carries neither.
+
+**The lock.** The Keychain's gate asks for a sign-in proved within the record's `lock_after`, five, fifteen or sixty
+minutes (`setLockAfter`, KEYCHAIN); fifteen until the owner chooses, which was the fixed window before. **Lock now**
+is `POST /auth/keychain/lock`, a sign-in route because what it changes is the session the Directory keeps: it moves
+that session's last proof back past the longest window, so the next Keychain act in that browser asks for a sign-in,
+and signing in again is the unlock. The session stays signed in for everything else; every other act that asks for a
+recent sign-in (`FRESH`, §6.1) asks again too, as it would of a laptop left open for an hour.
+
+**What is not built.** The screen's idle timer, which hides shown values and draws Locked after `lock_after` without a
+request, is the web app's. A key's account (`account`, agents 1.23.0) is a plain text field and never secret.
 
 ---
 
