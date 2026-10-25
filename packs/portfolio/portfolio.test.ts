@@ -255,9 +255,9 @@ test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them,
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own, 1.26.0 since the card's when reads the runs too, 1.27.0 since a page with nothing in play opens on a box to add one. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own, 1.26.0 since the card's when reads the runs too, 1.27.0 since a page with nothing in play opens on a box to add one, 1.28.0 since Numbers opens on a plain line and Where they are leaves Finished out. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.27.0');
+  assert.equal(doc.version, '1.28.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.27.0",
+  "version": "1.28.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A record with no project in play opens Projects on a box to add one, under one line, and says how to set a parked one building only when one is parked.",
+  "changes": "Numbers opens on a plain line, and its link says it opens every reading as a table. Where they are counts the projects Projects shows, so Finished is no longer in its total.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -330,7 +330,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Each kind of number your projects report, once, with its newest value and how old it is."
+          "body": "What your projects report, newest first."
         },
         {
           "key": "numbers-by-project",
@@ -350,10 +350,10 @@
         {
           "key": "numbers-rows",
           "kind": "link",
-          "heading": "Every reading",
+          "heading": "All readings",
           "icon": "rows",
           "span": 12,
-          "authored": [ { "cells": [ "Every reading, as a table", "/r/datapoints?rows=1", "Every reading on its own line, newest first" ] } ]
+          "authored": [ { "cells": [ "Open every reading as a table", "/r/datapoints?rows=1", "Every reading on its own line, newest first" ] } ]
         }
       ]
     },
@@ -557,7 +557,7 @@
       "metric": "projects-by-lane",
       "name": "Where they are",
       "source": "register.things",
-      "where": "lane is set",
+      "where": "lane is not retired",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },

@@ -1991,9 +1991,10 @@ const DECLARED: Record<string, Version> = {
       rule.kind-offers-kpis rule.project-past-aim
       script.kind_drafts script.kpi_backfill
     `,
-    declares: 'a8ec61d66a02d925',
+    declares: '624a460124b5bae5',
     history: [
       "Portfolio 1.28.0 (the look of 25 October, P7 and P11): `page.all-numbers` opens on a plain line and its link to every reading says what it opens, and `metric.projects-by-lane` leaves Finished out so Where they are counts what Projects draws; no id added or taken away -> a8ec61d66a02d925",
+      "Portfolio 1.28.0 (25 October, still unreleased): the link under `page.all-numbers` describes its target as Every reading on its own line, newest first, instead of One reading a row, newest first; no id added or taken away -> 624a460124b5bae5",
     ],
   },
   'portfolio@1.27.0': {
