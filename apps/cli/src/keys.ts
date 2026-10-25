@@ -87,6 +87,8 @@ export type KeysIo = {
   isFile?: ((path: string) => boolean) | undefined;
   fetch?: typeof globalThis.fetch | undefined;
   now?: (() => number) | undefined;
+  /** How a wait between two tries for a key the owner is asked about passes: a timer unless a test says. */
+  wait?: ((ms: number) => Promise<void>) | undefined;
   signal?: AbortSignal | undefined;
   /**
    * `put --from` ONLY: one yes or no from the person at the terminal, before each key is sent, or `null` when there is
@@ -375,6 +377,35 @@ async function getOne(door: Door, ask: { label: string } | { credential: string 
   return opened !== null && typeof opened.value === 'string' ? { value: opened.value as Plaintext } : { refused: answer };
 }
 
+/** How often a key the owner is asked about is tried again, and for how long, before the command gives up. */
+export const ASK_EVERY_MS = 3_000;
+export const ASK_FOR_MS = 120_000;
+
+/** Whether an answer is the record asking the owner first (`KEY_ASKED`): the same call opens the key once he allows it. */
+const askedOf = (got: { value: Plaintext } | { refused: Answer }): boolean =>
+  'refused' in got && got.refused.body?.ok === false && isObject(got.refused.body.refusal) && got.refused.body.refusal.code === 'KEY_ASKED';
+
+/**
+ * Read one key back, and wait while the owner is asked (`12 §6.3`). A key set to ask first answers `KEY_ASKED`; this
+ * says so once, on standard error, and asks the open door again every three seconds for up to two minutes, until it
+ * opens or is refused for another reason. Nothing new is sent: the same request, to the same `/api/vault/open` every
+ * installed host answers. A key with no rule opens on the first try, as it always did, and nothing is printed.
+ */
+async function getWaiting(door: Door, ask: { label: string } | { credential: string }, said: string, headers: Record<string, string>, io: KeysIo): Promise<{ value: Plaintext } | { refused: Answer }> {
+  let got = await getOne(door, ask, headers, io);
+  if (!askedOf(got)) return got;
+  io.say(`Waiting for you to allow ${said} in BrainDog…`);
+  const now = io.now ?? Date.now;
+  const wait = io.wait ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+  const until = now() + ASK_FOR_MS;
+  while (now() < until && !io.signal?.aborted) {
+    await wait(ASK_EVERY_MS);
+    got = await getOne(door, ask, headers, io);
+    if (!askedOf(got)) return got;
+  }
+  return got;
+}
+
 /**
  * Start the command with the key under one variable. THE ONE PLACE A KEY READ BACK LEAVES, and `secret-grep` names
  * this function as its exemption. The variables are a copy, so this process's own environment never holds the key,
@@ -440,7 +471,7 @@ async function openHeader(label: string, flags: { as?: string | undefined; vault
   }
   try {
     const ask = SPOKEN.test(label) ? { credential: label } : { label };
-    const got = await getOne(door, ask, await io.headers(door.key), io);
+    const got = await getWaiting(door, ask, label, await io.headers(door.key), io);
     if ('refused' in got) {
       io.say(refusedLine(door, got.refused));
       return REFUSED;
@@ -592,7 +623,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
     if (run === null) return REFUSED;
 
     const ask = SPOKEN.test(label.trim()) ? { credential: label.trim() } : { label: label.trim() };
-    const got = await getOne(door, ask, headers, io);
+    const got = await getWaiting(door, ask, label.trim(), headers, io);
     if ('refused' in got) {
       io.say(refusedLine(door, got.refused));
       return REFUSED;
