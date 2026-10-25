@@ -78,8 +78,6 @@ export const shell = {
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',
   automations: 'Automations',
-  /* The Jobs screen, named in the rail and in the sidebar's tools. */
-  jobs: 'Jobs',
   more: 'More',
   close: 'Close',
   arrangeCancel: 'Cancel',

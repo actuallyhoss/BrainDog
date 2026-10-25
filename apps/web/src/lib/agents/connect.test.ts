@@ -186,5 +186,4 @@ test('no sentence the sheet says carries an em dash', () => {
 
 test('the page an app sends you to says agent, as the button on it and the sheet do', () => {
   assert.equal(copy.consentTitle, connectWords.open);
-  assert.equal(copy.consentConnectAgent, connectWords.open);
 });
