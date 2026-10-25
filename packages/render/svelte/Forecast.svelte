@@ -368,7 +368,7 @@
          Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts. -->
     <ol class="forecast-axis" aria-hidden="true">
       {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} data-cut={a.cut ? '' : undefined} style="--at:{a.at}"
-          >{#if a.cut}<span class="forecast-axis-break" style={FORECAST_AXIS_BREAK_STYLE}>{FORECAST_AXIS_BREAK}</span>{/if}{a.label}</li
+          >{#if a.cut}<span class="forecast-axis-break" style={FORECAST_AXIS_BREAK_STYLE}>{@html FORECAST_AXIS_BREAK}</span>{/if}{a.label}</li
         >{/each}
     </ol>
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}

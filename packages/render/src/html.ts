@@ -1690,7 +1690,7 @@ function forecast(b: Block, o: RenderOptions): string {
     .map(
       (a) =>
         `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''}${a.cut ? ' data-cut=""' : ''} style="--at:${a.at}">${
-          a.cut ? `<span class="forecast-axis-break" style="${FORECAST_AXIS_BREAK_STYLE}">${escape(FORECAST_AXIS_BREAK)}</span>` : ''
+          a.cut ? `<span class="forecast-axis-break" style="${FORECAST_AXIS_BREAK_STYLE}">${FORECAST_AXIS_BREAK}</span>` : ''
         }${escape(a.label)}</li>`,
     )
     .join('')}</ol>`;

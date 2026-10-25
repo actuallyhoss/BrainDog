@@ -268,6 +268,9 @@ export function comingOf(
   return out.sort((a, b) => a.day.localeCompare(b.day) || a.seq - b.seq);
 }
 
+/** A run's handle (`S66`) is a key, never a word: "Sam Brain run S66" reads "Sam Brain run". */
+const unhandled = (said: string): string => said.replace(/\s*\bS[1-9][0-9]*\b/gu, '').trim();
+
 /* ── the runs of the day ────────────────────────────────────────────────── */
 
 /**
@@ -288,7 +291,7 @@ export function sessionsOf(rows: readonly Row[], dayStart: number, now: number):
     out.push({
       seq: r.seq,
       agent: text(r.fields.agent) || 'other',
-      doing: text(r.fields.doing),
+      doing: unhandled(text(r.fields.doing)),
       state,
       host: text(r.fields.host) || null,
       opened: began,
@@ -520,7 +523,7 @@ async function drawn(client: Client): Promise<{ questions: QueueQuestion[]; runs
     ? (table.rows as unknown[]).filter(isRow).map((r, i) => ({
         seq: r.seq,
         agent: text(r.fields.agent) || 'other',
-        doing: text(r.fields.doing),
+        doing: unhandled(text(r.fields.doing)),
         project: scopes[i] ?? (text(r.fields.project) || null),
         seen: text(r.fields.last_seen) || null,
       }))

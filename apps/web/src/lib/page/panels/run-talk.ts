@@ -230,6 +230,23 @@ export function refsSaid(note: string, questions?: ReadonlyMap<string, string>):
   });
 }
 
+/** A note cut into its plain text and its questions: a question read by its words carries the page that asks it. */
+export type NotePart = { text: string; href?: string };
+
+/** The same words as `refsSaid`, in parts, so a question named once can be drawn as a link to its page. */
+export function refsParts(note: string, questions?: ReadonlyMap<string, string>): NotePart[] {
+  const out: NotePart[] = [];
+  let at = 0;
+  for (const m of note.matchAll(REFS)) {
+    if (m.index > at) out.push({ text: note.slice(at, m.index) });
+    const said = refsSaid(m[0], questions);
+    out.push(refCount(m[0]) === 1 && questions?.get(m[0].trim()) ? { text: said, href: `/decide/${m[0].trim()}` } : { text: said });
+    at = m.index + m[0].length;
+  }
+  if (at < note.length) out.push({ text: note.slice(at) });
+  return out;
+}
+
 /**
  * A NOTE AS A PERSON READS IT: a path in it is said by its last plain words and a handle is left out, so a note that is
  * only a path reads "run notes and words" and one that is only an id says nothing and is not drawn.
@@ -352,6 +369,52 @@ function statusOf(row: Bag): AskedStatus {
   return 'declined';
 }
 
+type Client = ReturnType<typeof createClient>;
+
+/** A read that fails to nothing, so one refused read does not take the rest with it. */
+const quietly = async <T>(read: () => Promise<T | undefined>): Promise<T | undefined> => {
+  try {
+    return await read();
+  } catch {
+    return undefined;
+  }
+};
+
+/* A QUESTION BY ITS WORDS: an open one as the record lists what waits, a closed one as its decision kept it. */
+async function wordsOf(client: Client, rows: readonly Bag[]): Promise<(r: Bag) => Promise<string | null>> {
+  const waiting = rows.some((r) => r.status === 'open')
+    ? await quietly(async () => {
+        const booted = await client.boot();
+        return booted.ok ? new Map((booted.value.waiting ?? []).map((w) => [w.id, w.question])) : undefined;
+      })
+    : undefined;
+  return async (r: Bag): Promise<string | null> => {
+    if (r.status === 'open') return text(waiting?.get(String(r.id))) || null;
+    if (typeof r.decision !== 'string' || r.decision === '') return null;
+    const id = r.decision;
+    const got = await quietly(async () => client.governance({ register: 'decision', id }));
+    return got?.ok && isBag(got.value) ? text(got.value.question) || null : null;
+  };
+}
+
+
+/** The questions the notes name one by one, by their words (Z24), at most `NAMED_MOST` of them. */
+export async function readQuestionWords(client: Client, notes: readonly string[]): Promise<Map<string, string> | undefined> {
+  return quietly(async () => {
+    const named = [...new Set(notes.flatMap(refsIn))].slice(0, NAMED_MOST);
+    if (named.length === 0) return undefined;
+    const got = await Promise.all(named.map((id) => quietly(async () => client.governance({ register: 'suggestion', id }))));
+    const rows = got.map((g) => (g?.ok && isBag(g.value) ? g.value : null));
+    const words = await wordsOf(client, rows.filter((r): r is Bag => r !== null));
+    const out = new Map<string, string>();
+    for (const [i, r] of rows.entries()) {
+      const w = r === null ? null : await words(r);
+      if (w) out.set(named[i]!, w);
+    }
+    return out;
+  });
+}
+
 /**
  * What the panel says beside the run's own row, each read failing to nothing: its history, the name of its project,
  * the questions it asked, its helpers, and the run whose step it took. A part that could not be read is left out, and
@@ -400,44 +463,14 @@ export async function readRunParts(base: string, row: RunRow, io?: Io): Promise<
     return wordsFor(own);
   });
 
-  /* A QUESTION BY ITS WORDS: an open one as the record lists what waits, a closed one as its decision kept it. */
-  async function wordsOf(rows: readonly Bag[]): Promise<(r: Bag) => Promise<string | null>> {
-    const waiting = rows.some((r) => r.status === 'open')
-      ? await quiet(async () => {
-          const booted = await client.boot();
-          return booted.ok ? new Map((booted.value.waiting ?? []).map((w) => [w.id, w.question])) : undefined;
-        })
-      : undefined;
-    return async (r: Bag): Promise<string | null> => {
-      if (r.status === 'open') return text(waiting?.get(String(r.id))) || null;
-      if (typeof r.decision !== 'string' || r.decision === '') return null;
-      const id = r.decision;
-      const got = await quiet(async () => client.governance({ register: 'decision', id }));
-      return got?.ok && isBag(got.value) ? text(got.value.question) || null : null;
-    };
-  }
-
   async function wordsFor(own: readonly Bag[]): Promise<RunParts['asked']> {
     if (own.length === 0) return [];
-    const words = await wordsOf(own);
+    const words = await wordsOf(client, own);
     /* OLDEST FIRST, as it asked them: the record lists the newest first. */
     return Promise.all([...own].reverse().map(async (r) => ({ words: await words(r), status: statusOf(r) })));
   }
 
-  /* THE QUESTIONS ITS NOTES NAME ONE BY ONE, by their words (Z24), at most `NAMED_MOST` of them. */
-  const questions = quiet(async () => {
-    const named = [...new Set([...said(row.fields.notes), ...said(row.fields.tried)].flatMap(refsIn))].slice(0, NAMED_MOST);
-    if (named.length === 0) return undefined;
-    const got = await Promise.all(named.map((id) => quiet(async () => client.governance({ register: 'suggestion', id }))));
-    const rows = got.map((g) => (g?.ok && isBag(g.value) ? g.value : null));
-    const words = await wordsOf(rows.filter((r): r is Bag => r !== null));
-    const out = new Map<string, string>();
-    for (const [i, r] of rows.entries()) {
-      const w = r === null ? null : await words(r);
-      if (w) out.set(named[i]!, w);
-    }
-    return out;
-  });
+  const questions = readQuestionWords(client, [...said(row.fields.notes), ...said(row.fields.tried)]);
 
   const helpers = quiet(async () => {
     const out = await client.list({ register: 'session', where: { field: 'parent', is: handle }, limit: HELPERS_PAGE });

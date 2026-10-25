@@ -19,12 +19,13 @@
   import { onMount } from 'svelte';
   import { createClient } from '@braindog/client';
   import { since } from 'braindog-render';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { fill, told } from '$lib/record/instruct.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { listen } from '../listen.svelte.ts';
   import { stepsOf, type Step } from './steps.ts';
+  import { readQuestionWords, refsParts } from './run-talk.ts';
 
   let { owner = false }: { owner?: boolean } = $props();
 
@@ -49,6 +50,8 @@
 
   const client = createClient({ base: apiBase() });
   let steps = $state.raw<Step[]>([]);
+  /* THE QUESTIONS A STEP NAMES BY HANDLE, read for their words so a step never prints `SG288`. */
+  let questions = $state.raw<ReadonlyMap<string, string>>(new Map());
   let drew = $state<boolean | null>(null);
   let all = $state(false);
   let asking = $state<string | null>(null);
@@ -69,6 +72,7 @@
     }
     const [block] = Array.isArray(out.value.blocks) ? out.value.blocks : [];
     steps = stepsOf(block);
+    questions = (await readQuestionWords(client, steps.map((s) => s.next))) ?? new Map();
     drew = steps.length > 0;
   }
 
@@ -112,7 +116,7 @@
     <ol class="steps-list">
       {#each shown as s (s.key)}
         <li class="step" data-earlier={s.earlier ? '' : undefined}>
-          <p class="step-next">{s.next}</p>
+          <p class="step-next">{#each refsParts(s.next, questions) as part}{#if part.href}<a class="step-ref" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
           <p class="step-meta">
             {#if s.project}<span class="step-proj">{s.project}</span>{/if}<span>{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</span>
           </p>
@@ -176,6 +180,11 @@
     padding-block-end: 0;
   }
 
+  .step-ref {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
   .step-next {
     grid-column: 1;
     margin: 0;

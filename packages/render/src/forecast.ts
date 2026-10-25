@@ -1042,38 +1042,53 @@ const NOW_GAP = 0.025;
 /** Where today's label sits round its dot: over it to the end side, under it, or to the start side over or under. */
 export type NowPlace = 'above' | 'under' | 'start' | 'start-under';
 
+/** How far the label stands off the dot, as a share across, when every corner of it is crossed (`start`, shifted). */
+const NOW_SHIFT = 0.14;
+/** The label's width as a share where it stands off the dot, which only a plot wide enough to hold it can do. */
+const NOW_WIDE_FAR = 0.2;
+
 /**
  * THE CORNER OF TODAY'S DOT THAT THE LINE DOES NOT RUN THROUGH, AND THAT STAYS INSIDE THE PLOT (the audit of 25
  * October, Z16): over the dot to the end side, where the label always sat, drew "Today" and "EGP 752,841.68" across a
  * walk that steps up the day after, at 390. `points` are the line's own, as shares across and down. With the crossing's
  * flag near, the corners over the dot are the flag's. A dot with no free corner keeps the first, as it always did.
  */
-export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: number; y: number }, near: boolean): NowPlace {
+export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: number; y: number }, near: boolean): NowPlace | 'start-far' {
   const order: NowPlace[] = near ? ['under', 'start-under'] : ['above', 'under', 'start', 'start-under'];
-  const boxOf = (place: NowPlace) => {
-    const start = place === 'start' || place === 'start-under';
+  const boxOf = (place: NowPlace | 'start-far') => {
+    const far = place === 'start-far';
+    const start = place === 'start' || place === 'start-under' || far;
     const under = place === 'under' || place === 'start-under';
+    const off = far ? NOW_SHIFT : 0;
     return {
-      x0: start ? dot.x - NOW_WIDE : dot.x,
-      x1: start ? dot.x : dot.x + NOW_WIDE,
+      x0: start ? dot.x - off - (far ? NOW_WIDE_FAR : NOW_WIDE) : dot.x,
+      x1: start ? dot.x - off : dot.x + NOW_WIDE,
       y0: under ? dot.y + NOW_GAP : dot.y - NOW_GAP - NOW_TALL,
       y1: under ? dot.y + NOW_GAP + NOW_TALL : dot.y - NOW_GAP,
     };
   };
+  /* THE LINE BETWEEN ITS POINTS, not only the points: a long step has none inside a corner it runs straight through. */
+  const along = points.flatMap((p, i) => {
+    const q = points[i + 1];
+    if (!q) return [p];
+    const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 0.01));
+    return Array.from({ length: n }, (_, k) => ({ x: p.x + ((q.x - p.x) * k) / n, y: p.y + ((q.y - p.y) * k) / n }));
+  });
   /* HOW MUCH OF THE LINE A CORNER HOLDS, or `null` for one that would hang outside the plot. */
-  const crossed = (place: NowPlace): number | null => {
+  const crossed = (place: NowPlace | 'start-far'): number | null => {
     const b = boxOf(place);
     if (b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) return null;
-    return points.filter((p) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1).length;
+    return along.filter((p) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1).length;
   };
   /* THE FIRST CORNER THE LINE LEAVES FREE, else the one it crosses least, else where the label always sat. */
-  let best: { place: NowPlace; n: number } | null = null;
-  for (const place of order) {
+  let best: { place: NowPlace | 'start-far'; n: number } | null = null;
+  /* STANDING OFF THE DOT is the last resort: a dot at the foot of a line that falls into it has no free corner beside it. */
+  for (const place of [...order, ...(near ? [] : (['start-far'] as const))]) {
     const n = crossed(place);
     if (n !== null && (best === null || n < best.n)) best = { place, n };
     if (n === 0) break;
   }
-  return best?.place ?? order[0]!;
+  return best !== null && (best.n === 0 || best.place !== 'start-far') ? best.place : (order[0] ?? 'above');
 }
 
 /**
@@ -1188,7 +1203,9 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       traced.push(p);
     });
   const nearFlag = c !== null && Math.abs(daysBetween(start, c.day) / span - nowAt) <= FLAG_NEAR;
-  const place = nowPlace(traced, shareOf(model.today, model.opening), nearFlag);
+  const placed = nowPlace(traced, shareOf(model.today, model.opening), nearFlag);
+  /* STANDING OFF THE DOT is the start side's words, moved left along the plot. */
+  const place: NowPlace = placed === 'start-far' ? 'start' : placed;
   const figure = (v: number) => forecastFigure(model, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
   /* TOP FIRST, so the foot is the last level and the top the first. */
@@ -1224,7 +1241,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     below,
     now: {
       d: `M${x(model.today)} ${y(model.opening)}h0`,
-      at: at(nowAt),
+      at: at(placed === 'start-far' ? nowAt - NOW_SHIFT : nowAt),
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
       label: forecastFigure(model, model.opening, 'read'),
       place,
@@ -1381,9 +1398,9 @@ export const forecastAxisTo = (figure: string): string => `The axis stops at ${f
  * The break both drawers set beside the cut end of the value axis, the mark a chart draws where its axis does not run
  * to zero. Never the colour alone: the end's label is the real amount, and the chart's name says where it starts.
  */
-export const FORECAST_AXIS_BREAK = '//';
+export const FORECAST_AXIS_BREAK = '<svg viewBox="0 0 10 10" width="0.8em" height="0.8em" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1 8L4 2M6 8L9 2"/></svg>';
 /**
  * The break's own place, beside the label and over the chart's edge, written on the element so the string drawer, which
  * has no sheet of its own, sets it where the component does. No colour: it is the label's.
  */
-export const FORECAST_AXIS_BREAK_STYLE = 'position:absolute;inset-inline-end:100%;padding-inline-end:0.25em;letter-spacing:-0.1em';
+export const FORECAST_AXIS_BREAK_STYLE = 'position:absolute;inset-inline-end:100%;padding-inline-end:0.25em;line-height:1';

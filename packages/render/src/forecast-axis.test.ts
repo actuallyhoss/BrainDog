@@ -121,10 +121,10 @@ test('THE STRING DRAWER AND THE MODEL AGREE ON `cut`: a break at the cut end, th
   /* THE BREAK SITS IN THE CUT TICK, BEFORE THE REAL AMOUNT, and is never a colour alone: there is a mark and a figure. */
   const m = forecastModel(HIGH)!;
   const plan = planOf(HIGH);
-  const tick = /<li class="forecast-axis-tick" data-cut="" style="--at:1"><span class="forecast-axis-break" style="[^"]+">([^<]+)<\/span>([^<]+)<\/li>/u.exec(htmlOf(HIGH));
+  const tick = /<li class="forecast-axis-tick" data-cut="" style="--at:1"><span class="forecast-axis-break" style="[^"]+">(<svg[^>]*><path[^>]*\/><\/svg>)<\/span>([^<]+)<\/li>/u.exec(htmlOf(HIGH));
   assert.ok(tick, 'the foot tick holds the break and then its label');
   assert.equal(tick[2], forecastFigure(m, plan.lo, 'axis'));
-  assert.doesNotMatch(tick[0], /color|#[0-9a-f]{3}/iu, 'the break takes the label\'s own ink');
+  assert.doesNotMatch(tick[0], /(?<!current)color|#[0-9a-f]{3}/iu, 'the break takes the label\'s own ink');
 });
 
 test('THE WHAT-IF IS HELD IN MEMORY ONLY: nothing reaches the address or the browser\'s storage', () => {

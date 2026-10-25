@@ -1411,7 +1411,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         heading: 'All readings',
         icon: 'rows',
         span: 12,
-        authored: [{ cells: ['Open every reading as a table', '/r/datapoints?rows=1', 'One reading a row, newest first'] }],
+        authored: [{ cells: ['Open every reading as a table', '/r/datapoints?rows=1', 'Every reading on its own line, newest first'] }],
       },
     ],
   },

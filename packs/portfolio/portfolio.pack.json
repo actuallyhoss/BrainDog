@@ -353,7 +353,7 @@
           "heading": "Every reading",
           "icon": "rows",
           "span": 12,
-          "authored": [ { "cells": [ "Every reading, as a table", "/r/datapoints?rows=1", "Each number on its own row, newest first" ] } ]
+          "authored": [ { "cells": [ "Every reading, as a table", "/r/datapoints?rows=1", "Every reading on its own line, newest first" ] } ]
         }
       ]
     },
