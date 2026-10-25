@@ -45,7 +45,7 @@ export type Draft = {
 /** A door a script may be started by: its name and what it says it is. */
 export type Door = { id: string; description: string };
 
-/** What the form may offer: the vault's key labels, the doors, and the script ids already taken. `null` is not readable by this caller. */
+/** What the form may offer: the Keychain's key labels, the doors, and the script ids already taken. `null` is not readable by this caller. */
 export type Picks = { keys: string[] | null; doors: Door[] | null; taken: string[] };
 
 /** One script opened for editing: the installed row, the draft drawn from it, and whether its source was found. */
@@ -96,9 +96,9 @@ export const words = {
   egress: 'Fetches from',
   egressHelp: 'One address to a line, such as https://api.example.com. It may fetch from nothing else.',
   keys: 'Keys it may send',
-  keysNone: 'No key has a value in the vault yet.',
+  keysNone: 'No key has a value in the Keychain yet.',
   keysNoneAdd: 'Add one there first.',
-  keysShut: 'Only the owner, recently signed in, can pick keys from the vault.',
+  keysShut: 'Only the owner, recently signed in, can pick keys from the Keychain.',
   reads: 'Lists it reads',
   writes: 'Lists it writes',
   listsNoneChosen: 'none yet, press to choose',
@@ -306,8 +306,8 @@ export async function openScript(base: string, script: string, io?: Fetch): Prom
 }
 
 /**
- * What the form may offer. Each is read on its own, and a refusal is `null` for that one alone: the vault is the owner's
- * in a browser (`listGrants`, VAULT) and the doors are an admin's (`doors`), and a member who cannot read either can
+ * What the form may offer. Each is read on its own, and a refusal is `null` for that one alone: the Keychain is the owner's
+ * in a browser (`listGrants`, KEYCHAIN) and the doors are an admin's (`doors`), and a member who cannot read either can
  * still write a script by typing the door's name.
  */
 export async function readPicks(base: string, io?: Fetch): Promise<Result<Picks>> {
@@ -376,7 +376,7 @@ export async function tryDraft(base: string, d: Draft, input: string, listName: 
 /**
  * File the draft, and for the owner accept it in the same press.
  *
- * TWO CALLS, AND THE FIRST STANDS ALONE. A filed change the accept then refuses (a key the vault does not hold, a
+ * TWO CALLS, AND THE FIRST STANDS ALONE. A filed change the accept then refuses (a key the Keychain does not hold, a
  * conflict with a change that landed first) is still in Decide, where its sentence and the owner's answer belong, so a
  * refused accept is said as filed with the record's reason and not as nothing done.
  */

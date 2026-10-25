@@ -112,7 +112,7 @@
  * signed marker, the last shell and the offline cache. A live open keeps it again, as after a sign-out.
  *
  * WHAT IT NEVER STORES: a refusal; anything not a plain JSON value; a list whose declaration is unknown to this tab or
- * declares a `secret` field; the vault and the kernel's `session` list; any key named like a credential (`SECRET_KEY`).
+ * declares a `secret` field; the Keychain and the kernel's `session` list; any key named like a credential (`SECRET_KEY`).
  * It never stores a write either: writes always go to the record.
  *
  * PURE, AND NODE LOADS IT. The store is handed in (`local-db.ts` is the browser's IndexedDB, `memoryStore` a test's),
@@ -305,7 +305,7 @@ export type Log = {
   newest(): Promise<Said<{ events: Line[] }>>;
 };
 
-/** Lists never kept, whatever their declaration: the vault, and the kernel's own runs, which the sweep stamps. */
+/** Lists never kept, whatever their declaration: the Keychain, and the kernel's own runs, which the sweep stamps. */
 export const NEVER_KEPT: ReadonlySet<string> = new Set(['vault', 'session']);
 
 /** A key named like a credential, compared with case and punctuation taken out, as `@braindog/declare`'s scrub does. */

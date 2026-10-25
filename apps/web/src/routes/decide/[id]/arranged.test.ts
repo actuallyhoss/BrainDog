@@ -369,7 +369,7 @@ const SITTING = {
     'CALLS OUT api.stripe.com · every 1d · grant "Stripe"',
     'CALLS OUT api.mercury.com · every 6h · grant "Mercury"',
     'CALLS OUT hooks.example · when a rule runs it, at most 100 a day · grant "Stripe" · sends amount',
-    'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Stripe" to the host its vault entry opens',
+    'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Stripe" to the host its Keychain entry opens',
   ],
   rows: [
     { register: 'accounts', at: 'accounts#2', version: 3, patch: { last4: '7731', kind: 'card' }, before: { name: 'Credit Card', last4: '', kind: 'card' } },
@@ -463,7 +463,7 @@ test('a call that names no host is said as one, and a script with no key needs n
 });
 
 test('A SCRIPT’S KEY OPENS THE ONE HOST ITS LINE SENDS IT TO, and one sent to no host it names opens nothing the page guesses', () => {
-  const line = 'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Fx" to the host its vault entry opens and "Old" to no host it calls (its vault entry opens "x.example"), so every fetch with it is refused';
+  const line = 'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Fx" to the host its Keychain entry opens and "Old" to no host it calls (its Keychain entry opens "x.example"), so every fetch with it is refused';
   const call = callOf(line);
   assert.deepEqual(call.keys, ['Rates', 'Fx', 'Old']);
   assert.deepEqual(call.to, { Rates: 'rates.example' });

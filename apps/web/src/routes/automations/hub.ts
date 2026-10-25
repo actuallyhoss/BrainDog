@@ -596,7 +596,7 @@ export function nextReading(due: readonly ActionRow[], now: number, days = 14): 
 /**
  * One row on any tab: a name and what it is on the first line, where it stands on the second.
  *
- * THE SECOND LINE IS NEVER CUT. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
+ * THE SECOND LINE IS NEVER CUT. It is the verdict ("Paused. The key is not in the Keychain.") and an ellipsis took exactly
  * the part that said what to do, so it wraps; the first line gives way instead, what-it-is before the name.
  */
 export type HubRow = {

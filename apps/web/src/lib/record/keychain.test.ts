@@ -1,5 +1,5 @@
 /**
- * `/vault` and the approval it shares with `/settings/agents`: the rows each section draws, the one
+ * `/keychain` and the approval it shares with `/settings/agents`: the rows each section draws, the one
  * approval both screens send, and the plan offered after connecting an agent.
  *
  * WHAT IS PROVED HERE IS WHAT NEVER REACHES THE SCREEN as much as what does: no row this module builds
@@ -12,12 +12,12 @@ import assert from 'node:assert/strict';
 import type { Client, DeviceRow } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import * as vault from './vault.ts';
+import * as keychain from './keychain.ts';
 import {
-  GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, foldedAdds, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
+  GLOBAL, KEYCHAIN_ALL_DAYS, KEYCHAIN_DAYS, answerLine, approve, asks, daysFor, foldedAdds, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
   READ_ALL_PAGES, RECONNECT_STATE, readAll, reconnectFrom, reconnectOf, scopeName, words,
   type GrantState, type KeyRow, type ReconnectState,
-} from './vault.ts';
+} from './keychain.ts';
 
 const row = (over: Partial<DeviceRow>): DeviceRow => ({
   handle: 'h1',
@@ -58,8 +58,8 @@ test('with no client the answer is to sign in, and nothing is sent', async () =>
   assert.equal((await approve('12', null)).kind, 'malformed');
 });
 
-test('the sample is gone from this module: nothing here builds a vault that is not the record', () => {
-  assert.deepEqual(Object.keys(vault).filter((k) => /^sample/i.test(k)), []);
+test('the sample is gone from this module: nothing here builds a Keychain that is not the record', () => {
+  assert.deepEqual(Object.keys(keychain).filter((k) => /^sample/i.test(k)), []);
 });
 
 test('the code is sent without its separators, and each answer is read the way Settings reads it', async () => {
@@ -94,10 +94,10 @@ test('signing in again uses a passkey where one works, and goes to /signin where
 
   /* AND BACK TO THE SCREEN THAT ASKED, which is the step the person was half way through. */
   const was = globalThis.location;
-  Object.defineProperty(globalThis, 'location', { value: { pathname: '/app/acme/vault', search: '?reconnect=k' }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/app/acme/keychain', search: '?reconnect=k' }, configurable: true, writable: true });
   try {
     await reprove(auth(false, true), go);
-    assert.equal(went.at(-1), '/app/signin?next=%2Fapp%2Facme%2Fvault%3Freconnect%3Dk');
+    assert.equal(went.at(-1), '/app/signin?next=%2Fapp%2Facme%2Fkeychain%3Freconnect%3Dk');
   } finally {
     Object.defineProperty(globalThis, 'location', { value: was, configurable: true, writable: true });
   }
@@ -117,7 +117,7 @@ test('a revoke replaces the one row, or says why not', async () => {
 
 /* ── the machines ── */
 
-test('a request waiting is a pending vault grant, and a holder is an approved or active one', () => {
+test('a request waiting is a pending keychain access, and a holder is an approved or active one', () => {
   const rows = [
     row({ handle: 'p', status: 'pending' }),
     row({ handle: 'a', status: 'active' }),
@@ -131,8 +131,8 @@ test('a request waiting is a pending vault grant, and a holder is an approved or
 });
 
 test('a project grant lasts thirty days and a global one seven, and the scope is said by name', () => {
-  assert.equal(daysFor('row_kiln'), VAULT_DAYS);
-  assert.equal(daysFor(GLOBAL), VAULT_ALL_DAYS);
+  assert.equal(daysFor('row_kiln'), KEYCHAIN_DAYS);
+  assert.equal(daysFor(GLOBAL), KEYCHAIN_ALL_DAYS);
   assert.match(copy.reachMeans.vault ?? '', /thirty days/);
   assert.match(copy.reachMeans.vaultAll ?? '', /seven days/);
   const names = namesOf([{ id: 'row_kiln', fields: { name: 'Kiln' } }, { id: 'row_x', fields: {} }]);
@@ -224,7 +224,7 @@ test('A ROW WITH NO VALUE, AN OLDER SEAL OR A REVOKED ONE CARRIES NEITHER, and a
     assert.equal('bytes' in k, false, `${k.label} carries no size`);
     assert.equal('hint' in k, false, `${k.label} carries no hint`);
   }
-  /* A HINT LONGER THAN THE RECORD LETS ONE BE IS NOT A HINT (`packages/kernel/src/vault.ts`, sixty characters), and the size beside it still is. */
+  /* A HINT LONGER THAN THE RECORD LETS ONE BE IS NOT A HINT (`packages/kernel/src/keychain.ts`, sixty characters), and the size beside it still is. */
   const [long] = keysOf([rows[1]!], [{ id: 'g_old', opened: 0, last_opened: null, revoked_at: null, bytes: 61, hint: 'x'.repeat(61) }], new Map());
   assert.equal(long?.bytes, 61);
   assert.equal('hint' in (long ?? {}), false);
@@ -366,20 +366,20 @@ test('an answer with no plan hash is no plan, so nothing can be installed from i
 test('RECONNECT OPENS THE KEY A PAUSED ACTION NAMED: its row to replace, or Add under that name, and the action to resume', () => {
   const row = { id: 'cred_1', spoken: 'credentials#1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
   const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
-  assert.deepEqual(reconnectOf(asked('/vault?reconnect=stripe%20READ&then=stripe-balance'), [row]), { mode: 'replace', row, then: 'stripe-balance' });
-  assert.deepEqual(reconnectOf(asked('/vault?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });
-  assert.equal(reconnectOf(asked('/vault'), [row]), null);
-  assert.equal(reconnectOf(asked('/vault?reconnect=%20&then=x'), [row]), null);
+  assert.deepEqual(reconnectOf(asked('/keychain?reconnect=stripe%20READ&then=stripe-balance'), [row]), { mode: 'replace', row, then: 'stripe-balance' });
+  assert.deepEqual(reconnectOf(asked('/keychain?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });
+  assert.equal(reconnectOf(asked('/keychain'), [row]), null);
+  assert.equal(reconnectOf(asked('/keychain?reconnect=%20&then=x'), [row]), null);
 });
 
 test('RECONNECT FROM THE NAVIGATION STATE answers what the address answered, and nothing in the address is read', () => {
   const row: KeyRow = { id: 'cred_1', spoken: 'credentials#1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
   const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
-  assert.equal(RECONNECT_STATE, 'vaultReconnect');
+  assert.equal(RECONNECT_STATE, 'keychainReconnect');
   const pairs: [ReconnectState, string][] = [
-    [{ key: 'stripe READ', then: 'stripe-balance' }, '/vault?reconnect=stripe%20READ&then=stripe-balance'],
-    [{ key: 'GitHub deploy', then: null }, '/vault?reconnect=GitHub%20deploy'],
-    [{ key: '  Stripe read ', then: '  ' }, '/vault?reconnect=%20%20Stripe%20read%20&then=%20%20'],
+    [{ key: 'stripe READ', then: 'stripe-balance' }, '/keychain?reconnect=stripe%20READ&then=stripe-balance'],
+    [{ key: 'GitHub deploy', then: null }, '/keychain?reconnect=GitHub%20deploy'],
+    [{ key: '  Stripe read ', then: '  ' }, '/keychain?reconnect=%20%20Stripe%20read%20&then=%20%20'],
   ];
   for (const [state, href] of pairs) assert.deepEqual(reconnectFrom(state, [row]), reconnectOf(asked(href), [row]));
   assert.deepEqual(reconnectFrom({ key: 'stripe READ', then: 'stripe-balance' }, [row]), { mode: 'replace', row, then: 'stripe-balance' });

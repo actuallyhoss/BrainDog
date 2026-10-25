@@ -591,7 +591,7 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
 /* A STORE PAGE SAYS WHAT AN ADD-ON CALLS IN A PERSON'S WORDS, never the kernel's line (audit C of 25 October, X12). */
 
 test('what an add-on calls out to is a sentence: the host, how often, and the key by its name', () => {
-  assert.equal(callSaid({ host: 'api.kiln.example', key: 'kiln', line: 'CALLS OUT api.kiln.example · every 1h · key "kiln" to the host its vault entry opens' }), 'Calls api.kiln.example every hour with your Kiln key');
+  assert.equal(callSaid({ host: 'api.kiln.example', key: 'kiln', line: 'CALLS OUT api.kiln.example · every 1h · key "kiln" to the host its Keychain entry opens' }), 'Calls api.kiln.example every hour with your Kiln key');
   assert.equal(callSaid({ host: 'api.kiln.example', key: null, line: 'CALLS OUT api.kiln.example · every 6h · no key' }), 'Calls api.kiln.example every 6 hours');
   assert.equal(
     callSaid({ host: 'glaze.example', key: 'glaze', line: 'CALLS OUT glaze.example · when a rule runs it, at most 100 a day · grant "glaze"' }),

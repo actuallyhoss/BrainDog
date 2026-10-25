@@ -579,7 +579,7 @@ export type InboxItem = {
 };
 
 /**
- * What a vault row can hold, closed at five: `12 §6`'s prose and the `CHECK` in `30 §1`'s DDL.
+ * What a Keychain row can hold, closed at five: `12 §6`'s prose and the `CHECK` in `30 §1`'s DDL.
  *
  * `kind` WAS `string`, AND THREE OF THE SIX SEEDED ROWS WERE OUTSIDE THE LIST. They read `api key`,
  * `oauth` and `token`:
@@ -588,7 +588,7 @@ export type InboxItem = {
  *     bans on this exact screen.
  *   - `oauth` is not a `grant.kind` AT ALL. It belongs to `auth.kind`, the connector's eight
  *     (`25 §5.2`: `none · bearer · basic · header · query_param · oauth2_refresh · jwt_rs256 ·
- *     aws_sigv4`), which describes how a CONNECTOR authenticates rather than what a vault row holds.
+ *     aws_sigv4`), which describes how a CONNECTOR authenticates rather than what a Keychain row holds.
  *     Two enums, one screen, and the wrong one printed.
  *   - `token` is a `device_grant.reach` value (`02 §1`), from a third table.
  *
@@ -791,7 +791,7 @@ export type Person = {
    *
    * `null` IS NOT `read`, AND THE KERNEL HAS SHIPPED BOTH WRONG ANSWERS. `members.ts` records them:
    * it first PROMOTED the highest scoped level to the record-wide one, so somebody invited to one
-   * register as its owner was an owner of the record — the vault, the export, `invite` itself; the
+   * register as its owner was an owner of the record — the Keychain, the export, `invite` itself; the
    * fix then gave a scoped-only member `read`, which hands an APPENDER a record-wide read, and
    * `append`'s whole point is that it does not read.
    *

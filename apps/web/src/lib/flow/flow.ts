@@ -793,7 +793,7 @@ export const helpOf = (verb: string): string => STEP_HELP[verb as Verb] ?? '';
  * One argument as the inspector draws it: the grammar's argument (`name`, `required`, `from`) with this build's words.
  *
  * `text` is one line, `long` is a paragraph, `name` is an answer's name, `span` is a wait in the clock grammar,
- * `later` is a `schedule` span in the vault's grammar (where `m` is a month), `list` is one item a line, `pairs` is
+ * `later` is a `schedule` span in the Keychain's grammar (where `m` is a month), `list` is one item a line, `pairs` is
  * `field: value` a line, and `condition` is a `where` sentence. `template` marks the ones that read `{{…}}`, which the
  * inspector offers as chips rather than asking anybody to type braces.
  *
@@ -1203,7 +1203,7 @@ export function spanWords(span: string): string {
   return `${n} ${n === 1 ? unit[0] : unit[1]}`;
 }
 
-/** A `schedule` span, in the vault's grammar, where `m` is a month and `y` a year. */
+/** A `schedule` span, in the Keychain's grammar, where `m` is a month and `y` a year. */
 function laterWords(span: string): string {
   const m = /^(\d+)\s*([dwmy])$/u.exec(span.trim());
   if (!m) return span;

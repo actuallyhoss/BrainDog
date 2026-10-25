@@ -2,7 +2,7 @@
  * THE SIX-DIGIT FIELD'S RULES, pure, for `CodeForm.svelte`, which Settings, Agents draws and Home's connect sheet draws
  * under the `braindog setup` line. Moved out of `Agents.svelte` unchanged in what it says.
  *
- * THE DIGITS RULE IS `device.ts`'s (`codeOf`) and the answer's sentence is `vault.ts`'s (`answerLine`), the ones `/vault`
+ * THE DIGITS RULE IS `device.ts`'s (`codeOf`) and the answer's sentence is `keychain.ts`'s (`answerLine`), the ones `/keychain`
  * sends through too, so the three places cannot drift apart. Paste is never blocked and the field has no `maxlength`:
  * the CLI prints the code in two groups, read here as one code, and seven digits is refused out loud rather than
  * trimmed to a different code, since trimming would approve whichever machine the first six happen to match.
@@ -11,7 +11,7 @@
  */
 import type { Answer } from '../record/device.ts';
 import { CODE_DIGITS } from '../record/device.ts';
-import { answerLine, approve, type Approver } from '../record/vault.ts';
+import { answerLine, approve, type Approver } from '../record/keychain.ts';
 
 /** What the empty field shows: six noughts, which say how many digits belong in it without a word. */
 export const CODE_PLACEHOLDER = '0'.repeat(CODE_DIGITS);
@@ -19,7 +19,7 @@ export const CODE_PLACEHOLDER = '0'.repeat(CODE_DIGITS);
 /** One approval, as the form calls it: the typed text in, what came back out. Nothing malformed is sent. */
 export type Approve = (typed: string) => Promise<Answer>;
 
-/** The approval over one client, or over none, which answers "sign in again" (`vault.ts` `approve`). */
+/** The approval over one client, or over none, which answers "sign in again" (`keychain.ts` `approve`). */
 export const approverOf = (client: Approver | null): Approve => (typed) => approve(typed, client);
 
 /** What the field holds and what the last press answered. */
@@ -44,7 +44,7 @@ export async function sent(typed: string, send: Approve): Promise<CodeState & { 
  * again button is offered. `null` before the first press.
  *
  * `signin` IS THE ONE REFUSAL WITH A WAY FORWARD HERE: a sign-in older than fifteen minutes cannot approve, and signing
- * in again, with the code still typed, is the fix (`vault.ts` `reprove`).
+ * in again, with the code still typed, is the fix (`keychain.ts` `reprove`).
  */
 export type Said = { tone: 'good' | 'bad'; line: string; invalid: boolean; signIn: boolean };
 

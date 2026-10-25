@@ -26,7 +26,7 @@ import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
-import type { RECONNECT_STATE, ReconnectState } from './vault.ts';
+import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -48,7 +48,7 @@ export type MeterKey = 'runs' | 'requests' | 'bytes' | 'ms';
  * One scheduled action, as the record's `actions` read answers it.
  *
  * THE CONTRACT THIS SCREEN ASKS FOR ("each action's state,
- * last run, next run and counts from its own events"). The key is its vault label, never the key.
+ * last run, next run and counts from its own events"). The key is its Keychain label, never the key.
  */
 export type ActionRow = {
   ingest: string;
@@ -211,7 +211,7 @@ export const words = {
     next ? `${host} did not answer the last run. It tries again ${next}, and there is nothing to do.` : `${host} did not answer the last run. It tries again on its own.`,
   notWritten: 'Nothing was saved from the last run. The next run asks again.',
   refusedKey: (host: string, key: string) => `Paused. ${host} did not accept the key "${key}". Reconnect the key and it runs again.`,
-  missingKey: (key: string) => `Paused. The key "${key}" is not in the vault. Add it and it runs again.`,
+  missingKey: (key: string) => `Paused. The key "${key}" is not in the Keychain. Add it and it runs again.`,
   reconnect: 'Reconnect key',
   addTheKey: 'Add the key',
   paused: 'Paused. It runs again when you resume it.',
@@ -305,7 +305,7 @@ export function often(every: string): string {
 export type Tone = 'warn' | undefined;
 
 /** What one row says about where it stands, whether it offers Resume, and whether it points at usage. */
-/** The navigation state "Reconnect key" travels with: the Vault reads the key's name and the action to resume from it. */
+/** The navigation state "Reconnect key" travels with: the Keychain reads the key's name and the action to resume from it. */
 export type ReconnectNav = Record<typeof RECONNECT_STATE, ReconnectState>;
 
 /**
@@ -315,24 +315,24 @@ export type ReconnectNav = Record<typeof RECONNECT_STATE, ReconnectState>;
 export type Said = { line: string; tone: Tone; resume: boolean; usage: boolean; reconnect?: { href: string; label: string; state: ReconnectNav } };
 
 /**
- * The Vault, where a paused action's key is put right.
+ * The Keychain, where a paused action's key is put right.
  *
  * NOTHING AFTER THE PATH. An address is kept in the browser's history and goes wherever a link is pasted, and a key's
- * name is not for either, so what the Vault should open travels in the navigation's state (`reconnectState`). After a
- * reload the state is gone and the plain Vault shows, which is right.
+ * name is not for either, so what the Keychain should open travels in the navigation's state (`reconnectState`). After a
+ * reload the state is gone and the plain Keychain shows, which is right.
  */
-export const reconnectHref = (): string => '/vault';
+export const reconnectHref = (): string => '/keychain';
 
-/* THE VAULT'S OWN KEY, HELD EQUAL BY THE COMPILER AND NOT IMPORTED AS A VALUE: the app's frame reads this file, and the
-   Vault's reads are not for every screen to load. A different word in `vault.ts` fails the typecheck on this line. */
-const RECONNECT_KEY: typeof RECONNECT_STATE = 'vaultReconnect';
+/* THE KEYCHAIN'S OWN KEY, HELD EQUAL BY THE COMPILER AND NOT IMPORTED AS A VALUE: the app's frame reads this file, and the
+   Keychain's reads are not for every screen to load. A different word in `keychain.ts` fails the typecheck on this line. */
+const RECONNECT_KEY: typeof RECONNECT_STATE = 'keychainReconnect';
 
-/** What the Vault opens on: the key by the name its declaration gives it, and the action to resume once it is in. */
+/** What the Keychain opens on: the key by the name its declaration gives it, and the action to resume once it is in. */
 export const reconnectState = (key: string, ingest: string): ReconnectNav => ({ [RECONNECT_KEY]: { key, then: ingest } });
 
 /**
  * Whether a press on the link is this tab's to follow with state. A middle press or one with a modifier opens a tab or
- * a window, which the browser does from the address alone, and that opens the plain Vault.
+ * a window, which the browser does from the address alone, and that opens the plain Keychain.
  */
 export const ownPress = (e: Pick<MouseEvent, 'button' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'defaultPrevented'>): boolean =>
   e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.defaultPrevented;
@@ -350,7 +350,7 @@ export function stateOf(row: ActionRow, now: number): Said {
   const last = row.last;
   if (row.state === 'paused') {
     const refused = Boolean(last && (last.status === 401 || last.status === 403) && row.key);
-    /* A PAUSE WITH NO RUN BEHIND IT IS A KEY THAT WAS NOT IN THE VAULT WHEN THE ACTION FIRED: the kernel pauses the row
+    /* A PAUSE WITH NO RUN BEHIND IT IS A KEY THAT WAS NOT IN THE KEYCHAIN WHEN THE ACTION FIRED: the kernel pauses the row
        there and meters nothing, so `last` is empty or an older run. Nothing else pauses an action without a paused run. */
     const missing = !refused && Boolean(row.key) && (last?.outcome !== 'paused' || last.status === null);
     const why = refused ? words.refusedKey(host, row.key!) : missing ? words.missingKey(row.key!) : words.paused;
@@ -943,7 +943,7 @@ export type CallOut = {
   channel: Channel;
   host: string | null;
   every: string;
-  /** The key by its vault label, never the key. */
+  /** The key by its Keychain label, never the key. */
   key: string | null;
   /** The record fields it sends, or `null` when the diff does not say. */
   sends: string[] | null;

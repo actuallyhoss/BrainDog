@@ -7,7 +7,7 @@
   that needs a look.
 
   ONE PRESS, AND NOTHING ELSE CHANGES HERE. Resuming a paused action belongs to "Runs on" on its project's page, and a
-  key the action is missing is added in the Vault, so a row whose sentence asks for a key carries the link that adds it.
+  key the action is missing is added in the Keychain, so a row whose sentence asks for a key carries the link that adds it.
   An action on its clock carries Run now under it (`run-now.ts`): the record moves its next turn to now, and the line
   under the button says what the record answered, a wait included. A paused one carries none, because its own sentence
   already says it will not run and where it is resumed. New opens the scheduled-action sheet through the address
@@ -56,8 +56,8 @@
 
   const rowOf = (r: ActionRow): HubRow => {
     const said = stateOf(r, now);
-    /* THE LINK THAT PUTS A KEY RIGHT CARRIES WHAT THE VAULT SHOULD OPEN ON AS `state`, for the row list to navigate
-       with: the address itself is the plain Vault, with no key's name in it. */
+    /* THE LINK THAT PUTS A KEY RIGHT CARRIES WHAT THE KEYCHAIN SHOULD OPEN ON AS `state`, for the row list to navigate
+       with: the address itself is the plain Keychain, with no key's name in it. */
     const mend = said.reconnect && { path: said.reconnect.href, label: said.reconnect.label, state: said.reconnect.state };
     return {
       key: r.ingest,
@@ -158,7 +158,7 @@
     border-block-start: 1px solid var(--rule);
   }
 
-  /* THE PRESS LINES UP WITH THE ROW'S WORDS, NOT ITS WELL, as the row's own link to the Vault does. */
+  /* THE PRESS LINES UP WITH THE ROW'S WORDS, NOT ITS WELL, as the row's own link to the Keychain does. */
   .press {
     display: flex;
     flex-wrap: wrap;

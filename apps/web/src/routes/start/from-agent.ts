@@ -27,7 +27,7 @@ import type { Os } from '../../lib/device.ts';
 import { firstRun } from '../../lib/first-run.ts';
 import { connectLines as settingsLines, type ConnectLines } from '../../lib/record/device.ts';
 import { answer, everyGovernance, type Governor, type Sent } from '../../lib/record/governance.ts';
-import type { Approver } from '../../lib/record/vault.ts';
+import type { Approver } from '../../lib/record/keychain.ts';
 import type { Place } from '../../lib/start/propose.ts';
 
 type Row = Record<string, unknown>;

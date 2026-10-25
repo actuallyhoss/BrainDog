@@ -150,7 +150,7 @@ export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false;
 }
 
 /**
- * The key a reach's sentence is filed under. A vault grant's life depends on its scope: `*` is the
+ * The key a reach's sentence is filed under. Keychain access lasts as long as its scope says: `*` is the
  * keys of no project and lasts seven days, one project lasts thirty.
  */
 export const reachKey = (reach: DeviceRow['reach'], scope: string | null): string =>

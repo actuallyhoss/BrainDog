@@ -29,7 +29,7 @@ import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
 import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
-import { AUDIT, JOB, NEWS, NOW, VAULT } from './fixtures/sample.ts';
+import { AUDIT, JOB, NEWS, NOW, KEYCHAIN } from './fixtures/sample.ts';
 import { PAGES, REGISTERS, ROWS } from './held.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
 import { layoutOf } from './boot-live.ts';
@@ -208,8 +208,8 @@ test('an undeclared field is stringified rather than dropped', () => {
 
 test('the one secret field a register declares holds nothing in any row, so there is nothing for display to leak', () => {
   // The strongest form of this guarantee is structural, not behavioural: a key's row indexes what it
-  // OPENS. The agents pack declares `credentials.value`, which names the grant the vault sealed a key
-  // into and which only the vault door writes, so no row here holds one and the masking below is the
+  // OPENS. The agents pack declares `credentials.value`, which names the grant the Keychain sealed a key
+  // into and which only the Keychain door writes, so no row here holds one and the masking below is the
   // live test for the day one does.
   const declared = Object.entries(REGISTERS).flatMap(([id, reg]) =>
     reg.fields.filter((f) => f.type === 'secret').map((f) => `${id}.${f.id}`),
@@ -218,9 +218,9 @@ test('the one secret field a register declares holds nothing in any row, so ther
   for (const key of ROWS.credentials ?? []) assert.ok(!('value' in key.fields), `credentials#${key.seq} holds a value`);
 });
 
-test('a vault row carries no value, only what the key opens', () => {
+test('a Keychain row carries no value, only what the key opens', () => {
   const SECRETISH = /^(value|secret|token|key|password|credential)$/i;
-  for (const row of VAULT) {
+  for (const row of KEYCHAIN) {
     const leaked = Object.keys(row).filter((k) => SECRETISH.test(k));
     assert.deepEqual(leaked, [], `${row.id} carries ${leaked.join(', ')}`);
   }

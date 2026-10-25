@@ -12,7 +12,7 @@
   over the target register's rows, titled by the target's own `title` field, because a person picks
   "Halden Type Co" and never `people#1`. `money` puts the currency outside the input, since the
   currency is one somebody chose and not something you type. `secret` is refused outright: a
-  credential never goes in a row, and the vault is a different surface with different rules.
+  credential never goes in a row, and the Keychain is a different surface with different rules.
 
   Nothing here writes. What was typed goes out through `taken`, in the shapes the record stores, to
   the screen that owns the submit.
@@ -546,7 +546,7 @@
   {#if (decl?.fields ?? []).some((f) => f.type === 'secret')}
     <p class="row-note">
       <Icon name="vault" size="s" />
-      {copy.secretsLiveInTheVault}
+      {copy.secretsLiveInTheKeychain}
     </p>
   {/if}
 </div>

@@ -65,7 +65,7 @@ test("THE BRIEF IS THE ROW'S OWN WORDS, THEN ITS NOTE, THEN WHAT CHANGED", () =>
 
 test('WHAT IT RUNS ON IS BY NAME ONLY, AND A BLOCK TAKES ONLY ITS OWN LISTS', () => {
   const groups = [
-    { block: 'runs-on' as const, rows: [{ key: '3', cells: ['Stripe key', 'kept in the vault at /secret'], href: '/r/k/3' }] },
+    { block: 'runs-on' as const, rows: [{ key: '3', cells: ['Stripe key', 'kept in the Keychain at /secret'], href: '/r/k/3' }] },
     { block: 'crew' as const, rows: [{ key: '1', cells: ['Mara', 'Designer'] }, { key: '2', cells: ['', 'x'] }] },
   ];
   assert.deepEqual(rowsOf('runs-on', groups), [{ key: 'runs-on#3', title: 'Stripe key', detail: '', href: '/r/k/3' }]);

@@ -68,7 +68,7 @@
     owned?: readonly Omit<SideList, 'money'>[];
     /** The places' own views (Board under Work), drawn with the saved views. */
     views?: readonly SideLink[];
-    /** The record's tools (automations, the vault and the rest). */
+    /** The record's tools (automations, the Keychain and the rest). */
     tools?: readonly SideLink[];
     /** The words each group is drawn under. */
     heads?: SideHeads | undefined;

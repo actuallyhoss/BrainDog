@@ -10,7 +10,7 @@
   writes nothing. `status` is read by every signed-in person, so it does not carry the address or the key he picked.
 
   HIS KEY IS PICKED, NEVER TYPED. The picker lists the live API tokens `listGrants` answers, in a `Sheet`, which below 640px
-  is a bottom sheet. `listGrants` is the vault's own gate, an owner proved in the last fifteen minutes, so where it refuses
+  is a bottom sheet. `listGrants` is the Keychain's own gate, an owner proved in the last fifteen minutes, so where it refuses
   its sentence is drawn in place of the list, and a save that points his key somewhere asks the same gate at the door.
 
   AT 390px IT IS ONE COLUMN. Every row stacks, the fields are the column's width, and the line that says what answers now
@@ -71,7 +71,7 @@
     'refusal' in out ? out.refusal.fix : 'Something changed while this was open. Try again.';
 
   /* THE KEYS ARE ASKED FOR ONCE, WHEN HIS OWN KEY IS ON THE FORM, and not on every Settings visit: `listGrants` is the
-     vault's gate, and an owner who never looks at his own key has no reason to be told his vault is closed. */
+     Keychain's gate, and an owner who never looks at his own key has no reason to be told his Keychain is closed. */
   function loadKeys() {
     if (!client || keys !== null || keysRefused) return;
     void client.listGrants().then((out) => {

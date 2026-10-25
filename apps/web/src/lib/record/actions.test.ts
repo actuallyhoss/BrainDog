@@ -38,7 +38,7 @@ import {
   type Fetch,
 } from './actions.ts';
 import { signInFor } from './packs.ts';
-import { RECONNECT_STATE } from './vault.ts';
+import { RECONNECT_STATE } from './keychain.ts';
 import { copy } from '../copy.ts';
 
 const NOW_MS = Date.parse('2026-09-15T12:00:00.000Z');
@@ -100,11 +100,11 @@ test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, a
   assert.equal(refused.resume, true);
   assert.match(refused.line, /api\.stripe\.com did not accept the key "Stripe read"/);
 
-  /* THE ADDRESS IS THE VAULT AND NOTHING MORE. The key's name and the action to resume ride in the navigation's state,
-     under the key the Vault reads, so neither lands in the browser's history or in a link that is passed on. */
-  assert.equal(reconnectHref(), '/vault');
+  /* THE ADDRESS IS THE KEYCHAIN AND NOTHING MORE. The key's name and the action to resume ride in the navigation's state,
+     under the key the Keychain reads, so neither lands in the browser's history or in a link that is passed on. */
+  assert.equal(reconnectHref(), '/keychain');
   assert.deepEqual(refused.reconnect, {
-    href: '/vault',
+    href: '/keychain',
     label: 'Reconnect key',
     state: { [RECONNECT_STATE]: { key: 'Stripe read', then: 'stripe-balance' } },
   });
@@ -115,15 +115,15 @@ test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, a
   }
 
   const gone = stateOf(row({ state: 'paused', last: { at: '2026-09-15T06:11:00.000Z', outcome: 'paused', status: null, note: '' } }), NOW_MS);
-  assert.match(gone.line, /not in the vault/);
+  assert.match(gone.line, /not in the Keychain/);
   assert.equal(gone.reconnect?.label, 'Add the key');
-  assert.equal(gone.reconnect?.href, '/vault');
+  assert.equal(gone.reconnect?.href, '/keychain');
   assert.deepEqual(gone.reconnect?.state[RECONNECT_STATE], { key: 'Stripe read', then: 'stripe-balance' });
 
-  /* THE KERNEL PAUSES A ROW WHOSE KEY IS NOT IN THE VAULT AT FIRE TIME, before any run, so there is no paused run to read. */
+  /* THE KERNEL PAUSES A ROW WHOSE KEY IS NOT IN THE KEYCHAIN AT FIRE TIME, before any run, so there is no paused run to read. */
   for (const last of [null, { at: '2026-09-14T06:11:00.000Z', outcome: 'ok' as const, status: 200, note: '' }]) {
     const fired = stateOf(row({ state: 'paused', last }), NOW_MS);
-    assert.match(fired.line, /not in the vault/);
+    assert.match(fired.line, /not in the Keychain/);
     assert.equal(fired.reconnect?.label, 'Add the key', 'a key missing when the action fired offered no way to add it');
   }
 

@@ -2,10 +2,10 @@
  * Keeping one key an arrangement needs, from its sitting page (`KeyNeeded.svelte`, REC-A07).
  *
  * THE TYPED KEY OUTLIVES A REFUSAL; THE PASSPHRASE NEVER DOES. The key used to be emptied before the request went out,
- * so a vault behind a passphrase, which refuses the first try for want of one and only then grows the field, threw the
+ * so a Keychain behind a passphrase, which refuses the first try for want of one and only then grows the field, threw the
  * key away with it: the person typed the passphrase and had nothing left to send (audit 40-42, finding 8). Now the
  * passphrase goes with the one request and is emptied before it leaves, and the key is emptied only once the record
- * has kept it, as the Keys screen's sheet does (`vault/+page.svelte`, `saveKey`).
+ * has kept it, as the Keys screen's sheet does (`keychain/+page.svelte`, `saveKey`).
  *
  * Kept apart from the component so a test can hold the order without a browser.
  */
@@ -13,12 +13,12 @@
 import type { createClient } from '@braindog/client';
 
 import { copy } from '../../../lib/copy.ts';
-import { wantsPassphrase } from '../../../lib/record/vault.ts';
+import { wantsPassphrase } from '../../../lib/record/keychain.ts';
 import type { Need } from './arranged.ts';
 
 export type KeyClient = Pick<ReturnType<typeof createClient>, 'putKey'>;
 
-/** What the person has typed: the key, what it opens when the arrangement could not say, and the vault's passphrase. */
+/** What the person has typed: the key, what it opens when the arrangement could not say, and the keychain password. */
 export type KeyForm = { value: string; opens: string; passphrase: string; locked: boolean };
 
 /** What one press came to: kept, or the record's sentence. */
@@ -55,7 +55,7 @@ export async function keep(need: Need, form: KeyForm, client: KeyClient): Promis
   form.passphrase = '';
   const out = await client.putKey(args);
   if (!out.ok) {
-    /* A VAULT BEHIND A PASSPHRASE says so on the first try, and the field for it appears; the key stays typed. */
+    /* A KEYCHAIN BEHIND A PASSPHRASE says so on the first try, and the field for it appears; the key stays typed. */
     if (wantsPassphrase(out)) form.locked = true;
     return { ok: false, said: 'refusal' in out ? out.refusal.fix : copy.writeRaced };
   }

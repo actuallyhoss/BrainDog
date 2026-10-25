@@ -1,7 +1,7 @@
 <!--
   A new script: `/scripts/new`.
 
-  THE FORM IS `ScriptForm`, SHARED WITH `/scripts/<id>`. This screen reads only what the form may offer (the vault's key
+  THE FORM IS `ScriptForm`, SHARED WITH `/scripts/<id>`. This screen reads only what the form may offer (the Keychain's key
   labels, the doors and the ids already taken) and starts it empty. Once the owner's press installs it, the screen
   moves to the installed script, where the next edit is a change to a version rather than a second new script.
 -->

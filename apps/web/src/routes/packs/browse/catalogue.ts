@@ -171,7 +171,7 @@ export const signedLine = (signature: Signature | null | undefined, ours: boolea
 
 /**
  * What one call out is, as a person says it: "Calls api.stripe.com every hour with your Stripe key". The kernel's line
- * (`CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its vault entry opens`) is read for its cadence and
+ * (`CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its Keychain entry opens`) is read for its cadence and
  * anything else it says, and the key is said by its name.
  */
 export function callSaid(call: { host: string | null; line: string; key: string | null }): string {

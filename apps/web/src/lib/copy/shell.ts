@@ -73,7 +73,7 @@ export const shell = {
      `Lists`: what sits under it is the person's invoices and tasks, and "list" is how the record stores them (§35). */
   lists: 'Your things',
   packs: 'Add-ons',
-  vault: 'Vault',
+  keychain: 'Keychain',
   settings: 'Settings',
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',
@@ -418,7 +418,7 @@ export const shell = {
   writeNotReached: notReached,
   writeMarkAdded: 'Added',
   writeMarkSaving: 'Saving',
-  /* Settings, vault and packs writes (lane C) */
+  /* Settings, keychain and packs writes (lane C) */
   writeRaced: 'The record changed while this was sent, so it has been read again.',
   exported: (file: string) => `${file} is in your downloads.`,
   /* Lane E: archive and restore, installing an add-on, and saved views */

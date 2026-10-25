@@ -42,7 +42,7 @@ export const words = {
   moveLabel: (name: string) => `Where it applies: ${name}. Move it`,
   movedTo: (name: string) => `Moved to ${name}`,
   /** The one sentence asked before a key is opened to every project. */
-  widenKey: 'Any machine with a vault grant for every project can open it.',
+  widenKey: 'Any machine with keychain access for every project can open it.',
   widenGo: 'Move to Everywhere',
   current: 'Where it applies now',
   noPlaces: 'BrainDog could not reach this record.',
@@ -64,7 +64,7 @@ export const words = {
   movedBack: 'Moved back',
   backMany: (n: number) => `Moved ${n} back.`,
   /** The question before several keys are opened to every project, as `widenKey` asks it of one. */
-  widenKeys: (n: number) => (n === 1 ? 'Any machine with a vault grant for every project can open it.' : `Any machine with a vault grant for every project can open all ${n}.`),
+  widenKeys: (n: number) => (n === 1 ? 'Any machine with keychain access for every project can open it.' : `Any machine with keychain access for every project can open all ${n}.`),
 } as const;
 
 /**

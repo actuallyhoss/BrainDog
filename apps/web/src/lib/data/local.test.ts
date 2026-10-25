@@ -79,7 +79,7 @@ test('TOUCHED: a row write names its list; a question names the questions; a qui
   assert.deepEqual([...touched([{ id: 'p', kind: 'update', register: null, steps: [line('s', 'edit', 'tasks')] }]).lists], ['tasks'], 'a pass is its steps');
 });
 
-test('KEEPABLE: a known declaration, no secret field, never the vault or session; SCRUBBED drops credential keys and refuses a Map', () => {
+test('KEEPABLE: a known declaration, no secret field, never the Keychain or session; SCRUBBED drops credential keys and refuses a Map', () => {
   assert.equal(keepable(['tasks'], { tasks: DECL }), true);
   assert.equal(keepable(['tasks'], {}), false, 'an undeclared list is not kept');
   assert.equal(keepable(['keys'], { keys: SECRET }), false);

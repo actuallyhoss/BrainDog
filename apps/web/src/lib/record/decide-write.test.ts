@@ -56,11 +56,11 @@ test('an empty reason or an empty day asks the record nothing', async () => {
 
 test('a refusal is the record sentence', async () => {
   const { io } = host(() =>
-    json(422, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Add the key called "fenwick" to the vault, then accept.' } }),
+    json(422, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Add the key called "fenwick" to the Keychain, then accept.' } }),
   );
   assert.deepEqual(await answerQuestion(BASE, 'SG5', 'accept', 'Agreed.', io), {
     from: 'refused',
-    fix: 'Add the key called "fenwick" to the vault, then accept.',
+    fix: 'Add the key called "fenwick" to the Keychain, then accept.',
   });
 });
 

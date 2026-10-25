@@ -10,7 +10,7 @@
   different reads.
 
   THE SECOND LINE IS NEVER CUT, and the " · " between what it is and the verdict is in its words, not drawn by the style,
-  so a copy and a screen reader read the two apart. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
+  so a copy and a screen reader read the two apart. It is the verdict ("Paused. The key is not in the Keychain.") and an ellipsis took exactly
   the part that said what to do, so it wraps; the name gives way instead.
 
   A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (a

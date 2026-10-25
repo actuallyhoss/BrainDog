@@ -45,7 +45,7 @@ test('a sentence the record sends beside the turn is said as it wrote it', () =>
 });
 
 test('a paused or held action says the record’s own sentence, and did not run', async () => {
-  const paused = 'Tide tables is paused: the key it uses is not in the vault. Resume it on its project’s page.';
+  const paused = 'Tide tables is paused: the key it uses is not in the Keychain. Resume it on its project’s page.';
   const { io } = fake(409, { ok: false, refusal: { code: 'TRANSITION_ILLEGAL', fix: paused, at: 'ingest' } });
   assert.deepEqual(runNowSaid(await runNow('', 'tide-tables', io, NOW), NOW), { line: paused, ran: false });
   const held = 'Tide tables is held: this month’s runs are used up. It runs again on the 1st.';

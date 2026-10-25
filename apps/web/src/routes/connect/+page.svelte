@@ -31,7 +31,7 @@
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { titleOf } from '$lib/title.ts';
   import { TONES } from 'braindog-render';
   import { markedOf } from '@braindog/skin/agent-marks.ts';

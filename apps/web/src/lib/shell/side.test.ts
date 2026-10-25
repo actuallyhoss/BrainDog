@@ -17,7 +17,7 @@ test('lists group in the order the phone read them: places, money, the agents, t
     [{ href: '/?work', label: 'Work', icon: 'work', count: 27 }],
     [list('a1', { money: true }), list('r1', { kernel: true, count: 5 }), list('n1', { views: [{ name: 'Mine', href: '/p/mine' }] }), list('a2', { money: true })],
     [{ href: '/p/board', label: 'Board', icon: 'doc' }],
-    [{ href: '/vault', label: 'Vault', icon: 'vault' }],
+    [{ href: '/keychain', label: 'Keychain', icon: 'vault' }],
     HEADS,
   );
   assert.deepEqual(
@@ -28,7 +28,7 @@ test('lists group in the order the phone read them: places, money, the agents, t
       ['Agent work', ['R1']],
       ['Other lists', ['N1']],
       ['Saved views', ['Board', 'Mine']],
-      ['Tools', ['Vault']],
+      ['Tools', ['Keychain']],
     ],
   );
   assert.equal(groups[2]?.items[0]?.count, 5);

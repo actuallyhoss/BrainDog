@@ -7,8 +7,8 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { words as levelWords } from '../../levels.ts';
-  /* THE APPROVAL `/vault` SENDS TOO, from one module, so a fresh sign-in means one thing on every screen. */
-  import { reprove } from '$lib/record/vault.ts';
+  /* THE APPROVAL `/keychain` SENDS TOO, from one module, so a fresh sign-in means one thing on every screen. */
+  import { reprove } from '$lib/record/keychain.ts';
   /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the section below. */
   import { addressCommand, mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
@@ -191,7 +191,7 @@
 <!--
   `25 §9` DRAWS THIS SCREEN, which makes it the one settings area where inventing a control is
   least excusable. Three status words, a last-run line, a next-run line, a failure line naming
-  the credential by its VAULT LABEL rather than its value, and two buttons on the paused row
+  the credential by its KEYCHAIN LABEL rather than its value, and two buttons on the paused row
   only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
   receipts and the schedule row.
 -->

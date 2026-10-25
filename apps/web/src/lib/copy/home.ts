@@ -31,7 +31,7 @@ export const home = {
   measureNothingBefore: (n: number, weeks = false) => `Nothing reported in the ${n} ${weeks ? 'weeks' : 'days'} before`,
   measureLastOn: (day: string) => `Last reported ${day}`,
   /* THE FIVE STATES, ON THE FOUR SCREENS THAT COULD NOT DRAW ANY OF THEM. `grep -c "<Empty"` was
-     0 on Home, /audit, /packs and /vault — four surfaces with no way to tell "nothing here yet"
+     0 on Home, /audit, /packs and /keychain — four surfaces with no way to tell "nothing here yet"
      from "nothing matched", which `19 §6` calls the failure by name. */
   /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
      nothing needing you. It is the state of the first hour and nothing could say it. */

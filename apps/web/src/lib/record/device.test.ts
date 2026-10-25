@@ -97,7 +97,7 @@ test('there is no longer a refusal that means no record is here', async () => {
 
 /* ── what a grant reaches ── */
 
-test('every reach the kernel can grant has a sentence, and a vault grant\'s depends on its scope', () => {
+test('every reach the kernel can grant has a sentence, and a keychain access\'s depends on its scope', () => {
   for (const reach of REACHES) assert.ok(copy.reachMeans[reachKey(reach, null)], reach);
   assert.equal(reachKey('vault', '*'), 'vaultAll');
   assert.equal(reachKey('vault', 'p_01'), 'vault');

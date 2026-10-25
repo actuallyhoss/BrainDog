@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import Button from '$lib/ui/Button.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { actWords, type SheetAsk } from './act-sheet.ts';

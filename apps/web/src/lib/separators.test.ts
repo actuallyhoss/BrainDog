@@ -37,7 +37,7 @@ test('and the five that did now keep their spaces', () => {
     'routes/r/[register]/parts/ListTable.svelte',
     'routes/automations/HubRows.svelte',
     'routes/jobs/+page.svelte',
-    'routes/vault/+page.svelte',
+    'routes/keychain/+page.svelte',
   ])
     assert.match(readFileSync(join(SRC, file), 'utf8'), /\{' · '\}<\/span>/u, file);
 });

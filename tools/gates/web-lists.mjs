@@ -96,11 +96,11 @@ export const HELD = {
     ids: ['skills'],
     why: "sharing a pack offers the Agents pack's skills.",
   },
-  'apps/web/src/routes/vault/+page.svelte': {
+  'apps/web/src/routes/keychain/+page.svelte': {
     ids: ['credentials', 'things'],
-    why: "the vault lists the Agents pack's credentials and the projects each is for.",
+    why: "the Keychain lists the Agents pack's credentials and the projects each is for.",
   },
-  'apps/web/src/lib/record/vault.ts': {
+  'apps/web/src/lib/record/keychain.ts': {
     ids: ['credentials'],
     why: "`KEYS_REGISTER`, the Agents pack's credentials list, which the Keys index and a new action's key picker read by its id.",
   },

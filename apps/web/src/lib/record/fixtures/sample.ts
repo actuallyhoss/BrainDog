@@ -1,6 +1,6 @@
 /**
  * The sample record, as tests read it: the seed's lists and rows numbered as a record numbers them, and the questions,
- * inbox, vault, add-ons, news, audit trail and runs the sample's readers answer with.
+ * inbox, keychain, add-ons, news, audit trail and runs the sample's readers answer with.
  *
  * A TEST IMPORTS THIS AND NOTHING SHIPPED MAY. It was `lib/record/data.ts`, the mock the app was drawn against before a
  * record could answer, and it shipped for as long as a live screen read one of its tables.
@@ -691,11 +691,11 @@ export const QUEUE: Question[] = [...QUESTIONS, ...ARRANGING]
   .map((q) => ({ ...q, band: costOf(PROPOSALS[q.id]?.kind ?? 'options', PROPOSALS[q.id]?.body) }))
   .sort((a, b) => costRank(a.band) - costRank(b.band) || a.rank - b.rank);
 
-/* ── the vault ───────────────────────────────────────────────────────────
+/* ── the Keychain ───────────────────────────────────────────────────────────
    The register indexes what a key OPENS, never the key. No agent tool returns a secret, reveal is
    deliberate and audited, and the backup benefit and the exfiltration path are the same object. */
 
-export const VAULT: Credential[] = [
+export const KEYCHAIN: Credential[] = [
   { id: 'cr_01', label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example', kind: 'api_token', rotated: day(-214), stale: true },
   { id: 'cr_02', label: 'Nordhaven API', opens: 'DNS for five domains', kind: 'api_token', rotated: day(-41) },
   { id: 'cr_03', label: 'Ledger Post sending key', opens: 'Newsletter delivery for Portage', kind: 'api_token', rotated: day(-12) },
@@ -708,7 +708,7 @@ export const VAULT: Credential[] = [
  * What the sample knows about each key's grant, by credential id: where it applies (a project's name,
  * or null for global), whether a value is sealed, and how often it was opened. Two are index rows.
  */
-export const VAULT_OPENED: Record<string, { project: string | null; sealed: boolean; opened: number; lastOpened: string | null }> = {
+export const KEYCHAIN_OPENED: Record<string, { project: string | null; sealed: boolean; opened: number; lastOpened: string | null }> = {
   cr_01: { project: 'Kiln', sealed: true, opened: 14, lastOpened: stamp(-5) },
   cr_02: { project: null, sealed: true, opened: 3, lastOpened: stamp(-24 * 9) },
   cr_03: { project: 'Portage', sealed: true, opened: 22, lastOpened: stamp(-26) },
@@ -718,16 +718,16 @@ export const VAULT_OPENED: Record<string, { project: string | null; sealed: bool
 };
 
 /**
- * The sample's vault grants: one waiting for its six digits, and two machines that may open keys, one
+ * The sample's keychain access: one waiting for its six digits, and two machines that may open keys, one
  * for a project and one global.
  */
-const ALL_VAULT_GRANTS: { id: string; name: string; state: 'pending' | 'active'; project: string | null; at: string; lastSeen: string | null }[] = [
+const ALL_KEYCHAIN_GRANTS: { id: string; name: string; state: 'pending' | 'active'; project: string | null; at: string; lastSeen: string | null }[] = [
   { id: 'vg_01', name: 'Codex, studio desktop', state: 'pending', project: 'Portage', at: stamp(-0.03), lastSeen: null },
   { id: 'vg_02', name: 'braindog CLI, studio desktop', state: 'active', project: 'Kiln', at: stamp(-24 * 4), lastSeen: stamp(-5) },
   { id: 'vg_03', name: 'Claude Code, this laptop', state: 'active', project: null, at: stamp(-24 * 2), lastSeen: stamp(-26) },
 ];
 
-export const VAULT_GRANTS = ALL_VAULT_GRANTS;
+export const KEYCHAIN_GRANTS = ALL_KEYCHAIN_GRANTS;
 
 /* ── packs ───────────────────────────────────────────────────────────────── */
 
@@ -1270,7 +1270,7 @@ export const AUTH_METHODS = { passkey: true, magic: true } as const;
  * **`unpinned`**: the embedded key proves integrity and origin is `--key`'s job.
  *
  * A PUBLIC KEY IS THE ONE KEY THAT BELONGS ON A SCREEN, and this product's first promise makes that
- * worth saying out loud: the vault indexes what a key OPENS and never the key, and the rule is about
+ * worth saying out loud: the Keychain indexes what a key OPENS and never the key, and the rule is about
  * secrets. Publishing this one is the mechanism, and the design puts it at
  * `GET /.well-known/braindog-key`.
  *

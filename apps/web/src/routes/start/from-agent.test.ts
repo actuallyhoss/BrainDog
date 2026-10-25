@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { connectLines as settingsLines } from '../../lib/record/device.ts';
 import { copy } from '../../lib/copy.ts';
-import type { Approver } from '../../lib/record/vault.ts';
+import type { Approver } from '../../lib/record/keychain.ts';
 import { approverFor, ASK_EVERY, askBuild, connectLines, hostOf, linesFor, makeItMine, waitingBuild, watch, words } from './from-agent.ts';
 
 const BASE = 'https://brain.example/app/wren';
@@ -117,7 +117,7 @@ test('A REFUSED PRESS SAYS THE RECORD SENTENCE, and one that threw says the reco
 
 test('THE SIX DIGITS SETUP SHOWS ARE APPROVED ON THIS PAGE: one approval, of the code as typed in two groups', async () => {
   const sent: unknown[] = [];
-  /* ONLY THE ONE METHOD AN APPROVAL CALLS (`vault.ts` `Approver`); what it answers is not read here. */
+  /* ONLY THE ONE METHOD AN APPROVAL CALLS (`keychain.ts` `Approver`); what it answers is not read here. */
   const approver = (into: unknown[]): Approver => ({
     deviceApprove: async (args) => (into.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No machine is waiting with that code.' } }),
   });

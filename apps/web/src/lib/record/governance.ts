@@ -2,7 +2,7 @@
  * `/decide` and `/decide/<id>` on a live record: the open suggestions `governance` answers, the decisions
  * beside them, the rows a `rowset` would change, and the `decide` call that answers one.
  *
- * PURE, SO `node --test` CAN IMPORT IT, for the reason `vault.ts` gives: the client is handed in, so
+ * PURE, SO `node --test` CAN IMPORT IT, for the reason `keychain.ts` gives: the client is handed in, so
  * every branch is testable against an object literal, and the client stays out of the entry chunk.
  *
  * LIVE OR REFUSED, AND NOTHING IN BETWEEN. A refusal is drawn in the host's own sentence, whatever its code. This

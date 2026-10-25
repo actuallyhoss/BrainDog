@@ -1,15 +1,15 @@
 /**
- * `/vault`, and the approval it shares with `/settings/agents`: what the two screens decide, with no runes.
+ * `/keychain`, and the approval it shares with `/settings/agents`: what the two screens decide, with no runes.
  *
  * PURE, SO `node --test` CAN IMPORT IT, for the reason `device.ts` gives. The client and the sign-in helpers
  * are handed in, so every branch is testable against an object literal.
  *
- * AND NOTHING HERE DRAWS A VAULT THAT IS NOT THE RECORD. This module turned the sample's grants and keys into
+ * AND NOTHING HERE DRAWS A KEYCHAIN THAT IS NOT THE RECORD. This module turned the sample's grants and keys into
  * the record's rows for a visitor with no record; the sample is gone, and the
  * screen now draws only what `listDevices`, `list` and `listGrants` answer.
  *
  * ONE APPROVAL, EVERY SCREEN. A machine asking to open keys prints `/connect/approve`, Settings, Agents takes the
- * same code, and the Vault shows the same request at the top. All send the six digits through `approve` and say what came back
+ * same code, and the Keychain shows the same request at the top. All send the six digits through `approve` and say what came back
  * through `answerLine`, so they cannot drift into different rules for one act.
  *
  * NEVER A VALUE, A CODE OR A HANDLE. A key row carries what is known about its grant: whether a value is
@@ -28,12 +28,12 @@ import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.
 import { REGISTERS } from './held.ts';
 import type { Scope } from './scope-move.ts';
 
-/** The scope a vault grant names when it opens the keys of no project. */
+/** The scope a keychain access names when it opens the keys of no project. */
 export const GLOBAL = '*';
 
-/** How long an approved vault grant lasts: `packages/kernel/src/device.ts`, and question 6 of the agent path. */
-export const VAULT_DAYS = 30;
-export const VAULT_ALL_DAYS = 7;
+/** How long an approved keychain access lasts: `packages/kernel/src/device.ts`, and question 6 of the agent path. */
+export const KEYCHAIN_DAYS = 30;
+export const KEYCHAIN_ALL_DAYS = 7;
 
 export const words = {
   waiting: 'A request is waiting',
@@ -77,7 +77,7 @@ export const words = {
   copyValue: 'Copy',
   copied: 'Copied. The clipboard clears itself in a minute.',
   hidesIn: (s: number) => `Hides in ${s}s`,
-  keyAdded: (label: string) => `${label} is in the vault.`,
+  keyAdded: (label: string) => `${label} is in the Keychain.`,
   keyReplaced: (label: string) => `${label} has a new value.`,
   /** The kinds a key row declares, as a person reads them. `packages/kernel`'s `GRANT_KINDS`, in its order. */
   kinds: [
@@ -101,21 +101,21 @@ export const words = {
   changesTitle: 'Changes',
   takesOver: (names: string[], pack: string) => `Takes ${list(names)} over from ${pack}`,
   changesOwn: (name: string, detail: string) => (detail === '' ? `Changes ${name}` : `Changes ${name}, now ${detail}`),
-  /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"): the switch, the honesty table and the two sheets. The
+  /* THE KEYCHAIN PASSPHRASE (`12 §6`, "The optional second factor"): the switch, the honesty table and the two sheets. The
      table is the document's own trade, said in a person's words, with the consequence in the same place as the switch. */
-  passphrase: 'Passphrase',
-  lockSwitch: 'Passphrase',
+  passphrase: 'Keychain password',
+  lockSwitch: 'Keychain password',
   /* THE PASSPHRASE ROW'S LINE WHILE IT IS OFF: the state and what turning it on does, in one sentence (`12 §6`). */
   lockOffRow: 'Off. Turn it on and only you can open your keys.',
-  lockNoKeys: 'Add a key first. Then you can lock them with a passphrase.',
+  lockNoKeys: 'Add a key first. Then you can lock them with a keychain password.',
   lockHow: 'How it works',
-  lockOn: 'On. Keys open only with your passphrase.',
+  lockOn: 'On. Keys open only with your keychain password.',
   lockOff: 'Off. BrainDog opens your keys with the key this host keeps.',
-  lockReading: 'Checking whether the vault has a passphrase.',
+  lockReading: 'Checking whether the Keychain has a password.',
   lockProtects:
-    'It guards every key you put here. Once it is on, BrainDog cannot open them without you, and neither can an agent: only you can, on this screen, with the passphrase. A connector’s keys stay on the host key, so scheduled pulls keep running.',
-  tableCaption: 'What the passphrase changes',
-  tableState: 'Passphrase',
+    'It guards every key you put here. Once it is on, BrainDog cannot open them without you, and neither can an agent: only you can, on this screen, with the keychain password. A connector’s keys stay on the host key, so scheduled pulls keep running.',
+  tableCaption: 'What the keychain password changes',
+  tableState: 'Keychain password',
   tableReads: 'BrainDog can open your keys',
   tableForget: 'If you forget it',
   rowOff: 'Off',
@@ -127,27 +127,27 @@ export const words = {
   onForget: 'BrainDog cannot open your keys, and nobody can reset it',
   backups:
     'Backups made before you turn it on still open with the host key until they age out, 30 days later. Backups made after it is on carry it.',
-  turnOnTitle: 'Put a passphrase on the vault',
+  turnOnTitle: 'Put a keychain password on the Keychain',
   turnOnHint: 'A short sentence you will remember is better than a short password.',
-  turnOffTitle: 'Take the passphrase off',
+  turnOffTitle: 'Take the keychain password off',
   turnOffHint: 'Your keys go back under the key this host keeps, which BrainDog can open.',
-  passField: 'Passphrase',
+  passField: 'Keychain password',
   passAgain: 'Type it again',
-  passAgainHint: 'The same passphrase, typed a second time, so a slip of the finger cannot lock you out.',
+  passAgainHint: 'The same keychain password, typed a second time, so a slip of the finger cannot lock you out.',
   passDiffer: 'The two do not match yet.',
   passForget: 'If you forget it, BrainDog cannot open your keys.',
-  showPass: 'Show passphrase',
-  hidePass: 'Hide passphrase',
-  turnOn: 'Put the passphrase on',
+  showPass: 'Show keychain password',
+  hidePass: 'Hide keychain password',
+  turnOn: 'Put the keychain password on',
   turningOn: 'Putting it on',
-  turnOff: 'Take the passphrase off',
+  turnOff: 'Take the keychain password off',
   turningOff: 'Taking it off',
-  lockedNow: 'The vault is behind your passphrase.',
-  unlockedNow: 'The passphrase is off. BrainDog opens your keys with the host key again.',
+  lockedNow: 'The Keychain is behind its password.',
+  unlockedNow: 'The keychain password is off. BrainDog opens your keys with the host key again.',
   askTitle: (label: string) => `Open ${label}`,
-  askHint: 'The vault is behind a passphrase. Type it to open this key. It is sent with this one request and not kept.',
+  askHint: 'The Keychain is behind a password. Type it to open this key. It is sent with this one request and not kept.',
   askGo: 'Open the key',
-  keyPassHint: 'The vault is behind a passphrase. Type it to seal this key. It is sent with this one request and not kept.',
+  keyPassHint: 'The Keychain is behind a password. Type it to seal this key. It is sent with this one request and not kept.',
 } as const;
 
 /* ── the approval ─────────────────────────────────────────────────────── */
@@ -238,15 +238,15 @@ export async function revoke(client: Revoker, rows: readonly DeviceRow[], handle
 
 /* ── the machines ─────────────────────────────────────────────────────── */
 
-/** Vault grants waiting for the six digits. */
+/** Keychain access waiting for the six digits. */
 export const asks = (rows: readonly DeviceRow[]): DeviceRow[] => rows.filter((r) => r.reach === 'vault' && r.status === 'pending');
 
-/** Vault grants that may open keys now, or will at the machine's next poll. */
+/** Keychain access that may open keys now, or will at the machine's next poll. */
 export const holders = (rows: readonly DeviceRow[]): DeviceRow[] =>
   rows.filter((r) => r.reach === 'vault' && (r.status === 'approved' || r.status === 'active'));
 
 /** How many days a grant for this scope lasts once approved. */
-export const daysFor = (scope: string | null): number => (scope === null || scope === GLOBAL ? VAULT_ALL_DAYS : VAULT_DAYS);
+export const daysFor = (scope: string | null): number => (scope === null || scope === GLOBAL ? KEYCHAIN_ALL_DAYS : KEYCHAIN_DAYS);
 
 /** A scope as a person reads it: the project's name, or Global. A project this screen could not name is still a project. */
 export const scopeName = (scope: string | null, names: ReadonlyMap<string, string>): string =>
@@ -292,7 +292,7 @@ export type KeyRow = {
   spoken: string | null;
   label: string;
   opens: string;
-  /** Who the key is with ("Azure", "Stripe"), as its row says, or `null`: the Vault groups a project's keys by it. */
+  /** Who the key is with ("Azure", "Stripe"), as its row says, or `null`: the Keychain groups a project's keys by it. */
   provider?: string | null;
   project: string | null;
   /** Where the key applies, as the chip draws it: the project's spoken id, name, mark and hue, or `null` for
@@ -324,7 +324,7 @@ export type GrantState = {
 
 type KnownState = { sealed: boolean; opened: number; last_opened: string | null; bytes?: unknown; hint?: unknown };
 
-/** The longest hint the record keeps (`packages/kernel/src/vault.ts`, `bindGrant`): past it a hint could be the value. */
+/** The longest hint the record keeps (`packages/kernel/src/keychain.ts`, `bindGrant`): past it a hint could be the value. */
 export const HINT_MOST = 60;
 
 /**
@@ -401,7 +401,7 @@ export const KEYS_REGISTER = 'credentials';
 /* ── every page of a list ─────────────────────────────────────────────── */
 
 /**
- * The most pages `readAll` asks for: at the 200 rows a page the Vault reads, ten thousand keys. It is a stop for a host
+ * The most pages `readAll` asks for: at the 200 rows a page the Keychain reads, ten thousand keys. It is a stop for a host
  * that never answers a last page, not a size anybody is expected to reach, and a read that meets it says `more`.
  */
 export const READ_ALL_PAGES = 50;
@@ -454,7 +454,7 @@ export type UsedByReader = { usedBy(args: { spoken: string }): Promise<Wire<{ ru
  * The run that opened each key last, by the key's row id, for the keys that were opened at all: at most `most` asks,
  * in the order the index draws them.
  *
- * WHY A KEY'S ROW SAYS IT: the vault counts every open and signs each with the run that asked, so "opened 12 times"
+ * WHY A KEY'S ROW SAYS IT: the Keychain counts every open and signs each with the run that asked, so "opened 12 times"
  * was a count with nobody behind it, and the question a person has about a key is which agent is using it
  * A key nobody opened is not asked about, and a refusal leaves the row saying what
  * it said before rather than guessing: `usedBy` answers a key the caller cannot read as one that is not there.
@@ -571,14 +571,14 @@ function changesOf(
 
 /* ── reconnecting a paused action's key ──────────────────────────────── */
 
-/** What `/vault?reconnect=<label>&then=<action>` opens: the row to replace, or a new key under that name, and the action to resume. */
+/** What `/keychain?reconnect=<label>&then=<action>` opens: the row to replace, or a new key under that name, and the action to resume. */
 export type Reconnect = { then: string | null } & ({ mode: 'replace'; row: KeyRow } | { mode: 'add'; label: string });
 
 /**
  * The sheet a paused action's "Reconnect key" opens, or `null` when the address asks for none.
  *
  * THE KEY IS FOUND BY ITS LABEL, case-blind, because that is how a declaration names it and how the row that paused says
- * it. A label the vault does not hold opens Add with the name filled in, which is the "not in the vault" pause.
+ * it. A label the Keychain does not hold opens Add with the name filled in, which is the "not in the Keychain" pause.
  */
 export function reconnectOf(params: URLSearchParams, keys: readonly KeyRow[]): Reconnect | null {
   const label = params.get('reconnect')?.trim() ?? '';
@@ -588,17 +588,17 @@ export function reconnectOf(params: URLSearchParams, keys: readonly KeyRow[]): R
   return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
 }
 
-/** Where a navigation to `/vault` carries a `ReconnectState`: `goto('/vault', { state: { [RECONNECT_STATE]: ... } })`, read back from the page's state. */
-export const RECONNECT_STATE = 'vaultReconnect';
+/** Where a navigation to `/keychain` carries a `ReconnectState`: `goto('/keychain', { state: { [RECONNECT_STATE]: ... } })`, read back from the page's state. */
+export const RECONNECT_STATE = 'keychainReconnect';
 
 /**
- * What "Reconnect key" hands the Vault in the navigation's state, never in the address: the key's name as the paused
- * action says it, and the action to resume, or null for none. A reload drops it, and the plain Vault shows.
+ * What "Reconnect key" hands the Keychain in the navigation's state, never in the address: the key's name as the paused
+ * action says it, and the action to resume, or null for none. A reload drops it, and the plain Keychain shows.
  */
 export type ReconnectState = { key: string; then: string | null };
 
 /**
- * `reconnectOf`, asked with the navigation's state: the same sheet for the same key, with nothing after `/vault`.
+ * `reconnectOf`, asked with the navigation's state: the same sheet for the same key, with nothing after `/keychain`.
  *
  * `state` IS WHAT THE PAGE HOLDS UNDER `RECONNECT_STATE`, whatever that is. A history entry is written by more than this
  * app, so anything that is not a name and an action or null answers null, as an address asking for nothing does.
@@ -614,7 +614,7 @@ export function reconnectFrom(state: unknown, keys: readonly KeyRow[]): Reconnec
   return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
 }
 
-/* ── the vault passphrase ─────────────────────────────────────────────── */
+/* ── the keychain password ─────────────────────────────────────────────── */
 
 /**
  * An answer from the passphrase's two methods or the two key doors, with the part of a refusal read here: `at` says
@@ -632,30 +632,30 @@ export type Locker = {
 };
 
 /**
- * Whether the vault is behind a passphrase. `unknown` and `none` carry the record's sentence: `unknown` when the record
+ * Whether the Keychain is behind a passphrase. `unknown` and `none` carry the record's sentence: `unknown` when the record
  * would not say (a sign-in older than fifteen minutes, a colleague), `none` when there is nothing to put one on yet or
  * this host cannot.
  */
 export type Lock = { state: 'reading' | 'on' | 'off' } | { state: 'unknown' | 'none'; fix: string };
 
-/** The refusal every door gives a request that carried no passphrase while the vault is behind one. */
+/** The refusal every door gives a request that carried no passphrase while the Keychain is behind one. */
 export const wantsPassphrase = (out: Told<unknown>): boolean =>
   !out.ok && 'refusal' in out && out.refusal.code === 'REQUIRED_MISSING' && out.refusal.at === 'passphrase';
 
-/** What a change answered the vault now is: the record's `{ on }`, read as a lock. */
+/** What a change answered the Keychain now is: the record's `{ on }`, read as a lock. */
 const lockFrom = (value: unknown): Lock => ({
   state: typeof value === 'object' && value !== null && (value as { on?: unknown }).on === true ? 'on' : 'off',
 });
 
 /**
- * Whether the vault is behind a passphrase, asked by taking it off with none.
+ * Whether the Keychain is behind a passphrase, asked by taking it off with none.
  *
  * THE RECORD HAS NO READ THAT SAYS, and this is the one question whose answer says it and changes nothing either way
- * (`kernel/src/api/vault-passphrase.ts`, `host/src/passphrase.ts`). A vault with no passphrase answers `ALREADY_KNOWN`
- * before anything is compared. A vault behind one counts the try, then hears that no passphrase was carried, which is
+ * (`kernel/src/api/keychain-passphrase.ts`, `host/src/passphrase.ts`). A Keychain with no password answers `ALREADY_KNOWN`
+ * before anything is compared. A Keychain behind one counts the try, then hears that no passphrase was carried, which is
  * `REQUIRED_MISSING` and not a wrong one, so the try is handed back; `RATE_LIMITED` is only reached while one is on.
  * `NOT_IN_THIS_BUILD` is a record with no key of its own yet, or a host that cannot, and it is said rather than hidden.
- * Anything else, the vault gate above all, leaves the switch saying why it cannot tell.
+ * Anything else, the Keychain gate above all, leaves the switch saying why it cannot tell.
  */
 export async function lockOf(client: Pick<Locker, 'clearVaultPassphrase'>): Promise<Lock> {
   const out = await client.clearVaultPassphrase('');
@@ -675,10 +675,10 @@ export async function lockOf(client: Pick<Locker, 'clearVaultPassphrase'>): Prom
 }
 
 /**
- * Put the passphrase on (`to: 'on'`) or take it off (`'off'`): the vault after, or the record's sentence and, where the
- * refusal says what the vault is, that too.
+ * Put the passphrase on (`to: 'on'`) or take it off (`'off'`): the Keychain after, or the record's sentence and, where the
+ * refusal says what the Keychain is, that too.
  *
- * `ALREADY_KNOWN` IS THE VAULT ALREADY BEING WHERE IT WAS ASKED TO GO, changed from another tab since this one read it,
+ * `ALREADY_KNOWN` IS THE KEYCHAIN ALREADY BEING WHERE IT WAS ASKED TO GO, changed from another tab since this one read it,
  * so the switch moves to match and the sentence says why nothing was changed.
  */
 export async function turnLock(
@@ -697,7 +697,7 @@ export async function turnLock(
 export const confirmed = (first: string, again: string): boolean => first !== '' && first === again;
 
 /**
- * The passphrase a key door's body carries, or nothing: sent only while the vault is behind one, so a vault without
+ * The passphrase a key door's body carries, or nothing: sent only while the Keychain is behind one, so a Keychain without
  * one is sent the body it always was.
  */
 export const withPassphrase = (lock: Lock, passphrase: string): { passphrase?: string } =>

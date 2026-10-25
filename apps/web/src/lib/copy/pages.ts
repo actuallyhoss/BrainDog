@@ -162,7 +162,7 @@ export const pages = {
     'If the project answers its numbers as JSON at an https address, BrainDog can fetch them on a clock. You approve the address and how often once, in Needs you, and nothing is fetched before that.',
   pollEvery: 'How often',
   pollEveryLabels: { '15m': 'Every 15 minutes', '1h': 'Every hour', '6h': 'Every 6 hours', '1d': 'Every day' } as Record<string, string>,
-  pollKey: 'Key in the vault, only if the address needs one',
+  pollKey: 'Key in the Keychain, only if the address needs one',
   pollKeyNote: 'Leave it empty for an address anybody can read. A key is sent to this address and nowhere else.',
   pollNumbers: 'The numbers in the answer',
   pollName: 'Called',

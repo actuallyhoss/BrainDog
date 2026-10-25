@@ -36,7 +36,7 @@
     type ActionKind,
     type Filed,
   } from '$lib/record/action-draft.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -59,7 +59,7 @@
   /* THE INGEST NAME A DOOR WAS INSTALLED UNDER, so a sign-in the mint asked for can finish it. */
   let door = $state<string | null>(null);
   let reproving = $state(false);
-  /* The vault's labels; `null` is a vault this sheet cannot read, and the key is then typed. */
+  /* The Keychain's labels; `null` is a Keychain this sheet cannot read, and the key is then typed. */
   let keys = $state<string[] | null | undefined>(undefined);
   /* EVERY INGEST ID THE RECORD ALREADY DECLARES, doors and scheduled actions together, so `declarationOf` can refuse a
      name that would silently replace one; `undefined` while unread never blocks a press. */

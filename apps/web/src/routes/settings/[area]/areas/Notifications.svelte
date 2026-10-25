@@ -26,7 +26,7 @@
   let props: AreaProps = $props();
   const owner = $derived(ownsRecord(props.shell.me));
 
-  /* This area's own words. Urgent is one line: what interrupts, by name, and not how the vault and the limits work. */
+  /* This area's own words. Urgent is one line: what interrupts, by name, and not how the Keychain and the limits work. */
   const words = {
     notHereYet: 'Not on this record yet',
     urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',

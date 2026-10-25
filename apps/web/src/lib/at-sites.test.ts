@@ -40,7 +40,7 @@ const lineOf = (text: string, index: number) => text.slice(0, index).split('\n')
 const RENDERED = new Map([
   ['out.to', 'the switcher answers `/app/<slug>/` (`record/switcher.ts`)'],
   ['signIn', '`signInFirst` answers `/app/signin?next=…` (`lib/at.ts`)'],
-  ['href', 'the sign-in `reprove` hands back is built by `lib/record/vault.ts`'],
+  ['href', 'the sign-in `reprove` hands back is built by `lib/record/keychain.ts`'],
 ]);
 
 /** Navigations made in one file with a value that is already right, and why: `file arg`. */

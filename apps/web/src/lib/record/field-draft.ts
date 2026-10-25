@@ -29,7 +29,7 @@ import { listFromDraft, listLine } from './tags.ts';
  * Whether a field's value can be changed where it is drawn.
  *
  * EVERY TYPE BUT THOSE `UNBOXED` NAMES, ON BOTH SCREENS, and one predicate so the two cannot drift again. A secret is
- * never drawn and never edited: a credential does not go in a row, the vault is a different surface with different
+ * never drawn and never edited: a credential does not go in a row, the Keychain is a different surface with different
  * rules, and `readableFields` has already left it out.
  *
  * A `file` WAS UNBOXED BESIDE IT until the file store existed: its bytes live outside the row, at

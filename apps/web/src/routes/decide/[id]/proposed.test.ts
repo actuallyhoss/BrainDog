@@ -135,7 +135,7 @@ test('a script says where it calls out, what it may send, and carries its source
   const [script] = out?.appears ?? [];
   assert.deepEqual([script?.kind, script?.title], ['Script', 'Exchange rates']);
   /* THE RECORD'S OWN EGRESS LINE, the one the owner arms on accept (`approvalLines`), less the shouted lead the label says.
-     Asked of the kernel and not typed out, for the canvas's reason above: its wording grew a clause about the vault
+     Asked of the kernel and not typed out, for the canvas's reason above: its wording grew a clause about the Keychain
      while this test was being written. */
   const egress = egressOf(body)!;
   assert.match(egress.line, /^CALLS OUT api\.rates\.example · every 1h · key "Rates"/u);
@@ -148,8 +148,8 @@ test('a script says where it calls out, what it may send, and carries its source
   assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside this record' }]);
 });
 
-/* THE RECORD FILES THE LINE WITH THE VAULT IN HAND (`egressOf(d.body, titleOfRow, opensOf)` where a change is filed), and
-   this screen cannot reach the vault: worked out again here it said `key "Rates" to the host its vault entry opens`
+/* THE RECORD FILES THE LINE WITH THE KEYCHAIN IN HAND (`egressOf(d.body, titleOfRow, opensOf)` where a change is filed), and
+   this screen cannot reach the Keychain: worked out again here it said `key "Rates" to the host its Keychain entry opens`
    where the record had filed `to api.rates.example`, so the one pairing the owner approves was said vaguer on the
    screen than on the proposal. */
 test('a script the record filed an egress line for is said in that line, with the host each key goes to', () => {

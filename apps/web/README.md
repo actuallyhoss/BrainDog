@@ -30,7 +30,7 @@ and no real credential. The sample that used to stand in for it is test-only now
 | `/v/obligations.open` | a saved view, a named predicate: the one `tools/gates/record.mjs` saves |
 | `/p/money` · `?src=1` | a declared page, and its declaration as text |
 | `/t/2` | a track: what has been said on it, who is working on it, what is open |
-| `/vault` · `/packs` · `/settings/appearance` · `/audit` | the rest of the spine |
+| `/keychain` · `/packs` · `/settings/appearance` · `/audit` | the rest of the spine |
 | `/start` | the first run: one row, typed by hand |
 | `/jobs/<id>` | a tier-C run's transcript; no record answers with a run's steps yet, so every id draws "no such run" |
 | `/s/<token>` | a shared page: signed, read-only, and a landing page; today every token draws "This link does not open a page" |

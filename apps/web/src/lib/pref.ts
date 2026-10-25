@@ -56,7 +56,7 @@ export type Pref = {
    * should be.
    *
    * IT USED TO TAKE THE WHOLE RAIL AWAY, and that is not what anybody means by collapsed. `⌘\`
-   * removed every row of navigation and left one button in an empty gutter: a sweep of `/vault` in
+   * removed every row of navigation and left one button in an empty gutter: a sweep of `/keychain` in
    * that state returned six visible controls and all six were *Reveal once*. The record switcher,
    * the spine and the lists were then reachable only from a chord or the palette, and this
    * preference persists, so a chord pressed by accident survived the reload.

@@ -65,7 +65,7 @@
     type Source,
     type Unit,
   } from '$lib/record/packs.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';

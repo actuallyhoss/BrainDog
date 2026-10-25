@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { bytes } from 'braindog-render';
-import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './fixtures/sample.ts';
+import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, KEYCHAIN } from './fixtures/sample.ts';
 import { LEVELS, type Level } from './schema.ts';
 import { REGISTERS } from './api.ts';
 
@@ -308,7 +308,7 @@ test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something
 
 test('the connector rows are `25 §9`\u2019s three states, and the paused one names what to reconnect', () => {
   /* `25 §9` draws this screen — three status words, a last-run line, a next-run line, a failure line
-     naming the credential by its VAULT LABEL, and two buttons on the paused row only. */
+     naming the credential by its KEYCHAIN LABEL, and two buttons on the paused row only. */
   assert.deepEqual([...new Set(SOURCES.map((s) => s.state))].sort(), ['failing', 'ok', 'paused']);
   for (const s of SOURCES) {
     if (s.state === 'ok') {
@@ -320,9 +320,9 @@ test('the connector rows are `25 §9`\u2019s three states, and the paused one na
     /* `13 §6`: the app renders the server's `fix` VERBATIM, so it has to BE a sentence somebody can
        act on rather than a code. */
     assert.ok(s.error.fix.length > 30, `${s.name}'s fix explains nothing`);
-    /* AND THE CREDENTIAL BY THE LABEL THE VAULT INDEXES IT UNDER. A pull failure names what to
+    /* AND THE CREDENTIAL BY THE LABEL THE KEYCHAIN INDEXES IT UNDER. A pull failure names what to
        reconnect; naming the value would put a secret on a settings screen. */
-    assert.ok(VAULT.some((c) => c.label === s.error!.credential), `${s.name} names a credential the vault does not hold`);
+    assert.ok(KEYCHAIN.some((c) => c.label === s.error!.credential), `${s.name} names a credential the Keychain does not hold`);
   }
   /* Paused means nothing is scheduled until somebody acts. A next run on a paused connector is a
      promise the schedule is not keeping. */

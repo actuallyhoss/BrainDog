@@ -7,7 +7,7 @@
  *
  * HIS OWN KEY IS FOUR THINGS AND THE KEY IS NEVER TYPED HERE. A provider (Anthropic Messages, or any endpoint that speaks
  * OpenAI's chat completions), an address (empty for the provider's own), a model name, and a key PICKED from the API
- * tokens in his vault, by its id. The key's value never reaches this page: the vault holds
+ * tokens in his Keychain, by its id. The key's value never reaches this page: the Keychain holds
  * it, and the host opens it on each ask. The address is checked by the host, which is the only place that can say what a
  * public address is (`slashBaseUrlOf` in `packages/host/src/slash.ts`), and its refusal is drawn as it came.
  *
@@ -48,14 +48,14 @@ const ADDRESS = /[/:@\\]|^[^\s.]+(?:\.[^\s.]+)+$/u;
 
 export const PROVIDERS: readonly SlashProvider[] = ['anthropic', 'openai'];
 
-/** A key the owner may pick: a live API token in his vault, by its id and the label he gave it. */
+/** A key the owner may pick: a live API token in his Keychain, by its id and the label he gave it. */
 export type KeyChoice = { id: string; label: string };
 
 /**
  * The keys to offer, from what `listGrants` answered: live API tokens only, in the order of their labels.
  *
  * A PASSWORD IS NEVER OFFERED. The host refuses a save naming one (`slashGuardedEngine`), and a picker that offered it
- * would be a list of mistakes. A revoked key is gone from the vault screen, so it is gone here too.
+ * would be a list of mistakes. A revoked key is gone from the Keychain screen, so it is gone here too.
  */
 export const keysOf = (grants: readonly unknown[]): KeyChoice[] =>
   grants
@@ -154,9 +154,9 @@ export const words = {
   keyLabel: 'Key',
   keyPick: 'Pick a key',
   keyChange: 'Change the key',
-  keyNone: "Your vault holds no API token yet. Put your provider's key in the vault, then pick it here.",
-  keyGone: 'The key picked before is no longer in the vault. Pick another.',
+  keyNone: "Your Keychain holds no API token yet. Put your provider's key in the Keychain, then pick it here.",
+  keyGone: 'The key picked before is no longer in the Keychain. Pick another.',
   keySheet: 'Pick the key Slash answers with',
-  keySheetSub: 'API tokens in your vault. The key itself stays there.',
+  keySheetSub: 'API tokens in your Keychain. The key itself stays there.',
   go: 'Save how Slash is run',
 } as const;

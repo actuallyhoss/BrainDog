@@ -1772,7 +1772,7 @@
   }
 
   /* AND UNDER A THUMB EVERY LINK OF A NOTE IS 44 BY 44, the foot's doors and a sentence's one link alike ("3 keys have no
-     value. Add them in the vault", whose number is a tag of its own, so `:only-child` above never reached it). */
+     value. Add them in the Keychain", whose number is a tag of its own, so `:only-child` above never reached it). */
   @media (pointer: coarse) {
     .block-slot :global(.block[data-kind='note'] p > a) {
       display: inline-flex;

@@ -23,7 +23,7 @@ import { forget } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
 import { listName } from './names.ts';
 import { READINGS } from './reporting.ts';
-import { KEYS_REGISTER } from './vault.ts';
+import { KEYS_REGISTER } from './keychain.ts';
 
 /** What the sheet makes. */
 export type ActionKind = 'door' | 'action';
@@ -58,7 +58,7 @@ export type ActionDraft = {
   auth: AuthKind;
   /** The header or the address parameter the key goes in, for `header` and `query`. */
   keyName: string;
-  /** The vault key's label, or empty for none. */
+  /** The Keychain key's label, or empty for none. */
   grant: string;
   every: Every;
   /** The list a row lands in, or empty to leave what arrives in the inbox. */
@@ -98,8 +98,8 @@ export const actionWords = {
   urlHelp: 'The whole https:// address.',
   grant: 'Key',
   grantNone: 'No key, the address is public',
-  grantHelp: 'A key from the vault. It is named here and never shown.',
-  grantTyped: 'The key as it is labelled in the vault',
+  grantHelp: 'A key from the Keychain. It is named here and never shown.',
+  grantTyped: 'The key as it is labelled in the Keychain',
   auth: 'Sent as',
   auths: {
     bearer: 'A bearer key',
@@ -423,7 +423,7 @@ export async function fileDraft(call: Call, decl: Declared, said: string): Promi
 }
 
 /**
- * The labels of the vault's keys, for the key picker. `null` when the vault cannot be read here, and the sheet asks for
+ * The labels of the Keychain's keys, for the key picker. `null` when the Keychain cannot be read here, and the sheet asks for
  * the label as typed text instead, because the declaration names a key by its label and nothing else.
  */
 export async function keyLabels(call: Call): Promise<string[] | null> {

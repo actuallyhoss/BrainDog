@@ -30,7 +30,7 @@ const READERS = ['boot', 'list', 'entry', 'search', 'page', 'values', 'job', 'me
    now `held.ts`'s table of what the record declared, and the first test holds it to that. */
 const TABLES = [
   'AUDIT', 'AUTH_METHODS', 'DEPLOYMENT', 'DEVICES', 'INBOX', 'JOB', 'JOBS', 'NOW', 'PACKS', 'PAGES', 'PASSKEYS', 'QUESTIONS',
-  'DECIDED', 'ROWS', 'NEWS', 'SNAPSHOTS', 'SNAPSHOTS_KEPT', 'SIGNING_KEY', 'SOURCES', 'TODAY', 'TOKENS', 'VAULT', 'VIEWS',
+  'DECIDED', 'ROWS', 'NEWS', 'SNAPSHOTS', 'SNAPSHOTS_KEPT', 'SIGNING_KEY', 'SOURCES', 'TODAY', 'TOKENS', 'KEYCHAIN', 'VIEWS',
   'PEOPLE_ACCESS',
 ];
 

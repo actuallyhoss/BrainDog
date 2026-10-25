@@ -17,7 +17,7 @@
   import { createClient } from '@braindog/client';
   import { since } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { runPath, type UsedByRun } from '$lib/record/vault.ts';
+  import { runPath, type UsedByRun } from '$lib/record/keychain.ts';
   import { closed, opened } from '../../ui/screen.svelte.ts';
 
   let { spoken }: { spoken: string } = $props();

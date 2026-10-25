@@ -116,7 +116,7 @@ export const PATHS = {
   session: '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="3.5"/><path d="M7.5 10l2.75 2.25L7.5 14.5M12.75 14.5h3.75"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66L11.5 6.84"/><path d="M14 10a4 4 0 0 0-5.66 0l-2.83 2.83a4 4 0 0 0 5.66 5.66l1.33-1.33"/>',
   code: '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14"/>',
-  /* The vault: the icon set's `shield`, security. */
+  /* The Keychain: the icon set's `shield`, security. */
   vault: '<path d="M12 3.25 19.25 6v5.5c0 4.4-3 7.9-7.25 9.25C7.75 19.4 4.75 15.9 4.75 11.5V6z"/><path d="M9 12l2.25 2.25L15.25 10"/>',
   lock: '<rect x="4.75" y="10.25" width="14.5" height="10" rx="3"/><path d="M8 10.25V7.5a4 4 0 0 1 8 0v2.75"/>',
   key: '<circle cx="8" cy="15.5" r="4.25"/><path d="M11.1 12.6 19.5 4.25M16.25 7.5l2.5 2.5M14 9.75l1.75 1.75"/>',

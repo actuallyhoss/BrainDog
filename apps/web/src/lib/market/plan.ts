@@ -3,7 +3,7 @@
  * module, a use case's pack-by-pack plan (`routes/packs/sharing.ts` `SharedPlan`), or several of either for "Update
  * all", turned into the rows `PlanSheet.svelte` draws.
  *
- * THE WHOLE DIFF, NOT A SUMMARY OF IT. The Packs screen drew four of its keys (`vault.ts` `planOf`), so an update that
+ * THE WHOLE DIFF, NOT A SUMMARY OF IT. The Packs screen drew four of its keys (`keychain.ts` `planOf`), so an update that
  * retired a list, reset a setting or carried the owner's own edits over said none of it before the press. Every key a
  * person could want to know before approving is a section here, and a section with nothing in it is left out, because a
  * heading over nothing teaches people to skip headings.

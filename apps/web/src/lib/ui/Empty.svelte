@@ -351,7 +351,7 @@
     display: none;
   }
 
-  /* EXCEPT A REFUSAL'S BODY, WHICH IS THE RECORD'S OWN SENTENCE. The Vault's Keys and Machines sections draw "not
+  /* EXCEPT A REFUSAL'S BODY, WHICH IS THE RECORD'S OWN SENTENCE. The Keychain's Keys and Machines sections draw "not
      yours" as the title and the record's reason and remedy ("Ask an owner to raise your access.") as the body, and
      a section that hid it would say a door is shut without saying who holds the key. It takes its own line under the
      title, as the refusal lines do. */

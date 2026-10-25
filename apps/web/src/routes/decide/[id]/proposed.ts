@@ -95,7 +95,7 @@ function register(id: string, body: Row): Appears {
 /**
  * The egress line the record filed for this declaration, or the kernel's reading of its body when it filed none.
  *
- * FILED FIRST, for the reason `script` gives: the record works the line out with the vault and the installed copy in
+ * FILED FIRST, for the reason `script` gives: the record works the line out with the Keychain and the installed copy in
  * hand, and this screen has neither. The body's own reading is for a declaration whose line was not filed because it
  * calls out as the installed one already does.
  */
@@ -191,8 +191,8 @@ function rule(id: string, body: Row): Appears {
  * script could send a list's rows away, and the owner's only chance to see that it can.
  *
  * THE LINE THE PROPOSAL CARRIES WHEN IT CARRIES ONE (`filed`, the body's `egress`), because the record works it out with
- * the vault in hand and says which host each key goes to; this screen cannot reach the vault, and worked out here the
- * same script said "to the host its vault entry opens". The body's own line is for a script whose egress the record did
+ * the Keychain in hand and says which host each key goes to; this screen cannot reach the Keychain, and worked out here the
+ * same script said "to the host its Keychain entry opens". The body's own line is for a script whose egress the record did
  * not file, one that calls out as the installed copy already does.
  */
 function script(id: string, body: Row, filed: readonly unknown[]): Appears {

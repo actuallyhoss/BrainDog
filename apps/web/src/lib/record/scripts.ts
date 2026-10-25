@@ -313,7 +313,7 @@ export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused
 
 /**
  * The facts a card lists: how close it is to pausing, this month's runs, and what it may read, write, fetch and open.
- * Lists by their names and keys by their vault labels, never an id.
+ * Lists by their names and keys by their keychain labels, never an id.
  */
 export function factsOf(
   s: Pick<ScriptRow, 'reads' | 'writes' | 'egress' | 'keys' | 'refused' | 'month'>,

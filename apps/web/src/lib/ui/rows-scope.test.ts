@@ -42,7 +42,7 @@ const TODAY = new Set([
   'settings/[area]/areas/Sessions.svelte',
   'slash/+page.svelte',
   'usage/+page.svelte',
-  'vault/+page.svelte',
+  'keychain/+page.svelte',
 ]);
 
 const svelte = (dir: string): string[] =>

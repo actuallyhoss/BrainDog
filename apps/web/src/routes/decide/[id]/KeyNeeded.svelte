@@ -3,11 +3,11 @@
   whether the record holds it, and a field to put it in without leaving the question.
 
   SEALED AS THE KEYS SCREEN SEALS ONE. The value goes once to `putKey` with `sealed_under: 'connector'`, as the Keys
-  screen sends it with its switch on (`vault/+page.svelte`, `saveKey`), so a scheduled run can open it and the approval
+  screen sends it with its switch on (`keychain/+page.svelte`, `saveKey`), so a scheduled run can open it and the approval
   is not refused for a key only a person may open. The host seals it; the record is handed sealed bytes.
 
   THE VALUE NEVER REACHES A LOG LINE OR THE PAGE'S TEXT. It lives in the field until the record has kept it, and the
-  toast and the tick say only the label. While the vault is behind a passphrase the record says so on the first try,
+  toast and the tick say only the label. While the Keychain is behind a passphrase the record says so on the first try,
   and the passphrase field appears for the second with the key still typed; the passphrase is sent with that one
   request and emptied before it leaves (`key-needed.ts`).
 
@@ -19,8 +19,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { words as vaultWords } from '$lib/record/vault.ts';
-  import PassField from '../../vault/PassField.svelte';
+  import { words as keychainWords } from '$lib/record/keychain.ts';
+  import PassField from '../../keychain/PassField.svelte';
   import type { Need } from './arranged.ts';
   import { asksOpens as asks, blankForm, keep as keepKey, ready, type KeyClient } from './key-needed.ts';
 
@@ -64,13 +64,13 @@
   {#if client && !held}
     <form class="need-form" onsubmit={keep}>
       {#if asksOpens}
-        <label class="field-label" for={`need-${at}-opens`}>{vaultWords.opensAsk}</label>
+        <label class="field-label" for={`need-${at}-opens`}>{keychainWords.opensAsk}</label>
         <div class="field"><input class="field-input" id={`need-${at}-opens`} type="text" autocomplete="off" bind:value={form.opens} /></div>
-        <p class="field-hint">{vaultWords.opensHint}</p>
+        <p class="field-hint">{keychainWords.opensHint}</p>
       {/if}
       <PassField id={`need-${at}`} label={copy.arrangeNeedField} hint={copy.arrangeNeedHint} autocomplete="new-password" bind:value={form.value} invalid={said !== ''} />
       {#if form.locked}
-        <PassField id={`need-${at}-pass`} label={vaultWords.passField} hint={vaultWords.keyPassHint} autocomplete="current-password" bind:value={form.passphrase} />
+        <PassField id={`need-${at}-pass`} label={keychainWords.passField} hint={keychainWords.keyPassHint} autocomplete="current-password" bind:value={form.passphrase} />
       {/if}
       {#if said}<p class="need-said" role="status"><Icon name="alert" size="s" />{said}</p>{/if}
       <div class="need-act">

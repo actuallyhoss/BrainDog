@@ -139,7 +139,7 @@ export const revokeInbound = (base: string, io?: Fetch): Promise<Said> => press(
 /**
  * The words the Ingest area reads.
  *
- * HERE AND NOT IN `copy.ts`, for the reason `vault.ts` states about its own: `copy.ts` is in the entry chunk every
+ * HERE AND NOT IN `copy.ts`, for the reason `keychain.ts` states about its own: `copy.ts` is in the entry chunk every
  * screen waits for, and these are read by one area of one route that is not the home page. The sentences shared
  * with the rest of Settings are still `copy.ts`'s, and this object does not repeat them.
  */

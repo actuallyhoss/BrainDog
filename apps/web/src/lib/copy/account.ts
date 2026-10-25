@@ -1,5 +1,5 @@
 /**
- * The account's words: settings and every area in it, the vault, signing in, an invitation, usage, backups and
+ * The account's words: settings and every area in it, the Keychain, signing in, an invitation, usage, backups and
  * History.
  *
  * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
@@ -305,7 +305,7 @@ export const account = {
   endedByOperator: 'ended by the operator',
 
   /* WHAT IT MAY REACH, with its life, because that difference is the whole decision. `19 §9` keeps
-     every word from the schema off the screen. A vault grant's life depends on its scope. */
+     every word from the schema off the screen. Keychain access lasts as long as its scope says. */
   reachMeans: {
     login: 'sign in as you, for ninety days',
     runner: 'do work for you on this machine, for ninety days',
@@ -697,7 +697,7 @@ export const account = {
   inviteCheckMail: 'Check your email',
   inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
   inviteFromMail: 'You opened the link from your email. Join to finish.',
-  /* A key taken out of service from the vault screen: the bytes go, its line on the screen stays. */
+  /* A key taken out of service from the Keychain screen: the bytes go, its line on the screen stays. */
   keyRevoked: (label: string) => label + ' is out of service. It stays listed, because what it opened is a fact.',
 
   /* ── Billing, Sessions, Recovery and the lapse banner ─────────────────────────────────────────────────────────────

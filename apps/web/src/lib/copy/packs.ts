@@ -24,7 +24,7 @@ export const packs = {
     'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. One action fetches every currency your money is in. Open it again when you start using a new currency.',
   ratesSetUp: 'Set up exchange rates',
   noPacksYet: 'No add-ons installed',
-  /* The Vault's words are in `record/vault.ts`, which only its two routes load. */
+  /* The Keychain's words are in `record/keychain.ts`, which only its two routes load. */
 
   /* packs */
   uninstall: 'Uninstall',

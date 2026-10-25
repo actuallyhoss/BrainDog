@@ -23,7 +23,7 @@
   import { afterResume, forProject, openActions, ownPress, stateOf, usageHref, whatOf, words, type ActionRow, type ForProject, type Said, type Source } from '$lib/record/actions.ts';
   import { words as jobWords } from '$lib/record/jobs.ts';
   import { signInFor } from '$lib/record/packs.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -81,9 +81,9 @@
      belongs to the whole record" under its heading. The owner, and anybody reading all of it, still reads why. */
   const saysRefusal = $derived(holdsWhole((route.data as { me?: Reader } | undefined)?.me));
 
-  /* THE VAULT IS OPENED WITH WHAT IT SHOULD OPEN ON IN THE NAVIGATION'S STATE, never in the address. A press for a new
-     tab is left to the browser, which opens the plain Vault. */
-  function toVault(e: MouseEvent, mend: NonNullable<Said['reconnect']>) {
+  /* THE KEYCHAIN IS OPENED WITH WHAT IT SHOULD OPEN ON IN THE NAVIGATION'S STATE, never in the address. A press for a new
+     tab is left to the browser, which opens the plain Keychain. */
+  function toKeychain(e: MouseEvent, mend: NonNullable<Said['reconnect']>) {
     if (!ownPress(e)) return;
     e.preventDefault();
     void goto(at(mend.href), { state: mend.state });
@@ -133,7 +133,7 @@
     </p>
     {#if said.resume || said.usage || failed?.ingest === row.ingest}
       <div class="action-do">
-        {#if said.reconnect}{@const mend = said.reconnect}<Button weight="quiet" href={mend.href} onclick={(e) => toVault(e, mend)}>{mend.label}</Button>{/if}
+        {#if said.reconnect}{@const mend = said.reconnect}<Button weight="quiet" href={mend.href} onclick={(e) => toKeychain(e, mend)}>{mend.label}</Button>{/if}
         {#if said.resume}
           <Button weight="quiet" disabled={busy} aria-label="{words.resume} {row.ingest}" onclick={() => void resume(row)}>{words.resume}</Button>
         {/if}

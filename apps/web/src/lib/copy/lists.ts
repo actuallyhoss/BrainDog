@@ -68,7 +68,7 @@ export const lists = {
      stayed behind as sentences explaining a refusal that no longer happens. What is left is what `editable` answers
      no to, a secret alone, which `field-draft.test.ts` holds equal. */
   cellWhy: {
-    secret: 'held by the vault and never drawn in full',
+    secret: 'held by the Keychain and never drawn in full',
   } as Record<string, string | undefined>,
   /* FOR A REFUSED TYPE `cellWhy` DOES NOT NAME. Every type `editable` refuses today is named above, so this is said
      only if that list grows and this one does not, and it is written to be true of any value a box cannot hold. */
@@ -106,7 +106,7 @@ export const lists = {
   done: 'Done',
   noneChosen: 'None',
   yes: 'Yes',
-  secretsLiveInTheVault: 'Passwords and keys go in the Vault. This records what one opens.',
+  secretsLiveInTheKeychain: 'Passwords and keys go in the Keychain. This records what one opens.',
   /* The few words beside a move a row's panel offers, said before it is pressed (`ui/row-form-moves.ts`). */
   moveNeedsReason: 'needs a reason',
   moveNeeds: (label: string): string => `needs ${label.toLowerCase()}`,

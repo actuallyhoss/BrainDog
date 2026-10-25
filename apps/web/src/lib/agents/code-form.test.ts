@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { copy } from '../copy.ts';
-import type { Approver } from '../record/vault.ts';
+import type { Approver } from '../record/keychain.ts';
 import { CODE_PLACEHOLDER, approverOf, retyped, saidOf, sent } from './code-form.ts';
 
 /* An invented machine; never a real one's name. */

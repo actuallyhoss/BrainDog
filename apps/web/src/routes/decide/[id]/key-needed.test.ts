@@ -1,7 +1,7 @@
 /**
- * Keeping a key an arrangement needs, from Decide (`key-needed.ts`), with the vault behind a passphrase.
+ * Keeping a key an arrangement needs, from Decide (`key-needed.ts`), with the Keychain behind a passphrase.
  *
- * AUDIT 40-42 FINDING 8: the typed key was emptied before the request, so a locked vault's first refusal, the one that
+ * AUDIT 40-42 FINDING 8: the typed key was emptied before the request, so a locked Keychain's first refusal, the one that
  * asks for the passphrase, threw the key away and left the person a passphrase field and nothing to send with it. These
  * hold the order the Keys screen keeps: the passphrase is emptied before the request leaves, the key only after the
  * record kept it.
@@ -20,8 +20,8 @@ const NEED: Need = { label: 'Stripe', opens: 'api.stripe.com', scheduled: true, 
 type Args = Parameters<KeyClient['putKey']>[0];
 type Answer = Awaited<ReturnType<KeyClient['putKey']>>;
 
-const ASKS = { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Type the vault passphrase to keep a key.', at: 'passphrase' } } as Answer;
-const WRONG = { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That passphrase did not open the vault.', at: 'passphrase' } } as Answer;
+const ASKS = { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Type the keychain password to keep a key.', at: 'passphrase' } } as Answer;
+const WRONG = { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That passphrase did not open the Keychain.', at: 'passphrase' } } as Answer;
 const KEPT = { ok: true, value: { credential: 'cred_1', label: 'Stripe', version: 1, rotated: false } } as Answer;
 
 /** A client that answers in turn, and remembers what each request carried and what the form held while it was out. */
@@ -38,11 +38,11 @@ function stub(form: KeyForm, ...answers: Answer[]) {
   return { client, sent, during };
 }
 
-test('A LOCKED VAULT’S FIRST REFUSAL KEEPS THE KEY TYPED and asks for the passphrase', async () => {
+test('A LOCKED KEYCHAIN’S FIRST REFUSAL KEEPS THE KEY TYPED and asks for the passphrase', async () => {
   const form = { ...blankForm(), value: KEY };
   const s = stub(form, ASKS);
   const out = await keep(NEED, form, s.client);
-  assert.deepEqual(out, { ok: false, said: 'Type the vault passphrase to keep a key.' });
+  assert.deepEqual(out, { ok: false, said: 'Type the keychain password to keep a key.' });
   assert.equal(form.value, KEY, 'the refusal threw the typed key away');
   assert.equal(form.locked, true, 'the passphrase field was not asked for');
   assert.equal(s.sent[0]?.value, KEY);
@@ -68,7 +68,7 @@ test('A WRONG PASSPHRASE EMPTIES ONLY THE PASSPHRASE: the key is still there for
   const form = { ...blankForm(), value: KEY, locked: true, passphrase: 'wrong' };
   const s = stub(form, WRONG);
   const out = await keep(NEED, form, s.client);
-  assert.deepEqual(out, { ok: false, said: 'That passphrase did not open the vault.' });
+  assert.deepEqual(out, { ok: false, said: 'That passphrase did not open the Keychain.' });
   assert.equal(form.value, KEY);
   assert.equal(form.passphrase, '');
   assert.equal(form.locked, true);

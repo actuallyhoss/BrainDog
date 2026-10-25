@@ -47,9 +47,9 @@
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
-  import { foldedAdds, planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
-  /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `vault.ts` `approve`,
-     the approval `/vault` sends, so the screens cannot drift apart. */
+  import { foldedAdds, planOf, revoke, words as keychainWords, type Plan } from '$lib/record/keychain.ts';
+  /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `keychain.ts` `approve`,
+     the approval `/keychain` sends, so the screens cannot drift apart. */
   import CodeForm from '$lib/agents/CodeForm.svelte';
   import { approverOf } from '$lib/agents/code-form.ts';
   import { askerOf } from '$lib/agents/approve.ts';
@@ -481,7 +481,7 @@
      screen said it was drawn in between and `/api/packs` was still out when a reader moved on: WebKit reports that
      cancelled call as refused by access control, on every visit with a machine connected. */
   let offerAsked = false;
-  /* THE PLAN'S `calls_out`, beside the plan rather than in it, so `vault.ts` does not pull in `actions.ts`. */
+  /* THE PLAN'S `calls_out`, beside the plan rather than in it, so `keychain.ts` does not pull in `actions.ts`. */
   let offerCalls = $state<CallOut[]>([]);
   let installing = $state(false);
   let offerSaid = $state('');
@@ -520,7 +520,7 @@
     installing = false;
     if (out.ok) {
       offer = null;
-      toasts.push(vaultWords.packInstalled, { intent: 'good' });
+      toasts.push(keychainWords.packInstalled, { intent: 'good' });
     } else if (!out.ok && out.from === 'refused' && out.code === 'PLAN_STALE') {
       /* THE PLAN MOVED UNDER IT, so it is read again and shown again: what installs is what was shown.
          The sentence says the plan moved only when a fresh plan is on screen to approve. */
@@ -729,7 +729,7 @@
        its lists and pages by name and its figures as one count, so the offer fits on a phone's screen. -->
   {#if offer}
     {@const folded = foldedAdds(offer)}
-    <Tile icon="session" title={vaultWords.offerTitle} data-wide data-part="agents-offer">
+    <Tile icon="session" title={keychainWords.offerTitle} data-wide data-part="agents-offer">
       <div class="offer">
         {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
         <ul class="plan-adds">
@@ -745,7 +745,7 @@
         {#if offer.changes.length || offer.conflicts.length}
           <dl class="plan">
             {#if offer.changes.length}
-              <dt>{vaultWords.changesTitle}</dt>
+              <dt>{keychainWords.changesTitle}</dt>
               <dd>{#each offer.changes as c (c)}<p>{c}</p>{/each}</dd>
             {/if}
             {#if offer.conflicts.length}
@@ -759,7 +759,7 @@
         <p class="who-why">{offer.touches}</p>
         <div class="row-actions">
           <Button weight="primary" disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
-          <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+          <Button weight="bare" onclick={() => (offer = null)}>{keychainWords.notNow}</Button>
         </div>
         <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
           {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}

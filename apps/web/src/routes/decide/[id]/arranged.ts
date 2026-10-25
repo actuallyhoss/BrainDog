@@ -189,7 +189,7 @@ export function callOf(line: string): Call {
     }
     if (part === 'no key') return [];
     if (part.startsWith('key "')) {
-      /* A HOST IS A NAME WITH A DOT; "the host its vault entry opens" and "no host it calls" are not one. */
+      /* A HOST IS A NAME WITH A DOT; "the host its Keychain entry opens" and "no host it calls" are not one. */
       for (const k of part.matchAll(/"([^"]+)" to (\S+)/gu)) {
         keys.push(k[1]!);
         const host = k[2]!.replace(/,$/u, '');

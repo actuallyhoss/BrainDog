@@ -46,7 +46,7 @@
     found?: boolean | undefined;
     owner: boolean;
     lists: readonly { id: string; name: string }[];
-    /** The vault's key labels, or `null` when this caller cannot read the vault. */
+    /** The Keychain's key labels, or `null` when this caller cannot read the Keychain. */
     keys: readonly string[] | null;
     /** The doors, or `null` when this caller cannot read them. */
     doors: readonly Door[] | null;
@@ -73,7 +73,7 @@
   const faults = $derived(faultsOf(draft));
   const faultAt = (where: string): string | null => (pressed ? (faults.find((f) => f.at === where)?.say ?? null) : null);
 
-  /* WHAT WAS PICKED STAYS OFFERED, so a key the vault no longer lists, or a door this caller cannot read, is still
+  /* WHAT WAS PICKED STAYS OFFERED, so a key the Keychain no longer lists, or a door this caller cannot read, is still
      there to untick rather than silently dropped from the body. */
   const keyChoices = $derived([...new Set([...(keys ?? []), ...draft.keys])].sort((a, b) => a.localeCompare(b)));
   const listChoices = $derived([
@@ -228,7 +228,7 @@
               {/each}
             </div>
           {/if}
-          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link tap" href={at('/vault')}>{words.keysNoneAdd}</a></p>{/if}
+          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link tap" href={at('/keychain')}>{words.keysNoneAdd}</a></p>{/if}
         </fieldset>
         </div>
 

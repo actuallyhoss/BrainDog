@@ -42,7 +42,7 @@
     type Said,
     type Switched,
   } from '$lib/ui/webhook-doors.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { words as levelWords } from '../../routes/settings/levels.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';

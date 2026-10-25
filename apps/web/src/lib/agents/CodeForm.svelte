@@ -23,7 +23,7 @@
   import { copy } from '$lib/copy.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { codeOf, CODE_DIGITS, normalise, type Answer } from '$lib/record/device.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import { cellsOf, enteredOf } from './approve.ts';

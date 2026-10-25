@@ -17,7 +17,7 @@
   import { factsOf, outcomeOf, resumeScript, startsBy, stateOf, words, type Script } from '$lib/record/scripts.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { signInFor } from '$lib/record/packs.ts';
-  import { reprove } from '$lib/record/vault.ts';
+  import { reprove } from '$lib/record/keychain.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
