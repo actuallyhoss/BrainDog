@@ -207,7 +207,7 @@
   /* A LIST IS A COLUMN A READER RUNS DOWN, not a line across 1100px: its ring and its amount stay near the name. */
   .calendar-agenda {
     display: none;
-    max-inline-size: 720px;
+    max-inline-size: none;
     margin: 0;
     padding: 0;
     list-style: none;

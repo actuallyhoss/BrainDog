@@ -572,7 +572,7 @@
 
   .series {
     --series-h: 168px;
-    --series-scale: 3.5rem;
+    --series-scale: 4.75rem;
     gap: var(--sp-3);
   }
 
@@ -662,6 +662,8 @@
     font-size: var(--fs-cap);
     line-height: 1;
     white-space: nowrap;
+    text-align: end;
+    max-inline-size: calc(var(--series-scale) - var(--sp-2));
   }
 
   .series-cols {
@@ -714,7 +716,7 @@
   .series-bar[data-state='partial'],
   .series-bar[data-state='due'],
   .series-bar[data-state='ahead'] {
-    background: color-mix(in oklab, var(--bar) 50%, var(--tile));
+    background: color-mix(in oklab, var(--bar) 68%, var(--tile));
   }
 
   /* MORE WENT OUT THAN CAME IN: a 2px cap in the late red at the free end of the money that hangs under zero. */
@@ -1148,7 +1150,7 @@
   @container (inline-size < 30rem) {
     .series {
       --series-h: 136px;
-      --series-scale: 2.75rem;
+      --series-scale: 4.5rem;
     }
   }
 
@@ -1445,7 +1447,7 @@
 
   /* `--forecast-gutter` is the room the value axis stands in at the chart's end edge. */
   .forecast {
-    --forecast-gutter: 5ch;
+    --forecast-gutter: 10ch;
     /* How far above the figure the head's row is centred, for the tools placed in it. Measured against `.block-bar`. */
     --forecast-head: 46px;
     gap: var(--sp-3);
