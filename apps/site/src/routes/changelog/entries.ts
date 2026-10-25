@@ -87,6 +87,14 @@ export type Entry = {
  */
 export const ENTRIES: Entry[] = [
   {
+    date: '2026-10-26',
+    kind: 'changed',
+    title: 'The Vault is now the Keychain',
+    body:
+      'The place that holds your keys is called the Keychain, and a machine allowed to open them has keychain access. The CLI takes --keychain, and --vault still works. Not released yet.',
+    commits: ['37e4fe388'],
+  },
+  {
     date: '2026-10-20',
     kind: 'shipped',
     title: 'Every agent write gets a receipt and an undo',
