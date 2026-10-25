@@ -54,6 +54,7 @@
   import type { Snippet } from 'svelte';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { at } from '$lib/at.ts';
+  import { partName } from '$lib/start/propose.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PreviewPage from './PreviewPage.svelte';
   import { hostsOf, latestOf, listingHref, verifiedOf, type Action } from './listing.ts';
@@ -78,7 +79,7 @@
   const lists = $derived(reach?.lists ?? []);
   const brings = $derived(
     /* BY NAME OR NOT AT ALL (E20): a module this build does not know was said by its id. */
-    reach && reach.modules.length > 0 ? broughtBy(reach.modules.flatMap((id) => firstPartyModules().find((m) => m.id === id)?.name ?? [])) : null,
+    reach && reach.modules.length > 0 ? broughtBy(reach.modules.flatMap((id) => firstPartyModules().find((m) => m.id === id) ? partName(id) : [])) : null,
   );
 
   /* WHO MADE IT, ONLY WHEN IT IS NOT BRAINDOG: every built-in is BrainDog's, and saying so on each said nothing. */

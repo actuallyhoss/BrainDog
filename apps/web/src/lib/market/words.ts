@@ -135,8 +135,8 @@ export const words = {
   moreLines: (n: number): string => `${n} more`,
   /* WHAT A USE CASE BRINGS BESIDE ITS OWN LISTS: the modules it turns on, by name. */
   brings: (all: readonly string[]): string => {
-    /* THE RAIL SAYS PROJECTS FOR WHAT THE MODULE CALLS PORTFOLIO. */
-    const names = all.map((n) => (n === 'Portfolio' ? 'Projects' : n));
+    /* THE NAMES ARRIVE AS THE RAIL SAYS THEM (`partName`), so none is renamed here. */
+    const names = all;
     return `Also turns on ${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}`;
   },
 } as const;

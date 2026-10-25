@@ -71,6 +71,9 @@ const clockOf = (block: BlockResult): number => {
 import { copy } from '../copy.ts';
 import type { Entry } from './schema.ts';
 import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey } from './people.ts';
+
+/** The words a run of cards is counted in, for a part that draws them. */
+export { seenWords };
 import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';

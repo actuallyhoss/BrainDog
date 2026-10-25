@@ -1,10 +1,9 @@
 {
   "pack": "harbour-look",
-  "version": "1.0.1",
-  "icon": "eye",
+  "version": "1.0.0",
   "title": "Harbour look",
   "summary": "A sea blue-green in place of the house red, on a cooler grey, in light and in dark.",
-  "changes": "The first version: one look, built from a sea blue-green and a cool grey. Now draws its own icon.",
+  "changes": "The first version: one look, built from a sea blue-green and a cool grey.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": { "format": 1, "primitives": 1, "packs": {} },

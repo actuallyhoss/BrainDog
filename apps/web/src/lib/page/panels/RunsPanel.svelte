@@ -300,10 +300,6 @@
       }
     }
 
-    .runs-more,
-    .runs-door {
-      min-block-size: 44px;
-    }
   }
 
   /* THE THREE FOOT ACTIONS ARE SEPARATE BUTTONS on a phone: a fill each, 40px tall, the list door first. */
@@ -320,6 +316,14 @@
       border-radius: var(--r-ctl);
       background: var(--tile-2);
       color: var(--ink);
+    }
+  }
+
+  /* AFTER THE CONTAINER RULE ABOVE, so the 44px a thumb needs wins over its 40px on source order. */
+  @media (pointer: coarse) {
+    .runs-more,
+    .runs-door {
+      min-block-size: 44px;
     }
   }
 </style>

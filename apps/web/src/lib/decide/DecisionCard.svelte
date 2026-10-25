@@ -1085,7 +1085,7 @@
   /* ON A PHONE the question is 16 and not a heading: a card is its question, its answers and one line of care, not mostly title. */
   @media (width < 600px) {
     .dc-main > .queue-question {
-      font-size: 16px;
+      font-size: var(--fs-body);
       line-height: 1.35;
     }
 

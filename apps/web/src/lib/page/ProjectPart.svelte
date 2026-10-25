@@ -71,7 +71,10 @@
     });
   };
   /* AN OLD IMPORT SOURCE IS NEVER NAMED ON SCREEN: a run it made is an imported one. */
-  const unsourced = (t: string): string => t.replace(/\bSam Brain\b/gu, 'Imported');
+  const unsourced = (t: string, agent: string): string => {
+    const m = /^([A-Z][\w-]*(?: [A-Z][\w-]*)*)( run(?: S[1-9][0-9]*)?)$/u.exec(t);
+    return m && m[1] !== 'Imported' && m[1]!.toLowerCase() !== agent.toLowerCase() ? `Imported${m[2]}` : t;
+  };
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
   const hereWords = {
     working: 'Working here now',
@@ -282,7 +285,7 @@
             <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
             <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
                  (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
-            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{unsourced(s.doing || actor(s.agent).name)}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
+            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{unsourced(s.doing || actor(s.agent).name, actor(s.agent).name)}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
           </li>
         {/each}
       </ul>

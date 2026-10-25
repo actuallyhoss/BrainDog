@@ -1,7 +1,7 @@
 /**
  * The Keychain opens without writing, says one name, and its folded projects sit as one list (audit of 25 October, X24).
  *
- * `/keychain` sent `clearVaultPassphrase` (a write, answered 501 on a self-host) just by opening, to learn whether a
+ * `/keychain` sent `clearKeychainPassphrase` (a write, answered 501 on a self-host) just by opening, to learn whether a
  * passphrase was on. The key doors already say so when one is (`wantsPassphrase`), so the switch asks only when it is
  * pressed. Read from the screen's own text, as `one-list.test.ts` reads the Settings areas.
  */

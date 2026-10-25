@@ -74,7 +74,7 @@
   import { knowProjects } from './known-project.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { valueSaid } from '$lib/voice.ts';
-  import { seenWords } from '$lib/record/people.ts';
+  import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
   import { FADE, ms, settle, still } from '$lib/ui/motion.ts';
   import { quartOut } from 'svelte/easing';

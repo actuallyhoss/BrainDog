@@ -17,6 +17,7 @@ import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
 import { copy } from '../../lib/copy.ts';
+import { partName } from '../../lib/start/propose.ts';
 import { words } from './words.ts';
 import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
@@ -149,11 +150,8 @@ export const oneOf = (list: string): string => {
 };
 
 /** A pack by the name a person knows it by: this build's name for a module, else its id in words. */
-/** The rail says Projects for the module that is named Portfolio. */
-export const moduleTitle = (id: string): string => {
-  const name = moduleOf(id)?.name ?? moduleName(id);
-  return name === 'Portfolio' ? 'Projects' : name;
-};
+/** The rail's word for a module (`partName`): Projects for the module named Portfolio, because its one list says so. */
+export const moduleTitle = (id: string): string => (moduleOf(id) ? partName(id) : moduleName(id));
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'figure' | 'other'; name: string } {

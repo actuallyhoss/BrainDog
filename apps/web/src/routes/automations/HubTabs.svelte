@@ -89,8 +89,8 @@
   @media (width < 480px) {
     /* THE STRIP FADES AT ITS RIGHT EDGE, so a tab past it reads as more to scroll to, not as a cut word. */
     :global(.hub-tabs) {
-      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-      mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+      -webkit-mask-image: linear-gradient(to right, var(--ink) calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 28px), transparent);
     }
 
     .hub-tab {

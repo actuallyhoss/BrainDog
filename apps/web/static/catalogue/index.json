@@ -903,25 +903,8 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.0",
       "versions": [
-        {
-          "version": "1.0.1",
-          "checksum": "7e5bb2d132926b37617ad4260e4d29d6704c7a64704b55a413c6091ea4fb6112",
-          "bytes": 566,
-          "published_at": "2026-10-25T20:51:43.807Z",
-          "bump": "patch",
-          "reach": {
-            "modules": [],
-            "lists": [],
-            "pages": [],
-            "rules": [],
-            "examples": 0,
-            "skills": [],
-            "calls_out": []
-          },
-          "notes": "The first version: one look, built from a sea blue-green and a cool grey. Now draws its own icon."
-        },
         {
           "version": "1.0.0",
           "checksum": "f8d80cbfcd6ec05b2eca12d1c7710b407656ad8be4818af3ece87fba61359fb1",
@@ -948,8 +931,7 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      },
-      "icon": "eye"
+      }
     },
     {
       "kind": "pack",

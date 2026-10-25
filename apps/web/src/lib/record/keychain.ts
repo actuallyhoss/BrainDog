@@ -649,10 +649,10 @@ export type Told<T> =
   | { ok: false; refusal: { code: string; fix: string; at?: string | undefined } }
   | { ok: false; conflict: unknown };
 
-/** The two client methods the switch calls (`packages/client` `setVaultPassphrase`, `clearVaultPassphrase`). */
+/** The two client methods the switch calls (`packages/client` `setKeychainPassphrase`, `clearKeychainPassphrase`). */
 export type Locker = {
-  setVaultPassphrase(passphrase: string): Promise<Told<unknown>>;
-  clearVaultPassphrase(passphrase: string): Promise<Told<unknown>>;
+  setKeychainPassphrase(passphrase: string): Promise<Told<unknown>>;
+  clearKeychainPassphrase(passphrase: string): Promise<Told<unknown>>;
 };
 
 /**
@@ -681,8 +681,8 @@ const lockFrom = (value: unknown): Lock => ({
  * `NOT_IN_THIS_BUILD` is a record with no key of its own yet, or a host that cannot, and it is said rather than hidden.
  * Anything else, the Keychain gate above all, leaves the switch saying why it cannot tell.
  */
-export async function lockOf(client: Pick<Locker, 'clearVaultPassphrase'>): Promise<Lock> {
-  const out = await client.clearVaultPassphrase('');
+export async function lockOf(client: Pick<Locker, 'clearKeychainPassphrase'>): Promise<Lock> {
+  const out = await client.clearKeychainPassphrase('');
   if (out.ok) return lockFrom(out.value);
   if (!('refusal' in out)) return { state: 'unknown', fix: copy.writeRaced };
   switch (out.refusal.code) {
@@ -710,7 +710,7 @@ export async function turnLock(
   to: 'on' | 'off',
   passphrase: string,
 ): Promise<{ ok: true; lock: Lock } | { ok: false; fix: string; lock: Lock | null }> {
-  const out = to === 'on' ? await client.setVaultPassphrase(passphrase) : await client.clearVaultPassphrase(passphrase);
+  const out = to === 'on' ? await client.setKeychainPassphrase(passphrase) : await client.clearKeychainPassphrase(passphrase);
   if (out.ok) return { ok: true, lock: lockFrom(out.value) };
   if (!('refusal' in out)) return { ok: false, fix: copy.writeRaced, lock: null };
   const already: Lock | null = out.refusal.code === 'ALREADY_KNOWN' ? { state: to } : null;

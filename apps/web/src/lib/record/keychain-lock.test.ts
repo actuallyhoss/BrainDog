@@ -18,11 +18,11 @@ function stub(answer: Told<unknown>): Locker & { sent: string[] } {
   const sent: string[] = [];
   return {
     sent,
-    async setVaultPassphrase(p) {
+    async setKeychainPassphrase(p) {
       sent.push(p);
       return answer;
     },
-    async clearVaultPassphrase(p) {
+    async clearKeychainPassphrase(p) {
       sent.push(p);
       return answer;
     },

@@ -268,7 +268,7 @@ export function comingOf(
   return out.sort((a, b) => a.day.localeCompare(b.day) || a.seq - b.seq);
 }
 
-/** A run's handle (`S66`) is a key, never a word: "Sam Brain run S66" reads "Sam Brain run". */
+/** A run's handle (`S66`) is a key, never a word: "Kiln run S66" reads "Kiln run". */
 const unhandled = (said: string): string => said.replace(/\s*\bS[1-9][0-9]*\b/gu, '').trim();
 
 /* ── the runs of the day ────────────────────────────────────────────────── */

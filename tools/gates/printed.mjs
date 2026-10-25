@@ -72,11 +72,6 @@ export const ALLOWED = [
   },
   {
     status: 'Not Implemented',
-    path: '/api/clearVaultPassphrase',
-    why: "The keychain switch asks whether a passphrase is on by taking one off with none (`lockOf`); a record with no key of its own answers that it cannot, and the switch says so. The old route name, still sent by a page not yet renamed.",
-  },
-  {
-    status: 'Not Implemented',
     path: '/api/clearKeychainPassphrase',
     why: "The keychain switch asks whether a passphrase is on by taking one off with none (`lockOf`); a record with no key of its own answers that it cannot, and the switch says so.",
   },

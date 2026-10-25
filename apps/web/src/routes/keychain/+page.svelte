@@ -225,7 +225,7 @@
       void readLockAfter();
       void scopeNote();
       /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN (audit 25 October, X24): the only question that says is a write,
-         `clearVaultPassphrase` with none, and opening a page writes nothing. A key door that wants one says so
+         `clearKeychainPassphrase` with none, and opening a page writes nothing. A key door that wants one says so
          (`wantsPassphrase`), and the switch asks when it is pressed (`Passphrase.svelte`, `onask`). */
       reconnect();
       /* The screen has an answer if either half answered; a screen refused both halves is a refused screen. */

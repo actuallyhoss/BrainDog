@@ -31,8 +31,7 @@ const timeOf = (iso: string): number => Date.parse(iso);
  * a name keeps it.
  */
 export const noteSaid = (note: string): string => {
-  /* AN OLD IMPORT SOURCE IS NEVER NAMED: the day heading says when, so "Imported again from Sam Brain." reads "imported again." */
-  const said = note.replace(/\s+from\s+Sam Brain\b/giu, '');
+  const said = note;
   return said === 'created' ? 'added this' : /^[A-Z][a-z]+ed\b/u.test(said) ? `${said[0]!.toLowerCase()}${said.slice(1)}` : said;
 };
 
