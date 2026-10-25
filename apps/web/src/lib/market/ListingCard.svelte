@@ -17,7 +17,7 @@
 -->
 <script lang="ts" module>
   import type { Category } from '@braindog/declare/catalogue';
-  import type { IconName } from '../ui/icons.ts';
+  import { isGlyph, type IconName } from '../ui/icons.ts';
   import type { Listing } from './listing.ts';
 
   /** The glyph each category is drawn with, for a listing that brings no page of its own to take one from. */
@@ -32,6 +32,11 @@
     blocks: 'grid',
     themes: 'sun',
   };
+
+  /** The icon the add-on names for itself, when it is one the app draws. */
+  export function ownIcon(l: { icon?: string | undefined }): IconName | null {
+    return l.icon !== undefined && isGlyph(l.icon) ? l.icon : null;
+  }
 
   /**
    * A listing's glyph by what it is: a use case is a whole way of working, a module brings lists, and an add-on is drawn
@@ -116,7 +121,7 @@
     </div>
   {/if}
 
-  <h3 class="name"><Icon name={glyph ?? glyphOf(listing)} size="m" /><span>{listing.title}</span></h3>
+  <h3 class="name"><Icon name={ownIcon(listing) ?? glyph ?? glyphOf(listing)} size="m" /><span>{listing.title}</span></h3>
   <p class="summary">{listing.summary}</p>
 
   {#if lists.length > 0 || brings}

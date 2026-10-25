@@ -1,9 +1,10 @@
 {
   "pack": "count-cash",
-  "version": "1.4.1",
+  "version": "1.4.2",
+  "icon": "hand-coins",
   "title": "Count the cash",
   "summary": "Write down what is actually in a cash box or an account, and the record keeps it as a balance check and writes the difference from what it thought was there into the ledger.",
-  "changes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed.",
+  "changes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

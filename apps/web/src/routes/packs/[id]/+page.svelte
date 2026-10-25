@@ -30,6 +30,7 @@
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   /* THE GLYPH OF THE PLACE IT BRINGS, as its row on /packs wears it (agents F25). */
   import { glyphOf } from '../glyph.ts';
+  import { isGlyph } from '$lib/ui/icons.ts';
   import { describe, moduleHolds } from '$lib/market/describe.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -422,7 +423,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon={glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
+  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
     {#snippet actions()}
       {#if installed}
         <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->

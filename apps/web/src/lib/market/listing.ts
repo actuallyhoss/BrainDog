@@ -43,6 +43,8 @@ export type Listing = {
   versions: CatalogueVersion[];
   /** How many records hold it, rounded (`counts.ts`), or `null` below ten. */
   count: number | null;
+  /** The icon the add-on's manifest names from the app's icon set; absent draws the generic one. */
+  icon?: string;
 };
 
 /** What a listing's one primary button does on this record. */
@@ -129,6 +131,7 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
       latest: m.version,
       versions,
       count: counted(listingKey('module', m.id)),
+      icon: m.icon,
     };
   });
 
@@ -174,6 +177,7 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
       latest: offered(e.versions, e.latest),
       versions: e.versions,
       count: counted(listingKey(e.kind, e.id)),
+      ...(e.icon !== undefined ? { icon: e.icon } : {}),
     }));
 
   /* ONE LISTING PER THING (the scope of 24 October, E19): a use case and the add-on it stands on shared a title

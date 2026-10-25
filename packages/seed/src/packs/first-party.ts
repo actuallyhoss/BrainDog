@@ -31,6 +31,19 @@ export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'w
 /** Dependencies first: every other list points at a project, and Money points at People. */
 export const FIRST_PARTY: readonly FirstPartyId[] = ['portfolio', 'people', 'money-core', 'estate', 'work'];
 
+/**
+ * THE ICON EACH PACK WEARS in the store and the installed list, a name from the app's icon set. Kept apart from the
+ * declarations on purpose: `test/pack-versions.test.ts` fingerprints declarations and settings, so a pack's icon can
+ * change without a new version.
+ */
+export const FIRST_PARTY_ICONS: Readonly<Record<FirstPartyId, string>> = {
+  portfolio: 'projects',
+  people: 'people',
+  'money-core': 'money',
+  estate: 'service',
+  work: 'work',
+};
+
 const SUMMARIES: Record<FirstPartyId, string> = {
   portfolio: 'The things you run, and the plan for each.',
   people: 'Clients, contractors and accountants, the organisations they are with, and where each one was seen.',

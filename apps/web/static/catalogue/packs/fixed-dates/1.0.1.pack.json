@@ -1,0 +1,231 @@
+{
+  "pack": "fixed-dates",
+  "version": "1.0.1",
+  "icon": "calendar",
+  "title": "Dates",
+  "summary": "The days somebody else fixed: a deadline, a window with a last day, and a date that comes round each week, month or year.",
+  "changes": "The first version: a list of dates, a calendar of them, and a daily check that moves a repeating date on to its next turn. Now draws its own icon.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1
+  },
+  "declarations": [
+    {
+      "register": "fixed_dates",
+      "name": "Dates",
+      "icon": "calendar",
+      "one": "date",
+      "holds": "the days somebody else fixed: a deadline, an event, or a window from one day to a last day, and whether it comes round again",
+      "title": "what",
+      "mobile": [
+        "what",
+        "day",
+        "until"
+      ],
+      "pack": "fixed-dates",
+      "fields": [
+        {
+          "id": "what",
+          "label": "What",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "day",
+          "label": "Day",
+          "type": "day",
+          "required": true,
+          "index": true,
+          "deadline": true,
+          "remind": [
+            "-7d",
+            "-1d"
+          ]
+        },
+        {
+          "id": "until",
+          "label": "Last day",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "deadline",
+            "event"
+          ],
+          "labels": {
+            "deadline": "Deadline",
+            "event": "Event"
+          },
+          "default": "deadline",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "comes_round",
+          "label": "Repeats",
+          "type": "enum",
+          "values": [
+            "no",
+            "weekly",
+            "monthly",
+            "yearly",
+            "month_start",
+            "month_end"
+          ],
+          "labels": {
+            "no": "Does not repeat",
+            "weekly": "Every week",
+            "monthly": "Every month",
+            "yearly": "Every year",
+            "month_start": "First day of each month",
+            "month_end": "Last day of each month"
+          },
+          "default": "no",
+          "required": true
+        },
+        {
+          "id": "repeats_from",
+          "label": "Repeats from",
+          "type": "day"
+        },
+        {
+          "id": "note",
+          "label": "Note",
+          "type": "document"
+        }
+      ]
+    },
+    {
+      "rule": "dates_roll",
+      "pack": "fixed-dates",
+      "on": {
+        "every": "1d"
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "dates_roll",
+            "as": "rolled"
+          }
+        }
+      ]
+    },
+    {
+      "script": "dates_roll",
+      "title": "Move a repeating date on to its next turn once its last day has passed, every day",
+      "pack": "fixed-dates",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "fixed_dates"
+      ],
+      "writes": [
+        "fixed_dates"
+      ],
+      "source": "/**\n * Move a date that comes round on to its next turn, once its last day has passed.\n *\n * RUN ONCE A DAY, it reads the dates that repeat and whose last day is behind today, and writes each one's day as its\n * first turn on or after today. A window keeps its length: its last day moves by as many days as its first. A date\n * that does not repeat is never touched, and neither is one still to come or still running.\n *\n * THE TURNS. Every week is seven days on. Every month and every year keep the day of the month, and in a month too\n * short for it take that month's last day. First day of each month is the 1st, and last day of each month is the\n * month's last day whatever its length, the 28th or 29th in February.\n *\n * THE DAY IT REPEATS FROM IS KEPT. A 31st moved into February stands on the 28th, and counted from there it would be\n * the 28th for good. So the first time a date written past the 28th is moved, the day it was written with goes in\n * `repeats_from`, and every later turn is counted from that: the 31st is back in March, and 29 February in the next leap\n * year. A day somebody has since moved off its turn is the new word, and the kept day gives way to it.\n *\n * TODAY IS THE RECORD'S OWN DAY, `ctx.today()`, which the host works out in the record's zone, so a date moves when\n * the day turns where the person is. A host too old to say it gives the UTC day, as every host did before.\n *\n * FIFTY A RUN, the one page a script reads, and the rest the next day.\n */\nconst DAY_MS = 86400000;\nconst REPEATS = ['weekly', 'monthly', 'yearly', 'month_start', 'month_end'];\nconst MOST_TURNS = 6000;\n\nconst parts = (day) => day.split('-').map(Number);\nconst msOf = (day) => {\n  const [y, m, d] = parts(day);\n  return Date.UTC(y, m - 1, d);\n};\nconst dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);\nconst isDay = (v) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v);\n\n/** The day `n` turns on from `day`, in milliseconds. Turn 0 of the last day of each month is the end of `day`'s own month. */\nfunction turn(day, repeats, n) {\n  const [y, m, d] = parts(day);\n  if (repeats === 'weekly') return msOf(day) + n * 7 * DAY_MS;\n  if (repeats === 'month_start') return Date.UTC(y, m - 1 + n, 1);\n  if (repeats === 'month_end') return Date.UTC(y, m + n, 0);\n  /* DAY 0 OF THE MONTH AFTER IS THE LAST DAY OF THIS ONE, so a 31st in a short month, or 29 February, lands on it. */\n  const year = repeats === 'yearly' ? y + n : y;\n  const month = repeats === 'yearly' ? m - 1 : m - 1 + n;\n  return Date.UTC(year, month, Math.min(d, new Date(Date.UTC(year, month + 1, 0)).getUTCDate()));\n}\n\n/** Whether `day` is a turn of `anchor`: its day of the month, or the last day of a month too short for it; every year, its month too. */\nfunction turnOf(anchor, day, repeats) {\n  const [, am, ad] = parts(anchor);\n  const [y, m, d] = parts(day);\n  if (repeats === 'yearly' && am !== m) return false;\n  return d === Math.min(ad, new Date(Date.UTC(y, m, 0)).getUTCDate());\n}\n\n/** The day a row's turns are counted from: the kept one while the row still stands on a turn of it, and its own day otherwise. */\nfunction baseOf(day, anchor, repeats) {\n  if (repeats !== 'monthly' && repeats !== 'yearly') return day;\n  return isDay(anchor) && turnOf(anchor, day, repeats) ? anchor : day;\n}\n\n/** The first turn of `base` after `day` whose last day, `days` after it, is today or later; `null` when there is none in reach. */\nfunction next(day, base, repeats, days, today) {\n  const from = msOf(day);\n  const floor = msOf(today) - days * DAY_MS;\n  /* A WEEKLY DATE YEARS BEHIND IS STEPPED TO IN ONE GO, not a week at a time. */\n  const skip = repeats === 'weekly' ? Math.max(0, Math.floor((floor - from) / (7 * DAY_MS)) - 1) : 0;\n  for (let n = skip; n < skip + MOST_TURNS; n++) {\n    const at = turn(base, repeats, n);\n    if (at > from && at >= floor) return at;\n  }\n  return null;\n}\n\nexport default async function run(ctx) {\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const passed = {\n    all: [\n      { field: 'comes_round', in: REPEATS },\n      { any: [{ field: 'until', before: today }, { all: [{ field: 'until', empty: true }, { field: 'day', before: today }] }] },\n    ],\n  };\n  const rows = await ctx.record.list('fixed_dates', passed);\n  let moved = 0;\n  for (const row of rows) {\n    const { day, until, comes_round: repeats, repeats_from: anchor } = row.fields;\n    if (!isDay(day) || !REPEATS.includes(repeats)) continue;\n    /* A LAST DAY BEFORE THE FIRST IS NO WINDOW, so the row is rolled as the one day it names. */\n    const days = isDay(until) && until > day ? Math.round((msOf(until) - msOf(day)) / DAY_MS) : 0;\n    if (dayOf(msOf(day) + days * DAY_MS) >= today) continue;\n    const base = baseOf(day, anchor, repeats);\n    const at = next(day, base, repeats, days, today);\n    if (at === null) continue;\n    const patch = { day: dayOf(at) };\n    /* ONLY A DAY PAST THE 28TH CAN BE CUT SHORT, so only that one is kept, and a kept day no longer counted from is taken off. */\n    const kept = repeats === 'monthly' || repeats === 'yearly';\n    const keep = kept && (base !== day || parts(base)[2] > 28) ? base : null;\n    if (keep !== (isDay(anchor) ? anchor : null)) patch.repeats_from = keep;\n    if (isDay(until) && until >= day) patch.until = dayOf(at + days * DAY_MS);\n    ctx.update('fixed_dates#' + row.seq, patch, row.version);\n    moved += 1;\n  }\n  if (moved > 0) ctx.log('Moved ' + moved + (moved === 1 ? ' date' : ' dates') + ' on to the next turn.');\n}\n"
+    },
+    {
+      "page": "dates",
+      "title": "Dates",
+      "pack": "fixed-dates",
+      "nav": {
+        "section": "Work",
+        "order": 35
+      },
+      "icon": "calendar",
+      "requires": [
+        "register.fixed_dates"
+      ],
+      "blocks": [
+        {
+          "kind": "calendar",
+          "heading": "On the calendar",
+          "span": 12,
+          "source": "register.fixed_dates",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "day"
+            }
+          ],
+          "back": 0,
+          "ahead": 2,
+          "empty": "No date falls this month or the next two. Add a date with its day, and it is put on the calendar."
+        },
+        {
+          "kind": "table",
+          "heading": "Windows",
+          "span": 12,
+          "source": "register.fixed_dates",
+          "where": "until after yesterday",
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "day",
+              "label": "First day"
+            },
+            {
+              "field": "until"
+            },
+            {
+              "field": "kind"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No window is open or coming. A date with a last day is a window, such as a fair that runs four days."
+        },
+        {
+          "kind": "table",
+          "heading": "What is coming",
+          "span": 12,
+          "source": "register.fixed_dates",
+          "where": "day after yesterday",
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "day"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "comes_round"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing is coming. A date goes here with what it is and the day somebody else fixed."
+        }
+      ]
+    }
+  ]
+}

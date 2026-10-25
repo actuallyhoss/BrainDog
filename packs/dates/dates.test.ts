@@ -121,7 +121,7 @@ test('BEFORE THE PACK: a record with every first-party pack has no dates, no Dat
 
 test('THE SCRIPT IN THE FILE IS roll.js, byte for byte; it fetches nothing and reaches nothing but dates, once a day', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version, (doc.requires as Body).packs ?? {}], ['fixed-dates', '1.0.0', {}], 'Dates needs no other add-on');
+  assert.deepEqual([doc.pack, doc.version, (doc.requires as Body).packs ?? {}], ['fixed-dates', '1.0.1', {}], 'Dates needs no other add-on');
   const script = doc.declarations.find((d) => d.script === 'dates_roll')!;
   assert.equal(script.source, SOURCE, 'dates.pack.json and roll.js disagree; copy roll.js into the source');
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes], [[], [], ['fixed_dates'], ['fixed_dates']]);
@@ -140,13 +140,13 @@ test('INSTALLED FROM THE FILE: one list, one rule, one script and a page, and no
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ['page.dates', 'register.fixed_dates', 'rule.dates_roll', 'script.dates_roll']);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'fixed-dates')?.version, '1.0.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'fixed-dates')?.version, '1.0.1');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['fixed-dates', '1.0.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['fixed-dates', '1.0.1']);
 });
 
 /* ── The list ──────────────────────────────────────────────────────────────────────────────────── */

@@ -1,9 +1,10 @@
 {
   "pack": "agent-notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "notebook-pen",
   "title": "Agent notes",
   "summary": "Two short notes a day, at 08:00 and 17:00 your time, of what your agents ask you, what they did and what is stuck. Nothing when there is nothing to say, and never by mail.",
-  "changes": "The first version.",
+  "changes": "The first version. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

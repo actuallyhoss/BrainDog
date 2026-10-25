@@ -121,7 +121,7 @@ test('the same file passes as an add-on somebody opens from disk, and asks for n
 
 test('1.2.0 IS A LIST AND A PAGE: no automation, no step that asks a model, and the reply field kept', () => {
   const doc = pad();
-  assert.equal(doc.version, '1.2.0');
+  assert.equal(doc.version, '1.2.1');
   assert.notEqual(doc.version, was().version, 'the released 1.1.0 was changed in place instead of cut beside');
   assert.deepEqual(doc.declarations.map((d) => (d.register ? 'register' : d.page ? 'page' : 'other')), ['register', 'page']);
   assert.doesNotMatch(TEXT, /ask_slash|"rule"/u, 'the pad still holds a step that asks a model');
@@ -153,7 +153,7 @@ test('ON A FRESH RECORD WITH NO MODEL THE PAD INSTALLS AND ITS PAGE READS, with 
   old.sql.close();
 
   const { api, sql } = await padded();
-  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.1');
   assert.deepEqual(rules(api), [], 'the pad brought an automation with it');
   write(api, { text: 'Ask the printer for a proof on the heavier paper before the whole run.' });
   await api.kernel.drain();
@@ -242,7 +242,7 @@ test('A RECORD ON 1.1.0 TAKES 1.2.0 WITH EVERY NOTE AND REPLY KEPT, and its rule
   const diff = said<{ diff: Diff }>(await planOf(api, pad())).diff;
   assert.deepEqual(diff.conflicts, [], 'the upgrade asks about something a person wrote');
   said(await put(api));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.1');
   assert.deepEqual(rules(api), [], 'the upgrade left the rule that asks Slash behind');
 
   assert.equal(noteOf(api, answered.id).fields.reply, 'Nine sits under the large tin by enough to make the choice easy.');
@@ -282,7 +282,7 @@ test('THE SECOND OPINION INSTALLS ON TOP OF THE PAD, and is refused on a record 
   assert.deepEqual(rules(api), ['rule.pad_second_opinion']);
   assert.deepEqual(
     api.kernel.packs().filter((p) => p.id.startsWith('pad')).map((p) => [p.id, p.version]).sort(),
-    [['pad', '1.2.0'], ['pad-second-opinion', '1.0.0']],
+    [['pad', '1.2.1'], ['pad-second-opinion', '1.0.1']],
   );
   sql.close();
 });

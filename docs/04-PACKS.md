@@ -126,6 +126,7 @@ before anything is sent (`strayKeys` in `apps/cli/src/scratch.ts`).
 | `hands` | `{ <declaration id>: <pack id> }`: declarations this version stops declaring and gives to another pack, so a list with rows can leave a pack. The record reads it, and it is in `MANIFEST_KEYS` | optional |
 | `note` | string, a reader's comment kept and never interpreted | optional |
 | `unlisted` | `true`: installable by id and updated like any other, and left out of every listing, for a pack named for one person or one bank (`CatalogueEntry.unlisted`) | optional |
+| `icon` | the name of one icon from the app's icon set, such as `money` or `people`: drawn beside the add-on on Browse, in the installed list and on its page, and the generic add-on icon when absent. An unknown name is refused (`PACK_MALFORMED`, at `icon`) with the nearest names. It changes the file, so adding or changing it is a new version (`CatalogueEntry.icon`) | optional |
 
 *(Amended September 15th 2026 for modularity: the manifest gains one more optional key, `config:`, a
 closed subset of field types (no `ref`, `secret` or `file`) that a pack declares and an owner fills

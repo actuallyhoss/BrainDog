@@ -1,0 +1,93 @@
+{
+  "pack": "pad",
+  "version": "1.2.1",
+  "icon": "edit",
+  "title": "Pad",
+  "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it keeps on any record.",
+  "changes": "The pad asks no model now. The second opinion that was written under each note is an add-on of its own, Pad second opinion, for whoever wants it. Every note and every reply already written stays. Now draws its own icon.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "notes",
+      "name": "Notes",
+      "one": "note",
+      "holds": "thoughts written down beside the work, and a reply under each one",
+      "title": "text",
+      "fields": [
+        {
+          "id": "text",
+          "label": "Note",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "about",
+          "label": "About",
+          "type": "ref"
+        },
+        {
+          "id": "reply",
+          "label": "Reply",
+          "type": "text",
+          "search": true
+        }
+      ]
+    },
+    {
+      "page": "pad",
+      "title": "Pad",
+      "nav": {
+        "section": "Pad",
+        "order": 10
+      },
+      "icon": "doc",
+      "requires": [
+        "register.notes"
+      ],
+      "blocks": [
+        {
+          "kind": "section",
+          "heading": "The pad",
+          "source": "register.notes",
+          "empty": "Nothing on the pad yet."
+        },
+        {
+          "kind": "capture",
+          "heading": "A thought",
+          "register": "notes",
+          "span": 12
+        },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.notes",
+          "columns": [
+            {
+              "field": "text",
+              "as": "title"
+            },
+            {
+              "field": "reply",
+              "as": "reply"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "desc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing on the pad yet. Write a thought above."
+        }
+      ]
+    }
+  ]
+}

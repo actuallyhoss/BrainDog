@@ -1,9 +1,10 @@
 {
   "pack": "pad",
-  "version": "1.2.0",
+  "version": "1.2.1",
+  "icon": "edit",
   "title": "Pad",
   "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it keeps on any record.",
-  "changes": "The pad asks no model now. The second opinion that was written under each note is an add-on of its own, Pad second opinion, for whoever wants it. Every note and every reply already written stays.",
+  "changes": "The pad asks no model now. The second opinion that was written under each note is an add-on of its own, Pad second opinion, for whoever wants it. Every note and every reply already written stays. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

@@ -1,9 +1,10 @@
 {
   "pack": "project-brief",
-  "version": "2.1.0",
+  "version": "2.1.1",
+  "icon": "clipboard-list",
   "title": "Project brief",
   "summary": "What each project is in a line, the stage it is at, what is in the way, and a plan made of steps you can tick.",
-  "changes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has.",
+  "changes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

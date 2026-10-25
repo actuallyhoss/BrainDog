@@ -110,7 +110,7 @@ test('BEFORE THE PACK: Work arms no morning digest of its own', async () => {
 
 test('THE FILE IS standup 1.0.0, on Work, one daily digest with no prose', () => {
   const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Record<string, unknown>[] };
-  assert.deepEqual([doc.pack, doc.version], ['standup', '1.0.0']);
+  assert.deepEqual([doc.pack, doc.version], ['standup', '1.0.1']);
   assert.deepEqual(doc.requires.packs, { work: '^1.0.0' });
   assert.deepEqual(
     doc.declarations.map((d) => [d.digest, d.schedule, d.prose]),

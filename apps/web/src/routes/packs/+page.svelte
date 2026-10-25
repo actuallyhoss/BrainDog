@@ -50,6 +50,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { isGlyph, type IconName } from '$lib/ui/icons.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -75,6 +76,8 @@
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
   /* AND ITS LINE, what the catalogue says it is for, where this build's modules do not know it (Z11). */
   let catalogueSays = $state.raw<Map<string, string>>(new Map());
+  /* AND THE ICON ITS CATALOGUE ENTRY CARRIES, unlisted entries too, since an installed add-on is one a record holds by id. */
+  let catalogueIcons = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
   const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
   /* A LIST BY THE NAME THIS RECORD GIVES IT: `REGISTERS` holds what this tab has learnt of the record's declarations, and
@@ -565,6 +568,11 @@
    * case or an add-on from outside from its listing, the one `ListingRow` reads, so the three screens never disagree.
    */
   const listed = $derived(listingsOf({ kennel, counts: null }));
+  /* ITS OWN ICON, when its manifest names one the app draws: a built-in's, else the one its catalogue entry carries. */
+  const iconFor = (id: string): IconName | null => {
+    const named = byId.get(id)?.icon ?? catalogueIcons.get(id);
+    return named !== undefined && isGlyph(named) ? named : null;
+  };
   const holdsOn = (id: string): string => {
     const m = byId.get(id);
     if (m) return describe(moduleHolds(m));
@@ -592,6 +600,7 @@
         looked = true;
         const index = got.ok && got.index ? got.index : await readShippedCatalogue(fetch);
         [catalogueNames, catalogueSays] = await Promise.all([catalogueTitles(index), catalogueLines(index)]);
+        catalogueIcons = new Map((index?.entries ?? []).flatMap((e) => (e.kind === 'pack' && e.icon !== undefined ? [[e.id, e.icon] as const] : [])));
       })
       .catch(() => undefined);
     void read(async () => {
@@ -668,7 +677,7 @@
                a refusal is waiting on keeps its verbs showing (`data-needs`). -->
           <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined}>
             <div class="line addon">
-              <span class="line-mark"><IconWell name={glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
+              <span class="line-mark"><IconWell name={iconFor(state.id) ?? glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
               <a class="addon-main" href={at(`/packs/${state.id}`)}>
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>

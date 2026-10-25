@@ -10,8 +10,27 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "b5f50aa4774e2a3079f5d4e2168874a5798418030efd42a1d29101c2ae390dfb",
+          "bytes": 3934,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "ae4e99e6a913c97a0af9554669b68244ea4dbd7acd22251a4fb0ae0782ce29c6",
@@ -39,7 +58,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "notebook-pen"
     },
     {
       "kind": "pack",
@@ -49,8 +69,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.7.2",
+      "latest": "1.7.3",
       "versions": [
+        {
+          "version": "1.7.3",
+          "checksum": "4c5578a251efc2daba16eb5c49917cc47fe718ccbe54cfca410b5389ea6b2925",
+          "bytes": 60801,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name. Now draws its own icon."
+        },
         {
           "version": "1.7.2",
           "checksum": "e3df2e2166665db8aba645b74a5d9f3c4cd244c658dc8530230e852ef0589736",
@@ -210,7 +249,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "piggy-bank"
     },
     {
       "kind": "pack",
@@ -220,8 +260,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "0f94bf9bc0f6a19e6d13351e4ee44d161d04b2195c5326c8e814696b31a2703b",
+          "bytes": 10828,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "An alert that prints no currency is read in its card's own currency. A card alert is only ever matched to a card, never to an account whose digits end alike, and a question about digits no card holds says it is a card. Now draws its own icon."
+        },
         {
           "version": "1.3.0",
           "checksum": "becd616bac85b9c9b9d79084a699a2e499fd90fd1c49119dab15f0a7b4f8db3b",
@@ -306,7 +365,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "credit-card"
     },
     {
       "kind": "pack",
@@ -316,8 +376,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.4.1",
+      "latest": "1.4.2",
       "versions": [
+        {
+          "version": "1.4.2",
+          "checksum": "ffb9aea1730764388d653787b4f3f796aac38a28dcb7be2958d5efc3246baafa",
+          "bytes": 17946,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.4.1",
           "checksum": "e0ec187ce4fd54f5f90044b9b792c802af1a64c362efffb18b58e6469c6b9636",
@@ -584,7 +670,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "hand-coins"
     },
     {
       "kind": "pack",
@@ -642,8 +729,32 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "b15e17e4b98e26c917d96712dcaf2e589c8e1d0251c46b987fdc364d964a6d8d",
+          "bytes": 11219,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Dates"
+            ],
+            "pages": [
+              "Dates"
+            ],
+            "rules": [
+              "dates_roll"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: a list of dates, a calendar of them, and a daily check that moves a repeating date on to its next turn. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "883598b117710680e3c7e1e53ed7f613c5c90b737a8f0bf88065d8d67c92cab7",
@@ -678,7 +789,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "calendar"
     },
     {
       "kind": "pack",
@@ -688,8 +800,47 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "2ac97ebd4a1474c5c81646c9ada14cb380d566038ecc4e0ded91a805769e5975",
+          "bytes": 9010,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Checks",
+              "Notes"
+            ],
+            "pages": [],
+            "rules": [
+              "Note a check that was added",
+              "Note a check that arrived at the door",
+              "Note the clock every 15 minutes",
+              "Note late checks crossing their line",
+              "Ask whether to chase a check",
+              "Note a decision on chasing",
+              "Note a press of Run now",
+              "Note the last day of each month",
+              "A late urgent check is pinned",
+              "A late check, said briefly",
+              "A late check about the roof",
+              "A late check about the guttering",
+              "A check in the boiler room",
+              "Ask whether to chase, and wait a quarter of an hour",
+              "Ask whether to chase, and wait the usual time",
+              "Follow a chain of notes, rule writes too",
+              "Mark a chain note somebody wrote",
+              "Note who noted a check"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "87cc5ece499d521e5f51c5c20e1955f46dabfeffffb07e4af1f2f567cafb0d8f",
@@ -741,7 +892,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "list-checks"
     },
     {
       "kind": "pack",
@@ -751,8 +903,25 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "7e5bb2d132926b37617ad4260e4d29d6704c7a64704b55a413c6091ea4fb6112",
+          "bytes": 566,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: one look, built from a sea blue-green and a cool grey. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "f8d80cbfcd6ec05b2eca12d1c7710b407656ad8be4818af3ece87fba61359fb1",
@@ -779,7 +948,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "eye"
     },
     {
       "kind": "pack",
@@ -789,8 +959,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "d4d88afffd3c339c025254848e97b64c10e9266f7dcdc645da84dac3203e2d74",
+          "bytes": 2358,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Items"
+            ],
+            "pages": [
+              "Hello"
+            ],
+            "rules": [],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "05d64a8fbf7d069739142ff85dd3c2bb3544e2c7f8f4285dd1a5516c4d4b381b",
@@ -845,7 +1037,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "star"
     },
     {
       "kind": "pack",
@@ -855,8 +1048,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.4.1",
+      "latest": "1.4.2",
       "versions": [
+        {
+          "version": "1.4.2",
+          "checksum": "1cac983a1ca1d75fecb45b847f027b9984232987c7d40f48e022d5cace0c79bc",
+          "bytes": 15401,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.4.1",
           "checksum": "6acfb2ba757e4476cf2fd395fbfdb62de63e0d4d69b0fd02ac2d03a0666148a3",
@@ -995,7 +1214,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "chart-pie"
     },
     {
       "kind": "pack",
@@ -1005,8 +1225,25 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "7e1feea075bbf5d1a17caad67a8666a4bd5e1f2f7eb649d1bd076b9326bdd62c",
+          "bytes": 2842,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Draws its own icon in the store and in the installed list. Nothing in it changed."
+        },
         {
           "version": "1.0.0",
           "checksum": "9302debe657431b5934db7dac4f15af544c348104878e936e8ab10b4f554a68c",
@@ -1031,7 +1268,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "list-todo"
     },
     {
       "kind": "pack",
@@ -1041,8 +1279,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "b84c38111e6e72d51b4f1b5fe10d466bcb664c19b1eb64ca414ed98bffc4a703",
+          "bytes": 14505,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Properties",
+              "Tenancies",
+              "Rent received",
+              "Repairs"
+            ],
+            "pages": [
+              "Lettings",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "b814b6dffe9ca038b19d7c8bcb75785117ee0e4775a62c758df211f351e874c3",
@@ -1109,7 +1375,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "home"
     },
     {
       "kind": "pack",
@@ -1119,8 +1386,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.0",
+      "latest": "3.0.1",
       "versions": [
+        {
+          "version": "3.0.1",
+          "checksum": "4f1c0368f7db285fb015ff2138df67d1b0ce6d908a8d4968d4f2e5e81e1eccce",
+          "bytes": 22201,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "3.0.0",
           "checksum": "59b6ae4f1fb74b27ada577162eb2148979392c07924e92afbc32e42c7eae916b",
@@ -1349,7 +1647,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "flag-triangle-right"
     },
     {
       "kind": "pack",
@@ -1359,8 +1658,31 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "264803cc115d5fc5ca262788bebb6d09735a716632f066e0aff84a20f419cec6",
+          "bytes": 3547,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "stats.example.com",
+                "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
+                "key": "Example stats (read only)"
+              }
+            ]
+          },
+          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made. Now draws its own icon."
+        },
         {
           "version": "2.0.0",
           "checksum": "cae8f0f70bac242e1287e6811076dd37d06632800dd702a1ebabea0480b122f9",
@@ -1394,7 +1716,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "activity"
     },
     {
       "kind": "pack",
@@ -1404,8 +1727,33 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "28361d8186a69a787047f24566f7c9b10c2a9a0848e76dfbc823d0d78aba09d6",
+          "bytes": 29473,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Mercury money counts once. Each Mercury account is kept on the account you already typed for it when the names match, keeping your name for it, and one it cannot match waits for you to say which it is instead of counting as cash a second time. Now draws its own icon."
+        },
         {
           "version": "1.2.0",
           "checksum": "f85e197780c988e510bf21efe477d383555bae46ec4206ff5602d640d236801f",
@@ -1530,7 +1878,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "piggy-bank"
     },
     {
       "kind": "pack",
@@ -1722,8 +2071,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "5d2d69d41162871850c96b966dc3c9be9b3b9c8eba9d4481fb968529af4534e5",
+          "bytes": 46114,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Money watch"
+            ],
+            "pages": [
+              "Money watch"
+            ],
+            "rules": [
+              "Look for a charge made twice when an entry clears",
+              "Ask about a charge made twice",
+              "Act on an answer about a charge made twice",
+              "Look for a payment that repeats when an entry clears",
+              "Ask about a payment that repeats",
+              "Act on an answer about a payment that repeats"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee. A number of one or two digits now stays in the name unless it is the day of a date, so SPOTIFY 12 OCT, SPOTIFY 12OCT and SPOTIFY OCT 12 are all Spotify. A card number in groups, as in CARD 1234 5678 NETFLIX, is cut whole. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.3.0",
           "checksum": "5f65e37f0c3af70be610de5bc4a88608d0ecea2658f6afe85696db61c9ec5cbb",
@@ -1858,7 +2238,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "money"
     },
     {
       "kind": "pack",
@@ -1868,8 +2249,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "22a4ad13b51f41a9d58a2f84fc67d0e173efe792a5b1f83572f803e52a49012e",
+          "bytes": 17548,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Projects",
+              "Next steps",
+              "Decisions",
+              "Weekly notes"
+            ],
+            "pages": [
+              "Your project",
+              "This week"
+            ],
+            "rules": [
+              "Ask what comes next when a step is ticked"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "f06b6b3366f7d775e6afac2b4abac4659457f0df65b484831f776d95eb9bb8aa",
@@ -1936,7 +2345,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "projects"
     },
     {
       "kind": "pack",
@@ -1946,8 +2356,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "f1503fab2e856ecf85d31add58641d2c1420bbd0b4ffedb8c0809c03cfed6f21",
+          "bytes": 2232,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Notes"
+            ],
+            "pages": [
+              "Pad"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The pad asks no model now. The second opinion that was written under each note is an add-on of its own, Pad second opinion, for whoever wants it. Every note and every reply already written stays. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "5d3c07b9849740c8f37fb72f8c2ded25a23027307163a75855a13af22cf8f332",
@@ -2024,7 +2456,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "edit"
     },
     {
       "kind": "pack",
@@ -2034,8 +2467,29 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "76e2f3d56945989198855179a708c63e363be4bfddd0f695741f21cec4d7f7f3",
+          "bytes": 1451,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [
+              "Write a second opinion under each note"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: the second opinion the pad used to write itself, now an add-on of its own. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "e1d5c68e3bf92cf978584fb113bed587df57024bd9579ea1f2e5534698f4340e",
@@ -2066,7 +2520,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "messages-square"
     },
     {
       "kind": "pack",
@@ -2076,8 +2531,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "9d9e8a89649f54b807c74d3d662edd96af4a96c744b2169d225c36ae79aee169",
+          "bytes": 11071,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Shoots",
+              "Deliverables",
+              "Gear"
+            ],
+            "pages": [
+              "Shoots",
+              "Due",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "306af229058f3c8062a92333bcff89921e5c58568218f6d8b9c1b29d5b80d772",
@@ -2144,7 +2627,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "file-image"
     },
     {
       "kind": "pack",
@@ -2154,8 +2638,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.2.0",
+      "latest": "2.2.1",
       "versions": [
+        {
+          "version": "2.2.1",
+          "checksum": "4d509a97d6b7766bf512eaeb50f7257ffca29d0586d11cccf9511d625491e960",
+          "bytes": 15834,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "2.2.0",
           "checksum": "d3d5bef837e973867ea4cd52fcfe022f3180fe94499df945acf5935ed5a11ae1",
@@ -2257,7 +2765,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "chart-bar"
     },
     {
       "kind": "pack",
@@ -2267,8 +2776,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.2.2",
       "versions": [
+        {
+          "version": "1.2.2",
+          "checksum": "85add9e8623742443fe67207a34007096eaac137a878bd3fbc599230d8646158",
+          "bytes": 12236,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon."
+        },
         {
           "version": "1.2.1",
           "checksum": "946a474747dac436b6608d3a55d642855ab5fc66956081b75e19d03e6acb5f8b",
@@ -2390,7 +2927,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "people"
     },
     {
       "kind": "pack",
@@ -2400,8 +2938,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "a0914f36efee1eed49e9eb39eb1b9b5030c348db682104e64560b031879e0d1b",
+          "bytes": 16866,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "work"
+            ],
+            "lists": [
+              "Plan steps"
+            ],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [
+              "Tick the plan steps linked to a task when the task is done",
+              "Tick the plan steps linked to a thread when the thread is done",
+              "Bring briefs over"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has. Now draws its own icon."
+        },
         {
           "version": "2.1.0",
           "checksum": "a24c20f22f8bd3ba16608c55c14554d3703e6f5dbbe9db64b8bbabe0bf8f0e25",
@@ -2551,7 +3117,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "clipboard-list"
     },
     {
       "kind": "pack",
@@ -2561,8 +3128,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "90faac6cedd8bd46e1c3f3233ea433edc38020b8f71bd28df900ab4d966a1500",
+          "bytes": 1454,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "open.er-api.com",
+                "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
+                "key": null
+              }
+            ]
+          },
+          "notes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
+          "yanked": {
+            "reason": "Set up exchange rates, on Money's add-on page",
+            "at": "2026-10-25T20:51:43.807Z"
+          }
+        },
         {
           "version": "1.1.0",
           "checksum": "d559af88e27e3f3da57b9f4abbc1983f9b98ae5e5c69cafd31ee43937b8fffe3",
@@ -2625,7 +3219,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "trending-up"
     },
     {
       "kind": "pack",
@@ -2635,8 +3230,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "f4446975f6ec54091ce6d6712ba82f00508f0a6fe6307e7ae489b182c2b2d2c0",
+          "bytes": 2608,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Readings"
+            ],
+            "pages": [
+              "Reading"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "9a96fef0312f1ec959d84fb3335b72a6112528a6d3770e6315ffdbcfbee2ac78",
@@ -2710,7 +3327,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "book-open"
     },
     {
       "kind": "pack",
@@ -2720,8 +3338,38 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "030796dd75fd27b8b2462f082ec6cb4d861b37e7006062bd7d8b0f4c188cfe9a",
+          "bytes": 12041,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "780b5daaf3ad93a1c255f28b4cf2207ec30d927446528d51ed5145079a2ef109",
@@ -2792,7 +3440,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "clock"
     },
     {
       "kind": "pack",
@@ -2802,8 +3451,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "f2355a9b74ed95bdd39b0c320f29e6617b8ad358e71b0df52388e4d8e7568c54",
+          "bytes": 1490,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Roadmap"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "4747e92deb8c0a294ed72d2d467fc77eb8a74e3badca5acf5020dd0fb1277eba",
@@ -2856,7 +3527,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "square-kanban"
     },
     {
       "kind": "pack",
@@ -2866,8 +3538,45 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "1.1.2",
       "versions": [
+        {
+          "version": "1.1.2",
+          "checksum": "ee7b83912955446e72f696f369ecde1da8402756c39b719bafad4caaff63fea0",
+          "bytes": 16868,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work",
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Values",
+              "Blocks",
+              "Counts",
+              "Layout",
+              "Tab 5",
+              "Tab 6",
+              "Tab 7",
+              "Tab 8",
+              "Tab 9",
+              "Tab 10",
+              "Tab 11",
+              "Tab 12",
+              "Tab 13",
+              "Tab 14",
+              "Counts on {{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.1.1",
           "checksum": "d1edfb3525667f31be9d058b51f8d846873ddbcf26f00691b05903d5436d8cf1",
@@ -2989,7 +3698,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "file-text"
     },
     {
       "kind": "pack",
@@ -2999,8 +3709,37 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "a5e0059f46630007f3b510102bcea333e6d82baf873b05fcb0c2e1fa532a54ae",
+          "bytes": 15099,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Says locked for what each machine locks with your sync key, and gives a bundle's size as Size. Nothing it keeps changed. Now draws its own icon."
+        },
         {
           "version": "1.0.2",
           "checksum": "913a0ece2e54d095fb6734b1ddfc2803ace5e5d473e4c7de11bca210df1f4cb4",
@@ -3098,7 +3837,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "refresh-cw"
     },
     {
       "kind": "pack",
@@ -3108,8 +3848,27 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "1417b315a41b7e0aa0e8ce029d5a8ddf2e9cfed2079c5fa3e3d10362383dd628",
+          "bytes": 1910,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "dbe6dd3b2da02768cb29a0d9e9938398d07063f5649f6fc36d5945f97813ae90",
@@ -3137,7 +3896,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "slash"
     },
     {
       "kind": "pack",
@@ -3147,8 +3907,27 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "25e063a123abc02544ab2c773bb7c0f7df903a2069588dfcfd62422fd14c0ec7",
+          "bytes": 2128,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "e0ce2c838885432f8196e9521d73159da41dcedfff8600cf52c2533b43131db2",
@@ -3176,7 +3955,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "message-circle"
     },
     {
       "kind": "pack",
@@ -3186,8 +3966,33 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.4.0",
+      "latest": "1.4.1",
       "versions": [
+        {
+          "version": "1.4.1",
+          "checksum": "9136f86d0d59464000f7242ad9d403fd34e6f7879abf197ee49fa930032e2379",
+          "bytes": 20117,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          },
+          "notes": "Stripe money counts once. A Stripe balance you typed in yourself is taken over instead of counted a second time, the Stripe accounts keep their place when you rename them, the key and the book can be changed on this page, and currencies Stripe counts differently, such as ISK, read right. Now draws its own icon."
+        },
         {
           "version": "1.4.0",
           "checksum": "d84538fd2fba6a9a7acf078cfc4555b3214fee652ed1e94e838bd89a1f270e3e",
@@ -3343,7 +4148,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "badge-dollar-sign"
     },
     {
       "kind": "pack",
@@ -3353,8 +4159,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "2d2cc44af4254f7788634cf1c5c3e5a25e7ebf3020cf8276eef981b573ae3029",
+          "bytes": 16482,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Reading list",
+              "Study sessions"
+            ],
+            "pages": [
+              "Studies"
+            ],
+            "rules": [
+              "Ask whether to plan study for a new assignment"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "7d03694a62b61f47b81c71854b96ef5887d1b3f61c342c2c9519a7e260c7c0b4",
@@ -3419,7 +4252,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "graduation-cap"
     },
     {
       "kind": "pack",
@@ -3429,8 +4263,29 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "6b1388c090d3955430f8ad28b0fd4e87a3a41f3a1e167fab4405476953b77565",
+          "bytes": 6006,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [
+              "Work out a task's priority from its four numbers"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "56fc5d86a75069dbc30836377d3479102f7ead32f636a6eae68428ec069a6e93",
@@ -3461,7 +4316,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "list-ordered"
     },
     {
       "kind": "pack",
@@ -3471,8 +4327,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "0bd8cf58063f3bd9d41f70463cb8ec8771d0dc0c9654aeed5f6b91f010b72b01",
+          "bytes": 11873,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Team",
+              "Team tasks"
+            ],
+            "pages": [
+              "Board",
+              "Who is doing what"
+            ],
+            "rules": [
+              "Ask what unblocks a blocked task"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "bbbb6adb0413cd66bbf9b4a2083c7dfd0662283b0c39af6e0fc8d6fd66dc2d6a",
@@ -3535,7 +4417,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true
+      "unlisted": true,
+      "icon": "board"
     },
     {
       "kind": "pack",
@@ -3545,8 +4428,27 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "3834d82287cb665d5b8a3239cf9ebd55d66fec10fad3a48f0c1857c8784e0d1e",
+          "bytes": 2607,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version. Now draws its own icon."
+        },
         {
           "version": "1.0.0",
           "checksum": "43a0b6267be5b267df7fb101b7064d7fb42f23e73c757aeb6e4dc1e98e013aa5",
@@ -3574,7 +4476,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "calendar-range"
     },
     {
       "kind": "pack",
@@ -3584,8 +4487,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "77146a4dfe51326f466004019fa41b2e2da6ab7f492ff4a47ad128fe39ada4e8",
+          "bytes": 18308,
+          "published_at": "2026-10-25T20:51:43.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Worked numbers"
+            ],
+            "pages": [
+              "Worked numbers"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day. Now draws its own icon.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "bb1a7944bc65e44450949d019c36f0ecd02a85281971dd9c77d410e5d8c70932",
@@ -3619,7 +4546,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "icon": "chart-line"
     },
     {
       "kind": "usecase",

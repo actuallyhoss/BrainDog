@@ -1,9 +1,10 @@
 {
   "pack": "week-in-money",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "calendar-range",
   "title": "Week in money",
   "summary": "One message every Monday morning: cash now, what fell due in the week in both directions, and what money arrived, opened by two sentences from Slash where the host has Slash.",
-  "changes": "The first version.",
+  "changes": "The first version. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

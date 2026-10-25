@@ -47,7 +47,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
-  import { glyphOf } from '$lib/market/ListingCard.svelte';
+  import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, namesOf } from '$lib/market/adds.ts';
@@ -101,6 +101,8 @@
    */
   const glyph = $derived.by((): IconName => {
     if (!listing) return 'packs';
+    const own = ownIcon(listing);
+    if (own) return own;
     if (listing.kind === 'module') {
       const g = placeGlyph(firstPartyModules().find((m) => m.id === listing!.id)?.pages, page.data.nav ?? []);
       if (g !== 'packs') return g;

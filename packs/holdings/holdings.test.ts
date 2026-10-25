@@ -145,7 +145,7 @@ test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version abo
      adds a title, a `changes` line and a comment at the top of the script, and nothing a record reads differently. 1.4.0
      adds a price, the day it was priced and what the holding is worth, two counts, and takes the currency out of the format;
      before it shipped it gained the oldest day a price was said and a count of the prices over thirty days old. 1.4.1 gives its two scripts names of eight words or fewer (the audit of 25 October, Y12). */
-  assert.equal(doc.version, '1.4.1');
+  assert.equal(doc.version, '1.4.2');
   assert.equal(doc.declarations.find((d) => d.metric === 'holdings-value')?.sellable, true);
   assert.equal(built.version, '1.0.0', 'the frozen 1.0.0 moved, so this file has to say what it now is beside it');
   assert.deepEqual(doc.requires, built.requires);
@@ -186,7 +186,7 @@ test('INSTALLED FROM THE FILE: one list, one rule, two scripts, seven figures an
     ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost', 'script.holdings_twin'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.2');
   close();
 });
 
@@ -273,7 +273,7 @@ async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock
   said(await put(api, v100()));
   const ids = rows.map((row) => hold(api, row));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.2');
   return { api, clock, ids, close };
 }
 
@@ -388,7 +388,7 @@ test('HALF A UNIT IS A HOLDING AND A NEGATIVE COUNT IS NOT, and the card keeps t
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.4.1']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.4.2']);
 });
 
 /* ── 1.4.0: what a holding is worth now, and a format that names nobody's currency (REC-B17 steps 1 and 2) ─────────── */

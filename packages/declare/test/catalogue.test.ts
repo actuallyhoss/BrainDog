@@ -304,6 +304,27 @@ test("a version's notes are its file's changes, for an add-on and a use case, an
   assert.equal(codeOf(await readShared(JSON.stringify({ ...(JSON.parse(study) as Record<string, unknown>), changes: 7 }))), 'VALUE_MALFORMED');
 });
 
+test('an add-on names its icon from the icon set, carried to its entry, and an unknown name is refused naming the field', async () => {
+  const { MANIFEST_KEYS } = await import('../src/catalogue.ts');
+  assert.ok(MANIFEST_KEYS.includes('icon'));
+  const out = await publishTo(emptyCatalogue('Icons'), addon('1.0.0', [BOOKS], { icon: 'book-open' }), () => null);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(out.value.entry.icon, 'book-open');
+  const back = readCatalogue(JSON.parse(JSON.stringify(out.value.index)));
+  assert.ok(back.ok);
+  assert.equal(back.value.entries[0]?.icon, 'book-open');
+  const none = await publishTo(emptyCatalogue('Icons'), addon('1.0.0', [BOOKS]), () => null);
+  assert.ok(none.ok);
+  assert.equal(none.value.entry.icon, undefined);
+  const wrong = await publishTo(emptyCatalogue('Icons'), addon('1.0.0', [BOOKS], { icon: 'walet' }), () => null);
+  assert.ok(!wrong.ok && 'refusal' in wrong);
+  if (wrong.ok || !('refusal' in wrong)) return;
+  assert.equal(wrong.refusal.code, 'PACK_MALFORMED');
+  assert.equal(wrong.refusal.at, 'icon');
+  assert.match(wrong.refusal.fix, /walet/u);
+  assert.equal(codeOf(await publishTo(emptyCatalogue('Icons'), addon('1.0.0', [BOOKS], { icon: 7 }), () => null)), 'PACK_MALFORMED');
+});
+
 test('an unlisted pack stays in the index, installable by id, and out of every listing and search', async () => {
   const { listedEntries, MANIFEST_KEYS } = await import('../src/catalogue.ts');
   assert.ok(MANIFEST_KEYS.includes('changes') && MANIFEST_KEYS.includes('unlisted'));

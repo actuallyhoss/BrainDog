@@ -1,9 +1,10 @@
 {
   "pack": "worked-numbers",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "chart-line",
   "title": "Worked numbers",
   "summary": "Numbers worked out from your other numbers every day: a change over a week, a ratio, a share, a sum or a difference, written beside the readings they came from.",
-  "changes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day.",
+  "changes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

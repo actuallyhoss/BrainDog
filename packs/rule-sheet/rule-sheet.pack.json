@@ -1,9 +1,10 @@
 {
   "pack": "rule-sheet",
-  "version": "1.1.1",
+  "version": "1.1.2",
+  "icon": "file-text",
   "title": "Rule sheet",
   "summary": "Fourteen pages that draw every rule of a value, a block and a layout on your own record, so a check can read each rule where a person sees it.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",

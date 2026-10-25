@@ -1,9 +1,10 @@
 {
   "pack": "reading-list",
-  "version": "2.0.1",
+  "version": "2.0.2",
+  "icon": "book-open",
   "title": "Reading list",
   "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",
-  "changes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words.",
+  "changes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": { "format": 1, "primitives": 1, "packs": {} },

@@ -100,7 +100,7 @@ test('BEFORE THE PACK: Money arms no weekly digest of its own', async () => {
 
 test('THE FILE IS week-in-money 1.0.0, on money-core 3, one digest with prose from Slash', () => {
   const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Record<string, unknown>[] };
-  assert.deepEqual([doc.pack, doc.version], ['week-in-money', '1.0.0']);
+  assert.deepEqual([doc.pack, doc.version], ['week-in-money', '1.0.1']);
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.0.0 <4.0.0' });
   assert.deepEqual(
     doc.declarations.map((d) => [d.digest, d.prose]),

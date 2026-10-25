@@ -1,9 +1,10 @@
 {
   "pack": "bank-hsbc-eg",
-  "version": "1.7.2",
+  "version": "1.7.3",
+  "icon": "piggy-bank",
   "title": "HSBC Egypt alerts",
   "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
-  "changes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name.",
+  "changes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name. Now draws its own icon.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",

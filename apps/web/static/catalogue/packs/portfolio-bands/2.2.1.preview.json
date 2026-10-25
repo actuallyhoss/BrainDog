@@ -1,0 +1,53 @@
+{
+  "format": 1,
+  "made_at": "2026-10-25T20:51:43.807Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "band"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "empty": "Nothing is worked out yet. The bands are worked out once a day from each project's latest reading of what it takes a month and of its forecast a year out.",
+          "heading": "A month: now, next and later",
+          "kind": "split",
+          "source": "register.revenue_bands",
+          "span": 12,
+          "key": "k0iqp3nu",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "wholeRead": {
+            "rows": [],
+            "total": 0
+          }
+        }
+      ],
+      "icon": "thing",
+      "nav": {
+        "order": 6,
+        "section": "Projects"
+      },
+      "page": "bands",
+      "requires": [
+        "register.revenue_bands",
+        "register.things",
+        "register.datapoints"
+      ],
+      "title": "Revenue bands",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "bands",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

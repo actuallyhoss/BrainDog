@@ -76,7 +76,7 @@ async function record(withPack = true): Promise<{ api: Api; sql: NodeSql }> {
 test('the add-on says what it is, needs Agents, and ships one kind', () => {
   const doc = file();
   assert.equal(doc.pack, 'slash-desk');
-  assert.equal(doc.version, '1.0.0');
+  assert.equal(doc.version, '1.0.1');
   assert.equal(doc.title, 'Slash on your machine');
   assert.deepEqual((doc.requires as { packs: Record<string, string> }).packs, { agents: '^1.0.0' });
   const decl = kind();

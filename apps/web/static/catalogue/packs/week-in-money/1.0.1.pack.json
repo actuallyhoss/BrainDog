@@ -1,0 +1,102 @@
+{
+  "pack": "week-in-money",
+  "version": "1.0.1",
+  "icon": "calendar-range",
+  "title": "Week in money",
+  "summary": "One message every Monday morning: cash now, what fell due in the week in both directions, and what money arrived, opened by two sentences from Slash where the host has Slash.",
+  "changes": "The first version. Now draws its own icon.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "digest": "week-in-money",
+      "name": "Week in money",
+      "schedule": {
+        "day": "mon",
+        "at": "08:30"
+      },
+      "channels": [
+        "email",
+        "in-app"
+      ],
+      "prose": "slash",
+      "sections": [
+        {
+          "heading": "Cash now",
+          "source": "metric.cash-now",
+          "as": "stat"
+        },
+        {
+          "heading": "Money in that fell due",
+          "source": "register.obligations",
+          "where": "direction is owed to me, due after -8d, due before tomorrow",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "What"
+            },
+            {
+              "field": "amount",
+              "label": "Amount"
+            },
+            {
+              "field": "due",
+              "label": "Due"
+            }
+          ],
+          "omit_when_empty": true
+        },
+        {
+          "heading": "Money out that fell due",
+          "source": "register.obligations",
+          "where": "direction is owed by me, due after -8d, due before tomorrow",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "What"
+            },
+            {
+              "field": "amount",
+              "label": "Amount"
+            },
+            {
+              "field": "due",
+              "label": "Due"
+            }
+          ],
+          "omit_when_empty": true
+        },
+        {
+          "heading": "What arrived",
+          "source": "register.transactions",
+          "where": "state is cleared, transfer is false, direction is in, on after -8d",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "What"
+            },
+            {
+              "field": "amount",
+              "label": "Amount"
+            },
+            {
+              "field": "on",
+              "label": "On"
+            }
+          ],
+          "omit_when_empty": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 {
   "pack": "studies",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "icon": "graduation-cap",
   "title": "Studies",
   "summary": "Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",

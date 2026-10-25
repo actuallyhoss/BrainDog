@@ -1,0 +1,66 @@
+{
+  "pack": "job-starter",
+  "version": "1.0.1",
+  "icon": "list-todo",
+  "changes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
+  "title": "Starter jobs",
+  "summary": "Three kinds of job to run on your own machine: a review of your week, a sort of what arrived, and where a repository stands. Each one only reads and proposes, and you approve each kind once before it can run.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "job": "week-in-review",
+      "title": "Review my week",
+      "prompt": "Read what happened on this record in the last seven days: start with the context tool, then look at activity and the entries it points to. Write one short note on the week: what moved, what is stuck, and what waits on the owner. Do not change anything. Propose the note to the owner with the propose tool, once, and let them decide whether to keep it. Never decide for them.",
+      "tools": [
+        "mcp__braindog__context",
+        "mcp__braindog__activity",
+        "mcp__braindog__list",
+        "mcp__braindog__get",
+        "mcp__braindog__search",
+        "mcp__braindog__propose"
+      ],
+      "turns": 8,
+      "permission": "dontAsk",
+      "writes": false
+    },
+    {
+      "job": "inbox-triage",
+      "title": "Sort what arrived",
+      "prompt": "Read what is waiting in this record's inbox and, for each message, work out where it belongs: which list, which entry it is about, or whether to set it aside. Do not file anything yourself. Propose where each message goes to the owner with the propose tool, with one line of why, and let them decide. If the record does not let you read the inbox, propose nothing and say so in your last answer.",
+      "tools": [
+        "mcp__braindog__context",
+        "mcp__braindog__list",
+        "mcp__braindog__get",
+        "mcp__braindog__search",
+        "mcp__braindog__schema",
+        "mcp__braindog__propose"
+      ],
+      "turns": 8,
+      "permission": "dontAsk",
+      "writes": false
+    },
+    {
+      "job": "repo-status",
+      "title": "Where this repository stands",
+      "prompt": "You are in a repository on the owner's machine. Read its recent history with git log and what is changed with git status, and look at the files you need to understand them. Do not change any file. Work out the one next step that would move the work on, and propose it to the owner with the propose tool, with two or three lines of why. Let them decide.",
+      "repo": "project",
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git status:*)",
+        "mcp__braindog__propose"
+      ],
+      "turns": 12,
+      "permission": "dontAsk",
+      "writes": false
+    }
+  ]
+}

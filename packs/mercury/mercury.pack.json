@@ -1,9 +1,10 @@
 {
   "pack": "mercury",
-  "version": "1.2.0",
+  "version": "1.2.1",
+  "icon": "piggy-bank",
   "title": "Mercury",
   "summary": "Reads the balance of every Mercury account from api.mercury.com, once an hour or as often as its setting says, into Money's accounts, and its last thirty days of transactions into the ledger.",
-  "changes": "Mercury money counts once. Each Mercury account is kept on the account you already typed for it when the names match, keeping your name for it, and one it cannot match waits for you to say which it is instead of counting as cash a second time.",
+  "changes": "Mercury money counts once. Each Mercury account is kept on the account you already typed for it when the names match, keeping your name for it, and one it cannot match waits for you to say which it is instead of counting as cash a second time. Now draws its own icon.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

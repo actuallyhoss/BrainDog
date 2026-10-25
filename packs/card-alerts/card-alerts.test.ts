@@ -106,7 +106,7 @@ const moneysPayee = (): unknown =>
    finds a card, finds only a card, and reads a card's digits as one or more values, for a card the bank replaced. */
 test('THE FILE IS card-alerts 1.3.0, on money-core 3.10.0 or later, with the two wordings and their twins', async () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.3.0']);
+  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.3.1']);
   assert.equal(doc.extends, undefined, 'the payee field is Money\'s, and a pack laying it blocks Money\'s own update');
   assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.10.0 <4.0.0' });
   assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), FOUR);
@@ -150,7 +150,7 @@ test('INSTALLED FROM THE FILE: four patterns, nothing refused, and the text door
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FOUR);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.3.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.3.1');
   /* A TWIN WITH NO TOKEN MINTED IS A DOOR THAT MATCHES NOTHING YET, which is `none` and not `null`. */
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), { kind: 'none' });
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-in-sms' }), { kind: 'none' });

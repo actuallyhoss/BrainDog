@@ -1,0 +1,874 @@
+{
+  "format": 1,
+  "made_at": "2026-10-25T20:51:43.807Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Each line below names one rule of a value written in text, then shows the value itself, so a reader can check the two agree.\n\n## Values read from the record\n\nA figure by its name: {{open-tasks}} tasks are open.\n\nHow far that figure moved: {{open-tasks.change}}.\n\nThe first task that figure counts: {{open-tasks.first}}.\n\nHow many tasks the record holds, a count and never the tasks themselves: {{tasks.count}}. How many of them are open: {{tasks.open}}.\n\nA field of one task, named by its list and number: {{tasks#1.what}}.\n\nA long field is never pulled into text, so the notes of that task show a dash: {{tasks#1.note}}.\n\nA name that points at nothing is shown as written, marked: {{no-such-figure}}.\n\nA value inside backticks is left exactly as typed: `{{open-tasks}}`.\n\n## Typed values\n\nA day ahead, with how far off it is: {{date:2030-12-24}}.\n\nA day behind, with no link: {{day:2020-04-10}}.\n\nThe time left to a day: {{until:2030-01-01}}. The time left to the first task's due day: {{until:tasks#1.by}}.\n\nThe time since a day: {{ago:2020-01-01}}.\n\nMoney in minor units with its currency: {{money:129900 EGP}}. Money below nought: {{money:-4200 GBP}}.\n\nA currency with four decimals: {{money:1000000 CLF}} and {{money:123456 UYW}}.\n\nAn amount longer than sixteen digits keeps every digit: {{money:900719925474099312 JPY}}.\n\nA number with its unit: {{quantity:1.4 m}}. A quantity below nought: {{quantity:-2.5 kg}}. A whole number below nought: {{quantity:-1299}}.\n\nA percentage: {{pct:-46.3}}. A percentage written loosely stays as typed, marked: {{pct:12 %}}.\n\nA task named by reference: {{ref:tasks#1}}.\n\nA typed value that does not parse stays as typed, marked: {{money:12.50 GBP}} and {{date:2026-13-45}}.\n\n## Icons and evidence\n\nAn icon set inside a sentence: {{icon:rocket}} launched.\n\nChecked once against a source: {verified} and {verified: the bank statement}.\n\nWorked out from other facts: {inferred} and {inferred: two invoices}.\n\nA careful guess: {estimate} and {estimate: last quarter's pace}.\n\nNot known yet, something to find out: {unknown} and {unknown: nobody has asked}.",
+          "document": true,
+          "heading": "Values in text",
+          "kind": "note",
+          "span": 12,
+          "key": "k0rajghh",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "open-tasks": 1,
+            "open-tasks.first": "Chase Halden on 2026-041",
+            "tasks.count": 1,
+            "tasks.open": 0,
+            "tasks#1.what": "Chase Halden on 2026-041",
+            "tasks#1.by": "2026-09-04"
+          },
+          "read_as": {
+            "open-tasks": "figure",
+            "open-tasks.first": "figure",
+            "tasks.count": "count",
+            "tasks.open": "state",
+            "tasks#1.what": "field",
+            "tasks#1.by": "field"
+          },
+          "unnamed": [
+            "no-such-figure"
+          ]
+        },
+        {
+          "body": "A day is counted from the reader's own today, never from Greenwich time. At half past ten at night Greenwich time on 14 October it is already the 15th in Cairo, so at that moment the day below is today in Cairo and still a day off in Greenwich time: {{day:2026-10-15}}.",
+          "document": true,
+          "heading": "A day in two zones",
+          "kind": "note",
+          "span": 12,
+          "key": "k1ur18ew",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "notebook-pen",
+      "nav": {
+        "order": 10,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-values",
+      "requires": [
+        "register.tasks"
+      ],
+      "title": "Values",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-values",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Each block below is written to test one rule of how a block is drawn. A block written wrongly is still shown, as the text that was typed with a line saying what is wrong.\n\n## A stat takes six figures\n\n```stat | Six figures\nOpen | 12 | in play\nLate | 3 | past their day | bad\nDone this week | 9 | five more than last week | good\nWaiting on you | 2 | to check\nWith an agent | 4 | taken today\nLater | 21 | kept for later\n```\n\n```stat | Seven figures\nOpen | 12 | in play\nLate | 3 | past their day | bad\nDone this week | 9 | five more than last week | good\nWaiting on you | 2 | to check\nWith an agent | 4 | taken today\nLater | 21 | kept for later\nDropped | 5 | let go this month\n```\n\n## Chips need a number and a word\n\n```chips | Chips\nrocket | 4 | launched\nzap |  | shipped\nstar | 7 | \ncheck | 3 | done\n```\n\n## A bar with no number draws no bar\n\n```bar | Hours by project\nKiln | 12 | this week\nPortage | 7 | this week\nSomeday | not measured yet | no figure to draw\n```\n\n## Tone words a colour name stands for\n\n```chips | Tone aliases\ncheck | 1 | written earn | earn\nx | 2 | written danger | danger\ninfo | 3 | written accent | accent\nalert | 4 | written risk | risk\n```\n\n## A block inside a note ends the note\n\n```note | A note\nThis note opens here.\n```stat | Inside the note\nOpen | 12 | in play\n```\n\nThis line is outside the note: the first closing marks after the note opened ended it, and a block cannot sit inside another.\n\n## A ring takes five parts\n\n```ring | Five parts\nRent | 600 | a month\nFood | 300 | a month\nTravel | 120 | a month\nPhone | 40 | a month\nBooks | 30 | a month\n```\n\n```ring | Six parts\nRent | 600 | a month\nFood | 300 | a month\nTravel | 120 | a month\nPhone | 40 | a month\nBooks | 30 | a month\nGifts | 20 | a month\n```",
+          "document": true,
+          "heading": "Blocks in text",
+          "kind": "note",
+          "span": 12,
+          "key": "k1y9qjjp",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "12ch"
+            }
+          ],
+          "empty": "No task is on the record yet.",
+          "heading": "A quote mark written twice",
+          "kind": "table",
+          "limit": 5,
+          "source": "register.tasks",
+          "span": 6,
+          "where": "what is not \"The \"\"rule sheet\"\" check\", state is not dropped",
+          "key": "k1y3bmeh",
+          "rows": [
+            {
+              "id": "01M5TDARHZCJXWDVDB3KYC8HR3",
+              "register": "tasks",
+              "seq": 1,
+              "fields": {
+                "what": "Chase Halden on 2026-041",
+                "state": "review",
+                "agent": "cursor",
+                "by": "2026-09-04",
+                "effort": 17280,
+                "note": "Cursor drafted the chaser. Read it before it goes.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "review",
+              "version": 1,
+              "created_at": "2026-10-25T20:51:43.807Z",
+              "updated_at": "2026-10-25T20:51:43.807Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "12ch"
+            }
+          ],
+          "empty": "No task matches a filter that cannot be read.",
+          "heading": "A filter that cannot be read",
+          "kind": "table",
+          "limit": 5,
+          "source": "register.tasks",
+          "span": 6,
+          "where": "state is {{nothing-here}}",
+          "key": "k03449cq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [
+            {
+              "code": "ENUM_VALUE_UNKNOWN",
+              "fix": "state is {{nothing-here}}: tasks.state has no value {{nothing-here}}.",
+              "at": "state",
+              "allowed": [
+                "Later",
+                "open",
+                "doing",
+                "To check",
+                "blocked",
+                "done",
+                "dropped"
+              ]
+            }
+          ]
+        }
+      ],
+      "icon": "rows",
+      "nav": {
+        "order": 20,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-blocks",
+      "requires": [
+        "register.tasks"
+      ],
+      "title": "Blocks",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-blocks",
+        "basis": "r1dpof77",
+        "by": "rule",
+        "lead": "k1y3bmeh",
+        "next": {
+          "row": "tasks#1",
+          "text": "Chase Halden on 2026-041 is 51 days late"
+        }
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "empty": "No task is on the record yet.",
+          "heading": "Tasks done",
+          "icon": "circle-check",
+          "kind": "ring",
+          "source": "register.tasks",
+          "span": 4,
+          "where": "state is done",
+          "key": "k09u05ou",
+          "rows": [
+            {
+              "id": "tasks#ring",
+              "register": "tasks",
+              "seq": null,
+              "fields": {
+                "label": "Tasks done",
+                "value": 0,
+                "target": 1
+              },
+              "state": null,
+              "version": 0,
+              "created_at": "2026-10-25T20:51:43.807Z",
+              "updated_at": "2026-10-25T20:51:43.807Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "columns": [
+            {
+              "field": "label"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "target"
+            }
+          ]
+        },
+        {
+          "empty": "No task has a due day yet.",
+          "heading": "Done of the dated",
+          "icon": "calendar",
+          "kind": "ring",
+          "of": "by is set",
+          "source": "register.tasks",
+          "span": 4,
+          "where": "state is done",
+          "key": "k0z0m3pk",
+          "rows": [
+            {
+              "id": "tasks#ring",
+              "register": "tasks",
+              "seq": null,
+              "fields": {
+                "label": "Done of the dated",
+                "value": 0,
+                "target": 1
+              },
+              "state": null,
+              "version": 0,
+              "created_at": "2026-10-25T20:51:43.807Z",
+              "updated_at": "2026-10-25T20:51:43.807Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "columns": [
+            {
+              "field": "label"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "target"
+            }
+          ]
+        },
+        {
+          "columns": [
+            {
+              "field": "done_on"
+            }
+          ],
+          "empty": "Nothing was finished in the last twelve weeks.",
+          "heading": "Finished, by day",
+          "icon": "calendar",
+          "kind": "heat",
+          "source": "register.tasks",
+          "span": 12,
+          "where": "done_on after -84d",
+          "key": "k0ti8tcx",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "wholeRead": {
+            "rows": [],
+            "total": 0,
+            "outside": 0,
+            "outsideDays": 0
+          },
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "gauge",
+      "nav": {
+        "order": 30,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-counts",
+      "requires": [
+        "register.tasks"
+      ],
+      "title": "Counts",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-counts",
+        "basis": "r0rau2nj",
+        "by": "rule",
+        "hide": [
+          "k0ti8tcx"
+        ]
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "area": "rail",
+          "body": "This line is never drawn, so the page has no side column and the main column takes the whole width.",
+          "heading": "Only in the rail",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 0,
+            "metric": "open-tasks"
+          },
+          "key": "k18nkdaf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "what"
+            },
+            {
+              "as": "fact",
+              "field": "by"
+            }
+          ],
+          "empty": "No task is in play.",
+          "kind": "cards",
+          "limit": 4,
+          "source": "register.tasks",
+          "span": 12,
+          "where": "state is not done or dropped",
+          "key": "k0a3jefh",
+          "rows": [
+            {
+              "id": "01M5TDARHZCJXWDVDB3KYC8HR3",
+              "register": "tasks",
+              "seq": 1,
+              "fields": {
+                "what": "Chase Halden on 2026-041",
+                "state": "review",
+                "agent": "cursor",
+                "by": "2026-09-04",
+                "effort": 17280,
+                "note": "Cursor drafted the chaser. Read it before it goes.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "review",
+              "version": 1,
+              "created_at": "2026-10-25T20:51:43.807Z",
+              "updated_at": "2026-10-25T20:51:43.807Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "empty": "No task is on the record yet.",
+          "heading": "Three wide",
+          "icon": "circle-check",
+          "kind": "ring",
+          "source": "register.tasks",
+          "span": 3,
+          "where": "state is done",
+          "key": "k18fmvvz",
+          "rows": [
+            {
+              "id": "tasks#ring",
+              "register": "tasks",
+              "seq": null,
+              "fields": {
+                "label": "Three wide",
+                "value": 0,
+                "target": 1
+              },
+              "state": null,
+              "version": 0,
+              "created_at": "2026-10-25T20:51:43.807Z",
+              "updated_at": "2026-10-25T20:51:43.807Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "columns": [
+            {
+              "field": "label"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "target"
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "label": "Open",
+              "metric": "open-tasks",
+              "note": "Every task in play, the ones kept for later left out"
+            }
+          ],
+          "heading": "Four wide",
+          "icon": "gauge",
+          "kind": "stat",
+          "span": 4,
+          "key": "k0d9gluc",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Open",
+              "metric": "open-tasks",
+              "note": "Every task in play, the ones kept for later left out",
+              "target": {
+                "gte": 0
+              },
+              "reading": {
+                "value": 1,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ]
+        },
+        {
+          "body": "Three, four and five twelfths fill one line.",
+          "heading": "Five wide",
+          "kind": "note",
+          "span": 5,
+          "key": "k0odlx56",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Two blocks six wide share one line.",
+          "heading": "Six wide",
+          "kind": "note",
+          "span": 6,
+          "key": "k0u5t8n6",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "This is the second of the two.",
+          "heading": "Six wide beside it",
+          "kind": "note",
+          "span": 6,
+          "key": "k1x1wbhl",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Eight twelfths, with four beside it, make a whole line.",
+          "heading": "Eight wide",
+          "kind": "note",
+          "span": 8,
+          "key": "k1dv5quf",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "This is the four.",
+          "heading": "Four wide beside it",
+          "kind": "note",
+          "span": 4,
+          "key": "k0h12hnp",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "box": true,
+          "heading": "Cards inside a tile",
+          "icon": "rows",
+          "kind": "section",
+          "span": 12,
+          "key": "k0xf49t2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "The whole width",
+          "icon": "rows",
+          "kind": "section",
+          "span": 12,
+          "key": "k01r1lv8",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "This note takes the whole width of the page.",
+          "heading": "Twelve wide",
+          "kind": "note",
+          "span": 12,
+          "key": "k1hdo95x",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "layout": {
+        "rail": 4
+      },
+      "nav": {
+        "order": 40,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-layout",
+      "requires": [
+        "register.tasks"
+      ],
+      "title": "Layout",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-layout",
+        "basis": "r1aruywn",
+        "by": "rule",
+        "lead": "k0a3jefh",
+        "hide": [
+          "k0xf49t2"
+        ],
+        "next": {
+          "row": "tasks#1",
+          "text": "Chase Halden on 2026-041 is 51 days late"
+        }
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 5 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 50,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-5",
+      "title": "Tab 5",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-5",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 6 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 60,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-6",
+      "title": "Tab 6",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-6",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 7 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 70,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-7",
+      "title": "Tab 7",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-7",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 8 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 80,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-8",
+      "title": "Tab 8",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-8",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 9 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 90,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-9",
+      "title": "Tab 9",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-9",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 10 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 100,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-10",
+      "title": "Tab 10",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-10",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 11 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 110,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-11",
+      "title": "Tab 11",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-11",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 12 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 120,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-12",
+      "title": "Tab 12",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-12",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 13 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 130,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-13",
+      "title": "Tab 13",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-13",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "Tab 14 of 14. Every page of this section is a tab with an address of its own, and past twelve the rest are under More.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 140,
+        "section": "Rule sheet",
+        "tabs": true
+      },
+      "page": "rule-sheet-tab-14",
+      "title": "Tab 14",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "rule-sheet-tab-14",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

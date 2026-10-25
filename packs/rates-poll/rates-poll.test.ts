@@ -217,7 +217,7 @@ for (const [name, spec, want] of FILLED)
    currencies, and every record that installed it was sent those. The pairs are the fill's, from what a record holds. */
 test('the file as it ships quotes no currency, and filled with its example it is the example and nothing else', () => {
   const shipped = template();
-  assert.equal(shipped.version, '1.1.0');
+  assert.equal(shipped.version, '1.1.1');
   assert.deepEqual(mapOf(shipped), []);
   const { fill: _marks, ...rest } = shipped;
   assert.equal(JSON.stringify({ ...rest, summary: '', declarations: [] }), JSON.stringify({ ...fillRates(template(), EXAMPLE), summary: '', declarations: [] }));

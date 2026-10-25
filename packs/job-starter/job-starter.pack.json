@@ -1,6 +1,8 @@
 {
   "pack": "job-starter",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "list-todo",
+  "changes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
   "title": "Starter jobs",
   "summary": "Three kinds of job to run on your own machine: a review of your week, a sort of what arrived, and where a repository stands. Each one only reads and proposes, and you approve each kind once before it can run.",
   "author": "BrainDog",

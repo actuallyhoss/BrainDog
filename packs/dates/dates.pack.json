@@ -1,9 +1,10 @@
 {
   "pack": "fixed-dates",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "calendar",
   "title": "Dates",
   "summary": "The days somebody else fixed: a deadline, a window with a last day, and a date that comes round each week, month or year.",
-  "changes": "The first version: a list of dates, a calendar of them, and a daily check that moves a repeating date on to its next turn.",
+  "changes": "The first version: a list of dates, a calendar of them, and a daily check that moves a repeating date on to its next turn. Now draws its own icon.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

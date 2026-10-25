@@ -1,9 +1,10 @@
 {
   "pack": "slash-desk",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "slash",
   "title": "Slash on your machine",
   "summary": "Hands the heavy thinking of composing a page to your own machine. You press it on Slash, one job runs on a machine you enrolled, and what it would change waits for you in Decide. It writes nothing itself.",
-  "changes": "The first version.",
+  "changes": "The first version. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

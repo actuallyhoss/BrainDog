@@ -1,9 +1,10 @@
 {
   "pack": "new-project",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "icon": "projects",
   "title": "Starting a project",
   "summary": "A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",

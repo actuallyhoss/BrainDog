@@ -171,7 +171,7 @@ test('the file reads clean as an add-on somebody opens from disk: the list of re
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'worked-numbers');
   const doc = template();
-  assert.equal(doc.version, '1.0.0');
+  assert.equal(doc.version, '1.0.1');
   /* THE ONE VALUE IT LAYS ON A LIST IT DOES NOT OWN: `worked`, after the Source's own. */
   assert.deepEqual(doc.extends, { 'register.datapoints': { values: { source: ['worked'] }, labels: { source: { worked: 'Worked out' } } } });
   const list = doc.declarations.find((d) => d.register === 'recipes') as { name: string; fields: Field[] };

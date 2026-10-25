@@ -1,9 +1,10 @@
 {
   "pack": "stripe",
-  "version": "1.4.0",
+  "version": "1.4.1",
+  "icon": "badge-dollar-sign",
   "title": "Stripe",
   "summary": "Reads the Stripe balance, available and pending, and the payouts on their way to the bank from api.stripe.com every hour, into Money's accounts.",
-  "changes": "Stripe money counts once. A Stripe balance you typed in yourself is taken over instead of counted a second time, the Stripe accounts keep their place when you rename them, the key and the book can be changed on this page, and currencies Stripe counts differently, such as ISK, read right.",
+  "changes": "Stripe money counts once. A Stripe balance you typed in yourself is taken over instead of counted a second time, the Stripe accounts keep their place when you rename them, the key and the book can be changed on this page, and currencies Stripe counts differently, such as ISK, read right. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

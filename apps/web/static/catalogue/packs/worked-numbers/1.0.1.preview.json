@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "made_at": "2026-10-25T20:51:43.807Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Number"
+            },
+            {
+              "field": "thing",
+              "label": "Project"
+            },
+            {
+              "field": "how",
+              "label": "How"
+            },
+            {
+              "field": "of",
+              "label": "From"
+            },
+            {
+              "field": "with",
+              "label": "And"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Newest value"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Newest amount"
+            },
+            {
+              "field": "unit",
+              "label": "Unit"
+            },
+            {
+              "field": "worked_at",
+              "label": "Worked out"
+            }
+          ],
+          "empty": "No number is worked out yet. Add one: say what it is called, which measures it reads and how they are put together, and it is worked out once a day.",
+          "heading": "Each one and what it last came to",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.recipes",
+          "span": 12,
+          "key": "k1bia3wv",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "observe",
+      "nav": {
+        "order": 7,
+        "section": "Projects"
+      },
+      "page": "worked",
+      "requires": [
+        "register.recipes",
+        "register.datapoints",
+        "register.things"
+      ],
+      "title": "Worked numbers",
+      "read_at": "2026-10-25T20:51:43.807Z",
+      "zone": "UTC",
+      "look": {
+        "look": "worked",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

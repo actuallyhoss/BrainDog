@@ -1,0 +1,55 @@
+{
+  "pack": "pad-second-opinion",
+  "version": "1.0.1",
+  "icon": "messages-square",
+  "title": "Pad second opinion",
+  "summary": "A second opinion written under each note on the pad. It asks your record's model about every note with no reply, so each note spends some of its allowance.",
+  "changes": "The first version: the second opinion the pad used to write itself, now an add-on of its own. Now draws its own icon.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "pad": ">=1.2.0 <2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "rule": "pad_second_opinion",
+      "name": "Write a second opinion under each note",
+      "on": {
+        "written": {
+          "register": "notes",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "text",
+            "reply"
+          ]
+        }
+      },
+      "when": "reply is empty",
+      "once_per": [
+        "entry",
+        "text"
+      ],
+      "steps": [
+        {
+          "ask_slash": {
+            "question": "Give a short second opinion on this note, in two or three plain sentences: what it gets right, and what it may be missing. The note: {{trigger.row.text}}",
+            "as": "opinion"
+          }
+        },
+        {
+          "set": {
+            "field": "reply",
+            "to": "{{vars.opinion}}"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
-  import { glyphOf } from './ListingCard.svelte';
+  import { glyphOf, ownIcon } from './ListingCard.svelte';
   import { describe, listingHolds } from './describe.ts';
   import { latestOf, listingHref, type Action, type Listing } from './listing.ts';
   import { words } from './words.ts';
@@ -36,7 +36,7 @@
 
 <li class="listing-row">
   <a class="row-link" href={at(listingHref(listing))}>
-    <IconWell name={glyph ?? glyphOf(listing)} size="l" />
+    <IconWell name={ownIcon(listing) ?? glyph ?? glyphOf(listing)} size="l" />
     <span class="lr-words">
       <span class="lr-name">{listing.title}</span>
       <span class="lr-line">{listing.summary}</span>

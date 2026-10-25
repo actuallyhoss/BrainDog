@@ -31,7 +31,7 @@
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { digest, fillConfig, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
+import { digest, fillConfig, glyphFault, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration, type PackSource } from './index.ts';
@@ -184,6 +184,8 @@ export type CatalogueEntry = {
    * installable by id and updated as any other, and left out of every listing.
    */
   unlisted?: true;
+  /** The icon its latest file names from the app's icon set, drawn on Browse, the installed list and its page; absent draws the generic one. */
+  icon?: string;
   /**
    * A use case's: the words its latest file says it is heard in, as the first run listens for them, and the modules it
    * stands on (USE-A16). Left out by an add-on, by a use case whose file says none, and by an index written before
@@ -197,7 +199,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -572,7 +574,7 @@ const wordsRead = (x: unknown): string[] | null => (Array.isArray(x) && x.every(
  * from a hand-edited index is dropped rather than heard.
  */
 const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): CatalogueEntry => {
-  const { categories, publisher, unlisted, signals, modules, ...rest } = e;
+  const { categories, publisher, unlisted, signals, modules, icon, ...rest } = e;
   const named = Array.isArray(categories) ? CATEGORIES.filter((c) => categories.includes(c)) : null;
   const who: Publisher | null =
     isMap(publisher) && (publisher.kind === 'braindog' || publisher.kind === 'key' || publisher.kind === 'person') && typeof publisher.id === 'string' && typeof publisher.name === 'string'
@@ -585,6 +587,7 @@ const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): Ca
     ...(named ? { categories: named } : {}),
     ...(who ? { publisher: who } : {}),
     ...(unlisted === true ? { unlisted: true as const } : {}),
+    ...(typeof icon === 'string' && glyphFault(icon) === null ? { icon } : {}),
     ...(e.kind === 'usecase' && wordsRead(signals) ? { signals: wordsRead(signals) as string[] } : {}),
     ...(e.kind === 'usecase' && wordsRead(modules) ? { modules: wordsRead(modules) as string[] } : {}),
   };
@@ -760,6 +763,15 @@ export async function publishTo(
   if (flag !== undefined && flag !== true)
     return no('PACK_MALFORMED', 'unlisted is either true, for a pack named for one person or one bank, or left out.', { at: 'unlisted' });
 
+  /* AN ICON IS A NAME FROM THE APP'S ICON SET, and an unknown one is refused with the nearest names. */
+  const iconSaid = file.kind === 'pack' ? file.file.doc.icon : undefined;
+  if (iconSaid !== undefined) {
+    if (typeof iconSaid !== 'string') return no('PACK_MALFORMED', "icon is the name of one icon from the app's icon set, such as wallet or people. Write it as a word, or take it out.", { at: 'icon' });
+    const unknown = glyphFault(iconSaid);
+    if (unknown) return no('PACK_MALFORMED', `icon: ${unknown.fix} Use one of those, or take icon out and the generic icon is drawn.`, { at: 'icon' });
+  }
+  const iconName = typeof iconSaid === 'string' ? iconSaid : null;
+
   const checksum = await fileChecksum(text);
   const was = index.entries.find((e) => e.id === s.id && e.kind === kind) ?? null;
   const same = was?.versions.find((v) => v.version === s.version);
@@ -841,6 +853,7 @@ export async function publishTo(
     categories: categoriesOf(file, by?.kind === 'braindog' ? BRAINDOG_PUBLISHER.name : ''),
     ...(by ? { publisher: by } : {}),
     ...(flag === true ? { unlisted: true as const } : {}),
+    ...(iconName !== null ? { icon: iconName } : {}),
     /* WHAT THE FIRST RUN HEARS A USE CASE IN, from its own file: the words and the modules it stands on, so a stranger's
        sentence can point at it without a list in code naming it. Said only when the file says some. */
     ...(file.kind === 'usecase' && file.shared.usecase.signals.length > 0 ? { signals: [...file.shared.usecase.signals] } : {}),

@@ -43,6 +43,7 @@ The top of a pack file says what the add-on is and what it needs. Its keys are t
 - `changes`: what this version changed, in words a person will notice, at most 500 characters. The catalogue shows it
   as the version's notes.
 - `author` and `license`.
+- `icon` (optional): the name of one icon from the app's icon set, drawn beside the add-on in the store and the installed list.
 - `requires`: the format and primitives it is written for, and each add-on it needs installed first, with a version
   range, as `"money-core": ">=3.0.0 <4.0.0"`.
 - `declarations`: the lists, pages, figures, rules, digests and scripts it adds. Beside them, `extends` lays optional

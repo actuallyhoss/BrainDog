@@ -25,7 +25,7 @@ import { FIRST_PARTY_LISTS } from '@braindog/declare';
 import { MODULE_ORDER } from './usecases/index.ts';
 import { MODULE_NAMES } from './usecases/names.ts';
 import { AGENTS_PACK, agentsPackDocument } from './packs/agents.ts';
-import { FIRST_PARTY, firstPartyDocument, firstPartyManifest } from './packs/first-party.ts';
+import { FIRST_PARTY, FIRST_PARTY_ICONS, firstPartyDocument, firstPartyManifest } from './packs/first-party.ts';
 
 export type ModuleInfo = {
   id: string;
@@ -50,6 +50,8 @@ export type ModuleInfo = {
   leans: readonly string[];
   /** Lower-case words and short phrases a person uses for what it keeps. */
   signals: readonly string[];
+  /** The icon it wears in the store and the installed list, a name from the app's icon set. */
+  icon: string;
 };
 
 /** The words the first run hears Agents in. */
@@ -66,7 +68,7 @@ const leansOf = (id: string, requires: readonly string[]): string[] => [
 ];
 
 /** One module's card, from its document and manifest. */
-function infoOf(id: string, doc: Body, version: string, requires: readonly string[], signals: readonly string[]): ModuleInfo {
+function infoOf(id: string, doc: Body, version: string, requires: readonly string[], signals: readonly string[], icon: string): ModuleInfo {
   const declarations = Array.isArray(doc.declarations) ? (doc.declarations as Body[]) : [];
   const registers: string[] = [];
   const pages: string[] = [];
@@ -96,6 +98,7 @@ function infoOf(id: string, doc: Body, version: string, requires: readonly strin
     titles,
     leans: leansOf(id, requires),
     signals,
+    icon,
   };
 }
 
@@ -106,9 +109,9 @@ export function firstPartyModules(): readonly ModuleInfo[] {
   if (known !== null) return known;
   const five = FIRST_PARTY.map((id) => {
     const manifest = firstPartyManifest(id);
-    return infoOf(id, firstPartyDocument(id, { seeds: [] }) ?? {}, manifest.version, manifest.requires, manifest.signals);
+    return infoOf(id, firstPartyDocument(id, { seeds: [] }) ?? {}, manifest.version, manifest.requires, manifest.signals, FIRST_PARTY_ICONS[id]);
   });
-  const agents = infoOf('agents', agentsPackDocument(), AGENTS_PACK.manifest.version, AGENTS_PACK.manifest.requires, AGENTS_SIGNALS);
+  const agents = infoOf('agents', agentsPackDocument(), AGENTS_PACK.manifest.version, AGENTS_PACK.manifest.requires, AGENTS_SIGNALS, 'skill');
   const all = [...five, agents];
   known = MODULE_ORDER.flatMap((id) => all.filter((m) => m.id === id));
   return known;

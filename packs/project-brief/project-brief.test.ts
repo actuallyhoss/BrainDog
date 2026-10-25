@@ -388,11 +388,11 @@ test('installing it twice changes nothing, and uninstalling it keeps every brief
 test('the same file passes as an add-on somebody opens from disk, and 2.1.0 is 2.0.0 with one block more', async () => {
   const text = readFileSync(PACK_FILE, 'utf8');
   const file = said<{ pack: { manifest: { pack: string; version: string; extends?: unknown } } }>(await readPackFile(text));
-  assert.deepEqual([file.pack.manifest.pack, file.pack.manifest.version], ['project-brief', '2.1.0']);
+  assert.deepEqual([file.pack.manifest.pack, file.pack.manifest.version], ['project-brief', '2.1.1']);
   assert.deepEqual(Object.keys(file.pack.manifest.extends as object), ['register.things']);
   /* 2.0.0 IS RELEASED, so the file in packs/ is it with the stopped block laid in and its own version and changes line,
      and nothing else of 2.0.0 moved. */
-  const now = brief() as { adds: { block: { source?: string } }[] } & Record<string, unknown>;
+  const { icon: _icon, ...now } = brief() as { adds: { block: { source?: string } }[] } & Record<string, unknown>;
   const was = published('2.0.0');
   assert.deepEqual(
     { ...now, version: was.version, changes: was.changes, adds: now.adds.filter((a) => a.block.source !== 'actions.blocking') },
@@ -401,7 +401,7 @@ test('the same file passes as an add-on somebody opens from disk, and 2.1.0 is 2
   );
   /* THE CATALOGUE'S 2.1.0 IS WRITTEN BY tools/catalogue/from-packs.mjs, and once written it is this file. */
   const shipped = new URL('../../apps/web/static/catalogue/packs/project-brief/2.1.0.pack.json', import.meta.url);
-  if (existsSync(shipped)) assert.deepEqual(published('2.1.0'), brief(), 'the catalogue\'s 2.1.0 is not the file in packs/; run tools/catalogue/from-packs.mjs');
+  if (existsSync(shipped)) assert.deepEqual(published('2.1.1'), brief(), 'the catalogue\'s 2.1.1 is not the file in packs/; run tools/catalogue/from-packs.mjs');
   /* NO ID, NO EM DASH AND NO "ROW" IN WHAT A PERSON READS: the labels, headings, empty lines and the button's name. */
   const words = JSON.stringify(brief(), (k, v: unknown) => (k === 'source' ? undefined : v));
   assert.doesNotMatch(words, /—|\brows?\b|\b[0-9A-HJKMNP-TV-Z]{26}\b/u);
@@ -463,7 +463,7 @@ test('A RECORD ON 2.0.0 TAKES 2.1.0 WITH EVERY BRIEF AND STEP KEPT, and the proj
   /* ONE BLOCK MORE ON A PAGE IS ADDITIVE: nothing to approve and nothing in conflict. */
   assert.deepEqual([diff.approve, diff.conflicts], [[], []]);
   said(await put(api, brief()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'project-brief')?.version, '2.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'project-brief')?.version, '2.1.1');
   const fields = api.kernel.get(kiln)!.fields;
   assert.deepEqual([fields.about, fields.stage, fields.blockers], ['A type foundry', 'building', ['The licence text']]);
   assert.deepEqual(await stepsOn(api, 'kiln'), [['Ship the variable axis', 'First sale', false]]);

@@ -101,7 +101,7 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      that files says so. A block and a sentence added, so a minor.
      1.4.1 BESIDE THE PUBLISHED 1.4.0: the two blocks follow Heads up, in the main column, where they followed What it
      holds today, which Money no longer has. Where two blocks stand, nothing added or taken away, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '1.4.1');
+  assert.equal(file.value.pack.manifest.version, '1.4.2');
   assert.match(PACK.changes, /The box to count the cash in and the last count now go with Heads up on Money/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);

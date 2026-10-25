@@ -1,9 +1,10 @@
 {
   "pack": "standup",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "message-circle",
   "title": "Standup",
   "summary": "One message every morning about the work: what moved since yesterday, what is blocked, and what agents finished. A morning with none of the three sends nothing.",
-  "changes": "The first version.",
+  "changes": "The first version. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

@@ -1,9 +1,10 @@
 {
   "pack": "task-tiers",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "list-ordered",
   "title": "Task tiers",
   "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and the record works out its priority and writes the sum as the reason.",
-  "changes": "The first version.",
+  "changes": "The first version. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

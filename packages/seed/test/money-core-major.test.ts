@@ -133,10 +133,10 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
   /* AND IN BATCH 17 EACH KEEPS THE PAYEE AS ITS SOURCE WROTE IT, bank-hsbc-eg 1.6.0 and mercury 1.1.0, minor steps. Both
      floors move to money-core 3.10.0, which declares `counterparty_text` on the ledger that each now writes: laid by
      each pack it was `PROVIDES_CONFLICT` against money-core and between any two of them. */
-  assert.equal(bankHsbcEgFile().version, '1.7.2');
+  assert.equal(bankHsbcEgFile().version, '1.7.3');
   /* AND MERCURY 1.2.0 (REC-A05, batch 42): its accounts met by name on first contact, a minor step of its own, with no
      floor of money-core moved. */
-  assert.equal(mercuryFile().version, '1.2.0');
+  assert.equal(mercuryFile().version, '1.2.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(

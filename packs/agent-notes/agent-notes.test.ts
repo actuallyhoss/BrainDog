@@ -104,7 +104,7 @@ const OPTIONS = { options: [{ id: 'yes', label: 'Yes', because: 'It is ready' },
 
 test('THE FILE IS agent-notes 1.0.0, on Agents, two digests at 08:00 and 17:00 with no mail, no zone and no prose', () => {
   const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Decl[] };
-  assert.deepEqual([doc.pack, doc.version], ['agent-notes', '1.0.0']);
+  assert.deepEqual([doc.pack, doc.version], ['agent-notes', '1.0.1']);
   assert.deepEqual(doc.requires.packs, { agents: '^1.0.0' });
   assert.deepEqual(
     doc.declarations.map((d) => [d.digest, d.schedule, d.channels, d.prose]),

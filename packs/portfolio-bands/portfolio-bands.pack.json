@@ -1,9 +1,10 @@
 {
   "pack": "portfolio-bands",
-  "version": "2.2.0",
+  "version": "2.2.1",
+  "icon": "chart-bar",
   "title": "Revenue bands",
   "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
-  "changes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own.",
+  "changes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. Now draws its own icon.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
