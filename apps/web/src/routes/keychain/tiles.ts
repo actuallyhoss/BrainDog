@@ -275,3 +275,97 @@ export function sharedState(keys: readonly KeyRow[]): string | null {
   const word = states[0]!.word;
   return states.every((st) => st.word === word) ? word : null;
 }
+
+/* ── sorted, dated and used by ────────────────────────────────────────── */
+
+/** The orders the Keys list is drawn in. The choice is the screen's, never the address's. */
+export type SortBy = 'name' | 'opened-recently' | 'changed-recently' | 'most-opened';
+
+export const SORTS: readonly { id: SortBy; name: string }[] = [
+  { id: 'name', name: 'Name' },
+  { id: 'opened-recently', name: 'Recently opened' },
+  { id: 'changed-recently', name: 'Recently changed' },
+  { id: 'most-opened', name: 'Most opened' },
+];
+
+const byName = (a: KeyRow, b: KeyRow): number => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+const stamp = (iso: string | null | undefined): number => {
+  const t = iso ? Date.parse(iso) : Number.NaN;
+  return Number.isFinite(t) ? t : -Infinity;
+};
+
+/** The keys in the order asked, a new array. A key with no date for the order sorts after those with one, by name. */
+export function sortKeys(keys: readonly KeyRow[], by: SortBy): KeyRow[] {
+  const out = [...keys];
+  const newest = (date: (k: KeyRow) => number): KeyRow[] =>
+    out.sort((a, b) => {
+      const x = date(a);
+      const y = date(b);
+      return x === y ? byName(a, b) : y > x ? 1 : -1;
+    });
+  switch (by) {
+    case 'opened-recently':
+      return newest((k) => stamp(k.lastOpened));
+    case 'changed-recently':
+      return newest((k) => stamp(k.changed));
+    case 'most-opened':
+      return out.sort((a, b) => b.opened - a.opened || byName(a, b));
+    default:
+      return out.sort(byName);
+  }
+}
+
+export const dated = {
+  sortLabel: 'Sort keys',
+  changed: (when: string) => `Changed ${when}`,
+  expires: (when: string) => `Expires ${when}`,
+  expired: (when: string) => `Expired ${when}`,
+  usedBy: 'Used by',
+  usedByNone: 'Nothing names this key yet.',
+  details: 'Details',
+  locked: 'Locked',
+  lockedWhy: 'The Keychain locked itself after a while with no one here. Sign in again to open your keys.',
+  unlock: 'Unlock',
+  lockNow: 'Lock now',
+  asOf: (day: string) => `as of ${day}`,
+} as const;
+
+/** "Changed 3 weeks ago", or `null` for a key whose grant dates nothing. */
+export const changedSaid = (k: KeyRow, now: number = Date.now()): string | null => (k.changed ? dated.changed(sinceWords(k.changed, now)) : null);
+
+/** "Expires in 2 weeks" or "Expired 3 days ago", from the register's deadline, or `null` for a key with none. */
+export function expiresSaid(k: KeyRow, now: number = Date.now()): string | null {
+  if (!k.expires) return null;
+  const said = relativeWords(k.expires, now);
+  return Date.parse(`${k.expires}T12:00:00Z`) < now - 43_200_000 ? dated.expired(said) : dated.expires(said);
+}
+
+/** What the screen has already read that can name a key: scheduled actions, tools and scripts. */
+export type UseSources = {
+  actions?: readonly { ingest: string; key: string | null }[];
+  /** Tool rows as a list read gives them, with the list's id in `register` so the row's page can be linked. */
+  tools?: readonly { id: string; seq?: number | null; register?: string; fields: Record<string, unknown> }[];
+  scripts?: readonly { script: string; title: string; keys: readonly string[] }[];
+};
+
+export type Use = { kind: 'action' | 'tool' | 'script'; name: string; href: string | null };
+
+/**
+ * WHO NAMES THIS KEY, from reads that already exist: an action's `key` and a script's `keys` are the key's label; a
+ * tool's `needs` names `credentials#n` or the label. Nothing is guessed from a likeness, and no value is read.
+ */
+export function usesOf(k: KeyRow, from: UseSources): Use[] {
+  const label = k.label.trim().toLowerCase();
+  const names = (v: string): boolean => {
+    const t = v.trim().toLowerCase();
+    return t !== '' && (t === label || (k.spoken !== null && t === k.spoken.toLowerCase()));
+  };
+  const out: Use[] = [];
+  for (const a of from.actions ?? []) if (a.key !== null && names(a.key)) out.push({ kind: 'action', name: a.ingest, href: null });
+  for (const t of from.tools ?? []) {
+    const needs = Array.isArray(t.fields.needs) ? t.fields.needs.filter((n): n is string => typeof n === 'string') : [];
+    if (needs.some(names)) out.push({ kind: 'tool', name: String(t.fields.name ?? t.id), href: typeof t.seq === 'number' && t.register ? `/r/${t.register}/${t.seq}` : null });
+  }
+  for (const s of from.scripts ?? []) if (s.keys.some(names)) out.push({ kind: 'script', name: s.title || s.script, href: null });
+  return out;
+}

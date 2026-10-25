@@ -62,7 +62,11 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
-  import { cameFromOf, foldsOpen, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, sharedState, stateOf, twinsOf, words as tileWords, type KeyGroup } from './tiles.ts';
+  import {
+    cameFromOf, changedSaid, dated, expiresSaid, foldsOpen, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, sharedState, SORTS, sortKeys, stateOf, twinsOf, usesOf,
+    words as tileWords, type KeyGroup, type SortBy, type UseSources,
+  } from './tiles.ts';
+  import { createIdle, lockAfterOf, type Idle } from '$lib/record/keychain-idle.ts';
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
 
@@ -80,7 +84,13 @@
   /* AND WHAT IS TYPED IN THE BOX (Y26): 176 keys in one list were found by scrolling 22,900 px on a phone. */
   let findText = $state('');
   const finding = $derived(findText.trim() || asked || '');
-  const shownKeys = $derived(keysFor(keys, finding));
+  /* HOW THE KEYS ARE ORDERED: this screen's own choice, kept out of the address. */
+  let sortBy = $state<SortBy>('name');
+  const shownKeys = $derived(sortKeys(keysFor(keys, finding), sortBy));
+  /* WHAT NAMES A KEY (actions, tools, scripts), read once after the keys drew, for each key's details. */
+  let useFrom = $state.raw<UseSources>({});
+  /* WHEN THE KEYS WERE READ, so the counts say how old they are (audit 25 October, P24). */
+  let readAt = $state(Date.now());
   const groups = $derived(groupsOf(shownKeys));
   const severalGroups = $derived(groups.length > 1 || (groups[0]?.services.length ?? 0) > 1);
   /* EACH PROJECT FOLDS UNDER ITS NAME AND COUNT, and opens while a search is typed (`foldsOpen`). */
@@ -205,6 +215,8 @@
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
       void whoOpened();
       void twinsRead();
+      void usesRead();
+      readAt = Date.now();
       from = 'live';
       void scopeNote();
       /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN (audit 25 October, X24): the only question that says is a write,
@@ -355,7 +367,18 @@
       moreKeys = credentials.more;
     }
     if (grants.ok) forConnectors = connectorGrants(grants.value);
+    readAt = Date.now();
     void whoOpened();
+  }
+
+  /* WHO NAMES EACH KEY, from three reads that already exist; a refused one names nobody rather than failing the page. */
+  async function usesRead() {
+    const c = client;
+    if (!c) return;
+    /* TOOLS ARE NOT READ HERE YET: the web may not name the Agents pack's Tools list (web-lists), so `usesOf` takes them
+       once the record hands this screen that list's id. */
+    const [actions, scripts] = await Promise.all([c.actions().catch(() => null), c.scripts().catch(() => null)]);
+    useFrom = { ...(actions?.ok ? { actions: actions.value } : {}), ...(scripts?.ok ? { scripts: scripts.value } : {}) };
   }
 
   /* WHO OPENED EACH KEY LAST, asked after the index is drawn, so a slow answer never holds the keys back; the line
@@ -434,6 +457,45 @@
 
   /* AND LEAVING THE SCREEN PUTS IT AWAY. A route change destroys this component, and a timer still holding the
      last value would be a value alive in a tab nobody is looking at. */
+  /**
+   * THE IDLE LOCK (`keychain-idle.ts`): after the lock time with no input every value is put away, anything typed into a
+   * sheet is dropped, and the screen says Locked until the sign-in is proved again. The 30 s hide above and the 60 s
+   * clipboard clear run as they did. The lock time is the record's where it says one, else fifteen minutes.
+   */
+  let locked = $state(false);
+  let unlocking = $state(false);
+  let idle: Idle | null = null;
+  const lockAfter = $derived(lockAfterOf(undefined));
+  function lockScreen() {
+    forget();
+    shut();
+    shutAsk();
+    form = blank();
+    askPass = '';
+    locked = true;
+  }
+  onMount(() => {
+    idle = createIdle(lockAfter * 60_000, lockScreen);
+    const touch = () => idle?.touch();
+    const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
+    for (const e of events) window.addEventListener(e, touch, { passive: true });
+    return () => {
+      for (const e of events) window.removeEventListener(e, touch);
+      idle?.stop();
+    };
+  });
+  const lockNow = () => idle?.lockNow();
+  async function unlock() {
+    if (unlocking) return;
+    unlocking = true;
+    /* THE SAME RE-PROOF A STALE SIGN-IN GETS: a passkey here, or the sign-in page and back. */
+    const proved = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
+    unlocking = false;
+    if (!proved) return;
+    locked = false;
+    idle?.unlock();
+  }
+
   onDestroy(() => {
     forget();
     if (clipboard) clearTimeout(clipboard);
@@ -456,6 +518,7 @@
       refuse();
       return;
     }
+    if (locked) return;
     sheetSaid = '';
     form = blank();
     sheet = { mode: 'add' };
@@ -484,6 +547,7 @@
       refuse();
       return;
     }
+    if (locked) return;
     sheetSaid = '';
     form = { ...blank(), connector: row.grant !== null && forConnectors.has(row.grant) };
     sheet = { mode: 'replace', row };
@@ -572,7 +636,7 @@
       refuse();
       return;
     }
-    if (revealing !== '') return;
+    if (revealing !== '' || locked) return;
     /* BEHIND A PASSPHRASE, REVEAL ASKS FOR IT FIRST, in a sheet of its own, rather than sending a request it knows the
        record will refuse. */
     if (lock.state === 'on' && passphrase === '') {
@@ -702,8 +766,17 @@
     </Tile>
   {/if}
 
-  <Tile icon="key" class="section" data-surface="tile" title={words.keys} count={keys.length || undefined}>
+  {#if locked}
+    <!-- LOCKED: nothing is shown and nothing can be revealed until the sign-in is proved again. Calm, not an error. -->
+    <Tile icon="lock" title={dated.locked} data-part="locked">
+      <p class="said">{dated.lockedWhy}</p>
+      <div class="row-actions"><Button weight="primary" disabled={unlocking} onclick={() => void unlock()}>{dated.unlock}</Button></div>
+    </Tile>
+  {/if}
+
+  <Tile icon="key" class="section" data-surface="tile" title={words.keys}>
     {#snippet actions()}
+      {#if acts && !locked}<Button weight="quiet" onclick={lockNow}>{dated.lockNow}</Button>{/if}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
       {#if acts && index.kind === 'held'}
         <span class="add-desk"><Button onclick={openAdd}>{words.addKey}</Button></span>
@@ -742,7 +815,16 @@
       {#if asked}<p class="said">{tileWords.searched(asked, shownKeys.length)} <a href={at('/keychain')}>{tileWords.everyKey}</a></p>{/if}
       <!-- THE BOX THAT FINDS A KEY AS IT IS TYPED: its name, what it opens or who it is with. -->
       {#if keys.length > 1}
-        <div class="find"><label class="vh" for="key-find">{tileWords.find}</label><input class="field-input find-input" id="key-find" type="search" autocomplete="off" placeholder={tileWords.find} bind:value={findText} /></div>
+        <div class="find">
+          <label class="vh" for="key-find">{tileWords.find}</label>
+          <div class="field find-field"><input class="field-input find-input" id="key-find" type="search" autocomplete="off" placeholder={tileWords.find} bind:value={findText} /></div>
+          <label class="vh" for="key-sort">{dated.sortLabel}</label>
+          <div class="field sort-field">
+            <select class="field-input" id="key-sort" bind:value={sortBy}>
+              {#each SORTS as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+            </select>
+          </div>
+        </div>
       {/if}
       {#if findText.trim() !== '' && shownKeys.length === 0}<p class="said">{tileWords.searched(findText.trim(), 0)}</p>{/if}
       {#if shared}<p class="said">{tileWords.sharedSaid(shared)}</p>{/if}
@@ -795,6 +877,13 @@
                   {#if !state.sealed && state.word !== shared}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
                   {#if twins.has(k.id)}<span class="sep" aria-hidden="true">{' · '}</span><span class="twice">{tileWords.twice}</span>{/if}
                 </span>
+                {#if changedSaid(k, readAt) || expiresSaid(k, readAt)}
+                  <span class="line-detail key-dates">
+                    {#if changedSaid(k, readAt)}<span class="key-changed">{changedSaid(k, readAt)}</span>{/if}
+                    {#if changedSaid(k, readAt) && expiresSaid(k, readAt)}<span class="sep" aria-hidden="true">{' · '}</span>{/if}
+                    {#if expiresSaid(k, readAt)}<span class="key-expires" class:key-warn={k.expires && k.expires < new Date(readAt).toISOString().slice(0, 10)}>{expiresSaid(k, readAt)}</span>{/if}
+                  </span>
+                {/if}
               </span>
               <span class="key-count">
                 {#if k.sealed && counts}
@@ -812,7 +901,7 @@
                 <span class="line-verbs who-do key-do">
                   {#if action?.act === 'reveal'}
                     <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
-                    <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                    <Button size="sm" disabled={revealing === k.id || locked} onclick={() => void revealKey(k)}>
                       {revealing === k.id ? words.revealing : words.reveal}
                     </Button>
                   {:else if action?.act === 'seal'}
@@ -850,6 +939,21 @@
                 </div>
               </div>
             {/if}
+            <!-- WHAT NAMES THIS KEY, from the actions, tools and scripts already read; no value is read for it. -->
+            {#each [usesOf(k, useFrom)] as uses}
+            <details class="key-details">
+              <summary>{dated.usedBy}{uses.length > 0 ? ` (${uses.length})` : ''}</summary>
+              {#if uses.length === 0}
+                <p>{dated.usedByNone}</p>
+              {:else}
+                <ul>
+                  {#each uses as u (u.kind + u.name)}
+                    <li>{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if} <span class="group-count">{u.kind}</span></li>
+                  {/each}
+                </ul>
+              {/if}
+            </details>
+            {/each}
           </li>
         {/each}
       </ul>
@@ -895,7 +999,7 @@
   {#if opens}
     <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink.
          Counts and names only; a value never reaches a chart. -->
-    <Tile icon="key" title={tileWords.opensTitle} meta={tileWords.opensMeta}>
+    <Tile icon="key" title={tileWords.opensTitle} meta={`${tileWords.opensMeta} · ${dated.asOf(new Date(readAt).toLocaleDateString('en', { day: 'numeric', month: 'short' }))}`}>
       <p class="figure num">{opens.total.toLocaleString('en')}<span class="figure-unit">{tileWords.opensUnit(opens.total)}</span></p>
       <Bars items={opens.bars} subject={tileWords.opensTitle} />
       <p class="reading">{opens.reading}</p>
@@ -1088,11 +1192,54 @@
   }
 
   .find {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
     margin: 0 0 var(--sp-3);
+  }
+
+  .find-field {
+    flex: 1 1 14rem;
+  }
+
+  .sort-field {
+    flex: 0 1 12rem;
   }
 
   .find-input {
     inline-size: 100%;
+  }
+
+  /* THE COUNT ON A PROJECT'S LINE SITS AT ITS END, on the column every row's count keeps. */
+  .group-count {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .key-dates,
+  .key-details {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .key-details {
+    padding-block: var(--sp-1);
+  }
+
+  .key-details summary {
+    cursor: pointer;
+    min-block-size: var(--tap);
+    display: flex;
+    align-items: center;
+  }
+
+  .key-details ul {
+    margin: 0;
+    padding-inline-start: var(--sp-5);
+  }
+
+  .key-warn {
+    color: var(--warn);
   }
 
   /* A KEY HELD TWICE, said in words beside what it opens. */

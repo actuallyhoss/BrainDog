@@ -310,6 +310,10 @@ export type KeyRow = {
   bytes?: number;
   /** What the sealed value is, unopened ("a 40-character value"), as the host wrote it when it sealed. Absent as `bytes` is. */
   hint?: string;
+  /** When the value was last put in or rotated, else when it was first sealed. Absent where the grant says neither. */
+  changed?: string;
+  /** The day the key runs out, from the register's `expires` deadline, else the grant's own. Absent where there is none. */
+  expires?: string;
 };
 
 /** `listGrants`, with only the keys read here. `bytes` and `hint` are absent from a host older than them and null on an older seal. */
@@ -320,6 +324,9 @@ export type GrantState = {
   revoked_at: string | null;
   bytes?: number | null;
   hint?: string | null;
+  created_at?: string | null;
+  rotated_at?: string | null;
+  expires_at?: string | null;
 };
 
 type KnownState = { sealed: boolean; opened: number; last_opened: string | null; bytes?: unknown; hint?: unknown };
@@ -343,6 +350,18 @@ function unopened(from: { bytes?: unknown; hint?: unknown }): { bytes?: number; 
 
 const isKnown = (v: unknown): v is KnownState =>
   typeof v === 'object' && v !== null && typeof (v as KnownState).sealed === 'boolean' && typeof (v as KnownState).opened === 'number';
+
+/** WHEN A KEY'S VALUE LAST CHANGED: the grant's rotation, else its first sealing. Nothing is guessed for a grant that says neither. */
+function changedOf(grant: GrantState | undefined): { changed?: string } {
+  const at = [grant?.rotated_at, grant?.created_at].find((v): v is string => typeof v === 'string' && Number.isFinite(Date.parse(v)));
+  return at ? { changed: at } : {};
+}
+
+/** THE DAY A KEY RUNS OUT: the register's `expires` deadline first, the grant's own day where the row names none. */
+function expiresOf(field: unknown, grant: GrantState | undefined): { expires?: string } {
+  const day = [field, grant?.expires_at].find((v): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(v));
+  return day ? { expires: day.slice(0, 10) } : {};
+}
 
 /**
  * The credentials register's rows as the index draws them: retired rows are gone, and the order is
@@ -390,6 +409,8 @@ export function keysOf(
         lastOpened: known?.last_opened ?? grant?.last_opened ?? null,
         ...(typeof r.fields.where === 'string' && r.fields.where.trim() !== '' ? { kept: true } : {}),
         ...(sealed ? unopened(known ?? grant ?? {}) : {}),
+        ...changedOf(grant),
+        ...expiresOf(r.fields.expires, grant),
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
