@@ -62,11 +62,14 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
+  import AskTile from './AskTile.svelte';
+  import AccessSheet from './AccessSheet.svelte';
+  import { accessWords } from './access.ts';
   import {
     cameFromOf, changedSaid, dated, expiresSaid, foldsOpen, groupsOf, hintOf, keysFor, opensInWords, opensOf, rowAction, rowPath, sentenceOf, sharedState, SORTS, sortKeys, stateOf, twinsOf, usesOf,
     words as tileWords, type KeyGroup, type SortBy, type UseSources,
   } from './tiles.ts';
-  import { createIdle, lockAfterOf, type Idle } from '$lib/record/keychain-idle.ts';
+  import { createIdle, lockAfterOf, LOCK_AFTER_MINUTES, type Idle } from '$lib/record/keychain-idle.ts';
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
 
@@ -218,6 +221,8 @@
       void usesRead();
       readAt = Date.now();
       from = 'live';
+      accessTick++;
+      void readLockAfter();
       void scopeNote();
       /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN (audit 25 October, X24): the only question that says is a write,
          `clearVaultPassphrase` with none, and opening a page writes nothing. A key door that wants one says so
@@ -464,7 +469,31 @@
   let locked = $state(false);
   let unlocking = $state(false);
   let idle: Idle | null = null;
-  const lockAfter = $derived(lockAfterOf(undefined));
+  /* THE LOCK WINDOW is the record's (`keyAccess`), fifteen minutes until it has said. */
+  let lockAfter = $state(lockAfterOf(undefined));
+  const rebuildIdle = () => {
+    idle?.stop();
+    idle = createIdle(lockAfter * 60_000, lockScreen);
+  };
+  /* WHAT THE ASK TILE AND THE ACCESS SHEET READ AGAIN FOR: bumped when this screen's own data is read. */
+  let accessTick = $state(0);
+  /* The key whose access sheet is open, by spoken id (else row id), and the ask an alert linked to. */
+  let accessFor = $state<KeyRow | null>(null);
+  const askFocus = $derived(page.url.searchParams.get('ask'));
+  async function readLockAfter() {
+    const out = await client?.keyAccess().catch(() => null);
+    if (out && out.ok) {
+      lockAfter = lockAfterOf(out.value.lock_after);
+      if (!locked) rebuildIdle();
+    }
+  }
+  async function chooseLockAfter(e: Event) {
+    const minutes = lockAfterOf((e.currentTarget as HTMLSelectElement).value);
+    const out = await client?.setLockAfter(minutes as 5 | 15 | 60).catch(() => null);
+    if (out && out.ok) lockAfter = lockAfterOf(out.value.lock_after);
+    else toasts.push(out && 'refusal' in out ? out.refusal.fix : accessWords.accessRefused, { intent: 'warn' });
+    if (!locked) rebuildIdle();
+  }
   function lockScreen() {
     forget();
     shut();
@@ -472,9 +501,11 @@
     form = blank();
     askPass = '';
     locked = true;
+    /* THE SERVER'S PROOF GOES STALE TOO, not only this screen. */
+    void client?.lockKeychain().catch(() => null);
   }
   onMount(() => {
-    idle = createIdle(lockAfter * 60_000, lockScreen);
+    rebuildIdle();
     const touch = () => idle?.touch();
     const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
     for (const e of events) window.addEventListener(e, touch, { passive: true });
@@ -492,7 +523,8 @@
     unlocking = false;
     if (!proved) return;
     locked = false;
-    idle?.unlock();
+    rebuildIdle();
+    accessTick++;
   }
 
   onDestroy(() => {
@@ -703,6 +735,7 @@
 </PageHead>
 
 <div class="page">
+  {#if acts}<AskTile {client} refresh={accessTick} focus={askFocus} paused={locked} {acts} />{/if}
   {#if waiting.length}
     <!--
       THE REQUEST LEADS, AND ONLY WHILE THERE IS ONE: it is time-boxed, so it is the one tile that is about now. Amber and
@@ -775,7 +808,15 @@
 
   <Tile icon="key" class="section" data-surface="tile" title={words.keys}>
     {#snippet actions()}
-      {#if acts && !locked}<Button weight="quiet" onclick={lockNow}>{dated.lockNow}</Button>{/if}
+      {#if acts && !locked}
+        <label class="vh" for="lock-after">{accessWords.lockAfter}</label>
+        <div class="field sort-field">
+          <select class="field-input" id="lock-after" value={String(lockAfter)} onchange={(e) => void chooseLockAfter(e)}>
+            {#each LOCK_AFTER_MINUTES as m (m)}<option value={String(m)}>{accessWords.lockAfter} {accessWords.minutes(m)}</option>{/each}
+          </select>
+        </div>
+        <Button weight="quiet" onclick={lockNow}>{dated.lockNow}</Button>
+      {/if}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
       {#if acts && index.kind === 'held'}
         <span class="add-desk"><Button onclick={openAdd}>{words.addKey}</Button></span>
@@ -865,6 +906,7 @@
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
                 {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{k.label}</a>{:else}<span class="line-title key-name" data-own>{k.label}</span>{/if}
+                {#if k.account}<span class="line-detail key-account" data-own>{k.account}</span>{/if}
                 <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
                      projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
                 <!-- WHERE IT APPLIES IS THE GROUP'S HEAD once there are groups, so the line says what it opens, in words:
@@ -917,6 +959,7 @@
                       <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}>{words.reveal}</button>
                     {/if}
                     <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{k.sealed ? words.replace : tileWords.sealValue}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => (accessFor = k)}>{accessWords.access}</button>
                     {#if k.grant && k.sealed}
                       <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
                     {/if}
@@ -1010,6 +1053,8 @@
   {#if acts}
     <Passphrase {lock} {client} keys={keys.length} onask={probe} onturn={(next) => (lock = next)} />
   {/if}
+
+  <AccessSheet {client} credential={accessFor ? (accessFor.spoken ?? accessFor.id) : null} label={accessFor?.label ?? ''} machines={holding} onclose={() => (accessFor = null)} />
 
   <Sheet open={sheet !== null} title={sheetTitle} subtitle={sheetHint} onclose={shut}>
     <form class="key-form" id="key-form" onsubmit={saveKey} novalidate>

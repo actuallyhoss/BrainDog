@@ -294,6 +294,8 @@ export type KeyRow = {
   opens: string;
   /** Who the key is with ("Azure", "Stripe"), as its row says, or `null`: the Keychain groups a project's keys by it. */
   provider?: string | null;
+  /** Which account the key is for (a user name or address), as its row says. Not secret. */
+  account?: string;
   project: string | null;
   /** Where the key applies, as the chip draws it: the project's spoken id, name, mark and hue, or `null` for
       a global key. Built from the same project row `project` names, never a second lookup. */
@@ -402,6 +404,7 @@ export function keysOf(
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
         ...(typeof r.fields.provider === 'string' && r.fields.provider.trim() !== '' ? { provider: r.fields.provider.trim() } : {}),
+        ...(typeof r.fields.account === 'string' && r.fields.account.trim() !== '' ? { account: r.fields.account.trim() } : {}),
         project,
         scope,
         sealed,
