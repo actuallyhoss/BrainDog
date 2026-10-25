@@ -68,3 +68,10 @@ test('a script step with no name is accepted by the record and by the canvas, an
   const filled = { ...body, steps: [{ script: { ...(fresh.script as object), id: 'tidy' } }] };
   assert.equal(validateDeclaration({ id: 'rule.one', kind: 'rule', body: filled } as never), null, 'a new step with its script chosen installs');
 });
+
+/* A SCRIPT NAMED AFTER ITS OWN AUTOMATION is not said twice on one page. */
+test('a script step that would repeat the automation title says what it does instead', () => {
+  learnScripts([{ script: 'tidy', title: 'Tidy up' }]);
+  assert.equal(sayStep({ script: { id: 'tidy' } }, 'Tidy up'), 'Run the script this rule is named for');
+  assert.equal(sayStep({ script: { id: 'tidy' } }, 'Something else'), 'Run the script Tidy up');
+});

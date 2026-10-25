@@ -1453,8 +1453,8 @@ export type Part = { text: string; ref?: string };
  * What one step does, as words and references, so a card can draw `{{vars.rate}}` as a chip and not as a word in the
  * sentence. The texts joined are `sayStep`, character for character, so every other reader is unchanged.
  */
-export function sayParts(step: Step): Part[] {
-  const whole = saying(step);
+export function sayParts(step: Step, own = ''): Part[] {
+  const whole = saying(step, own);
   const out: Part[] = [];
   let at = 0;
   for (const m of whole.matchAll(MARKED)) {
@@ -1484,9 +1484,10 @@ export function learnScripts(rows: readonly { script: string; title: string }[])
 export const scriptName = (id: string): string => SCRIPT_TITLES.get(id) ?? (id.includes('\u0002') ? id : idWords(id));
 
 /** What one step does, in one line, with no braces. */
-export const sayStep = (step: Step): string => unmark(saying(step));
+/** `own` is the title of the automation the step sits in: a script step that would only repeat it says what it does instead. */
+export const sayStep = (step: Step, own = ''): string => unmark(saying(step, own));
 
-function saying(step: Step): string {
+function saying(step: Step, own = ''): string {
   const verb = verbOf(step);
   const a = verb === null ? undefined : step[verb];
   const at = (...path: string[]) => aloud(getAt(a, path));
@@ -1534,7 +1535,8 @@ function saying(step: Step): string {
     /* NO NAME IT IS KEPT UNDER (VERIFY H30): "keeping the id of its queued run as filing" put a variable's name on
        screen. The runner queues the script and goes on (`startScript`); where its run is kept is the step's own detail. */
     case 'script':
-      return at('id') === '' ? 'Run a script' : `Run the script ${scriptName(at('id'))}`;
+      if (at('id') === '') return 'Run a script';
+      return own.trim() !== '' && scriptName(at('id')).trim() === own.trim() ? 'Run the script this rule is named for' : `Run the script ${scriptName(at('id'))}`;
     case 'wait':
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':

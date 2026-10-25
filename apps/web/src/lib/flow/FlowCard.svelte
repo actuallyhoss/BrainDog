@@ -64,14 +64,14 @@
 
   const said = $derived.by(() => {
     void grammar;
-    return sayStep(node.step);
+    return sayStep(node.step, flow.draft.name);
   });
   /* THE SENTENCE AS PARTS, so a value a step reads is a chip and not a word run into the words round it: the sample
      said "Tell you: Gold is rate a gram". `said` stays the plain join for every
      label and the live region, where a chip has nothing to draw. */
   const parts = $derived.by(() => {
     void grammar;
-    return sayParts(node.step);
+    return sayParts(node.step, flow.draft.name);
   });
   const verb = $derived(verbOf(node.step, grammar));
   /* A CARD JUST ADDED KEEPS ITS FAULTS UNTIL THE SHEET HAS CLOSED ON IT ONCE (`FlowDraft.holds`): every required box
