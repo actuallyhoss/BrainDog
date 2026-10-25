@@ -280,7 +280,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 `band.edges.length + 1 === values.length`, else `BAND_EDGES_MISMATCH`. Every field id named by `search title mobile
 key pairs identity scopes derive required_when transitions.requires` is declared on this register, else `FIELD_UNKNOWN`.
 
-A `secret` field is written by the vault door alone (41 §5.4), so nothing else may put a value in it: it is never
+A `secret` field is written by the Keychain door alone (41 §5.4), so nothing else may put a value in it: it is never
 `required`, never under `required_when`, never given a `default`, and a `list` of `secret` is refused
 (`DECLARATION_INVALID`). It holds where a key is sealed and says nothing about the row, so it is never searched
 (`SEARCH_FIELD_TYPE`) and never the `title` (`DECLARATION_INVALID`).
@@ -386,7 +386,7 @@ a string ≤ 200.
 | `dedupe` | 1–4 field ids, or `{ near: { on: [Id…], day: Id, prefix?: { field: Id, chars?: int 1–64 } } }` — 07 §2's fuzzy dedupe | no | — | — |
 | `on_conflict` | — | no | `skip`; `update` on a pull | `skip update new` |
 | `url` | a literal `https://` address; `{since}` and `{until}` only after the origin | `call` `poll` | — | `ACTION_NOT_HTTPS` · `ACTION_HOST_COMPUTED` · `ACTION_EVALUATES` |
-| `grant` | text ≤ 40, a vault label | `call` `poll` | — | `ACTION_GRANT_MISSING` |
+| `grant` | text ≤ 40, a Keychain label | `call` `poll` | — | `ACTION_GRANT_MISSING` |
 | `every` · `floor` | `Interval`; `every` ≥ 15m and ≥ `floor` | `every` on `call` `poll` | — | `ACTION_INTERVAL_TOO_SHORT`, on a `pull` too |
 | `project` | text | no | the whole record, metered as `global` | — |
 | `body` | an object ≤ 8 KB; string leaves substituted, never evaluated | no; `call` only | — | `OUT_OF_BOUNDS` over 8 KB · `ACTION_EVALUATES` |
@@ -669,7 +669,7 @@ The checks, in 04 §5's row order. B = one declaration alone · C = the Registry
     `VALUE_MALFORMED`; `NOT_IN_THIS_BUILD` on `url email json list`); `required_when` compares one `text enum bool int` field by
     `is` (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, 27's `REQUIRED_WHEN_OP_UNSUPPORTED`); a field's and a move's `by` is `decide`
     (`ENUM_VALUE_UNKNOWN`), and a move's `requires` names fields of the register (`FIELD_UNKNOWN`); and a `secret` field takes no
-    value but the vault door's (`DECLARATION_INVALID`, `SEARCH_FIELD_TYPE`).
+    value but the Keychain door's (`DECLARATION_INVALID`, `SEARCH_FIELD_TYPE`).
 
 Borrowed at install, "one code, two moments" (30 §6's `TRANSITION_ILLEGAL` precedent): `FIELD_UNKNOWN` (an unknown key,
 or a named field the register lacks), `REQUIRED_MISSING` (a required key absent), `ENUM_VALUE_UNKNOWN` (a closed-list

@@ -488,7 +488,7 @@ The predecessor refuses five things **at the MCP layer**, before any request lea
 reason an agent reads: deciding a suggestion (*"deciding is the owner's, never an agent's"*), the one-time
 import, every sign-in route (*"registering a passkey would mint a permanent way in that he never
 approved"*), the job surface (*"arbitrary code execution … ask the owner to run it from Spark"*), and every
-vault route (*"the highest-value thing prompt injection could ask for"*). BrainDog's equivalents are
+Keychain route (*"the highest-value thing prompt injection could ask for"*). BrainDog's equivalents are
 the four RPC groups outside DATA and READ+ in [30-BLUEPRINT](30-BLUEPRINT.md) §5, forty-three of
 the sixty-six methods, each refused to every MCP token **with a reason**, plus `by: decide` on the
 transitions that need a person. `markRead`, alone in DATA, answers a person principal only.

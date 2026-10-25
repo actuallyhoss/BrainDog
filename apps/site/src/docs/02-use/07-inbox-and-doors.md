@@ -67,7 +67,7 @@ When the owner saves a rule, what it reads waits in Needs you until they press *
 
 A connector is an add-on that fetches on a clock. Stripe reads your balance and the payouts on their way to the bank. Mercury reads your account balances and recent transactions. Card alerts reads a card alert, forwarded by mail or posted as a text, into Money as a transaction.
 
-Installing one shows each service it will call, with which key and how often, before you accept. Its key lives in the Vault. Each connector is listed under Automations, under Scheduled, and says when it last ran and why it paused, if it did. A figure fed by one that has stopped shows a gap and says it is stale, rather than holding yesterday's number.
+Installing one shows each service it will call, with which key and how often, before you accept. Its key lives in the Keychain. Each connector is listed under Automations, under Scheduled, and says when it last ran and why it paused, if it did. A figure fed by one that has stopped shows a gap and says it is stale, rather than holding yesterday's number.
 
 ## Agents and the Inbox
 

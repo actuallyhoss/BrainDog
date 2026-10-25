@@ -273,7 +273,7 @@ that fires nightly until you act is a reminder you filter to a folder.
 
 **2 · Batch by default; interrupt by exception.** Everything lands in the daily or weekly digest
 unless it is explicitly `urgent`. The core knows only a row a rule marks `urgent`, and its one
-default is the vault's own: a credential expiring inside 48 hours. Which other rows are urgent (a
+default is the Keychain's own: a credential expiring inside 48 hours. Which other rows are urgent (a
 payment failing, a domain expiring inside 7 days) is declared by whoever built that list, a person,
 an agent or a pack, and anything a pack marks urgent shows in the install diff as `interrupts you`.
 *(An earlier revision made a failed payment and an expiring domain core defaults. Those are one
@@ -327,7 +327,7 @@ interpolatable string — and `as: list`, which is a primitive, not a kind.)*
 The keys are typed and closed: `schedule: { day?, at, tz? }` — weekly with `day`, daily without;
 `channels`, one to five of `in-app · email · push · webhook · mcp`; `sections`, at most twelve; `prose`,
 only ever `slash` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.11). A `webhook` channel names where it posts —
-`webhook: { url, grant? }`, an `https:` URL printed in the install diff's `CALLS OUT` line and the vault
+`webhook: { url, grant? }`, an `https:` URL printed in the install diff's `CALLS OUT` line and the Keychain
 label of the secret that signs the POST — because a URL a digest posts to is egress, and egress is declared
 or it does not happen ([04-PACKS](04-PACKS.md) §7).
 

@@ -49,7 +49,7 @@ A pack may place its own pages in the rail. It never moves yours.
 - Delete anything.
 - Load anything from outside the record into a page: no remote font, picture, script or frame.
 - Write a colour, a font or a spacing value. A page names intent, and the theme decides how it looks.
-- Carry a credential. A key a script needs is held in the record's vault and named by its label.
+- Carry a credential. A key a script needs is held in the record's Keychain and named by its label.
 - Call out to any host the plan did not print. A host is written out in full, so the plan can print it.
 
 [What a pack can and cannot do](/docs/packs/limits) has the whole list.

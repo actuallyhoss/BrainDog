@@ -29,7 +29,7 @@ Credential | How it is made | What it reaches
 Agent token | In the app, or braindog token create | The reads and everyday writes, at its scope
 Connected app | An MCP client's sign-in, allowed on the consent screen | The same as an agent token at the scope you chose, for ninety days
 Machine sign-in | braindog login or setup, six digits approved in the app | Write, for ninety days, kept in the machine's hosts file
-Vault grant | braindog login --vault, six digits approved in the app | Opening the keys of one project, and nothing else
+Keychain access | braindog login --keychain, six digits approved in the app | Opening the keys of one project, and nothing else
 Operation grant | Six digits approved in the app, for one export, import or token | That one operation, once, within ten minutes
 Report key | In the app, for one list | Adding rows to that list, and nothing else
 Runner | braindog runner enrol, six digits approved in the app | Claiming, reporting on and stopping the jobs you approved

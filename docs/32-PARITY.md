@@ -8,7 +8,7 @@ shapes, a 22-tool MCP server with a refusal list, a 752-line agent contract with
 files, ~50 Svelte screens, 27 browser harnesses, and 120 commits of recorded reasoning. Every one of
 its features was traced to its mechanism — the route, the table, the derivation, the test — and
 mapped onto BrainDog. **Traced on 2026-09-02 from the brain's repository at `14fe0d7`**, including the
-vault and job runner that landed on 2026-09-01 and are not yet in the brain's own skill — and **re-checked
+Keychain and job runner that landed on 2026-09-01 and are not yet in the brain's own skill — and **re-checked
 against `2451e4f`**, the five commits that followed the same day (§2.4), and **re-traced on
 2026-09-08 against `4521455`**, the five after that (§2.5). The second re-trace is the first to find
 things that do **not** fit, and §2.5 says which.
@@ -61,8 +61,8 @@ has it. **Pack** means a first-party pack declares it and a new user does not se
 | **Session — the shared context window** | `S42` | **the kernel's one register** — §2.1 | **kernel** |
 | Audit event | — | `event`, closed vocabulary | kernel ✓ |
 | Skills register (what you can invoke) | — | `register.skills` | pack: agents |
-| Credentials register (what a key opens, never the key) | — | `register.credentials` + `secret` fields → the vault | pack: agents + kernel vault |
-| Vault value, per-device grant | — | kernel vault + **device-authorisation grant** — §2.2 | kernel |
+| Credentials register (what a key opens, never the key) | — | `register.credentials` + `secret` fields → the Keychain | pack: agents + kernel Keychain |
+| Keychain value, per-device grant | — | kernel Keychain + **device-authorisation grant** — §2.2 | kernel |
 | Service / metric split | — | `register.services` + `metric_point` series | pack: estate ✓ |
 | Domain register | — | `register.domains` | pack: estate ✓ |
 | Money: accounts · txn · categories · rules · income · recurring · installments · assets · fx · snapshots · inbox · company | — | `money-core` registers, with the additions in §3 | pack: money |
@@ -158,15 +158,15 @@ suggestions, and `whatsNew` — **one round trip to a useful first paint**.
 between decide and dismiss, and open questions are ranked by a capped cost of delay. Two columns, one
 sort.
 
-### 2.2 · The vault, brought up to the brain's standard
+### 2.2 · The Keychain, brought up to the brain's standard
 
-[12-SECURITY](12-SECURITY.md) §6 had envelope encryption and AAD binding. The brain's vault, built
+[12-SECURITY](12-SECURITY.md) §6 had envelope encryption and AAD binding. The brain's Keychain, built
 2026-09-01 after an owner decision (SG24 → D39, *encrypted-in-brain*), has five things it did not:
 
 | Brain mechanism | Why it matters | Now in BrainDog |
 |---|---|---|
-| **RFC 8628 device-authorisation grant** — a device shows a six-digit code, the owner approves it from a session that is already his | *"the thing asking is not the thing holding the identity"* — a CLI on a VPS, an agent, a browser that has never opened the vault all ask the same way. **The code is not the security**; it proves the approver is looking at the device that asked | §6.1 of [12-SECURITY](12-SECURITY.md) and the `device_grant` kernel table, [30-BLUEPRINT](30-BLUEPRINT.md) §1; **and it is the enrolment flow for the tier-C runner** — a 90-day bearer stored as `token_hash`, no keypair — which had its own bespoke one. `device_grant.reach` names what a grant is for: `login`, `runner`, or one ADMIN operation ([ADR-060](16-DECISIONS.md)) |
-| **`opened` and `last_opened` on the row** | one secret per request, every read counted **and visible**. *"The XSS is not prevented — it is made slow and loud, which is the honest claim"* | the `grant` table gains both; the Vault screen draws them |
+| **RFC 8628 device-authorisation grant** — a device shows a six-digit code, the owner approves it from a session that is already his | *"the thing asking is not the thing holding the identity"* — a CLI on a VPS, an agent, a browser that has never opened the Keychain all ask the same way. **The code is not the security**; it proves the approver is looking at the device that asked | §6.1 of [12-SECURITY](12-SECURITY.md) and the `device_grant` kernel table, [30-BLUEPRINT](30-BLUEPRINT.md) §1; **and it is the enrolment flow for the tier-C runner** — a 90-day bearer stored as `token_hash`, no keypair — which had its own bespoke one. `device_grant.reach` names what a grant is for: `login`, `runner`, or one ADMIN operation ([ADR-060](16-DECISIONS.md)) |
+| **`opened` and `last_opened` on the row** | one secret per request, every read counted **and visible**. *"The XSS is not prevented — it is made slow and loud, which is the honest claim"* | the `grant` table gains both; the Keychain screen draws them |
 | **`kek_id`** — a fingerprint of the key that wrapped the row | without it, rotating the root key turns every row into a WebCrypto error that reads exactly like corruption, *"on the one screen where 'the data is gone' and 'the key changed' need different answers"* | `grant.kek_id`; a mismatch is `409 WRONG_KEY`, never *corrupt* |
 | **Reveal is a `POST`, never a `GET`** | no URL, no history, no `Referer` | the RPC is `openGrant(id)` in the VAULT group — a browser session only, every token refused with `403 NEEDS_BROWSER_SESSION`; it returns sealed material and **the host decrypts — the Worker or the self-host process — and the record never sees plaintext** ([ADR-062](16-DECISIONS.md)). There is no readable address |
 | `bytes` and `hint` on the row | *"a 3.2 KB env file"* versus *"a 64-character token"* without opening anything — most of what the owner needs at a glance | two columns |
@@ -180,7 +180,7 @@ Carried from the brain's worker and MCP layer into [30-BLUEPRINT](30-BLUEPRINT.m
 - **The login lockout is sticky, reservation-before-compare, and fails closed** — and **agent tokens bypass it deliberately**, so an agent tripping the ten-strike block cannot lock the owner out of his own record.
 - **`guardText`: refuse a JSON-quoted string and a string with literal `\n` and no real newline.** Two such writes corrupted the brain's record on 2026-08-30 and were invisible on read-back. *"It refuses rather than repairing."*
 - The asset store: content-addressed, type sniffed **from bytes never from the header**, **SVG refused (415)**, 2 MB, `default-src 'none'; sandbox`, `noindex`, the URL is the capability. All now the rules for `file` and `/a/<sha256>`.
-- The export excludes `auth_fail` — and every other `dog_section = 'local'` table: `token`, `device_grant`, `observation`, `job`, `job_event` — while `grant` rows and the KEK-wrapped `vault_key` travel **sealed** by default and `--redact-grants` drops the ciphertext ([03-DOG-FORMAT](03-DOG-FORMAT.md) §5). It flags `auditTruncated`, always writes `latest`, and a failed snapshot writes an `export` event with `note: 'failed: <reason>'` and opens a suggestion to re-run it — *"a backup that silently gave up is worse than none."* *(An earlier draft said the export excluded the vault and wrote a `blocker` event; `blocker` is not an event kind and the vault's ciphertext is what the format carries.)*
+- The export excludes `auth_fail` — and every other `dog_section = 'local'` table: `token`, `device_grant`, `observation`, `job`, `job_event` — while `grant` rows and the KEK-wrapped `vault_key` travel **sealed** by default and `--redact-grants` drops the ciphertext ([03-DOG-FORMAT](03-DOG-FORMAT.md) §5). It flags `auditTruncated`, always writes `latest`, and a failed snapshot writes an `export` event with `note: 'failed: <reason>'` and opens a suggestion to re-run it — *"a backup that silently gave up is worse than none."* *(An earlier draft said the export excluded the Keychain and wrote a `blocker` event; `blocker` is not an event kind and the Keychain's ciphertext is what the format carries.)*
 
 ---
 
@@ -191,7 +191,7 @@ placed; nothing in them needed a new mechanism, and four of them carried a lesso
 
 | Commit | What landed in the brain | Where it lives here |
 |---|---|---|
-| `f32ffb6` | `.secrets` retired: 72 credentials into the vault, verified byte-identical before deletion; three things moved *out* because the vault cannot hold its own key; an audit-note leak found by the harness (`opens` prose on the activity screen); seven harness assertions rewritten to where the property now lives; the runner live under a hardened systemd unit | [12-SECURITY](12-SECURITY.md) §6 and §8 · [20-COLLABORATION](20-COLLABORATION.md) §8 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 |
+| `f32ffb6` | `.secrets` retired: 72 credentials into the Keychain, verified byte-identical before deletion; three things moved *out* because the Keychain cannot hold its own key; an audit-note leak found by the harness (`opens` prose on the activity screen); seven harness assertions rewritten to where the property now lives; the runner live under a hardened systemd unit | [12-SECURITY](12-SECURITY.md) §6 and §8 · [20-COLLABORATION](20-COLLABORATION.md) §8 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 |
 | `46334fd` | Slash's second mode — a live job transcript with five properties that beat the terminal, `jobEvents({ id, after })` high-water polling — the job view's poll — leave-and-return, `Esc` back-then-out | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 · [19-INTERFACE](19-INTERFACE.md) §4 |
 | `d75939a` | the claim long-polls: 15.4 s → under 1.5 s *and* 43,200 → ≈4,300 requests a day; twenty seconds not thirty; an abort at wait + 10; `idle_ms` kept for a runner that cannot hold a connection | [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [33-CONTRACTS](33-CONTRACTS.md) §11 |
 | `04c714b` | two money-audit findings: the forecast joined net worth to liquid cash and was right by coincidence; a draft wiped by its own screen finishing loading; and *assert on the code shape, never on the file* | [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 · [22-FRONTEND](22-FRONTEND.md) §7 · §10 below |
@@ -472,7 +472,7 @@ shipped in `packages/seed/src/packs/agents.ts`:
 | Register | What a row is | What it refuses |
 |---|---|---|
 | `skills` | a skill or command: its name, when to reach for it, its text and its version, at a project or everywhere | a change to `body` or `rev` except by an accepted proposal, so the text changes by the owner's press |
-| `credentials`, labelled **Keys** | what a key opens and where it applies; the key is sealed in the vault, or the row says where it is kept | any write to `value`, which only the vault door sets; and key-shaped text in any field |
+| `credentials`, labelled **Keys** | what a key opens and where it applies; the key is sealed in the Keychain, or the row says where it is kept | any write to `value`, which only the Keychain door sets; and key-shaped text in any field |
 | `tools` | an MCP server, command line or integration: how it starts, and the keys it needs by row, never by value | an MCP server with no transport, a `stdio` one with no command, an `http` one with no address |
 
 **Nearer wins, by name, for skills and tools**: a project's `review-pr` hides the global one inside
@@ -510,7 +510,7 @@ rule: a `ref` to a row that itself has a parent is rewritten at write, not refus
 [04-PACKS](04-PACKS.md) §6 allows a native tier where craft beats configuration. These are the
 brain's features that land there, each with the reason it is not a declaration.
 
-> **Corrected September 22nd 2026.** Vault crypto, passkeys,
+> **Corrected September 22nd 2026.** Keychain crypto, passkeys,
 > the doors, the runner and screenshot mode are primitives and stay native. The SMS parser's bank
 > formats, Company sync (Mercury, Stripe) and the logo proxy are use cases: each becomes a script or
 > a shared pack a person installs, never code in `packages/`. Their rows are kept for what they
@@ -522,7 +522,7 @@ brain's features that land there, each with the reason it is not a declaration.
 | The SMS parser's three bank formats | **mostly declarable** — `after/before/between/money/date/enum/text` express all three. What is native: the **skip list** (refunds, PINs, everything else → silent skip *with a reason*), routing `kind × currency → account` with **review on a miss**, and the **fuzzy ledger dedupe** — same account, amount, currency, day ±1, description prefix — which a `where:` cannot say |
 | Company sync (Mercury, Stripe) | [25-CONNECTORS](25-CONNECTORS.md) covers the fetch. Native: **per-provider partial failure** (a Mercury outage keeps the last Mercury rows), Stripe's available/pending/in-transit kept apart, and the ordered regex table over counterparty + description |
 | The logo proxy | the merchant name **never leaves the Worker**; four icon sources raced; bytes sniffed; a generic-icon hash blocklist. Money-specific, and it is the one exception to *"nothing loads from another server"* |
-| Vault crypto, passkeys, the doors | as [12-SECURITY](12-SECURITY.md) |
+| Keychain crypto, passkeys, the doors | as [12-SECURITY](12-SECURITY.md) |
 | The runner | as [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md), **now with the brain's five refinements**: `--resume <session>` for follow-ups (*"the single most valuable column"*), a distilled event transcript with nine kinds (`start say think tool out limit note end error`), a per-job `seq` high-water mark so a poll — `jobEvents({ id, after })`, the job view's — is one indexed read, a `cancel` **flag never a delete** (a stopped job is one you want the transcript of), and **`LOST` is deliberately not a status** — *"a status the runner can never write is a status that lies when the runner dies mid-job"*; the list route derives it from a stale `claimed_at`. The statuses are nine — `queued claimed ok needs_decision refused limit error interrupted cancelled` — and the kinds a closed four, `triage · explain · propose · draft`, that the runner's own templates check (26 §4.3); both are `CHECK`s on the kernel `job` table. The runner **distils rather than relays**: a trivial two-turn job emits ~12 KB of stream-json, most of it constant |
 | Screenshot mode | §9 |
 | The analytics adapters | two vendors' endpoints. The **model** — the series kind (`gauge · flow · cumulative · unique · fact`, declared on the ingest as `writes: { series, kind }`, never a `metric_point` column), the compare window, the partial bucket, the trend — is now declarative |
@@ -620,7 +620,7 @@ them by copying.
 | "Match the system" is unreachable once a theme is chosen — the only UI offers the *opposite* of system | a three-way segment, not a toggle |
 | A track's "Read it full-screen" opens an empty reader — the caller passes `src`, the reader reads `body` | a primitive's props are a type, and a stray prop is a compile error |
 | Screenshot mode's words stay in the DOM — *documented as not a privacy boundary* | carried with the same honesty: it is a **display** mode for a shoulder, not a redaction of the payload |
-| A stale harness (`capability.mjs`) contradicts the rebuilt Vault and is green because it is not in CI | **every harness is in CI or is deleted** |
+| A stale harness (`capability.mjs`) contradicts the rebuilt Keychain and is green because it is not in CI | **every harness is in CI or is deleted** |
 | `.rain.ps1` in three places — a `\b` eaten by an escape | the docs are linted for their own commands |
 | Root scratch files not covered by `.gitignore` | `_*` and `__*` prefixes are ignored from commit one |
 | The forecast line joined net worth to liquid cash and was right only because nothing illiquid had a snapshot yet | **one measure across the join**, and a derivation lives in a metric where a test can reach it, never in markup — [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 |
@@ -634,7 +634,7 @@ them by copying.
 
 | | Days |
 |---|---|
-| Kernel: `session` register, `member.seen_at`, `boot`, suggestion defer, vault refinements, refusal hardening | 6–9 |
+| Kernel: `session` register, `member.seen_at`, `boot`, suggestion defer, Keychain refinements, refusal hardening | 6–9 |
 | Data model: the fourteen additions in §3 | 12–16 |
 | Dialect: path grammar, eight typed kinds, evidence tags, identity, renderer rules | 5–7 |
 | The `agents`, `work`, `portfolio` and `people` packs | 10–13 |

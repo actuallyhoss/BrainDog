@@ -184,7 +184,7 @@ base64url; `key_id` is the first 16 hex characters of SHA-256 over the public ke
 It claims: *this file was produced by that instance, and no row has changed since.*
 It does not claim: the contents are true, or that we vouch for a third party's file.
 
-The private key lives in the record's own vault — `vault_key(purpose = 'signing')`, wrapped like the
+The private key lives in the record's own Keychain — `vault_key(purpose = 'signing')`, wrapped like the
 DEK ([12-SECURITY](12-SECURITY.md) §6) — and is generated on first run, self-host and Cloud alike.
 Cloud shows the public half in the UI and serves it at a well-known URL — `GET /.well-known/braindog-key`
 → `{ key_id, public_key }`, on both hosts — so a customer can verify a backup they downloaded a year ago
@@ -229,13 +229,13 @@ never be:
 - Every other table is readable. That is the point.
 - `grant.ciphertext` is **AES-256-GCM** and stays encrypted inside the export. The key is not in
   the file and never has been.
-- An export therefore carries the *shape* of the vault — labels, what each key opens, when it
+- An export therefore carries the *shape* of the Keychain — labels, what each key opens, when it
   was rotated — and none of its secrets. This is the right default: a backup you can inspect,
   that cannot leak a token if it ends up in the wrong Dropbox.
 - The `local` section (§3) is not in the file at all: agent tokens, device grants, lockouts, observations
   and the job tables never leave the record. Sealed grants travel, and so does `vault_key` — wrapped keys
   that open nothing without the root KEK, which is a Worker secret and is never in any file. A restored
-  record can read its own vault; a thief with the file cannot.
+  record can read its own Keychain; a thief with the file cannot.
 
 ```
 braindog export --with-grants    # requires the passphrase, re-wraps to a passphrase-derived key — CLI: later (48 §10)

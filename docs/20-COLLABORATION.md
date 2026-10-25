@@ -5,7 +5,7 @@ This document is what that buys, and why it is not "multiplayer".
 
 The strategic frame is settled and not re-litigated here: **real-time co-editing is not the pitch
 and is not built this year.** Competitors collaborate on *code* artefacts — sessions, diffs,
-plans, bugs. None of them is a typed record with doors in and out, schedules, pages and a vault
+plans, bugs. None of them is a typed record with doors in and out, schedules, pages and a Keychain
 that a team and its agents shape to whatever the business runs; a money ledger, a domain register
 and a credential index are examples of what a team builds on it, not the pitch. The differentiated thing is that shared typed
 **business** record, and the differentiated *feature* is the shared **decision**.
@@ -90,7 +90,7 @@ slices of one list is one rule with an `any:`, which keeps "what can she see" a 
 | **`append`** | **`create`, `propose` and `log` — and no read.** The conservative half: an appender sees nothing, not even what it filed, unless a `read` grant on that register says so ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.1). Held on the whole record, it adds to every list but the owner-only ones (below) |
 | `write` | create, edit, and change state on granted registers |
 | **`decide`** | **settle a question: pick an option and record the binding reason** |
-| **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the vault (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
+| **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the Keychain (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
 
 The five are the `member` table's `level` CHECK ([30-BLUEPRINT](30-BLUEPRINT.md) §1). A transition may
 name the level it needs — `transitions: { proposed: { to: [active], by: decide } }`

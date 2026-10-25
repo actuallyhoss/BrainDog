@@ -35,7 +35,7 @@ It is the runbook set. There is no `docs/ops/` directory; this document is it.
 - Never a restore that loses what it replaced: a restore goes back to a kept copy and keeps the record as it stood as a
   `before-restore` copy first (§5.5), and `braindog import` replaces a record only with a copy of that same record.
 - Never a downgrade: kernel migrations are forward-only (02 §7). A downgrade is a restore.
-- Never a request for a vault passphrase (12 §7).
+- Never a request for a keychain password (12 §7).
 
 **Boundary.** The code the procedures lean on lives elsewhere, and there is no `ops.ts`: what this spec once asked of
 one file is spread over the Worker's own modules. The nightly walk is `apps/worker/src/nightly.ts`, wired in
@@ -59,7 +59,7 @@ Every command below is dispatched by `apps/cli/src/main.ts`; `braindog help` pri
 | Command | Used in | Note |
 |---|---|---|
 | `braindog login <host>` | every Cloud procedure the CLI runs | the device grant; a token in `hosts.json`. An ADMIN command asks for an **operation grant**: ten minutes, one command, approved by the owner in the browser for the named subject, held in memory, never written (48 §5.2, D1) |
-| `braindog export [--redact-grants] [-o <file.brainl>] [--key <pubkey\|url>] [--host <host>]` | the restore point before a push (§5.2), handover | operation grant. The sealed grants travel unless `--redact-grants` is given, so the file can put the vault back; the file is checked with `verify` as it lands |
+| `braindog export [--redact-grants] [-o <file.brainl>] [--key <pubkey\|url>] [--host <host>]` | the restore point before a push (§5.2), handover | operation grant. The sealed grants travel unless `--redact-grants` is given, so the file can put the Keychain back; the file is checked with `verify` as it lands |
 | `braindog import <file.brainl> [--key <pubkey\|url>] [--host <host>]` | §5.5 (b) | operation grant. It always replaces the record, and the record refuses a file that is not its own copy, naming both ids; the file is verified on this machine before anything is sent |
 | `braindog verify <file> [--key <pubkey\|url>]` | every backup check, §5.4 | offline: format, every table against the manifest, the signature; a self-host `.brain` is checked against its `.brain.sig` |
 | `braindog init <slug> --owner <email>` · `init <slug> --from <copy>` | a new self-host record; §5.4's drill; §5.5 (c) | spawns the self-host's entry (48 §5.14) |
@@ -459,7 +459,7 @@ where `age` is installed; the drill itself deletes the plaintext it makes.
    (RQ-LCH-191, `index.ts`, `import`), so the next export carries that one event past the file it came from. It refuses a file without `vault_key` rows or sealed
    grants when it holds some, because that import would throw every key away.
 3. Tokens, device grants, observations and jobs did not travel (`local`). The owner re-mints agent tokens and re-enrols
-   runners. The vault opens if `vault_key('record')` is wrapped under a key `KEK` still holds (§5.6), or
+   runners. The Keychain opens if `vault_key('record')` is wrapped under a key `KEK` still holds (§5.6), or
    passphrase-wrapped and the owner has the passphrase; otherwise §5.7's *lost* script.
 4. Delete `<tmp>/night.brainl`.
 
@@ -482,7 +482,7 @@ is lost or will not open: `init --from` reads a `.brainl` (an export, or a Cloud
 host's own `.brain` copies, which go back in place as above.
 
 Precondition: the process stopped; a `.brainl` that `braindog verify` passes; `/data/kek` intact, since without it no
-vault opens.
+Keychain opens.
 
 1. `mv /data/<slug> /data/<slug>.broken.<date>`: the pre-restore file is kept beside (03 §7 rule 3).
 2. `braindog init <slug> --from <file.brainl>`.
@@ -502,7 +502,7 @@ named is read by nothing (§13 #2, amended). Two keys at most, rotations at leas
 
 Precondition: last night's walk clean and `stragglers = 0`; `KEK` holds one key, so the last rotation's old key was
 retired (step 6); at least 30 days since the last rotation, or, for an incident, rotate anyway and accept that a copy
-from before the previous rotation opens its vault only with that key put back; **the current key's value, from where
+from before the previous rotation opens its Keychain only with that key put back; **the current key's value, from where
 it was kept when it was set** (the password manager), because a Worker secret cannot be read back from Cloudflare; a
 note in the ops record: `rotation quarterly` or `rotation incident <id>`.
 
@@ -532,7 +532,7 @@ mode 0600; start. The start re-wraps every record under the new key before anyth
 says so. Unless `BRAINDOG_SESSION_SECRET` is set, the session key is derived from the key file, so a new key file signs
 everybody out, and the boot line says that too. Retire by deleting `/data/kek.prev` after step 5's wait.
 
-Verify: on the ops record open one grant (Settings > Vault): plaintext, no `WRONG_KEY`; `walk.done.stragglers = 0`;
+Verify: on the ops record open one grant (Settings > Keychain): plaintext, no `WRONG_KEY`; `walk.done.stragglers = 0`;
 every record's line reads `kek: "ok"` on the night after the re-wrap.
 Rollback: put the pair back in the other order, the old key first and the new one second, and the next walk re-wraps
 toward the old key. Nothing is lost while both keys are present.
@@ -547,14 +547,14 @@ becomes `wrapped_by = 'passphrase'`, `kek_id NULL`. `connector` stays `kek` (ADR
 words. Support says, in these words: *turning the passphrase on removes our access going forward, and removes it from
 the backups thirty days later* (12 §7). Never a shorter sentence — the honesty table is only worth having if it is
 believed.
-Verify: Settings > Vault says the passphrase is on; the walk's `kek` reads `ok` for the record, because a passphrase
+Verify: Settings > Keychain says the passphrase is on; the walk's `kek` reads `ok` for the record, because a passphrase
 row is never a straggler.
 
 **Disable**: the same operation in reverse, and it requires the passphrase (12 §6).
 
-**Lost passphrase** — the script: *The vault is gone. The record is not.* There is exactly one wrapping of the DEK and
+**Lost passphrase** — the script: *The Keychain is gone. The record is not.* There is exactly one wrapping of the DEK and
 we do not hold its key. A backup inside 30 days does not help unless the enable was inside it, and we do not restore a
-record to before an enable to get around the owner's choice. The owner's steps: Settings → vault → *reset vault*:
+record to before an enable to get around the owner's choice. The owner's steps: Settings → Keychain → *reset Keychain*:
 `revokeGrant` on every row — ciphertext zeroed, rows kept with `revoked_at` (02 §9) — a new `record` DEK generated and
 KEK-wrapped, then each credential re-bound from its issuer. `opens` is their list of issuers to visit. Rollback: none;
 say so before they click.
@@ -734,7 +734,7 @@ Containment, then rotation, then honesty.
    the wrapped DEKs live in the objects, and in copies sealed to a recipient whose identity was never in the Worker (§8).
 5. Say precisely what was exposed. Rows of every Cloud record — readable by the Worker at any time (12 §7). Credentials
    in vaults with the passphrase **off**, if the attacker unwrapped DEKs — treat as exposed: *rotate every credential in
-   your vault at its issuer; the vault's `opens` column is your list.* Connector credentials in every record, passphrase
+   your Keychain at its issuer; the Keychain's `opens` column is your list.* Connector credentials in every record, passphrase
    on or off (ADR-052). Prompts: not stored (12 §7). Vaults with the passphrase on: not exposed through the Worker.
 6. The post-mortem is a `log` note within 7 days.
 
@@ -768,7 +768,7 @@ Rollback: none — `[Reconnect]` with the old credential re-pauses on the same 4
 
 ### 5.13 · Runner
 
-Enrolment is the vault's device grant (26 §2.3); there is no second flow.
+Enrolment is the Keychain's device grant (26 §2.3); there is no second flow.
 
 **Enrol**: on the machine, `braindog runner enrol <host>` prints six digits; the owner approves in Settings > Agents (browser
 only — a bearer gets `NEEDS_BROWSER_SESSION`); the poll exchanges `approved` for a 90-day grant, shown once;
@@ -863,7 +863,7 @@ Codes an operator meets, every one from 30 §6 or the adapter's list in 30 §13.
 | `SIGNATURE_INVALID` | 422 | `dog_sig` does not verify | the wrong `--key`, or a tampered or truncated file | *Verify with the record's current public key; if it still fails, use another night's backup.* |
 | `CHECKSUM_MISMATCH` | 422 | `dog_manifest` disagrees with the rows; or a migration file with its row | a corrupt or edited file | *Use another backup; never edit a `.brain` by hand.* |
 | `IMPORT_NOT_EMPTY` | 422 | an import that does not replace, into a record with rows | the kernel's merge refusal; `braindog import` always replaces its own record's copy, so an operator meets this only from another caller | *Import into a new record or a fresh directory.* |
-| `WRONG_KEY` | 409 | a `kek_id` neither key in `KEK` answers to | a retired KEK, or a restore from before two rotations, never *corrupt* (12 §6.1) | *Put the old key back as `KEK`'s second key if you still hold it; else reset the vault.* |
+| `WRONG_KEY` | 409 | a `kek_id` neither key in `KEK` answers to | a retired KEK, or a restore from before two rotations, never *corrupt* (12 §6.1) | *Put the old key back as `KEK`'s second key if you still hold it; else reset the Keychain.* |
 | `NEEDS_BROWSER_SESSION` | 403 | a bearer at VAULT, ADMIN or the JOBS session half | a token where the owner's browser is required; the CLI turns it into an operation grant request (48 §5.2) | *Do this from the owner's browser.* |
 | `FORBIDDEN` | 403 | a write on a `lapsed` record | billing | *Read-only until billing resumes. Export is available.* |
 | `UNAUTHORIZED` | 401 | revoked, expired, or created before `TOKENS_VALID_FROM` | the body says only this (12 §8); the reason is in `wrangler tail` | — |
@@ -908,7 +908,7 @@ and nowhere else (12 §6), and the Worker imports it as a non-extractable `Crypt
 The age identity that opens `.brainl.age` lives outside Cloudflare, in two copies in the operator's password manager,
 and the Worker holds only the recipient, `AGE_RECIPIENT`; a Worker compromise yields sealed copies (§13 #13). The drill
 reads the identity file where it is kept and refuses a path inside the repository. A self-hoster backs up `/data/kek`
-(and `/data/kek.prev` during a rotation) *separately* from the copies: a copy without it opens no vault.
+(and `/data/kek.prev` during a rotation) *separately* from the copies: a copy without it opens no Keychain.
 
 **Audit of operator actions.** Two ledgers. The customer's: every `system` write is an `event` in their record —
 `migrate`, `purge`, `grant.rotate`, `export` with its counts or `note: 'failed: …'` — and every read we make is preceded

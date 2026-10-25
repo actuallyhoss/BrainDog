@@ -153,7 +153,7 @@ structured output, which every model above supports.
 | DLP | **block** on request, **flag** on response | scans prompts AND responses using Cloudflare One's detection profiles. **Flag and Block are the only actions — there is no redact**, so redaction is BrainDog's own job, not the gateway's. See §7 |
 | Guardrails | flag | logged, not blocked — a false block on a business record is worse than a flag |
 | Custom cost tracking | on | so the per-record budget is real numbers, not estimates |
-| BYOK (the gateway's own) | **not used** | Secrets Store's 100-secret ceiling; the customer's key lives in their vault and rides as the provider header through passthrough — see below |
+| BYOK (the gateway's own) | **not used** | Secrets Store's 100-secret ceiling; the customer's key lives in their Keychain and rides as the provider header through passthrough — see below |
 
 ### Bring your own model
 
@@ -165,7 +165,7 @@ second tier a config row rather than a project.
 > **One thing not to do, and it is the obvious thing.** AI Gateway's BYOK stores provider keys in
 > Secrets Store, scoped per gateway. Secrets Store's ceiling is **100 secrets**, which is the same
 > wall [12-SECURITY](12-SECURITY.md) §6 already hit for the root KEK — so a key per customer fails
-> at customer 101, silently, at signup. The customer's key lives in **their own record vault**,
+> at customer 101, silently, at signup. The customer's key lives in **their own record Keychain**,
 > is decrypted in the Worker, and is passed as the provider auth header through gateway
 > passthrough. Same caching, same rate limiting, same cost tracking, no ceiling.
 
@@ -177,7 +177,7 @@ key ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9; [12-SECURITY](12-SECURITY.md) §6)
 the routing table above does not decide the model: every job, both passes of a question, the
 arranger's press and an automation's question, goes to the one model he named, at the provider he
 chose (Anthropic Messages or an OpenAI-compatible endpoint) and the `https:` public address he gave,
-with the vault key he picked by its id. The request goes from the Worker straight to that address
+with the Keychain key he picked by its id. The request goes from the Worker straight to that address
 and not through AI Gateway, so the gateway's caching, DLP and cost tracking in the table above apply
 to the included model only; the passthrough design in the note above is not what shipped. His asks
 are listed in Settings and not capped, since his provider bills them.

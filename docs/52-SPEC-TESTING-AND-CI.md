@@ -208,7 +208,7 @@ rather than this table's.
 | `stack` | `packages/*` and `src/` sources | 31 §1's banned surface: no `node:` or `cloudflare:` import, no bare `fetch`, no `Buffer`. A signature is not a call, so the port interface passes | — |
 | `nul-bytes` | every tracked text file, as bytes rather than as syntax | no C0 control byte below 0x20 other than tab, newline and carriage return, and no DEL. Two files carried one and typechecked clean | — |
 | `graph` | every `package.json`; every `src/**` import specifier | acyclic; every workspace edge points down 31 §2's order; no undeclared import and no relative import that climbs out of its own package | — |
-| `secret-grep` | `packages/**` and `apps/**` sources | no plaintext source reaches a sink (a log, telemetry, a push, a prompt template); the `Plaintext` brand appears only at the two hosts' vault boundaries | — |
+| `secret-grep` | `packages/**` and `apps/**` sources | no plaintext source reaches a sink (a log, telemetry, a push, a prompt template); the `Plaintext` brand appears only at the two hosts' Keychain boundaries | — |
 | `event-kinds` | the migration's CHECK; 30 §1's CHECK; 30 §2's table and its prose; `EVENT_KINDS` | all five sources say the same number and the same members. Four of the five are not code, which is why it is a gate and not a test | — |
 | `router-groups` | each host's route table; `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route declares a group; no INTERNAL method is routed; VAULT is cookie-only; ADMIN admits no token principal | — |
 | `guards` | `ROUTES` in `packages/host`; the guard each handler in `packages/record` actually calls | the group the table publishes and the check the record applies agree. It found `members` routed ADMIN and guarded `read`, on an answer carrying every colleague's email | — |
@@ -548,7 +548,7 @@ the gate this becomes when the corpus record exists.
 1. Sources: identifiers `plaintext`, `decrypted`, `secretValue`, and the branded type `Plaintext`.
 2. Sinks: `console.`, `log(`, `telemetry(`, `push(`, `dispatch.`, any file under `**/prompts/`.
 3. For every sink call whose argument text contains a source → red.
-4. `Plaintext` (the brand) appears only in the two hosts' vault steps — the module 49 §5 step 9 and 51 §5 name for
+4. `Plaintext` (the brand) appears only in the two hosts' Keychain steps — the module 49 §5 step 9 and 51 §5 name for
    `openGrant`/`bindGrant`'s unwrap; anywhere else is red. The record never sees one.
    *`47 §13` D9's key hierarchy moved into `packages/host/src/sealing.ts`, and that file carries no brand on
    purpose. It takes and returns plain bytes; each host brands at its own boundary, which is where the answer is
@@ -963,7 +963,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 5 | **`node --test` for `where-property`, `boot-probe`, `brain-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (the deviation is recorded) |
 | 6 | **1,000 property runs, not 10,000.** `budgets.property.runs = 1000`, every committed seed replayed first | 33 §8; 30 §7 (add the number) |
 | 7 | **The four widths are 390 / 768 / 1024 / 1440.** 22 §10 said *four widths* and named none; 390 is 22 §4's phone, 1440 is 13 §4.2's column ceiling | 22 §10 |
-| 8 | **Seventeen Playwright specs, not ten.** [50-SPEC-WEB](50-SPEC-WEB.md) §9's sixteen names are adopted as written (they fold 22 §10's layout assertions into `grid-contract` and 18 §6's `page-render`, `shell`, `no-model`, `keys-sheet` rows in); `vault-screen` is added because 50 covers only one of 12 §8's three vault invariants; `bundle` stays a spec — it reads the build, needs no browser, and runs in `ci.yml` step 8 | 33 §8; 50 §9 (add `vault-screen`) |
+| 8 | **Seventeen Playwright specs, not ten.** [50-SPEC-WEB](50-SPEC-WEB.md) §9's sixteen names are adopted as written (they fold 22 §10's layout assertions into `grid-contract` and 18 §6's `page-render`, `shell`, `no-model`, `keys-sheet` rows in); `vault-screen` is added because 50 covers only one of 12 §8's three Keychain invariants; `bundle` stays a spec — it reads the build, needs no browser, and runs in `ci.yml` step 8 | 33 §8; 50 §9 (add `vault-screen`) |
 | 9 | **`telemetry-allowlist` is two gates.** 33 §8's row conflated 08 §5's Analytics Engine blob list with ADR-050's screenshot-mode provenance list; they are `telemetry-allowlist` and `shot-allowlist` | 33 §8 |
 | 10 | **No Stylelint.** 22 §7 gate 1's three Stylelint rules and 18 §6's CSS rows are the twelve rules of `css-rules.mjs`, one regex tokeniser, zero dependencies; Stylelint or `postcss` is added the day a rule needs a parser (§10) | 22 §7; 31 §3 |
 | 11 | **`graph` covers 31 §3's layers 3–5.** ESLint + `import-x` is deferred until a rule needs an AST | 31 §3 |

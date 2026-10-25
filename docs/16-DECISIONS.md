@@ -269,7 +269,7 @@ fallback is still the magic link, never a password.
 
 ---
 
-## ADR-012 · The vault passphrase is optional and defaults to OFF
+## ADR-012 · The keychain password is optional and defaults to OFF
 
 **Decided.** Envelope encryption always; an optional passphrase that removes the operator's
 ability to decrypt, defaulting to off, with the consequence stated in the same sentence as the
@@ -840,7 +840,7 @@ which point the `.brain` could be produced at the edge and `.brainl` would becom
 
 **Decided.** A person's grants are register × level, materialised in `member` — five levels,
 `read append write decide owner`; scope is rules over typed fields; every page and share link is a
-projection that can only narrow. Capability-based, per register. The vault is its own capability,
+projection that can only narrow. Capability-based, per register. The Keychain is its own capability,
 owner-only by default; a share link is a projection with an empty ceiling. Enforced inside the
 record — at step 1 of the write path and in the compiler for reads — never in the router. This
 settles [Q4](17-OPEN-QUESTIONS.md); the model is [20-COLLABORATION](20-COLLABORATION.md) §1.
@@ -1181,7 +1181,7 @@ already owns in a terminal.
 ## ADR-052 · Connector credentials live under a second, KEK-wrapped DEK
 
 **Decided.** A scheduled connector must decrypt with nobody present, so connector grants are wrapped
-by the operator's KEK — `vault_key.purpose = 'connector'`, always `kek` — even when the vault
+by the operator's KEK — `vault_key.purpose = 'connector'`, always `kek` — even when the Keychain
 passphrase is on. The [12-SECURITY](12-SECURITY.md) §7 honesty table carries the row and the bind
 screen says it in words. *"We cannot read it"* is true only after the 30-day PITR and backup window.
 This settles [Q13](17-OPEN-QUESTIONS.md).
@@ -1272,7 +1272,7 @@ primitive layer is wrong, not the count.
 
 **Decided.** Every refusal has a code from the one table in [30-BLUEPRINT](30-BLUEPRINT.md) §6 —
 **a hundred and twelve codes in nine families**: pack and declaration (47), grammar (14), write path
-(18), auth and vault (7), format and lifecycle (8), dialect (2), slash (5), connector (7) and host
+(18), auth and Keychain (7), format and lifecycle (8), dialect (2), slash (5), connector (7) and host
 and client (4) — plus the adapter's separate closed vocabulary of thirteen. *An earlier draft said
 ninety-nine in eight, which was true when nothing enforced it: the `refusals` gate then compared the
 table against the code and found twenty-six codes the tree emitted and the registry did not have,
@@ -1469,7 +1469,7 @@ version said "the Worker" and left the connector DEK to be found at first bind.)
 
 *Note, September 15th 2026:* the agent path's key doors keep this. A deposit through `/api/vault/deposit`
 is sealed by the host before `depositGrant` binds it, and a read through `/api/vault/open` is opened by the
-host from what `openForGrant` returns sealed; the plaintext goes back once, to a terminal holding a vault
+host from what `openForGrant` returns sealed; the plaintext goes back once, to a terminal holding a Keychain
 grant, rather than to a browser ([12-SECURITY](12-SECURITY.md) §6 rule 9). The Worker checks the grant and
 answers `NOT_IN_THIS_BUILD` until it has a key store bound.
 
@@ -1484,7 +1484,7 @@ so in one sentence ([51-SPEC-WORKER](51-SPEC-WORKER.md) §8 rule 3); a record pr
 all, unless the deployment sets `PROVISION_WITHOUT_KEYS: yes` to say it seals nothing on purpose.
 
 **Rejected:** decryption inside the object. It would give the record a `KeyStore` port and make a
-compromised record a compromised vault; today a compromised record yields ciphertext.
+compromised record a compromised Keychain; today a compromised record yields ciphertext.
 
 **Would reverse it:** a per-record hardware key that only the object can drive — which does not
 exist on the platform.
@@ -1647,7 +1647,7 @@ rows in `apps/site/src/lib/plans.ts` and ADR-071's figures in the same change, e
 owner chose the new name and asked for every reference to change.
 
 **Every reference, not only the words on screen.** The package (`packages/slash`), the routes
-(`/api/slash/*`), the flow step (`ask_slash`), the vault key label, the host settings (`SLASH_*`),
+(`/api/slash/*`), the flow step (`ask_slash`), the Keychain key label, the host settings (`SLASH_*`),
 the spec ([46-SPEC-SLASH](46-SPEC-SLASH.md)), and the types, functions, tests and file names under
 them. What a record already holds under the old name (an event's actor, a suggestion's opener, a
 person's prefs, a key's label, a parked step, a declaration's step) is renamed by a migration that

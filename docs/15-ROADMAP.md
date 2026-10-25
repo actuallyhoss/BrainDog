@@ -76,7 +76,7 @@ work with no line item.**
 | Emergent pages: six triggers, header derivation, the conflict rules | 6–9 | [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) |
 | The self-improvement loop | **22** | [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) — Phase C, gated on gate 4 |
 | *Sub-total — the 2026-09-01 validation round* | *≈106–140* | 14+5+3+26+4+18+8+6+22 = 106 · 20+7+4+34+6+26+12+9+22 = 140 |
-| **Parity with the predecessor** — the kernel `session` register, `member.seen_at` (the read mark), `boot`, the device grant and vault refinements, fourteen data-model additions, the completed dialect, the `agents`, `work`, `portfolio` and `people` packs, money's `running`/`pairs`/`snapshot`/forecast, screenshot mode | **46–63** | [32-PARITY](32-PARITY.md) §11 |
+| **Parity with the predecessor** — the kernel `session` register, `member.seen_at` (the read mark), `boot`, the device grant and Keychain refinements, fourteen data-model additions, the completed dialect, the `agents`, `work`, `portfolio` and `people` packs, money's `running`/`pairs`/`snapshot`/forecast, screenshot mode | **46–63** | [32-PARITY](32-PARITY.md) §11 |
 | **Total** | **≈152–203** — 106 + 46 = 152 · 140 + 63 = 203 | 336 + 152 = **488** · 442 + 203 = **645** |
 
 *An earlier draft printed 148–198 and 488/643: the parity row was 42–58 because the `portfolio`
@@ -95,7 +95,7 @@ before the sum was quoted.*
 > rather than features**) or firmly outside it.
 >
 > **The one item worth pulling forward is tier B**, at 4–6 days, because it is the only thing on the
-> list that makes the assistant good rather than merely present, and the vault it needs already
+> list that makes the assistant good rather than merely present, and the Keychain it needs already
 > exists.
 
 > **That is not a plan. It is a research programme with a price tag, and it should be read as
@@ -122,7 +122,7 @@ authoring tier, no assistant.
 | The record object, the Worker, magic-link auth, agent tokens, the CLI, `.brain` export | 20–26 |
 | `@braindog/host` — the route table, `httpStatus`, the request context and `serveApi`, written once for the Worker and the self-host ([ADR-064](16-DECISIONS.md)) | 2 |
 | MCP: sixteen tools, resources, the token budget in CI | 8–12 |
-| Native screens per register + the spine + the vault + the decide queue | 20–26 |
+| Native screens per register + the spine + the Keychain + the decide queue | 20–26 |
 | Alarms, `schedule`, reminders, one hard-coded weekly digest | 8–10 |
 | Cloud: Stripe, signup, backups, the inbound endpoint, inbound email | 12–15 |
 | Stage 0 — the renderer, MIT, alone. Outside the record; keep only if gates 1a–1d are still wanted | +10, not in the total |
@@ -238,7 +238,7 @@ the re-costed total for every described stage is §1's 248–317.*
 | A2 | The kernel | 12 | the 27 kernel tables, ids, money, time, provenance, **the `where:` compiler**, FTS5 wiring |
 | A3 | Record object + API + auth | 10 | the Durable Object, `@braindog/host` — the route table and request context both hosts share — then the Worker and the self-host, passkeys, agent tokens, the CLI |
 | A4 | MCP | 5 | the sixteen tools, resources, prompts, the token budget in CI, **MRTR decision gate** |
-| A5 | The app, native | 12 | shell, nav, register lists, entry detail, command palette, search, the decide queue, the vault |
+| A5 | The app, native | 12 | shell, nav, register lists, entry detail, command palette, search, the decide queue, the Keychain |
 | A6 | Cloud | 6 | Stripe, signup, backups, the inbound endpoint, email |
 
 The stages follow the package order of [31-STACK](31-STACK.md) §2: `record` before `mcp`, because the
@@ -251,7 +251,7 @@ At the end of Phase A (~132 working days including stage 0 at the re-costed rate
 estimated; ≈9.5 months calendar at 162 productive days a year) there is:
 
 - a hosted, paid, multi-tenant typed business record
-- with MCP, a CLI, a web app, a credential vault, a decision gate, search, digests and reminders
+- with MCP, a CLI, a web app, a credential Keychain, a decision gate, search, digests and reminders
 - self-hostable, complete, free
 - **and no platform at all**
 
@@ -470,7 +470,7 @@ without changing them. That is the test for whether something belongs in this li
 |---|---|---|
 | **Cold start** — the record is empty on day one, so it only helps the person who already filled it | likeliest | packs as onboarding ([06-PAGES](06-PAGES.md) §4), one worked example per pack, and the ingest proposal loop. `throughline` is this exact architecture at 21★ |
 | **Distribution, not product** | predicts revenue better than any property of the software | stage 0 shipping alone, the skill, shared pages as landing pages, ingest patterns as long-tail search |
-| **Churn, not acquisition** | specific to the subscription | gate 3 at 5%. A leaky bucket cannot be filled. The retention mechanisms are the digest, the reminders and the vault — the three things you would miss |
+| **Churn, not acquisition** | specific to the subscription | gate 3 at 5%. A leaky bucket cannot be filled. The retention mechanisms are the digest, the reminders and the Keychain — the three things you would miss |
 
 ---
 

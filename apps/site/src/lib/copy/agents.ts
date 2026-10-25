@@ -28,7 +28,7 @@ export const agents = {
     cannot: {
       title: "What it can't do",
       lines: [
-        'See a key. It uses them from the vault, by name.',
+        'See a key. It uses them from the Keychain, by name.',
         'Move money, share or delete without your yes.',
         'Hide what it did. Everything it writes carries its name.',
       ],

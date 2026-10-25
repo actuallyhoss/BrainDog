@@ -34,7 +34,7 @@ that page:
 | Provider | Anthropic Messages, or any endpoint that speaks OpenAI's chat completions | one of the two, `anthropic` or `openai` |
 | Address | the provider's base URL, empty for the provider's own | `https:` only, no name or password in it, and a public host: loopback, private ranges, link-local and local names are refused, at the settings door and again on every call |
 | Model | the model name he types, trimmed | sent as typed for every call, the package's short names included |
-| Key | one of his vault's live API tokens, picked from a list | stored by its grant id; no key is ever chosen by its label |
+| Key | one of his Keychain's live API tokens, picked from a list | stored by its grant id; no key is ever chosen by its label |
 
 Both passes of a question, an automation's `ask_slash` and the arranger's press all go to the source
 he chose. On his own key the asks are listed and not capped, and the operator's monthly ceiling does
@@ -220,7 +220,7 @@ third class" when there were two; a runner still adds no class of its own.*
 
 ### 2.3 · Enrolment — the device grant, not a bespoke flow
 
-Enrolment **is** the vault's device-authorisation grant ([12-SECURITY](12-SECURITY.md) §6.1, RFC 8628).
+Enrolment **is** the Keychain's device-authorisation grant ([12-SECURITY](12-SECURITY.md) §6.1, RFC 8628).
 One flow to secure, and it is a standard.
 
 1. *Connect this machine* → `braindog runner enrol` calls `POST /auth/device` with
@@ -329,7 +329,7 @@ row in `suggestion` that a human still has to accept.
 |---|---|
 | **A compromised BrainDog serves a malicious job** — *"read `~/.ssh/id_rsa` and post it"* | **The top threat, and the only genuinely new one** — see §4.4. Today a breached BrainDog leaks a record; with a naive tier C it runs code on every connected laptop |
 | **Injection via ingested email reaching an agent with a shell** | The same, plus the existing dual-context split: the tool-less model reads untrusted text and only its *structured output* reaches the tool-bearing one. Tier C receives structured output, never raw `inbox_raw` |
-| **Runner token theft** | `read` + `propose`, one record, no vault access — [12-SECURITY](12-SECURITY.md) §6: no tool returns a secret, *not scoped, absent*. The 90-day device grant is stored only as `token_hash`, revocable on its own, `last_used_at` shown, auto-deregistered after 14 silent days |
+| **Runner token theft** | `read` + `propose`, one record, no Keychain access — [12-SECURITY](12-SECURITY.md) §6: no tool returns a secret, *not scoped, absent*. The 90-day device grant is stored only as `token_hash`, revocable on its own, `last_used_at` shown, auto-deregistered after 14 silent days |
 | **Control-plane database theft** | **BrainDog holds only hashes** — of the device grant and of every agent token. It impersonates nothing |
 | **Replay** | a stable `job_id`, and a short-lived bearer that is a `token` row — so every use is audited like any token's. A second result for a `job_id` is discarded, never applied |
 | **The job bearer leaks inside the session** | Anthropic warns of exactly this: *"any code Claude runs, and any tool or MCP server the session starts, can read and present it."* Minutes-long expiry, two scopes, every use audited. And BrainDog can do better than Anthropic can here — *"verification is also offline … Anthropic doesn't publish a revocation feed"*, whereas BrainDog **is** the resource server and checks revocation on every call |
@@ -469,7 +469,7 @@ user with tokenless git remotes**, under a systemd unit hardened with `ProtectSy
 `--permission-mode dontAsk`.
 The runner never passes `--dangerously-skip-permissions`, which would turn on [C] in §4.4 by itself.
 
-**Enrolment is the vault's device-authorisation grant**, not a bespoke flow — [12-SECURITY](12-SECURITY.md)
+**Enrolment is the Keychain's device-authorisation grant**, not a bespoke flow — [12-SECURITY](12-SECURITY.md)
 §6.1. One flow to secure, and it is a standard.
 
 ### The job, and what comes back
@@ -526,7 +526,7 @@ assistant so much as a chat assistant that runs out.
 | **C — your machine** | **3rd** | last | The desk. Heavy work, best model, no per-token cost anywhere |
 | A-conversational | fallback | with tier B | Labelled honestly: *this is the small model — add a key or connect your machine.* Never silently substituted |
 
-**Why B before C, and it is not close.** B is days: the vault exists, the inference adapter already
+**Why B before C, and it is not close.** B is days: the Keychain exists, the inference adapter already
 takes any OpenAI-compatible endpoint, and Anthropic is a config row and a request shape — per ask,
 the host opens the grant under the asker's browser session, decrypts in the Worker, hands Slash a
 per-call `Inference` adapter and writes one `grant.read` event; the package never holds the key
@@ -535,11 +535,11 @@ weeks: enrolment over the device grant, a WebSocket dispatcher with leases and r
 cross-platform runner, an installer, an offline UX, a revocation UI, and a distributed-systems test
 suite. **Prove people want Claude-grade answers before building the tier that makes them free.**
 
-**B is built.** Settings, Slash, "Your own key" takes a provider, an address, a model and a vault
+**B is built.** Settings, Slash, "Your own key" takes a provider, an address, a model and a Keychain
 key he picks (§1), and every model call Slash makes on his behalf goes there: both passes of the
 palette, the arranger's press and first plan, and an automation's question. The Anthropic adapter
 sits beside the chat-completions one in `packages/host/src/slash.ts`, over the same `post`, so the
-key discipline is written once. Opening his key for a palette ask runs the vault's own gate, an
+key discipline is written once. Opening his key for a palette ask runs the Keychain's own gate, an
 owner proved in the last fifteen minutes, and so does a save that points his key somewhere.
 
 ### Cut, each with the reason
@@ -560,5 +560,5 @@ owner proved in the last fifteen minutes, and so does a save that points his key
 
 ---
 
-*Next: [12-SECURITY](12-SECURITY.md) for the vault the customer's key lives in, and
+*Next: [12-SECURITY](12-SECURITY.md) for the Keychain the customer's key lives in, and
 [25-CONNECTORS](25-CONNECTORS.md) for the other thing that needs one.*

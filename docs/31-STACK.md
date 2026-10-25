@@ -289,7 +289,7 @@ interface** (it is which `apps/*` you deploy), and **three were missing.**
 | 2 | `Scheduler` | DO alarm | one `setTimeout` over `MIN(due_at)` |
 | 3 | **`Clock`** *(new)* | `Date.now()` | `Date.now()` |
 | 4 | `Blobs` | R2 | `node:fs` under a root |
-| 5 | `Inference` | Workers AI via the gateway — **BYO key is the same adapter, a different base URL and a vault grant** | any OpenAI-compatible endpoint |
+| 5 | `Inference` | Workers AI via the gateway — **BYO key is the same adapter, a different base URL and keychain access** | any OpenAI-compatible endpoint |
 | 6 | `Dispatch` | Email Service · VAPID · fetch | SMTP · VAPID · undici |
 | 7 | **`Http`** *(new)* | `fetch`, `redirect: 'manual'` | undici with an agent refusing private IPs |
 | 8 | **`KeyStore`** *(new)* | Secrets Store | env var or an `0600` file |

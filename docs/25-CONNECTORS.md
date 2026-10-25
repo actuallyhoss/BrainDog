@@ -117,7 +117,7 @@ fetch:
   path: /v1/balance_transactions
   auth:
     kind: bearer                        # a closed kernel list of eight — §5.2
-    grant: stripe-read                  # a vault label, never a literal
+    grant: stripe-read                  # a Keychain label, never a literal
     require_scopes: [balance_transaction_source_read]   # proven at bind time — §7 rule 6
   headers: { Stripe-Version: "2026-08-26.dahlia" }      # Authorization is RESERVED — §7 rule 2
   query:
@@ -205,7 +205,7 @@ symbol → code map ([02-DATA-MODEL](02-DATA-MODEL.md) §3). Dedupe and `on_conf
 A `channel: webhook` ingest carries `verify:` where a pull carries `fetch:` —
 `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` — or relies on the URL's random path
 token; an unverified payload is stored `untriaged` and never matched ([12-SECURITY](12-SECURITY.md) §3).
-`grant:` is a vault label here too, never a literal.
+`grant:` is a Keychain label here too, never a literal.
 
 ### 3.3 · `call` and `poll`, the scheduled actions
 
@@ -218,7 +218,7 @@ address, one key and one interval.
 ingest: balance
 channel: poll
 url: https://api.example.test/v1/balance?since={since:date}   # a literal https origin; {since} and {until} only after it
-grant: example read                     # the key's vault label, never the key
+grant: example read                     # the key's Keychain label, never the key
 every: 1h                               # fifteen minutes at least, or the provider's floor
 floor: 1h                               # optional: the provider's own floor, when it is higher
 project: studio                         # optional: the scope its usage is metered under; absent is global
@@ -238,7 +238,7 @@ body: { text: "Summary up to {until:date}" }   # JSON, 8 KB at most; string leav
 | Key | `call` | `poll` | Rule |
 |---|---|---|---|
 | `url` | required | required | starts `https://`; the host is written out in full, with no brace, `$`, `@`, `%` or space in it |
-| `grant` | required | optional | a vault label of at most 40 characters; a `poll` of an address that answers anybody names none |
+| `grant` | required | optional | a Keychain label of at most 40 characters; a `poll` of an address that answers anybody names none |
 | `every` | required | required | at least fifteen minutes, and at least `floor:` when one is declared |
 | `body` | optional | refused | an object of at most 8 KB; each string leaf may use `{since}` and `{until}` |
 | `writes.register` | optional | required | the ingest pipeline's own `extract:` or `map:`, and `writes:` |
@@ -281,7 +281,7 @@ Five refusals, raised at install by the kernel's declaration check and counted i
 |---|---|
 | `ACTION_NOT_HTTPS` | `url:` is not an `https://` address |
 | `ACTION_HOST_COMPUTED` | the host is not written out in full: a placeholder, a user name, or anything computed |
-| `ACTION_GRANT_MISSING` | no key is named by its vault label |
+| `ACTION_GRANT_MISSING` | no key is named by its Keychain label |
 | `ACTION_INTERVAL_TOO_SHORT` | `every:` is under fifteen minutes or under the declared `floor:`. A `pull` under the floor answers this code too |
 | `ACTION_EVALUATES` | the address or a body leaf computes rather than substitutes |
 
@@ -392,7 +392,7 @@ own rows.
 
 ### 5.2 · `auth.kind` is kernel code, not declaration
 
-> **An auth kind is kernel code if it (a) touches crypto, (b) writes back to the vault, or (c)
+> **An auth kind is kernel code if it (a) touches crypto, (b) writes back to the Keychain, or (c)
 > chooses a header name. All eight hit at least one.**
 
 `none` · `bearer` · `basic` · `header` · `query_param` · `oauth2_refresh` · `jwt_rs256` · `aws_sigv4`
@@ -405,7 +405,7 @@ example ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D2).
 | Reason | Why it disqualifies a declaration on its own |
 |---|---|
 | **crypto** | a declaration that can construct a signature can construct **arbitrary signed assertions** with the user's private key — the same PEM that signs a GA4 token assertion signs anything, with any audience. And expressing HMAC or base64 in YAML needs functions, which is the expression language by the back door |
-| **vault write** | [12-SECURITY](12-SECURITY.md) §6 rule 3 is *"no agent tool returns a secret — not scoped, absent."* A declaration that can write a rotated refresh token has vault write capability, and the blast radius is every credential under the same DEK |
+| **Keychain write** | [12-SECURITY](12-SECURITY.md) §6 rule 3 is *"no agent tool returns a secret — not scoped, absent."* A declaration that can write a rotated refresh token has Keychain write capability, and the blast radius is every credential under the same DEK |
 | **header choice** | it could write a secret into `Referer` or a header a proxy logs — or set `Authorization` from a literal, putting `sk_live_…` in a file destined for the Kennel |
 
 **`jwt_rs256` earns its place by having two customers, not one.** GA4 signs
@@ -413,13 +413,13 @@ example ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D2).
 signs `{iss: enablebanking.com, aud: api.enablebanking.com, kid: <appId>}` and **presents** it
 directly. Same signer, two `mode:` values, one kernel implementation.
 
-The one vault write a connector ever causes is the rotated refresh token of `oauth2_refresh`, and even
+The one Keychain write a connector ever causes is the rotated refresh token of `oauth2_refresh`, and even
 that is not the declaration's and not connect's to store: connect re-seals it (`seal`, version + 1) and
 the **record** stores it from the ack's `result.rotated_grant` with one `grant.rotate` event
 ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D5; [12-SECURITY](12-SECURITY.md) §6).
 
 *Named and deliberately not built:* a ninth kind, `claim_once` — SimpleFIN's one-time token
-exchange. It needs a state transition *and* a vault write, so it is legitimately kernel work, and it
+exchange. It needs a state transition *and* a Keychain write, so it is legitimately kernel work, and it
 has exactly one customer in a product §4 recommends not building.
 
 ### 5.3 · `probe:` — exactly one, and no chaining
@@ -639,7 +639,7 @@ states, `pending · firing · paused`, and its first `due_at` at install is `now
 install. A fire (`firePull`, `packages/kernel/src/pull.ts`) writes one outbox row carrying the ingest, the
 cursor it last saw and the id of the key it sends, and nothing more. The key is the one the connector's
 `fetch.auth.grant` names, or its top-level `grant` when the auth block names none, by label or id; the fire
-writes the id, because the vault opens a key only for a job that names it by id.
+writes the id, because the Keychain opens a key only for a job that names it by id.
 
 The host's pass leases the row, and the record's `prepareAction` opens the sealed key under that lease
 (`sealedGrant`), reads the connector's cursor and slot off its schedule row, and hands the host a `Paged`.
@@ -783,7 +783,7 @@ So each way money reaches the record makes the figure better, and none of them i
   a person chooses to install, as the revision above asks: the seed's `bank-from-out-sms` ingest is
   gone from `packages/seed`.
 - **Pulled with a key the person holds**: `mercury` and `stripe` fetch balances and movements on a
-  schedule through a key in the vault, where a provider offers one to its own customer.
+  schedule through a key in the Keychain, where a provider offers one to its own customer.
 
 **CSV and OFX paste, the recommendation above, is not built yet.** It would be one more door into
 the same `transactions` list, and the roll above would read it with no change.
@@ -811,7 +811,7 @@ the same `transactions` list, and the roll above would read it with no change.
 and `packages/kernel/src/flow.ts` (the rule's step).*
 
 The owner's rule of that day: BrainDog is the shell. The code ships
-primitives, doors in and out, schedules, scripts, registers, pages, automations and the vault, and never a use case.
+primitives, doors in and out, schedules, scripts, registers, pages, automations and the Keychain, and never a use case.
 A currency rate or a message a payment provider posts is something a person or an agent builds on those. For this
 document that settles three things.
 
@@ -836,7 +836,7 @@ of being code:
 | Is | a declaration: substitution, never evaluation (§3.1) | JavaScript whose default export is `run(ctx)`, 64 KB at most |
 | Runs | on the host, the record never making the call | on the host in a sandbox, the record never running it: a fire writes one `script.run` outbox row and a host leases it |
 | Calls out to | one literal `base:` origin | the literal `https://` origins in `egress:`, each written out in full; a path, a port the parser would drop or a placeholder is `ACTION_HOST_COMPUTED`, anything not `https://` is `ACTION_NOT_HTTPS` |
-| Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `slash` key (`FORBIDDEN` at `keys[i]`) |
+| Sends | one grant, by label | the Keychain labels in `keys:`, each only to the host its Keychain entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the Keychain's `slash` key (`FORBIDDEN` at `keys[i]`) |
 | Reads the record | no | the registers in `reads:`, with every secret field taken off and a filter on one refused |
 | Writes | the rows its mapping makes, into one register or series | creates and updates into the registers in `writes:`, applied together after the run, all or none |
 | Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. A rule's `script` step starts one that says `runs.rule: true`, queuing the same `script.run` a clock does and going on without waiting (`startScript` in `kernel/src/flow.ts`), and every verified arrival at its `runs.door` queues one run with `input: { body, headers }` in the arrival's own transaction, at most `doorRunsPerDay()` a day (`startAtDoor` in `kernel/src/script.ts`, called from `arrive` in `kernel/src/ingest.ts`). A paused script is started by neither |
@@ -861,7 +861,7 @@ as a run. It runs on a self-host whose actions are on and on the Cloud where `LO
 **What is not built, said here because this document is where a reader looks for egress.** A door starts a script
 only on a verified arrival, and an unverified one starts nothing. The egress line joins every
 origin and every key into one line, so it does not say which host a key goes to, because `scriptEgress` does not
-see the vault; the key is held to its host at the fetch, not in the sentence the owner approves. And a key whose
+see the Keychain; the key is held to its host at the fetch, not in the sentence the owner approves. And a key whose
 `opens` is not one of the script's `egress:` hosts is not refused at install, only at each fetch, where three
 refused runs pause the script ([12-SECURITY](12-SECURITY.md) §6.2).
 

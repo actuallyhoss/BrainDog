@@ -255,7 +255,7 @@ packages/kernel/
 ├── src/
 │   ├── migrations/0001_kernel.ts   the DDL of 30 §1 plus the seed rows, as one exported string
 │   ├── migrations/0002_session.ts  register.session, the kernel's one register, as its canonical bytes
-│   ├── migrations/0004_device.ts   device_grant rebuilt: the seventh reach, vault, and its scope
+│   ├── migrations/0004_device.ts   device_grant rebuilt: the seventh reach, Keychain, and its scope
 │   ├── migrations/0005_schedule_actions.ts   schedule rebuilt with call and poll: twelve kinds
 │   ├── actions.ts                  scheduled actions: fire, prepare, finish, meter, resume; the host passes the executor
 │   ├── migrate.ts                  the runner, the checksum, the ledger, schemaState
@@ -465,7 +465,7 @@ nothing to roll back — and step R runs.
 
 1. `decl = register(register)`; none or retired → `REGISTER_UNKNOWN`.
 2. The current row. By id: `SELECT rowid, id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE id = ?`; none → `VALUE_MALFORMED` at `id`. On a `series: true` create, by key — `WHERE register = ? AND json_extract(fields, '$.a') = ? AND json_extract(fields, '$.b') = ?` over the coerced key values (the `entry_k_<reg>` index); a hit turns the create into an update of that row, `deleted_at` cleared (§13 #8).
-3. Every `patch` key: `deleted_at` is accepted as the delete/restore signal; another reserved id (`id seq register created_at updated_at version spoken title`) or a `_`-prefixed id → `FIELD_UNKNOWN`, except `_rule`, `_parent`, `_each` when `w.mechanism` starts `rule:` and `w.cascade === false`; an id the declaration lacks → `FIELD_UNKNOWN`; a derived, retired or kernel-written field → `IMMUTABLE_FIELD`. The kernel-written fields are the `session` register's `last_seen`, `project` and `token_id` (`KERNEL_WRITTEN` in `session.ts`), refused from every caller, a person included; the ladder below writes them through `w.stamp`, past this check. A `secret` field, or a `list` of them, is refused the same way and from every caller, because the vault door (after step 12a) is the one write that sets one.
+3. Every `patch` key: `deleted_at` is accepted as the delete/restore signal; another reserved id (`id seq register created_at updated_at version spoken title`) or a `_`-prefixed id → `FIELD_UNKNOWN`, except `_rule`, `_parent`, `_each` when `w.mechanism` starts `rule:` and `w.cascade === false`; an id the declaration lacks → `FIELD_UNKNOWN`; a derived, retired or kernel-written field → `IMMUTABLE_FIELD`. The kernel-written fields are the `session` register's `last_seen`, `project` and `token_id` (`KERNEL_WRITTEN` in `session.ts`), refused from every caller, a person included; the ladder below writes them through `w.stamp`, past this check. A `secret` field, or a `list` of them, is refused the same way and from every caller, because the Keychain door (after step 12a) is the one write that sets one.
 4. The actor, by principal:
    - `person` → `ctx.principal.id` (`p_…`, resolved to a name through the `person` mirror at read — §13 #4).
    - `system` → `w.mechanism ?? 'system'`.
@@ -522,7 +522,7 @@ creation by a person pins too; a redacted value inside it is the string `--redac
 | `file` | `{ sha256: /^[0-9a-f]{64}$/, mime: string, bytes: int ≥ 0, name: string }` | `VALUE_MALFORMED` |
 | `url` | `new URL(s)` succeeds and `protocol ∈ { 'https:', 'mailto:' }`; stored as `url.href` | `VALUE_MALFORMED` |
 | `email` | one `local@domain`, no spaces, one `@`; domain lower-cased | `VALUE_MALFORMED` |
-| `secret` | no patch: step 1.3 refuses one, and the vault door sets the grant id itself. `coerce` on its own checks `^g_[0-9A-HJKMNP-TV-Z]{26}$` and `SELECT 1 FROM grant WHERE id = ?` | anything else → `VALUE_MALFORMED` with `found` **omitted** — the value might be the credential itself (§8) |
+| `secret` | no patch: step 1.3 refuses one, and the Keychain door sets the grant id itself. `coerce` on its own checks `^g_[0-9A-HJKMNP-TV-Z]{26}$` and `SELECT 1 FROM grant WHERE id = ?` | anything else → `VALUE_MALFORMED` with `found` **omitted** — the value might be the credential itself (§8) |
 | `list<T>` | an array; each element coerced as `of:`; a refusal's `at` is `<f>[i]` | a non-array → `VALUE_MALFORMED`; element refusals as T |
 | `json` | any JSON | — |
 
@@ -558,7 +558,7 @@ ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1;                -- subj
 At depth 0 the statement runs after the (empty) transaction returns, in autocommit; inside a hook it runs where it
 is. The one write a refusal makes ([24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.2).
 
-**6 · PERSIST.** At its head, after `attribute`: on the vault door's write only, `bindGrant` runs with the run as its actor, rotating the live grant the row's secret field already names or minting one (a revoked one is replaced), and `merged[field]` takes the grant id. A refusal there is returned like any other, and the savepoint the door opened rolls back the run with it.
+**6 · PERSIST.** At its head, after `attribute`: on the Keychain door's write only, `bindGrant` runs with the run as its actor, rotating the live grant the row's secret field already names or minting one (a revoked one is replaced), and `merged[field]` takes the grant id. A refusal there is returned like any other, and the savepoint the door opened rolls back the run with it.
 
 1. A rule-generated create (`_rule` present): `SELECT id FROM entry WHERE json_extract(fields,'$._rule') = ? AND json_extract(fields,'$._parent') = ? AND json_extract(fields,'$._each') = ?` (the `entry_created_by` index); a hit returns that row `ok` with no event — a re-run is a no-op ([07-INGEST](07-INGEST-AND-RULES.md) §6.1).
 2. `seq = decl.series ? null : allocate('seq:' + register)` on a create.
@@ -632,7 +632,7 @@ layer owns quiet hours. At most 100 rows per field per write, nearest first (§1
 **12a · OUTBOX.** Rows a hook queued through `kernel.outbox(row)` are already inserted —
 `INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES (?, ?, ?, ?, 'pending', 0)` — inside this transaction. Nothing else is in the step; it is named so the boundary below has a last statement.
 
-**The two doors only the kernel opens.** `write` takes a fifth argument that the kernel's public `write`, `create` and `update` never pass, so nothing a caller fills in can set it. `decided` is set by governance's accept path on the rows an accepted proposal writes, and is the one way a field or a move declared `by: decide` changes. `seal` is set by `depositGrant({ register, ref?, field, fields?, grant }, w)`, the vault door's half in the record. It is INTERNAL and routed nowhere: a host's vault door calls it once it has sealed a key with the key store and dropped the value, handing over the sealed bytes and what they open. It runs this write path under a savepoint, creating the row or updating `ref`, binds the grant at the head of step 6, and returns the row and the grant. So `grant.add` and `create` are both signed by the run, a refusal anywhere rolls back the grant and the run together, and step 8 writes the field as `--redacted--`.
+**The two doors only the kernel opens.** `write` takes a fifth argument that the kernel's public `write`, `create` and `update` never pass, so nothing a caller fills in can set it. `decided` is set by governance's accept path on the rows an accepted proposal writes, and is the one way a field or a move declared `by: decide` changes. `seal` is set by `depositGrant({ register, ref?, field, fields?, grant }, w)`, the Keychain door's half in the record. It is INTERNAL and routed nowhere: a host's Keychain door calls it once it has sealed a key with the key store and dropped the value, handing over the sealed bytes and what they open. It runs this write path under a savepoint, creating the row or updating `ref`, binds the grant at the head of step 6, and returns the row and the grant. So `grant.add` and `create` are both signed by the run, a refusal anywhere rolls back the grant and the run together, and step 8 writes the field as `--redacted--`.
 
 **═ transaction ends ═** `transaction()` returns `{ ok: true, value: entry, version: version() }` — `MAX(event.rowid)` after this write's rows. Then the **caller** — `record` — does **11 · ARM** (`pendingWork().nextDueMs` → `await scheduler.set(min)` on a difference) and **12b · WAKE** (`outboxPending` → `await scheduler.wake()`). Both are async and outside the kernel by construction ([30-BLUEPRINT](30-BLUEPRINT.md) §4).
 
@@ -857,7 +857,7 @@ rather than an address, and `declare.ts` likewise roots a declaration's own JSON
 | `TEXT_JSON_QUOTED` | 3 | a string wrapped in its own JSON quotes | "Send the string itself, not its JSON encoding: strip the outer quotes." |
 | `TEXT_ESCAPED_NEWLINE` | 3 | the characters `\n` and no real newline | "Send a real newline (U+000A), not the two characters backslash-n." |
 | `INT_OUT_OF_RANGE` | 3 | `\|n\| > 2^53 − 1` on int, duration, amount | "Integers must fit 53 bits (±9,007,199,254,740,991); store a larger figure as text." |
-| `VALUE_MALFORMED` | 3 · 1 · erase | a value that is not the type's shape and cannot be coerced; an unresolvable id or spoken ref; a `secret` that is not a grant id (`found` omitted); an erase subject under three characters | "A <type> is <shape from 34 §3>." · "No row <ref> in register.<reg>." · "A secret field holds a grant id; bind the credential in the vault first." |
+| `VALUE_MALFORMED` | 3 · 1 · erase | a value that is not the type's shape and cannot be coerced; an unresolvable id or spoken ref; a `secret` that is not a grant id (`found` omitted); an erase subject under three characters | "A <type> is <shape from 34 §3>." · "No row <ref> in register.<reg>." · "A secret field holds a grant id; bind the credential in the Keychain first." |
 | `REQUIRED_MISSING` | 4 · 5 | a required field missing; `required_when:` true and missing; `requires:` on the entered state | "Set <f>." · "<f> is required when <leaf>." · "Entering <state> requires <f, g>." |
 | `ENUM_VALUE_UNKNOWN` | 4 | a value outside `values:` | "One of: <values>." |
 | `OUT_OF_BOUNDS` | 4 | outside `min:`/`max:` or a default cap | "<f> takes <min>–<max> <bytes\|elements\|units>; found <n>." |

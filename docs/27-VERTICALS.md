@@ -16,7 +16,7 @@ using only what [02-DATA-MODEL](02-DATA-MODEL.md) permitted, with instructions t
 
 > **The record layer was general. The analysis layer was not.**
 
-The kernel — `entry`, `event` with an actor, `decision` with a mandatory reason, the vault,
+The kernel — `entry`, `event` with an actor, `decision` with a mandatory reason, the Keychain,
 money-as-minor-units, one predicate grammar — would carry any of the four, and several parts of it
 are better than what the commercial products in each vertical ship. What broke was everything
 downstream of storage: no arithmetic, no grouping, no pictures, no cross-row constraints, no state
@@ -127,7 +127,7 @@ consultancies, studios, small clinics, small labels, anybody running several thi
 
 *(Read September 22nd 2026 against the shell direction.)* The claim above describes what the record
 can hold, and it stays true. It is not a list of use cases the product ships. BrainDog is the
-shell: a typed record, doors in and out, schedules, pages and a vault. The code ships those
+shell: a typed record, doors in and out, schedules, pages and a Keychain. The code ships those
 primitives; the lists, fields, integrations and metadata a given business needs are added at run
 time by the person or their agents, or brought by a pack they choose to install. The verticals in
 this document are tests of the primitives, not packs the product is obliged to carry.

@@ -12,7 +12,7 @@ A pack is a file of data that a record reads, so what it can do is a short list,
 - Send a digest on a schedule.
 - Tag, move, note, notify and set fields through rules, and make rows through a rule only up to a bound it declares.
 - Run a script in a sandbox, reaching only what its declaration names.
-- Call out to a host written out in full, as often as it says and no more often than every fifteen minutes, with a vault key named by its label.
+- Call out to a host written out in full, as often as it says and no more often than every fifteen minutes, with a Keychain key named by its label.
 - Carry example rows, marked as examples and counted on their own line in the plan.
 
 ## What a pack cannot do

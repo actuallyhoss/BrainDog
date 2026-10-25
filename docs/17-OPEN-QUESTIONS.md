@@ -155,12 +155,12 @@ value type, the closed list is wrong and it is better to know at day 8 than at d
 
 **The question.** Cloud Team is $29/mo for up to 5 people on one record. [12-SECURITY](12-SECURITY.md)
 settles authentication but not authorisation: is it role-based or capability-based, per-register or
-per-page, and how is the vault excluded for a contractor?
+per-page, and how is the Keychain excluded for a contractor?
 
 **Answered in [20-COLLABORATION](20-COLLABORATION.md) §1**, recorded as
 [ADR-035](16-DECISIONS.md). Three layers — a materialised ceiling (person × register × level, five
 levels: `read append write decide owner`), scope as rules over typed fields, and pages and share
-links as projections that can only narrow. Capability-based, per register; the vault is its own
+links as projections that can only narrow. Capability-based, per register; the Keychain is its own
 capability, owner-only by default; a share link is a projection with an empty ceiling. The schema
 decision that could not wait past stage A2 is made: grants live in the kernel `member` table, not
 on `entry` — [30-BLUEPRINT](30-BLUEPRINT.md) §1. Capability-based because it extends to >5 people
@@ -374,7 +374,7 @@ per write and one join per predicate, it is boring, and it cannot fail this way.
 
 ---
 
-## Q13 · Does turning the vault passphrase on disable pull connectors?
+## Q13 · Does turning the keychain password on disable pull connectors?
 
 **The question, and it is a genuine conflict between two things this corpus is proud of.**
 
@@ -390,7 +390,7 @@ present**, to send a bearer token or refresh an OAuth credential.
 | | |
 |---|---|
 | **(a) Connectors pause without a live session** | honest, simple, and it makes the passphrase mean exactly what it says. The cost is that a security feature silently disables an unrelated one, and the user finds out from a gap in a chart |
-| **(b) Connector grants live under a second, KEK-wrapped DEK** | connectors keep working. **The cost is that the operator *can* decrypt those specific credentials — read-scoped analytics keys, not the whole vault** |
+| **(b) Connector grants live under a second, KEK-wrapped DEK** | connectors keep working. **The cost is that the operator *can* decrypt those specific credentials — read-scoped analytics keys, not the whole Keychain** |
 
 **What must not happen is (b) silently.** [12-SECURITY](12-SECURITY.md) §7 is a table of what we can
 see, and it was already corrected once for overclaiming. Taking (b) without adding a row to it makes

@@ -468,7 +468,7 @@ server key, and adds the operator's two.
 | `POST /auth/device/start` · `/poll` · `/approve` | none yet | specified, not built |
 
 Self-service sign-up is not built: a hosted record is made by the operator today. A record provisioned while `KEK`
-is bound is made with its three keys wrapped under it. One provisioned without it has no vault keys, and binding
+is bound is made with its three keys wrapped under it. One provisioned without it has no Keychain keys, and binding
 `KEK` later does not give it any: it reads, writes and signs people in, cannot seal a grant or sign an export, and
 its key doors answer the sentence in §8 rule 3.
 
@@ -684,8 +684,8 @@ queue(batch):
 *As built, September 22nd 2026: `apps/worker/src/do/slash.ts` does not exist. The palette's engine is built inside the
 record's own object on the first ask (`workerSlashDoor`, `apps/worker/src/slash.ts`), with Slash's `settings` and
 `call` tables in that object's storage, and it is reached through `/api/slash/*` rather than a `Slash` class. The
-Worker reads no operator key for Slash (`slashFromEnv(env, { operatorKey: false })`), so wherever the vault holds a
-`slash` grant every ask, on every tier, goes through the record's vault gate and opens that grant in the asker's
+Worker reads no operator key for Slash (`slashFromEnv(env, { operatorKey: false })`), so wherever the Keychain holds a
+`slash` grant every ask, on every tier, goes through the record's Keychain gate and opens that grant in the asker's
 name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can be opened, no engine is built, and
 `/api/version` says `slash: false`. The runner socket above is not built.*
 
@@ -813,7 +813,7 @@ three refusals) is the same code on both hosts and is written there once.*
 9. **A trial** (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12). The record's `tryScript` dependency is wired
    where the object opens its record (`#open`): `scriptTrial` (`packages/host/src/script-try.ts`) over `runScript`
    with the same loader, `ScriptRuns`, send loop and key opener as the alarm (`#openKey`, the one reader of `KEK` for
-   both), the caller's own reads, and the vault only for the owner signed in as a person. It asks the Directory's
+   both), the caller's own reads, and the Keychain only for the owner signed in as a person. It asks the Directory's
    `mayRun` and is metered on its ledger like a run, and writes nothing. With no `LOADER` bound it answers a refusal
    with no code, *"This deployment has no sandbox, so nothing ran."*
 
@@ -830,7 +830,7 @@ under `wall_ms: 500` answered clean). Both are closed, by step 3 and by step 8's
 still runs until it lets go or the platform's `cpuMs` ends it, which local workerd does not enforce and no deploy
 smoke has run yet. This host sets no memory ceiling of its own; the loaded Worker has the platform's. What the
 self-host shares is closed here too, because the send loop, the key rule and the record's half are the same code:
-the key goes only to the host its vault entry opens, the scrub takes every spelling `spellingsOf` names, and the
+the key goes only to the host its Keychain entry opens, the scrub takes every spelling `spellingsOf` names, and the
 log is shown only to an owner who reads every list the script touched. **Not built**, on both hosts: the install
 line does not say which host each key goes to, and a key whose `opens` is not among the script's origins is refused
 at each fetch rather than at install ([12-SECURITY](12-SECURITY.md) §6.2).
@@ -919,7 +919,7 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
    *The key doors, September 15th 2026.* `KEK` is a Worker secret (`wrangler secret put KEK --env <environment>`)
    or a Secrets Store binding of that name, holding 32 bytes as 64 hex characters or base64url; the fingerprint is the
    self-host's, so one root key names itself the same way on both hosts. A bound value that is not 32 bytes is a
-   refusal and never an absent store. Unbound, `/api/vault/deposit` and `/api/vault/open` check the vault grant and
+   refusal and never an absent store. Unbound, `/api/vault/deposit` and `/api/vault/open` check the keychain access and
    answer `NOT_IN_THIS_BUILD`, and `/auth/provision` answers `NOT_IN_THIS_BUILD` too rather than making a record with
 no wrapped keys, unless the deployment declares `PROVISION_WITHOUT_KEYS: yes`. Amending this rule in the revision
 that added `src/keyless.ts`: it read "exactly as before", and before was a record that could never seal a grant,
@@ -953,7 +953,7 @@ run a connector, hold a model key or sign an export, with no call that could eve
     binding are loopback entrypoints into the object that started it; a request with no run header is refused
     wherever it points, and a stamped one meets the same checks as on the self-host before `sendAction` sends it.
     The sandbox never holds a key, only a label; the object opens the grant for one request, and only to the host
-    its vault entry opens. What the script reads has every secret field taken off. Rule 2 still holds for `Record`'s
+    its Keychain entry opens. What the script reads has every secret field taken off. Rule 2 still holds for `Record`'s
     ports: the fetch is made by the object's host code, in the alarm as a scheduled action's is, or for a trial in
     the request that asked for it, and never by the record package.
 

@@ -20,7 +20,7 @@ When a rule's steps cannot say it, a pack carries a script: a function in JavaSc
 
 - **`runs`** says when: `every` on a clock, `door` when a door receives something, or `rule: true` when a rule's step starts it.
 - **`egress`** is every address it may call, each a bare `https://` origin: no path, no placeholder and nothing computed.
-- **`keys`** are the vault keys it may send, by label. The script never holds a key: it names the label, and the host opens the key outside the sandbox.
+- **`keys`** are the Keychain keys it may send, by label. The script never holds a key: it names the label, and the host opens the key outside the sandbox.
 - **`reads`** and **`writes`** are the lists it may read and write.
 - **`limits`** asks for time, calls and writes. The defaults and the most a declaration may ask for are `DEFAULT_LIMITS` and `CEILINGS` in `packages/script/src/index.ts`, and a declaration over a ceiling is refused rather than cut down.
 
@@ -88,12 +88,12 @@ Stripe 1.3.0 reads as an add-on: 0 lists, 0 pages and 0 example rows. Nothing wa
   Installs first: money-core
   Adds lists: none; pages: none; rules: none
   Example rows: 0; suggests skills: none
-  Calls out to: CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its vault entry opens
-  Refused in a scratch record: Add the key called "stripe" to the vault, then install. (REQUIRED_MISSING)
+  Calls out to: CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its Keychain entry opens
+  Refused in a scratch record: Add the key called "stripe" to the Keychain, then install. (REQUIRED_MISSING)
 Stripe 1.3.0 would be refused by a record, as said above.
 ```
 
-The refusal on the last lines is the rule working: a pack that sends a key installs only when that key is already in the vault. A scratch record has an empty vault, so `check` says so for any pack that sends one.
+The refusal on the last lines is the rule working: a pack that sends a key installs only when that key is already in the Keychain. A scratch record has an empty Keychain, so `check` says so for any pack that sends one.
 
 The rules for an address are the same whichever way it is called:
 

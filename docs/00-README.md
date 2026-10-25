@@ -8,7 +8,7 @@ them. Where a document and the code disagree, the code is the truth.
 [15-ROADMAP](15-ROADMAP.md) is an older roadmap, kept as history.
 
 BrainDog is the shell (September 22nd 2026): a typed record, doors in and out,
-schedules, pages and a vault, which a person and their agents shape to whatever they run. The code ships the primitives;
+schedules, pages and a Keychain, which a person and their agents shape to whatever they run. The code ships the primitives;
 use cases, integrations and metadata (a field, a list, a relation) are added at run time by people or agents, or
 brought by a pack somebody chose to install. Money, renewals, hosting and credentials, which many of these documents
 use as their examples, are use cases built on those primitives, not the product.

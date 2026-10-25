@@ -145,8 +145,8 @@ script.fetcher's egress "https://api.example.com/v1" must be an origin written o
 rates may be fetched no more often than every fifteen minutes.
 ```
 
-```code | A key that is not in the vault yet (REQUIRED_MISSING)
-Add the key called "stripe" to the vault, then install.
+```code | A key that is not in the Keychain yet (REQUIRED_MISSING)
+Add the key called "stripe" to the Keychain, then install.
 ```
 
 ```code | A job that would skip its permissions (DECLARATION_INVALID)

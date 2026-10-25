@@ -166,11 +166,11 @@ We also share information:
 We'd rather say this plainly.
 
 - **Your record's rows.** They are not end-to-end encrypted, because BrainDog has to read them to show your pages, run your rules and answer your agents. So we can technically read them.
-- **Your saved keys.** They are sealed with a key that belongs to your record, which is itself sealed with a key only BrainDog's servers hold. If you turn on a vault passphrase, we can't open your saved keys without it. You type it each time you open one, and BrainDog uses it for that moment only and never stores it. Copies of the record made before you turned it on can still be opened without it until they are deleted: 30 days for nightly copies, and longer for copies taken by hand (see "How long we keep it").
+- **Your saved keys.** They are sealed with a key that belongs to your record, which is itself sealed with a key only BrainDog's servers hold. If you turn on a keychain password, we can't open your saved keys without it. You type it each time you open one, and BrainDog uses it for that moment only and never stores it. Copies of the record made before you turned it on can still be opened without it until they are deleted: 30 days for nightly copies, and longer for copies taken by hand (see "How long we keep it").
 - **Keys your connections use while you're away.** A connection that runs on a schedule must open its key with nobody present, so we can still open those, even with a passphrase on. BrainDog tells you so when you save one.
 - **Slash's questions.** Not kept by us, and the gateway is asked not to keep them, as above.
 
-**When we look.** Only to support you, keep BrainDog safe, or follow the law. Support will never ask for your vault passphrase.
+**When we look.** Only to support you, keep BrainDog safe, or follow the law. Support will never ask for your keychain password.
 
 ## Where your information goes
 

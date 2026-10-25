@@ -11,7 +11,7 @@ A door is checked in one of two ways:
 ```comparison | How a door knows its sender
 Check | How it works | Address
 A token in the address | The app mints a random token for the door and shows the whole address once. Minting again replaces it | /in/webhook/<record id>/<door>/<token>
-A signature | The sender signs the body with a shared key kept in your vault: an HMAC-SHA256 under a header the door names, GitHub's X-Hub-Signature-256, or Stripe's own signature | /in/webhook/<record id>/<door>
+A signature | The sender signs the body with a shared key kept in your Keychain: an HMAC-SHA256 under a header the door names, GitHub's X-Hub-Signature-256, or Stripe's own signature | /in/webhook/<record id>/<door>
 ```
 
 ```code | sh

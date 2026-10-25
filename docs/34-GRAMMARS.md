@@ -487,7 +487,7 @@ because the object is single-writer. A purged row's number is never reissued —
 | `kek_id` | the KEK | the first 18 hex of SHA-256(raw KEK) |
 
 The `.brainl` is the canonical projection written out — 41 §5.10's line format, one table after another in
-`dog_section` order — so `dog_manifest.sha256` is checkable with `sed` and `sha256sum`. The vault's bytes — the AAD
+`dog_section` order — so `dog_manifest.sha256` is checkable with `sed` and `sha256sum`. The Keychain's bytes — the AAD
 and the sealed shape `{ ciphertext, nonce, aad, kek_id, wrapped_dek }` — are defined once, in
 [12-SECURITY](12-SECURITY.md) §6, and `‖` in this corpus means byte concatenation.
 
@@ -523,7 +523,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
 | Series kinds | 5 | `gauge flow cumulative unique fact` | 08 §3 |
 | Suggestion body kinds | 4 (+ `query`, never filed) | `options pattern rowset change` · `query` is the palette's unfiled answer | 23 §4 |
-| Refusal codes | 125, in 9 families | pack and declaration 54 · grammar 14 · write path 18 · auth and vault 8 · format and lifecycle 8 · dialect 2 · slash 5 · connector 12 · host and client 4 | 30 §6 |
+| Refusal codes | 125, in 9 families | pack and declaration 54 · grammar 14 · write path 18 · auth and Keychain 8 · format and lifecycle 8 · dialect 2 · slash 5 · connector 12 · host and client 4 | 30 §6 |
 | `SqlErrorCode` | 13 | 33 §3 — the adapter vocabulary, not refusal codes | 30 §13 |
 | `Http` error names | 4 | `PrivateRange TooLarge Timeout Network` — a vocabulary, not refusal codes | 33 §1 |
 | Event kinds | 40 | 30 §2 | 30 §2 |
@@ -542,7 +542,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Job statuses | 9 | `queued claimed ok needs_decision refused limit error interrupted cancelled` | 26 §5 |
 | Job event kinds | 9 | `start say think tool out limit note end error` | 26 §5 |
 | Grant kinds | 5 | `api_token password ssh_key recovery_codes note` | 12 §6 |
-| Vault key purposes | 3 | `record connector signing` | 12 §6 |
+| Keychain key purposes | 3 | `record connector signing` | 12 §6 |
 | Grant `sealed_under` | 2 | `record connector` | 12 §6 |
 | Connector `auth.kind` | 8 | 25 §3 | 25 §3 |
 | Connector placeholders | 5 | 25 §3 | 25 §3 |

@@ -155,7 +155,7 @@ communication.** BrainDog has the first two structurally. The full design is in
 | A redaction pass over every projection before it enters a prompt | **ours.** `secret` fields become their label; ciphertext never leaves the record |
 | AI Gateway DLP as a tripwire on prompts and responses | defence in depth. **Flag and block only — it cannot redact**, so it catches a mistake rather than preventing one |
 | Every proposal records what it read | audit |
-| A model key kept in the vault opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the vault's own gate, in the host ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9, §6.2 below) |
+| A model key kept in the Keychain opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the Keychain's own gate, in the host ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9, §6.2 below) |
 
 **No injection classifier is a control here.** ~95% accuracy at ~65 ms is a fine signal and a
 useless gate on a record holding credentials. It goes in the audit log as a flag.
@@ -201,7 +201,7 @@ BrainDog. If an app were found to show `_meta` to its model, the remedy is to ta
 
 ---
 
-## 6 · The credential vault
+## 6 · The credential Keychain
 
 The prior system's rule was *"the register indexes what a key OPENS, never the key."* That is a
 good rule for a private tool and insufficient for a product: people will keep credentials
@@ -230,10 +230,10 @@ somewhere, and somewhere is currently a notes app. So BrainDog stores them, prop
   AES-256-GCM(plaintext, nonce, aad = record_id ‖ grant_id ‖ version)   -- ‖ is the byte 0x1F; exact below
 ```
 
-**The vault cannot hold its own key.** The KEK, the owner's passkey and a self-host's `BRAINDOG_TOKEN` live
-outside it by necessity: reading the vault needs them, so the safe cannot hold what opens it. The predecessor's
+**The Keychain cannot hold its own key.** The KEK, the owner's passkey and a self-host's `BRAINDOG_TOKEN` live
+outside it by necessity: reading the Keychain needs them, so the safe cannot hold what opens it. The predecessor's
 migration of 2026-09-02 moved exactly three things *out* of its secrets folder for this reason — the token that
-opens the vault and two SSH keys, into `~/.ssh` with a config — and seventy-two values *in*, each verified
+opens the Keychain and two SSH keys, into `~/.ssh` with a config — and seventy-two values *in*, each verified
 byte-identical while the original still existed, which was the last moment that proof was possible.
 
 Secrets Store's **100-secret, 1 KB-per-secret** ceiling is precisely why the root key is one key
@@ -245,7 +245,7 @@ decrypt. Copying a blob between records yields nothing. **The bytes, once, here:
 `aad = utf8(record_id) ‖ 0x1F ‖ utf8(grant_id) ‖ 0x1F ‖ utf8(String(version))` — wherever this corpus
 writes `‖` it means that byte. The wrapped DEK is bound the same way, to `utf8(record_id) ‖ 0x1F ‖
 utf8(purpose)`; the grant key is HKDF-SHA-256 over the DEK with the grant id as `info`; nonces are 12
-bytes; and everything crosses a wire as base64url. One rule for vault and connector grants alike,
+bytes; and everything crosses a wire as base64url. One rule for Keychain and connector grants alike,
 byte-exact in [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.6. **Sign-up generates all three keys** — the
 record DEK, the connector DEK (§7) and the signing key ([03-DOG-FORMAT](03-DOG-FORMAT.md) §4).
 
@@ -254,7 +254,7 @@ record DEK, the connector DEK (§7) and the signing key ([03-DOG-FORMAT](03-DOG-
 [03-DOG-FORMAT](03-DOG-FORMAT.md) §4) — each with `wrapped`, `nonce`, `wrapped_by` (`kek` |
 `passphrase`), `kek_id`, `salt` and `rewrapped_at`; exactly one wrapping per key
 ([30-BLUEPRINT](30-BLUEPRINT.md) §1). It travels in an export, sealed — a wrapped key is nothing without the
-KEK, and a record restored from its own backup must be able to open its own vault (§8).
+KEK, and a record restored from its own backup must be able to open its own Keychain (§8).
 
 **Rotation is two slots.** The root key has a current slot and a previous one — `KEK` and `KEK_PREV`;
 `rewrapKeys` re-wraps every `vault_key` row from the old to the new, `kek_id` tells the rows apart during
@@ -283,12 +283,12 @@ A `WRONG_KEY` is judged against `vault_key`'s own `kek_id`, never guessed from t
 
 ### The optional second factor
 
-A record may set a **vault passphrase**, distinct from login.
+A record may set a **keychain password**, distinct from login.
 
 > **An earlier draft said the DEK is then wrapped by `HKDF(passphrase)` "as well" — which does not
 > provide the guarantee two tables in this document then claimed.** If the DEK is wrapped by the KEK
 > *and* by the passphrase, **either wrapping opens it**, so the operator's KEK still decrypts the
-> vault. The honesty table below would have been false.
+> Keychain. The honesty table below would have been false.
 
 **The mechanism, corrected: enabling a passphrase RE-WRAPS and destroys.** The DEK is unwrapped with
 the KEK once, re-wrapped under a key derived by **PBKDF2-SHA-256, 600,000 iterations, a 16-byte salt** — WebCrypto has no
@@ -304,7 +304,7 @@ has nobody there to type anything, so for those the answer to the first question
 
 This is the honest trade, stated in the UI rather than in a whitepaper:
 
-| Vault passphrase | We can read your credentials | You can lose them |
+| Keychain password | We can read your credentials | You can lose them |
 |---|---|---|
 | off (default) | yes, technically | no |
 | **on** | **no** | **yes, permanently** |
@@ -323,7 +323,7 @@ handed wrapped bytes and a salt and never the passphrase or a key. The details:
 - **Only the record DEK moves** (`vault_key` purpose `record`). The connector DEK and the signing key
   stay on the KEK, so connector pulls and the signed nightly copy run as before. What stops is anything
   that opens a key a person deposited with nobody present: a scheduled call or a signed digest post that
-  names such a key, and every agent's vault grant, which is told the vault is behind a passphrase.
+  names such a key, and every agent's keychain access, which is told the Keychain is behind a passphrase.
 - **The derivation** is PBKDF2-SHA-256 over the passphrase normalised to NFC, `PASSPHRASE_ITERATIONS`
   rounds and a fresh salt of `PASSPHRASE_SALT_BYTES` in `vault_key.salt`; the DEK is wrapped with
   AES-256-GCM under the derived key with the same additional data it has under the KEK,
@@ -376,7 +376,7 @@ FOR" is structural rather than remembered.
 
 ### Rules
 
-1. **Every read is an event.** `grant.read` with the actor. A vault whose reads are not audited
+1. **Every read is an event.** `grant.read` with the actor. A Keychain whose reads are not audited
    cannot answer "did anything get out".
 2. **Reveal is deliberate**: a click, a re-auth if the session is over 15 minutes old, a 30-second
    auto-hide, and clipboard cleared after 60 seconds.
@@ -389,7 +389,7 @@ FOR" is structural rather than remembered.
    a test that greps every write path.
 6. **Ciphertext stays ciphertext in exports.** `grant` rows travel sealed by default; `--redact-grants`
    drops them — [03-DOG-FORMAT](03-DOG-FORMAT.md) §5 and §8 below.
-7. **The vault is its own RPC group.** `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` are the
+7. **The Keychain is its own RPC group.** `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` are the
    VAULT group of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — a browser session only; every token, whatever its
    scope, gets `403 NEEDS_BROWSER_SESSION`, and so does an operation grant — VAULT has no reach
    ([ADR-060](16-DECISIONS.md)).
@@ -398,7 +398,7 @@ FOR" is structural rather than remembered.
    **proven at bind**, never assumed. When a provider rotates a refresh token mid-run, connect re-seals
    it (version + 1) and the record stores it from the ack with one `grant.rotate` event — the previous
    version kept as `prev_ciphertext`.
-9. **An agent's keys go through two doors, under a vault grant, except that a login token may add a new key.** `POST /api/vault/deposit`
+9. **An agent's keys go through two doors, under keychain access, except that a login token may add a new key.** `POST /api/vault/deposit`
    and `POST /api/vault/open` take as their bearer a device grant of reach `vault`, approved by a person for
    one project or for `*`, the keys of no project; 30 days for a project and 7 for `*`. The bearer is checked
    with `vaultGrant`, which never accepts a login token, and a key whose row's project is not the grant's
@@ -419,22 +419,22 @@ FOR" is structural rather than remembered.
    same host step: the `KeyStore` seals the value and the record is handed sealed bytes, through the same INTERNAL
    `depositGrant` and `openForGrant`. What decides whether the session may reach a key is rule 2's gate and not the
    door: an owner, no token, and a proof under fifteen minutes old; a person reaches every key the record holds,
-   where a vault grant reaches only its own project's. A read is the same counted `grant.read`, signed by the
+   where keychain access reaches only its own project's. A read is the same counted `grant.read`, signed by the
    person, and the value leaves in the same one answer with `no-store`. The Keys screen is the only caller:
    it puts a key in, replaces one row's value, and reveals one for thirty seconds, clearing the clipboard after
    sixty. `/api/vault/deposit` and `/api/vault/open` are unchanged and still refuse a page, whatever its origin.)*
    *(Amended September 25th 2026: an agent may ADD a key with its login token, and only
    add one. `POST /api/vault/deposit` also takes `Authorization: Bearer <rec>.<token>`, a live token of scope `write`
-   on the keys list, checked as every `/api` bearer is, and only when the bearer is not a vault grant. Its body is
+   on the keys list, checked as every `/api` bearer is, and only when the bearer is not keychain access. Its body is
    `{ label, opens, kind?, value }`; a `project` or a `credential` in it is `VALUE_MALFORMED`, because the key goes to
    the project the token's run is in, as the session ladder resolves it, or to no project when the run is in none. A
-   label already within that reach is `403 FORBIDDEN`, whose sentence names the two ways a value is replaced: a vault
-   grant for its project (`braindog login <host> --vault <project>`) or the owner on the Keys screen. So a login token that leaks can add a
-   key and never swap one, and rotation keeps needing a vault grant or the owner. The host sets the record's
+   label already within that reach is `403 FORBIDDEN`, whose sentence names the two ways a value is replaced: a Keychain
+   grant for its project (`braindog login <host> --keychain <project>`) or the owner on the Keys screen. So a login token that leaks can add a
+   key and never swap one, and rotation keeps needing keychain access or the owner. The host sets the record's
    `agentDeposit` flag on this path alone, never from a body; the answer is the one a grant's deposit gets, with
    `no-store`, the events are `grant.add` and `create`, signed by the run, and the row's origin reads
-   `<agent> on <machine>, S<n>`. `POST /api/vault/open` still takes a vault grant and nothing else. `braindog keys put`
-   sends the vault grant when one is held and the login otherwise, and `braindog tools scan` deposits through it.)*
+   `<agent> on <machine>, S<n>`. `POST /api/vault/open` still takes keychain access and nothing else. `braindog keys put`
+   sends the keychain access when one is held and the login otherwise, and `braindog tools scan` deposits through it.)*
    *(Added September 15th 2026. `tools/gates/secret-grep.mjs` holds
    the value's shapes in the three files that may name it, and follows a call to a function in the same file
    whose return type names the brand.)*
@@ -455,14 +455,14 @@ FOR" is structural rather than remembered.
 
 ### 6.1 · The device-authorisation grant, and five refinements from the predecessor
 
-The predecessor's vault landed on 2026-09-01 after an owner decision (SG24 → D39,
+The predecessor's Keychain landed on 2026-09-01 after an owner decision (SG24 → D39,
 *encrypted-in-brain*) and answered every argument the original *"never a value"* rule had made — in
 code rather than by dropping them. Five of its mechanisms were missing here.
 
 **RFC 8628, the flow a television uses.** The device that wants in shows a six-digit code; the owner
 approves it from a session that is already authenticated as him. It is the right shape because *the
 thing asking is not the thing holding the identity* — a CLI on a VPS, an agent, a browser that has
-never opened the vault all ask the same way.
+never opened the Keychain all ask the same way.
 
 > **The code is not the security.** Six digits is a million, with a ten-minute life
 > (`DEVICE_CODE_EXPIRED` after it) and five attempts (`DEVICE_CODE_TRIES`). What the code proves is that the approver is **looking at the device that asked.**
@@ -482,7 +482,7 @@ never opened the vault all ask the same way.
 | **The poll id is never shown.** A listing, an event and a revoke name a row by a handle, the first 16 hex of `sha256('device:' ‖ id)` | between approval and exchange, whoever holds the id can take the bearer |
 | **A denied row is kept** | *"I said no to a request I did not make"* is the single most important line this table can produce |
 | The grant is **revocable on its own**, without ending the session | it is a separate long-lived token, 90 days, stored as `token_hash`, because revocation is real. `expires` holds the code's ten minutes while pending and is rewritten when the poll exchanges an approved row (approved → active), once: a second poll is refused. A `login` exchange mints an ordinary `token` row through `createToken` (scope `write`, 90 days, the device's label, owned by the approver), so there is one bearer format and one verifier, and revoking the grant revokes that token. A device silent for 14 days, counted through its token for a login, is moved to `expired` by the hourly sweep and its token revoked |
-| **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one — **and the operation grant's** (§3), **and the vault grant's**. The row's `reach` says which: `login` · `runner` · `export` · `import` · `pack` · `token` · `vault` — seven values since kernel migration 4. A `runner` exchange returns the 90-day bearer; an operation reach returns a bearer that keeps the code's ten minutes and is spent on one call; a `vault` reach carries `scope`, a project row id or `*`, and returns a bearer that opens that scope's keys for 30 days, or 7 for `*`, checked by `vaultGrant` and never by `verifyToken` | one flow to secure, and it is a standard |
+| **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one — **and the operation grant's** (§3), **and the Keychain grant's**. The row's `reach` says which: `login` · `runner` · `export` · `import` · `pack` · `token` · `vault` — seven values since kernel migration 4. A `runner` exchange returns the 90-day bearer; an operation reach returns a bearer that keeps the code's ten minutes and is spent on one call; a `vault` reach carries `scope`, a project row id or `*`, and returns a bearer that opens that scope's keys for 30 days, or 7 for `*`, checked by `vaultGrant` and never by `verifyToken` | one flow to secure, and it is a standard |
 
 **The `runner` reach, in use** *(added September 28th 2026)*. `braindog runner
 enrol <host>` asks with `reach: 'runner'`, and the 90-day bearer it gets back is kept in the hosts file beside the
@@ -509,7 +509,7 @@ it may do: the kind's tools, permission mode and pin hold under every profile, a
 profile's own MCP servers out of the run. A profile's name and a machine's name on a run are read only where runs are
 already read; the Profiles add-on's lists stay personal.
 
-Four more rows on the vault itself, each answering a specific way the earlier design would have
+Four more rows on the Keychain itself, each answering a specific way the earlier design would have
 failed:
 
 | Mechanism | Why |
@@ -521,7 +521,7 @@ failed:
 
 **What is not defended, stated plainly:** a compromised host — on Cloud, the Worker — which can read the root key. The
 alternative — end-to-end encryption — would mean no agent could ever read a secret and losing a
-passkey loses the vault. The predecessor's owner chose the other trade knowingly, and the honesty table
+passkey loses the Keychain. The predecessor's owner chose the other trade knowingly, and the honesty table
 in §7 says so.
 
 ### 6.2 · Where a key may go, and who may open it
@@ -530,16 +530,16 @@ in §7 says so.
 checked against `packages/host/src/actions.ts`, `packages/host/src/script.ts`, `packages/host/src/script-try.ts`,
 `packages/host/src/slash.ts`, `packages/kernel/src/script.ts` and both apps' `keyOpener` at `d23ac77d`.*
 
-A key the vault holds leaves the host in one form only: an `authorization: Bearer` header on one request the host
+A key the Keychain holds leaves the host in one form only: an `authorization: Bearer` header on one request the host
 makes, opened for that request after every check on it has passed, and dropped when the answer is back. Four paths
 open one:
 
 | Path | Opened by, and the `grant.read` signed as | Sent to | Checked first |
 |---|---|---|---|
 | a scheduled `call`, `poll` or `pull` ([25-CONNECTORS](25-CONNECTORS.md) §9) | the host's `keyOpener`, as `system`: nobody asked | the origin its declaration names | `sendAction`: `https:`, an origin an active declaration names, a host written as a literal private or local address refused, and on the self-host `pin` resolving the name and refusing a private address before the socket opens |
-| a script's `ctx.fetch` | the same opener, as `system` | an origin in the script's `egress:`, and only the host the key's vault entry says it opens | in the sandbox, the origin, `https:`, no user name or password in the URL, the fetch count and a declared label; then `keyRefused`, the URL's host against the grant's `opens`; then `sendAction`'s checks again, over the script's own origins |
-| a trial of a draft script (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12) | the same opener, as `system`, and only when the caller is the owner signed in as a person | as a script's | as a script's. For any other caller, a token included, the record hands the host no vault, and a fetch naming a key is refused unsent |
-| Slash ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9) | the app's `keyOpener`, as the person who asked | `SLASH_ENDPOINT` | the vault's gate on the asker's own session: an owner, never a token, a proof under fifteen minutes old; for tier `b`, a live `api_token` grant that is not the one labelled `slash` |
+| a script's `ctx.fetch` | the same opener, as `system` | an origin in the script's `egress:`, and only the host the key's Keychain entry says it opens | in the sandbox, the origin, `https:`, no user name or password in the URL, the fetch count and a declared label; then `keyRefused`, the URL's host against the grant's `opens`; then `sendAction`'s checks again, over the script's own origins |
+| a trial of a draft script (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12) | the same opener, as `system`, and only when the caller is the owner signed in as a person | as a script's | as a script's. For any other caller, a token included, the record hands the host no Keychain, and a fetch naming a key is refused unsent |
+| Slash ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9) | the app's `keyOpener`, as the person who asked | `SLASH_ENDPOINT` | the Keychain's gate on the asker's own session: an owner, never a token, a proof under fifteen minutes old; for tier `b`, a live `api_token` grant that is not the one labelled `slash` |
 
 1. **Neither the sandbox nor the model ever holds a key.** A script names a label and the host resolves it, by
    label or id, never a revoked grant, the newest first; Slash's package is handed an adapter whose key is asked
@@ -549,12 +549,12 @@ open one:
    own asks from anybody else's. Slash's openings now carry the asker; `system` is what a run with nobody at the
    keyboard gets. A trial of a draft script is the one exception left: the owner asked for it, and its opening is
    still signed `system`, because both hosts hand it the scheduled runs' opener, which takes no actor.
-3. **A key other people's asks would open goes through the vault's own gate.** Where Slash's included model is
-   keyed from the vault (no operator key, and a live grant labelled `slash`, which on the Cloud is the only way it
+3. **A key other people's asks would open goes through the Keychain's own gate.** Where Slash's included model is
+   keyed from the Keychain (no operator key, and a live grant labelled `slash`, which on the Cloud is the only way it
    is keyed), a colleague is refused before any model is called, on a read as well as a propose. Measured before the
    gate: a colleague at `read` with a proof fifty minutes old read and proposed with 200, on three model calls on the
    owner's key.
-4. **A script's key goes only to the host its vault entry opens** (`keyRefused`, the same function on both hosts).
+4. **A script's key goes only to the host its Keychain entry opens** (`keyRefused`, the same function on both hosts).
    The grant's `opens` is read as a host name when it parses as one (`api.gold.test`, `api.gold.test:8443` and
    `https://api.gold.test/v1` all name `api.gold.test`) and compared with the fetched URL's host exactly, with no
    subdomain let in: `opens: stripe.com` does not open `api.stripe.com`. An `opens` that names no host, such as "the
@@ -562,7 +562,7 @@ open one:
    however the script handles it, as an undeclared key does. Measured before it
    on the self-host runner: `goldapi`, whose row opens `api.gold.test`, was sent as a bearer to `collector.test`,
    because that origin was also in the script's `egress:` (`apps/selfhost/test/script-key-egress.test.ts`).
-5. **No script may name the vault's `slash` key**, whatever it opens, because on a host with no `SLASH_KEY` it is
+5. **No script may name the Keychain's `slash` key**, whatever it opens, because on a host with no `SLASH_KEY` it is
    the key the included model answers everybody with, the same reason Slash refuses it as a tier `b` key. The kernel
    refuses it at install and before a trial (`scriptBody`, `FORBIDDEN` at `keys[i]`), and both hosts refuse a run
    that declares it before the sandbox starts (`slashDeclared`) or fetches with it under its grant id (`keyRefused`
@@ -582,15 +582,15 @@ open one:
 - **The install line does not say which host each key goes to.** A script names its origins and its keys as two
   lists, and `scriptEgress` (`packages/kernel/src/actions.ts`) joins them into one line (`CALLS OUT api.gold.test
   and collector.test · every 1h · key "goldapi"`). It cannot pair them, because the kernel's egress line does not
-  see the vault. The pairing is enforced at the fetch (rule 4), so a key cannot reach the wrong host, but the owner
+  see the Keychain. The pairing is enforced at the fetch (rule 4), so a key cannot reach the wrong host, but the owner
   approving the line is not told where it will go.
 - **A key whose `opens` is not one of the script's `egress:` hosts is not refused at install.** Such a script
   installs, and every fetch with that key is then refused at run time, three refused runs pausing it. Nothing at
   install or in Decide compares the two, for the same reason: the check that sees the declaration does not see the
-  vault.
+  Keychain.
 - **A scheduled `call`, `poll` or `pull` does not read `opens` either.** Its declaration has one host and one grant,
   and its install line names both together, so the owner sees the pairing; but a key sent by an action is not
-  compared with what its vault entry says it opens.
+  compared with what its Keychain entry says it opens.
 - **The scrub catches the spellings above and no others.** A key re-encoded another way (hex, `\u` escapes of
   ordinary characters, a hash of it) is not caught, and neither is a derived spelling shorter than eight characters,
   which only a key of five bytes or fewer has; the bytes as sent are always scrubbed, however short.
@@ -608,8 +608,8 @@ implied.
 | | Cloud | Self-host |
 |---|---|---|
 | Your rows | **we can read them** — the object runs on our account | no |
-| Your credentials, vault passphrase **off** | **we could decrypt them** | no |
-| Your credentials, vault passphrase **on** | no | no |
+| Your credentials, keychain password **off** | **we could decrypt them** | no |
+| Your credentials, keychain password **on** | no | no |
 | Your sealed files (Setup sync) | no: your machines seal them under a key we never hold, and the host keeps bytes it cannot open (§8) | no |
 | Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Slash's `call` table ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
 | Telemetry | off until the operator binds it; then one point per request: the door, the kind of client, the method, the refusal code or status class and the milliseconds, with the record id hashed under a key that changes every month, kept three months ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.18) | none |
@@ -621,7 +621,7 @@ Operationally: access to a customer's record requires a named reason recorded in
 in the operator's own record, written before the read), follows the diagnosis order of
 [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.15 (the version tuple, the crash's reference, the refusal
 state, the record's log lines, which hold no values, and only then, with the owner, its events and the
-`system` suggestions), and support never asks for a vault passphrase. **The strongest available answer to "can you read
+`system` suggestions), and support never asks for a keychain password. **The strongest available answer to "can you read
 my data" is "self-host, and here is the complete build"** — which is what publishing the source and
 D41 buy together, and why the self-host must never be a crippled tier. The licence is permissive, so
 it is the *complete build* half of that sentence doing the work, not an obligation the licence puts
@@ -641,7 +641,7 @@ passphrase-wrapped DEK forbids, so **connector grants only** live under a second
 | | Passphrase off | Passphrase on |
 |---|---|---|
 | Your record's content | we can read it | we cannot |
-| Your vault credentials | we can read them | **we cannot** |
+| Your Keychain credentials | we can read them | **we cannot** |
 | **Your connector credentials** | we can read them | **we can still read them** — read-scoped analytics keys, so the Worker can fetch while you sleep |
 
 Q13 says it in one line: *"what must not happen is (b) silently."* This is the row that stops it
@@ -723,7 +723,7 @@ refused `OUT_OF_BOUNDS` when the run starts. What else is held:
   thrown message or a list name the script made up, goes first in the guarded log (`finishScript`,
   `packages/record/test/script-refusal-note.test.ts`).
 - **A trial writes nothing and opens a key only for the owner.** `script_try` runs a draft in the same sandbox, with
-  the caller's own reads instead of `system`'s, since nobody approved the draft's `reads:`, and with no vault for any
+  the caller's own reads instead of `system`'s, since nobody approved the draft's `reads:`, and with no Keychain for any
   caller but the owner signed in as a person (§6.2). It is metered as a run on the plan's allowance.
 
 The findings of the scripts audit (the log, the key's host, the `slash` key,
@@ -802,13 +802,13 @@ Carried from the predecessor, where each was earned:
 
 **An audit row is drawn on another screen.** The predecessor logged `Credential indexed: <name> — opens
 <opens>` on the reasoning that an audit row is read in a briefing and should be useful — and that reasoning is
-why it was wrong: audit rows are drawn on the activity screen, and the vault is the one screen that is
+why it was wrong: audit rows are drawn on the activity screen, and the Keychain is the one screen that is
 **absent, not blurred, under screenshot mode**, because an index that is merely smudged is an index still in
 the page source. Latent while credentials were added by hand; a migration indexed thirty-five in one run and
 the harness caught thirty-five `opens` sentences on a screen that should carry none. So: a `grant.*` event's
 `note` carries the grant's id and `kind`, never its `label` or `opens` — the rule keys on `target_kind = 'grant'`,
 whatever the event kind, and a `vault_key` re-wrap's note is `<purpose> <from> → <to>`, naming no grant; the
-event's `refs` carry the id, so a reader entitled to the prose is one call from it. Three invariants of the vault screen are tests
+event's `refs` carry the id, so a reader entitled to the prose is one call from it. Three invariants of the Keychain screen are tests
 ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6): a closed row draws no `opens`; opening a row opens exactly one;
 no value control is drawn on a page with nothing expanded.
 
@@ -845,7 +845,7 @@ seal each file before it leaves them, and the record keeps it as it came.
 - **The host never sees what is in them.** A file is sealed on the owner's machine with AES-256-GCM under a sync key of
   32 random bytes that only his machines hold, each in its own secret store, with the file's key as its additional
   data. The record checks a part's length and the whole file's SHA-256 and parses none of it. A copy of the sync key is
-  kept as a sealed file too, under his sync passphrase (PBKDF2-SHA-256, 600,000 rounds, as the vault's passphrase), so a
+  kept as a sealed file too, under his sync passphrase (PBKDF2-SHA-256, 600,000 rounds, as the Keychain's passphrase), so a
   new machine can join; the passphrase and the key never leave his machines.
 - **Symmetric on purpose, so the host cannot forge one.** With a public sealing key, anybody holding the public half, a
   host somebody broke into among them, could seal a file for his machines to place. With a key only his machines
@@ -876,7 +876,7 @@ seal each file before it leaves them, and the record keeps it as it came.
   them lists its sealed files as not whole, and the owner's machines put them again. Deleting the record deletes its
   sealed parts; a self-host's cold copy carries them with its files.
 
-The honest trade, as the vault's passphrase has it:
+The honest trade, as the Keychain's passphrase has it:
 
 | | We can read your sealed files | You can lose them |
 |---|---|---|
@@ -903,7 +903,7 @@ sealed by default**, and so does the wrapped DEK in `vault_key` — which opens 
 Worker secret that is never in any file — so a leaked export is
 bytes. `--redact-grants` drops the ciphertext too. **Sealed files travel by name**: `sealed_file` carries each one's key,
 parts, size and hash, and its bytes stay with the host that holds them (Sealed files, above). *An earlier draft said the export excludes every
-vault table; that contradicted [03-DOG-FORMAT](03-DOG-FORMAT.md) §5's three export modes and rule 6
+Keychain table; that contradicted [03-DOG-FORMAT](03-DOG-FORMAT.md) §5's three export modes and rule 6
 above, and it is withdrawn.* **A snapshot is not an export.** On a self-host a snapshot is a full copy
 that keeps the six `local` tables and never leaves the host — disaster recovery; on Cloud the nightly
 backup is an export, sealed, and it rides the **outbox**, which gives it the retry ladder and the visible
@@ -922,7 +922,7 @@ and **list what is kept, with counts.**
 | Not doing | Because |
 |---|---|
 | SOC 2 | a solo product with 80 subscribers does not need an auditor; it needs a checkable source tree. Revisit if an entity buyer appears — which is already a watched signal |
-| End-to-end encryption of the whole record | the server must query to render pages, run metrics and answer MCP. E2EE would make the record a blob store and delete the product. The vault is encrypted; the rows are not, and this is stated |
+| End-to-end encryption of the whole record | the server must query to render pages, run metrics and answer MCP. E2EE would make the record a blob store and delete the product. The Keychain is encrypted; the rows are not, and this is stated |
 | Bring-your-own-KMS | no customer has asked. It is an additive adapter later |
 | A bug bounty | before there are users, a bounty is a support queue |
 | 2FA via SMS | passkeys are better and simpler, and SIM swap is exactly the attack this data attracts |

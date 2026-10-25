@@ -1,6 +1,6 @@
 # Settings
 
-A pack's settings are the few values its owner should choose rather than you: which tag to use, how many days ahead to look, which vault key to send. They are declared under `config` in the manifest, shown on the pack's page in the record, and read two ways: by a declaration when the pack is installed, and by a script each time it runs.
+A pack's settings are the few values its owner should choose rather than you: which tag to use, how many days ahead to look, which Keychain key to send. They are declared under `config` in the manifest, shown on the pack's page in the record, and read two ways: by a declaration when the pack is installed, and by a script each time it runs.
 
 ## Declaring them
 
@@ -18,7 +18,7 @@ A setting's name is lower-case letters, digits and underscores. Each one has a `
 The types a setting may take are `CONFIG_TYPES` in `packages/kernel/src/declare.ts`: `text`, `enum`, `bool`, `money`, `day`, `duration`, `number` and `list`. Three field types are left out on purpose, and a setting of one is refused:
 
 - **`ref`**, because a setting that pointed at a list would let a pack configure its way into a list it did not declare.
-- **`secret` and `file`**, because a manifest is a file people share, so a setting never holds a credential or a document. A key a script sends is held in the vault and named by its label.
+- **`secret` and `file`**, because a manifest is a file people share, so a setting never holds a credential or a document. A key a script sends is held in the Keychain and named by its label.
 
 A default is checked the way a row's field is: a money default is an amount and a currency, a day is a day that exists, and a text that looks like a key is refused.
 

@@ -309,7 +309,7 @@ with `⌘`/`Ctrl` and `Esc` · a `g` armed within 1,000 ms → the go-to table �
 |---|---|---|
 | document | `⌘K` / `Ctrl+K` | open the palette, also from inside a text field |
 | document | `/` | open the palette with the caret in the query |
-| document | `g` then `h d i s v p ,` | Home · Decide · Inbox · Search · Vault · Packs · Settings — armed 1 s, hint `role="status"`, hidden under a coarse pointer |
+| document | `g` then `h d i s v p ,` | Home · Decide · Inbox · Search · Keychain · Packs · Settings — armed 1 s, hint `role="status"`, hidden under a coarse pointer |
 | document | `g` then `1`–`9` | the nth item of **your** nav in **your** order; the digit is printed beside the item |
 | document | `⌘\` | toggle the sidebar |
 | document | `⌘Z` | undo the last write from the toast stack |
@@ -616,7 +616,7 @@ mechanism 2, amended in §13 D1). Per device — §10.
 4. A `MutationObserver` (`childList`, `characterData`, `subtree`) plates nodes that arrive while the mode is on; a
    node inside `.shot` is skipped.
 5. Off: every `.shot` is unwrapped and the observer disconnected.
-6. `/vault` renders `Empty` with one line — *Screenshot mode is on.* — and nothing else while `data-shot` is set;
+6. `/keychain` renders `Empty` with one line — *Screenshot mode is on.* — and nothing else while `data-shot` is set;
    the index is absent, not blurred (12 §8).
 7. Chrome stays legible because chrome is literals; the Sidebar's page titles are record data and plate.
 
@@ -752,9 +752,9 @@ A size budget that only warns is exceeded; every row fails CI.
 |---|---|
 | Colour | no component names a colour: Stylelint (gate 1), the colour grep over TS and inline SVG (gate 2), the rendered-DOM gate asserting every computed colour is a token value or an identity `oklch(L C h)` **in sRGB** (gate 3), the contrast gate over `pairs.json` (gate 4) — 22 §7. No icon accepts a `color` prop; the sprite is `currentColor` |
 | Theme text | generated server-side, re-serialised from a typed parse (28 §4.4); applied by `replaceSync`, never parsed from markup, so no `unsafe-inline`; the client refuses `url(` `@import` `expression(` `\`; `@layer theme` precedes `@layer a11y`, so a theme cannot remove the focus ring |
-| Screenshot mode | the allow-list is compile-time provenance; the default is plate; the vault is absent. It is a **display** mode for a shoulder, not a redaction of the payload — the words stay in the DOM (32 §10) |
+| Screenshot mode | the allow-list is compile-time provenance; the default is plate; the Keychain is absent. It is a **display** mode for a shoulder, not a redaction of the payload — the words stay in the DOM (32 §10) |
 | Links from content | `https:`, `mailto:`, `#anchor` and same-origin paths render as links; everything else is text — in `render` for documents and in `rows.ts` for palette results (12 §8, 04 §7) |
-| Auth | cookie only; the app never mints, stores or sends a bearer; the one session cookie, `__Host-bd_s`, is the host's and `HttpOnly`, and names the record through its session row (51 D4, amended); `Authorization: Share <token>` on `/s/<token>` and `X-Request-Id` are the only headers the app ever sets; `/vault` strips any query string on load and never writes one (19 §5); `openGrant` is a POST whose plaintext is shown once and held in no store |
+| Auth | cookie only; the app never mints, stores or sends a bearer; the one session cookie, `__Host-bd_s`, is the host's and `HttpOnly`, and names the record through its session row (51 D4, amended); `Authorization: Share <token>` on `/s/<token>` and `X-Request-Id` are the only headers the app ever sets; `/keychain` strips any query string on load and never writes one (19 §5); `openGrant` is a POST whose plaintext is shown once and held in no store |
 | CSP | the hosts' header (51); this app's only inline script is the one-statement prefs reader, whose SHA-256 the hosts allow; the theme is a linked file or a constructed sheet, never an inline `<style>`; no third-party origin |
 | Injection | one renderer, one escape function (spec 36); the quarantine frame of 23 §9 never calls the markdown renderer on `inbox_raw` |
 | Secrets | a `secret` field renders its grant's label; a `grant.*` event's note is drawn as id and kind; the app logs nothing to the console in production and shows only a code and a `rid` on failure (12 §8) |
@@ -795,7 +795,7 @@ pack kind · a deliberately unknown primitive — × widths 390 · 768 · 1024 �
 | `field-height` | every field is exactly one height per pointer size; 32 fine, 44 coarse, at all four widths |
 | `contrast` | every pair in `pairs.json` ≥ 4.5:1 text, ≥ 3:1 `edge` and focus; the identity accents ≥ 3:1 on every surface; axe-core reports zero violations |
 | `focus` | no `outline: none` in first-party CSS; the two-tone ring is visible on every surface; `activeElement`'s bounding box is the row it looks like after `j` — and after `←`/`→` under `rtl` the inline axis inverts, the block axis does not |
-| `screenshot-mode` | element boxes and page height byte-identical off → on; the 500-row fixture rendered with every digit `0` and again with `8` gives identical pixels under `data-shot`; `/vault` renders no `opens` and no grant row |
+| `screenshot-mode` | element boxes and page height byte-identical off → on; the 500-row fixture rendered with every digit `0` and again with `8` gives identical pixels under `data-shot`; `/keychain` renders no `opens` and no grant row |
 | `motion` | `--ease-spring` sampled at 1,000 points: last value 1, max ≤ 1.05; no duration token > 300 ms; under `prefers-reduced-motion` every duration is 1 ms and every state still changes something |
 | `bundle` | the §7 rows |
 | `a11y-tree` | for every fixture block and the degraded fence, the accessibility tree of `<Block>`/`<Table>` equals that of `toHTML`'s markup parsed by the browser, and the `--cells` and `--cols` values are equal — 36 §9's stage-3 row |
@@ -920,7 +920,7 @@ spec's §9), and 36 §9's stage-3 parity row.
 - [ ] A write refused at `fields.due` keeps the typed value on screen with the `fix` beside the field; a 409 on a disjoint field lands without a prompt; a 409 on the same field asks.
 - [ ] Pulling the socket produces polling within 60 s; a frame naming a page's register refetches exactly one `page()`.
 - [ ] `?` lists the registry; every palette row prints its key; `Character keys: off` silences every bare letter and no chord; `Space` scrolls in a 500-row grid.
-- [ ] Screenshot mode: boxes and page height identical off → on; digits `0` and `8` pixel-identical; `/vault` absent.
+- [ ] Screenshot mode: boxes and page height identical off → on; digits `0` and `8` pixel-identical; `/keychain` absent.
 - [ ] `SLASH_ENDPOINT` unset: every spec green, the word *Slash* nowhere in the DOM.
 - [ ] Leaving Home advances `member.seen_at`; opening it does not.
 - [ ] Both hosts serve `build/` unchanged: `/app/r/obligations` and `/app/<slug>/r/obligations` on either answer `app/index.html` and render the grid, and a page load of `/r/obligations` is a `308` to `/app/r/obligations`; `deploy-parity` matches `/app/` and `/app/_app/version.json` (`/` and `/_app/version.json` before push A).

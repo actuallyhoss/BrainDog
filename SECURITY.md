@@ -35,7 +35,7 @@ app <YYYY.MM.DD>+<sha7> · format <user_version> · kernel <migration> · primit
 After a first publish, only the latest minor of each npm package gets fixes; an older minor is
 answered with "update", because there is one maintainer and no back-port branch.
 
-A fork is not supported. If you have changed the write path, the vault or either host, reproduce it
+A fork is not supported. If you have changed the write path, the Keychain or either host, reproduce it
 on unmodified `master` before reporting.
 
 ---
@@ -123,7 +123,7 @@ return:
 - **Do not degrade the service.** No load testing, no volumetric denial of service, no spam through
   an inbound email address or a webhook endpoint.
 - **Do not social-engineer** anybody: a maintainer, a user, a support conversation, or a hosting
-  provider. Support will never ask for a vault passphrase, and neither will we.
+  provider. Support will never ask for a keychain password, and neither will we.
 - Give us the **90 days** above before publishing.
 
 Safe harbour covers the source, your own instances, and your own Cloud record. It does not extend to
@@ -136,9 +136,9 @@ Cloudflare, npm, GitHub or any other third party; report defects in their platfo
 The classes below are the ones this design has actually reasoned about, so a report against one of
 them lands somewhere useful. Each cites the section that owns it.
 
-### 1 · Key handling and the vault (`12 §6`, [ADR-062](docs/16-DECISIONS.md))
+### 1 · Key handling and the Keychain (`12 §6`, [ADR-062](docs/16-DECISIONS.md))
 
-The vault stores credentials, and the rule the design turns on is that **the record indexes what a
+The Keychain stores credentials, and the rule the design turns on is that **the record indexes what a
 key opens, never the key**: encryption runs in the host, never in the record. In scope:
 
 - The key hierarchy: root **KEK** → per-record **DEK** (wrapped, in `vault_key`) → **grant key** =
@@ -148,7 +148,7 @@ key opens, never the key**: encryption runs in the host, never in the record. In
   fail to decrypt. `aad = utf8(record_id) ‖ 0x1F ‖ utf8(grant_id) ‖ 0x1F ‖ utf8(String(version))`;
   the wrapped DEK is bound to `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`. A missing or reordered
   binding is in scope even without a working decrypt behind it.
-- The **passphrase re-wrap**. Enabling a vault passphrase must unwrap under the KEK, re-wrap under
+- The **passphrase re-wrap**. Enabling a keychain password must unwrap under the KEK, re-wrap under
   `PBKDF2-SHA-256, 600,000 iterations, 16-byte salt`, and **overwrite and zeroise the KEK-wrapped
   copy in the same transaction**. If both wrappings survive, either opens the DEK and the honesty
   table in `12 §7` becomes false. That is the exact bug class this section exists for, and it was in
@@ -159,8 +159,8 @@ key opens, never the key**: encryption runs in the host, never in the record. In
   model prompt, an error message or a stack trace. `secret-grep` is meant to catch this statically; a
   path it cannot see is itself a finding.
 - **Audit leakage.** A `grant.*` event whose `note` carries the grant's `label` or `opens`. The rule
-  keys on `target_kind = 'grant'`, whatever the event kind. So is a vault screen that renders under
-  screenshot mode, where the vault must be *absent*, not blurred.
+  keys on `target_kind = 'grant'`, whatever the event kind. So is a Keychain screen that renders under
+  screenshot mode, where the Keychain must be *absent*, not blurred.
 - Anything that reads more than one grant per request, or reads one without writing `grant.read` and
   incrementing `opened`.
 
@@ -273,7 +273,7 @@ or a discussion), but it is not a vulnerability report.
 
 | Not a vulnerability | Where it is decided |
 |---|---|
-| **The operator can read a Cloud record** when the vault passphrase is off. Stated plainly, in the product UI as well as the docs | `12 §7` |
+| **The operator can read a Cloud record** when the keychain password is off. Stated plainly, in the product UI as well as the docs | `12 §7` |
 | **Connector credentials stay readable to the operator even with the passphrase on**: a scheduled connector must decrypt with nobody present | `12 §7`, [ADR-052](docs/16-DECISIONS.md) |
 | **"We cannot read it" is true after thirty days, not immediately**: PITR and sealed backups span the re-wrap | `12 §7` |
 | **The record's rows are not end-to-end encrypted.** The server must query to render pages, run metrics and answer MCP; E2EE would make the record a blob store | `12 §9` |

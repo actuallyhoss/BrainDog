@@ -338,11 +338,11 @@ export const ASKED: Asked[] = [
     id: 'key',
     kind: 'Key',
     by: 'Cursor',
-    ask: 'A Stripe key was pasted into a note. Move it to the vault?',
-    why: 'AI tools can still use it from the vault, without ever seeing it.',
+    ask: 'A Stripe key was pasted into a note. Move it to the Keychain?',
+    why: 'AI tools can still use it from the Keychain, without ever seeing it.',
     yes: 'Move it',
     no: 'Not now',
-    done: 'Key moved to the vault, note cleaned',
+    done: 'Key moved to the Keychain, note cleaned',
   },
 ];
 
@@ -474,7 +474,7 @@ export const FINDS: Find[] = [
     count: 4,
     aside: FOUND,
     hits: [
-      { icon: 'key', title: 'Stripe live key', sub: 'In the vault · used by Tidepool', kind: 'Key' },
+      { icon: 'key', title: 'Stripe live key', sub: 'In the Keychain · used by Tidepool', kind: 'Key' },
       { icon: 'download', title: 'Stripe payouts', sub: '38 payouts · Tidepool', kind: 'List' },
       { icon: 'message', title: 'Upgraded the Stripe library', sub: 'Note by Codex · Monday', kind: 'Note' },
       { icon: 'server', title: 'Stripe', sub: 'Tidepool runs on it · working', kind: 'Service' },

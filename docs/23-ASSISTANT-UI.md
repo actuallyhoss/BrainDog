@@ -662,7 +662,7 @@ mode worse than a missed highlight.
 
 ### Credentials: nothing to add
 
-Slash gets **no** Vault affordance. No *"ask about this key"*, no summary. The register is not in
+Slash gets **no** Keychain affordance. No *"ask about this key"*, no summary. The register is not in
 its projection, and the `What Slash read` fold says so on every run. Compare MCP's own elicitation
 rule: servers *"**MUST NOT** use elicitation to request sensitive information."*
 

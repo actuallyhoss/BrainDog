@@ -23,8 +23,8 @@ Most commands take `--host` for the record's address. Without it, the host comes
 Command | What it does
 braindog setup <host> | Sign in, add the hooks, register the MCP server, write the record's tools and sync its skills, in that order, one line each. --dry-run writes nothing
 braindog login <host> | Sign this machine in: six digits to approve in the app, and the token kept in the hosts file
-braindog login <host> --vault <project> | Ask for a vault grant that opens the keys of one project, or, given a star, the keys that belong to no project
-braindog logout [<host>] | Remove this machine's sign-in, runner sign-in and vault grants for one host. Nothing is sent
+braindog login <host> --keychain <project> | Ask for keychain access that opens the keys of one project, or, given a star, the keys that belong to no project
+braindog logout [<host>] | Remove this machine's sign-in, runner sign-in and keychain access for one host. Nothing is sent
 braindog install | Show the two hooks it would add to Claude Code's settings. --apply writes them. --replace takes out an older tool's hooks, servers and skills
 braindog hook start | What Claude Code runs when a session starts: the briefing
 braindog hook end | What Claude Code runs when a session ends: people met, and the session idle
@@ -33,9 +33,9 @@ braindog mcp [--agent <name>] | Serve the record to an agent over standard input
 
 ## Keys
 
-```comparison | The vault
+```comparison | The Keychain
 Command | What it does
-braindog keys put <label> | Put the value on standard input in the vault as a key. --opens says what it opens, --kind its kind, --vault its project
+braindog keys put <label> | Put the value on standard input in the Keychain as a key. --opens says what it opens, --kind its kind, --keychain its project
 braindog keys exec <label> -- <command> | Run the command with the key in one environment variable, named from the label unless --as names it. Never printed
 braindog run <label> -- <command> | The same as keys exec, under a shorter name
 braindog keys headers <label> --as <Header> | Print the key as one header for a program that reads it. Refuses a terminal
@@ -53,7 +53,7 @@ braindog session tried <text> | Add a dead end
 braindog session note <text> | Add a line of reasoning
 braindog session end | End it. --state says idle, handoff or done, and --next leaves a last step
 braindog skills sync | Write the record's skills where Claude Code reads them, keep a local edit and propose it, and add a skill kept by hand
-braindog tools scan | Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is put in the vault, and only its name is recorded
+braindog tools scan | Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is put in the Keychain, and only its name is recorded
 braindog tools write | Show the Claude Code entries the record's tools become. --scope user or --scope project writes that one
 ```
 

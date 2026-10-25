@@ -80,7 +80,7 @@ A `page` declaration is a [declared page](/docs/dialect/pages), in the same keys
 
 ## Scripts
 
-A script lives twice in a pack's folder: as `<name>.js`, the file you edit and read, and as the `source` of its declaration in the pack file, which is what a record runs. A script opens with a comment saying what it does, in words a person deciding whether to install it can follow. It says when it runs, the lists it reads and writes, the hosts it may call, and the vault keys it uses by label, and the plan prints each of those before anything installs.
+A script lives twice in a pack's folder: as `<name>.js`, the file you edit and read, and as the `source` of its declaration in the pack file, which is what a record runs. A script opens with a comment saying what it does, in words a person deciding whether to install it can follow. It says when it runs, the lists it reads and writes, the hosts it may call, and the Keychain keys it uses by label, and the plan prints each of those before anything installs.
 
 ## The folder
 

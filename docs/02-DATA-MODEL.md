@@ -10,7 +10,7 @@ that BrainDog owns and every record has, and **registers** that packs declare.
 Twenty-seven tables (migration 0042 adds `instruction_seen` and `agent_profile`, below), and four header tables the format adds to every live record — thirty-one in
 the file. Nothing a pack declares can alter them, and nothing in them is optional. *(An earlier draft
 said twenty. The review proved seven missing: the people, tokens, lockouts and counters a `.brain` must
-resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
+resolve offline, the Keychain's wrapped keys, and the two job tables of tier C.)*
 
 ```sql
 -- IDENTITY AND SHAPE ------------------------------------------------------------
@@ -51,7 +51,7 @@ observation   -- how the record is actually used: kind, subject, day, n. PRUNABL
 decision      -- immutable. id, question, answer, reason (NOT NULL), decided_by, ts
 suggestion    -- open questions with options json, status, opened_by
 prediction    -- a falsifiable claim about an accepted change: measure, frozen baseline (INTEGER, with unit), score_at, on_miss
-grant         -- the credential vault. label, opens, kind, version, ciphertext, nonce, kdf, rotated_at, stale_at
+grant         -- the credential Keychain. label, opens, kind, version, ciphertext, nonce, kdf, rotated_at, stale_at
 device_grant  -- a device asking in: code_hash, status, tries, expires, reach — six values, login | runner | export | import |
               -- pack | token; an operation reach is the owner's ten-minute grant of 12-SECURITY §3. see 12-SECURITY §6.1
 member        -- who may do what, per register: person_id, register, level, seen_at (the READ MARK, MAX only)
@@ -84,8 +84,8 @@ alike, because on the self-host the live file *is* the `.brain` ([03-DOG-FORMAT]
 twenty-seven carry `dog_section = 'local'` and **never travel**: `token`, `device_grant`, `auth_fail`,
 `observation`, `job`, `job_event`. `counter` travels, because `seq` allocation must survive a move.
 `vault_key` travels **sealed**: a KEK-wrapped key opens nothing without the KEK, and a record restored
-from its own backup must be able to open its own vault ([12-SECURITY](12-SECURITY.md) §8). *(An earlier
-draft listed it as `local`, which would have made every restored vault unreadable.)*
+from its own backup must be able to open its own Keychain ([12-SECURITY](12-SECURITY.md) §8). *(An earlier
+draft listed it as `local`, which would have made every restored Keychain unreadable.)*
 
 > **`observation` and `prediction` are the two that make [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)
 > possible, and they are deliberately not one table.** An observation is *Origin* — it is prunable,
@@ -482,7 +482,7 @@ text, at most 20 (a `max` narrows this), each coerced as a text setting's own li
 
 **A text never holds a key.** A `text` or `document` value, or a `list<text>` element, that looks like
 a credential is refused at step 3 as `VALUE_MALFORMED`, from every caller, with no `found` and a
-sentence that says to deposit the key in the vault. Looking like one means an issuer's own prefix (a
+sentence that says to deposit the key in the Keychain. Looking like one means an issuer's own prefix (a
 private key's PEM header, `sk_live_`, `ghp_`, `github_pat_`, `xoxb-`, `AKIA` and the others
 [25-CONNECTORS](25-CONNECTORS.md) §7 names), a JWT, a webhook address, a password in a URL, or a run of
 32 or more base64 characters that mixes cases and digits and reads as random. Hex digests, git hashes,
@@ -518,8 +518,8 @@ test showed exactly what their absence cost.
 Four of them are special:
 
 - **`secret`** never stores a value in `fields`. It stores a `grant` id. The row shows *what the
-  key opens*; the key itself is in the vault. See [12-SECURITY](12-SECURITY.md) §6. No caller writes
-  it, a person included: the vault door seals a key and points the field at its grant in one write
+  key opens*; the key itself is in the Keychain. See [12-SECURITY](12-SECURITY.md) §6. No caller writes
+  it, a person included: the Keychain door seals a key and points the field at its grant in one write
   ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.4), and a create or update naming the field is
   `IMMUTABLE_FIELD`. So a secret is never `required`, never given a `default`, never searched and
   never a row's title.
@@ -1035,7 +1035,7 @@ leave their lines. The kernel keeps the rule in `write` in `packages/kernel/src/
 Two consequences worth stating:
 
 1. **`grant.read` is an event.** Every decryption of a credential is logged with the actor. A
-   vault whose reads are not audited is a vault that cannot answer "did anything get out".
+   Keychain whose reads are not audited is a Keychain that cannot answer "did anything get out".
 2. **An agent's writes are attributable.** `actor` distinguishes Claude from Codex from a rule
    from a human. This is the thing no vendor's memory store gives you, and it is cheap here.
 

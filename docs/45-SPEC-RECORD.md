@@ -135,7 +135,7 @@ export type RecordApi = {
   ingestVerify(args: { ingest_id: string }, ctx: CallContext): Promise<Result<IngestVerify>>;          // added — 51 §5.4
   deviceStart(args: { reach: Reach; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited>;   // counted per address, 12 §6.1
   devicePoll(args: { device_code: string }): Promise<Result<DeviceWaiting | Exchanged>>;   // the bearer once, after approval
-  vaultGrant(bearer: string): Promise<Result<VaultGrant>>;                                 // a vault reach's bearer, for the host's key doors
+  vaultGrant(bearer: string): Promise<Result<VaultGrant>>;                                 // a Keychain reach's bearer, for the host's key doors
   acceptInvite(args: { token: string; person?: Invitee }): Promise<Result<Invited | MemberRow[]>>;   // `/auth/invite`, with the verified person; no person only looks
 };
 
@@ -416,7 +416,7 @@ call(method, args, ctx):
              INTERNAL from anything but system → FORBIDDEN (export admits system). Any other mismatch → FORBIDDEN.
  2. OP       ctx.op set (an operation grant): the method must be in its reach — export → export · import → import ·
              pack → planPack installPack uninstallPack · token → createToken listTokens revokeToken — else FORBIDDEN;
-             VAULT with op set → NEEDS_BROWSER_SESSION, fix "Sign in again to open the vault" (49 §5.2 step 7 moved here).
+             VAULT with op set → NEEDS_BROWSER_SESSION, fix "Sign in again to open the Keychain" (49 §5.2 step 7 moved here).
  3. LEVELS   person, or token.person:  SELECT register, level FROM member WHERE person_id = ?
              → Map<register, Level>; the '*' row fills every register without its own row.
              VAULT · ADMIN (except the four person-level methods) · JOBS-session: the '*' level must be owner.
@@ -713,7 +713,7 @@ ends the search rather than starting one.
 **The two ways in, and why two.** These four are a browser session's at `/api/<method>`, except that the sealed
 shape itself is not routed: `openGrant` answers material a browser cannot open and `bindGrant` takes material a
 browser cannot make, so neither is in `ROUTES` (33 §4). What reaches them from a screen is the host, through
-INTERNAL `depositGrant` and `openForGrant`, which a host calls with a vault grant at `/api/vault/*` or with a
+INTERNAL `depositGrant` and `openForGrant`, which a host calls with keychain access at `/api/vault/*` or with a
 browser session at `/api/keys/*`. A session is held to this section's own gate wherever it comes in: an owner, no
 token of any kind, and a proof under fifteen minutes old. *(The second pair of doors added September 16th 2026;
 no method was added, and the counts of 30 §5 are unchanged.)*
@@ -1004,7 +1004,7 @@ same `Result`; this table is what **this layer** raises, with the `fix` a person
 |---|---|---|---|
 | `FORBIDDEN` | the principal's kind, level, scope or `op` reach does not reach the method or register (§5.1 steps 1–4); `slash` outside `propose`; `share` outside its slug; a runner on another runner's job; a wrong device code (first four) | `principal` · `register` · `user_code` | `You hold <held>; this needs <needed>.` |
 | `NEEDS_BROWSER_SESSION` | a `token` or `runner` at VAULT, ADMIN or the JOBS session half; an `op` grant at VAULT | `principal` | `Open this from the app; a token cannot reach it.` |
-| `WRONG_KEY` | `openGrant` / `ingestVerify`: `vault_key.kek_id ≠ args.kek_id` | `kek_id` | `The vault was wrapped by another key — rotate the KEK forward; the data is intact.` |
+| `WRONG_KEY` | `openGrant` / `ingestVerify`: `vault_key.kek_id ≠ args.kek_id` | `kek_id` | `The Keychain was wrapped by another key — rotate the KEK forward; the data is intact.` |
 | `GRANT_REVOKED` | `openGrant` / `bindGrant` / `revokeGrant` on a row with `revoked_at` | `id` | `This credential was revoked on <date>; bind a new one.` |
 | `DEVICE_CODE_EXPIRED` | `devicePoll` on a pending row past its ten minutes | `device_code` | `The code expired; ask for a new one.` |
 | `DEVICE_CODE_TRIES` | the fifth wrong `deviceApprove`; `devicePoll` on a denied row | `user_code` | `Five wrong codes — every pending request was denied. Start again.` |
@@ -1250,7 +1250,7 @@ Twenty-one, each a `ponytail:` line in the file named.
 shape and the wrong default. The core should know only "a row a rule marks urgent": a declared
 marker on `remind:` that whoever built the list sets. Which rows are urgent (a payment failing, a
 domain expiring) is that person's or that pack's to declare, because payments and domains are use
-cases, not primitives. The one urgent default the core keeps is the vault's own credential expiry
+cases, not primitives. The one urgent default the core keeps is the Keychain's own credential expiry
 inside 48 hours, which the file already has.
 
 ---

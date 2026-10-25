@@ -636,7 +636,7 @@ the `refusals/` file names with the *Fixture* column of 30 §6 by regex, both di
 - `ponytail:` **lookalike packs, not the shipped six.** The six do not exist yet (phase 6). When they ship, `PACKS`
   points at them and the six lookalikes are deleted; the invented two stay.
 - `ponytail:` **grant ciphertext is RNG bytes**, not AES-GCM output. Add real sealing when a fixture must be *opened*;
-  the vault's own tests (45) seal their own.
+  the Keychain's own tests (45) seal their own.
 - `ponytail:` **no `file` values, no blob store.** Add an attachment fixture when 53's export-with-missing-attachment
   case needs one.
 - `ponytail:` **the third-party kind takes one input, `source:`**, because the page grammar's closed key list passes

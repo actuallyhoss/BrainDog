@@ -92,7 +92,7 @@ export const MODELS: Record<ModelId, ModelRate>;          // the routing table's
 automation's question (§5.2), which the block above does not name: it reads nothing from the record, is handed the
 question the kernel filled and the fields the rule named, and answers `Result<{ text: string }>` in the rule's shape.
 The `inference` argument on `read`, `propose` and `answer` is
-built on both: a host whose included model is keyed from the vault builds that model again for each asker and hands
+built on both: a host whose included model is keyed from the Keychain builds that model again for each asker and hands
 it in, so the key it opens is opened in the asker's name (§5.9). It is an argument and not a slot the host sets
 around the call, because two asks awaiting the model together would share a slot, and the Worker has no
 `AsyncLocalStorage` to scope one (`packages/slash/test/per-call-inference.test.ts`, two reads in flight each drafting
@@ -272,8 +272,8 @@ said `glm-5.3-flash` whatever `SLASH_MODEL` said, for a question the endpoint ha
 | a 200 the host could not read: over 64,000 characters, not JSON, or broken off; or no answer within `SLASH_TIMEOUT_MS`, thirty seconds | `read · error · ANSWER_UNREADABLE`, under the model's name, with the provider's counts where the body held them | 1 | ends, once: *"rule.<id> asked Slash at step N, and the model answered with something Slash could not read: <what the host saw> The run stopped there rather than ask it again."* |
 | the answer was read and was not the shape (not a number, not one of the `choices:`), or was blank | `read · error · PROPOSAL_SCHEMA` | 1 | ends on the sentence saying what was wanted |
 | the month's asks already spent, counted by the package on tier `a` and by the host's `slashGuardedEngine` on `b` and `byo` | none | 0 | ends on `SLASH_BUDGET_SPENT` and when the asks come back |
-| on the Worker, the vault holds no key labelled `slash` | none, and nothing is posted | 0 | ends on `FORBIDDEN`, naming the label (§5.2) |
-| on the Worker, the vault holds a key labelled `slash` and it will not open (the `KEK` changed under the record, the bytes do not decrypt) | none, and nothing is posted | 0 | ends on `FORBIDDEN`: *"… the key labelled slash in this record's vault would not open on this Worker, so nothing was sent and the run stopped there."* (§5.2) |
+| on the Worker, the Keychain holds no key labelled `slash` | none, and nothing is posted | 0 | ends on `FORBIDDEN`, naming the label (§5.2) |
+| on the Worker, the Keychain holds a key labelled `slash` and it will not open (the `KEK` changed under the record, the bytes do not decrypt) | none, and nothing is posted | 0 | ends on `FORBIDDEN`: *"… the key labelled slash in this record's Keychain would not open on this Worker, so nothing was sent and the run stopped there."* (§5.2) |
 
 **A status is not an answer, and what comes after a 200 is.** A provider's 429 or 503 is the endpoint saying it
 served no completion, and a hosted provider does not bill one; counted, a rate limit spent the owner's allowance and
@@ -601,7 +601,7 @@ at `tier` rather than store a tier no `propose` could serve. *(Until September 2
 palette's own-key adapter, nothing, or a refusal. The adapter is handed to both passes, to `read` and `propose` as
 `inference` and to `propose` as `byok`, so the predicate and the proposal of one question go to the model he chose. A
 refusal is the answer on a `read`, a `propose` and a `pattern` alike, before the model is called, so a caller the
-vault turns away costs no model call.
+Keychain turns away costs no model call.
 The record's JOBS methods are built (`packages/record/src/jobs.ts`), and a machine runs them with `braindog runner`
 over long-poll ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13); `/ws/runner` is not built, and this package's tier C
 dispatcher (`jobs`) is not the runner's, which reads a `job.<id>` declaration rather than a prompt of §4.7's. *(Until
@@ -613,8 +613,8 @@ outbox row, `{ run, rule, step, question, shape, choices?, about? }`, and parks 
 `serveAsks` in `packages/host/src/slash-answers.ts`, leases up to five, hands each to `answer`, and acks it with
 `result.text` for an answer, `result.failed` for a refusal that ends the run, or a `failed` ack for `UNREACHABLE`
 alone, which the outbox's ladder asks again. Neither host's delivery pump leases the kind, because a pump acks `done`
-with no `result` and every run would end on *"no text"*. The model answers in the rule's name: the vault's key is
-opened as `rule:<id>`, and `slashOwnKeyFor` is never asked, since a rule has no session for the vault's gate to read and
+with no `result` and every run would end on *"no text"*. The model answers in the rule's name: the Keychain's key is
+opened as `rule:<id>`, and `slashOwnKeyFor` is never asked, since a rule has no session for the Keychain's gate to read and
 installing it was the owner's consent to its question leaving for this host's endpoint.
 
 | Host | Answers where | Where the pass runs |
@@ -640,11 +640,11 @@ automation's question does" is what holds. The two paragraphs below are the labe
 measurements in them.)*
 
 **A Worker record with no key labelled `slash` fails the run and sends nothing.** On a self-host a call with no
-`authorization` is a model on the owner's own machine working, and the host's key path sends one when the vault holds
+`authorization` is a model on the owner's own machine working, and the host's key path sends one when the Keychain holds
 no `slash` grant. On the Worker the endpoint is a hosted provider on the owner's bill, so before anything is built,
 held or posted, `workerSlashAnswers` (`apps/worker/src/slash.ts`) refuses a job whose record has no live grant under
-that label: `FORBIDDEN`, no ledger row, and the run stops on *"rule.<id> asked Slash at step N, and this record's vault
-holds no key labelled slash, so the run stopped there. Put your model key in the vault under slash."* Without the
+that label: `FORBIDDEN`, no ledger row, and the run stops on *"rule.<id> asked Slash at step N, and this record's Keychain
+holds no key labelled slash, so the run stopped there. Put your model key in the Keychain under slash."* Without the
 check, the survey that set it measured one keyless POST, a 401, and, under the status rule of the time, an answer
 that blamed the model for a key nobody had put in. Under §4.1's rule as it
 stood then the same 401 was `UNREACHABLE`, so each rung of the ladder would have been another keyless POST. What each
@@ -655,7 +655,7 @@ opened on the call, so a grant labelled `slash` that the Worker cannot open (the
 bytes that do not decrypt) passed it and went out with no `authorization`: a measurement found 8 keyless POSTs of 8 over the ladder after a `KEK` change. The rule's wire now asks the host's
 key path for `keyRequired`, the rule tier `b` keeps (§5.9): a `slash` grant that is missing or will not open is a
 throw before anything is sent, `answer` writes no ledger row for it, and the run stops on `FORBIDDEN`, *"rule.<id>
-asked Slash at step N, and the key labelled slash in this record's vault would not open on this Worker, so nothing was
+asked Slash at step N, and the key labelled slash in this record's Keychain would not open on this Worker, so nothing was
 sent and the run stopped there."* The self-host passes no such option, because its keyless local model is the product
 working.
 
@@ -734,7 +734,7 @@ Any other changed path → `FORBIDDEN` with `fix: 'Slash may not change <path>; 
 
 1. With `askId`: `SELECT predicate, question FROM call WHERE id = ? AND kind = 'read'`; re-run step 5.4-5 with the stored predicate (the record is the cache — rows may have moved, and citations resolve at paint anyway). Without: run §5.4 first.
 2. Zero rows → `ok` with `{ text: '', body_kind: 'query', body: { registers, where, q }, verbs: ['open'], citations: [], filed: null, model: '—', read }`. No model call.
-3. Meter as 5.4-1. **As built the check runs first, before step 1**, once per call (`propose.ts`, `spent()`), so a pass 2 at the cap is refused `SLASH_BUDGET_SPENT` even where its rows would have come back empty and no model would have run; and a `propose` with no `ask_id` that starts one under the cap makes both of its calls and ends one over it. Choose the adapter and model: tier `a` → the host's model, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the vault, or switch Slash to the included model.`), `settings.model`; tier `byo` → the host's model, `settings.model`. "The host's model" is the `inference` argument when the host handed one for this ask, and `deps.inference` otherwise (`propose.ts`, `inference ?? fallback`); pass 1 drafts on the same one on every tier, tier `b` included. On `b` and `byo` the host's own count runs before this method is entered (§4.1), and on `b` the host's door has already refused a caller the vault turns away (§5.9), so this package's `FORBIDDEN` is reached only when no key can be had at all.
+3. Meter as 5.4-1. **As built the check runs first, before step 1**, once per call (`propose.ts`, `spent()`), so a pass 2 at the cap is refused `SLASH_BUDGET_SPENT` even where its rows would have come back empty and no model would have run; and a `propose` with no `ask_id` that starts one under the cap makes both of its calls and ends one over it. Choose the adapter and model: tier `a` → the host's model, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the Keychain, or switch Slash to the included model.`), `settings.model`; tier `byo` → the host's model, `settings.model`. "The host's model" is the `inference` argument when the host handed one for this ask, and `deps.inference` otherwise (`propose.ts`, `inference ?? fallback`); pass 1 drafts on the same one on every tier, tier `b` included. On `b` and `byo` the host's own count runs before this method is entered (§4.1), and on `b` the host's door has already refused a caller the Keychain turns away (§5.9), so this package's `FORBIDDEN` is reached only when no key can be had at all.
 4. Print rows, one line each, `register#seq | title | field: value …` from `ProjectionRow.summary` and `fields` — money as `EGP 5,005.00`, days as `2026-11-04` — until `tokens ≤ 6,000`. This is the model's *input*; digits are fine here.
 5. Steps §5.3-3 and -4 with `PROMPTS.propose`.
 6. `cite(out.text, citable(projection))` and, for `options`, `cite(option.because)` and `cite(option.label)` per option; for `rowset`, `cite(JSON of every text-typed field)` per row. Any refusal → the whole proposal is refused (`PROPOSAL_UNCITED`), status `refused`, and the client keeps pass 1 — the rows were the answer.
@@ -824,9 +824,9 @@ the same builders on both hosts). Two keys can stand behind a Slash call:
 | Key | Where it is kept | What it answers |
 |---|---|---|
 | the operator's `SLASH_KEY` | the self-host's environment. The Worker has no endpoint of its own and reads none | the self-host's own endpoint, on tiers `a` and `byo`; with none set that endpoint is called with no key, which is a local model working |
-| his own key | a live `api_token` grant in the vault he picked in Settings, by id (`settings.grant_id`), with `own.provider` and `own.base_url` in `slash_meta` (§4.1) | every call on tier `b`: both passes of a question, an automation's question, and the arranger's press and first plan |
+| his own key | a live `api_token` grant in the Keychain he picked in Settings, by id (`settings.grant_id`), with `own.provider` and `own.base_url` in `slash_meta` (§4.1) | every call on tier `b`: both passes of a question, an automation's question, and the arranger's press and first plan |
 
-**The vault's `slash` label chooses nothing any more**. It keyed the host's own model
+**The Keychain's `slash` label chooses nothing any more**. It keyed the host's own model
 for everybody, so a key an owner labelled `slash` for another reason went to that endpoint as its bearer. `slashGrantOf`
 is gone; `SLASH_KEY_LABEL` stays only because a script that names it is still refused (below).
 
@@ -848,13 +848,13 @@ and again on every call (`slashBaseUrlOf`). The model he typed is sent for every
 The grant must be live and of kind `api_token` on every call, and a key that will not open is a `SlashKeyClosedError`
 before anything is sent: never a call with no key.
 
-**The vault gate** (`slashOwnKeyFor`). It runs on every palette `read`, `propose` and `pattern` where the tier is `b`,
+**The Keychain gate** (`slashOwnKeyFor`). It runs on every palette `read`, `propose` and `pattern` where the tier is `b`,
 and on a settings save that picks his key, names a grant or names an address (`slashKeySave`), and nowhere else:
 
 1. Ask the record's `listGrants(ctx)`, which is the record's `vault(ctx)` and nothing added: a person at `owner` on
    the whole record, never a token, and a last proof no more than fifteen minutes old (`FRESH`,
    `packages/record/src/index.ts`). It writes no event, which is why it is the probe and `openGrant` is not. A
-   context with no `provedAt`, a self-host in open mode where there is no session, passes as it does at the vault.
+   context with no `provedAt`, a self-host in open mode where there is no session, passes as it does at the Keychain.
 2. Refused: `FORBIDDEN` with the 5.5-3 sentence (`SLASH_KEY_CLOSED`), on a `read`, a `propose` and a `pattern`
    alike, since on his key both passes are his. No model is called and no key opened; nothing is drafted on another
    model in its place.
@@ -863,8 +863,8 @@ and on a settings save that picks his key, names a grant or names an address (`s
    (`SLASH_KEY_GONE`). A grant that cannot be opened when the call is made is a `SlashKeyClosedError` before anything
    is sent, never a call with no `authorization`, which would be an anonymous call against his provider account.
 
-So an owner's palette on his own key needs a proof in the last fifteen minutes, as the vault does. That is the tier
-`b` rule as it stood, now on every pass; whether a palette ask should need less than opening the vault by hand is the
+So an owner's palette on his own key needs a proof in the last fifteen minutes, as the Keychain does. That is the tier
+`b` rule as it stood, now on every pass; whether a palette ask should need less than opening the Keychain by hand is the
 owner's call, and it is recorded as an open question and not decided here.
 
 Measured before the gate: a colleague at `read` whose last proof was fifty minutes old proposed with 200 and the
@@ -881,20 +881,20 @@ own Slash model on his key, the arranger's press and its daily look, and a sched
 draft script is also signed `system`, although the owner asked for it: both hosts hand its sends the same opener a
 scheduled run uses, with no actor.
 
-**A script never opens the vault's `slash` key.** When that key answered everybody's asks, the kernel came to refuse
+**A script never opens the Keychain's `slash` key.** When that key answered everybody's asks, the kernel came to refuse
 a script that names it at install and before a trial (`scriptBody`, `FORBIDDEN` at `keys[i]`), and both hosts refuse
 a run that declares it before the sandbox starts, or fetches with it by its grant id (`slashDeclared` and
 `keyRefused`, `packages/host/src/script.ts`; 12 §6.2). The label keys nothing for Slash now; the refusal stands until
 `script.ts`'s owner retires it.
 
 **What a save on his own key must name** (`slashGuardedEngine`'s `configure`, for an owner; anybody else is left to
-`configure`'s own refusal, so the check never tells a colleague whether a grant id exists): a grant the vault holds
+`configure`'s own refusal, so the check never tells a colleague whether a grant id exists): a grant the Keychain holds
 and has not revoked, of kind `api_token`, and a model. Each grant miss is `VALUE_MALFORMED` at `grant_id` in its own
 sentence: *"That grant holds no key in this record…"*, *"That grant is not an API token, so Slash cannot answer with
 it…"*. The kind rule is there because a live password opens like any other grant, and before it an owner who chose
 her bank login saved 200 and the next propose sent it as the bearer. What the key is labelled no longer matters. The
 settings door checks the address first (`slashBaseUrlOf`) and stores it the one way it is written, and a save of this
-kind passes the vault's gate before the engine sees it.
+kind passes the Keychain's gate before the engine sees it.
 
 **On his own key, what an automation's question does.** It is asked on a wire signed `rule:<id>` and runs no session
 gate, since a rule has none; installing the rule is the owner's consent. A grant that is gone stops the run
@@ -910,7 +910,7 @@ on the default reads as the included model, its asks stopping `NOT_IN_THIS_BUILD
 **Not built.**
 
 - **Nothing checks that his address is the provider which issued his key.** The grant's `opens` column is not read
-  on this path. He names the address and picks the key, both behind the vault's gate, so a key is sent only where
+  on this path. He names the address and picks the key, both behind the Keychain's gate, so a key is sent only where
   its owner pointed it; on a self-host with no address of his, it is the host operator's endpoint, which is a trust in
   the host that 12 §6.2 states.
 - **No gateway passthrough.** His key's request goes straight to his address through `post`; no
@@ -919,7 +919,7 @@ on the default reads as the included model, its asks stopping `NOT_IN_THIS_BUILD
 - **A public name that resolves to a private address is not caught.** `slashBaseUrlOf` reads the name as typed and
   resolves nothing. Where a Worker's request to such a name would land was not measured; on a self-host its own
   resolver decides.
-- **No passphrase step.** Step 4 of the earlier text asked for the vault passphrase in the session before
+- **No passphrase step.** Step 4 of the earlier text asked for the keychain password in the session before
   `openGrant`. No door asks for one: the gate is the owner and the fifteen minutes. The self-host's `keyOpener`
   answers `null` for a key whose wrap has no `kek_id`, so a passphrase-wrapped key is not opened and the call is
   `UNREACHABLE`, rather than refused up front in the 5.5-3 sentence.
@@ -959,7 +959,7 @@ both, and the spend is this package's ledger.
 
 | Code | Raised | `fix` a person reads |
 |---|---|---|
-| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9); on the Worker, an automation's question on a record whose vault holds no key labelled `slash`, or one that will not open, raised by the host (§5.2) | `A job is code execution on a machine; ask the owner to run it from Slash.` · `This job is not yours.` · `Post seq <n>.` · `Slash may not change <path>.` · the 5.5-3 sentence · *"Slash answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* · §5.2's no-key sentence, *"… Put your model key in the vault under slash."* · §5.2's closed-key sentence, *"… would not open on this Worker, so nothing was sent and the run stopped there."* |
+| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's Keychain gate refusing the asker (§5.9); on the Worker, an automation's question on a record whose Keychain holds no key labelled `slash`, or one that will not open, raised by the host (§5.2) | `A job is code execution on a machine; ask the owner to run it from Slash.` · `This job is not yours.` · `Post seq <n>.` · `Slash may not change <path>.` · the 5.5-3 sentence · *"Slash answers here on a key kept in this record's Keychain, which opens only for the owner signed in within the last fifteen minutes…"* · §5.2's no-key sentence, *"… Put your model key in the Keychain under slash."* · §5.2's closed-key sentence, *"… would not open on this Worker, so nothing was sent and the run stopped there."* |
 | `NEEDS_BROWSER_SESSION` (30 §6) | a bearer at `createJob cancelJob listJobs` or any `/api/slash/*` route — the router | `Open this in the app.` |
 | `PROPOSAL_UNCITED` (§13 #5) | a digit outside `{{…}}`; an unknown path or spoken id; a quoted money or day not in a row; a pattern anchor not in a sample; `pct` or `quantity` with a literal | `Name the path this figure comes from, or leave it out.` |
 | `PROPOSAL_NO_ROWS` (§13 #5) | a filed body with zero citations | `A proposal names the rows behind it, or it is not filed.` |
@@ -1055,7 +1055,7 @@ The lethal trifecta (12 §5): private data + untrusted content + a way out. Slas
 | The runner's job bearer is `propose`, one record, expires with the job | structural | minted inside `claimJob`, revoked at `end`; a second `end` for a job is refused |
 | Logs carry the code, the id and the shape | rule | `call.read` holds register, count and predicate — never a row; a refusal's `found` is a span, never a projection line |
 | The `secret-grep` gate covers `prompts.ts` | gate | 33 §8: no prompt template can carry a `grant` plaintext |
-| A vault key behind Slash opens only for the owner on a fresh proof, and is logged as whoever asked | procedural, the record's own gate | not this package: the host's `slashOwnKeyFor` asks the record's `vault(ctx)` before any model call, and hands the palette's own-key adapter, wired with the asker's id, to both passes, so each `grant.read` names them (§5.9) |
+| A Keychain key behind Slash opens only for the owner on a fresh proof, and is logged as whoever asked | procedural, the record's own gate | not this package: the host's `slashOwnKeyFor` asks the record's `vault(ctx)` before any model call, and hands the palette's own-key adapter, wired with the asker's id, to both passes, so each `grant.read` names them (§5.9) |
 | A tier `b` key is a live API token the owner chose, never the key everybody's asks use | procedural | the host's `slashGuardedEngine` refuses a save naming a missing, revoked, non-`api_token` or `slash`-labelled grant (§5.9) |
 | The key everybody's asks use is never a script's | procedural, the kernel's and the host's | not this package: `scriptBody` refuses a script naming `slash` at install, and `slashDeclared` and `keyRefused` refuse a run that declares it or fetches with it (§5.9) |
 
@@ -1136,7 +1136,7 @@ and not this package's:
 | no `SLASH_KEY` and a live `slash` grant: the colleague reads, on tier `a` and on tier `b` | `FORBIDDEN` before any model call (`slash-included-guard`) |
 | the same, tier `b` naming the `slash` grant | 422 at `grant_id` |
 | the owner's own read, and her tier `a` propose | `grant.read` signed by her, once and twice |
-| an operator `SLASH_KEY` set | no gate anywhere; the included model never touches the vault |
+| an operator `SLASH_KEY` set | no gate anywhere; the included model never touches the Keychain |
 | the Worker's `keyOpener` | signs `grant.read` with the actor it is given, and `system` only when given none (`apps/worker/test/key-opener-actor.test.ts`) |
 
 **The dispatcher** — a fake `RecordApi` over the memory `Sql` running the 30 §1 `job`/`job_event` DDL and the §5.8 statements:
@@ -1225,7 +1225,7 @@ Position: eleventh of fifteen (31 §2); Phase B7 for the palette, Phase A for `t
 | 7 | **`CallContext.principal` gains `{ kind: 'runner'; id; name }`**, built only from a verified device grant or a socket attachment; the JOBS runner half checks it, the session half checks `person` at `owner` | 33 §2, 30 §10 |
 | 8 | **The self-host runner transport is the long-poll**; the hibernatable socket is Cloud-only. No `ws` dependency; the hold runs in the host process where wall time costs nothing | 26 §2.2 parity row: "✅ (`ws`)" → "long-poll, §46"; 33 §11 *Wait* |
 | 9 | **No Slash inference passes `tools`.** Every call is schema-constrained structured output; retrieval is `project()`; the dual-context split holds with one context | 11 §6 ("tool-call headroom" → the schema), 11 §7 *Dual-context* |
-| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key. *Amended September 22nd 2026 to what is built (§5.9): the host asks the record's vault gate first, decrypts wherever its key store is (the Worker, or the self-host process), opens the key on each model call as the asker, and posts to `SLASH_ENDPOINT` directly with no gateway passthrough; the included model is held to the same gate when it is keyed from the vault; and tiers `b` and `byo` are metered by the host (§4.1).* *Amended again: tier `b` is "Your own key" in Settings, a provider (Anthropic Messages or OpenAI-compatible), an `https:` public address, a model and a vault key he picks by id, and it answers both passes, `ask_slash` and the arranger's press; it posts to his address, not to `SLASH_ENDPOINT`, except a self-host's chat completions with no address of his; no key is chosen by the label `slash`; and his asks are listed and not capped, with no operator ceiling (§4.1, §5.9)* | 11 §3 *Bring your own model*, 26 §1 and §6 |
+| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key. *Amended September 22nd 2026 to what is built (§5.9): the host asks the record's Keychain gate first, decrypts wherever its key store is (the Worker, or the self-host process), opens the key on each model call as the asker, and posts to `SLASH_ENDPOINT` directly with no gateway passthrough; the included model is held to the same gate when it is keyed from the Keychain; and tiers `b` and `byo` are metered by the host (§4.1).* *Amended again: tier `b` is "Your own key" in Settings, a provider (Anthropic Messages or OpenAI-compatible), an `https:` public address, a model and a Keychain key he picks by id, and it answers both passes, `ask_slash` and the arranger's press; it posts to his address, not to `SLASH_ENDPOINT`, except a self-host's chat completions with no address of his; no key is chosen by the label `slash`; and his asks are listed and not capped, with no operator ceiling (§4.1, §5.9)* | 11 §3 *Bring your own model*, 26 §1 and §6 |
 | 11 | **`Proposal` carries `model`, `filed` and `read`** beside the five named fields, and `body_kind` admits `query` for the answer that is never filed | 23 §1, §4 (*one object, four bodies* — a fifth shape, `query`, is the palette's unfiled answer) |
 | 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation: pass 2 is never called and never spent. Pass 1 has already spent its one ask by then (§4.1, one per model call) | 23 §7 |
 | 13 | **Lost jobs are re-claimed once** inside the claim statement; expiry is applied by `claimJob`; `preferred` is not built | 26 §2.4, 33 §11 *Lost* and *Expire* |

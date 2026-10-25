@@ -16,7 +16,7 @@ When the quick line recognises something in what you typed, such as a date or an
 
 On a phone the quick line sits behind the + at the top, and the list is drawn as cards.
 
-Passwords and keys never go in a row. They go in the Vault, and a row records what one opens.
+Passwords and keys never go in a row. They go in the Keychain, and a row records what one opens.
 
 ## Find rows
 

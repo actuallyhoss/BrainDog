@@ -31,7 +31,7 @@ prefers, and hosted is never required.*
 | `metric` | a derived number | source, predicate, aggregation, format, **target**, window |
 | `theme` | token values only | colour roles, scales, density — never CSS |
 | `digest` | scheduled output | schedule, sections (each `as:` a kind, `omit_when_empty:` to drop an empty one), channel |
-| `script` | a person's or an agent's code, never run by the record | `runs:` (a clock, a door, a rule), `egress:` origins, vault `keys:`, the registers it `reads:` and `writes:`, `limits:`, `source:`. A fire writes one `script.run` outbox row and a host runs it in a sandbox (`packages/kernel/src/script.ts`) |
+| `script` | a person's or an agent's code, never run by the record | `runs:` (a clock, a door, a rule), `egress:` origins, Keychain `keys:`, the registers it `reads:` and `writes:`, `limits:`, `source:`. A fire writes one `script.run` outbox row and a host runs it in a sandbox (`packages/kernel/src/script.ts`) |
 | `job` | what one run of Claude Code on the owner's own machine may do, never run by the record | `title`, `prompt` (with `%arg%` slots), `args`, `repo`, `tools` (named file tools, the record's own tools, and `Bash(<command>)`, never `Bash` alone), `turns`, `permission` (never `bypassPermissions`), `writes`, `pack`. A run is a `job` row naming the kind, claimed by a runner the owner enrolled (`packages/kernel/src/jobs.ts`) |
 
 The kernel holds itself to this list in `KINDS` (`packages/kernel/src/declare.ts`), and the database's `CHECK`
@@ -505,7 +505,7 @@ you approved.
 line of each action that is `new` or `changed` against what is installed, and a project action's key line after
 its own. `installPack` arms them only when `approve` comes back with exactly those lines, and otherwise refuses
 with nothing written, the rest of the pack included. An action that is `same` asks for nothing and keeps running.
-A key it sends must already be in the vault. The lines go into the `install` event's note, signed by the owner. A
+A key it sends must already be in the Keychain. The lines go into the `install` event's note, signed by the owner. A
 token cannot install, so an agent's actions arrive as a proposal whose acceptance is the same approval.
 
 ### The one thing packs cannot protect against, stated plainly

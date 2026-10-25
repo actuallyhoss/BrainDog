@@ -59,7 +59,7 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The connect page (`copy/agents.ts`). */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
-  { id: 'agent-sees-no-key', said: 'See a key. It uses them from the vault, by name.', where: 'agents.cannot.lines.0', state: 'true' },
+  { id: 'agent-sees-no-key', said: 'See a key. It uses them from the Keychain, by name.', where: 'agents.cannot.lines.0', state: 'true' },
   { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
   { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },
   { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },

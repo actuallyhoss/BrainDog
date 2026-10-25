@@ -75,7 +75,7 @@ previewPage, previewChange | Draw a page or a change nobody has installed. Nothi
 checkAutomation, tryAutomation, automationSentence, scriptTry | Try an automation or a script before proposing it. Nothing is written, and a script's try counts as a run
 ```
 
-The rest (members and invitations, tokens, packs, exports, the vault) takes a person signed in to the app. [Scopes](/docs/agents/scopes) lists it.
+The rest (members and invitations, tokens, packs, exports, the Keychain) takes a person signed in to the app. [Scopes](/docs/agents/scopes) lists it.
 
 ## How fast
 

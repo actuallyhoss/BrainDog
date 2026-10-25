@@ -75,7 +75,7 @@ A scheduled action fetches from, calls or watches a web address on a clock, and 
 
 - the other service did not answer, and it tries again on its own;
 - the service turned the key away, and it is paused until you reconnect the key;
-- the key is not in the Vault, and it is paused until you add it;
+- the key is not in the Keychain, and it is paused until you add it;
 - the record has used its allowance for the month, and it waits for next month.
 
 Press **Resume** on a paused action to run it again.
