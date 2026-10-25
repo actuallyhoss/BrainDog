@@ -219,17 +219,6 @@
           <p class="help" id="script-egress-help" class:wrong={faultAt('egress') !== null}>{faultAt('egress') ?? words.egressHelp}</p>
         </div>
 
-        <fieldset class="item">
-          <legend class="label">{words.keys}</legend>
-          {#if keyChoices.length > 0}
-            <div class="picks form-checks">
-              {#each keyChoices as k (k)}
-                <label class="pick"><input type="checkbox" checked={draft.keys.includes(k)} onchange={() => (draft.keys = toggle(draft.keys, k))} />{k}</label>
-              {/each}
-            </div>
-          {/if}
-          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link tap" href={at('/keychain')}>{words.keysNoneAdd}</a></p>{/if}
-        </fieldset>
         </div>
 
         <div class="column">
@@ -251,6 +240,18 @@
             {/if}
           </details>
         {/each}
+
+        <fieldset class="item">
+          <legend class="label">{words.keys}</legend>
+          {#if keyChoices.length > 0}
+            <div class="picks form-checks">
+              {#each keyChoices as k (k)}
+                <label class="pick"><input type="checkbox" checked={draft.keys.includes(k)} onchange={() => (draft.keys = toggle(draft.keys, k))} />{k}</label>
+              {/each}
+            </div>
+          {/if}
+          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone} <a class="link tap" href={at('/keychain')}>{words.keysNoneAdd}</a></p>{/if}
+        </fieldset>
         </div>
       </div>
     </div>

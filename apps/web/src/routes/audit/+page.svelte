@@ -679,7 +679,7 @@
   <!-- THE LINE AS ONE SENTENCE (`lineSaid`): no second verb where the title already says what was done, a question in
        quotation marks, and a note that does not say the title again, its days said as a person says them. -->
   {@const said = lineSaid(
-    kindOf(e.kind).word,
+    e.kind === 'pull' && by.kind === 'automation' ? 'Ran a script' : kindOf(e.kind).word,
     thing?.text ?? null,
     declared === null && pass === null ? t.note : '',
     t.many === null && /^(?:suggestion|decision|prediction):/u.test(e.target ?? ''),
@@ -1316,6 +1316,10 @@
     }
 
     .detail-text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
       white-space: normal;
     }
   }

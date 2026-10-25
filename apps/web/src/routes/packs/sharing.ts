@@ -149,7 +149,11 @@ export const oneOf = (list: string): string => {
 };
 
 /** A pack by the name a person knows it by: this build's name for a module, else its id in words. */
-export const moduleTitle = (id: string): string => moduleOf(id)?.name ?? moduleName(id);
+/** The rail says Projects for the module that is named Portfolio. */
+export const moduleTitle = (id: string): string => {
+  const name = moduleOf(id)?.name ?? moduleName(id);
+  return name === 'Portfolio' ? 'Projects' : name;
+};
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'figure' | 'other'; name: string } {

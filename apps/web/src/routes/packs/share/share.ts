@@ -21,7 +21,7 @@ export const words = {
   skillsWhy: 'Each goes as its name and when to use it. Its text stays here.',
   /* THE WORDS THAT SUGGEST IT, the first few and how many more, never all forty in a paragraph. */
   signals: (said: readonly string[]): string =>
-    said.length <= 4 ? `Include the words that suggest it: ${said.join(', ')}` : `Include the words that suggest it: ${said.slice(0, 4).join(', ')} and ${said.length - 4} more`,
+    said.length <= 2 ? `Include the words that suggest it: ${said.join(', ')}` : `Include the words that suggest it: ${said.slice(0, 2).join(', ')} and ${said.length - 2} more`,
   changesSince: (since: string): string => `What changed since ${since}`,
   sinceShared: (version: string): string => `${version}, as last shared`,
   sinceBuiltIn: (title: string): string => `${title} as BrainDog ships it`,

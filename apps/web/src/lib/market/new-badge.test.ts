@@ -32,7 +32,7 @@ test('a new add-on from outside is New until ten records hold it, then the round
   counts['pack:settled-one'] = settled as number;
   const all = listingsOf({ kennel, counts });
   const of = (id: string) => all.find((l) => l.id === id);
-  assert.equal(words.held(of('fresh-one')?.count ?? null, 'kennel'), 'New');
+  assert.equal(words.held(of('fresh-one')?.count ?? null, 'kennel'), 'New in the store');
   assert.equal(words.held(of('settled-one')?.count ?? null, 'kennel'), 'On 50+ BrainDogs');
 });
 
@@ -40,5 +40,5 @@ test('nothing is said for a built-in with no count, and nothing under ten is eve
   assert.equal(words.held(null, 'bundled'), null);
   assert.equal(roundCount(9), null);
   assert.equal(roundCount(10), 10);
-  assert.equal(words.held(roundCount(9), 'kennel'), 'New');
+  assert.equal(words.held(roundCount(9), 'kennel'), 'New in the store');
 });

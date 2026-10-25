@@ -1536,7 +1536,7 @@ function saying(step: Step, own = ''): string {
        screen. The runner queues the script and goes on (`startScript`); where its run is kept is the step's own detail. */
     case 'script':
       if (at('id') === '') return 'Run a script';
-      return own.trim() !== '' && scriptName(at('id')).trim() === own.trim() ? 'Run the script this rule is named for' : `Run the script ${scriptName(at('id'))}`;
+      return own.trim() !== '' && scriptName(at('id')).trim() === own.trim() ? 'Run its script' : `Run the script ${scriptName(at('id'))}`;
     case 'wait':
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':

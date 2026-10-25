@@ -776,7 +776,7 @@
               <span class="line-mark"><IconWell name="refresh" size="l" /></span>
               <span class="addon-main">
                 <span class="line-title addon-name">{u.title}</span>
-                <span class="line-detail addon-line">{words.updateAvailable}<span class="sep">{' · '}</span><span class="num">{words.fromTo(u.from, u.to)}</span></span>
+                <span class="line-detail addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
               </span>
               <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
               {#if s && 'filed' in s}

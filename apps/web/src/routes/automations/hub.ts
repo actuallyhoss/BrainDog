@@ -376,16 +376,16 @@ function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { month:
 }
 
 /**
- * "Runs this month": a bar per automation, the busiest six. One is highlighted in ink, the
- * busiest, and any with a failure is red with the count at its end, because a failure is the part that needs him.
+ * "Runs this month": a bar per automation, the busiest six. Every bar is the one grey, so the key has nothing to explain, the
+ * busiest first, and any with a failure is red with the count at its end, because a failure is the part that needs him.
  */
 export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
   return ranThisMonth(rows)
     .slice(0, top)
-    .map((r, i) => ({
+    .map((r) => ({
       label: r.name,
       value: r.month.runs,
-      tone: r.month.failures > 0 ? 'danger' : i === 0 ? 'ink' : undefined,
+      tone: r.month.failures > 0 ? 'danger' : undefined,
       note: r.month.failures > 0 ? hubWords.failedNote(r.month.failures) : undefined,
     }));
 }

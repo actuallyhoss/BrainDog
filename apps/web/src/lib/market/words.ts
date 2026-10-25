@@ -37,7 +37,7 @@ export const words = {
   nothingFoundBody: 'Try fewer words, or pick All.',
   installs: (n: number): string => `On ${n}+ BrainDogs`,
   /* UNDER TEN INSTALLS THE STORE SAYS NO NUMBER (`roundCount`), so an add-on from outside that nobody much holds yet is "New". */
-  newOne: 'New',
+  newOne: 'New in the store',
   /**
    * HOW MANY HOLD IT, AS A CARD AND A PAGE SAY IT: "On 50+ BrainDogs" from ten up (the count is already rounded, and a
    * count under ten is never sent), "New" for an add-on from outside with no count yet, and nothing for a built-in.
@@ -134,6 +134,9 @@ export const words = {
   /* A SMALL DRAWING'S LAST LINE, when a Home has more headings than a card draws. */
   moreLines: (n: number): string => `${n} more`,
   /* WHAT A USE CASE BRINGS BESIDE ITS OWN LISTS: the modules it turns on, by name. */
-  brings: (names: readonly string[]): string =>
-    `With ${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}`,
+  brings: (all: readonly string[]): string => {
+    /* THE RAIL SAYS PROJECTS FOR WHAT THE MODULE CALLS PORTFOLIO. */
+    const names = all.map((n) => (n === 'Portfolio' ? 'Projects' : n));
+    return `Also turns on ${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}`;
+  },
 } as const;

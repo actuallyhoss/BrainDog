@@ -153,7 +153,7 @@
    */
   type PlanRow = { key: string; glyph: IconName; label: string; n: number; names: string };
   /** At most this many named on a row, and how many more said after them, so Money's 38 figures are one line. */
-  const NAMED_MOST = 6;
+  const NAMED_MOST = 4;
   const planRows = $derived.by((): PlanRow[] => {
     const rows: PlanRow[] = [];
     /* THE COUNT IS EVERY ONE; THE NAMES ARE EACH NAME ONCE, so two rules said the same way are not said twice. */
@@ -167,7 +167,7 @@
     if (read) {
       push('lists', 'rows', words.addsLists, read.lists.map((l) => l.name));
       push('pages', 'doc', words.addsPages, read.pages.map(pageTitle));
-      push('figures', 'activity', words.addsFigures, read.figures.map((f) => f.name));
+      push('figures', 'activity', words.addsFigures, read.figures.map((f) => f.name), '; ');
       push('rules', 'skill', words.addsRules, read.rules, '; ');
     } else if (reach) {
       push('lists', 'rows', words.addsLists, reach.lists);
@@ -627,15 +627,9 @@
             <dt>{words.addsModules}</dt>
             <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
             <!-- A MODULE ADDED HERE WRITES NO EXAMPLE ROWS (`packDocument`), so it says none rather than its seed's. -->
-            {#if listing.kind === 'module'}
+            {#if listing.kind !== 'module' && (adds ? adds.examples : (reach?.examples ?? 0)) > 0}
               <dt>{words.addsExamples}</dt>
-              <dd>{words.examples(0)}</dd>
-            {:else if adds}
-              <dt>{words.addsExamples}</dt>
-              <dd>{words.examples(adds.examples)}</dd>
-            {:else if reach}
-              <dt>{words.addsExamples}</dt>
-              <dd>{words.examples(reach.examples)}</dd>
+              <dd>{words.examples(adds ? adds.examples : (reach?.examples ?? 0))}</dd>
             {/if}
           </dl>
         </Tile>

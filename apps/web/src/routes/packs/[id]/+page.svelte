@@ -430,7 +430,8 @@
   const metaOf = (r: string): string => {
     const x = railOf(r);
     const parts: string[] = [];
-    if (x && x.guessed !== true) parts.push(x.count === 1 ? '1 entry' : `${x.count.toLocaleString('en-GB')} entries`);
+    /* KEYS COUNT RETIRED ROWS IN THE RAIL'S COUNT; THE KEYCHAIN LEAVES THEM OUT, so the two said 176 and 83. Say no number rather than the wrong one. */
+    if (x && x.guessed !== true && r !== 'credentials') parts.push(x.count === 1 ? '1 entry' : `${x.count.toLocaleString('en-GB')} entries`);
     const at = changedAt[r];
     if (at) parts.push(`changed ${since(at, nowMs)}`);
     return parts.join(' · ');

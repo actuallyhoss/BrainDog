@@ -9,7 +9,7 @@ test('SHARE THIS SETUP IN TWO STEPS (E22): numbered, the skills behind one count
   assert.match(words.about, /^1\. /u);
   assert.match(words.send, /^2\. /u);
   assert.equal(words.skillsPicked(3, 35), 'Skills to include: 3 of 35');
-  assert.equal(words.signals(['founder', 'startup', 'saas', 'mrr', 'runway', 'launch']), 'Include the words that suggest it: founder, startup, saas, mrr and 2 more');
+  assert.equal(words.signals(['founder', 'startup', 'saas', 'mrr', 'runway', 'launch']), 'Include the words that suggest it: founder, startup and 4 more');
   assert.equal(words.signals(['founder', 'startup']), 'Include the words that suggest it: founder, startup');
   for (const said of [publishWords.publish, publishWords.listed('Solo founder', '3.0.1'), publishWords.unreached, publishWords.unread])
     assert.doesNotMatch(said, /Kennel/u, said);

@@ -227,7 +227,7 @@ test('THE BARS ARE THE BUSIEST SIX, THE TOP ONE INK, AND ONE WITH A FAILURE RED 
   ];
   const bars = monthBars(rows);
   assert.equal(bars.length, 6);
-  assert.deepEqual(bars[0], { label: 'Standup', value: 30, tone: 'ink', note: undefined });
+  assert.deepEqual(bars[0], { label: 'Standup', value: 30, tone: undefined, note: undefined });
   assert.deepEqual(bars[1], { label: 'Chase invoices', value: 12, tone: 'danger', note: '3 failed' });
   assert.equal(bars.some((b) => b.label === 'Quiet'), false, 'an automation that did not run is not a bar');
   assert.equal(monthReading(rows), 'Standup ran 30 times, the most this month; Chase invoices failed three of 12.');

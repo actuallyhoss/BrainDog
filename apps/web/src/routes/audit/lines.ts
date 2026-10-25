@@ -74,7 +74,7 @@ export const historyWords = {
   lastWeek: 'Last 7 days',
   byAgents: (n: number) => `${count(n)} by agents`,
   byYou: (n: number) => `${count(n)} by you`,
-  byRest: (n: number) => `${count(n)} by scripts and rules`,
+  byRest: (n: number) => `${count(n)} by rules`,
   lanesSubject: 'Agent stretches of work in the last 24 hours',
   groupsSubject: 'Changes by who made them',
   kindsSubject: 'Changes by kind, the five biggest',
@@ -438,7 +438,14 @@ export type LineSaid = {
 
 /** A SCRIPT SIGNATURE IN A NOTE IS THE SCRIPT IN WORDS: "Written by script:book_from_account@v3." is "Written by the Book from account script." */
 export const scriptWords = (note: string): string =>
-  note.replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`);
+  note
+    /* The line already says which script wrote it, so "Written by the X script." is not said again. */
+    .replace(/\bWritten by script:[a-z][a-z0-9_-]*@v\d+\.?\s*(?:·\s*)?/gu, '')
+    .replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`)
+    /* A rule's id is a mechanism: "rule.meet-payees ran." is "Meet payees ran." */
+    .replace(/\brule[.:]([a-z][a-z0-9_-]*)/gu, (_m, slug: string) => humanize(slug))
+    .replace(/\s*·\s*$/u, '')
+    .trim();
 
 /**
  * ONE LINE AS A SENTENCE: "Asked “Does Portage keep sending…?”", "Closed “Filed 2 payments…”" said as "Filed 2
