@@ -62,10 +62,10 @@
  * host loads a tool at once (`anthropic/alwaysLoad`) or finds it by search (`anthropic/searchHint`) never reach a turn.
  * The ceiling did not move; the two cards' `_meta` it used to count came out of the figure, which measured 2,656.
  *
- * `context`'s `project` SAID WHEN TO SEND IT, PAID FOR BY THREE LINES THE RECORD SAYS ITSELF (25 October, audit D). The
- * card now tells a run in no project to name it to `context`, so `project` says "By name, when the folder is in none";
- * `undo`'s "Refused for anyone else's" and the "1 to 100" on two limits went, since each refusal says it with a try.
- * `list`'s "predicate tree" became "filters". It measured 2,714 before and 2,710 after.
+ * THE CARD TEACHES `context`'s `project`, NOT THE LIST (25 October, audit D). A run in no project is told on its card to
+ * name it to `context`, which is the moment it applies, so `project` stays undescribed; `undo`'s "Refused for anyone
+ * else's" went, since its refusal says so, and `list`'s "predicate tree" became "filters". The limits keep "1 to 100",
+ * which `mcp.test.ts` reads against the record's ceiling. It measured 2,714 before and 2,703 after.
  */
 
 import { test } from 'node:test';

@@ -485,7 +485,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND `topic`, WHAT THE PERSON IS WORKING ON, which an agent with no folder says on its first call (Claude.ai,
        ChatGPT, any remote client): with no repository, remote or folder it is the one thing that places its run, in the
        project of that name or the first one formed from it. An agent that sends none is asked for it in the answer. */
-    input: obj({ task: str('Whole, with its version.'), project: str('By name, when the folder is in none.'), topic: str('No folder: what they work on') }),
+    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' }, topic: str('No folder: what they work on') }),
     quiet: ['depth', 'since'],
     writes: false,
   },
@@ -554,7 +554,7 @@ export const TOOLS: readonly Tool[] = [
            had been told twenty. The four tokens it costs are 2,761 against the 2,760 `budget.test.ts` holds, so one
            came off `fields` below ("answered" became "kept"), and the two together measure 2,760. `search` keeps
            "Default 20.", which is still the whole truth of it. */
-        limit: int('Up to 60 whole, else 20.'),
+        limit: int('1 to 100. Up to 60 whole, else 20.'),
         cursor: { type: 'string' },
         /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
            `clipped: true`, so an agent that needs the whole write-up names its field here or reads the row with `get`. */
@@ -573,7 +573,7 @@ export const TOOLS: readonly Tool[] = [
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
     /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
-    input: obj({ q: { type: 'string' }, limit: int('Default 20.') }, ['q']),
+    input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.') }, ['q']),
     writes: false,
   },
   {
