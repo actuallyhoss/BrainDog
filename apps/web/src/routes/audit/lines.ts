@@ -359,6 +359,16 @@ const ROW = /^([a-z][a-z0-9_-]*)#(\d+)$/u;
 export const listOf = (target: string | undefined): string | null => (target === undefined ? null : (ROW.exec(target)?.[1] ?? null));
 
 /**
+ * A ROW'S NAME WITHOUT THE BANK'S OWN NOISE: the statement date a payee line begins with ("25OCT26 Phone Banking
+ * Transfer" is "Phone Banking Transfer"), and a name that is only a card or reference number ("0447") is no name, so the
+ * line says "an entry" and the row's own page holds the raw text.
+ */
+export function bankName(title: string): string | null {
+  const bare = title.trim().replace(/^\d{1,2}[A-Za-z]{3}\d{2,4}\s+/u, '').trim();
+  return /\p{L}{2,}/u.test(bare) ? bare : null;
+}
+
+/**
  * What a target is called and where it goes, or `null` when there is nothing to say that is not an id.
  *
  * `title` IS WHAT THE RECORD CALLED THE TARGET when it sent the line (`readLog`'s `names`): a row's title or the
@@ -376,7 +386,8 @@ export const listOf = (target: string | undefined): string | null => (target ===
  */
 export function thingOf(target: string, title: string | null, nameOf: (list: string) => string = listName): Thing | null {
   /* A BANK'S LINE IN CAPITALS READS AS WORDS (H21, `readable`): "Changed LEDGER POST" is "Changed Ledger Post". */
-  const said = title !== null && title.trim() !== '' ? moneyInText(readable(title)) : null;
+  const cleaned = title === null ? null : bankName(title);
+  const said = cleaned !== null ? moneyInText(readable(cleaned)) : null;
   const row = ROW.exec(target);
   /* A ROW GOES TO ITS OWN PAGE rather than through the spoken-id resolver, which took `services#6` only once the `#`
      was escaped out of the fragment. */

@@ -441,13 +441,13 @@
     }
 
     /* A LONE LAST CARD FILLS ITS ROW, and not a third of it beside two empty ones. */
-    .cards > :last-child:nth-child(3n + 1) {
+    .cards > :global(:last-child:nth-child(3n + 1)) {
       grid-column: 1 / -1;
     }
   }
 
   @media (width >= 640px) and (width < 900px) {
-    .cards > :last-child:nth-child(2n + 1) {
+    .cards > :global(:last-child:nth-child(2n + 1)) {
       grid-column: 1 / -1;
     }
   }

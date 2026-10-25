@@ -720,7 +720,6 @@
           >
         </span>
       </span>
-      <span class="where">{thing?.list ?? ''}</span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
            its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
       <span class="line-when">
@@ -768,7 +767,8 @@
       </Tile>
     {/if}
 
-    {#if busy.total > 0}
+    <!-- A WEEK OF HOURS NEEDS A WEEK TO SHOW: with fewer than ten lines, or lines on one day only, the grid is one lit row and says nothing. -->
+    {#if busy.total >= 10 && busy.values.filter((r) => r.some((v) => v > 0)).length >= 2}
       <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
         <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
         <p class="reading">{busySaid(busy.values)}</p>
@@ -1233,20 +1233,7 @@
     white-space: nowrap;
   }
 
-  .where {
-    grid-column: 3;
-    grid-row: 1;
-    max-inline-size: 18ch;
-    overflow: hidden;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .where-inline {
-    display: none;
-  }
+  /* THE LIST IS SAID IN THE LINE ITSELF, after who and what, and not as a lone chip at the far edge. */
 
   /* A TIME IN A FEED IS GEIST AT 13 WITH TABULAR FIGURES, in the quiet ink: the figures line up down the tile without a
      typewriter face beside the words. */
@@ -1277,28 +1264,17 @@
    * at the end. The hours run on as one list, a hairline between every two lines.
    */
   @container (width >= 640px) {
-    .hour-band {
-      display: grid;
-      grid-template-columns: 6ch minmax(0, 1fr);
-      column-gap: var(--sp-2);
-      align-items: start;
+    /* ONE TIME COLUMN: every line says its own time, so the hour's subhead is not said again beside it. */
+    .hour {
+      display: none;
     }
 
     .hour-band + .hour-band {
       border-block-start: 1px solid var(--rule);
     }
 
-    .hour,
-    .hour-band + .hour-band .hour {
-      margin: 0;
-      padding-block-start: calc((var(--row-h-2) - 20px) / 2);
-      color: var(--ink);
-      font-size: var(--fs-body);
-      line-height: 20px;
-    }
-
     .act {
-      grid-template-columns: 6ch var(--well-l) minmax(0, 1fr) auto;
+      grid-template-columns: 6ch var(--well-l) minmax(0, 1fr);
     }
 
     .act > :global(:first-child) {
@@ -1308,10 +1284,6 @@
 
     .act .line-main {
       grid-column: 3;
-    }
-
-    .where {
-      grid-column: 4;
     }
 
     .act .line-when {
@@ -1337,14 +1309,6 @@
     .act .line-when {
       grid-column: 3;
       grid-row: 1;
-    }
-
-    .where {
-      display: none;
-    }
-
-    .where-inline {
-      display: inline;
     }
 
     .line-detail {

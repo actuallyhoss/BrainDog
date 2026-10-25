@@ -25,3 +25,9 @@ test('THE NOTE DOES NOT SAY THE TITLE AGAIN, and its days are said as a person s
   assert.equal(lineSaid('Noted', 'Newsletter sending', 'Newsletter sending', false, NOW).note, '');
   assert.equal(lineSaid('Noted', 'Halden licence', 'Halden licence is due today: £2,400.', false, NOW).note, 'Halden licence is due today: £2,400.');
 });
+import { bankName, thingOf } from './lines.ts';
+test('a bank line loses its statement date and a bare number is no name', () => {
+  assert.equal(bankName('25OCT26 Phone Banking Transfer'), 'Phone Banking Transfer');
+  assert.equal(bankName('0447'), null);
+  assert.equal(thingOf('ledger#4', '0447', () => 'Ledger')?.text, 'an entry');
+});
