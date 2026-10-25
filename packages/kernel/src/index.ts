@@ -140,6 +140,7 @@ import {
   type Scope,
   type TokenDeps,
   type TokenRow,
+  type TokenUses,
   type Verified,
 } from './token.ts';
 import {
@@ -8807,6 +8808,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     personal: (r) => (registers.get(r)?.personal === true ? registers.get(r)!.name : null),
   });
 
+  /* WHEN EACH KEY'S USE WAS LAST WRITTEN, for this open record only (`TokenUses`): a key called again inside a minute writes nothing. */
+  const tokenUses: TokenUses = new Map();
+
   /**
    * What a token needs beyond SQL.
    *
@@ -8816,6 +8820,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const tokenDeps = (): TokenDeps => ({
     sql,
+    uses: tokenUses,
     nowMs: clock.now(),
     mint,
     recordId: () => recordIdentity(sql)?.id ?? null,

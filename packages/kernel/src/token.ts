@@ -270,7 +270,44 @@ export type TokenDeps = {
    * opened by a test, the CLI or another host has none, and a value kept in the record would travel in its `.brain`.
    */
   validFrom?: string | undefined;
+  /**
+   * When this process last wrote each key's use (`verifyToken`), so a key called again inside `USE_WRITE_MS` with the same
+   * door and build writes nothing. THE HOST'S, ONE PER OPEN RECORD AND KEPT IN MEMORY, never in the record. Absent, every
+   * use is written, as before.
+   */
+  uses?: TokenUses;
 };
+
+/** The last use written per key id: when, through which door, and the build it kept (`null`, none said). */
+export type TokenUses = Map<string, { at: number; surface: string | null; build: string | null }>;
+
+/**
+ * How stale a key's `last_used_at` may be: a minute. A use inside it writes nothing, so a busy agent's calls do not each
+ * wait on a storage write before their answer leaves the record, and every reader of the column (the connections list,
+ * a login grant's silence, "not used since March") is still right to the minute.
+ */
+export const USE_WRITE_MS = 60_000;
+
+/** The most keys `uses` holds before the ones past `USE_WRITE_MS` are let go: a child key is minted every hour. */
+const USES_MOST = 512;
+
+/**
+ * Whether any of `ids` needs its use written: never written by this process, written a minute ago or more, last through
+ * another door, or told a build it has not kept. A door or build that changed is written at once, so the listing never
+ * names the wrong one.
+ */
+function usesStale(uses: TokenUses, ids: readonly string[], now: number, surface: string | null, build: string | null): boolean {
+  return ids.some((id) => {
+    const was = uses.get(id);
+    return was === undefined || now - was.at >= USE_WRITE_MS || now < was.at || was.surface !== surface || (build !== null && was.build !== build);
+  });
+}
+
+/** Note a use as written for `ids`, the build kept being the one said or the one already noted. */
+function usesWritten(uses: TokenUses, ids: readonly string[], now: number, surface: string | null, build: string | null): void {
+  if (uses.size >= USES_MOST) for (const [id, was] of uses) if (now - was.at >= USE_WRITE_MS) uses.delete(id);
+  for (const id of ids) uses.set(id, { at: now, surface, build: build ?? uses.get(id)?.build ?? null });
+}
 
 /**
  * Where a host keeps the plan's count of agents (LCH-A08): one row of a small table the host makes, `host_meta`, under
@@ -656,20 +693,30 @@ const rank = (scope: Scope): number => SCOPES.indexOf(scope);
  * `build` IS WHAT THE COMMAND SAID IT WAS (`x-braindog-cli`), kept in the same statement, so a call costs no write more.
  * A value that is not a build (`isBuild`) is dropped and the build already kept stays: a header anybody can send is not
  * let into a column a person reads.
+ *
+ * AT MOST ONCE A MINUTE A KEY, with `deps.uses`: the first use, a use a minute or more after the last one written, and a
+ * use through another door or with a new build are written, and the rest are not (`USE_WRITE_MS`). On a busy record a
+ * write per call was a storage write every answer waited for.
  */
 export async function verifyToken(deps: TokenDeps, bearer: string, surface?: string, build?: string): Promise<Result<Verified>> {
   const held = await heldBy(deps, bearer);
   if (held === null) return no<Verified>('FORBIDDEN', 'That bearer is not one this record knows.', { at: 'authorization' });
   const { row, narrows } = held;
 
-  deps.sql.exec(
-    'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id IN (?, ?)',
-    instant(deps.nowMs),
-    surface ?? null,
-    build !== undefined && isBuild(build) ? build : null,
-    row.id,
-    row.parent_id ?? row.id,
-  );
+  const door = surface ?? null;
+  const kept = build !== undefined && isBuild(build) ? build : null;
+  const ids = row.parent_id === null ? [row.id] : [row.id, row.parent_id];
+  if (deps.uses === undefined || usesStale(deps.uses, ids, deps.nowMs, door, kept)) {
+    deps.sql.exec(
+      'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id IN (?, ?)',
+      instant(deps.nowMs),
+      door,
+      kept,
+      row.id,
+      row.parent_id ?? row.id,
+    );
+    if (deps.uses !== undefined) usesWritten(deps.uses, ids, deps.nowMs, door, kept);
+  }
   const client = clientOf(row);
   const agent = row.parent_id !== null && row.scope === row.parent_scope ? row.parent_id : row.id;
   return ok({

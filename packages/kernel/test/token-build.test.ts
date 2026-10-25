@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { MIGRATIONS, execScript } from '../src/migrate.ts';
 import { openRecord } from '../src/index.ts';
 import tokenBuild0032 from '../src/migrations/0032_token_build.ts';
-import { createToken, isBuild, listTokens, noteTool, revokeToken, verifyToken, type TokenDeps } from '../src/token.ts';
+import { createToken, isBuild, listTokens, noteTool, revokeToken, USE_WRITE_MS, verifyToken, type TokenDeps, type TokenUses } from '../src/token.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 9);
@@ -200,4 +200,42 @@ test('THE LISTING CARRIES BOTH, and a revoke answers with them', async () => {
   const revoked = value<{ last_build: string | null; last_tool_at: string | null }>(revokeToken(deps, 'p_owner', used.id));
   assert.equal(revoked.last_build, BUILD);
   assert.equal(revoked.last_tool_at, '2026-10-09T09:05:00.000Z');
+});
+
+test('A KEY CALLED AGAIN INSIDE A MINUTE WRITES NOTHING, and the first use, a minute on, a new door and a new build do', async () => {
+  const { sql, deps: base } = await record();
+  const minted = value<{ id: string; bearer: string }>(await createToken(base, 'p_owner', { scope: 'write', label: 'laptop' }));
+  const exec = sql.exec.bind(sql);
+  let writes = 0;
+  sql.exec = ((query: string, ...args: unknown[]) => {
+    if (/^UPDATE token SET last_used_at/.test(query)) writes += 1;
+    return (exec as (q: string, ...a: unknown[]) => unknown)(query, ...args);
+  }) as typeof sql.exec;
+  const uses: TokenUses = new Map();
+  const at = (ms: number): TokenDeps => ({ ...base, nowMs: NOW + ms, uses });
+  const used = (): string | null | undefined => stored(sql, minted.id)?.last_used_at;
+
+  value(await verifyToken(at(0), minted.bearer, 'api', BUILD));
+  assert.equal(writes, 1, 'the first use was not written');
+  value(await verifyToken(at(30_000), minted.bearer, 'api', BUILD));
+  value(await verifyToken(at(USE_WRITE_MS - 1), minted.bearer, 'api', 'not a build'));
+  value(await verifyToken(at(USE_WRITE_MS - 1), minted.bearer, 'api'));
+  assert.equal(writes, 1, 'a use inside the minute, same door and build, was written');
+  assert.equal(used(), new Date(NOW).toISOString());
+
+  /* A MINUTE ON IS WRITTEN, so the column is never more than a minute behind. */
+  value(await verifyToken(at(USE_WRITE_MS), minted.bearer, 'api', BUILD));
+  assert.equal(writes, 2);
+  assert.equal(used(), new Date(NOW + USE_WRITE_MS).toISOString());
+
+  /* ANOTHER DOOR OR A NEW BUILD IS WRITTEN AT ONCE, so the listing never names the wrong one. */
+  value(await verifyToken(at(USE_WRITE_MS + 1_000), minted.bearer, 'mcp', BUILD));
+  assert.equal(writes, 3);
+  value(await verifyToken(at(USE_WRITE_MS + 2_000), minted.bearer, 'mcp', 'dev+0000000'));
+  assert.equal(writes, 4);
+  assert.equal(stored(sql, minted.id)?.last_build, 'dev+0000000');
+
+  /* AND WITH NO `uses`, EVERY USE IS WRITTEN, as before. */
+  value(await verifyToken({ ...base, nowMs: NOW + USE_WRITE_MS + 3_000 }, minted.bearer, 'mcp', 'dev+0000000'));
+  assert.equal(writes, 5);
 });
