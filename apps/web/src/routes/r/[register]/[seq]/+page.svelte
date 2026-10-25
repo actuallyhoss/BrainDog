@@ -2466,13 +2466,14 @@
       display: contents;
     }
 
-    .row-head :global(.page-head .head-main:has([data-head-primary])::after) {
+    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart])::after) {
       content: '';
       flex-basis: 100%;
       order: 1;
     }
 
-    .row-head :global(.page-head [data-head-primary]) {
+    .row-head :global(.page-head [data-head-primary]),
+    .row-head :global(.page-head [data-row-chart]) {
       order: 2;
       margin-block-start: var(--sp-3);
     }

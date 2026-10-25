@@ -578,6 +578,49 @@
     line-height: 20px;
   }
 
+  /* THE WORDS SIT BESIDE THE BOX, never under it, and a pick has air above it and the disclosure below. */
+  .row-pick > span {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .row-pick input {
+    flex: none;
+    margin-block-start: 2px;
+  }
+
+  .skills-pick {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* THE DISCLOSURE DRAWS ITS OWN ARROW, not the browser's black triangle. */
+  .skills-pick > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .skills-pick > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .skills-pick > summary::after {
+    content: '';
+    inline-size: 7px;
+    block-size: 7px;
+    border: solid var(--ink-3);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+    margin-block-end: 3px;
+  }
+
+  .skills-pick[open] > summary::after {
+    transform: rotate(225deg);
+    margin-block-end: -3px;
+  }
+
   .pick-text {
     display: flex;
     flex-direction: column;

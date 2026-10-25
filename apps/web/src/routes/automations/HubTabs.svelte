@@ -85,6 +85,14 @@
     background: transparent;
   }
 
+  /* ON A PHONE THE WORDS SIT CLOSER, so more of the strip shows and its last tab is cut by the edge, not mid letter. */
+  @media (width < 480px) {
+    .hub-tab {
+      padding-inline: 10px;
+      font-size: var(--fs-meta);
+    }
+  }
+
   /* 44 UNDER A THUMB ON BOTH AXES (`13 §7`); `controls.css` gives the height and the width floor, and the word keeps
      its room either side. */
   @media (pointer: coarse) {

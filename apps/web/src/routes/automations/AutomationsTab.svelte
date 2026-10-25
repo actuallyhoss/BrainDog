@@ -184,6 +184,7 @@
     <div class="tiles">
       <Tile icon="refresh" title={w.runsMonth} meta={w.runsMonthMeta(split.runs)}>
         <Bars items={bars} subject={w.runsMonthSubject} />
+        {#if bars.some((b) => b.tone === 'danger')}<p class="key">Red bars had failed runs.</p>{/if}
         <p class="reading">{monthReading(rows)}</p>
       </Tile>
       <Tile icon="check" title={w.endedTitle}>
@@ -225,6 +226,12 @@
   .ring {
     display: flex;
     justify-content: center;
+  }
+
+  .key {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */

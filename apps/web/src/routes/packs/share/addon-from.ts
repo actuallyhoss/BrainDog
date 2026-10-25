@@ -16,7 +16,7 @@
 export const words = {
   modeGroup: 'What to share',
   modeUseCase: 'The whole setup',
-  modeAddon: 'An add-on from what you made',
+  modeAddon: 'An add-on',
   sentence: 'Tick what you made and download it as an add-on. It carries how each thing is set up, never what you keep in it.',
   cannot: 'This BrainDog cannot make an add-on yet.',
   nothing: 'Nothing of your own yet. Make a list, a page or an automation and it shows here.',

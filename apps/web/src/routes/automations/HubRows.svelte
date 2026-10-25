@@ -69,9 +69,10 @@
     <span class="line-detail meta">
       {#if r.what}<span class="what">{r.what}</span>{#if r.said}<span class="sep">{' · '}</span>{/if}{/if}
       {#if r.said}<span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>{/if}
+      {#if r.aside && r.toggle}<span class="aside-in">{' · '}{r.aside}</span>{/if}
     </span>
   </span>
-  {#if r.aside}<span class="line-when aside" data-clock={r.clock ? '' : undefined}>{r.aside}</span>{/if}
+  {#if r.aside}<span class="line-when aside" data-switched={r.toggle ? '' : undefined} data-clock={r.clock ? '' : undefined}>{r.aside}</span>{/if}
 {/snippet}
 
 {#snippet item(r: HubRow)}
@@ -299,6 +300,21 @@
   @media (prefers-reduced-motion: reduce) {
     .turn {
       transition: none;
+    }
+  }
+
+  /* ON A PHONE A SWITCHED ROW'S NEXT TURN SITS IN ITS DETAIL LINE, so the switch and the turn do not squeeze the name. */
+  .aside-in {
+    display: none;
+  }
+
+  @media (width < 640px) {
+    .aside[data-switched] {
+      display: none;
+    }
+
+    .aside-in {
+      display: inline;
     }
   }
 

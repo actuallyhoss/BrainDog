@@ -464,7 +464,9 @@
   );
   /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
      the product. `13 §4.3`'s cap, and the line that admits it. */
-  const shown = $derived(matched.slice(0, DOM_CAP));
+  /* A PHONE-LENGTH FIRST SCREEN: the newest 30 lines, then "Show more" adds 30 of the same page. */
+  let wanted = $state(30);
+  const shown = $derived(matched.slice(0, Math.min(wanted, DOM_CAP)));
   /* A BURST IS ONE LINE (`burstsOf`), folded from what is drawn, so the cap above still counts lines of the log and
      the cap line under the list still says how many of them there are. */
   const told = $derived(burstsOf(shown, listSaid));
@@ -867,7 +869,13 @@
         </p>
       {/if}
 
-      <CapLine shown={shown.length} total={matched.length} />
+      {#if shown.length < matched.length && wanted < DOM_CAP}
+        <div class="older">
+          <Button weight="quiet" onclick={() => (wanted += 30)}>Show more ({matched.length - shown.length} left)</Button>
+        </div>
+      {:else}
+        <CapLine shown={shown.length} total={matched.length} />
+      {/if}
       {#if route.data.live && live && live.cursor !== null}
         <div class="older">
           <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
