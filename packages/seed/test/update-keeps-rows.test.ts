@@ -137,7 +137,7 @@ async function take(rec: Rec, doc: Doc, doing: string, plant?: Plant): Promise<v
     const out = (await rec.api.installPack({ doc: given, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner)) as Out<unknown>;
     /* A PACK THAT SENDS A KEY IS REFUSED UNTIL THE VAULT HOLDS ONE UNDER THE LABEL IT NAMES. The entry is a label and no
        bytes, sealed for a connector as a key a script opens is (`packs/mercury/mercury.test.ts` has the reasons). */
-    const label = out.ok || keys > 3 ? null : /^Add the key called "(.+)" to the vault/u.exec(out.refusal?.fix ?? '')?.[1];
+    const label = out.ok || keys > 3 ? null : /^Add the key called "(.+)" to the (?:keychain|vault)/u.exec(out.refusal?.fix ?? '')?.[1];
     if (!label) {
       value(out, `${doing}, installing ${doc.pack} ${doc.version}`);
       break;

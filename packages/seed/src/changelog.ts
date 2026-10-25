@@ -352,6 +352,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    { version: '1.23.0', notes: 'A key says which account it is for, such as a user name or an address, as a keychain item does. It is never the key itself.' },
     {
       version: '1.22.0',
       notes: 'The Vault is now the Keychain. Keys and the notes about a key with no value or one written in plain text say Keychain, and their links go to it. Nothing you keep is moved or changed.',

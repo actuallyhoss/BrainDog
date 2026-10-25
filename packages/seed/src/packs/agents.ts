@@ -144,6 +144,10 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
       { id: 'label', label: 'Name', type: 'text', required: true, max: 120, search: true },
       { id: 'opens', label: 'What it opens', type: 'text', required: true, max: 280, search: true },
       { id: 'provider', label: 'Provider', type: 'text', index: true, search: true },
+      /* WHICH ACCOUNT THE KEY IS FOR, as a keychain names it beside a password: a user name, an address or an account id.
+         Added in 1.23.0. Never the key: a text field goes through the kernel's credential check, so one shaped like a key
+         is refused. */
+      { id: 'account', label: 'Account', type: 'text', max: 280, search: true },
       /* The kinds the vault seals (`packages/kernel/src/vault.ts`). */
       { id: 'kind', label: 'Kind', type: 'enum', values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'], required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
@@ -811,8 +815,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      it. No list, field or figure goes.
      1.22.0 IS WORDS, SO IT IS MINOR (Vault is now Keychain): the Keys list, its count and the notes about a key with no
      value or one in plain text say Keychain where they said vault, and the links go to /keychain. No list, field or
-     figure goes. */
-  manifest: { id: 'agents', version: '1.22.0', requires: ['register.things'] },
+     figure goes.
+     1.23.0 ADDS A FIELD, SO IT IS MINOR (Keychain works like a keychain): a key says which account it is for, as a
+     keychain item does, in a text field that is never secret. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.23.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
