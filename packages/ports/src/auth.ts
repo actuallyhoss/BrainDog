@@ -75,6 +75,11 @@ export type AuthCall =
   /** End this person's other sessions (`keep: 'this'`), or all of them, this one included (`keep: 'none'`). */
   | { flow: 'logout.all'; sid: string; keep: 'this' | 'none' }
   /**
+   * Lock the keychain in this browser: the session's last proof is put behind the longest keychain window, so the next
+   * keychain act asks for a sign-in again. The session stays signed in for everything else.
+   */
+  | { flow: 'keychain.lock'; sid: string }
+  /**
    * A new address accepting an invitation proves the mailbox first. The host has already looked the invitation up,
    * and `email` is the address it was made for; this mints the proof and hands it back in `mail`.
    */
@@ -278,6 +283,8 @@ export type AuthBodies = {
   sessions: { sessions: SessionInfo[] };
   /** How many sessions were ended: the others, or with `keep: 'none'` this one too. */
   'logout.all': { ended: number };
+  /** The keychain is locked in this browser: `locked` is always true, and the session is otherwise as it was. */
+  'keychain.lock': { locked: true };
   'invite.prove': Record<string, never>;
   'invite.proved': InviteProved;
   'signup.start': Record<string, never>;

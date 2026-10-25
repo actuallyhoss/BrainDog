@@ -26,7 +26,7 @@
 import type {
   AccountCall, AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, SignupCall, SignupName, SignupVerified, Sql, Who,
 } from '@braindog/ports';
-import { ACCESS_ENDED_AT, accessEndedSaid, ulids } from '@braindog/kernel';
+import { ACCESS_ENDED_AT, LOCK_AFTER_MOST_MS, accessEndedSaid, ulids } from '@braindog/kernel';
 
 import { badSlug } from './directory.ts';
 import { ipBucket, mailCanon } from './signup-keys.ts';
@@ -1196,6 +1196,22 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         );
         if (!moved) return refused;
         return { status: 200, body: { ...whoOf(found.row), record: to.record }, ...keep };
+      }
+
+      /**
+       * Lock the keychain in this browser (`12 §6.3`, Lock now): the session's last proof is put behind the longest window
+       * the keychain can be set to open for, so its next use asks for a sign-in, whatever window the owner chose.
+       *
+       * ONLY THIS SESSION, AND ONLY ITS PROOF. It stays signed in for everything else, its cookie and its life as they
+       * were; a proof moved back by an hour is still well inside `PROOF_LIFE`. Signing in again moves `authed_at` to now,
+       * which is the unlock. Every other act that asks for a recent sign-in (`FRESH`) asks for one again too, as it would
+       * of a laptop left open for an hour, which is what a locked keychain says.
+       */
+      case 'keychain.lock': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        sql.exec('UPDATE dir_session SET authed_at = MIN(authed_at, ?) WHERE id_hash = ?', now - LOCK_AFTER_MOST_MS - 1, await hashNow(found));
+        return { status: 200, body: { locked: true }, ...carry(found) };
       }
 
       /** The row goes and the cookie is cleared, and an id that names nothing is signed out just the same. */

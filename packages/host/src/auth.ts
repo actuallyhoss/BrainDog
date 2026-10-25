@@ -454,6 +454,9 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
   { path: '/auth/sessions', method: 'GET', flow: 'sessions', on: 'both', needs: 'session', what: 'Every live session you have, this one marked, each by a short reference and never by its id.' },
   { path: '/auth/logout/all', method: 'POST', flow: 'logout.all', on: 'both', needs: 'session', what: 'End your other sessions, `{ keep: "this" }`, or every one of them, `{ keep: "none" }`.' },
+  /* LOCK NOW, for the keychain (`12 §6.3`): the session's proof is put behind the keychain's longest window, so the next
+     keychain act asks for a sign-in again and nothing else changes. A POST, as everything that changes a session is. */
+  { path: '/auth/keychain/lock', method: 'POST', flow: 'keychain.lock', on: 'both', needs: 'session', what: 'Lock the keychain in this browser: its next use asks you to sign in again, and nothing else changes.' },
   { path: '/auth/switch', method: 'POST', flow: 'switch', on: 'both', needs: 'session', what: 'Open another record you are on, in this browser. `{ slug }`.' },
   { path: '/auth/signup/start', method: 'POST', flow: 'signup.start', on: 'worker', needs: 'nothing', what: 'Ask for a record of your own: a link is mailed to prove the address. `{ email, slug, name?, tz? }`.' },
   { path: '/auth/signup/verify', method: 'POST', flow: 'signup.verify', on: 'worker', needs: 'nothing', what: 'Spend the mailed link, once: the person is made and signed in. `{ token }`.' },
@@ -922,6 +925,7 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
     case 'passkeys':
     case 'logout':
     case 'sessions':
+    case 'keychain.lock':
       return { flow, sid: sid ?? '' };
     /* ANYTHING BUT `none` KEEPS THIS SESSION, as the Directory reads it too: a page that sent no `keep`, or a word
        this build does not know, never signs out the browser it was pressed in. */
