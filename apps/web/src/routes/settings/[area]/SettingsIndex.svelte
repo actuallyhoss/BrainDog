@@ -24,7 +24,7 @@
   import { copy } from '$lib/copy.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { ONLY_WIDE, type AreaGroup } from './place.ts';
+  import { ONLY_WIDE, rowsOf, type AreaGroup } from './place.ts';
 
   let { groups, current }: { groups: readonly AreaGroup[]; current?: string | undefined } = $props();
 </script>
@@ -34,10 +34,10 @@
     <div class="group">
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">
-        {#each g.areas as a (a.id)}
+        {#each rowsOf(g) as a (a.href)}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
-          <li class={ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
-            <a class="area-row" href={at(`/settings/${a.id}`)} aria-current={a.id === current ? 'page' : undefined}>
+          <li class={a.id !== undefined && ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
+            <a class="area-row" href={at(a.href)} aria-current={a.id !== undefined && a.id === current ? 'page' : undefined}>
               <span class="area-icon"><IconWell name={a.icon} /></span>
               <span class="words">
                 <span class="name">{a.label}</span>

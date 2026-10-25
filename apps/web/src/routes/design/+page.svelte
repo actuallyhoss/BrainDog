@@ -12,6 +12,8 @@
 -->
 <script lang="ts">
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
+  import { at } from '$lib/at.ts';
   /* THE STYLESHEETS A DECLARED PAGE'S BLOCKS ARE DRAWN WITH, as `PageView` loads them: the sheets and the book draw the
      product's own blocks and charts, and without these a chart showed as its data table. */
   import '@braindog/skin/blocks-kinds.css';
@@ -53,9 +55,19 @@
 
   /* DRAWN AT ONCE: every sheet is the product's own parts, with nothing to wait for. */
   $effect(() => drew('ready'));
+
+  /* A DEVELOPER SHOWCASE, NOT THE PRODUCT: its samples ("Your plan lapsed") are made up, so a built app sends anyone who
+     reaches the address to Settings, and the page is never indexed. */
+  const showcase = import.meta.env.DEV;
+  $effect(() => {
+    if (!showcase) void goto(at('/settings'), { replaceState: true });
+  });
 </script>
 
-<svelte:head><title>{titleOf(words.title)}</title></svelte:head>
+<svelte:head>
+  <title>{titleOf(words.title)}</title>
+  <meta name="robots" content="noindex, nofollow" />
+</svelte:head>
 
 <!-- A LINK SOMEBODY FOLLOWS WHILE THE PAGE IS OPEN changes the hash and loads nothing, so the sheet follows it here. -->
 <svelte:window onhashchange={() => (sheet = named())} />
@@ -68,17 +80,19 @@
   </Segmented>
 {/snippet}
 
-<PageHead icon="eye" kicker={words.back} back="/settings" title={words.title} sentence={words.lead} below={sheets} />
+{#if showcase}
+  <PageHead icon="eye" kicker={words.back} back="/settings" title={words.title} sentence={words.lead} below={sheets} />
 
-<div class="look">
-  {#if sheet === 'charts'}
-    <SheetCharts {shell} />
-  {:else if sheet === 'design'}
-    <DesignBook />
-  {:else}
-    <SheetControls />
-  {/if}
-</div>
+  <div class="look">
+    {#if sheet === 'charts'}
+      <SheetCharts {shell} />
+    {:else if sheet === 'design'}
+      <DesignBook />
+    {:else}
+      <SheetControls />
+    {/if}
+  </div>
+{/if}
 
 <style>
   /* THE PAGE'S WIDTH, with its gutter: the sheets lay their own tiles out in it. */

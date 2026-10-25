@@ -291,10 +291,6 @@
     <Empty kind="no-data-yet" title={words.cantOpen}>
       {#snippet actions()}<Button weight="primary" href="/inbox">{words.toInbox}</Button>{/snippet}
     </Empty>
-  {:else if samples.length === 0 && asked.samples.length === 0 && step === 1 && pasted === 0}
-    <Empty kind="no-data-yet" title={words.noSamples} body={words.noSamplesBody}>
-      {#snippet actions()}<Button weight="primary" href="/inbox">{words.toInbox}</Button>{/snippet}
-    </Empty>
   {:else}
     <!-- THE FOUR STEPS AS ONE SEGMENTED CONTROL on the ground: the step in hand is the white pill, and a step not yet
          reachable is words that do not press. -->
@@ -338,6 +334,9 @@
             </div>
             <div><Button weight="bare" size="sm" onclick={() => removeSample(current.key)}>{words.removeSample}</Button></div>
           </Tile>
+        {:else}
+          <!-- NO MESSAGE PICKED YET: the paste box below starts a rule as well as a group in the Inbox does. -->
+          <p class="note">{words.noSamplesBody} <a href={at('/inbox')}>{words.toInbox}</a></p>
         {/if}
 
         <div class="form-row">

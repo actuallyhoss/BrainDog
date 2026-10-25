@@ -1057,6 +1057,8 @@
                   </li>
                 {/each}
               </ul>
+            {:else if proposal === null && !anyOn}
+              <p class="reading">{words.beforeTyping}</p>
             {/if}
             <p class="reading">
               {#if anyOn}{words.onReading(

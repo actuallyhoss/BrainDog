@@ -88,7 +88,7 @@ export const words = {
   unreached: 'BrainDog could not reach this record.',
   retry: 'Try again',
   noSamples: 'No messages to make a rule from',
-  noSamplesBody: 'Open the builder from a group of alike messages in the Inbox.',
+  noSamplesBody: 'Paste a message below to start a rule, or pick a group of alike messages in the Inbox.',
   toInbox: 'Go to the Inbox',
   cantOpen: 'The builder cannot open this rule: it reads a web answer rather than the words of a message.',
   rawOf: (raw: string) => `From the text “${raw}”`,

@@ -436,7 +436,7 @@
   /* ── A link that does not open ────────────────────────────────────────────────────────── */
 
   .gone {
-    justify-self: start;
+    justify-self: center;
     inline-size: min(56ch, 100%);
     padding-block-start: var(--sp-7);
   }

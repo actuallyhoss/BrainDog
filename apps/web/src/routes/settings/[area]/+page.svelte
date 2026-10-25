@@ -440,6 +440,7 @@
 <!-- THE INDEX'S "⋯" (agents F28, F29): reordering the areas, the owner's, and the design book. Nothing else sits on the
      head, so the list under it is the first thing read. -->
 {#snippet indexTools()}
+  {#if mayArrange || import.meta.env.DEV}
   <Menu label={words.more} align="end">
     {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="isr">{words.more}</span></span>{/snippet}
     {#if mayArrange}
@@ -447,8 +448,9 @@
         ><Icon name="edit" size="s" />{words.arrange}</button
       >
     {/if}
-    <a role="menuitem" href={at('/design')}><Icon name="eye" size="s" />{words.designBook}</a>
+    {#if import.meta.env.DEV}<a role="menuitem" href={at('/design')}><Icon name="eye" size="s" />{words.designBook}</a>{/if}
   </Menu>
+  {/if}
 {/snippet}
 {#if known}
   <!-- EACH AREA UNDER ITS OWN GLYPH (agents F28): the sun for Appearance, the bell for Notifications. -->

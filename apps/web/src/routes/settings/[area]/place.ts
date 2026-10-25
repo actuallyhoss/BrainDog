@@ -233,7 +233,7 @@ export function groupsOf(blocks: readonly IndexBlock[]): readonly AreaGroup[] {
     }
     if (areas.length === 0) continue;
     const home = DEFAULT_GROUPS.find((g) => g.title === b.heading);
-    groups.push({ title: b.heading?.trim() || areas[0]!.label, icon: (b.icon as IconName | undefined) ?? home?.icon ?? areas[0]!.icon, areas });
+    groups.push({ title: b.heading?.trim() || areas[0]!.label, icon: (b.icon as IconName | undefined) ?? home?.icon ?? areas[0]!.icon, areas, ...(home?.outside ? { outside: home.outside } : {}) });
   }
   return groups.length > 0 ? groups : DEFAULT_GROUPS;
 }

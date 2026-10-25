@@ -83,8 +83,8 @@
    */
   const words = {
     /** A refused read, in a person's words (U-A14): the record's own sentence waits behind Read details. */
-    refusedTitle: 'The inbox could not be read',
-    refusedBody: 'Nothing was changed. Try again in a moment.',
+    refusedTitle: 'The messages could not be listed',
+    refusedBody: 'Nothing was changed. This sign-in may not be allowed to read the messages, so open the inbox in the app to see them. What the rules did is below.',
     /** The press that asks for a rule drafted from a sender's alike messages (today F14): no internal name in it. */
     askPattern: 'Suggest a rule',
     asking: 'Drafting a rule',
@@ -747,16 +747,12 @@
 />
 
 <div class="page">
-  {#if refused}
-    <Empty kind="error" title={words.refusedTitle} body={words.refusedBody} detail={refused}>
-      {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
-    </Empty>
-  {:else if !answered || unrouted}
+  {#if !refused && (!answered || unrouted)}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}
-  {:else if INBOX.length === 0 && !tallied}
+  {:else if !refused && INBOX.length === 0 && !tallied}
     <Waiting />
-  {:else if never}
+  {:else if !refused && never}
     <!-- ONE TILE, AND THE ONE THING TO DO: nothing has reached this record's inbox by any way, so the ways in, the
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
@@ -888,7 +884,14 @@
               </div>
             </Tile>
           {/if}
-          {@render waitingSeries()}
+          {#if refused}
+            <!-- THE ARRIVALS WERE REFUSED, the rest of the screen was not: the tiles above and the patterns still draw. -->
+            <Empty kind="error" title={words.refusedTitle} body={words.refusedBody} detail={refused}>
+              {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+            </Empty>
+          {:else}
+            {@render waitingSeries()}
+          {/if}
         {/if}
       </div>
     </div>
