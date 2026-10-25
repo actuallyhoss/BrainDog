@@ -127,7 +127,7 @@
             >{/if}{k.change.said}</span
         >
         <span class="kpi-against">{k.change.against}</span>
-      {:else if k.when}
+      {:else if k.when && !k.aged.endsWith(k.when)}
         <span class="kpi-against">{k.when}</span>
       {/if}
       <!-- AN OLD READING SAYS ITS DAY, beside the change it is read against or alone (`aged`, more than a week): a figure

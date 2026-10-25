@@ -283,7 +283,6 @@
   const tools = $derived<Tool[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' as const, count: inbox }] : []),
     { href: '/automations', label: copy.automations, icon: 'refresh' },
-    { href: '/jobs', label: copy.jobs, icon: 'play' },
     { href: '/packs', label: copy.packs, icon: 'packs' },
     { href: '/keychain', label: copy.keychain, icon: 'vault' },
     { href: '/settings', label: copy.settings, icon: 'settings' },

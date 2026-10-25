@@ -64,6 +64,15 @@
   const drawn = $derived(kpi === null && trend && trend.values.length >= 3 ? trend : null);
   const figure = $derived(kpi ? kpi.figure : card.figure ? symbolText(money(card.figure.minor, card.figure.currency), homeCurrency(), true) : null);
   const figureLabel = $derived(kpi ? kpi.name : label);
+  /** THE LABEL CUT AT A WORD, never mid-word beside the figure; the whole name is on hover. */
+  const LABEL_MAX = 16;
+  const labelShort = $derived.by(() => {
+    const t = figureLabel;
+    if (t.length <= LABEL_MAX) return t;
+    const head = t.slice(0, LABEL_MAX + 1);
+    const at = head.lastIndexOf(' ');
+    return `${(at > 3 ? head.slice(0, at) : t.slice(0, LABEL_MAX)).trimEnd()}…`;
+  });
   /* A PROJECT WITH NO MONEY LEADS WITH HOW FAR ALONG IT IS, so its card has no hole where the figure would be. */
   const leadsWithProgress = $derived(figure === null && card.progress !== null);
   const meterSaid = $derived.by(() => {
@@ -135,7 +144,7 @@
       {#if figure}
         <!-- SAID SHORT, AS A TILE SAYS A FIGURE: £18,400, never £18,400.00. -->
         {#key figure}<span class="pc-num num" data-arrived={arrived.has('figure') ? '' : undefined}>{figure}</span>{/key}
-        {#if figureLabel}<span class="pc-label" dir="auto">{figureLabel}</span>{/if}
+        {#if figureLabel}<span class="pc-label" dir="auto" title={labelShort === figureLabel ? undefined : figureLabel}>{labelShort}</span>{/if}
       {:else}
         {#key card.progress}<span class="pc-num num" data-arrived={arrived.has('progress') ? '' : undefined}>{card.progress}%</span>{/key}
         <span class="pc-label">of the way</span>

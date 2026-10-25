@@ -1588,6 +1588,33 @@
       grid-row: 1 / span 4;
     }
 
+    /* THE WEEK'S MONEY SITS UNDER CASH, in the right column beside the foot, so the tall Needs you is not beside a hole:
+       cash keeps its own height and the week's money takes the track under it. */
+    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-row: 2;
+    }
+
+    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      grid-row: 3;
+      grid-column: calc(var(--n) + 1) / -1;
+      align-self: start;
+    }
+
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])):has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-row: 2 / span 2;
+    }
+
+    .body[data-board]:has(:global(.desk-part[data-desk='late'])):has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      grid-row: 4;
+    }
+
+    /* TWO LISTS OF TASKS AT THE FOOT (Handed back, Urgent) SIT SIDE BY SIDE, not each a full row of one line; one alone
+       keeps the row. */
+    .body[data-board] :global(.home-page > .page > .block-slot:has(> .block[data-kind='todo']):has(~ .block-slot > .block[data-kind='todo'])),
+    .body[data-board] :global(.home-page > .page > .block-slot:has(> .block[data-kind='todo']) ~ .block-slot:has(> .block[data-kind='todo'])) {
+      grid-column: span 6;
+    }
+
     /* EVERY CELL OF THE FIRST ROW'S TRACKS IS HELD, the fourth under the foot and the right column where there is no
        cash, so nothing laid out later lands in one. It is no height and lies under the tiles. */
     .body[data-board] > .row-one-rest {
