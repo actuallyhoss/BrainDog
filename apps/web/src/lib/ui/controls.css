@@ -773,4 +773,26 @@
       border-color: Highlight;
     }
   }
+
+  /* THE DOTS OF A "..." AND A DRAG HANDLE (the more and drag glyphs, found by their heavier stroke) are drawn bolder than the
+     line glyphs, so a 16px menu is three dots a thumb can see rather than three specks. */
+  .icon > path[stroke-width='2.75'] {
+    stroke-width: 3.5px;
+  }
+
+  .menu-trigger .icon[data-size='m']:has(> path[stroke-width='2.75']) {
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .menu-trigger .icon[data-size='m']:has(> path[stroke-width='2.75']) {
+      inline-size: var(--icon-l);
+      block-size: var(--icon-l);
+    }
+  }
+
+  /* A DISABLED BUTTON KEEPS AN EDGE, so on a tile it reads as a control that cannot act and not as plain text. */
+  .btn:disabled {
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+  }
 }

@@ -783,7 +783,7 @@
       padding-block-start: var(--sp-3);
     }
 
-    /* The phone's name, 22/28, two lines at most and then an ellipsis: a cut name loses its meaning, and two lines never
+    /* The phone's name, 22/28, four lines at most and then an ellipsis (two cut a question to "File..."): a cut name loses its meaning, and two lines never
        push the count or the actions off the row. THE GLYPH AND THE WORDS IN A GRID (today F9, which the question page
        drew for itself), so a second line starts under the first and not under the glyph, and the glyph sits on the
        first line. */
@@ -808,8 +808,8 @@
       display: -webkit-box;
       overflow: hidden;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
     }
 
     .count {
