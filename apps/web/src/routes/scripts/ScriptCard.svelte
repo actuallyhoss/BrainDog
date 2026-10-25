@@ -74,7 +74,10 @@
 
   <!-- ONE CELL A RECENT RUN, the ones that went through filled, and the line saying what starts it and how its
        runs went. No chart when the history held none of its runs. -->
-  {#if recent}<Segments total={recent.total} done={recent.ok} subject={shown.recentSubject} />{/if}
+  {#if recent}
+    <Segments total={recent.total} done={recent.ok} subject={shown.recentSubject} />
+    <p class="reading legend">{shown.legend(recent.total)}</p>
+  {/if}
   <p class="reading">{startsBy(s)} {recent?.said ?? words.noRuns}</p>
 
   {#if said.resume || failed?.script === s.script}

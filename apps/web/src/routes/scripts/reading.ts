@@ -92,6 +92,7 @@ export function recentOf(s: Pick<Script, 'recent'> & Partial<Pick<Script, 'month
 
 export const words = {
   recentSubject: 'Recent runs that went through',
+  legend: (n: number) => (n === 1 ? 'One bar for its last run; dark when it went through.' : `One bar for each of its last ${n} runs; dark bars went through, pale ones did not.`),
   edit: 'Edit',
   editOne: (title: string) => `Edit ${title}`,
 };

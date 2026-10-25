@@ -116,8 +116,24 @@
   );
   const told = $derived(live && rows.length > 0 ? sentenceOf(rows) : null);
   /* THE PAGE'S OWN LINE IS THE HEAD'S, so it is not drawn again as a tile under it. */
+  /* THE ONES THAT RAN COME FIRST, the latest on top, and "Not run yet" closes the list. */
+  const ranAt = (e: { fields: Record<string, unknown> }): number => (typeof e.fields.last_at === 'string' ? Date.parse(e.fields.last_at) || 0 : 0);
   const drawn = $derived<Opened | null>(
-    live ? { ...live, page: { ...live.page, blocks: live.page.blocks.map((b) => (b.kind === 'note' && (b as { lead?: unknown }).lead === true ? { ...b, drawn: false } : b)) } } : got,
+    live
+      ? {
+          ...live,
+          page: {
+            ...live.page,
+            blocks: live.page.blocks.map((b) =>
+              b.kind === 'note' && (b as { lead?: unknown }).lead === true
+                ? { ...b, drawn: false }
+                : b.source === 'scripts' && b.entries
+                  ? { ...b, entries: [...b.entries].sort((x, y) => ranAt(y) - ranAt(x)) }
+                  : b,
+            ),
+          },
+        }
+      : got,
   );
   const none = $derived(live !== null && listed !== null && listed.refusals.length === 0 && rows.length === 0);
 
@@ -153,6 +169,11 @@
 </div>
 
 <style>
+  /* THE TITLE COLUMN TAKES MOST OF THE ROW, so a long title is whole and not cut at "from what Numbe...". */
+  .page :global(.table) {
+    --cols: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) !important;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
