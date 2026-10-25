@@ -257,16 +257,49 @@ export const encoded = (script: string): string => Buffer.from(script, 'utf16le'
 
 const POWERSHELL = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand'];
 
+/*
+ * Credential Manager keeps 2,560 bytes of a value (1,280 characters of UTF-16), so a longer one, such as a tool sign-in
+ * item, goes in pieces: the item holds `braindog-chunks:<n>` and the pieces sit in `<account>.c1` to `.c<n>`. A short
+ * value, the sync key among them, is written plain.
+ */
+const CHUNK = 1_000;
+const CHUNKED = /^braindog-chunks:(\d{1,3})$/u;
+const piece = (item: Item, i: number): Item => ({ ...item, account: `${item.account}.c${i}` });
+const NO_START = 'PowerShell did not start, so Credential Manager could not be asked.';
+
 /** Credential Manager, through a PowerShell helper over the system's credential calls. */
 export function credentialManager(run: Run = runProgram): SecretStore {
   const call = (op: 'read' | 'write' | 'remove', item: Item, input: string | null) => run('powershell.exe', [...POWERSHELL, encoded(credScript(op, item))], input);
-  const read = async (item: Item): Promise<Found> => {
-    const fault = itemFault(item);
-    if (fault !== null) return { ok: false, why: fault };
+  const rawRead = async (item: Item): Promise<Found> => {
     const got = await call('read', item, null);
     if (got.code === 0) return { ok: true, value: got.out };
     if (got.code === 2) return { ok: true, value: null };
-    return { ok: false, why: got.code === -1 ? 'PowerShell did not start, so Credential Manager could not be asked.' : 'Credential Manager did not answer.' };
+    return { ok: false, why: got.code === -1 ? NO_START : 'Credential Manager did not answer.' };
+  };
+  const rawRemove = async (item: Item): Promise<{ ok: true; had: boolean } | { ok: false; why: string }> => {
+    const got = await call('remove', item, null);
+    if (got.code === 0) return { ok: true, had: true };
+    if (got.code === 2) return { ok: true, had: false };
+    return { ok: false, why: 'Credential Manager did not remove it.' };
+  };
+  const piecesOf = (head: Found): number => (head.ok && head.value !== null ? Number(CHUNKED.exec(head.value)?.[1] ?? 0) : 0);
+  const read = async (item: Item): Promise<Found> => {
+    const fault = itemFault(item);
+    if (fault !== null) return { ok: false, why: fault };
+    const head = await rawRead(item);
+    const n = piecesOf(head);
+    if (n === 0) return head;
+    let whole = '';
+    for (let i = 1; i <= n; i++) {
+      const part = await rawRead(piece(item, i));
+      if (!part.ok || part.value === null) return { ok: false, why: part.ok ? 'Credential Manager lost part of it.' : part.why };
+      whole += part.value;
+    }
+    return { ok: true, value: whole };
+  };
+  /* Pieces an earlier, longer value left, so nothing of it stays behind. */
+  const dropPieces = async (item: Item): Promise<void> => {
+    for (let i = 1; i <= piecesOf(await rawRead(item)); i++) await rawRemove(piece(item, i));
   };
   return {
     name: 'Credential Manager',
@@ -274,18 +307,23 @@ export function credentialManager(run: Run = runProgram): SecretStore {
     write: async (item, value) => {
       const fault = itemFault(item);
       if (fault !== null) return { ok: false, why: fault };
-      const got = await call('write', item, value);
-      if (got.code === -1) return { ok: false, why: 'PowerShell did not start, so Credential Manager could not be asked.' };
+      await dropPieces(item);
+      const parts: string[] = [];
+      if (value.length > CHUNK) for (let i = 0; i < value.length; i += CHUNK) parts.push(value.slice(i, i + CHUNK));
+      for (let i = 0; i < parts.length; i++) {
+        const put = await call('write', piece(item, i + 1), parts[i] ?? '');
+        if (put.code !== 0) return { ok: false, why: put.code === -1 ? NO_START : 'Credential Manager did not keep it.' };
+      }
+      const got = await call('write', item, parts.length === 0 ? value : `braindog-chunks:${parts.length}`);
+      if (got.code === -1) return { ok: false, why: NO_START };
       const back = await read(item);
       return got.code === 0 && back.ok && back.value === value ? { ok: true } : { ok: false, why: 'Credential Manager did not keep it.' };
     },
     remove: async (item) => {
       const fault = itemFault(item);
       if (fault !== null) return { ok: false, why: fault };
-      const got = await call('remove', item, null);
-      if (got.code === 0) return { ok: true, had: true };
-      if (got.code === 2) return { ok: true, had: false };
-      return { ok: false, why: 'Credential Manager did not remove it.' };
+      await dropPieces(item);
+      return rawRemove(item);
     },
   };
 }
