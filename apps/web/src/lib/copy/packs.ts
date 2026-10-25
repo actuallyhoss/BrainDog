@@ -97,6 +97,8 @@ export const packs = {
   shareStep: 'What changed since it was last shared',
   shareStepPatch: 'Words, examples or small fixes',
   shareStepMinor: 'A list or a page added',
+  shareFromInstalled: (version: string) => `Counted on from ${version}, the version installed.`,
+  shareFirstVersion: 'Not shared before, so this is the first version.',
   shareLastShared: (version: string) => `Last shared as ${version}.`,
   shareNoSkills: 'No skills to share yet.',
   shareRailOrder: 'The order of your pages and lists in the rail goes in too, and is used on the BrainDog that installs it.',

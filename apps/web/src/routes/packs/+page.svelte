@@ -967,22 +967,21 @@
       font-size: var(--fs-body);
     }
 
-    /* A LONG LINE KEEPS TO TWO on a phone, so a row is never five lines tall; its page says the rest. */
+  }
+  /* A LONG DESCRIPTION WRAPS WHOLE ON A PHONE, where a two-line clamp cut words; wider it keeps to two lines. */
+  .addon-line {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  @media (width >= 640px) {
     .addon-line {
       display: -webkit-box;
       overflow: hidden;
+      text-overflow: clip;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       line-clamp: 2;
     }
-  }
-  /* A LONG DESCRIPTION WRAPS TO TWO LINES AT EVERY WIDTH, never cut mid-word on one. */
-  .addon-line {
-    white-space: normal;
-    text-overflow: clip;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
   }
 </style>

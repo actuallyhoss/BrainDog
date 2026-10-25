@@ -1024,7 +1024,7 @@
     }
 
     .page[data-bar] {
-      padding-block-end: calc(68px + var(--sp-4));
+      padding-block-end: calc(68px + var(--tabbar, env(safe-area-inset-bottom)) + var(--sp-8));
     }
 
     .narrow-only > :global(*) {

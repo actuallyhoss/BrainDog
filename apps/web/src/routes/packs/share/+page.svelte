@@ -119,6 +119,15 @@
   const signals = $derived(speaking === null ? [] : (useCase(speaking)?.signals ?? []));
   /* THE VERSION FOLLOWS THE STEP UNTIL SOMEBODY TYPES ONE. */
   let typed = $state(false);
+  /* WHAT IT IS FOR AND WHO FOR START AS THE SETUP SAYS THEM, until somebody writes their own. */
+  let wrote = $state(false);
+  $effect(() => {
+    if (wrote || speaking === null) return;
+    const u = useCase(speaking);
+    if (!u) return;
+    summary = u.summary;
+    audience = (copy.shareAudiences as Record<string, string>)[u.audience] ?? '';
+  });
   $effect(() => {
     const next = speaking === null ? '1.0.0' : offeredVersion(installedVersion, lastShared, step);
     if (!typed) version = next;
@@ -352,7 +361,7 @@
               <div class="pair">
                 <label class="field-label" for="share-version">{copy.shareVersion}</label>
                 <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
-                {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
+                {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{:else if installedVersion}<p class="note">{copy.shareFromInstalled(installedVersion)}</p>{:else}<p class="note">{copy.shareFirstVersion}</p>{/if}
               </div>
               <fieldset class="pair steps">
                 <legend class="field-label">{copy.shareStep}</legend>
@@ -361,12 +370,12 @@
               </fieldset>
               <div class="pair">
                 <label class="field-label" for="share-summary">{copy.shareSummary}</label>
-                <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" placeholder={copy.shareSummaryHint} bind:value={summary} /></div>
+                <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" placeholder={copy.shareSummaryHint} bind:value={summary} oninput={() => (wrote = true)} /></div>
               </div>
               <div class="pair">
                 <label class="field-label" for="share-audience">{copy.shareAudience}</label>
                 <div class="field">
-                  <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" placeholder={copy.shareAudienceHint} bind:value={audience} />
+                  <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" placeholder={copy.shareAudienceHint} bind:value={audience} oninput={() => (wrote = true)} />
                 </div>
                 <datalist id="share-audience-suggestions">
                   {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}

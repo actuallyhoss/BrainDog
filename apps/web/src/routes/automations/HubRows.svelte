@@ -46,7 +46,13 @@
   } = $props();
 
   /* RULES OF ONE FAMILY ARE ONE ROW (`hub-family.ts`); every other row, and a family of one, is itself. */
-  const folds = $derived(families(rows));
+  const all = $derived(families(rows));
+  /* GROUPED THE SAME WAY THROUGHOUT: the families first, then the rules that stand alone under their own count, so the
+     groups' counts and the single rules add up to the rules in the list. */
+  const folds = $derived([...all.filter((f) => f.kind === 'family'), ...all.filter((f) => f.kind === 'one')]);
+  const alone = $derived(all.filter((f) => f.kind === 'one').length);
+  const grouped = $derived(all.length > alone);
+  const firstAlone = $derived(folds.findIndex((f) => f.kind === 'one'));
   /* THE FAMILIES OPENED, by key. Closed when drawn, so a long family never pushes the rest of the page down. */
   let opened = $state.raw<ReadonlySet<string>>(new Set());
   const flip = (key: string): void => {
@@ -114,7 +120,10 @@
   idle sentence, indented to the family's words. No tile of its own: it is a row of the same list.
 -->
 <ul class="ledger ledger-lead hub-rows" data-dim={dim ? '' : undefined}>
-  {#each folds as f (f.kind === 'one' ? f.row.key : `family:${f.family.key}`)}
+  {#each folds as f, i (f.kind === 'one' ? f.row.key : `family:${f.family.key}`)}
+    {#if grouped && i === firstAlone && alone > 0}
+      <li class="alone-cap">{familyWords.alone(alone)}</li>
+    {/if}
     {#if f.kind === 'one'}
       <li>{@render item(f.row)}</li>
     {:else}
@@ -293,6 +302,14 @@
   }
 
   /* THE MEMBERS SIT UNDER THE FAMILY, their wells lined up with its words, so the fold reads as one thing opened. */
+  .alone-cap {
+    padding-block: var(--sp-3) var(--sp-1);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    list-style: none;
+  }
+
   .members {
     margin: 0 0 var(--sp-2) calc(var(--well-l) + var(--sp-3));
   }

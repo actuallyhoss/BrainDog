@@ -86,7 +86,7 @@ export function recentOf(s: Pick<Script, 'recent'> & Partial<Pick<Script, 'month
   const lead = total === 1 ? (ok === 1 ? 'Its one recent run went through' : 'Its one recent run did not go through') : ok === total ? `All ${total} recent runs went through` : `${ok} of the last ${total} runs went through`;
   const tail = total > 1 && refused > 0 && ok < total ? `; ${refused === 1 ? '1 was' : `${refused} were`} refused` : '';
   /* THE MONTH'S REFUSALS COUNT MORE RUNS THAN THESE FEW: when none of the recent ones was refused, the month's came before them. */
-  const earlier = refused === 0 && total > 1 && s.month !== undefined && s.month.refused > 0 ? `; the ${s.month.refused} refused this month came earlier` : '';
+  const earlier = refused === 0 && total > 1 && s.month !== undefined && s.month.refused > 0 ? `; of this month's ${s.month.runs.toLocaleString('en-GB')} runs, the ${s.month.refused} refused came earlier` : '';
   return { total, ok, said: `${lead}${tail}${earlier}.` };
 }
 

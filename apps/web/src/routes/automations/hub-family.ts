@@ -35,6 +35,7 @@ export type Fold<T extends Kin> = { kind: 'one'; row: T } | { kind: 'family'; fa
 
 export const familyWords = {
   count: (n: number) => `${n.toLocaleString('en')} rules`,
+  alone: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'rule' : 'rules'} on their own`,
   noneRan: 'None has run',
   someNever: (n: number) => `${spell(n, true)} never ran.`,
   /* WHAT THE FAMILY'S SWITCHES SAY TOGETHER, in the column every other row's switch stands in. */

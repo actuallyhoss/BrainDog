@@ -66,10 +66,10 @@ test('lanes sit 28 apart with the axis under the last, as Main draws them', () =
   const g = swimlanes([...LANES, { label: 'cursor', spans: [] }], opts(533));
   assert.deepEqual(
     g.lanes.map((l) => l.y),
-    [26, 54, 82],
+    [32, 60, 88],
   );
-  assert.equal(g.axisY, 104.5);
-  assert.equal(g.tickY, 120);
+  assert.equal(g.axisY, 110.5);
+  assert.equal(g.tickY, 126);
 });
 
 test('ticks fall on whole local hours, spaced so their labels never touch', () => {

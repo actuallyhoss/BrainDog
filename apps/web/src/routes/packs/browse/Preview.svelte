@@ -31,7 +31,8 @@
     <span class="mini-item"><Icon name="home" size="s" />{preview.spine.home ?? copy.home}</span>
     <span class="mini-item"><Icon name="decide" size="s" />{preview.spine.decide ?? copy.decide}</span>
     {#each preview.rail as section (section.section)}
-      <span class="mini-section">{section.section}</span>
+      <!-- A SECTION WITH ONE PAGE OF ITS OWN NAME SAYS IT ONCE: "Dashboard" over "Dashboard" is one line. -->
+      {#if !(section.pages.length === 1 && section.pages[0] === section.section)}<span class="mini-section">{section.section}</span>{/if}
       {#each section.pages as title (title)}<span class="mini-item"><Icon name="doc" size="s" />{title}</span>{/each}
     {/each}
     {#if preview.rail.length === 0}<span class="mini-empty">{copy.browseNoRail}</span>{/if}

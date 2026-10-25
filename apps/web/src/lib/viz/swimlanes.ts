@@ -140,7 +140,7 @@ export function swimlanes(lanes: readonly Lane[], o: SwimOptions): SwimGeometry 
   const x = (t: number): number => (span > 0 ? gutter + ((clamp(t, o.start, o.end) - o.start) / span) * plot : gutter);
 
   const pitch = folded ? 38 : 28;
-  const first = folded ? TOP + 22 : TOP + 8;
+  const first = folded ? TOP + 26 : TOP + 14;
   const drawn = lanes.map((lane, i): DrawnLane => {
     const y = first + i * pitch;
     const spans = lane.spans.flatMap((s): DrawnSpan[] => {

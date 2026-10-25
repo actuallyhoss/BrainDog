@@ -460,7 +460,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
+  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name}>
     {#snippet actions()}
       {#if installed}
         <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->
@@ -482,9 +482,12 @@
   </PageHead>
 
   <div class="page">
-    <!-- WHICH VERSION AND WHETHER IT IS ON, under the sentence that says what it does: the head's switch says the state
-         to a screen reader, and this line says it in words, so off is never colour alone. -->
-    <div class="lead">
+   <div class="tiles">
+    <!-- THE LEAD TILE, AS THE STORE'S PAGE DRAWS IT: what it is for, then its version and whether it is on. The head's
+         switch says the state to a screen reader, and this line says it in words, so off is never colour alone. -->
+    <div class="lead-cell">
+     <Tile lead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} title={copy.useCaseFor} aria-label={copy.useCaseFor}>
+      {#if pack?.blurb}<p class="summary">{pack.blurb}</p>{/if}
       <p class="about">
         {#if settings.version}<span class="num">{market.versionOf(settings.version)}</span>{/if}
         {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
@@ -500,8 +503,10 @@
       {/if}
       <p class="turn-said" role="status">{turnSaid}</p>
       {#if waits}<p class="waits">{waits}</p>{/if}
+     </Tile>
     </div>
 
+    <div class="wide-cell stack">
     {#if entries.length}
       <Tile icon="settings" class="section" data-surface="tile" title={words.settings}>
         <div class="section-body">
@@ -744,7 +749,9 @@
         </div>
       </Tile>
     {/if}
+    </div>
     {#if pack && (pack.registers.length || shownPages.length)}
+     <div class="adds-cell">
       <!-- WHAT IT HOLDS AS INSTALLED AND THE STORE SAY IT (E21), "3 lists and 2 pages", never the two summed into one. -->
       <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} meta={describe(moduleHolds(pack)) || undefined}>
         <div class="section-body">
@@ -772,7 +779,9 @@
           </ul>
         </div>
       </Tile>
+     </div>
     {/if}
+   </div>
   </div>
 {/if}
 
@@ -780,18 +789,56 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    gap: var(--sp-4);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    min-inline-size: 0;
   }
 
-  .lead {
+  /* THE STORE PAGE'S TILES: the lead beside what it adds, settings across the width under them. One column on a phone. */
+  .tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--tile-gap);
+    min-inline-size: 0;
+  }
+
+  .tiles > * {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    min-inline-size: 0;
   }
 
-  .lead:not(:has(:not(:empty))) {
-    display: none;
+  .stack {
+    gap: var(--tile-gap);
+  }
+
+  .summary {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 24px;
+    text-wrap: pretty;
+  }
+
+  @media (width >= 900px) {
+    .tiles {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      grid-auto-flow: row dense;
+    }
+
+    .lead-cell {
+      grid-column: 1;
+    }
+
+    .adds-cell {
+      grid-column: 2;
+    }
+
+    .wide-cell {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
   }
 
   /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
