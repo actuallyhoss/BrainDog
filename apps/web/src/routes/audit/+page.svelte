@@ -532,7 +532,9 @@
   const tallyMeta = $derived.by(() => {
     const agents = tally.groups.find((g) => g.group === 'agent')?.count ?? 0;
     const yours = tally.groups.find((g) => g.group === 'you')?.count ?? 0;
-    return [agents ? historyWords.byAgents(agents) : '', yours ? historyWords.byYou(yours) : ''].filter(Boolean).join(' · ') || undefined;
+    /* THE REST ARE SCRIPTS, RULES AND BRAINDOG ITSELF, said so the parts add up to the whole above them. */
+    const rest = tally.total - agents - yours;
+    return [agents ? historyWords.byAgents(agents) : '', yours ? historyWords.byYou(yours) : '', rest > 0 ? historyWords.byRest(rest) : ''].filter(Boolean).join(' · ') || undefined;
   });
   const tallyReading = $derived(
     tallySaid(

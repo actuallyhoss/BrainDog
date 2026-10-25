@@ -73,7 +73,7 @@ export function withoutNew(url: URL): string {
 
 export const hubWords = {
   tabs: 'Kinds of thing that run by themselves',
-  tab: { automations: 'Automations', scheduled: 'Scheduled', scripts: 'Scripts', doors: 'Doors', runs: 'Runs' } as Record<Tab, string>,
+  tab: { automations: 'Automations', scheduled: 'Scheduled', scripts: 'Scripts', doors: 'Inbound', runs: 'Runs' } as Record<Tab, string>,
   /* THE KIND A RUN BELONGS TO, said after its name on the Runs tab, where the three are mixed. */
   kind: { automation: 'Automation', scheduled: 'Scheduled action', script: 'Script', agent: 'Agent run', job: 'Job' } as Record<RunKind, string>,
   newAction: 'New scheduled action',
@@ -141,7 +141,7 @@ export const hubWords = {
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
   runsMonthSubject: 'Runs this month, by automation',
-  runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
+  runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'} started by automations`,
   endedTitle: 'How runs ended',
   endedSubject: 'Runs this month that finished',
   endedOf: (n: number) => `of ${n.toLocaleString('en')}`,

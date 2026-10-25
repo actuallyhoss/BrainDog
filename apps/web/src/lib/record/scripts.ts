@@ -221,7 +221,7 @@ export const words = {
   writes: 'Writes',
   fetches: 'Fetches from',
   keys: 'Opens the keys',
-  nothing: 'Nothing',
+  nothing: 'None',
   inARowLabel: 'Refused one after another',
   monthLabel: 'This month',
   /* Runs, logs and versions. */

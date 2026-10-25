@@ -125,7 +125,7 @@ export const words = {
   countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
   /* THE BROWSE TITLE ROW'S SENTENCE: how many there are, and how many this record holds already. */
   sentence: (n: number, held: number | null): string =>
-    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from, and ${held} ${held === 1 ? 'is' : 'are'} already in your BrainDog.`,
+    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from. Your BrainDog holds ${held} ${held === 1 ? 'add-on' : 'add-ons'} in all, the built-in ones too.`,
   /* WHAT A USE CASE BRINGS OF ITS OWN, said once under its drawing: its lists by name. */
   ownLists: (names: readonly string[]): string => names.join(', '),
   /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */

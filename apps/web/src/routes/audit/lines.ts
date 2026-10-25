@@ -74,6 +74,7 @@ export const historyWords = {
   lastWeek: 'Last 7 days',
   byAgents: (n: number) => `${count(n)} by agents`,
   byYou: (n: number) => `${count(n)} by you`,
+  byRest: (n: number) => `${count(n)} by scripts, rules and BrainDog`,
   lanesSubject: 'Agent stretches of work in the last 24 hours',
   groupsSubject: 'Changes by who made them',
   kindsSubject: 'Changes by kind, the five biggest',
@@ -424,6 +425,10 @@ export type LineSaid = {
   note: string;
 };
 
+/** A SCRIPT SIGNATURE IN A NOTE IS THE SCRIPT IN WORDS: "Written by script:book_from_account@v3." is "Written by the Book from account script." */
+export const scriptWords = (note: string): string =>
+  note.replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`);
+
 /**
  * ONE LINE AS A SENTENCE: "Asked “Does Portage keep sending…?”", "Closed “Filed 2 payments…”" said as "Filed 2
  * payments…" with "closed" beside who did it, and a note that does not start by saying the title again ("Noted
@@ -438,7 +443,7 @@ export function lineSaid(word: string, thing: string | null, note: string, gover
     if (rest === name) rest = '';
     else if (rest.startsWith(`${name} · `)) rest = rest.slice(name.length + 3).trim();
   }
-  rest = datesIn(rest, now);
+  rest = datesIn(scriptWords(rest), now);
   if (name !== '' && DONE.test(name)) return { verb: null, quoted: false, done: word.toLowerCase(), note: rest };
   return { verb: word, quoted: governed && name !== '', done: null, note: rest };
 }

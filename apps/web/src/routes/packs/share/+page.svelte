@@ -33,6 +33,7 @@
   import { useCase } from '@braindog/seed/usecases';
   import { useCaseName } from '@braindog/seed/usecases/names';
   import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
+  import { catalogueTitles, readShippedCatalogue } from '../browse/catalogue.ts';
   import { changeLines, changesSince, kennelFetch, publishedHref, publishedLink, publishedSaid, publishedText, publishWords, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -122,7 +123,12 @@
     if (!typed) version = next;
   });
 
+  /* A PACK THE BUILD HAS NO MODULE FOR IS NAMED BY THE CATALOGUE THIS BUILD SHIPS (, never ). */
+  let shippedTitles = $state<ReadonlyMap<string, string>>(new Map());
+  const titleOfModule = (id: string): string => shippedTitles.get(id) ?? moduleTitle(id);
+
   onMount(() => {
+    void readShippedCatalogue(fetch).then((index) => catalogueTitles(index)).then((m) => (shippedTitles = m)).catch(() => undefined);
     void read(async () => {
       client = createClient({ base: apiBase() });
       /* WITH NO RECORD THIS SAID "This is the sample, so the file is made from a record of your own" over a form whose
@@ -294,7 +300,7 @@
     return () => clearTimeout(timer);
   });
 
-  const lines = $derived(draft?.state === 'ready' ? changeLines(draft.changes, moduleTitle) : []);
+  const lines = $derived(draft?.state === 'ready' ? changeLines(draft.changes, titleOfModule) : []);
   /* THE INSTALLER'S VIEW, drawn as browse draws a use case. A file this build cannot draw is simply not drawn: the
      diff above it still says what goes out. */
   const installerView = $derived.by(() => {
@@ -354,12 +360,12 @@
               </fieldset>
               <div class="pair">
                 <label class="field-label" for="share-summary">{copy.shareSummary}</label>
-                <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
+                <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" placeholder={copy.shareSummaryHint} bind:value={summary} /></div>
               </div>
               <div class="pair">
                 <label class="field-label" for="share-audience">{copy.shareAudience}</label>
                 <div class="field">
-                  <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+                  <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" placeholder={copy.shareAudienceHint} bind:value={audience} />
                 </div>
                 <datalist id="share-audience-suggestions">
                   {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
@@ -562,7 +568,8 @@
   /* A PICK IS A ROW: the box, then its words, 44 tall so the whole row is the target. */
   .row-pick {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    padding-block: var(--sp-2);
     gap: var(--sp-3);
     min-block-size: var(--tap);
     color: var(--ink);

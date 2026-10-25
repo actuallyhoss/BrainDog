@@ -88,3 +88,8 @@ test('a list is the name its declaration gives it, else its id in words, and nev
   assert.equal(listName('late_payers'), 'Late payers');
   assert.equal(listName('constructor'), 'Constructor');
 });
+
+test('a script signature is the script by name, never Someone on this record or its slug', () => {
+  assert.deepEqual(actor('script:book_from_account@v3'), { name: 'Book from account script', kind: 'automation' });
+  assert.equal(actor('script:book_from_account@v3', null, new Map([['script:book_from_account', 'File what an account holds']])).name, 'File what an account holds');
+});

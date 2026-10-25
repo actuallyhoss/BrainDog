@@ -166,6 +166,10 @@
     addsOpen = true;
   }
 
+  /** An add-on nobody described says what it adds, in a sentence, and never lists names bare. */
+  const listsLine = (names: readonly string[]): string =>
+    names.length === 0 ? 'An add-on with no lists of its own.' : `Adds the ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`} ${names.length === 1 ? 'list' : 'lists'}.`;
+
   /** The second line of a row: off said as off, else what the add-on or its use case is for, else the lists it keeps. */
   const lineOf = (state: PackState): string =>
     state.disabled_at !== null
@@ -173,7 +177,7 @@
       : (byId.get(state.id)?.blurb ??
         (state.id.startsWith('usecase-') ? useCase(state.id.slice('usecase-'.length))?.summary : undefined) ??
         catalogueSays.get(state.id) ??
-        state.registers.map(listName).join(', '));
+        listsLine(state.registers.map(listName)));
 
   /**
    * One press of a switch, or of the button a refusal offered.
@@ -969,5 +973,14 @@
       -webkit-line-clamp: 2;
       line-clamp: 2;
     }
+  }
+  /* A LONG DESCRIPTION WRAPS TO TWO LINES AT EVERY WIDTH, never cut mid-word on one. */
+  .addon-line {
+    white-space: normal;
+    text-overflow: clip;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 </style>

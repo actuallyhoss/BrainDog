@@ -64,7 +64,8 @@ const oneOf = (word: string): string => {
  * its name, so the example it shows is one it reads. With no such list, the house example.
  */
 export function exampleOf(lists: readonly { name: string; fields?: readonly { id: string; type?: string | undefined; deadline?: boolean | undefined }[] | undefined }[]): string {
-  for (const l of lists) {
+  /* IN ONE ORDER ON EVERY WIDTH: by name, so the rail's order or a late read never picks a different list. */
+  for (const l of [...lists].sort((a, b) => a.name.localeCompare(b.name))) {
     const due = (l.fields ?? []).some((f) => f.type === 'day' && (f.id === 'due' || f.deadline === true));
     const word = l.name.split(/[\s,/]+/u).find((w) => w !== '' && !JOINS.has(w.toLowerCase()));
     if (!due || word === undefined) continue;

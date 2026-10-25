@@ -235,8 +235,9 @@
         <div class="column">
 
         {#each GROUPS as group (group.which)}
-          <fieldset class="item">
-            <legend class="label">{group.label}</legend>
+          <!-- A LONG CHECKLIST IS FOLDED UNDER WHAT IT HOLDS, so reads and writes are not two walls of the same names. -->
+          <details class="item lists" open={draft[group.which].length > 0 ? true : undefined}>
+            <summary class="label">{group.label}: {draft[group.which].length === 0 ? words.listsNoneChosen : words.listsChosen(draft[group.which].length, listChoices.length)}</summary>
             {#if listChoices.length === 0}
               <p class="help">{words.listsNone}</p>
             {:else}
@@ -248,7 +249,7 @@
                 {/each}
               </div>
             {/if}
-          </fieldset>
+          </details>
         {/each}
         </div>
       </div>
@@ -422,7 +423,7 @@
 
   /* THE SOURCE KEEPS ITS LINES. It scrolls sideways inside its own box, never the page, and holds its indentation. */
   .code {
-    min-block-size: calc(var(--sp-9) * 4);
+    min-block-size: calc(var(--sp-9) * 2);
     font-family: var(--font-mono);
     white-space: pre;
     overflow-x: auto;
@@ -463,13 +464,6 @@
     display: grid;
     gap: var(--inset);
     min-inline-size: 0;
-  }
-
-  @media (width >= 900px) {
-    .work {
-      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-      align-items: start;
-    }
   }
 
   .said {

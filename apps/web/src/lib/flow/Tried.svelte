@@ -122,9 +122,9 @@
       </Segmented>
 
       {#if pick.from === 'latest' && kind === 'written'}
-        <p class="tried-note">{rowsNote(rows, rowsRead)}</p>
+        <p class="tried-note">{rows.length > 0 ? `Tries it on: ${rowsNote(rows, rowsRead)}` : rowsNote(rows, rowsRead)}</p>
       {:else if pick.from === 'latest' && kind === 'arrival'}
-        <p class="tried-note">{arrivals[0]?.label ?? editWords.noArrivals}</p>
+        <p class="tried-note">{arrivals[0] ? `Tries it on: ${arrivals[0].label}` : editWords.noArrivals}</p>
       {:else if pick.from === 'row'}
         {#if rows.length === 0}
           <p class="tried-note">{rowsNote(rows, rowsRead)}</p>

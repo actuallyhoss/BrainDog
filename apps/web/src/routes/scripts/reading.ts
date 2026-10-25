@@ -78,14 +78,16 @@ export function toneOf(outcome: string): 'done' | 'bad' | 'warn' | 'quiet' {
  * A script's recent runs as its chart shows them, one cell a run and the ones that went through filled, and the line
  * under it. `null` when the history held no run of it, and then there is no chart.
  */
-export function recentOf(s: Pick<Script, 'recent'>): { total: number; ok: number; said: string } | null {
+export function recentOf(s: Pick<Script, 'recent'> & Partial<Pick<Script, 'month'>>): { total: number; ok: number; said: string } | null {
   const total = s.recent.length;
   if (total === 0) return null;
   const ok = s.recent.filter((r) => r.outcome === 'ok').length;
   const refused = s.recent.filter((r) => r.outcome === 'refused' || r.outcome === 'failed').length;
   const lead = total === 1 ? (ok === 1 ? 'Its one recent run went through' : 'Its one recent run did not go through') : ok === total ? `All ${total} recent runs went through` : `${ok} of the last ${total} runs went through`;
   const tail = total > 1 && refused > 0 && ok < total ? `; ${refused === 1 ? '1 was' : `${refused} were`} refused` : '';
-  return { total, ok, said: `${lead}${tail}.` };
+  /* THE MONTH'S REFUSALS COUNT MORE RUNS THAN THESE FEW: when none of the recent ones was refused, the month's came before them. */
+  const earlier = refused === 0 && total > 1 && s.month !== undefined && s.month.refused > 0 ? `; the ${s.month.refused} refused this month came earlier` : '';
+  return { total, ok, said: `${lead}${tail}${earlier}.` };
 }
 
 export const words = {

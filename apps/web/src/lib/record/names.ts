@@ -241,6 +241,9 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   if (named !== undefined && named.trim() !== '') return { name: named, kind: 'person' };
   /* AN ADDRESS IS NEVER A NAME, in whatever shape it came (`jo@kiln.example`, `Jo <jo@kiln.example>`, `@jo`): a `who`
      with an `@` the caller holds no name for is Someone on this record, never the address itself. */
+  /* A SCRIPT IS SIGNED `script:<name>@v<n>`: it is said by its title when the caller holds one, else its name in words, never its version. */
+  const script = /^script:([^@]+)@v\d+$/u.exec(who)?.[1];
+  if (script !== undefined) return said(names.get(`script:${script}`) ?? `${humanize(script)} script`, 'automation');
   if (who.includes('@')) return { name: copy.feedSomeone, kind: 'person' };
   if (who === 'slash') return said(nameWords.slash, 'slash');
   if (who === 'system') return said(nameWords.brainDog, 'system');

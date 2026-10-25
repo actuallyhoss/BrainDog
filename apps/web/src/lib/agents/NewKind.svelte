@@ -20,6 +20,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { AGENTS, FILE_TOOLS, PERMISSIONS, PRESETS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, presetOf, recordToolWords, slotsOf, withPreset, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
 
   /* THE FIRST WAY TO START IS PICKED, so a kind written with no choice made still reads and tells, changing nothing. */
@@ -124,7 +125,7 @@
         </fieldset>
 
         <details class="more" open={pressed && fault !== null && UNDER_MORE.includes(fault.at) ? true : undefined}>
-        <summary class="label more-head">{words.more}</summary>
+        <summary class="label more-head"><Icon name="chevron" size="s" />{words.more}</summary>
         <div class="column">
         <div class="item">
           <label class="label" for="kind-repo">{words.repo}</label>
@@ -209,6 +210,7 @@
       <!-- AT THE TILE'S FOOT, ON THE START EDGE (UI pass of 21 October, H38), never loose on the board under it. -->
       <div class="do form-submit">
         <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
+        <Button weight="quiet" href={at('/agents')}>{words.cancel}</Button>
       </div>
     </div>
   </Tile>
@@ -219,7 +221,7 @@
     display: grid;
     gap: var(--sp-6);
     min-inline-size: 0;
-    max-inline-size: 720px;
+    max-inline-size: 1080px;
   }
 
   /* THE THREE WAYS TO START: one a row, its name and what it does, the picked one on the tile's ink edge. */
@@ -268,6 +270,8 @@
     min-block-size: var(--ctl-h);
     display: flex;
     align-items: center;
+    gap: var(--sp-2);
+    list-style: none;
   }
 
   .more > .column {
