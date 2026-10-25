@@ -142,7 +142,7 @@ export type KeychainDeps = {
    * this file is the keychain. A second copy of the rate limit here would be a second answer to "have
    * we interrupted this person already", and the two would disagree on the day it mattered.
    */
-  interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
+  interrupt: (said: { actor: string; say: string; because?: string; url?: string; cause?: string }) => void;
   mint: () => string;
   nowMs: number;
   /**
@@ -1002,4 +1002,229 @@ function event(sql: Sql, deps: KeychainDeps, kind: string, id: string, grantKind
     `grant:${id}`,
     `${id} ${grantKind}`,
   );
+}
+
+/* ── keychain access: which machine may open which key, and the asks waiting on the owner ── */
+
+/**
+ * What one key says to one machine (migration 46): open it, ask the owner first, or refuse it.
+ *
+ * NO ROW IS `always`, AND THAT IS TODAY'S BEHAVIOUR. A key nobody set a rule on opens for every keychain grant that
+ * reaches it, exactly as every key did before keychain access existed, so an installed CLI on such a key sees nothing new.
+ */
+export const KEY_RULES = ['always', 'ask', 'deny'] as const;
+export type KeyRule = (typeof KEY_RULES)[number];
+
+/** The owner's three answers to an ask: this once, from now on (which writes the machine's rule), or not this time. */
+export const KEY_ANSWERS = ['once', 'always', 'deny'] as const;
+export type KeyAnswer = (typeof KEY_ANSWERS)[number];
+
+/** The machine a key's own default is kept under. A handle is sixteen hex characters, so it is never this. */
+export const EVERY_MACHINE = '*';
+
+/**
+ * How long an ask waits for the owner, and how long a `once` answer waits to be spent.
+ *
+ * TEN MINUTES, LONGER THAN THE CLI WAITS. The CLI gives up after two, and an owner who answers at minute five has
+ * still allowed the next try, which then opens without asking again.
+ */
+export const KEY_ASK_LIFE_MS = 10 * 60_000;
+
+/** How long an answered or spent ask is kept before it is cleared away: a week, enough for the screen's recent asks. */
+const KEY_ASK_KEPT_MS = 7 * 86_400_000;
+
+export type KeyAccessRow = { credential: string; machine: string; rule: KeyRule; set_by: string; set_at: string };
+export type KeyAskStatus = 'pending' | 'once' | 'always' | 'denied' | 'used';
+export type KeyAskRow = {
+  id: string;
+  credential: string;
+  machine: string;
+  run: string | null;
+  status: KeyAskStatus;
+  asked_at: string;
+  expires: string;
+  answered_by: string | null;
+  answered_at: string | null;
+};
+
+const ASK_COLUMNS = 'id, credential, machine, run, status, asked_at, expires, answered_by, answered_at';
+
+/** The rule that holds for one key and one machine: the machine's own row, else the key's `*` row, else `always`. */
+export function keyRule(sql: Sql, credential: string, machine: string): KeyRule {
+  const row = sql.one<{ rule: KeyRule }>(
+    "SELECT rule FROM key_access WHERE credential = ? AND machine IN (?, '*') ORDER BY machine = '*' LIMIT 1",
+    credential,
+    machine,
+  );
+  return row?.rule ?? 'always';
+}
+
+/** Every rule set, or every rule on one key, the key's default first and then each machine by handle. */
+export function keyAccessRows(sql: Sql, credential?: string): KeyAccessRow[] {
+  return credential === undefined
+    ? sql.all<KeyAccessRow>("SELECT credential, machine, rule, set_by, set_at FROM key_access ORDER BY credential, machine <> '*', machine")
+    : sql.all<KeyAccessRow>("SELECT credential, machine, rule, set_by, set_at FROM key_access WHERE credential = ? ORDER BY machine <> '*', machine", credential);
+}
+
+/**
+ * Set one key's rule for one machine, or its default with `*`, or with `null` take the row away (the machine then
+ * follows the key's default, and the default `always`). The caller has checked who may and that the key is there.
+ */
+export function setKeyAccess(sql: Sql, deps: KeychainDeps, args: { credential: string; machine: string; rule: KeyRule | null }): KeyAccessRow | null {
+  if (args.rule === null) {
+    sql.exec('DELETE FROM key_access WHERE credential = ? AND machine = ?', args.credential, args.machine);
+    return null;
+  }
+  const at = instant(deps.nowMs);
+  sql.exec(
+    `INSERT INTO key_access (credential, machine, rule, set_by, set_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (credential, machine) DO UPDATE SET rule = excluded.rule, set_by = excluded.set_by, set_at = excluded.set_at`,
+    args.credential,
+    args.machine,
+    args.rule,
+    deps.actor,
+    at,
+  );
+  return { credential: args.credential, machine: args.machine, rule: args.rule, set_by: deps.actor, set_at: at };
+}
+
+/** The asks still waiting on the owner, newest first; with `recent`, every ask of the last week as well. */
+export function keyAsks(sql: Sql, nowMs: number, recent = false): KeyAskRow[] {
+  return recent
+    ? sql.all<KeyAskRow>(`SELECT ${ASK_COLUMNS} FROM key_ask WHERE asked_at > ? ORDER BY asked_at DESC, id DESC`, instant(nowMs - KEY_ASK_KEPT_MS))
+    : sql.all<KeyAskRow>(`SELECT ${ASK_COLUMNS} FROM key_ask WHERE status = 'pending' AND expires > ? ORDER BY asked_at DESC, id DESC`, instant(nowMs));
+}
+
+/** What one machine's open of one key came to: it may open, or it was refused (the ask filed, waiting, or denied). */
+export type KeyGate = { open: true } | { open: false; refusal: { code: string; fix: string; at: string } };
+
+/** The one sentence an agent waiting on the owner reads, on the first ask and on every try while it waits. */
+const ASKED = 'The owner has been asked to allow this machine to open that key. Try again once they answer in BrainDog.';
+
+/**
+ * Whether one keychain grant's machine may open one key now, asking the owner when the key's rule says so. INTERNAL:
+ * the record's `openForGrant` calls it for an agent's keychain grant, after it found the key within the grant's reach.
+ *
+ * `always` (or no rule) OPENS. `deny` IS REFUSED `FORBIDDEN` AT `credential`, in a sentence that names no other key.
+ *
+ * `ask` SPENDS AN ANSWER OR FILES A QUESTION. A `once` answer still live is spent by this open (`used`); a `deny` answer
+ * still live refuses this open and is spent with it, so the next try asks again; an ask still pending is answered
+ * `KEY_ASKED` again and the owner is not told twice, because the CLI asks every three seconds while it waits. Anything
+ * else files a new ask, tells the owner once (`cause`, the ask's id) and answers `KEY_ASKED`. An `always` answer has
+ * already written the machine's rule, so it never reaches here.
+ *
+ * NOT FOR SCHEDULED RUNS OR LEASES, which never come here: a scheduled `call`, `poll` or `pull` opens its key through the
+ * host's `keyOpener` and `openGrant`, and a leased runner through `sealedGrant`. Nobody is at the keyboard for either,
+ * so neither could wait for an answer, and both keep the behaviour they always had.
+ *
+ * `spoken` IS THE CREDENTIAL'S SPOKEN ID, never the key's label: an alert is read on a lock screen.
+ */
+export function keyGate(
+  sql: Sql,
+  deps: KeychainDeps,
+  args: { credential: string; machine: string; run: string | null; spoken: string; machineName: string | null },
+  transaction: <T>(fn: () => T) => T,
+): KeyGate {
+  const rule = keyRule(sql, args.credential, args.machine);
+  if (rule === 'always') return { open: true };
+  if (rule === 'deny')
+    return { open: false, refusal: { code: 'FORBIDDEN', fix: 'The owner does not let this machine open that key. Ask them to change its access in BrainDog.', at: 'credential' } };
+  const now = instant(deps.nowMs);
+  const asked: KeyGate = { open: false, refusal: { code: 'KEY_ASKED', fix: ASKED, at: 'credential' } };
+  return transaction((): KeyGate => {
+    const live = sql.one<{ id: string; status: KeyAskStatus }>(
+      "SELECT id, status FROM key_ask WHERE credential = ? AND machine = ? AND status IN ('pending', 'once', 'denied') AND expires > ? ORDER BY asked_at DESC, id DESC LIMIT 1",
+      args.credential,
+      args.machine,
+      now,
+    );
+    if (live?.status === 'once') {
+      sql.exec("UPDATE key_ask SET status = 'used' WHERE id = ?", live.id);
+      return { open: true };
+    }
+    if (live?.status === 'denied') {
+      sql.exec('UPDATE key_ask SET expires = ? WHERE id = ?', now, live.id);
+      return { open: false, refusal: { code: 'FORBIDDEN', fix: 'The owner said no to this machine opening that key.', at: 'credential' } };
+    }
+    if (live?.status === 'pending') return asked;
+    sql.exec("DELETE FROM key_ask WHERE status <> 'pending' AND asked_at < ?", instant(deps.nowMs - KEY_ASK_KEPT_MS));
+    const id = `ka_${deps.mint()}`;
+    sql.exec(
+      "INSERT INTO key_ask (id, credential, machine, run, status, asked_at, expires) VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+      id,
+      args.credential,
+      args.machine,
+      args.run,
+      now,
+      instant(deps.nowMs + KEY_ASK_LIFE_MS),
+    );
+    const who = args.machineName ?? 'A machine';
+    deps.interrupt({
+      actor: `key_ask:${id}`,
+      say: `${who} asks to use ${args.spoken}`,
+      because: `${who}${args.run ? `, in ${args.run},` : ''} asked to open ${args.spoken}, which is set to ask first. Allow it once, always, or deny it in BrainDog.`,
+      url: `/keychain?ask=${id}`,
+      cause: `key_ask:${id}`,
+    });
+    return asked;
+  });
+}
+
+/**
+ * The owner's answer to one ask: `once`, `always` (which also writes the machine's rule for that key) or `deny`. An ask
+ * that is not pending, or has run out, is refused, so a second press on an old alert changes nothing.
+ */
+export function answerKeyAsk(sql: Sql, deps: KeychainDeps, args: { id: string; answer: KeyAnswer }, transaction: <T>(fn: () => T) => T): Result<KeyAskRow> {
+  const now = instant(deps.nowMs);
+  return transaction((): Result<KeyAskRow> => {
+    const row = sql.one<KeyAskRow>(`SELECT ${ASK_COLUMNS} FROM key_ask WHERE id = ?`, args.id);
+    if (!row) return no('REF_UNKNOWN', 'There is no ask by that id. The list of asks names each one.', { at: 'id' });
+    if (row.status !== 'pending' || row.expires <= now)
+      return no('FORBIDDEN', 'That ask was already answered or has run out. The machine asks again when it next tries.', { at: 'id' });
+    const status: KeyAskStatus = args.answer === 'deny' ? 'denied' : args.answer;
+    sql.exec('UPDATE key_ask SET status = ?, answered_by = ?, answered_at = ? WHERE id = ?', status, deps.actor, now, row.id);
+    if (args.answer === 'always') setKeyAccess(sql, deps, { credential: row.credential, machine: row.machine, rule: 'always' });
+    return ok({ ...row, status, answered_by: deps.actor, answered_at: now });
+  });
+}
+
+/* ── the keychain locks itself: how long a sign-in opens it for ── */
+
+/** The three windows an owner may choose, in minutes. Fifteen is the default, the fixed window before this setting. */
+export const LOCK_AFTER_MINUTES = [5, 15, 60] as const;
+export type LockAfter = (typeof LOCK_AFTER_MINUTES)[number];
+export const LOCK_AFTER_DEFAULT: LockAfter = 15;
+/** The longest window, which `lockKeychain` puts a session's proof behind so the next keychain act asks again. */
+export const LOCK_AFTER_MOST_MS = Math.max(...LOCK_AFTER_MINUTES) * 60_000;
+
+/**
+ * WHERE THE WINDOW IS KEPT: one `pref` row (migration 9) under the record's own holder, `keychain`, which no person id
+ * is, because the keychain is the record's and every owner opens the same one. No migration, and nothing a copy carries.
+ */
+const LOCK_HOLDER = 'keychain';
+const LOCK_KEY = 'lock_after';
+
+/** The record's window in minutes: the one set, or fifteen. A value that is not one of the three reads as fifteen. */
+export function lockAfter(sql: Sql): LockAfter {
+  const raw = sql.one<{ value: string }>('SELECT value FROM pref WHERE person_id = ? AND key = ?', LOCK_HOLDER, LOCK_KEY)?.value;
+  let n: unknown = null;
+  try {
+    n = raw === undefined ? null : JSON.parse(raw);
+  } catch {
+    n = null;
+  }
+  return (LOCK_AFTER_MINUTES as readonly unknown[]).includes(n) ? (n as LockAfter) : LOCK_AFTER_DEFAULT;
+}
+
+/** Set the window. The caller has checked the value is one of the three and who may set it. */
+export function setLockAfter(sql: Sql, nowMs: number, minutes: LockAfter): LockAfter {
+  sql.exec(
+    `INSERT INTO pref (person_id, key, value, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT (person_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    LOCK_HOLDER,
+    LOCK_KEY,
+    JSON.stringify(minutes),
+    instant(nowMs),
+  );
+  return minutes;
 }

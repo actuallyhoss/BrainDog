@@ -265,6 +265,19 @@ import {
   type PullHandoff,
 } from './actions.ts';
 import {
+  answerKeyAsk,
+  keyAccessRows,
+  keyAsks,
+  keyGate,
+  lockAfter,
+  setKeyAccess,
+  setLockAfter,
+  type KeyAccessRow,
+  type KeyAnswer,
+  type KeyAskRow,
+  type KeyGate,
+  type KeyRule,
+  type LockAfter,
   bindGrant,
   getGrant,
   listGrants,
@@ -561,7 +574,7 @@ export type { PushJob, PushSettled, PushTarget } from './push.ts';
 export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
-export { GRANT_KINDS, spanMs } from './keychain.ts';
+export { GRANT_KINDS, KEY_ANSWERS, KEY_RULES, EVERY_MACHINE, KEY_ASK_LIFE_MS, LOCK_AFTER_MINUTES, LOCK_AFTER_DEFAULT, LOCK_AFTER_MOST_MS, spanMs } from './keychain.ts';
 import { GROUP_CAP } from './buckets.ts';
 import { RATE_STALE_DAYS, ratesFrom } from './fx.ts';
 import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
@@ -817,7 +830,7 @@ export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSect
 export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, PageSees, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
-export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './keychain.ts';
+export type { BindGrantArgs, GrantKind, GrantRow, KeyAccessRow, KeyAnswer, KeyAskRow, KeyAskStatus, KeyGate, KeyRule, LeasedSeal, LockAfter, SealedGrant } from './keychain.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, Known, Owners, PackConfig, PackToggle, PlannedRecord } from './declare.ts';
@@ -10421,6 +10434,24 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
     revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, keychainDeps(actor), id, transaction),
+
+    /* ── keychain access (migration 46): which machine may open which key, asked of the owner when he says so ── */
+
+    /** Every rule set, or one key's (`credential` is its row id). Ids and rules only. */
+    keyAccess: (credential?: string): KeyAccessRow[] => keyAccessRows(sql, credential),
+    /** Set one key's rule for one machine, its default with `*`, or with `null` take the row away. */
+    setKeyAccess: (args: { credential: string; machine: string; rule: KeyRule | null }, actor: string): KeyAccessRow | null =>
+      transaction(() => setKeyAccess(sql, keychainDeps(actor), args)),
+    /** The asks waiting on the owner, or with `recent` the last week's too. */
+    keyAsks: (recent = false): KeyAskRow[] => keyAsks(sql, clock.now(), recent),
+    /** The owner's answer to one ask. */
+    answerKeyAsk: (args: { id: string; answer: KeyAnswer }, actor: string): Result<KeyAskRow> => answerKeyAsk(sql, keychainDeps(actor), args, transaction),
+    /** Whether one machine may open one key now, asking the owner first where the key says so. INTERNAL: `openForGrant`'s. */
+    keyGate: (args: { credential: string; machine: string; run: string | null; spoken: string; machineName: string | null }, actor: string): KeyGate =>
+      keyGate(sql, keychainDeps(actor), args, transaction),
+    /** How many minutes a sign-in opens the keychain for: 5, 15 (the default) or 60. */
+    lockAfter: (): LockAfter => lockAfter(sql),
+    setLockAfter: (minutes: LockAfter): LockAfter => setLockAfter(sql, clock.now(), minutes),
 
     /**
      * What a digest would say if it went now. It sends nothing.

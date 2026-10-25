@@ -65,6 +65,7 @@ import agents0042 from './migrations/0042_agents.ts';
 import share0043 from './migrations/0043_share.ts';
 import seat0044 from './migrations/0044_seat.ts';
 import sealed0045 from './migrations/0045_sealed.ts';
+import keyAccess0046 from './migrations/0046_key_access.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -115,6 +116,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 43, slug: 'share', sql: share0043 },
   { version: 44, slug: 'seat', sql: seat0044 },
   { version: 45, slug: 'sealed', sql: sealed0045 },
+  { version: 46, slug: 'key_access', sql: keyAccess0046 },
 ];
 
 /**
@@ -183,6 +185,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * `job_place`, `local`. So the format is still 1.
  * Migration 45 adds `sealed_file` in `data`, which an older reader skips as a table it has no shape for, and
  * `sealed_part` in `local`, so no file carries it. So the format is still 1.
+ * Migration 46 adds `key_access` and `key_ask`, both `local`, so no file carries either. So the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 
