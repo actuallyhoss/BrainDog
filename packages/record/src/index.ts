@@ -108,6 +108,7 @@ import {
   type Exchanged,
   type OperationGrant,
   type KeychainGrant,
+  type KeyGate,
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
   type InboxLine,
@@ -2890,10 +2891,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       };
     const stop = allows(ctx, 'owner', listName);
     if (stop) return stop;
-    /* AND A SESSION WHOSE LAST PROOF IS OLDER THAN FIFTEEN MINUTES IS SENT BACK TO PROVE IT AGAIN. A
+    /* AND A SESSION WHOSE LAST PROOF IS OLDER THAN THE KEYCHAIN'S LOCK WINDOW IS SENT BACK TO PROVE IT AGAIN. A
        cookie is thirty days of standing access; the keychain is the one place a laptop left open on a desk
-       should not be enough. After the owner check, so somebody who is not an owner is told that instead. */
-    if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+       should not be enough. After the owner check, so somebody who is not an owner is told that instead. The window
+       is the owner's `lock_after`, five, fifteen or sixty minutes, and fifteen (`FRESH`) until he sets one; Lock now
+       (`lockKeychain`, a sign-in route) puts the session's proof behind the longest of them. */
+    if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
       return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' };
     return null;
   };
@@ -3094,6 +3097,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const keychainActor = (hints: SessionHints): string => {
     const run = hints.spoken ? kernel.findRun({ spoken: hints.spoken }) : null;
     return run && run.seq !== null ? `${PREFIX}${run.seq}` : `agent:${hints.agent ?? 'other'}`;
+  };
+
+  /**
+   * Whether an agent's keychain grant may open one key now (`kernel.keyGate`): its machine is the grant's handle, and the
+   * owner is told the machine by the name `listDevices` shows, the part before what the record adds after a middle dot.
+   * The machine list is read only for a key set to ask, so a key with no rule costs one indexed read and nothing more.
+   */
+  const keyGateFor = async (row: Entry, grant: KeychainGrant, hints: SessionHints): Promise<KeyGate> => {
+    const actor = keychainActor(hints);
+    const run = actor.startsWith(PREFIX) ? actor : null;
+    let machineName: string | null = null;
+    if (kernel.keyAccess(row.id).some((r) => r.rule !== 'always')) {
+      const device = (await kernel.deviceList()).find((d) => d.handle === grant.handle);
+      const label = device?.label?.split(' · ')[0]?.trim();
+      machineName = label ? label : null;
+    }
+    return kernel.keyGate({ credential: row.id, machine: grant.handle, run, spoken: kernel.nameOf(row.id), machineName }, actor);
   };
 
   /**
@@ -14567,6 +14587,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!row) return unreached(grant);
       const held = typeof row.fields[KEY_FIELD] === 'string' ? String(row.fields[KEY_FIELD]) : '';
       if (!held) return no('GRANT_REVOKED', `${kernel.nameOf(row.id)} holds no sealed value.`, { at: 'credential' });
+      /* KEYCHAIN ACCESS (`12 §6.3`): an agent's machine opens this key as its rule says, `always` (and a key with no rule,
+         which is every key until the owner sets one, so an installed CLI on it sees nothing new), `ask`, which asks the
+         owner and answers `KEY_ASKED` until he allows it, or `deny`. AN OWNER IN A BROWSER IS NEVER ASKED, being the one
+         who answers. AND SCHEDULED RUNS AND LEASES NEVER COME HERE: they open through the host's `keyOpener` and
+         `sealedGrant`, with nobody at the keyboard to wait for, and keep the behaviour they had. */
+      if (grant !== null) {
+        const gate = await keyGateFor(row, grant, hints);
+        if (!gate.open) return tail(no<OpenedForGrant>(gate.refusal.code, gate.refusal.fix, { at: gate.refusal.at }));
+      }
       const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : keychainActor(hints));
       if (!out.ok) return out;
       return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });

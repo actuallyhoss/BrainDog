@@ -172,8 +172,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-five, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 24 write path · 11 auth and keychain · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-six, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 24 write path · 12 auth and keychain · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -258,7 +258,7 @@ const WRITE = [
   'NOT_FOUND',
 ] as const;
 
-/** Auth and keychain — 11. */
+/** Auth and keychain — 12. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',
@@ -272,6 +272,10 @@ const AUTH = [
   /* A TOOL HE SWITCHED OFF FOR THIS AGENT in Settings > Agents, 2026-10-21 (plan §6.2, §6.5), refused at the door before
      it runs, for a client whose cached list still has it. Not `FORBIDDEN`: no bigger key turns it back on, only he does. */
   'TOOL_OFF',
+  /* A KEY SET TO ASK FIRST, 2026-10-26 (Keychain access): a machine's keychain grant reached it, and the owner has been
+     asked to allow that machine. Not `FORBIDDEN`, which says the grant is short: the same call opens the key once he
+     answers, so a CLI waits and tries it again, and only a `deny` answer or rule is `FORBIDDEN`. 403. */
+  'KEY_ASKED',
 ] as const;
 
 /** Format and lifecycle — 8. */
@@ -324,7 +328,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and thirty-five, in `30 §6`'s order. */
+/** The hundred and thirty-six, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
@@ -337,7 +341,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and thirty-five. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and thirty-six. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

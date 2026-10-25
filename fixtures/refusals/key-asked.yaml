@@ -1,0 +1,4 @@
+code:   KEY_ASKED
+via:    rpc
+raises: packages/kernel/src/keychain.ts
+fix:    Try again once they answer in BrainDog.

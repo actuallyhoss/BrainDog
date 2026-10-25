@@ -14,6 +14,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { keyOpener } from '../src/actions.ts';
 import { openKeyStore, recordKeys } from '../src/keys.ts';
 import { start } from '../src/server.ts';
 
@@ -144,6 +145,9 @@ async function stack() {
     file,
     call,
     project,
+    owner,
+    store,
+    signIn,
     advance: (ms: number) => void (now += ms),
     /** A keychain grant for `scope`, through the device flow a terminal runs and the approval a person gives. */
     async grant(scope: string): Promise<string> {
@@ -297,6 +301,111 @@ test('AN EXPIRED GRANT IS REFUSED: thirty days for a project', async () => {
     assert.equal(late.status, 403, late.raw);
     assert.equal(late.body?.refusal?.code, 'FORBIDDEN');
     assert.ok(!late.raw.includes('value'), 'the refusal carried a value');
+  } finally {
+    await s.close();
+  }
+});
+
+/* ── keychain access: a key set to ask first (`12 §6.3`) ─────────────────── */
+
+test('A KEY SET TO ASK WAITS FOR HIM: KEY_ASKED until he allows it once, then it opens once, and the next try asks again', async () => {
+  const s = await stack();
+  try {
+    const kiln = s.project('Kiln');
+    const bearer = await s.grant(kiln);
+    const value = fake();
+    const put = await s.call(door('deposit'), { bearer, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value } });
+    assert.equal(put.status, 200, put.raw);
+    const credential = String(put.body?.value?.credential);
+    const sid = await s.signIn();
+
+    /* NO RULE IS TODAY'S BEHAVIOUR: it opens, and the owner sees no rule and no ask. */
+    assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.value?.value, value);
+    const none = await s.call(`/api/keyAccess?credential=${encodeURIComponent(credential)}`, { sid });
+    assert.deepEqual(none.body?.value?.rules, [], none.raw);
+
+    const ask = await s.call('/api/setKeyAccess', { sid, body: { credential, machine: '*', rule: 'ask' } });
+    assert.equal(ask.status, 200, ask.raw);
+    assert.equal(ask.body?.value?.rule, 'ask');
+
+    const asked = await s.call(door('open'), { bearer, body: { credential } });
+    assert.equal(asked.status, 403, asked.raw);
+    assert.equal(asked.body?.refusal?.code, 'KEY_ASKED');
+    assert.ok(!asked.raw.includes(value), 'the refusal carried the value');
+    /* The CLI's next try while it waits is the same answer, and still one ask. */
+    assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.refusal?.code, 'KEY_ASKED');
+
+    const waiting = await s.call('/api/keyAsks', { sid });
+    const asks = waiting.body?.value?.asks as { id: string; credential: string; label: string; machine_name: string }[];
+    assert.equal(asks.length, 1, waiting.raw);
+    assert.deepEqual([asks[0]!.credential, asks[0]!.label, asks[0]!.machine_name], [credential, 'Kiln deploy', 'test-laptop']);
+
+    /* AN AGENT CANNOT ANSWER ITS OWN ASK: a token never reaches the keychain's methods. */
+    const login = await s.login();
+    const self = await s.call('/api/answerKeyAsk', { bearer: login, body: { id: asks[0]!.id, answer: 'always' } });
+    assert.equal(self.body?.refusal?.code, 'NEEDS_BROWSER_SESSION', self.raw);
+
+    const once = await s.call('/api/answerKeyAsk', { sid, body: { id: asks[0]!.id, answer: 'once' } });
+    assert.equal(once.status, 200, once.raw);
+    assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.value?.value, value, 'allowed once did not open');
+    assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.refusal?.code, 'KEY_ASKED', 'allowed once opened twice');
+  } finally {
+    await s.close();
+  }
+});
+
+test('ALWAYS ALLOW opens from then on; DENY is FORBIDDEN; and the owner in a browser is never asked', async () => {
+  const s = await stack();
+  try {
+    const kiln = s.project('Kiln');
+    const bearer = await s.grant(kiln);
+    const value = fake();
+    const put = await s.call(door('deposit'), { bearer, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value } });
+    const credential = String(put.body?.value?.credential);
+    const sid = await s.signIn();
+    assert.equal((await s.call('/api/setKeyAccess', { sid, body: { credential, machine: '*', rule: 'ask' } })).status, 200);
+
+    assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.refusal?.code, 'KEY_ASKED');
+    const id = String(((await s.call('/api/keyAsks', { sid })).body?.value?.asks as { id: string }[])[0]?.id);
+    assert.equal((await s.call('/api/answerKeyAsk', { sid, body: { id, answer: 'always' } })).status, 200);
+    for (let i = 0; i < 2; i++) assert.equal((await s.call(door('open'), { bearer, body: { credential } })).body?.value?.value, value);
+
+    const handle = (await s.running.api.kernel.deviceList()).find((d) => d.reach === 'vault')!.handle;
+    const deny = await s.call('/api/setKeyAccess', { sid, body: { credential, machine: handle, rule: 'deny' } });
+    assert.equal(deny.status, 200, deny.raw);
+    assert.equal(deny.body?.value?.machine_name, 'test-laptop');
+    const denied = await s.call(door('open'), { bearer, body: { credential } });
+    assert.equal(denied.status, 403, denied.raw);
+    assert.equal(denied.body?.refusal?.code, 'FORBIDDEN');
+    assert.equal(denied.body?.refusal?.at, 'credential');
+
+    /* The owner's own read goes through the keychain gate and no rule. */
+    const mine = await s.call('/api/keys/open', { sid, body: { credential } });
+    assert.equal(mine.body?.value?.value, value, mine.raw);
+
+    /* A machine nobody signed in is not a machine a rule can name. */
+    const stranger = await s.call('/api/setKeyAccess', { sid, body: { credential, machine: 'ffffffffffffffff', rule: 'deny' } });
+    assert.equal(stranger.body?.refusal?.code, 'REF_UNKNOWN', stranger.raw);
+  } finally {
+    await s.close();
+  }
+});
+
+test('A SCHEDULED RUN IS NEVER ASKED: its opener reaches a key set to ask, or to deny, as it always did', async () => {
+  const s = await stack();
+  try {
+    const bearer = await s.grant(s.project('Kiln'));
+    const value = fake();
+    const put = await s.call(door('deposit'), { bearer, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value } });
+    const credential = String(put.body?.value?.credential);
+    const grant = String(s.running.api.kernel.get(credential)?.fields.value);
+    const sid = await s.signIn();
+    const open = keyOpener(s.running.api, s.store);
+    for (const rule of ['ask', 'deny'] as const) {
+      assert.equal((await s.call('/api/setKeyAccess', { sid, body: { credential, machine: '*', rule } })).status, 200);
+      assert.equal(await open({ id: grant, label: 'Kiln deploy' }), value, `a scheduled run was stopped by ${rule}`);
+    }
+    assert.equal(((await s.call('/api/keyAsks', { sid })).body?.value?.asks as unknown[]).length, 0, 'a scheduled run filed an ask');
   } finally {
     await s.close();
   }

@@ -219,6 +219,8 @@ const NOT_422: Readonly<Record<string, number>> = {
   /* A RUN HE STOPPED OR PAUSED: the same call is refused until he resumes it, so retrying is no answer (plan §2.4). */
   RUN_STOPPED: 403,
   RUN_PAUSED: 403,
+  /* A KEY SET TO ASK FIRST: the owner has been asked, and the same call opens it once he allows the machine. */
+  KEY_ASKED: 403,
   SCHEMA_MISMATCH: 503,
   SCHEMA_NEWER: 503,
   /* A RECORD NOBODY MAY ACT ON IS NOT A REFUSAL OF THE CALLER'S INPUT. Every owner suspended is the

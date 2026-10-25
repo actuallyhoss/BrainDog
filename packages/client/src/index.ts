@@ -1767,6 +1767,15 @@ export function wroteOutside(): void {
   SENT += 1;
 }
 
+/** Where the sign-in routes are for a client's `base`: its origin, since `/auth/*` is the person's and never under a record's path. */
+const originOf = (base: string): string => {
+  try {
+    return new URL(base).origin;
+  } catch {
+    return '';
+  }
+};
+
 export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
   const base = options.base.replace(/\/+$/, '');
@@ -2271,6 +2280,27 @@ export function createClient(options: ClientOptions) {
     setVaultPassphrase: (passphrase: string) => call<Answer<'setVaultPassphrase'>>('setVaultPassphrase', { passphrase }),
     /** @deprecated See setVaultPassphrase. */
     clearVaultPassphrase: (passphrase: string) => call<Answer<'clearVaultPassphrase'>>('clearVaultPassphrase', { passphrase }),
+    /* KEYCHAIN ACCESS (`12 §6.3`). KEYCHAIN, as the key doors are: the owner in a browser, proved within the keychain's
+       lock window. A machine is a keychain grant's handle from `listDevices`, or `*` for every machine; no rule is always. */
+    /** The lock window in minutes and the rules set, every key's or one key's: `{ lock_after, rules }`. */
+    keyAccess: (args: { credential?: string } = {}) => call<Answer<'keyAccess'>>('keyAccess', args as Record<string, unknown>),
+    /** One key opened always, after asking, or never by one machine or every machine; `rule: null` takes the rule away. */
+    setKeyAccess: (args: { credential: string; machine: string; rule: 'always' | 'ask' | 'deny' | null }) =>
+      call<Answer<'setKeyAccess'>>('setKeyAccess', args as Record<string, unknown>),
+    /** The machines waiting for the owner to allow a key, newest first; `recent` adds the last week's answered asks. */
+    keyAsks: (args: { recent?: boolean } = {}) => call<Answer<'keyAsks'>>('keyAsks', args.recent ? { recent: 'true' } : {}),
+    /** Answer one ask: let it through once, always (which sets the machine's rule), or deny it. */
+    answerKeyAsk: (args: { id: string; answer: 'once' | 'always' | 'deny' }) => call<Answer<'answerKeyAsk'>>('answerKeyAsk', args as Record<string, unknown>),
+    /** How long a sign-in opens the keychain for: 5, 15 or 60 minutes. */
+    setLockAfter: (minutes: 5 | 15 | 60) => call<Answer<'setLockAfter'>>('setLockAfter', { minutes }),
+    /**
+     * Lock now: the keychain's next use in this browser asks for a sign-in again (`POST /auth/keychain/lock`, a sign-in
+     * route on the origin, since what changes is the session). Everything else stays signed in. Answers `{ locked: true }`.
+     */
+    lockKeychain: () =>
+      hostAnswer<{ locked: true }>(() =>
+        doFetch(`${originOf(base)}/auth/keychain/lock`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
+      ),
     /**
      * Ask Slash one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
      * A browser session and this origin, like the key doors. 501 `NOT_IN_THIS_BUILD` on a host with no model behind it,

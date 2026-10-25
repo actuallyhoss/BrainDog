@@ -298,3 +298,61 @@ test('A KEY THIS RECORD DOES NOT HOLD IS REF_UNKNOWN, and one with no sealed val
     await s.close();
   }
 });
+
+test('THE KEYCHAIN LOCKS AFTER THE WINDOW HE CHOSE: five minutes once he sets five, and fifteen until he does', async () => {
+  const s = await stack();
+  try {
+    const sid = await s.signIn();
+    const put = await s.call(door('put'), { sid, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value: fake() } });
+    assert.equal(put.status, 200, put.raw);
+    const credential = String(put.body?.value?.credential);
+
+    const read = await s.call('/api/keyAccess', { sid });
+    assert.equal(read.status, 200, read.raw);
+    assert.equal(read.body?.value?.lock_after, 15);
+    const wrong = await s.call('/api/setLockAfter', { sid, body: { minutes: 10 } });
+    assert.equal(wrong.body?.refusal?.code, 'ENUM_VALUE_UNKNOWN', wrong.raw);
+    const set = await s.call('/api/setLockAfter', { sid, body: { minutes: 5 } });
+    assert.equal(set.status, 200, set.raw);
+    assert.equal(set.body?.value?.lock_after, 5);
+
+    s.advance(4 * 60_000);
+    assert.equal((await s.call(door('open'), { sid, body: { credential } })).status, 200, 'four minutes in, the keychain was locked');
+    s.advance(2 * 60_000);
+    const locked = await s.call(door('open'), { sid, body: { credential } });
+    assert.equal(locked.status, 403, locked.raw);
+    assert.equal(locked.body?.refusal?.code, 'NEEDS_BROWSER_SESSION');
+    /* SIGNING IN AGAIN IS THE UNLOCK. */
+    assert.equal((await s.call(door('open'), { sid: await s.signIn(), body: { credential } })).status, 200);
+  } finally {
+    await s.close();
+  }
+});
+
+test('LOCK NOW: the next keychain act in that browser asks for a sign-in, and the session stays signed in for the rest', async () => {
+  const s = await stack();
+  try {
+    const sid = await s.signIn();
+    const put = await s.call(door('put'), { sid, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value: fake() } });
+    assert.equal(put.status, 200, put.raw);
+    const credential = String(put.body?.value?.credential);
+
+    const lock = await s.call('/auth/keychain/lock', { sid, body: {} });
+    assert.equal(lock.status, 200, lock.raw);
+    assert.deepEqual(lock.body?.value, { locked: true });
+    const locked = await s.call(door('open'), { sid, body: { credential } });
+    assert.equal(locked.status, 403, locked.raw);
+    assert.equal(locked.body?.refusal?.code, 'NEEDS_BROWSER_SESSION');
+    assert.equal((await s.call('/auth/session', { sid })).status, 200, 'locking the keychain signed the browser out');
+    assert.equal((await s.call('/api/boot', { sid })).status, 200, 'locking the keychain closed the record');
+
+    /* ANOTHER BROWSER IS NOT LOCKED, and a page somewhere else cannot lock this one. */
+    const other = await s.signIn();
+    assert.equal((await s.call(door('open'), { sid: other, body: { credential } })).status, 200);
+    const cross = await s.call('/auth/keychain/lock', { sid: other, body: {}, headers: { origin: 'https://elsewhere.example' } });
+    assert.notEqual(cross.status, 200, cross.raw);
+    assert.equal((await s.call(door('open'), { sid: other, body: { credential } })).status, 200);
+  } finally {
+    await s.close();
+  }
+});

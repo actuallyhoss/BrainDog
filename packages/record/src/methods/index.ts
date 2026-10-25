@@ -31,6 +31,7 @@ import { methods as todayReminders } from './today-reminders.ts';
 import { methods as slashDraft } from './slash-draft.ts';
 import { methods as comments } from './comments.ts';
 import { methods as keychainPassphrase } from './keychain-passphrase.ts';
+import { methods as keychainAccess } from './keychain-access.ts';
 import { methods as shares } from './shares.ts';
 import { methods as ownTokens } from './own-tokens.ts';
 import { methods as quiet } from './quiet.ts';
@@ -236,6 +237,7 @@ export function methods(deps: RecordDeps) {
     ...slashDraft(deps),
     ...comments(deps),
     ...keychainPassphrase(deps),
+    ...keychainAccess(deps),
     ...shares(deps),
     ...ownTokens(deps),
     ...quiet(deps),
