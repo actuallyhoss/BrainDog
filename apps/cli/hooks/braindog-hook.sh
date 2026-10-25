@@ -58,7 +58,11 @@ case "$which" in
     id=''
     session_id
     [ -n "$id" ] || exit 0
-    flags="${XDG_CONFIG_HOME:-$HOME/.config}/braindog/sessions/${id}.inbox.flags"
+    # Where the CLI keeps sessions: XDG, else Windows' APPDATA (Git Bash runs this there), else ~/.config.
+    cfg="${XDG_CONFIG_HOME:-}"
+    [ -z "$cfg" ] && [ -n "${APPDATA:-}" ] && cfg=$(cygpath -u "$APPDATA" 2>/dev/null || printf %s "$APPDATA")
+    cfg="${cfg:-$HOME/.config}"
+    flags="$cfg/braindog/sessions/${id}.inbox.flags"
     words=''
     [ -f "$flags" ] && IFS= read -r words < "$flags"
     case " $words " in *" $which "*) ;; *) exit 0 ;; esac
@@ -66,7 +70,7 @@ case "$which" in
     # good for: printed with cat, the state and flags after it put in place with mv, and no Node started, so a hook with
     # something to say costs what one with nothing does. A subagent, a turn a Stop hook already continued, and a tool
     # named by its server are Node's to judge; a stopped run's own BrainDog tools and ToolSearch go on.
-    ready="${XDG_CONFIG_HOME:-$HOME/.config}/braindog/sessions/${id}.inbox.${which}.ready"
+    ready="$cfg/braindog/sessions/${id}.inbox.${which}.ready"
     if [ -f "$ready" ] && [ -n "$(find "$ready" -mmin -2 2>/dev/null)" ]; then
       case "$which:$raw" in
         stop:*'"agent_id"'* | stop:*'"stop_hook_active":true'* | stop:*'"stop_hook_active": true'* | tool:*'"mcp_server"'*) ready='' ;;

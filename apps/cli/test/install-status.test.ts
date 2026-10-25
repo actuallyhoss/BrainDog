@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { HOOK_STATUS, HOOKS_HELD, hookCommand, installAt } from '../src/install.ts';
+import { gitShell, HOOK_STATUS, HOOKS_HELD, hookCommand, installAt } from '../src/install.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-install-status-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -110,9 +110,23 @@ test('a beat entry from an earlier install that showed a status line is rewritte
   assert.deepEqual(read(file).hooks.PostToolUse, [{ hooks: [hook('beat')] }]);
 });
 
-test('on Windows the beat runs the PowerShell script with the word beat', () => {
-  const command = hookCommand('beat', 'C:\\braindog\\apps\\cli\\hooks', 'win32');
+test('on Windows without Git the beat runs the PowerShell script with the word beat', () => {
+  const command = hookCommand('beat', 'C:\\braindog\\apps\\cli\\hooks', 'win32', null);
   assert.match(command, /^powershell -NoProfile -ExecutionPolicy Bypass -File ".*braindog-hook\.ps1" beat$/u);
+});
+
+test("on Windows with Git the beat runs Git's sh on the POSIX script, with forward slashes", () => {
+  const command = hookCommand('beat', 'C:\\braindog\\apps\\cli\\hooks', 'win32', 'C:\\Program Files\\Git\\usr\\bin\\sh.exe');
+  assert.equal(command, '"C:\\Program Files\\Git\\usr\\bin\\sh.exe" "C:/braindog/apps/cli/hooks/braindog-hook.sh" beat');
+});
+
+test("Git's sh is found from Claude Code's Git Bash path, else under Program Files", () => {
+  const has = (want: string) => (p: string) => p === want;
+  const sh = 'C:\\Git\\usr\\bin\\sh.exe';
+  assert.equal(gitShell({ CLAUDE_CODE_GIT_BASH_PATH: 'C:\\Git\\bin\\bash.exe' }, has(sh)), sh);
+  const pf = 'C:\\Program Files\\Git\\usr\\bin\\sh.exe';
+  assert.equal(gitShell({ ProgramFiles: 'C:\\Program Files' }, has(pf)), pf);
+  assert.equal(gitShell({}, () => false), null);
 });
 
 test('the watcher that wakes an idle session is written only with --rewake, as an async Stop hook beside the stop hook', () => {

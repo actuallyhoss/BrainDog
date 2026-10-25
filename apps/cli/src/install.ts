@@ -62,7 +62,7 @@
 import { execFileSync } from 'node:child_process';
 import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { refused, type Result } from '@braindog/ports';
@@ -308,11 +308,26 @@ export function serversFileOf(dir: string, home: string = homedir()): string {
   return fold(resolve(dir)) === fold(resolve(home, '.claude')) ? join(home, '.claude.json') : join(resolve(dir), '.claude.json');
 }
 
-/** The command Claude Code runs: the PowerShell shim on Windows, the POSIX one elsewhere. */
-export function hookCommand(which: Which, scripts: string, platform: string = process.platform): string {
-  return platform === 'win32'
-    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${join(scripts, 'braindog-hook.ps1')}" ${which}`
-    : `sh "${join(scripts, 'braindog-hook.sh')}" ${which}`;
+/**
+ * Git for Windows' `sh.exe`, when it is installed. Claude Code needs Git Bash on Windows, and its `sh` starts in about a
+ * fifth of Windows PowerShell's time, which runs before every prompt and tool call and passed the 5 s limit under load.
+ */
+export function gitShell(env: NodeJS.ProcessEnv = process.env, exists: (path: string) => boolean = existsSync): string | null {
+  const bash = env.CLAUDE_CODE_GIT_BASH_PATH;
+  const roots = [env.ProgramW6432, env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && win32.join(env.LOCALAPPDATA, 'Programs')];
+  const found = [
+    ...(bash ? [win32.join(win32.dirname(win32.dirname(bash)), 'usr', 'bin', 'sh.exe'), win32.join(win32.dirname(bash), 'sh.exe')] : []),
+    ...roots.filter((r): r is string => typeof r === 'string' && r !== '').map((r) => win32.join(r, 'Git', 'usr', 'bin', 'sh.exe')),
+  ];
+  return found.find((p) => exists(p)) ?? null;
+}
+
+/** The command Claude Code runs: Git's `sh` on Windows when there is one, else the PowerShell shim; `sh` elsewhere. */
+export function hookCommand(which: Which, scripts: string, platform: string = process.platform, shell: string | null = platform === 'win32' ? gitShell() : null): string {
+  if (platform !== 'win32') return `sh "${join(scripts, 'braindog-hook.sh')}" ${which}`;
+  return shell !== null
+    ? `"${shell}" "${join(scripts, 'braindog-hook.sh').replaceAll('\\', '/')}" ${which}`
+    : `powershell -NoProfile -ExecutionPolicy Bypass -File "${join(scripts, 'braindog-hook.ps1')}" ${which}`;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
