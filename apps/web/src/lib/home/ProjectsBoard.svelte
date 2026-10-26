@@ -1,0 +1,774 @@
+<!--
+  THE PROJECTS PAGE AS ONE BOARD (`projects-board.ts` works it out, `projects-board-read.ts` reads it): drawn in the slot
+  of the page's block over every project (`key: board`, the Projects template).
+
+  FROM THE TOP: the lead tile, the date line, a headline that is a fact naming the projects, what it counted, and the red
+  button to the late work; beside it what the earning projects bring in a month, each with its own warning. Then this
+  week's four tiles: late, due in seven days, numbers gone quiet, renewals. Then ONE LIST in three groups, earning, then
+  building that is moving or due, then building and quiet, each row the project, its next step whole, one chip, the
+  number it leads with and its line, and the last real work on it. Then the parked as a strip of chips that say only
+  what is due, and the finished as a count.
+
+  ON A PHONE the same sentence leads, the four tiles go two by two, and a row is its name and chip, its next step in two
+  lines, and one small line of its number and its last work.
+
+  While the reads are out the board draws the projects from the block's own rows, so the page never opens blank.
+-->
+<script lang="ts">
+  import { untrack } from 'svelte';
+  import { apiBase, at } from '$lib/at.ts';
+  import { live } from '$lib/data/live.svelte.ts';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import ProjectWell from '$lib/ui/ProjectWell.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
+  import { slotStyle } from './project-cards.ts';
+  import { sparkOf, type Board, type BoardRow } from './projects-board.ts';
+  import { readBoard } from './projects-board-read.ts';
+
+  let { list, entries }: { list: string; entries: readonly { seq?: unknown; id?: unknown; fields?: Record<string, unknown> }[] } = $props();
+
+  let board = $state.raw<Board | null>(null);
+  let failed = $state(false);
+  const said = $derived(`${list}:${entries.map((e) => String(e.seq)).join(',')}`);
+  $effect(() => {
+    const key = said;
+    void live.version;
+    untrack(() => {
+      void readBoard(apiBase(), list, entries)
+        .then((got) => {
+          if (key !== said) return;
+          board = got;
+          failed = got === null;
+        })
+        .catch(() => (failed = true));
+    });
+  });
+
+  const W = 80;
+  const H = 24;
+  const spark = (r: BoardRow) => (r.number.kind === 'kpi' ? sparkOf(r.number.points, W, H) : null);
+  const share = (minor: number, total: number) => `${Math.max(2, Math.round((minor / Math.max(1, total)) * 100))}%`;
+</script>
+
+{#if board}
+  {@const b = board}
+  {@const earnTotal = b.earning.lines.reduce((s, l) => s + l.minor, 0)}
+  <div class="projects-board">
+    <div class="b-top">
+      <section class="b-lead" aria-label="Where the projects are">
+        <p class="b-date">{b.date}</p>
+        <h2 class="b-head" dir="auto">{b.headline}</h2>
+        {#if b.lede}<p class="b-lede" dir="auto">{b.lede}</p>{/if}
+        {#if b.acts.late || b.acts.feed || b.acts.asks}
+          <div class="b-acts">
+            {#if b.acts.late}<Button weight="primary" href={b.acts.late.href}>{b.acts.late.said}</Button>{/if}
+            {#if b.acts.feed}<Button href={b.acts.feed.href}>{b.acts.feed.said}</Button>{/if}
+            {#if b.acts.asks}<a class="b-ask" href={at(b.acts.asks.href)} dir="auto">{b.acts.asks.said}</a>{/if}
+          </div>
+        {/if}
+      </section>
+      <section class="b-earn" aria-label="Earning, a month">
+        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">Earning, a month</h2>{#if b.earning.lines.length > 0}<span class="t-meta">{b.earning.lines.length} {b.earning.lines.length === 1 ? 'project' : 'projects'}</span>{/if}</header>
+        {#if b.earning.total}
+          <p class="e-total num">{b.earning.total}</p>
+          {#if b.earning.year}<p class="small">{b.earning.year}</p>{/if}
+          <div class="e-stack" aria-hidden="true">
+            {#each b.earning.lines as l (l.name)}<i style={slotStyle(l.hue)} style:inline-size={share(l.minor, earnTotal)}></i>{/each}
+          </div>
+          <ul class="kv">
+            {#each b.earning.lines as l (l.name)}
+              <li>
+                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name" dir="auto">{l.name}</span>{#if l.status}<span class="small" data-warn={l.warn ? '' : undefined}>· {l.status}</span>{/if}</a>
+                <span class="kv-v num">{l.said}</span>
+              </li>
+            {/each}
+          </ul>
+          {#if b.earning.also}<p class="small">{b.earning.also}</p>{/if}
+        {:else}
+          <p class="e-empty">{b.earning.empty}</p>
+        {/if}
+      </section>
+    </div>
+
+    <div class="b-week" role="list" aria-label="This week">
+      {@render week('Late', 'clock', 'late', b.week.late)}
+      {@render week('Due in 7 days', 'calendar', 'plain', b.week.due)}
+      {@render week('Numbers gone quiet', 'activity', 'warn', b.week.quiet)}
+      {@render week('Renewals, 60 days', 'globe', 'plain', b.week.renewals)}
+    </div>
+
+    {#if b.groups.length > 0}
+      <section class="b-list" aria-label="Projects in play">
+        <div class="r-head" aria-hidden="true"><span>Project</span><span>Next step</span><span>Needs</span><span>Its number</span><span>Last real work</span></div>
+        {#each b.groups as g (g.id)}
+          <h3 class="g-head">{g.name} <span>{g.said}</span></h3>
+          <ul class="rows">
+            {#each g.rows as r (r.key)}
+              {@const s = spark(r)}
+              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined}>
+                <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title" dir="auto">{r.name}</span></a>
+                <p class="r-next" dir="auto" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
+                <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
+                <div class="r-num" style={slotStyle(r.hue)}>
+                  {#if r.number.kind === 'kpi'}
+                    <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small" dir="auto">{r.number.sub}</span></div>
+                    {#if s}<svg class="spark" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
+                  {:else if r.number.kind === 'aim'}
+                    <div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div>
+                  {:else}
+                    <span class="muted">{r.number.said}</span>
+                  {/if}
+                </div>
+                <div class="r-work">
+                  {#if r.work.agent}<AgentFace agent={r.work.agent} run="" live="stopped" size="xs" />{:else}<span class="face-none" aria-hidden="true">–</span>{/if}
+                  <span class="w-words"><span class:muted={r.work.none}>{r.work.said}</span>{#if r.work.sub}<span class="small">{r.work.sub}</span>{/if}</span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/each}
+      </section>
+    {/if}
+
+    {#if b.parked.length > 0 || b.finished.count > 0}
+      <section class="b-parked" aria-label="Parked and finished">
+        <header class="t-head">
+          <IconWell name="archive" size="m" /><h2 class="t-title">Parked <span class="t-count num">{b.parked.length}</span></h2>
+          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>Finished {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
+        </header>
+        {#if b.parked.length > 0}
+          <ul class="chips">
+            {#each b.parked as p (p.href)}
+              <li><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span dir="auto">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
+  </div>
+{:else if !failed}
+  <Waiting rows={4} />
+{/if}
+
+{#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
+  <section class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>
+    <header class="t-head"><IconWell name={icon} size="m" /><h3 class="t-title">{title}</h3></header>
+    <p class="wk-fig num">{t.count}<span>{t.said}</span></p>
+    {#if t.lines.length > 0}
+      <ul class="wk-lines">
+        {#each t.lines as l, n (n)}
+          <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a href={at(l.href)} dir="auto"><span class="strong">{l.project}</span> · {l.text}</a></li>
+        {/each}
+      </ul>
+      {#if t.more > 0}<p class="small">and {t.more} more</p>{/if}
+    {/if}
+  </section>
+{/snippet}
+
+<style>
+  .projects-board {
+    display: grid;
+    gap: var(--inset, 12px);
+    min-inline-size: 0;
+  }
+
+  .b-lead,
+  .b-earn,
+  .wk,
+  .b-list,
+  .b-parked {
+    min-inline-size: 0;
+    padding: var(--tile-pad, 20px);
+    border-radius: var(--r-tile, 16px);
+    background: var(--tile);
+    color: var(--ink);
+  }
+
+  .b-top {
+    display: grid;
+    gap: var(--inset, 12px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (width >= 1000px) {
+    .b-top {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+
+    .b-lead,
+    .b-earn {
+      padding: var(--sp-5, 24px);
+    }
+  }
+
+  .b-date {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .b-head {
+    margin: 10px 0 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 25px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 30px;
+    text-wrap: pretty;
+  }
+
+  @media (width >= 640px) {
+    .b-head {
+      font-size: 34px;
+      line-height: 40px;
+    }
+  }
+
+  .b-lede {
+    max-inline-size: 64ch;
+    margin: 12px 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .b-acts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-block-start: 18px;
+  }
+
+  .b-ask {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    text-decoration: none;
+  }
+
+  .b-ask:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
+  /* ── a tile's head, as `Tile` draws it ── */
+  .t-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2, 8px) var(--sp-3, 12px);
+    min-block-size: var(--well, 28px);
+  }
+
+  .t-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi, 600);
+    line-height: 22px;
+  }
+
+  .t-count {
+    margin-inline-start: 4px;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  .t-meta {
+    margin-inline-start: auto;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .small {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .small[data-warn] {
+    color: var(--warn);
+  }
+
+  .muted {
+    color: var(--ink-3);
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── earning ── */
+  .e-total {
+    margin: 12px 0 0;
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 44px;
+  }
+
+  .e-stack {
+    display: flex;
+    gap: 2px;
+    block-size: 10px;
+    margin-block: 12px;
+    overflow: hidden;
+    border-radius: 5px;
+  }
+
+  .e-stack i,
+  .sw {
+    background: var(--ph);
+  }
+
+  .e-stack i {
+    display: block;
+  }
+
+  .e-empty {
+    margin: 12px 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .kv {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .kv li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-block: 9px;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .kv li:first-child {
+    border-block-start: 0;
+  }
+
+  .kv-k {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 6px;
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .kv-k:hover .kv-name {
+    text-decoration: underline;
+  }
+
+  .sw {
+    display: inline-block;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 2px;
+  }
+
+  .kv-v {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ── this week ── */
+  .b-week {
+    display: grid;
+    gap: var(--inset, 12px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (width >= 1000px) {
+    .b-week {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .wk {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .wk-fig {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 8px;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 32px;
+  }
+
+  .wk-fig span {
+    color: var(--ink-3);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  .wk[data-tone='late'] .wk-fig {
+    color: var(--red);
+  }
+
+  .wk-lines {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .wk-lines li {
+    display: flex;
+    gap: 8px;
+    min-inline-size: 0;
+  }
+
+  .wk-lines b {
+    flex: none;
+    inline-size: 50px;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  .wk-lines a {
+    min-inline-size: 0;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+
+  .wk-lines a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
+  .strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* On a phone a tile shows two of its lines. */
+  @media (width < 640px) {
+    .wk-lines li:nth-child(n + 3) {
+      display: none;
+    }
+  }
+
+  /* ── the list ── */
+  .r-head,
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px 16px;
+  }
+
+  .r-head {
+    display: none;
+    padding-block-end: 8px;
+    color: var(--ink-3);
+    font-size: var(--fs-cap, 12px);
+    line-height: 16px;
+  }
+
+  @media (width >= 1000px) {
+    .r-head,
+    .row {
+      grid-template-columns: 170px minmax(0, 1fr) 150px 190px 168px;
+      align-items: start;
+    }
+
+    .r-head {
+      display: grid;
+    }
+  }
+
+  .g-head {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin: 18px 0 4px;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  .g-head:first-of-type {
+    margin-block-start: 4px;
+  }
+
+  .g-head span {
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .row {
+    padding-block: 12px;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .row[data-quiet] {
+    padding-block: 9px;
+  }
+
+  .r-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-inline-size: 0;
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .r-name:hover .r-title {
+    text-decoration: underline;
+  }
+
+  .r-title {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .r-next {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 20px;
+    overflow-wrap: anywhere;
+  }
+
+  .r-next[data-none] {
+    color: var(--ink-3);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    block-size: 22px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: var(--tile-2, var(--hover));
+    color: var(--ink-2);
+    font-size: var(--fs-cap, 12px);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .chip[data-tone='late'] {
+    background: var(--red-tint);
+    color: var(--red);
+  }
+
+  .chip[data-tone='warn'] {
+    background: var(--warn-tint, var(--cat-yellow-tint));
+    color: var(--warn);
+  }
+
+  .dot {
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .r-num {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-inline-size: 0;
+  }
+
+  .n-words {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .n-fig {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 26px;
+  }
+
+  .n-fig[data-stale] {
+    color: var(--ink-2);
+  }
+
+  .spark {
+    flex: none;
+  }
+
+  .sp-line {
+    fill: none;
+    stroke: var(--ph);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .sp-area {
+    fill: color-mix(in oklab, var(--ph) 12%, transparent);
+  }
+
+  .sp-end {
+    fill: var(--ph);
+  }
+
+  .spark[data-stale] .sp-line {
+    stroke: var(--ink-3);
+  }
+
+  .spark[data-stale] .sp-end {
+    fill: var(--ink-3);
+  }
+
+  .spark[data-stale] .sp-area {
+    fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
+  }
+
+  .r-work {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-inline-size: 0;
+    font-size: var(--fs-body);
+    line-height: 20px;
+  }
+
+  .face-none {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+    border-radius: 50%;
+    background: var(--tile-2, var(--hover));
+    color: var(--ink-3);
+    font-size: 11px;
+  }
+
+  .w-words {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  /* ON A PHONE: name and chip on one line, the next step in two, and one small line for the number and the work. */
+  @media (width < 1000px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: 'name chip' 'next next' 'num work';
+      align-items: center;
+    }
+
+    .r-name {
+      grid-area: name;
+    }
+
+    .r-chip {
+      grid-area: chip;
+    }
+
+    .r-next {
+      grid-area: next;
+      display: -webkit-box;
+      overflow: hidden;
+      padding-inline-start: 34px;
+      font-size: var(--fs-meta);
+      line-height: 18px;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+    }
+
+    .r-num {
+      grid-area: num;
+      padding-inline-start: 34px;
+    }
+
+    .r-work {
+      grid-area: work;
+      justify-self: end;
+      font-size: var(--fs-meta);
+      line-height: 18px;
+    }
+
+    .n-fig {
+      font-size: var(--fs-body);
+      line-height: 20px;
+    }
+
+    .r-num .small,
+    .r-work .small,
+    .r-num .muted,
+    .face-none,
+    .r-work :global(.agent-face) {
+      display: none;
+    }
+
+    .r-num .n-words .small {
+      display: none;
+    }
+  }
+
+  /* ── parked and finished ── */
+  .b-parked {
+    display: grid;
+    gap: 14px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-block-size: 36px;
+    padding: 0 12px 0 4px;
+    border-radius: 10px;
+    background: var(--tile-2, var(--hover));
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    text-decoration: none;
+  }
+
+  .pchip:hover {
+    background: var(--hover);
+  }
+
+  .pchip :global(.icon-well) {
+    transform: scale(0.85);
+  }
+</style>

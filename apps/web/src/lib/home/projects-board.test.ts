@@ -1,0 +1,184 @@
+/**
+ * The Projects board: a headline that is a fact naming the projects, what they earn a month, this week's counts, one
+ * list in three groups, and the parked folded into a strip.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { boardOf, endedAs, names, quietOf, runProject, sparkOf, type BoardInput, type BoardProject } from './projects-board.ts';
+
+test('a line is drawn from three readings, inside its box', () => {
+  assert.equal(sparkOf([1, 2], 80, 24), null);
+  const s = sparkOf([1, 3, 2], 80, 24)!;
+  assert.equal(s.line, 'M2.0 22.0 L40.0 2.0 L78.0 12.0');
+  assert.deepEqual(s.end, [78, 12]);
+});
+
+const NOW = Date.UTC(2026, 9, 27, 10);
+const TODAY = '2026-10-27';
+const usd = (minor: number) => `$${(minor / 100).toLocaleString('en-US')}`;
+
+const project = (seq: number, name: string, lane: string, more: Partial<BoardProject> = {}): BoardProject => ({
+  seq,
+  id: `id${seq}`,
+  spoken: `things#${seq}`,
+  name,
+  mark: '',
+  hue: null,
+  lane,
+  next: '',
+  health: '',
+  href: `/p/${name.toLowerCase()}`,
+  year: null,
+  repos: [],
+  ...more,
+});
+
+const base = (more: Partial<BoardInput> = {}): BoardInput => ({
+  projects: [
+    project(1, 'Kiln', 'earning', { repos: ['kiln-app'] }),
+    project(2, 'Portage', 'building', { next: 'Write the launch post, then ship it by 30 Oct.' }),
+    project(3, 'Lantern', 'building'),
+    project(4, 'Tidewater', 'building'),
+    project(5, 'Moss', 'parked'),
+    project(6, 'Fern', 'retired'),
+  ],
+  tasks: [],
+  moves: [],
+  runs: [],
+  kpis: [],
+  asks: [],
+  renewals: [],
+  recurring: [],
+  now: NOW,
+  today: TODAY,
+  format: (m) => usd(m),
+  home: 'USD',
+  hrefs: { late: '/r/tasks?late', asks: '/decide', feed: '/numbers/setup', numbers: '/p/all-numbers' },
+  ...more,
+});
+
+test('nothing late, due or quiet says so, never that nothing needs a push', () => {
+  const b = boardOf(base({ projects: base().projects.map((p) => ({ ...p, next: '' })) }));
+  assert.equal(b.headline, 'Nothing is late, due this week or gone quiet.');
+  assert.equal(b.date, 'Tuesday 27 October · 4 in play · 1 parked · 1 finished');
+});
+
+test('the headline names the late projects and the quiet numbers, and the button opens the late work', () => {
+  const b = boardOf(
+    base({
+      tasks: [
+        { seq: 10, project: 'things#1', title: 'Check the door on two phones', by: '2026-10-26', href: '/r/tasks/10' },
+        { seq: 11, project: 'id3', title: 'Deploy the first wave', by: '2026-10-26', href: '/r/tasks/11' },
+        { seq: 12, project: 'things#1', title: 'Send the draft', by: null, href: '/r/tasks/12' },
+      ],
+      kpis: [
+        { project: 'things#4', name: 'Players a day', figure: '289', money: null, every: '1d', latestAt: '2026-09-28', points: [1, 2, 3], move: null, stale: '29 days old', aim: null, readings: 40 },
+      ],
+    }),
+  );
+  assert.equal(b.headline, 'Kiln and Lantern are a day late, and Tidewater stopped sending numbers.');
+  assert.match(b.lede ?? '', /“Check the door on two phones” was due Mon 26 Oct/u);
+  assert.deepEqual(b.acts.late, { said: 'Open the 2 late tasks', href: '/r/tasks?late' });
+  assert.deepEqual(b.acts.feed, { said: 'Fix the numbers feed', href: '/numbers/setup' });
+  assert.equal(b.week.late.count, 2);
+  assert.equal(b.week.late.said, 'tasks, 1 day over');
+  assert.equal(b.week.quiet.count, 1);
+  assert.equal(b.week.quiet.said, 'since 28 Sep');
+  const kiln = b.groups[0]!.rows[0]!;
+  assert.deepEqual(kiln.chip, { tone: 'late', text: '1 late · 2 open' });
+  const tide = b.groups.flatMap((g) => g.rows).find((r) => r.name === 'Tidewater')!;
+  assert.deepEqual(tide.chip, { tone: 'warn', text: 'numbers 29 days old' });
+});
+
+test('a day written in a next step is due this week, and puts the project among the moving', () => {
+  const b = boardOf(base());
+  assert.equal(b.week.due.count, 1);
+  assert.deepEqual(b.week.due.lines[0], { day: 'Fri 30', project: 'Portage', text: 'Ship it', href: '/p/portage' });
+  const moving = b.groups.find((g) => g.id === 'moving')!;
+  assert.deepEqual(
+    moving.rows.map((r) => r.name),
+    ['Portage'],
+  );
+  assert.deepEqual(moving.rows[0]!.chip, { tone: 'plain', text: 'Fri 30 Oct' });
+  assert.equal(b.headline, 'Portage has work due Fri 30 Oct.');
+  const quiet = b.groups.find((g) => g.id === 'quiet')!;
+  assert.deepEqual(
+    quiet.rows.map((r) => r.name),
+    ['Lantern', 'Tidewater'],
+  );
+});
+
+test('last real work is a tagged run or a task change, never an edit of the project row', () => {
+  const run = { seq: 7, agent: 'claude', project: '', repo: 'kiln-app', remote: '', cwd: '/home/dev/kiln-app', at: new Date(NOW - 30 * 60_000).toISOString(), state: 'done', closedAs: '', handed: false };
+  const b = boardOf(base({ runs: [run], moves: [{ project: 'things#3', at: new Date(NOW - 2 * 86_400_000).toISOString() }] }));
+  const kiln = b.groups[0]!.rows[0]!;
+  assert.deepEqual(kiln.work, { agent: 'claude', said: '30 min ago', sub: 'ended without a handoff', none: false });
+  const lantern = b.groups.find((g) => g.id === 'moving')!.rows.find((r) => r.name === 'Lantern')!;
+  assert.equal(lantern.work.said, 'Tasks changed 2 days ago');
+  const tide = b.groups.find((g) => g.id === 'quiet')!.rows[0]!;
+  assert.deepEqual(tide.work, { agent: null, said: 'No session tagged', sub: null, none: true });
+});
+
+test('a run is placed by its tag, else loosely by its repository, remote or folder', () => {
+  const ps = base().projects;
+  assert.equal(runProject({ project: 'things#2', repo: '', remote: '', cwd: '' }, ps)?.name, 'Portage');
+  assert.equal(runProject({ project: '', repo: '', remote: 'github.com/someone/Kiln-App.git', cwd: '' }, ps)?.name, 'Kiln');
+  assert.equal(runProject({ project: '', repo: '', remote: '', cwd: 'C:\\code\\lantern' }, ps)?.name, 'Lantern');
+  assert.equal(runProject({ project: '', repo: '', remote: '', cwd: '/home/dev' }, ps), null);
+});
+
+test('how a run ended is said in words', () => {
+  assert.equal(endedAs({ state: 'active', closedAs: '', handed: false }).said, 'still open');
+  assert.equal(endedAs({ state: 'handoff', closedAs: '', handed: true }).said, 'handed off');
+  assert.equal(endedAs({ state: 'done', closedAs: 'dropped', handed: false }).said, 'dropped');
+  assert.equal(endedAs({ state: 'done', closedAs: '', handed: false }).said, 'ended without a handoff');
+});
+
+test('earning a month adds linked repeating money, else a monthly key number, in one currency', () => {
+  const projects = [project(1, 'Kiln', 'earning'), project(2, 'Marlow', 'earning'), project(3, 'Oxbow', 'earning')];
+  const b = boardOf(
+    base({
+      projects,
+      recurring: [{ project: 'things#1', minor: 875_000, currency: 'USD', every: 'month', state: 'live', nextDue: '2026-10-31' }],
+      kpis: [{ project: 'things#2', name: 'Revenue by month', figure: '$4,815', money: { minor: 481_500, currency: 'USD' }, every: '1m', latestAt: '2026-09-30', points: [], move: null, stale: null, aim: null, readings: 12 }],
+    }),
+  );
+  assert.equal(b.earning.total, '$13,565');
+  assert.deepEqual(
+    b.earning.lines.map((l) => [l.name, l.said, l.status]),
+    [
+      ['Kiln', '$8,750', 'next pay Sat 31 Oct'],
+      ['Marlow', '$4,815', 'Sep'],
+    ],
+  );
+  assert.equal(b.earning.also, '1 project with no money linked');
+  assert.match(b.groups[0]!.said, /about \$13,565 a month/u);
+});
+
+test('no money linked to an earning project says how to link it', () => {
+  const b = boardOf(base());
+  assert.equal(b.earning.total, null);
+  assert.match(b.earning.empty ?? '', /No money is linked/u);
+});
+
+test('the parked ask nothing unless something of theirs is due, and the finished are a count', () => {
+  const b = boardOf(base({ renewals: [{ project: 'things#5', name: 'moss.example', day: '2026-11-20', href: '/r/services/9' }] }));
+  assert.deepEqual(b.parked, [{ name: 'Moss', mark: '', hue: null, href: '/p/moss', due: 'moss.example renews 20 Nov' }]);
+  assert.deepEqual(b.finished, { count: 1, names: ['Fern'] });
+  assert.equal(b.week.renewals.count, 1);
+  assert.equal(b.headline.includes('moss.example renews in 24 days'), true);
+});
+
+test('a number with a cadence is quiet past twice it, and one without past two weeks', () => {
+  assert.deepEqual(quietOf({ every: '1d', latestAt: '2026-10-24' }, TODAY), { quiet: true, days: 3 });
+  assert.deepEqual(quietOf({ every: '1m', latestAt: '2026-09-30' }, TODAY), { quiet: false, days: 27 });
+  assert.deepEqual(quietOf({ every: null, latestAt: '2026-10-20' }, TODAY), { quiet: false, days: 7 });
+});
+
+test('names join as a sentence', () => {
+  assert.equal(names(['A']), 'A');
+  assert.equal(names(['A', 'B']), 'A and B');
+  assert.equal(names(['A', 'B', 'C', 'D']), 'A, B and 2 more');
+});

@@ -649,6 +649,9 @@
       return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: c.told ? (c.worked ?? null) : (said?.worked ?? null), last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? null), moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
+  /* THE PROJECTS PAGE'S BOARD (`ProjectsBoard.svelte`): a cards block over the projects list keyed `board` is drawn as
+     the one board, its headline, its money, its week, its list and its parked, in place of a grid of cards. */
+  const board = $derived(block.key === 'board' && projectCards !== null && !arranging ? (block.register ?? null) : null);
   /* THE DESK'S ROW OF CARDS, by the desk's own rule (`deskCards`), each leading with its project's key number. */
   const deskProjects = $derived.by(() => {
     if (desk?.kind !== 'projects') return null;
@@ -713,7 +716,7 @@
   <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
        ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
        heading list. While arranging it shows, since that is the label a block is moved by. -->
-  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) || (desk && !arranging) || (parts !== null && !arranging) ? '' : undefined}>
+  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && (lanes.length > 1 || board) && !arranging) || (desk && !arranging) || (parts !== null && !arranging) ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
@@ -838,6 +841,8 @@
     {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
   {#if most !== null}<button type="button" class="block-more tap" data-queue-more onclick={(e) => void unfold(e, most)}>{words.more(every.length - most)}</button>{/if}
+{:else if board}
+  {#await import('$lib/home/ProjectsBoard.svelte') then { default: ProjectsBoard }}<ProjectsBoard list={board} entries={(block.entries ?? []) as never} />{/await}
 {:else if projectCards}
   <!-- THE CARDS ON THE BOARD, NOT IN A TILE (proj F5): the slot's fill and padding go (`:has(> .project-cards)` below),
        its heading is the lane bar, and the cards take the one grid every screen lays them in. -->
@@ -1263,7 +1268,7 @@
 
   /* THE CARDS STAND ON THE BOARD (proj F5): a slot holding them is no tile, so a card is the white card Today draws and
      never a grey one inside a white one. */
-  :global(.block-slot.block-slot:is(:has(> .project-cards), :has(> .project-lanes))) {
+  :global(.block-slot.block-slot:is(:has(> .project-cards), :has(> .project-lanes), :has(> .projects-board))) {
     padding: 0;
     background: none;
     container-type: inline-size;
