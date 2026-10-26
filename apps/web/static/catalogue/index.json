@@ -4605,8 +4605,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.6.0",
+      "latest": "3.7.0",
       "versions": [
+        {
+          "version": "3.7.0",
+          "checksum": "d7b5353d42ae30c43a93980a0134660ab19fc792109c3672eb8f9f0fe5cf299c",
+          "bytes": 42301,
+          "published_at": "2026-10-26T23:00:31.039Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.6.0",
           "checksum": "a487e38352ff5e1d302efe5172ee30aac887f5b17de4ecce1fe9742af7b866c0",
@@ -5642,8 +5671,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.27.0",
+      "latest": "2.28.0",
       "versions": [
+        {
+          "version": "2.28.0",
+          "checksum": "702b5359d674b9f837e8d63f7e85efa970123ac713b3b60081e555f580650b49",
+          "bytes": 37416,
+          "published_at": "2026-10-26T23:00:31.039Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.27.0",
           "checksum": "658b5ab6291de6610e00870ccaf28e09e53086710fa41b04487ea71953185a0e",
