@@ -55,6 +55,16 @@ export type ShapeWork = { list: string; rows: unknown[]; cursor: unknown };
 /** The runs on a project, newest heard first, and the field that names it, as `list` answers them. */
 export type ShapeRuns = { list: string; field: string; rows: unknown[] };
 
+/** A list that points at the project, the field it points by, and its rows on this project, as `list` answers them. */
+export type ShapeRows = { list: string; field: string; rows: unknown[] };
+
+/** The most readings of its numbers read, newest first: four months of a few daily measures. */
+export const SHAPE_READINGS_READ = 2000;
+/** The most services and repeating payments read. */
+export const SHAPE_LINKED_READ = 100;
+/** The most answered questions about it read, latest first. */
+export const SHAPE_DECIDED_READ = 6;
+
 /** What the shape answers: each part as its own method answered it, `null` where that part was refused or has none. */
 export type ShapeAnswer = {
   register: string;
@@ -73,7 +83,33 @@ export type ShapeAnswer = {
   kpis: unknown[] | null;
   /** Its money, each figure by its id (`project-in-month:Kiln`), as `metric` answers it. */
   figures: Record<string, unknown>;
+  /**
+   * WHAT ITS PAGE DRAWS BESIDE THE SHAPE'S FIRST PARTS (the project page of 27 October): what it runs on and when each
+   * renews, the readings of its numbers in the last four months, the money that repeats on it, and what was decided
+   * about it. Each list found by what it declares, each read as `list` answers it alone; `null` where the record keeps
+   * no such list or refused the read.
+   */
+  services?: ShapeRows | null;
+  readings?: ShapeRows | null;
+  recurring?: ShapeRows | null;
+  decided?: unknown[] | null;
 };
+
+/**
+ * The first list that points at `projects` and declares every field in `ids`, by what it declares and never its name, and
+ * none that hands work out (the work is read as work).
+ */
+export function linkedListOf(decls: readonly Decl[], projects: string, ids: readonly string[]): { list: string; field: string } | null {
+  for (const d of decls) {
+    if (d.id === projects || handOf(d as unknown as Record<string, unknown>) !== null) continue;
+    const field = d.fields.find((f) => f.type === 'ref' && f.to === projects);
+    if (field && ids.every((id) => d.fields.some((f) => f.id === id))) return { list: d.id, field: field.id };
+  }
+  return null;
+}
+
+/** The fields each linked list is known by. */
+export const SHAPE_LINKED = { services: ['renews', 'provider'], readings: ['at', 'value', 'name'], recurring: ['every', 'next_due', 'direction'] } as const;
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
 const asking = <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => ask(args as never, ctx as never).catch(() => null);
@@ -130,5 +166,19 @@ export async function shapeAnswerOf(asks: ShapeAsks, register: string, seq: numb
       const got = valueOf(await asking(asks.metric, { metric: id }, ctx));
       if (got !== null) figures[id] = got;
     }
-  return { register, seq, row, history, links, work, runs, kpis, figures };
+  /* WHAT IT RUNS ON, ITS READINGS AND ITS REPEATING MONEY, each list read alone on this project. */
+  const linked = async (ids: readonly string[], extra: Record<string, unknown>): Promise<ShapeRows | null> => {
+    const on = linkedListOf(decls, register, ids);
+    if (on === null) return null;
+    const got = valueOf(await asking(asks.list, { register: on.list, where: `${on.field} is ${spoken}`, ...extra }, ctx)) as { rows?: unknown[] } | null;
+    return got !== null && Array.isArray(got.rows) ? { ...on, rows: got.rows } : null;
+  };
+  const services = await linked(SHAPE_LINKED.services, { limit: SHAPE_LINKED_READ });
+  const readings = await linked(SHAPE_LINKED.readings, { limit: SHAPE_READINGS_READ, order: [{ field: 'at', dir: 'desc' }] });
+  const recurring = await linked(SHAPE_LINKED.recurring, { limit: SHAPE_LINKED_READ });
+  /* WHAT WAS DECIDED ABOUT IT, the body a `governance.decided` block over this row asks, drawn by the same method. */
+  const asked = { page: 'decided', title: 'Decided', blocks: [{ kind: 'table', source: 'governance.decided', where: `about is ${spoken}`, columns: [{ field: 'question' }, { field: 'answer_label' }, { field: 'answer' }, { field: 'at' }], limit: SHAPE_DECIDED_READ }] };
+  const said = valueOf(await asking(asks.previewPage, { body: asked }, ctx)) as { blocks?: { rows?: unknown }[] } | null;
+  const decided = Array.isArray(said?.blocks?.[0]?.rows) ? (said.blocks[0].rows as unknown[]) : null;
+  return { register, seq, row, history, links, work, runs, kpis, figures, services, readings, recurring, decided };
 }

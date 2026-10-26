@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
-import { SHAPE_FIGURES, workListOf, type ShapeAnswer } from '../src/project-shape.ts';
+import { SHAPE_FIGURES, SHAPE_LINKED, linkedListOf, workListOf, type ShapeAnswer } from '../src/project-shape.ts';
 import { runsListOf } from '../src/today.ts';
 import { installSeed } from '../../seed/src/index.ts';
 import { NOW } from '../../seed/src/modules/base.ts';
@@ -67,6 +67,19 @@ test("ONE PAGE CALL HOLDS EVERY PART: the row, what was said, what points here, 
     assert.deepEqual(shape.figures[id] ?? null, alone.ok ? alone.value : null, id);
   }
   assert.ok(Object.keys(shape.figures).length > 0, 'the money is asked by the project name');
+
+  /* WHAT IT RUNS ON, ITS READINGS AND ITS REPEATING MONEY, each the answer `list` gives alone. */
+  const alone = async (on: { list: string; field: string } | null, extra: Record<string, unknown>) =>
+    on === null ? null : value<{ rows: unknown[] }>(await api.list({ register: on.list, where: `${on.field} is ${spoken}`, ...extra } as never, owner)).rows;
+  const services = linkedListOf(decls, register, SHAPE_LINKED.services);
+  assert.ok(services && shape.services, 'the seed keeps services on its projects');
+  assert.deepEqual(shape.services.rows, await alone(services, { limit: 100 }));
+  assert.ok(shape.services.rows.length > 0, 'the sample runs Kiln on a service');
+  const readings = linkedListOf(decls, register, SHAPE_LINKED.readings);
+  assert.deepEqual(shape.readings?.rows ?? null, await alone(readings, { limit: 2000, order: [{ field: 'at', dir: 'desc' }] }));
+  const recurring = linkedListOf(decls, register, SHAPE_LINKED.recurring);
+  assert.deepEqual(shape.recurring?.rows ?? null, await alone(recurring, { limit: 100 }));
+  assert.ok(Array.isArray(shape.decided), 'what was decided about it is read');
   sql.close();
 });
 

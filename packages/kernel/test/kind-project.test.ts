@@ -32,7 +32,7 @@ const refusalOf = (out: { ok: boolean }) => (!out.ok && 'refusal' in out ? (out 
 test('every part of the shape installs, alone or beside others, and is answered as the block with its parts', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  const rows = [['hero'], ['path', 'money'], ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here']];
+  const rows = [['hero', 'side'], ['path', 'money'], ['numbers', 'what-is-open'], ['dates', 'who-is-on-it', 'runs-on'], ['agents-here', 'decisions'], ['happened']];
   assert.deepEqual(rows.flat().sort(), [...PROJECT_PARTS].sort(), 'a part of the shape is in no row');
   assert.equal(refusalOf(await k.install([pageOf(...rows.map((parts) => ({ kind: 'project', parts, heading: parts.join(' and '), span: 12 })))])), null, 'a row of the shape was refused at install');
   for (const parts of rows) {
