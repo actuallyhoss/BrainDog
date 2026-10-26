@@ -84,7 +84,7 @@ const RESERVED = new Set([
      `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
      set does not hold, so a route added later cannot fall behind it. */
   'activity', 'add', 'agents', 'audit', 'automations', 'catalogue', 'connect', 'decide', 'design', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
-  'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
+  'keychain', 'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
 
 /**
