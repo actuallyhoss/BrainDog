@@ -595,6 +595,11 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      the answer: nothing is filed and the proposer is told which. A rule's, Slash's or a person's question derives none,
      for migration 31's reason: an automation's run waits on its own question, and two runs asking alike are two asks. */
   const by = typeof actor === 'function' ? actor() : actor;
+  /* AN AGENT'S OPTION THAT SAYS A CHANGE CARRIES IT (`unwritten`), or picking it would be recorded and change nothing. */
+  if (p.body_kind === 'options' && RUN_ID.test(by)) {
+    const bare = unwritten(body);
+    if (bare) return { ok: false, refusal: bare };
+  }
   /* A MODEL'S DRAFT NAMES NOBODY TO DECIDE IT: Slash writes only suggest, propose and predict, and handing one is the owner's. */
   if (p.decider !== undefined && by === SLASH)
     return no<Filed>('FORBIDDEN', 'A question Slash drafts names nobody to decide it. The owner hands it to somebody.', { at: 'decider' });
@@ -2728,6 +2733,32 @@ function patchesFault(deps: GovernDeps, raw: unknown, at: string): Refusal | nul
     if (!deps.hasRegister(list)) return { code: 'REGISTER_UNKNOWN', fix: `There is no list called ${list}.`, at };
     const bad = checkUpdates(deps, list, rows);
     if (bad) return { ...bad, at: bad.at?.replace(/^body\.rows/u, at) ?? at };
+  }
+  return null;
+}
+
+/**
+ * The first word of an option that moves entries along: close them, mark them done, move them, file them. Only words
+ * that say nothing but a change to rows: "Drop it" or "Merge them" may be a list's field or the record's own merge,
+ * which the asker carries out on its own way.
+ */
+const CHANGES = /^(?:archive|cancel|close|complete|file|finish|mark|move|reopen|retire|supersede|tick)\b/iu;
+
+/**
+ * The refusal for an agent's option that says a change and carries none, or `null`.
+ *
+ * MEASURED ON THE LIVE RECORD: "Close all six" was an option of words only. The owner picked it, the decision was kept,
+ * and the six tasks stayed open, because nothing but `patches` is ever written at a press and the agent that asked was
+ * gone by then. So an option a run files that starts with a change carries the changes, or the question is a rowset.
+ */
+function unwritten(body: Record<string, unknown>): Refusal | null {
+  for (const [n, o] of listOf(body.options).entries()) {
+    if (!isMap(o) || o.patches !== undefined || typeof o.label !== 'string' || !CHANGES.test(o.label.trim())) continue;
+    return {
+      code: 'REQUIRED_MISSING',
+      fix: `"${o.label.trim()}" says a change, and picking it would write nothing. Give it the changes it makes as patches, [{"at":"tasks#12","version":3,"patch":{"state":"done"}}], or ask it as a rowset.`,
+      at: `body.options[${n}].patches`,
+    };
   }
   return null;
 }
