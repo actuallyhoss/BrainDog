@@ -322,7 +322,7 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
 
   /* THE PEOPLE PAGE DRAWS EVERYONE AS FACES, SINCE People 3.6.0: the name with its initial, what they are, who they are
      with and the day they last spoke, one card each and never grouped; the owner is not among them. SINCE 3.9.0 what
-     they are is the note's own words and who they are with is the projects they are on (UX44). */
+     they are is the note's own words and who they are with is the projects they are on. */
   const everyone = (PAGES.people!.blocks as { kind?: string; heading?: string; group?: string; where?: string; columns?: { field: string }[] }[]).find((b) => b.heading === 'Everyone');
   assert.equal(everyone?.kind, 'cards');
   assert.equal(everyone?.group, undefined);

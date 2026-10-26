@@ -233,7 +233,7 @@
      reads by its name. */
   const offered = $derived(about?.kind === 'options' ? about.body.options : undefined);
 
-  /* A CHANGE OF MANY ROWS SHOWS A FEW OF THEM (UX21): "File them" over 200 entries named none, so the press was taken on
+  /* A CHANGE OF MANY ROWS SHOWS A FEW OF THEM: "File them" over 200 entries named none, so the press was taken on
      trust. The first five rows an answer's changes name, by their own titles, read once the page is drawn, and how many
      more there are. A row the reader may not see, or that is gone, is left out of the sample, not guessed at. */
   const SAMPLE_MOST = 5;
@@ -988,7 +988,7 @@
 <!-- NOT NOW, THE THIRD VERB, kept beside the answers: a queue with only yes and no is a queue that gets rubber-stamped.
      It opens the step that asks why not yet and until when. -->
 {#snippet later()}
-  <!-- NEVER BESIDE AN ANSWER OF THE ASKER'S OWN THAT ONLY PUTS IT OFF (UX18): one Later, not "Later" and "Later". -->
+  <!-- NEVER BESIDE AN ANSWER OF THE ASKER'S OWN THAT ONLY PUTS IT OFF: one Later, not "Later" and "Later". -->
   {#if !deferring && !(question?.options ?? []).some((o) => /^(?:later|not now|ask me later|not yet)\.?$/iu.test(o.title.trim()))}
     <!-- A CLOCK AND ITS WORDS, as on every card (VERIFY H8): "Ask me later", 44 under a thumb. The clock alone floated
          under the answers and said nothing to anybody who had not pressed it. -->
@@ -2138,7 +2138,7 @@
     color: var(--ink-3);
   }
 
-  /* THE SUGGESTED ANSWER SAYS SO ON ITS OWN BUTTON (UX21), "Accept, suggested", and is the one red primary. */
+  /* THE SUGGESTED ANSWER SAYS SO ON ITS OWN BUTTON, "Accept, suggested", and is the one red primary. */
   .gate-sug {
     font-weight: 400;
     opacity: 0.85;

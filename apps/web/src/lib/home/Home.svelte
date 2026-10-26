@@ -744,7 +744,7 @@
        the first late block of the page is drawn as the desk's late tile, a line a thing with its button, and any other
        late block is marked not drawn at its place. */
     const lateAt = board ? (late?.at ?? []) : [];
-    /* URGENT WORK AND WORK HANDED BACK STAND IN THE LATE BAND (UX8, UX9), under the late lines, each with its tick: their
+    /* URGENT WORK AND WORK HANDED BACK STAND IN THE LATE BAND, under the late lines, each with its tick: their
        own tiles are not drawn, and with nothing late the first of them carries the band. */
     const bandAt = board ? band.at : [];
     const lateTile = bandShown.length > 0 ? (lateShown.length > 0 ? lateAt[0] : bandAt[0]) : undefined;
@@ -1282,7 +1282,7 @@
     }
   }
 
-  /* NOT ON A PHONE'S TODAY AT ALL (UX14): the ⋯ stood alone beside the greeting with nothing a thumb arranges there, and
+  /* NOT ON A PHONE'S TODAY AT ALL: the ⋯ stood alone beside the greeting with nothing a thumb arranges there, and
      Edit layout is offered from 900px. */
   @media (width < 600px) {
     .today-head + .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .home-tools) {
@@ -1294,7 +1294,7 @@
     }
   }
 
-  /* THE PHONE'S OWN ORDER (UX9, the Bento phone board): what needs you first, two of it, then what is late and urgent,
+  /* THE PHONE'S OWN ORDER (the Bento phone board): what needs you first, two of it, then what is late and urgent,
      who is at work, cash with its week, and what is next. The few key numbers, the projects, what arrived and the
      people are a tab away (Projects, Money, Activity), so the phone's Today is about two screens and not six. */
   @media (width < 600px) {
@@ -1349,7 +1349,7 @@
       padding-block-start: 0;
     }
 
-    /* THE FIRST QUESTION IS ANSWERED WHERE IT STANDS, at most two lines with "Read all" for the rest (UX6). */
+    /* THE FIRST QUESTION IS ANSWERED WHERE IT STANDS, at most two lines with "Read all" for the rest. */
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa:first-child .queue-question) {
       line-clamp: 2;
       -webkit-line-clamp: 2;
@@ -1525,7 +1525,7 @@
     padding-block-start: var(--sp-3);
   }
 
-  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in ink (UX81), as wide as its words. */
+  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in ink, as wide as its words. */
   .body :global(.block-slot[data-key='coming-up'] > a.block-more) {
     align-self: flex-start;
     color: var(--ink);
@@ -1681,7 +1681,7 @@
       grid-row: 4;
     }
 
-    /* THE WEEK'S MONEY IS THE FOOT OF CASH AHEAD (UX10), one tile and not a second one floating under it: cash fills its
+    /* THE WEEK'S MONEY IS THE FOOT OF CASH AHEAD, one tile and not a second one floating under it: cash fills its
        track, its lower corners square, and the week's money butts it with a hairline between, as Needs you's foot does. */
     .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
       align-self: stretch;

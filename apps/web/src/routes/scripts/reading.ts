@@ -64,7 +64,7 @@ export function sentenceOf(rows: readonly SaidRow[]): Said | null {
 }
 
 /**
- * Where a script's row sorts by what has stopped (the pass of 27 October, UX55): 0 for a refused or failed last run, 1
+ * Where a script's row sorts by what has stopped (the pass of 27 October): 0 for a refused or failed last run, 1
  * for a paused script, 2 for one running as it should. The head names the first two in red, so the list leads with them.
  */
 export function troubleOf(fields: Record<string, unknown>): number {
@@ -102,7 +102,7 @@ export function recentOf(s: Pick<Script, 'recent'> & Partial<Pick<Script, 'month
 
 export const words = {
   recentSubject: 'Recent runs that went through',
-  /* THE KEY SAYS ONLY THE BARS THAT ARE DRAWN (the pass of 27 October, UX57): five dark bars stood over "pale ones did
+  /* THE KEY SAYS ONLY THE BARS THAT ARE DRAWN (the pass of 27 October): five dark bars stood over "pale ones did
      not", a bar nobody could find. `ok` is how many went through. */
   legend: (n: number, ok: number = n) =>
     n === 1

@@ -91,7 +91,7 @@ function run(name: string, when: number, bad = false, kind: RunLine['kind'] = 'a
   return { key: `${name}:${when}`, kind, name, at: iso(when), said: bad ? 'Failed.' : 'Ran.', bad, path: null };
 }
 
-/* THE PASS OF 27 OCTOBER (UX59): "100 automations run by themselves" stood over 64 Ledger filing rules, 43 never run. */
+/* THE PASS OF 27 OCTOBER: "100 automations run by themselves" stood over 64 Ledger filing rules, 43 never run. */
 test('WITH THE RECORD\'S COUNT, THE SENTENCE SAYS HOW MANY RAN, HOW MANY NEVER DID, AND THE LIST MOST ARE ON', () => {
   const ledger = Array.from({ length: 12 }, (_, i) => auto(`Payee ${i}`, { register: 'transactions', fired: i < 5 ? 3 : 0, month: { runs: 0, failures: 0 } }));
   const rows = [...ledger, auto('Standup', { register: 'tasks', fired: 9, month: { runs: 9, failures: 2 } }), auto('Old one', { enabled: false, fired: 0 })];
@@ -241,7 +241,7 @@ test('THE BARS ARE THE BUSIEST SIX, THE TOP ONE INK, AND ONE WITH A FAILURE RED 
   const bars = monthBars(rows);
   assert.equal(bars.length, 6);
   assert.deepEqual(bars[0], { label: 'Standup', value: 30, part: undefined, note: undefined });
-  /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, never the whole bar red (the pass of 27 October, UX59). */
+  /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, never the whole bar red (the pass of 27 October). */
   assert.deepEqual(bars[1], { label: 'Chase invoices', value: 12, part: 3, note: '3 failed' });
   assert.equal(bars.some((b) => b.label === 'Quiet'), false, 'an automation that did not run is not a bar');
   assert.equal(monthReading(rows), 'Standup ran 30 times, the most this month; Chase invoices failed three of 12.');

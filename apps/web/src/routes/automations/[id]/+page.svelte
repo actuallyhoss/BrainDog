@@ -744,7 +744,7 @@
     </PageHead>
     {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
-      <!-- THE SENTENCE FIRST (the pass of 27 October, UX60): the whole automation in words, the script it runs named,
+      <!-- THE SENTENCE FIRST (the pass of 27 October): the whole automation in words, the script it runs named,
            over the tabs that take it apart. Said from the draft, so an edit on the canvas says itself here too. -->
       {#if whole}<p class="whole">{whole}</p>{/if}
       <Segmented class="tabs" role="group" aria-label={title}>

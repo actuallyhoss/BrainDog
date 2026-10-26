@@ -42,7 +42,7 @@
     /* NEEDS YOU, AS THE BAR CALLS IT (audit 25 October, X20): the page said Decide, a name nothing else on screen uses. */
     missedLine: 'Run it now from Needs you, or let tonight try again.',
     answer: 'Answer it',
-    /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS (the pass of 27 October, UX68): a host whose copies a browser cannot list
+    /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS (the pass of 27 October): a host whose copies a browser cannot list
        still copies the record each night, and the exports he took are his backups too. "No backups here yet" stood
        over both. */
     nightly: 'Copied every night',
@@ -366,7 +366,7 @@
            host that keeps no copies is a promise the next row takes back. -->
       <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
       {@render missedRow()}
-      <!-- THE NIGHT'S COPY FIRST, as `boot` says it (the pass of 27 October, UX68): its age and size, late past 26 hours.
+      <!-- THE NIGHT'S COPY FIRST, as `boot` says it (the pass of 27 October): its age and size, late past 26 hours.
            A host that sends no such fact, or a record never copied, keeps the row that says there is none. -->
       {#if lastCopy && facts?.last_copy_at}
         <div role="status">

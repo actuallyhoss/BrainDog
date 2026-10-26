@@ -440,7 +440,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'organisations-count',
     name: 'Organisations',
     source: 'register.organisations',
-    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0 (the pass of 27 October, UX45): a payee a bank text named is
+    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0 (the pass of 27 October): a payee a bank text named is
        met with no kind (`rule.meet-payees` gives none), so "Organisations 13" listed nine cut-off shop names beside the
        four companies he deals with. Those are counted apart, below. */
     where: 'merged_into is empty, retired_on is empty, kind is set',
@@ -527,7 +527,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'people-quiet', is: 0 },
         /* NOT HOW MANY WERE IN TOUCH, SINCE People 3.4.0: In touch under it says that figure with its month as a line,
            and a page says a figure once. */
-        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM (the pass of 27 October, UX43): "Add Priya to People?"
+        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM (the pass of 27 October): "Add Priya to People?"
            names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
            counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
         body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)',
@@ -620,7 +620,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* NAME, ROLE AND WHEN YOU LAST SPOKE, and not who they are with (money F13): a phone's line holds two values
            after the name, and "With" took the place of Last spoke there, so the one fact a person scans People for was
            dropped on a phone. Who they are with is on their own page, first line. */
-        /* ONE LINE A PERSON, SINCE People 3.9.0 (the pass of 27 October, UX44): their name, what they are to you in
+        /* ONE LINE A PERSON, SINCE People 3.9.0 (the pass of 27 October): their name, what they are to you in
            the words written about them (the note's first line, under the name), the projects they are on as chips, and
            when you last spoke. "Role · Other" stood under most of them as a field and its value. */
         columns: [
@@ -657,7 +657,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'name', dir: 'asc' }],
       },
       {
-        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0 (the pass of 27 October, UX45): how many and the
+        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0 (the pass of 27 October): how many and the
            first few by name, and the list to look them over, where nine half names stood in Organisations. */
         kind: 'note',
         span: 6,

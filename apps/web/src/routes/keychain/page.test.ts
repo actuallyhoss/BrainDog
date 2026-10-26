@@ -96,7 +96,7 @@ test('THE MACHINES SECTION SAYS THE RECORD’S OWN REFUSAL, and says nothing whe
   assert.equal(refused?.title, words.machinesNotYours);
   assert.equal(refused?.body, 'This needs owner, and you have read access. Ask an owner to raise your access.');
   /* A token is refused by a different gate, and its sentence speaks of a token he never holds in the app, so the screen
-     says what to do instead (the pass of 27 October, UX63); a sentence naming the record's insides is said so too. */
+     says what to do instead (the pass of 27 October); a sentence naming the record's insides is said so too. */
   assert.equal(machinesTellOf(saidOf(NEEDS_BROWSER_SESSION))?.body, words.machinesHow);
   const insides = { ok: false as const, refusal: { code: 'LEVEL_REQUIRED', fix: 'The live look reads only the DATA and READ+ groups, so listDevices, in ADMIN, was not sent.' } };
   assert.equal(machinesTellOf(saidOf(insides))?.body, words.machinesHow);

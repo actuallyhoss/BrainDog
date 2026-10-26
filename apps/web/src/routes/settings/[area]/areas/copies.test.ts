@@ -172,7 +172,7 @@ test('a drill reported a moment ago reads "just now", as the operator sees it af
   assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This BrainDog's last restore test: passed just now");
 });
 
-/* THE PASS OF 27 OCTOBER (UX68): Backups said "No backups here yet" while Activity counted four exports he took. */
+/* THE PASS OF 27 OCTOBER: Backups said "No backups here yet" while Activity counted four exports he took. */
 test('the exports he took are listed newest first, and the night’s own dump is never one', async () => {
   const events = [
     { kind: 'export', actor: 'p_1', note: 'sections registers', ts: '2026-10-02T10:00:00Z' },

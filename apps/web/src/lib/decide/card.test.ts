@@ -377,14 +377,14 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
 
 test('EVERY CARD STARTS WITH ITS SENTENCE: who asked is one line under the question, and the side is drawn only with something in it', () => {
   const card = src('./DecisionCard.svelte');
-  /* CUT AT TWO LINES UNTIL "READ ALL" (UX6), so the heading carries its clamp and its measure. */
+  /* CUT AT TWO LINES UNTIL "READ ALL", so the heading carries its clamp and its measure. */
   assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<h3 class="queue-question" dir="auto" data-clamp=\{readAll \? undefined : ''\} bind:this=\{titleEl\}>/u, 'a card starts with who asked, not its sentence (U-A7)');
   assert.match(card, /\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
   const article = card.indexOf('<div class="dc-main">');
   assert.ok(card.indexOf('<h3 class="queue-question"', article) < card.indexOf('<p class="queue-by">', article), 'who asked leads the question');
   /* NAME AND APP, NEVER THE RUN'S TITLE CUT AT 24 CHARACTERS. */
   assert.match(card, /const from = \$derived\(\[card\.by\.app\]\.filter/u);
-  /* THE LADDER'S RULE IS NO WHY (UX18): it waits behind an info mark, so it alone draws no side. */
+  /* THE LADDER'S RULE IS NO WHY: it waits behind an info mark, so it alone draws no side. */
   assert.match(card, /const side = \$derived\(!compact && \(\(card\.why !== '' && !ladderLine\(card\.why\)\) \|\| changesAny\)\);/u);
   assert.match(card, /\{#if side\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-side">/u, 'a side is drawn for who asked alone');
   assert.match(card, /data-side=\{side \? '' : undefined\}/u);

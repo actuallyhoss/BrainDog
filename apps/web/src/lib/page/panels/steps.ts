@@ -50,7 +50,7 @@ function keyNamed(label: string): string {
 }
 
 /**
- * A STEP IN PLAIN WORDS (the pass of 27 October, UX39), as Up next prints it: a step one run left for him opens with
+ * A STEP IN PLAIN WORDS (the pass of 27 October), as Up next prints it: a step one run left for him opens with
  * his name ("Sam: answer 2 questions"), which on his own screen is noise, and names a key as the keychain stores it
  * ("the sealed mercury-secret key"). The name is dropped and the key said by what it opens ("the Mercury key"). The
  * step's own words stay what Take hands on and what Drop is keyed by.

@@ -33,7 +33,7 @@ export type Tab = 'automations' | 'scheduled' | 'scripts' | 'doors' | 'runs';
 export const TABS: readonly { id: Tab; path: string }[] = [
   { id: 'automations', path: '/automations' },
   { id: 'scheduled', path: '/automations?tab=scheduled' },
-  /* THE SCRIPTS SCREEN ITSELF, SINCE the pass of 27 October (UX58): it wears these tabs too, so Scripts is one place
+  /* THE SCRIPTS SCREEN ITSELF, SINCE the pass of 27 October: it wears these tabs too, so Scripts is one place
      whichever way it is reached, and `?tab=scripts` still opens the hub's short list for an old link. */
   { id: 'scripts', path: '/scripts' },
   { id: 'doors', path: '/automations?tab=doors' },
@@ -250,7 +250,7 @@ export function hubSentence(rows: readonly AutomationRow[], listSaid?: (id: stri
 export const ONE_LIST_MANY = 10;
 
 /**
- * THE ON RULES AS THE RECORD COUNTS THEM (the pass of 27 October, UX59): how many are on, the list most of them are
+ * THE ON RULES AS THE RECORD COUNTS THEM (the pass of 27 October): how many are on, the list most of them are
  * rules on when it holds more than `ONE_LIST_MANY`, and how many have run against how many never have. "100 automations
  * run by themselves" stood over 64 Ledger filing rules and 43 that had never run. `null` from a host that sends no count,
  * and the sentence is then said as before.
@@ -415,7 +415,7 @@ export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
     .map((r) => ({
       label: r.name,
       value: r.month.runs,
-      /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR (the pass of 27 October, UX59), red from its start, and the rest of
+      /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR (the pass of 27 October), red from its start, and the rest of
          the bar is the runs that finished: "3 failed" of 20 drew the whole bar red. */
       part: r.month.failures > 0 ? Math.min(r.month.failures, r.month.runs) : undefined,
       note: r.month.failures > 0 ? hubWords.failedNote(r.month.failures) : undefined,

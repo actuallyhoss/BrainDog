@@ -300,7 +300,7 @@ test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones q
   assert.equal(standsSaid(run({ stopped: 'pause' })), 'Paused by you');
 });
 
-/* THE PASS OF 27 OCTOBER (UX1, UX38): three rows of "Claude / Claude Code run" on Today and "Has not said what it is
+/* THE PASS OF 27 OCTOBER: three rows of "Claude / Claude Code run" on Today and "Has not said what it is
    doing" four times on Agents, "On MacBook Pro and Sam" for a Windows PC silent nine hours, and the screenshot run
    itself counted at work. A run is named by its app and where it works, says the last thing it did, and is counted
    only once it wrote, asked or said what it does. */

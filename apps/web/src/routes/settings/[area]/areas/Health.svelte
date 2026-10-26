@@ -67,7 +67,7 @@
   /** Whether the reads took longer than anyone waits: said in plain words, never left on Reading. */
   let slow = $state(false);
   /**
-   * WHETHER THE QUICK PARTS ARE LATE (the pass of 27 October, UX69): eight seconds and some still out. "Reading the record
+   * WHETHER THE QUICK PARTS ARE LATE (the pass of 27 October): eight seconds and some still out. "Reading the record
    * for anything to tidy." stood alone for as long as the slowest of them took on his record, so past eight seconds it
    * says what it has, that the record is slow, and reads on under it.
    */

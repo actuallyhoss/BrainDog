@@ -215,7 +215,7 @@ export function waysOf(q: Pick<QueueQuestion, 'options'> & { who?: string | unde
     return {
       key: o.key,
       label,
-      /* A RULE'S ANSWER SAYS WHAT IT CHANGES (UX5): the record files a rule's options with no reason, and the answer that
+      /* A RULE'S ANSWER SAYS WHAT IT CHANGES: the record files a rule's options with no reason, and the answer that
          marks a bill paid read as if it changed nothing. Said only where the rule's own answer is the one named. */
       because: own !== '' ? own : (rule?.[o.label.trim()] ?? ''),
       recommended: o.recommended,

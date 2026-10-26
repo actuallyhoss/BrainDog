@@ -75,7 +75,7 @@ export const words = {
   confirm: (answer: string) => `${String(answer).replace(/[.?!]+$/u, '')}? This cannot be undone.`,
   /** The way back out of that confirm, sending nothing. */
   goBack: 'Go back',
-  /** A few of the rows an answer changes, named in its card (UX21), and how many more. */
+  /** A few of the rows an answer changes, named in its card, and how many more. */
   sample: 'Some of what it changes',
   sampleMore: (n: number) => `and ${n.toLocaleString('en-GB')} more`,
 

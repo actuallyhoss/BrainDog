@@ -259,7 +259,7 @@
     font-weight: 600;
   }
 
-  /* THE WORD AT A LINE'S END IS A LINK IN INK (UX81); red only where it answers something that needs him. */
+  /* THE WORD AT A LINE'S END IS A LINK IN INK; red only where it answers something that needs him. */
   .nf-go {
     flex: none;
     color: var(--ink);

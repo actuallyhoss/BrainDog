@@ -230,7 +230,7 @@ export function evidenceIn(body: unknown, now?: number): Evidence | null {
   return { value: v, max, said: words !== '' ? words : `${v.toLocaleString('en-GB')} of ${max.toLocaleString('en-GB')}` };
 }
 
-/* ── the lead tile and the compact queue under it (UX17) ─────────────── */
+/* ── the lead tile and the compact queue under it ─────────────── */
 
 /** The key the lead tile is placed by on the board (`+page.svelte`). */
 export const LEAD_KEY = 'decide-lead';
@@ -239,7 +239,7 @@ export const LEAD_KEY = 'decide-lead';
 type Drawn = { kind: string; key?: string | undefined; drawn: boolean; queue?: readonly { id: string }[] | undefined; total: number };
 
 /**
- * DECIDE LEADS WITH ONE QUESTION (UX17, the Bento Decide board): the first question of the first group is drawn whole in
+ * DECIDE LEADS WITH ONE QUESTION (the Bento Decide board): the first question of the first group is drawn whole in
  * a tile of its own across the board, with what it changes, its suggested answer and its numbered answers, and the rest
  * are a compact queue under it, each its question, who asked and its answers.
  *

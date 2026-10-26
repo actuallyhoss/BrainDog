@@ -234,7 +234,7 @@
   });
   const order = $derived(asks.order);
   /** Whether a block's questions are drawn compact: every queue on a home, and the questions a page sets aside. */
-  /* AND A QUEUE THAT ASKS FOR IT (`compact: true`), as Decide's queue under its lead does (UX17), drawn whole or not. */
+  /* AND A QUEUE THAT ASKS FOR IT (`compact: true`), as Decide's queue under its lead does, drawn whole or not. */
   const compactAt = (i: number, kind: string): boolean =>
     (blocks[i] as { compact?: unknown } | undefined)?.compact === true || (!whole && (mode === 'home' ? kind === 'queue' : asks.compact.has(i)));
   /** Whether the look's next action is a question the page set aside: it is on the board, and the line would lead with it again. */

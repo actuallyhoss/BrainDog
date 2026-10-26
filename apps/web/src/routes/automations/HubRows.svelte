@@ -272,7 +272,7 @@
     cursor: pointer;
   }
 
-  /* IN THE INK OF EVERY OTHER NAME (the pass of 27 October, UX59): a button's own grey made each family read as turned
+  /* IN THE INK OF EVERY OTHER NAME (the pass of 27 October): a button's own grey made each family read as turned
      off, under a heading that said On. */
   .kin .name {
     color: var(--ink);

@@ -23,7 +23,7 @@ export const words = {
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',
   urgent: 'Urgent',
-  /** The late tile's name once urgent work or work handed back stands in it too (UX8). */
+  /** The late tile's name once urgent work or work handed back stands in it too. */
   lateAndUrgent: 'Late and urgent',
   /** How a line that is not late came to stand in the late band, said where how late it is would be. */
   urgentWhy: 'urgent',

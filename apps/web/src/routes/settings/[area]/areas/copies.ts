@@ -73,7 +73,7 @@ export function exportLine(facts: CopyFacts, now: number): string {
 }
 
 /**
- * THE EXPORTS SOMEBODY TOOK, AS THE LOG KEEPS THEM (the pass of 27 October, UX68): every export writes one `export`
+ * THE EXPORTS SOMEBODY TOOK, AS THE LOG KEEPS THEM (the pass of 27 October): every export writes one `export`
  * event whose note begins `sections` (`packages/kernel/src/copies.ts`), and the night's own dump is one too, written as
  * `system`, which is the nightly copy and never an export. Backups said "No backups here yet" over a log whose Activity
  * counted four of his exports, so it lists them, newest first, the instants alone.

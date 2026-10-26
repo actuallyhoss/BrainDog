@@ -4,7 +4,7 @@
  * (`LateNow.svelte`), and Today keeps the line a press can finish when one thing stands in two lists
  * (`today-brief.ts` `onceEach`).
  *
- * A BILL AND A TASK ARE PRESSED DIFFERENTLY (UX4): a line with money on it is a bill, answered "Paid" or "Not yet" with
+ * A BILL AND A TASK ARE PRESSED DIFFERENTLY: a line with money on it is a bill, answered "Paid" or "Not yet" with
  * its amount to the cent; a task is a quiet tick, never a red "Mark done" louder than everything else on the page.
  */
 

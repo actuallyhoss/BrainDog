@@ -85,7 +85,7 @@ export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts
     parts.push(o.counts && sealed.length > 0 ? `${keysSaid(o.keys.length)}, ${total === 0 ? 'none opened yet' : keychain.opened(total)}.` : `${keysSaid(o.keys.length)}.`);
     const none = o.keys.filter(missing).length;
     if (none > 0) parts.push(`${none === 1 ? '1 has' : `${none} have`} no value yet.`);
-    /* THE RETIRED ONES ARE COUNTED BESIDE THEM (UX62): Search's Keys counts every row, so "83 keys" here and "176" there
+    /* THE RETIRED ONES ARE COUNTED BESIDE THEM: Search's Keys counts every row, so "83 keys" here and "176" there
        read as two records. */
     const retired = o.retired ?? 0;
     if (retired > 0) parts.push(`${retired === 1 ? '1 more is' : `${retired} more are`} retired and not listed here.`);

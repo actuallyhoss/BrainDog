@@ -769,7 +769,7 @@
       </h3>
       <!-- A QUESTION LONGER THAN TWO LINES IS CUT THERE, and read whole on a press. -->
       {#if clamped && !readAll}<button type="button" class="dc-read tap" onclick={() => (readAll = true)}>{cardWords.readAll}</button>{/if}
-      <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE (UX17): the kind of thing, who, and when. -->
+      <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE: the kind of thing, who, and when. -->
       {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, card.when].filter((s) => s !== '').join(' · ')}</p>{/if}
       {#if !compact}
         <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence
@@ -1140,7 +1140,7 @@
     }
   }
 
-  /* A QUESTION IS AT MOST TWO LINES UNTIL "READ ALL" (UX6): the rest is cut at a word with an ellipsis. */
+  /* A QUESTION IS AT MOST TWO LINES UNTIL "READ ALL": the rest is cut at a word with an ellipsis. */
   .dc-main > .queue-question[data-clamp] {
     display: -webkit-box;
     -webkit-box-orient: vertical;

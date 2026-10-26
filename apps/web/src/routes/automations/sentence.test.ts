@@ -87,7 +87,7 @@ test('the box example is the record’s own: its first list with a due date, by 
   assert.equal(sentenceWords.hint('When a bill is due in 3 days, tell me'), 'For example: When a bill is due in 3 days, tell me.');
 });
 
-/* THE PASS OF 27 OCTOBER (UX60): an automation's page says it whole first, its script named. */
+/* THE PASS OF 27 OCTOBER: an automation's page says it whole first, its script named. */
 test('an automation is said whole: what starts it, then each step in order', () => {
   assert.equal(
     wholeSentence('When an item in Bills and invoices has its Status set to paid', ['Run the script Move a repeating line on']),

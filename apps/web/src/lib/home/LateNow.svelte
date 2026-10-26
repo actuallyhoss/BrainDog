@@ -4,11 +4,11 @@
   Today's late list (`home-rows.ts` `lateLines`: every list's deadlines before today, and the late tasks) was folded
   behind More, and on his record a 13 days late salary, a 9 days late instalment and a 14 days late fee stood on no part
   of Today's first screen. Here they lead the desk: a line a thing, its name opening its row, how late in red and the day
-  it fell due. A BILL (UX4) carries its amount to the cent in its own currency and two answers: Paid, the one primary,
+  it fell due. A BILL carries its amount to the cent in its own currency and two answers: Paid, the one primary,
   and Not yet, which puts it aside until tomorrow in this browser. A TASK is a quiet tick at its start, never a red
   "Mark done". Each finishes through the row's own write with an Undo (`late-finish.ts`, fetched on the press); a list
   with no way to finish a row opens the row instead. A line Needs you already asks about is answered there and is not
-  here (`unasked`). URGENT WORK AND WORK HANDED BACK stand under the late lines (UX8, UX9), each with its tick.
+  here (`unasked`). URGENT WORK AND WORK HANDED BACK stand under the late lines, each with its tick.
 
   A FEW AT REST, four at a desk and three on a phone, so the first screen holds the greeting, the brief and the first
   things to do; the rest open in place.
@@ -111,7 +111,7 @@
       {@const amount = amountSaid(line)}
       <li class="ln" data-row={line.key} data-bill={bill ? '' : undefined} data-done={done.has(line.key) ? '' : undefined}>
         {#if !bill && verb}
-          <!-- A TASK IS A QUIET TICK at the line's start (UX4): the row's own verb is its name for a screen reader. -->
+          <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. -->
           <button type="button" class="ln-tick tap" aria-label={`${verb}: ${line.title}`} title={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}
             ><Icon name="check" size="s" /></button
           >
@@ -215,7 +215,7 @@
     gap: var(--sp-2);
   }
 
-  /* A TASK'S QUIET TICK (UX4): an empty ring at the line's start that fills with the check under the pointer, never
+  /* A TASK'S QUIET TICK: an empty ring at the line's start that fills with the check under the pointer, never
      a red button. 24 to the eye, a thumb's 44 under one. */
   .ln-tick {
     display: grid;

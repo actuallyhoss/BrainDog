@@ -375,7 +375,7 @@
     const queue = live?.page.blocks.find((b) => b.kind === 'queue' && b.source === 'governance.open')?.queue;
     return queue ? mineFirst(queue, shell.me?.person ?? null).heading : null;
   });
-  /* ONE LEAD TILE ACROSS THE BOARD, THE REST A COMPACT QUEUE UNDER IT (UX17): the first group's first question, whole. */
+  /* ONE LEAD TILE ACROSS THE BOARD, THE REST A COMPACT QUEUE UNDER IT: the first group's first question, whole. */
   const led = $derived(shaped ? leadOf(shaped.blocks, shaped.first === 'quick' ? [GROUP_KEY.quick, GROUP_KEY.money] : [GROUP_KEY.money, GROUP_KEY.quick]) : null);
   const drawn = $derived<Opened | null>(got && got.from === 'live' && led ? { ...got, page: { page: got.page.page, blocks: led.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
@@ -601,7 +601,7 @@
       align-self: start;
     }
 
-    /* THE LEAD TILE IS THE BOARD'S FIRST ROW, ACROSS IT (UX17), and the groups and Handled are the row under it. */
+    /* THE LEAD TILE IS THE BOARD'S FIRST ROW, ACROSS IT, and the groups and Handled are the row under it. */
     .body[data-board] :global(.page:not([data-narrow]) .block-slot[data-key='decide-lead']) {
       grid-row: 1;
       grid-column: 1 / -1;

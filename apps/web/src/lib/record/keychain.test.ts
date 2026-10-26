@@ -392,7 +392,7 @@ test('RECONNECT FROM THE NAVIGATION STATE answers what the address answered, and
   for (const state of not) assert.equal(reconnectFrom(state, [row]), null, JSON.stringify(state) ?? 'undefined');
 });
 
-/* THE PASS OF 27 OCTOBER (UX62): a key is a Keys row not retired, said once, and the retired are counted beside it. */
+/* THE PASS OF 27 OCTOBER: a key is a Keys row not retired, said once, and the retired are counted beside it. */
 test('a key is a row of the Keys list that is not retired, and the retired are counted apart', () => {
   const rows = [
     { id: 'a', fields: { label: 'A', state: 'live' } },

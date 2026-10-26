@@ -169,7 +169,7 @@
        their mail. `copy.ts` renamed the word off the inbox's own button for the same reason. */
     extract: { word: 'Read an email', icon: 'inbox' },
     propose: { word: 'Proposed', icon: 'decide' },
-    /* `Ran` AND IT WAS `Fetched` (the pass of 27 October, UX64): a rule or a script that ran is what a person reads. */
+    /* `Ran` AND IT WAS `Fetched` (the pass of 27 October): a rule or a script that ran is what a person reads. */
     pull: { word: 'Ran', icon: 'refresh' },
     /* Access */
     'access.grant': { word: 'Gave access', icon: 'people' },
@@ -227,7 +227,7 @@
      `script:settle_matched_line@v4` is said by the name the Automations page gives it, never its id. */
   let titles = $state.raw<ReadonlyMap<string, string>>(new Map());
   const names = $derived<ReadonlyMap<string, string>>(new Map<string, string>([...(Object.entries(route.data.names ?? {}) as [string, string][]), ...titles]));
-  /* THE READER'S OWN FACE IS THEIR OWN FIRST LETTER, never the "Y" of "You" (UX67). */
+  /* THE READER'S OWN FACE IS THEIR OWN FIRST LETTER, never the "Y" of "You". */
   const myName = $derived((route.data.me as { name?: string }).name ?? null);
   $effect(() => {
     if (!route.data.live) return;
@@ -493,7 +493,7 @@
      everything that matched, so a line drawn and a line counted are the same line. */
   const lines = $derived(rolledRuns(burstsOf(matched, listSaid)));
   const told = $derived(lines.slice(0, Math.min(wanted, DOM_CAP)));
-  /* ONE PRESS FOR MORE (UX65): more of what was read, then the older page under it. */
+  /* ONE PRESS FOR MORE: more of what was read, then the older page under it. */
   const moreRead = $derived(told.length < lines.length && wanted < DOM_CAP);
   const moreOlder = $derived(!moreRead && route.data.live && live !== null && live.cursor !== null);
   function showMore(): void {
@@ -730,7 +730,7 @@
           <span class="detail-text"
             >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}</span
           >
-          <!-- WHERE IT HAPPENED AS A CHIP at the line's end (UX64): the list a row is in, as the rail names it. -->
+          <!-- WHERE IT HAPPENED AS A CHIP at the line's end: the list a row is in, as the rail names it. -->
           {#if thing?.list}<span class="where-chip">{thing.list}</span>{/if}
         </span>
       </span>
@@ -1216,7 +1216,7 @@
     white-space: nowrap;
   }
 
-  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what (the pass of 27 October, UX64), as Recent runs and Up
+  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what (the pass of 27 October), as Recent runs and Up
      next say a project: the list a row is in, never a lone chip at the far edge. */
   .where-chip {
     flex: none;

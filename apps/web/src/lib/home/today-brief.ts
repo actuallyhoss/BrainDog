@@ -72,7 +72,7 @@ export function unasked(lines: readonly HomeLine[], questions: readonly { about?
   if (questions.length === 0) return [...lines];
   const abouts = new Set(questions.map((q) => q.about).filter((a): a is string => typeof a === 'string' && a !== ''));
   const asked = questions.map((q) => (typeof q.question === 'string' ? q.question : ''));
-  /* AND A QUESTION THAT NAMES THE ROW'S WHOLE TITLE INSIDE IT (UX22): "Mark Wave 0: nav, … done?" asks about the late
+  /* AND A QUESTION THAT NAMES THE ROW'S WHOLE TITLE INSIDE IT: "Mark Wave 0: nav, … done?" asks about the late
      task "Wave 0: nav, …", so it is shown once, in Needs you. Only a title long enough to be a name and not a word. */
   const names = (q: string, title: string): boolean => {
     if (title.length < TITLE_NAMED) return false;
@@ -89,7 +89,7 @@ const TITLE_NAMED = 12;
 export type BandHeadings = { urgent: string; back: string };
 
 /**
- * URGENT WORK AND WORK HANDED BACK, AS LINES OF THE LATE BAND (UX8, UX9): they sat under seventeen project cards, 2,600px
+ * URGENT WORK AND WORK HANDED BACK, AS LINES OF THE LATE BAND: they sat under seventeen project cards, 2,600px
  * down a laptop and 6,600px down a phone. Each drawn `todo` block declared under one of the two headings gives its rows
  * as lines, each with its tick and how it got here in words; a row already in the late list is not said twice. `at` is
  * where each such block stands, so the page marks it not drawn.

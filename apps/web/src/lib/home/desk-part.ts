@@ -62,7 +62,7 @@ export function runsOf(b: Pick<LiveBlock, 'entries' | 'rows' | 'columns'>): Work
  * so Today and Projects say one time. `now` is the record's clock.
  */
 /**
- * HOW MANY PROJECT CARDS TODAY DRAWS (UX9): four, and "N more" opens Projects for the rest. Seventeen cards stood between
+ * HOW MANY PROJECT CARDS TODAY DRAWS: four, and "N more" opens Projects for the rest. Seventeen cards stood between
  * the first row and the urgent work, 2,600px of a laptop; the Projects tab holds them all.
  */
 export const TODAY_PROJECTS = 4;

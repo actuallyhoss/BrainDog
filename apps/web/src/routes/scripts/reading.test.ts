@@ -119,7 +119,7 @@ test('the Scripts page is the Scripts screen: its address goes there', async () 
   assert.match(route, /SCREENS[^=]*=\s*\{[^}]*\bscripts: '\/scripts'/u);
 });
 
-/* THE PASS OF 27 OCTOBER (UX55): the script refused on its last run sat ninth, folded under "9 more". */
+/* THE PASS OF 27 OCTOBER: the script refused on its last run sat ninth, folded under "9 more". */
 test('a refused last run sorts first, then a paused script, then the rest', () => {
   const rows = [
     { title: 'Fine', status: 'on', last: 'ok' },
@@ -131,7 +131,7 @@ test('a refused last run sorts first, then a paused script, then the rest', () =
   assert.deepEqual(sorted.map((r) => r.title), ['Refused', 'Failed', 'Paused', 'Fine']);
 });
 
-/* THE PASS OF 27 OCTOBER (UX57): the key named pale bars over five dark ones. */
+/* THE PASS OF 27 OCTOBER: the key named pale bars over five dark ones. */
 test('the bars\' key says only the bars that are drawn', () => {
   assert.equal(words.legend(5, 5), 'One bar for each of its last 5 runs.');
   assert.equal(words.legend(5, 0), 'One bar for each of its last 5 runs; a pale bar did not go through.');

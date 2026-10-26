@@ -90,7 +90,7 @@ export const COMING_UP_LIMIT = 5;
 export const NEEDS_YOU_LIMIT = 3;
 
 /**
- * On a phone, two (the phone order of 27 October, UX9): the first answered where it stands with its suggested answer,
+ * On a phone, two (the phone order of 27 October): the first answered where it stands with its suggested answer,
  * the second a row a tap opens, and "N more" the door to the rest, so the phone's Today holds what needs him, what is
  * late and urgent, who is at work, cash and what is next in about two screens.
  */

@@ -828,7 +828,7 @@ export function runSignsNight(sql: Sql, nowMs: number, tz: string): number {
  * could not be read.", "Nothing has been asked on this record yet."), and one written here could not tell those apart.
  */
 export const QUIET: Readonly<Record<string, (s: VitalSign) => string>> = {
-  /* RED IS NOT ALWAYS MESSAGES WAITING (the pass of 27 October, UX54): a list behind its doors, or a day set aside as
+  /* RED IS NOT ALWAYS MESSAGES WAITING (the pass of 27 October): a list behind its doors, or a day set aside as
      repeats, reads red with none waiting, and "Messages wait to be filed." sent him to an Inbox that listed none. What
      is true of all three is that messages came in and were not filed. */
   'arrivals-filed': (s) =>

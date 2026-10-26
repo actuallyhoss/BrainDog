@@ -35,7 +35,7 @@
     overflow: hidden;
   }
 
-  /* A LINK IN THE RECORD IS INK WITH A QUIET UNDERLINE (UX81). Red is kept for what needs him, the one primary action
+  /* A LINK IN THE RECORD IS INK WITH A QUIET UNDERLINE. Red is kept for what needs him, the one primary action
      and what is late, each of which says so on its own class; an ordinary link ("See what it changes", "1 more",
      "Show all") read as one more alarm. The shared base keeps red for the marketing site's documents. */
   a {

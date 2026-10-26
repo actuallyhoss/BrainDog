@@ -863,7 +863,7 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
- * PEOPLE 3.9.0 COMES OFF BEFORE IT (the pass of 27 October, UX44 and UX45): no figure for the shops a card text named nor
+ * PEOPLE 3.9.0 COMES OFF BEFORE IT (the pass of 27 October): no figure for the shops a card text named nor
  * the line that says them, organisations of every kind counted and listed, and Everyone's role and organisation.
  */
 const withoutCardTexts39 = (doc: Body): Body => ({

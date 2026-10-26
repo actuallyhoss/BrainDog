@@ -279,7 +279,7 @@
     color: var(--ink);
   }
 
-  /* A THUMB'S TARGET (UX83): the row's ⋯ is 44 square under one, drawn at its own size inside it. */
+  /* A THUMB'S TARGET: the row's ⋯ is 44 square under one, drawn at its own size inside it. */
   @media (pointer: coarse) {
     .r-do {
       inline-size: var(--tap, 44px);

@@ -72,7 +72,7 @@ test('READ WITH NO LIST, IT COUNTS THE QUESTIONS ABOUT A ROW OF ANY LIST, and a 
   sql.close();
 });
 
-/* THE PASS OF 27 OCTOBER (UX43): "Add Priya to People?" is a rowset on People that names no row of its own, and People's
+/* THE PASS OF 27 OCTOBER: "Add Priya to People?" is a rowset on People that names no row of its own, and People's
    line said no question was open while it waited in Needs you. A question that adds or changes a list's rows is on it. */
 test("A QUESTION THAT ADDS OR CHANGES A LIST'S ROWS IS ON THAT LIST, in the figure and in the queue alike", async () => {
   const sql = openSqlite();

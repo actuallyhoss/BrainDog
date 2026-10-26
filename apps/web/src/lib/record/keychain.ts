@@ -378,7 +378,7 @@ function expiresOf(field: unknown, grant: GrantState | undefined): { expires?: s
  * bytes are gone, does not go on describing them.
  */
 /**
- * WHAT A KEY IS, SAID ONCE (the pass of 27 October, UX62): a row of the Keys list that is not retired. The Keychain lists
+ * WHAT A KEY IS, SAID ONCE (the pass of 27 October): a row of the Keys list that is not retired. The Keychain lists
  * and counts these; the Keys list itself, and Search's "every entry, finished ones too", count the retired as well, so
  * the Keychain says how many are retired beside its own count and the two add up.
  */

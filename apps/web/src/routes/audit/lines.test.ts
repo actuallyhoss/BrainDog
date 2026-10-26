@@ -341,7 +341,7 @@ test('the words about what is hidden name the person’s own things, in plain wo
   }
 });
 
-/* ── a rule's runs, one line a day (the pass of 27 October, UX64) ──────── */
+/* ── a rule's runs, one line a day (the pass of 27 October) ──────── */
 
 test('a rule’s quiet runs on one day are one line saying how many times, and a failed run stays its own', () => {
   const ran = (h: number, by: string, note = 'rule.meet-payees ran.') => one({ ...ev(iso(29, h), by, 'pull', 'declaration:rule.meet-payees'), note });

@@ -450,7 +450,7 @@ export const scriptWords = (note: string): string =>
     .replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`)
     /* A rule's id is a mechanism: "rule.meet-payees ran." is "Meet payees ran." */
     .replace(/\brule[.:]([a-z][a-z0-9_-]*)/gu, (_m, slug: string) => humanize(slug))
-    /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S (the pass of 27 October, UX64): "settle_matched_line did not
+    /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S (the pass of 27 October): "settle_matched_line did not
        finish" is "Settle matched line did not finish", never the id. A caller holding the thing's title says that first. */
     .replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (slug, at: number) => (at === 0 ? humanize(slug) : humanize(slug).toLowerCase()))
     .replace(/\s*·\s*$/u, '')
@@ -639,7 +639,7 @@ export function ranSaid(note: string, title: string, id: string): string {
 }
 
 /**
- * ONE LINE A RULE A DAY (the pass of 27 October, UX64). A filing rule runs on every payment that arrives and writes a
+ * ONE LINE A RULE A DAY (the pass of 27 October). A filing rule runs on every payment that arrives and writes a
  * "ran" line each time, so a day of Activity was forty "Fetched · A rule: Meet payees · Meet payees ran." The runs of
  * one rule on one day that went through are its newest line, saying how many times; a run that failed stays a line of
  * its own, since that one needs him.
@@ -909,7 +909,7 @@ export const partWords = {
 } as const;
 
 /**
- * WHAT A LINE CHANGED, IN A PERSON'S WORDS (the pass of 27 October, UX66): a change to a row is its list ("Ledger",
+ * WHAT A LINE CHANGED, IN A PERSON'S WORDS (the pass of 27 October): a change to a row is its list ("Ledger",
  * "People"), a question asked or answered is that, an export is an export, a rule's run is a run and a failed one is
  * counted apart. "What changed" was split by the log's own verbs, "Fetched 41", and said "Fetched is the biggest share".
  */
