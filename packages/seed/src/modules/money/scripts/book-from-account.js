@@ -49,8 +49,10 @@ export function bookFromAccount(rows, inBook) {
  * lowest one read, as `plans-from-names.js` reads. ASKED BY ACCOUNT, since the account is indexed on all four lists
  * and a Ledger of ten thousand entries in no book, on accounts in no book, is then never read at all.
  *
- * "FILE THEM" CARRIES AT MOST 900 CHANGES, under the 1,000 a declaration may ask for. Past that the answer says so, and
- * the cause carries the count, so what is left is a new question the night after the first is answered.
+ * "FILE THEM" CARRIES AT MOST 200 CHANGES, the most one option may carry (the gate's `OPTION_PATCHES`). Past that the
+ * answer says so, and the cause carries the count, so what is left is a new question the night after the first is
+ * answered. IT WAS 900, over the gate's 200, so a record with more than two hundred entries in no book had every nightly
+ * run refused and asked nothing.
  *
  * THE COUNT IS OF WHAT STILL STANDS, AS THE PAGE COUNTS IT (`figures/books.ts`, the figures of what is in no book): a
  * Ledger entry that is not void, a bill open or part paid, a repeating line that has not ended, an instalment still
@@ -60,7 +62,7 @@ export function bookFromAccount(rows, inBook) {
  */
 export default async function run(ctx) {
   const PAGE = 50;
-  const MOST = 900;
+  const MOST = 200;
   /* THE LISTS THAT HOLD AN ACCOUNT, and what one thing on each is called. Bills and invoices is among them since it
      gained an account (REC-A09 step 1), and is said by the list's own name: half of them are invoices. */
   const LISTS = ['transactions', 'obligations', 'recurring', 'installments'];

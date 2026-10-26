@@ -173,6 +173,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.26.0',
+      notes: 'Entries in no book on an account that is in one are asked about two hundred at a time, and the rest the night after, where a record with more than two hundred was asked nothing.',
+    },
+    {
       version: '3.25.0',
       notes: 'A payment that paid a repeating line moves the line on to its next day again, where the step stopped with an error.',
     },

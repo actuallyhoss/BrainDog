@@ -454,3 +454,30 @@ test('sixty entries on one account are all counted, and two books are both named
   assert.match(q.body?.about ?? '', /^Acme and 1 more$/u);
   r.sql.close();
 });
+
+/**
+ * MORE THAN ONE OPTION MAY CARRY IS ASKED IN TURN. "File them" carries at most the two hundred changes the gate lets one
+ * option carry; it asked for up to nine hundred, so a record with more than two hundred entries in no book had every
+ * nightly run refused and was asked nothing. The first two hundred are asked, and what is left is asked the night after.
+ */
+test('two hundred and five entries are asked two hundred at a time, and the five left are asked the next night', async () => {
+  const r = await money();
+  const acme = r.made('books', { name: 'Acme' }).id;
+  const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000), as_of: '2026-10-01' }).id;
+  for (let i = 0; i < 205; i++) r.made('transactions', entry(account, { what: `CEDAR LANE ${i}` }));
+  await r.turn(6);
+  value(r.k.update('accounts', account, { book: acme }, OWNER));
+  await r.night();
+  const q = r.asked('open')[0]!;
+  assert.ok(q, 'the run was refused and asked nothing');
+  assert.equal(r.said(q.id).replace(/^"|"$/gu, ''), '205 Ledger entries are in no book, and their account is in one. File each in its account\'s book?');
+  const file = q.body!.options!.find((o) => o.label === 'File them')!;
+  assert.equal(file.patches?.length, 200);
+  assert.equal(file.because, 'The first 200 take the book their account is in, and you are asked about the other 5 after.');
+  value(r.k.decide(q.id, { decide: { option: file.id, reason: 'They are the company\'s.' } }, 'p_1'));
+  await r.night();
+  const next = r.asked('open');
+  assert.equal(next.length, 1);
+  assert.equal(next[0]!.body?.options?.[0]?.patches?.length, 5);
+  r.sql.close();
+});
