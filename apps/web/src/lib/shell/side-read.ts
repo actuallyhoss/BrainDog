@@ -14,7 +14,7 @@ import { REGISTERS } from '../record/held.ts';
 import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
 import { figureReader } from '../../routes/r/[register]/[seq]/figures.ts';
-import { lanesOf, type Lanes, type SideProject } from './side.ts';
+import { lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
 import { keepSide, keptSide, type SideCopy } from './side-copy.ts';
 
 /** The most projects read: more than any record holds, and the limit the desk and the pages ask, so all share one read. */
@@ -149,27 +149,86 @@ export async function readWeek(base: string, list: string, play: readonly SideRo
 }
 
 /**
- * HOW MANY ROWS OF A LIST ARE OPEN, for Work's row in the sidebar (`side.ts` `withOpenWork`): every row whose state is
- * not one the list declares done, as Work's head and its project chips count them. Read off the declaration (its
- * `state` and `done`) with one `countBy`, never by a figure's name. `null` where the list declares no state, the count
- * was capped, or the read did not land, and the row then says no number.
+ * HOW MANY ROWS OF A LIST ARE OPEN, for Work's row in the sidebar: every row taken on, neither in a state the list
+ * declares done nor in one it keeps for later, which is what Work's own Open counts. Read off the declaration with one
+ * `countBy`, never by a figure's name: the done states are its `done`, and the states kept for later are the live ones
+ * its state field lists before the one a new row starts in (`laterOf`). `null` where the list declares no state, the
+ * count was capped, or the read did not land; the row then keeps what it drew.
  */
 export async function readOpenWork(base: string, list: string): Promise<number | null> {
   const client = createClient({ base });
   /* THE LIST'S DECLARATION MAY NOT BE LEARNED YET (Today, Needs you and Projects never open it), so it is asked, not skipped. */
   if (REGISTERS[list] === undefined) await learn(client.schema, list, asked).catch(() => undefined);
-  const d = REGISTERS[list] as { state?: string; done?: readonly string[] } | undefined;
+  const d = REGISTERS[list];
   if (!d?.state) return null;
   const out = await client
     .countBy({ register: list, by: d.state })
     .catch(() => null);
   if (!out?.ok) return null;
-  return openOf(out.value, d.done ?? []);
+  return openOf(out.value, [...(d.done ?? []), ...laterOf(d)]);
 }
 
-/** The open rows of a `countBy` over a list's state: every one matched, less those in a done state. */
-export function openOf(counted: { counts: readonly { value: unknown; n: number }[]; matched: number; capped?: true }, done: readonly string[]): number | null {
+/**
+ * THE STATES A LIST KEEPS FOR LATER: the live ones its state field lists before the state a new row starts in, so a
+ * task kept for later is not counted as taken on. None where the field names no starting state.
+ */
+export function laterOf(d: { state?: string | undefined; done?: readonly string[] | undefined; fields?: readonly { id: string; values?: readonly string[] | undefined; default?: unknown }[] | undefined }): string[] {
+  const f = d.fields?.find((x) => x.id === d.state);
+  const values = f?.values ?? [];
+  const start = typeof f?.default === 'string' ? values.indexOf(f.default) : -1;
+  return start <= 0 ? [] : values.slice(0, start).filter((v) => !(d.done ?? []).includes(v));
+}
+
+/** The open rows of a `countBy` over a list's state: every one matched, less those in a closed state. */
+export function openOf(counted: { counts: readonly { value: unknown; n: number }[]; matched: number; capped?: true }, closed: readonly string[]): number | null {
   if (counted.capped || !Number.isSafeInteger(counted.matched)) return null;
-  const closed = counted.counts.filter((c) => typeof c.value === 'string' && done.includes(c.value)).reduce((a, c) => a + c.n, 0);
-  return Math.max(0, counted.matched - closed);
+  const shut = counted.counts.filter((c) => typeof c.value === 'string' && closed.includes(c.value)).reduce((a, c) => a + c.n, 0);
+  return Math.max(0, counted.matched - shut);
+}
+
+/**
+ * HOW MANY PEOPLE A LIST THAT KEEPS PEOPLE HOLDS, as its page counts them: never the reader's own row, and never one
+ * merged into another. Read off the roles it declares (`meets:`), so a list that declares none answers `null` and the
+ * row keeps the shell's count.
+ */
+export async function readFolk(base: string, list: string): Promise<number | null> {
+  const client = createClient({ base });
+  if (REGISTERS[list] === undefined) await learn(client.schema, list, asked).catch(() => undefined);
+  const roles = REGISTERS[list]?.meets;
+  const self = roles?.self;
+  if (!self) return null;
+  const merged = roles.merged_into;
+  const out = await client
+    .countBy({ register: list, by: self, ...(merged ? { where: { toJSON: () => `${merged} is empty` } } : {}) })
+    .catch(() => null);
+  if (!out?.ok || out.value.capped || !Number.isSafeInteger(out.value.matched)) return null;
+  const mine = out.value.counts.filter((c) => c.value === true).reduce((a, c) => a + c.n, 0);
+  return Math.max(0, out.value.matched - mine);
+}
+
+/** What a list's declaration says about where it belongs (`side.ts` `homesOf`), or `null` until it is learnt. */
+export function factsOf(id: string, projects: string | null): ListFacts | null {
+  const d = REGISTERS[id];
+  if (d === undefined) return null;
+  const fields = d.fields ?? [];
+  return {
+    ...(d.pack ? { pack: d.pack } : {}),
+    money: fields.some((f) => f.type === 'money'),
+    folk: d.meets !== undefined || d.org !== undefined,
+    projects: d.scopes !== undefined,
+    ofProjects: projects !== null && projects !== id && fields.some((f) => f.type === 'ref' && (f as { to?: unknown }).to === projects),
+  };
+}
+
+/** Every list's facts once each declaration is learnt, asked together; a list whose declaration did not land is left out. */
+export async function readFacts(base: string, lists: readonly { id: string }[]): Promise<Record<string, ListFacts>> {
+  const client = createClient({ base });
+  await Promise.all(lists.filter((l) => REGISTERS[l.id] === undefined).map((l) => learn(client.schema, l.id, asked).catch(() => undefined)));
+  const projects = lists.find((l) => REGISTERS[l.id]?.scopes !== undefined)?.id ?? null;
+  const out: Record<string, ListFacts> = {};
+  for (const l of lists) {
+    const f = factsOf(l.id, projects);
+    if (f) out[l.id] = f;
+  }
+  return out;
 }

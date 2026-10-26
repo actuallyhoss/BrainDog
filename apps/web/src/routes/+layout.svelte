@@ -1,7 +1,8 @@
 <!--
-  The shell: a skip link, the rail or the top bar with its sidebar, the tab bar, the palette, the toast
-  stack, and one polite live region. Frame A (23 October): the bar is where you go and asking, the sidebar on the left
-  is what you own, and the right side is only the thing you opened.
+  The shell: a skip link, the sidebar with the top bar beside it (or the side rail somebody kept), the tab bar, the
+  palette, the toast stack, and one polite live region. THE SIDEBAR HOLDS EVERY PLACE, the window's full height on the
+  left; the top bar runs across the work's column only and says where you are and lets you ask. The two are one surface
+  (`--nav`), and only the work sits on the board.
 
   THE LIVE HAIRLINE ACROSS THE TOP IS DRAWN ONLY WHILE SOMETHING IS WRONG. It
   was two pixels in the boundary colour on every screen at all times, on the argument that a
@@ -71,9 +72,9 @@
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
-  import type { SideHeads, SideLink } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
-  import { WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { MENU, WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -244,16 +245,14 @@
   /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a tool once anything has arrived. A shell no record answered has no
      `counts`, and is read from the two numbers it does carry. */
   const spine = $derived(spineOf(data.counts ? { ...data.counts, decide: open, inbox } : { decide: open, inbox }));
-  /* THE TOOLS, folded under Lists in the sidebar, with the rail's glyphs and words. USAGE'S WORD IS WRITTEN OUT rather
-     than read from `record/actions.ts`, which would carry the usage reader into the entry chunk for one word. */
+  /* THE SIDEBAR'S FOOT: what the record is run with, then Settings, the one door to it. USAGE'S WORD IS WRITTEN OUT
+     rather than read from `record/actions.ts`, which would carry the usage reader into the entry chunk for one word. */
   const USAGE = 'Usage';
-  const tools = $derived<SideLink[]>([
+  const foot = $derived<SideLink[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
-    { href: '/automations', label: copy.automations, icon: 'refresh' },
-    /* NO JOBS: its list of runs lives on Agents now, which the top bar holds, and `/jobs` only sent him there (E48). */
     { href: '/packs', label: copy.packs, icon: 'packs' },
-    { href: '/keychain', label: copy.keychain, icon: 'vault' },
     { href: '/usage', label: USAGE, icon: 'observe' },
+    { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
@@ -287,10 +286,52 @@
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE SIDEBAR TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
   const hiddenCount = $derived(railNav.filter((e) => navPrefs.hidden.includes(e.href)).length);
-  /* THE SIDEBAR'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`), the kernel's own marked. */
+  /* THE SIDEBAR'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`), the kernel's own marked, each with
+     what its declaration says of where it belongs: as the sidebar learnt it, else as this device last kept it, so every
+     list is drawn in its home at once, from the shell's own index, and never pops in after a read. */
   const kernelLists = $derived(new Set(data.lists.filter((l) => l.kernel).map((l) => l.id)));
-  const sideLists = $derived(
-    orderLists(data.index.registers, navPrefs.order).map((r) => ({ id: r.id, name: r.name, icon: r.icon, count: r.count, views: r.views, kernel: kernelLists.has(r.id) })),
+  const keptFacts = $derived.by(() => {
+    try {
+      return factsKept(localStorage.getItem(FACTS_KEY), apiBase(page.url));
+    } catch {
+      return {};
+    }
+  });
+  /* WHAT EACH LIST DECLARES, READ ONCE THE SHELL HAS DRAWN, on the desk and the phone alike, and kept on this device so
+     the next draw places each list at once. Its reader is the sidebar's own chunk, asked for here, never in the entry. */
+  $effect(() => {
+    if (bare || data.live !== true || data.refused) return;
+    const base = apiBase(page.url);
+    const lists = data.lists;
+    let gone = false;
+    void import('$lib/shell/side-read.ts')
+      .then((m) => m.readFacts(base, lists))
+      .then((facts) => {
+        if (gone || Object.keys(facts).length === 0) return;
+        frame.facts = facts;
+        try {
+          const all = JSON.parse(localStorage.getItem(FACTS_KEY) ?? '{}') as Record<string, unknown>;
+          all[base] = facts;
+          localStorage.setItem(FACTS_KEY, JSON.stringify(all));
+        } catch {
+          /* Kept for this tab only. */
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  });
+  const sideLists = $derived<SideList[]>(
+    orderLists(data.index.registers, navPrefs.order).map((r) => ({
+      id: r.id,
+      name: r.name,
+      icon: r.icon,
+      count: r.count,
+      views: r.views,
+      kernel: kernelLists.has(r.id),
+      facts: frame.facts[r.id] ?? keptFacts[r.id] ?? null,
+    })),
   );
 
   /**
@@ -317,10 +358,8 @@
       const own = rail.things.find(([section]) => section === i.label)?.[1] ?? [];
       return own.length > 0 ? { ...i, near: [...i.near, ...own.map((e) => e.href)] } : i;
     });
-  const tabs = $derived(withThings(tabsOf(rail.places, 5, navPrefs.tabs)));
-  /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
-     phone. Agents may sit past the rail's seven, so the places under More are read too. */
-  const barPlaces = $derived(withThings(tabsOf([...rail.places, ...rail.rest])));
+  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. */
+  const tabs = $derived(withThings(tabsOf(rail.places, 4, navPrefs.tabs)));
   /* READ AT ONCE, so a phone's first draw is already a phone's (the Projects tab draws the list, not the desk page). */
   let narrow = $state(typeof matchMedia === 'function' && matchMedia('(width < 900px)').matches);
   $effect(() => {
@@ -341,66 +380,110 @@
     return () => mq.removeEventListener('change', set);
   });
 
-  /* THE SIDEBAR IS THE TOP BAR'S: a column beside the work from 1,280 (`sideOn`), from 900 a drawer over the page from
-     the left (`sideOver`), never from the right, and the menu shape's one button opens the same drawer. */
+  /* THE SIDEBAR IS THE BAR SHAPE'S: the full column beside the work from 1,280 (`sideOn`), and narrower, or hidden, its
+     56px rail of the places (`railOn`), never nothing. From the rail the full sidebar opens as a drawer over the page
+     from the left (`sideOver`), never from the right, and the menu shape's one button opens the same drawer. */
   let sideOver = $state(false);
   const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
+  const railOn = $derived(navPrefs.shape === 'bar' && !narrow && !sideOn);
   const overOn = $derived(navPrefs.shape !== 'rail' && !narrow && sideOver && !sideOn);
-  /* THE PROJECTS PLACE is the one whose own things are projects' pages, so on a phone its tab opens the sidebar as a
-     page (projects, then lists), and the desk keeps its page. */
-  const projectsPlace = $derived(barPlaces.find((p) => rail.things.some(([section]) => section === p.label)) ?? null);
-  const phoneProjects = $derived(navPrefs.shape !== 'rail' && narrow && projectsPlace !== null && here(page.url.pathname) === projectsPlace.href);
+  /* THE PROJECTS PLACE is the one whose own things are projects' pages, else the section called Projects: its heading
+     is the sidebar's projects part, never a place of its own. */
+  const projectsPlace = $derived(
+    [...rail.places, ...rail.rest].find((p) => rail.things.some(([section]) => section === p.label)) ??
+      [...rail.places, ...rail.rest].find((p) => p.key.replace(/^section:/u, '').trim().toLowerCase() === 'projects') ??
+      null,
+  );
+  /* ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE, at its own address (`MENU`); the desk draws Today there. */
+  const phoneMenu = $derived(navPrefs.shape !== 'rail' && narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
   $effect(() => {
-    if ((sideOn || overOn || phoneProjects) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
+    if ((sideOn || railOn || overOn || phoneMenu) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
   });
 
   /* THE PROJECTS AN AGENT IS AT WORK ON, by name, for the sidebar's green dots. */
   const workingOn = $derived(workingNow().map((w) => w.project));
 
-  /* HIDE OR SHOW, BY ITS BUTTON OR `[`: the column snaps and the work slides from where its edge was (`slide`); under
-     1,280 the drawer opens or closes. */
+  /* HIDE OR SHOW, BY ITS BUTTON OR `[`: the column narrows to its rail or widens again, and the work slides from where
+     its edge was (`slide`); under 1,280 the full sidebar opens or closes as a drawer over the rail. */
+  const RAIL_W = 56;
   async function toggleSide(): Promise<void> {
     if (shape === 'rail' || narrow) return;
     if (shape !== 'bar' || !deskWide) return void (sideOver = !sideOver);
-    const was = sideShown ? sideWidth : 0;
+    const was = sideShown ? sideWidth : RAIL_W;
     sideShown = !sideShown;
     keepSide();
     await tick();
     const el = document.getElementById('main');
-    const now = sideShown ? sideWidth : 0;
+    const now = sideShown ? sideWidth : RAIL_W;
     if (el) slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
   }
 
+  /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
+  const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest]));
+
   /**
-   * THE SIDEBAR'S LISTS (`groupsOf`): the places the bar on screen leaves out, each a row (Work with its tasks' count,
-   * People), and on a phone Activity too, which the desk's bell reaches; the places' own views; the lists; the tools.
-   * Each count is said once, so the tasks list is not a row of its own while Work counts it.
+   * THE SIDEBAR, ONE MODEL (`side.ts` `sideModel`): Today, Needs you and the record's places, each with its count and the
+   * lists that are its own (`homesOf`); the projects' part; the sections and lists with no place under More lists; and
+   * the foot. EACH PLACE COUNTS ONE THING, said the same wherever it is said: what needs you on Needs you, who is at work
+   * on Agents, the open tasks on Work and the people on People (read by the sidebar, `side-read.ts`).
    */
-  const onBar = $derived(new Set((narrow ? tabs : barPlaces).map((i) => i.key)));
-  const sidePlaces = $derived<SideLink[]>(
-    [...rail.places, ...rail.rest]
-      .filter((i) => !onBar.has(i.key) && i.key !== 'decide' && (narrow || i.key !== 'activity'))
-      .map((i) => ({ href: i.href, label: i.label, icon: i.icon, count: i.href === WORK ? data.index.registers.find((r) => r.id === TASKS)?.count : i.count })),
+  const placed = $derived.by(() => {
+    const all = [...rail.places, ...rail.rest];
+    const agents = all.find((i) => i.href === agentsAt)?.key ?? null;
+    const money = all.find((i) => i.key.replace(/^section:/u, '').trim().toLowerCase() === 'money')?.key ?? null;
+    const at = { agents, money };
+    const working = workingNow().length;
+    const places: NavPlace[] = all
+      .filter((i) => i !== projectsPlace && i.key !== 'activity' && (rail.places.includes(i) || i.key === agents))
+      .map((i) => (i.key === 'decide' ? { ...i, count: open } : i.key === agents ? { ...i, count: working, live: working > 0 } : i));
+    const others: NavPlace[] = rail.rest.filter((i) => i !== projectsPlace && i.key !== 'activity' && i.key !== agents);
+    return { at, places: sideOrder(places, at), others };
+  });
+  const sideHomes = $derived(homesOf(sideLists, placed.places, placed.at));
+  const model = $derived(
+    sideModel({
+      places: placed.places,
+      others: placed.others,
+      projects: projectsPlace
+        ? {
+            href: projectsPlace.href,
+            label: projectsPlace.label,
+            things: (rail.things.find(([section]) => section === projectsPlace.label)?.[1] ?? []).map((e) => ({ href: e.href, label: e.title, icon: 'doc' })),
+          }
+        : null,
+      lists: sideLists,
+      homes: sideHomes,
+      views: Object.fromEntries(Object.entries(rail.views).map(([key, list]) => [key, list.map((v) => ({ href: v.href, label: v.title, icon: 'doc' }))])),
+      /* THE AGENTS' TOOLS ARE THE AGENTS': what runs by itself, and the keys they use. */
+      tools: [
+        { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE },
+        { href: '/keychain', label: copy.keychain, icon: 'vault', home: placed.at.agents ?? IN_MORE },
+      ],
+      foot,
+      counted: holdsTasks ? { work: TASKS } : {},
+    }),
   );
-  const workCounted = $derived(sidePlaces.some((p) => p.href === WORK));
-  const sideViews = $derived<SideLink[]>(rail.places.flatMap((i) => (rail.views[i.key] ?? []).map((v) => ({ href: v.href, label: v.title, icon: 'doc' }))));
-  const listsShown = $derived(sideLists.filter((l) => !(workCounted && l.id === TASKS)));
-  /* THE GROUPS' WORDS, written out as USAGE is, so the entry carries five words and no area's copy. */
-  const sideHeads: SideHeads = {
-    money: { label: 'Money', icon: 'money' },
-    kernel: { label: 'Agent work', icon: 'session' },
-    lists: { label: 'Other lists', icon: 'rows' },
-    views: { label: 'Saved views', icon: 'doc' },
-    extras: { label: 'Tools', icon: 'packs' },
-  };
+  /* A TAB IS LIT ON ITS PLACE'S OWN LISTS TOO, as the sidebar's place unfolds there: Money's tab on its ledger. */
+  const phoneTabs = $derived(
+    tabs.map((t) => {
+      const own = model.places.find((p) => p.key === t.key)?.kids ?? (projectsPlace?.key === t.key ? (model.projects?.kids ?? []) : []);
+      return own.length > 0 ? { ...t, near: [...t.near, ...own.map((k) => k.href)] } : t;
+    }),
+  );
+  /* THE ONE LIT ROW, and the crumb the bar says it in. */
+  const spot = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
+  const lit = $derived(litOf(spot, model));
+  const crumb = $derived(crumbOf(spot, model, lit, frame.title || null));
+  $effect.pre(() => {
+    frame.here = crumb.at(-1)?.label ?? '';
+  });
   /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT (USE-B03): an update that adds a page lands hidden. */
   const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
   const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation' } : null);
 
-  /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the bar's five places, and Settings (2.A.15). */
-  const goPlaces = $derived([...barPlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings' }]);
-  /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
-  const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest]));
+  /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the sidebar's places, the projects, and Settings (2.A.15). */
+  const sidePlaces = $derived<FlatItem[]>([...model.places.map((p) => ({ key: p.key, href: p.href, label: p.label, icon: p.icon, near: p.near })), ...(projectsPlace ? [projectsPlace] : [])]);
+  const goPlaces = $derived([...sidePlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings', near: ['/settings'] }]);
 
   /**
    * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day
@@ -433,8 +516,8 @@
      `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */
   const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim() || (data.me.name ?? '').trim());
 
-  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, and the top bar's own rows on the top bar. */
-  const numbered = $derived(navPrefs.shape === 'bar' ? barPlaces : rail.places);
+  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, the sidebar's on the bar shape. */
+  const numbered = $derived(navPrefs.shape === 'bar' ? sidePlaces : rail.places);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -1055,6 +1138,8 @@
     frame.refused = recordsRefused;
     frame.person = personName;
     frame.open = (r) => void openOther(r);
+    frame.news = data.whatsNew ?? [];
+    frame.crumbed = shape === 'bar';
   });
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
@@ -1224,7 +1309,7 @@
        first third. That is the artefact somebody hands an accountant. -->
   <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
-  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape} data-side={sideOn ? '' : undefined} style:--side-col={sideOn ? `${sideWidth}px` : undefined}>
+  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape} data-side={sideOn ? '' : railOn ? 'rail' : undefined} style:--side-col={sideOn ? `${sideWidth}px` : railOn ? `${RAIL_W}px` : undefined}>
     {#if shape === 'rail'}
       <div class="rail-slot" bind:this={railSlot}>
         {#if Sidebar}
@@ -1248,17 +1333,34 @@
         {/if}
       </div>
     {:else}
+      {#if sideOn || railOn}
+        <!-- THE SIDEBAR, THE WINDOW'S FULL HEIGHT: the full column from 1,280, else its rail; its width held while its
+             chunk arrives. -->
+        <div class="side-slot">
+          {#if SideBar}
+            <SideBar
+              base={apiBase(page.url)}
+              lists={data.lists}
+              {model}
+              {lit}
+              working={workingOn}
+              version={live.version}
+              mode={sideOn ? 'full' : 'rail'}
+              shown={sideOn}
+              pen={sidePen}
+              width={sideWidth}
+              onwidth={(n, done) => {
+                sideWidth = n;
+                if (done) keepSide();
+              }}
+              ontoggle={() => void toggleSide()}
+            />
+          {/if}
+        </div>
+      {/if}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar
-            entries={barPlaces}
-            working={workingNow()}
-            agents={agentsAt}
-            news={data.whatsNew}
-            side={{ shown: deskWide ? sideShown : sideOver }}
-            onside={() => void toggleSide()}
-            onfind={() => (palette.open = true)}
-          />
+          <TopBar {crumb} onfind={() => (palette.open = true)} />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -1270,49 +1372,23 @@
           </button>
         {/if}
       </div>
-      {#if sideOn}
-        <!-- THE SIDEBAR, its width held while its chunk arrives. -->
-        <div class="side-slot">
-          {#if SideBar}
-            <SideBar
-              base={apiBase(page.url)}
-              lists={data.lists}
-              working={workingOn}
-              version={live.version}
-              projects={projectsPlace?.href ?? null}
-              places={sidePlaces} workList={workCounted ? TASKS : null}
-              owned={listsShown}
-              views={sideViews}
-              {tools}
-              heads={sideHeads}
-              pen={sidePen}
-              width={sideWidth}
-              onwidth={(n, done) => {
-                sideWidth = n;
-                if (done) keepSide();
-              }}
-            />
-          {/if}
-        </div>
-      {:else if overOn}
-        <!-- UNDER 1,280, OR ON THE MENU SHAPE, THE SAME SIDEBAR SLIDES IN FROM THE LEFT over the page; a press beside it,
-             Esc or a move closes it. -->
+      {#if overOn}
+        <!-- UNDER 1,280, OR ON THE MENU SHAPE, THE FULL SIDEBAR SLIDES IN FROM THE LEFT over its rail and the page; a press
+             beside it, Esc or a move closes it. -->
         <button type="button" class="side-scrim" aria-label={copy.close} tabindex="-1" onclick={() => (sideOver = false)}></button>
         <div class="side-over" style:--side-col={`${sideWidth}px`}>
           {#if SideBar}
             <SideBar
               base={apiBase(page.url)}
               lists={data.lists}
+              {model}
+              {lit}
               working={workingOn}
               version={live.version}
-              projects={projectsPlace?.href ?? null}
-              places={sidePlaces} workList={workCounted ? TASKS : null}
-              owned={listsShown}
-              views={sideViews}
-              {tools}
-              heads={sideHeads}
+              shown={true}
               pen={sidePen}
               width={sideWidth}
+              ontoggle={() => (sideOver = false)}
             />
           {/if}
         </div>
@@ -1356,9 +1432,9 @@
       {#if data.me.grant !== undefined && !data.me.owner}
         {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
       {/if}
-      {#if phoneProjects}
-        <!-- ON A PHONE THE PROJECTS TAB IS THE SIDEBAR AS A PAGE: the projects, one fact each, then the lists. -->
-        {#if SideBar}<SideBar phone base={apiBase(page.url)} lists={data.lists} working={workingOn} version={live.version} places={sidePlaces} workList={workCounted ? TASKS : null} owned={listsShown} views={sideViews} {tools} heads={sideHeads} pen={sidePen} />{/if}
+      {#if phoneMenu}
+        <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
+        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} {lit} working={workingOn} version={live.version} pen={sidePen} />{/if}
       {:else}
         {@render children()}
       {/if}
@@ -1367,7 +1443,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar {tabs} />
+    <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} />
   </div>
 
   <!--
@@ -1535,9 +1611,9 @@
     padding: var(--inset) var(--inset) 0;
   }
 
-  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the nav's surface with one hairline under it, in light and in dark: in dark
-     the nav is its own indigo and the hairline is its edge (frame B, U8). The Mac app's title bar is paid here, once:
-     the work under the bar pays none. */
+  /* THE TOP BAR RUNS ACROSS THE WORK'S COLUMN ONLY, from the sidebar's edge, on the nav's surface with one hairline
+     under it, on the line of the hairline under the sidebar's head: the two are one surface, in light and in dark. The
+     Mac app's title bar is paid here, once: the work under the bar pays none. */
   .shell[data-shape='bar'] .bar-slot {
     position: relative;
     z-index: var(--z-palette);
@@ -1552,11 +1628,16 @@
     --shell-inset: 0px;
   }
 
-  /* FRAME B: THE SIDEBAR'S COLUMN UNDER THE BAR, its width the device's (`--side-col`), nothing when it is hidden. Below
+  /* THE SIDEBAR'S COLUMN, THE WINDOW'S FULL HEIGHT: its width the device's (`--side-col`), or the rail's 56. The bar and
+     the work take the column after it, so the bar's start follows the sidebar's edge wherever it is dragged. Below
      900px there is no bar and no sidebar, and the rule further down gives the work the one column. */
   @media (width >= 900px) {
     .shell[data-shape='bar'] {
       grid-template-columns: var(--side-col, 0px) minmax(0, 1fr);
+    }
+
+    .shell[data-shape='bar'] .bar-slot {
+      grid-column: 2 / -1;
     }
 
     .shell[data-shape='bar'] .body {
@@ -1566,15 +1647,18 @@
   }
 
   .side-slot {
+    position: relative;
+    z-index: var(--z-palette);
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1 / -1;
     display: flex;
     min-block-size: 0;
     overflow: hidden;
+    background: var(--nav);
   }
 
-  /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge: the bar is the window's width from 1,280 too. On a phone
-     it is the bottom sheet (`Panel.svelte`, `PHONE`), which hangs from the screen's foot and is left alone. */
+  /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge. On a phone it is the bottom sheet (`Panel.svelte`,
+     `PHONE`), which hangs from the screen's foot and is left alone. */
   @media (width >= 900px) {
     .shell[data-shape='bar'] :global(dialog.dock) {
       inset-block: calc(56px + var(--shell-inset, 0px) + var(--inset)) var(--inset);
@@ -1733,7 +1817,8 @@
        whatever the shape says, so the strip goes and the grid is one column with one row again —
        without the second half of that, `main` would sit in an `auto` row inside a `100dvh` box with
        `overflow: hidden` and every screen would end where the window does. */
-    .bar-slot {
+    .bar-slot,
+    .side-slot {
       display: none;
     }
 
@@ -1803,7 +1888,7 @@
       grid-area: 2 / 1;
     }
 
-    /* FRAME B: the bar over every column, the sidebar, the work, and the docked panel's column at the end. */
+    /* THE SIDEBAR, THE WORK UNDER THE BAR, and the docked panel's column at the end, the bar over both. */
     .shell[data-shape='bar'] {
       grid-template-columns: var(--side-col, 0px) minmax(0, 1fr) var(--dock-col, 0px);
     }
@@ -1813,12 +1898,13 @@
     }
   }
 
-  /* THE SIDEBAR'S DRAWER, under 1,280 and on the menu shape: it slides in from the left over the page, under the bar,
-     on the board's own ground, and a quiet scrim over the rest takes the press that closes it. */
+  /* THE SIDEBAR'S DRAWER, under 1,280 and on the menu shape: the full sidebar slides in from the left over its rail and
+     the page, the window's full height, and a quiet scrim over the rest takes the press that closes it. AT THE BAR'S
+     LEVEL AND AFTER IT IN THE PAGE, so both are drawn over the bar, the rail and the work's sticky head. */
   .side-scrim {
     position: fixed;
-    inset: calc(56px + var(--shell-inset, 0px)) 0 0;
-    z-index: var(--z-sheet);
+    inset: 0;
+    z-index: var(--z-palette);
     padding: 0;
     border: 0;
     background: color-mix(in srgb, var(--ink) 16%, transparent);
@@ -1827,18 +1913,13 @@
 
   .side-over {
     position: fixed;
-    inset-block: calc(56px + var(--shell-inset, 0px)) 0;
+    inset-block: 0;
     inset-inline-start: 0;
-    z-index: var(--z-sheet);
+    z-index: var(--z-palette);
     display: flex;
     inline-size: min(var(--side-col, 248px), calc(100vw - 2 * var(--tap)));
-    background: var(--board);
+    background: var(--nav);
     animation: side-in var(--d-panel) var(--ease-out);
-  }
-
-  .shell[data-shape='menu'] .side-scrim,
-  .shell[data-shape='menu'] .side-over {
-    inset-block-start: 0;
   }
 
   :global([dir='rtl']) .side-over {

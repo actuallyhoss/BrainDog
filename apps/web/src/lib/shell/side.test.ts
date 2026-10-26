@@ -1,51 +1,155 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SIDE_MAX, SIDE_MIN, SIDE_START, byWeek, factOf, groupsOf, holdsProjects, lanesOf, phoneLine, pinsKept, playSaid, shownName, sideKept, splitOf, widthOf, type SideList } from './side.ts';
+import {
+  IN_MORE,
+  IN_PROJECTS,
+  SIDE_MAX,
+  SIDE_MIN,
+  SIDE_START,
+  byWeek,
+  countKept,
+  crumbOf,
+  factOf,
+  factsKept,
+  holdsProjects,
+  homesOf,
+  lanesOf,
+  litOf,
+  phoneLine,
+  pinsKept,
+  playSaid,
+  shownName,
+  sideKept,
+  sideModel,
+  sideOrder,
+  splitOf,
+  widthOf,
+  type ListFacts,
+  type NavPlace,
+  type SideList,
+} from './side.ts';
 
-const HEADS = {
-  money: { label: 'Money', icon: 'money' },
-  kernel: { label: 'Agent work', icon: 'session' },
-  lists: { label: 'Other lists', icon: 'rows' },
-  views: { label: 'Saved views', icon: 'doc' },
-  extras: { label: 'Tools', icon: 'packs' },
-};
-const list = (id: string, o: Partial<SideList> = {}): SideList => ({ id, name: id.toUpperCase(), icon: 'rows', count: 1, views: [], kernel: false, money: false, ...o });
+/* An invented record: a studio with Work, Money, Crew (its agents), Guests and a Services section past the places. */
+const place = (key: string, label: string, href: string, near: readonly string[] = [href]): NavPlace => ({ key, href, label, icon: 'rows', near });
+const TODAY: NavPlace = { key: 'today', href: '/', label: 'Today', icon: 'today', near: ['/'], exact: true };
+const DECIDE = place('decide', 'Needs you', '/decide');
+const WORKS = place('work', 'Work', '/?work', ['/?work', '/p/board']);
+const MONEY = place('section:Money', 'Money', '/p/money');
+const GUESTS = place('section:Guests', 'Guests', '/p/guests');
+const CREW = place('section:Crew', 'Crew', '/p/crew');
+const SERVICES = place('section:Services', 'Services', '/p/services');
+const AT = { agents: CREW.key, money: MONEY.key };
+const facts = (o: Partial<ListFacts> = {}): ListFacts => ({ money: false, folk: false, projects: false, ofProjects: false, ...o });
+const list = (id: string, o: Partial<SideList> = {}): SideList => ({ id, name: id.toUpperCase(), icon: 'rows', count: 1, views: [], kernel: false, facts: facts(), ...o });
 
-test('lists group in the order the phone read them: places, money, the agents, the rest, views, tools', () => {
-  const groups = groupsOf(
-    [{ href: '/?work', label: 'Work', icon: 'work', count: 27 }],
-    [list('a1', { money: true }), list('r1', { kernel: true, count: 5 }), list('n1', { views: [{ name: 'Mine', href: '/p/mine' }] }), list('a2', { money: true })],
-    [{ href: '/p/board', label: 'Board', icon: 'doc' }],
-    [{ href: '/keychain', label: 'Keychain', icon: 'vault' }],
-    HEADS,
-  );
-  assert.deepEqual(
-    groups.map((g) => [g.label, g.items.map((i) => i.label)]),
-    [
-      ['Work', ['Work']],
-      ['Money', ['A1', 'A2']],
-      ['Agent work', ['R1']],
-      ['Other lists', ['N1']],
-      ['Saved views', ['Board', 'Mine']],
-      ['Tools', ['Keychain']],
-    ],
-  );
-  assert.equal(groups[2]?.items[0]?.count, 5);
-  assert.equal(groups[1]?.items[0]?.href, '/r/a1');
+test('each list has one home, read off what it declares: agents, people, money, projects, then its add-on, else More', () => {
+  const lists = [
+    list('runs', { kernel: true, facts: null }),
+    list('folk', { name: 'Guests', facts: facts({ folk: true, pack: 'hosting' }) }),
+    list('orgs', { name: 'Firms', facts: facts({ folk: true, pack: 'hosting' }) }),
+    list('ledger', { facts: facts({ money: true, pack: 'books' }) }),
+    list('rates', { facts: facts({ pack: 'books' }) }),
+    list('readings', { facts: facts({ ofProjects: true }) }),
+    list('skills', { facts: facts({ pack: 'crew-skills' }) }),
+    list('notes', { facts: facts() }),
+    list('unread', { facts: null }),
+  ];
+  const homes = homesOf(lists, [TODAY, DECIDE, WORKS, MONEY, GUESTS, CREW], AT);
+  assert.deepEqual(Object.fromEntries(homes), {
+    runs: CREW.key,
+    folk: GUESTS.key,
+    orgs: GUESTS.key,
+    ledger: MONEY.key,
+    rates: MONEY.key,
+    readings: IN_PROJECTS,
+    skills: CREW.key,
+    notes: IN_MORE,
+    unread: IN_MORE,
+  });
 });
 
-test('ONE ROW A LIST (audit C, X6): a place and the list it is named as are one row, which carries the list count', () => {
-  /* Invented: a record whose Guests place is off the bar and whose Guests list holds two. The sidebar said "Guests,
-     Guests 2", two rows of one word. A list named as no place keeps its own row. */
-  const groups = groupsOf([{ href: '/p/guests', label: 'Guests', icon: 'people' }], [list('folk', { name: 'Guests', count: 2 }), list('kilns', { name: 'Kilns', count: 3 })], [], [], HEADS);
-  assert.deepEqual(
-    groups.map((g) => [g.label, g.items.map((i) => `${i.label} ${String(i.count)} ${i.href}`)]),
-    [
-      ['Guests', ['Guests 2 /p/guests']],
-      ['Other lists', ['Kilns 3 /r/kilns']],
+test('a list whose declaration is not read yet keeps the home this device drew it in, so nothing moves under the reader', () => {
+  const homes = homesOf([list('ledger', { facts: null })], [MONEY], AT, { ledger: MONEY.key });
+  assert.equal(homes.get('ledger'), MONEY.key);
+  assert.equal(homesOf([list('ledger', { facts: null })], [MONEY], AT, { ledger: 'section:Gone' }).get('ledger'), IN_MORE, 'a home that is gone is More');
+});
+
+test('the agents stand straight after money, and the rest keep the rail order', () => {
+  const order = sideOrder([TODAY, DECIDE, WORKS, MONEY, GUESTS, CREW], AT).map((p) => p.label);
+  assert.deepEqual(order, ['Today', 'Needs you', 'Work', 'Money', 'Crew', 'Guests']);
+  assert.deepEqual(sideOrder([TODAY, CREW], AT).map((p) => p.label), ['Today', 'Crew'], 'no money, no move');
+});
+
+const MODEL = () => {
+  const lists = [
+    list('tasks', { name: 'Tasks', count: 59 }),
+    list('folk', { name: 'Guests', count: 11, facts: facts({ folk: true }), views: [{ name: 'Regulars', href: '/r/folk/v/regulars' }] }),
+    list('ledger', { name: 'Ledger', count: 336, facts: facts({ money: true }) }),
+    list('runs', { name: 'Agent runs', count: 930, kernel: true, facts: null }),
+    list('things', { name: 'Projects', facts: facts({ projects: true }) }),
+    list('readings', { name: 'Numbers', count: 2527, facts: facts({ ofProjects: true }) }),
+    list('services', { name: 'Services', count: 35 }),
+    list('notes', { name: 'Notes', count: 4 }),
+  ];
+  const places = [TODAY, { ...DECIDE, count: 13 }, WORKS, MONEY, { ...CREW, count: 3, live: true }, GUESTS];
+  return sideModel({
+    places,
+    others: [SERVICES],
+    projects: { href: '/p/projects', label: 'Projects', things: [{ href: '/p/kiln', label: 'Kiln', icon: 'doc' }] },
+    lists,
+    homes: homesOf(lists, places, AT),
+    views: { work: [{ href: '/p/board', label: 'Board', icon: 'doc' }] },
+    tools: [{ href: '/automations', label: 'Automations', icon: 'refresh', home: CREW.key }],
+    foot: [
+      { href: '/packs', label: 'Add-ons', icon: 'packs' },
+      { href: '/settings', label: 'Settings', icon: 'settings' },
     ],
-  );
+    counted: { work: 'tasks' },
+  });
+};
+
+test('every list lives under its place, a list named as a place is that place, and what has no place is under More', () => {
+  const m = MODEL();
+  const kids = Object.fromEntries(m.places.map((p) => [p.label, p.kids.map((k) => k.label)]));
+  assert.deepEqual(kids, {
+    Today: [],
+    'Needs you': [],
+    Work: ['Board'],
+    Money: ['Ledger'],
+    Crew: ['Agent runs', 'Automations'],
+    Guests: ['Regulars'],
+  });
+  assert.equal(m.places.find((p) => p.label === 'Work')?.list, 'tasks', 'Work counts its tasks and draws no Tasks row');
+  assert.equal(m.places.find((p) => p.label === 'Guests')?.count, 11, 'one word is never two rows');
+  assert.deepEqual(m.projects?.kids.map((k) => k.label), ['Numbers']);
+  assert.deepEqual(m.more.map((l) => `${l.label} ${String(l.count)}`), ['Services 35', 'Notes 4']);
+});
+
+test('EXACTLY ONE ROW IS LIT: the row the page is on most closely, a list over its place and a project over Projects', () => {
+  const m = MODEL();
+  assert.equal(litOf('/', m), '/');
+  assert.equal(litOf('/?work', m), '/?work');
+  assert.equal(litOf('/p/board', m), '/p/board', 'Board, and not Work as well');
+  assert.equal(litOf('/r/ledger', m), '/r/ledger');
+  assert.equal(litOf('/r/ledger/42', m), '/r/ledger', 'a row lights its list');
+  assert.equal(litOf('/p/money', m), '/p/money');
+  assert.equal(litOf('/p/kiln', m), '/p/kiln');
+  assert.equal(litOf('/p/projects', m), '/p/projects');
+  assert.equal(litOf('/settings/navigation', m), '/settings');
+  assert.equal(litOf('/search', m), null, 'a page no row leads to lights none');
+  assert.equal(litOf('/decide/7', m), '/decide');
+});
+
+test('the crumb says the place, then where you are, each step a link back but the last', () => {
+  const m = MODEL();
+  assert.deepEqual(crumbOf('/r/ledger', m, '/r/ledger', 'Ledger'), [{ label: 'Money', href: '/p/money' }, { label: 'Ledger' }]);
+  assert.deepEqual(crumbOf('/p/kiln', m, '/p/kiln', 'Kiln'), [{ label: 'Projects', href: '/p/projects' }, { label: 'Kiln' }]);
+  assert.deepEqual(crumbOf('/', m, '/', 'Good evening'), [{ label: 'Today' }]);
+  assert.deepEqual(crumbOf('/r/ledger/42', m, '/r/ledger', 'Rent'), [{ label: 'Money', href: '/p/money' }, { label: 'Ledger', href: '/r/ledger' }, { label: 'Rent' }]);
+  assert.deepEqual(crumbOf('/settings/navigation', m, '/settings', 'Navigation'), [{ label: 'Settings', href: '/settings' }, { label: 'Navigation' }]);
+  assert.deepEqual(crumbOf('/search', m, null, 'Search'), [{ label: 'Search' }]);
+  assert.deepEqual(crumbOf('/p/projects', m, '/p/projects', 'Projects'), [{ label: 'Projects' }]);
 });
 
 test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT (audit C, X6): "Projects 0 in play" headed a new shop', () => {
@@ -54,9 +158,14 @@ test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT (audit C, X6): "Project
   assert.equal(holdsProjects({ rows: [{ key: 'things#1' }] }), true);
 });
 
-test('an empty kind draws no group, and a kernel list that holds money stays with the agents', () => {
-  const groups = groupsOf([], [list('r1', { kernel: true, money: true })], [], [], HEADS);
-  assert.deepEqual(groups.map((g) => g.label), ['Agent work']);
+test('what the device keeps of counts and facts is read safely, by record', () => {
+  const raw = JSON.stringify({ '/a': { work: 39, folk: -1, bad: 'x' } });
+  assert.equal(countKept(raw, '/a', 'work'), 39);
+  assert.equal(countKept(raw, '/a', 'folk'), null);
+  assert.equal(countKept(raw, '/b', 'work'), null);
+  assert.equal(countKept('{', '/a', 'work'), null);
+  assert.deepEqual(factsKept(JSON.stringify({ '/a': { ledger: { money: true, pack: 'books' }, bad: 3 } }), '/a'), { ledger: { pack: 'books', money: true, folk: false, projects: false, ofProjects: false } });
+  assert.deepEqual(factsKept('nope', '/a'), {});
 });
 
 const p = (name: string, o: Partial<{ pinned: boolean; late: number; working: boolean; moved: boolean; lane: string }> = {}) => ({

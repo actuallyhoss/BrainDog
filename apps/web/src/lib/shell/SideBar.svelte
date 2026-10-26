@@ -1,85 +1,106 @@
 <!--
-  The sidebar (frame A, 23 October): what you own, under the top bar, on the board. One sidebar, on the left only.
+  The sidebar: every place, on the nav's own surface beside the work, the window's full height. One sidebar, on the left.
 
-  A head ("Projects", how many are in play, and "+" to add one), then each project in play as a row, by this week (pins
-  on top, then late, then an agent at work, then money in), with its own colour and one mark: a red "late" or a green
-  working dot. The open project shows its parts under it, the tiles its page draws (`data-part`), the one in view
-  marked. Parked and Finished fold under them. Then Lists, grouped as the phone's old sheet read them and each group folded
-  until opened, with counts (`groupsOf`); at the foot suggested changes when any, then Settings.
+  A 56px head on the bar's line: the record's mark and its name ("Acme ▾", the switcher) and the button that hides it.
+  Then the places, Today, Needs you and the record's own (Work, Money, Agents, People), each with its count, the red one
+  only for what needs you and a live dot for an agent at work. Then the projects: the heading is the portfolio page,
+  "+" adds one, the ones in play by this week (pins, late, an agent at work, money in), Parked and Finished folded, and
+  the lists that belong to the projects. Then More lists, folded, for whatever has no place. At the foot what the record
+  is run with: the inbox, add-ons, usage, suggested changes when any, and Settings.
 
-  GENERIC: whatever projects the record holds (`side-read.ts`), found by what its list declares; nothing here names one.
+  EACH LIST LIVES UNDER THE PLACE IT BELONGS TO (`side.ts` `homesOf`) and unfolds when you are in that place, so Money's
+  lists show on Money and on each of them. EXACTLY ONE ROW IS LIT ON EVERY PAGE (`litOf`), the one the page is on most
+  closely; the open project's parts show under it, the one in view in ink and never lit as well.
 
-  ON A PHONE (`phone`) IT IS THE PROJECTS TAB: the page's head, one sentence, and the same rows with one fact each in
-  place of the dot, in a tile, with the same folds, then the lists.
+  THREE SHAPES. `full`, the column beside the work from 1,280. `rail`, 56 wide, the places as their glyphs, when the
+  window is narrower or the sidebar is hidden: never nothing. `phone`, the Menu tab: the same rows as a page, in tiles.
 
-  ITS OWN CHUNK, loaded when the frame asks for it (`+layout.svelte`), so the shell's entry carries none of it.
+  GENERIC: whatever projects and lists the record holds (`side-read.ts`), found by what each declares; nothing here
+  names one. ITS OWN CHUNK, loaded when the shell draws it (`+layout.svelte`), so the shell's entry carries none of it.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
   import { at, here as inside } from '../at.ts';
-  import { WORK, placeOf } from '../nav.ts';
   import { slotStyle } from '../home/project-cards.ts';
+  import Count from '../ui/Count.svelte';
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
   import { drew } from '../ui/screen.svelte.ts';
-  import { REGISTERS } from '../record/held.ts';
-  import { PINS_KEY, SIDE_MAX, SIDE_MIN, byWeek, factOf, groupsOf, holdsProjects, phoneLine, pinsKept, withOpenWork, playSaid, shownName, splitOf, widthOf, type SideGroup, type SideHeads, type SideLink, type SideList, type SideProject } from './side.ts';
-  import { keptRead, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { knowProjects } from '../page/known-project.ts';
+  import { keepOrder } from './project-order.ts';
+  import { frame } from './frame.svelte.ts';
+  import RecordMenu from './RecordMenu.svelte';
+  import {
+    COUNTS_KEY,
+    PINS_KEY,
+    SIDE_MAX,
+    SIDE_MIN,
+    byWeek,
+    countKept,
+    factOf,
+    holdsProjects,
+    phoneLine,
+    pinsKept,
+    playSaid,
+    shownName,
+    splitOf,
+    widthOf,
+    type SideLink,
+    type SideModel,
+    type SidePlace,
+    type SideProject,
+  } from './side.ts';
+  import { keptRead, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
 
   let {
     base,
     lists,
+    model,
+    lit = null,
     working = [],
     version = null,
-    projects = null,
     width = 248,
-    phone = false,
-    places = [],
-    workList = null,
-    owned = [],
-    views = [],
-    tools = [],
-    heads,
+    mode = 'full',
+    shown = true,
     pen = null,
     onwidth,
+    ontoggle,
   }: {
     /** Where the record answers. */
     base: string;
     /** The record's lists, as `boot` names them, for finding the projects list by what it declares. */
     lists: readonly { id: string }[];
+    /** Every row the sidebar draws (`side.ts` `sideModel`). */
+    model: SideModel;
+    /** The one row lit, by its address (`litOf`). */
+    lit?: string | null;
     /** The projects an agent is at work on now, by name. */
     working?: readonly (string | null)[];
     /** The record's version, so the sidebar reads again when something changed. */
     version?: number | null;
-    /** Where the Projects place opens, for the head's name. */
-    projects?: string | null;
     /** The width it is drawn at on a desk. */
     width?: number;
-    phone?: boolean;
-    /** The places the bar leaves out (Work, People), each a row under Lists. */
-    places?: readonly SideLink[];
-    /** The list Work counts, whose open rows its row says (audit Z8); `null` and the row says no number. */
-    workList?: string | null;
-    /** The record's lists that hold something, the kernel's own marked; money's is read from each declaration. */
-    owned?: readonly Omit<SideList, 'money'>[];
-    /** The places' own views (Board under Work), drawn with the saved views. */
-    views?: readonly SideLink[];
-    /** The record's tools (automations, the Keychain and the rest). */
-    tools?: readonly SideLink[];
-    /** The words each group is drawn under. */
-    heads?: SideHeads | undefined;
+    mode?: 'full' | 'rail' | 'phone';
+    /** Whether the full column is shown (the hide button's state); the rail is the hidden column. */
+    shown?: boolean;
     /** Suggested changes waiting, said as one line, and where they are reviewed. */
     pen?: { label: string; href: string } | null;
     /** Told of a width dragged, and whether the drag is over (then it is kept). */
     onwidth?: ((n: number, done: boolean) => void) | undefined;
+    /** Hide or show the full column (`[` does the same). */
+    ontoggle?: (() => void) | undefined;
   } = $props();
+
+  const phone = $derived(mode === 'phone');
 
   const words = {
     title: 'Projects',
+    nav: 'Places',
+    side: 'Sidebar',
+    menu: 'Menu',
     inPlay: (n: number) => `${n.toLocaleString('en-GB')} in play`,
     add: 'Add a project',
     late: 'late',
@@ -89,9 +110,12 @@
     parts: (name: string) => `${name}, its parts`,
     resize: 'Sidebar width',
     none: 'No projects yet.',
-    lists: 'Lists',
+    more: 'More lists',
     review: 'Review',
-    settings: 'Settings',
+    hide: 'Hide the sidebar',
+    show: 'Show the sidebar',
+    open: (name: string) => `${name}, what is under it`,
+    needs: (n: number) => `${n.toLocaleString('en-GB')} need you`,
   } as const;
 
   /* THE READ: the projects first, then their week. Asked again when the record's version moves, a moment after. DRAWN AT
@@ -108,8 +132,55 @@
   /** The outline's rows, by how far each bar reaches. */
   const OUTLINE = ['62%', '48%', '56%'] as const;
   let week = $state.raw<Week>(new Map());
-  /* HOW MANY TASKS ARE OPEN, for Work's row (audit Z8): never the count of every row ever filed. */
-  let openWork = $state<number | null>(null);
+
+  /* THE COUNTS THE SIDEBAR READS ITSELF (Work's open tasks, the people a list keeps), BY PLACE. While a read is out the
+     row says the number this device last drew, never nothing. */
+  const counting = $derived(model.places.filter((p) => p.list !== undefined));
+  let counts = $state<Record<string, number>>({});
+  const keptCounts = (b: string): Record<string, number> => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(COUNTS_KEY);
+    } catch {
+      /* Nothing kept. */
+    }
+    return Object.fromEntries(untrack(() => counting).flatMap((p) => {
+      const n = countKept(raw, b, p.key);
+      return n === null ? [] : [[p.key, n] as const];
+    }));
+  };
+  counts = untrack(() => keptCounts(base));
+  function keepCounts(b: string, now: Record<string, number>): void {
+    try {
+      const all = JSON.parse(localStorage.getItem(COUNTS_KEY) ?? '{}') as Record<string, Record<string, number>>;
+      all[b] = { ...(all[b] ?? {}), ...now };
+      localStorage.setItem(COUNTS_KEY, JSON.stringify(all));
+    } catch {
+      /* A browser that keeps nothing draws the shell's count until the read lands. */
+    }
+  }
+  /* WHICH LIST EACH PLACE COUNTS, and whether it keeps people, said as one word so the counts are asked again only when
+     that changes, never each time the model is drawn again. */
+  const countedKey = $derived(JSON.stringify(counting.map((p) => [p.key, p.list, frame.facts[p.list!]?.folk === true])));
+  let countAsk = 0;
+  $effect(() => {
+    void version;
+    const b = base;
+    const counted = JSON.parse(countedKey) as [string, string, boolean][];
+    if (counted.length === 0) return;
+    const n = ++countAsk;
+    /* EACH PLACE'S COUNT, BY WHAT ITS LIST DECLARES: the people for a list that keeps them, else the work taken on. */
+    const t = setTimeout(() => {
+      void Promise.all(counted.map(async ([key, list, folk]) => [key, folk ? await readFolk(b, list) : await readOpenWork(b, list)] as const)).then((got) => {
+        if (n !== countAsk) return;
+        const now = Object.fromEntries(got.filter((g): g is readonly [string, number] => g[1] !== null));
+        counts = { ...counts, ...now };
+        keepCounts(b, now);
+      });
+    }, 0);
+    return () => clearTimeout(t);
+  });
+
   let asked = 0;
   $effect(() => {
     void version;
@@ -121,31 +192,27 @@
       readFor = b;
       read = keptRead(b);
       answered = false;
+      counts = keptCounts(b);
     }
-    const go = (): void =>
+    const go = (): void => {
       void readSide(b, l)
         .then(async (got) => {
           if (n !== asked) return;
           read = got;
           answered = true;
-          /* WORK'S OPEN COUNT ASKED WITH THE WEEK'S FIGURES, so it goes in their wave and not as a read of its own. */
-          if (got === null) {
-            const o = workList ? await readOpenWork(b, workList) : null;
-            if (n === asked) openWork = o;
-            return;
-          }
+          if (got === null) return;
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
-          knowProjects(b, got.rows, projects);
+          knowProjects(b, got.rows, model.projects?.href ?? null);
           const play = splitOf(got.rows, got.lanes).play;
-          const [w, o] = await Promise.all([readWeek(b, got.list, play), workList ? readOpenWork(b, workList) : null]);
+          const w = await readWeek(b, got.list, play);
           if (n !== asked) return;
           week = w;
-          openWork = o;
         })
         /* NOT ANSWERED AFTER ITS TRIES (`readSide`): what is drawn stays, and the next move of the record asks again. */
         .catch(() => {
           if (n === asked) answered = true;
         });
+    };
     /* THE FIRST READ AT ONCE, over the kept list too; a re-read waits for the page that moved the version to have its own
        reads out first. */
     const t = setTimeout(go, untrack(() => answered) ? 1200 : 0);
@@ -177,13 +244,32 @@
   };
   const split = $derived(read ? splitOf(read.rows.map(full), read.lanes) : null);
   const play = $derived(split ? byWeek(split.play) : []);
+  /* ONE ORDER EVERYWHERE: the order drawn here is the one Today's projects are drawn in (`project-order.ts`). */
+  $effect(() => {
+    if (answered) keepOrder(base, play.map((p) => p.key));
+  });
 
   /* THE OPEN PROJECT: the one whose page the address is on. */
   const path = $derived(inside(page.url.pathname));
   const openOf = (p: { href: string }): boolean => path === p.href || path.startsWith(`${p.href}/`);
+  const opened = $derived(play.find(openOf) ?? null);
+  /* THE LIT ROW: the shell's, else the open project where the shell could not name it. */
+  const projectLit = $derived(lit === null || lit === model.projects?.href ? (split ? [...split.play, ...split.parked, ...split.finished].find(openOf)?.href : undefined) : undefined);
+  const isLit = (href: string): boolean => (projectLit !== undefined ? href === projectLit : href === lit);
 
-  /* WHICH FOLDS ARE OPEN. Shut on every load: they hold what is not in play. */
-  let folds = $state({ parked: false, finished: false });
+  /* WHICH FOLDS ARE OPEN. Parked and Finished are shut on every load, and open by themselves on a project of theirs. */
+  let folds = $state<{ parked: boolean | null; finished: boolean | null; more: boolean | null }>({ parked: null, finished: null, more: null });
+  const foldOpen = (key: 'parked' | 'finished', list: readonly SideProject[]): boolean => folds[key] ?? list.some((p) => isLit(p.href));
+  const moreOpen = $derived(folds.more ?? model.more.some((l) => isLit(l.href)));
+  /* A PLACE'S OWN ROWS SHOW WHILE YOU ARE THERE; on a phone each opens by its own button. */
+  let opens = $state<Record<string, boolean>>({});
+  const placeOpen = (p: SidePlace): boolean => (phone ? (opens[p.key] ?? false) : isLit(p.href) || p.kids.some((k) => isLit(k.href)));
+
+  /* THE COUNT A PLACE SAYS: what the sidebar read for it, else the shell's. */
+  const countOf = (p: SidePlace): number | null => {
+    const n = counts[p.key] ?? p.count ?? null;
+    return n !== null && n > 0 ? n : null;
+  };
 
   /**
    * THE OPEN PROJECT'S PARTS, as its page draws them: every tile that says it is a part (`data-part`), with its count or
@@ -192,9 +278,8 @@
   type Part = { id: string; label: string; icon: IconName; count: string | null; live: boolean };
   let parts = $state.raw<Part[]>([]);
   let inView = $state<string | null>(null);
-  const opened = $derived(play.find(openOf) ?? null);
   $effect(() => {
-    if (phone || opened === null) return void (parts = []);
+    if (mode !== 'full' || opened === null) return void (parts = []);
     void path;
     let main: HTMLElement | null = null;
     let wait: ReturnType<typeof setTimeout> | undefined;
@@ -232,17 +317,17 @@
       }
       inView = at ?? untrack(() => parts)[0]?.id ?? null;
     };
-    let frame = 0;
+    let frameAsk = 0;
     const onscroll = (): void => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(spy);
+      cancelAnimationFrame(frameAsk);
+      frameAsk = requestAnimationFrame(spy);
     };
     const start = setTimeout(take, 0);
     document.addEventListener('scroll', onscroll, { capture: true, passive: true });
     return () => {
       clearTimeout(start);
       clearTimeout(wait);
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(frameAsk);
       seen.disconnect();
       document.removeEventListener('scroll', onscroll, { capture: true });
     };
@@ -293,18 +378,7 @@
   }
 
   const sentence = $derived(read && split ? playSaid(split.play, read.label) : undefined);
-
-  /* THE LISTS' GROUPS, once the read has learnt every list's declaration: a list is money's by a money field it declares. */
-  const groups = $derived.by((): SideGroup[] => {
-    if (!answered || heads === undefined) return [];
-    const money = (id: string): boolean => REGISTERS[id]?.fields.some((f) => f.type === 'money') ?? false;
-    return groupsOf(withOpenWork(places, WORK, openWork), owned.map((l) => ({ ...l, money: money(l.id) })), views, tools, heads);
-  });
-  const spot = $derived(placeOf(path, page.url.searchParams));
-  const under = (href: string): boolean => spot === href || spot.startsWith(`${href}/`);
-  /* A GROUP IS FOLDED UNTIL OPENED, and the one holding the page you are on is open. */
-  let unfolded = $state<Record<string, boolean>>({});
-  const isOpen = (g: SideGroup): boolean => unfolded[g.key] ?? g.items.some((i) => under(i.href));
+  const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
 </script>
 
 {#snippet mark(p: SideProject)}
@@ -312,25 +386,21 @@
   <span class="s-pm" style={slotStyle(p.hue)} aria-hidden="true">{#if m.glyph}<Icon name={m.glyph} size="s" />{:else}{m.letter}{/if}</span>
 {/snippet}
 
-{#snippet row(p: SideProject, fact: boolean)}
-  {@const here = openOf(p)}
+{#snippet project(p: SideProject)}
+  {@const here = isLit(p.href)}
   {@const name = shownName(p.name)}
-  <li class="s-item" data-open={here && !phone ? '' : undefined}>
-    <a class="s-row tap" href={at(p.href)} aria-current={here ? 'page' : undefined}>
-      {#if !phone}<span class="s-caret" aria-hidden="true"><Icon name={here ? 'chevronDown' : 'chevron'} size="s" /></span>{/if}
+  <li class="s-item">
+    <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined}>
       {@render mark(p)}
-      {#if fact}
+      {#if phone}
         <!-- ITS LANE AND NEXT STEP UNDER ITS NAME ON THE PHONE (Z32 of 25 October), as the laptop's cards say them. -->
         {@const line = read ? phoneLine(p, read.label) : null}
-        <span class="s-two"><span class="s-name" dir="auto">{name}</span>{#if line}<span class="s-sub" dir="auto">{line}</span>{/if}</span>
-      {:else}
-        <span class="s-name" dir="auto">{name}</span>
-      {/if}
-      {#if fact}
         {@const f = factOf(p)}
+        <span class="s-two"><span class="s-name" dir="auto">{name}</span>{#if line}<span class="s-sub" dir="auto">{line}</span>{/if}</span>
         {#if f}<span class="s-fact" data-tone={f.tone}>{f.text}</span>{/if}
         {#if p.working && f?.tone !== 'live'}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {:else}
+        <span class="s-name" dir="auto">{name}</span>
         {#if p.late > 0}<span class="s-late">{words.late}</span>{/if}
         {#if p.working}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {/if}
@@ -340,12 +410,12 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25zM12 13.75v5.5" /></svg>
       </button>
     {/if}
-    {#if here && !phone && parts.length > 0}
+    {#if openOf(p) && mode === 'full' && parts.length > 0}
       <ul class="s-parts" aria-label={words.parts(name)}>
         {#each parts as part (part.id)}
           <li>
             <button type="button" class="s-part tap" aria-current={inView === part.id ? 'location' : undefined} onclick={() => toPart(part.id)}>
-              <Icon name={part.icon} size="s" /><span class="s-name">{part.label}</span>
+              <span class="s-name">{part.label}</span>
               {#if part.live}<span class="s-dot" aria-hidden="true"></span>{:else if part.count}<span class="s-count num">{part.count}</span>{/if}
             </button>
           </li>
@@ -357,24 +427,53 @@
 
 {#snippet fold(key: 'parked' | 'finished', list: SideProject[], label: string, icon: IconName)}
   {#if list.length > 0}
-    <button type="button" class="s-fold tap" aria-expanded={folds[key]} onclick={() => (folds[key] = !folds[key])}>
-      <Icon name={icon} size="s" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
-      <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
-    </button>
-    {#if folds[key]}
-      <ul class="s-list">
-        {#each list as p (p.key)}{@render row(p, phone)}{/each}
-      </ul>
-    {/if}
+    {@const open = foldOpen(key, list)}
+    <li>
+      <button type="button" class="s-row s-fold tap" aria-expanded={open} onclick={() => (folds[key] = !open)}>
+        <Icon name={icon} size="s" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
+        <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+      </button>
+      {#if open}
+        <ul class="s-list s-nested">
+          {#each list as p (p.key)}{@render project(p)}{/each}
+        </ul>
+      {/if}
+    </li>
   {/if}
 {/snippet}
 
 {#snippet link(l: SideLink, nested: boolean)}
   <li>
-    <a class="s-row s-link s-list-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={under(l.href) ? 'page' : undefined}>
-      <Icon name={l.icon as IconName} size="s" /><span class="s-name">{l.label}</span>
+    <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
+      {#if !nested}<Icon name={l.icon as IconName} size="s" />{/if}<span class="s-name" dir="auto">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
     </a>
+  </li>
+{/snippet}
+
+{#snippet place(p: SidePlace)}
+  {@const n = countOf(p)}
+  {@const open = placeOpen(p)}
+  <li class="s-item">
+    <a class="s-row s-place tap" href={at(p.href)} aria-current={isLit(p.href) ? 'page' : undefined}>
+      <Icon name={p.icon as IconName} size="s" /><span class="s-name">{p.label}</span>
+      {#if p.key === 'decide'}
+        {#if n}<Count n={n} label={words.needs(n)} />{/if}
+      {:else}
+        {#if p.live}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
+        {#if n}<span class="s-count num">{n.toLocaleString('en-GB')}</span>{/if}
+      {/if}
+    </a>
+    {#if phone && p.kids.length > 0}
+      <button type="button" class="s-open tap" aria-expanded={open} aria-label={words.open(p.label)} onclick={() => (opens[p.key] = !open)}>
+        <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+      </button>
+    {/if}
+    {#if open && p.kids.length > 0}
+      <ul class="s-list s-nested">
+        {#each p.kids as k (k.href)}{@render link(k, true)}{/each}
+      </ul>
+    {/if}
   </li>
 {/snippet}
 
@@ -388,94 +487,136 @@
   </ul>
 {/snippet}
 
-{#snippet listed()}
-  {#if groups.length > 0}
-    <h2 class="s-title s-lists">{words.lists}</h2>
+{#snippet projectsPart()}
+  {#if showProjects && model.projects}
+    <div class="s-head">
+      {#if model.projects.href}<a class="s-title tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) ? 'page' : undefined}>{model.projects.label}</a>{:else}<span class="s-title">{model.projects.label}</span>{/if}
+      {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
+      {#if read}
+        <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /></a>
+      {/if}
+    </div>
+    {#if read && split}
+      <ul class="s-list">
+        {#each play as p (p.key)}{@render project(p)}{/each}
+        {@render fold('parked', split.parked, read.label('parked'), 'archive')}
+        {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
+        {#each model.projects.kids as k (k.href)}{@render link(k, false)}{/each}
+      </ul>
+    {:else if !answered}
+      {@render outline()}
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet morePart()}
+  {#if model.more.length > 0}
     <ul class="s-list">
-      {#each groups as g (g.key)}
-        {#if g.items.length === 1 && g.items[0]}
-          {@render link(g.items[0], false)}
-        {:else}
-          {@const open = isOpen(g)}
-          <li>
-            <button type="button" class="s-fold s-group tap" aria-expanded={open} onclick={() => (unfolded[g.key] = !open)}>
-              <Icon name={g.icon as IconName} size="s" /><span class="s-name">{g.label}</span><span class="s-count num">{g.items.length}</span>
-              <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
-            </button>
-            {#if open}
-              <ul class="s-list">
-                {#each g.items as l (l.href)}{@render link(l, true)}{/each}
-              </ul>
-            {/if}
-          </li>
+      <li>
+        <button type="button" class="s-row s-fold tap" aria-expanded={moreOpen} onclick={() => (folds.more = !moreOpen)}>
+          <Icon name="rows" size="s" /><span class="s-name">{words.more}</span><span class="s-count num">{model.more.length}</span>
+          <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+        </button>
+        {#if moreOpen}
+          <ul class="s-list s-nested">
+            {#each model.more as l (l.href)}{@render link(l, true)}{/each}
+          </ul>
         {/if}
-      {/each}
+      </li>
     </ul>
   {/if}
 {/snippet}
 
-{#snippet end()}
+{#snippet footPart()}
   <ul class="s-list s-end">
-    {#if pen}
-      <li>
-        <a class="s-row s-link tap" href={at(pen.href)}><Icon name="alert" size="s" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
-      </li>
-    {/if}
-    {@render link({ href: '/settings', label: words.settings, icon: 'settings' }, false)}
+    {#each model.foot as l (l.href)}
+      {#if l.href === '/settings' && pen}
+        <li>
+          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="s" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
+        </li>
+      {/if}
+      {@render link(l, false)}
+    {/each}
   </ul>
 {/snippet}
 
-{#if phone}
-  <PageHead title={words.title} {sentence} />
+{#if mode === 'phone'}
+  <PageHead title={words.menu} headless />
+  <!-- THE PAGE'S NAME FOR A SCREEN READER: the bar says it for the eye. -->
+  <h1 class="sr-only" tabindex="-1">{words.menu}</h1>
   <div class="s-phone">
-    {#if read && split}
-      {#if play.length > 0}
-        <ul class="s-list s-tile">
-          {#each play as p (p.key)}{@render row(p, true)}{/each}
-        </ul>
-      {:else}
-        <p class="s-none">{words.none}</p>
-      {/if}
-      <div class="s-foot">
-        {@render fold('parked', split.parked, read.label('parked'), 'archive')}
-        {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
+    <div class="s-tile s-who"><RecordMenu phone /></div>
+    <nav class="s-tile" aria-label={words.nav}>
+      <ul class="s-list">
+        {#each model.places as p (p.key)}{@render place(p)}{/each}
+      </ul>
+    </nav>
+    {#if showProjects && model.projects}
+      <div class="s-tile">
+        {#if sentence}<p class="s-said">{sentence}</p>{/if}
+        {@render projectsPart()}
       </div>
-    {:else if !answered}
-      <div class="s-tile">{@render outline()}</div>
     {/if}
-    {#if groups.length > 0}
-      <div class="s-tile s-phone-lists">{@render listed()}</div>
-    {/if}
-  </div>
-{:else}
-  <aside class="s-side" aria-label={words.title}>
-    <div class="s-scroll">
-      <!-- THE PROJECTS ONCE THERE IS ONE (audit C, X6): "Projects 0 in play" headed a new shop. -->
-      {#if read === null ? !answered : holdsProjects(read)}
-        <div class="s-head">
-          {#if projects}<a class="s-title" href={at(projects)}>{words.title}</a>{:else}<span class="s-title">{words.title}</span>{/if}
-          {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
-          {#if read}
-            <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /></a>
-          {/if}
-        </div>
-        {#if read && split}
-          <ul class="s-list">
-            {#each play as p (p.key)}{@render row(p, false)}{/each}
-          </ul>
-          {#if split.parked.length > 0 || split.finished.length > 0}
-            <div class="s-foot">
-              {@render fold('parked', split.parked, read.label('parked'), 'archive')}
-              {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
-            </div>
-          {/if}
-        {:else if !answered}
-          {@render outline()}
-        {/if}
-      {/if}
-      {@render listed()}
-      {#if answered}{@render end()}{/if}
+    <div class="s-tile">
+      {@render morePart()}
+      {@render footPart()}
     </div>
+  </div>
+{:else if mode === 'rail'}
+  <!-- THE NARROW RAIL: the places as their glyphs, each named on hover and to a screen reader, never nothing. -->
+  <nav class="s-rail" aria-label={words.nav}>
+    <div class="s-rhead">
+      <RecordMenu bare />
+    </div>
+    <ul class="s-list s-rlist">
+      {#each model.places as p (p.key)}
+        {@const n = countOf(p)}
+        <li>
+          <a class="s-ricon tap" href={at(p.href)} aria-current={isLit(p.href) || p.kids.some((k) => isLit(k.href)) ? 'page' : undefined} aria-label={p.label} title={p.label}>
+            <Icon name={p.icon as IconName} size="m" />
+            {#if p.key === 'decide' && n}<span class="s-rbadge"><Count n={n} size="s" label={words.needs(n)} /></span>{:else if p.live}<span class="s-rdot" aria-hidden="true"></span>{/if}
+          </a>
+        </li>
+      {/each}
+      {#if model.projects?.href}
+        <li>
+          <a class="s-ricon tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) || projectLit !== undefined || model.projects.things.some((t) => isLit(t.href)) || model.projects.kids.some((k) => isLit(k.href)) ? 'page' : undefined} aria-label={model.projects.label} title={model.projects.label}>
+            <Icon name="projects" size="m" />
+          </a>
+        </li>
+      {/if}
+    </ul>
+    <ul class="s-list s-rlist s-rfoot">
+      <li>
+        <button type="button" class="s-ricon tap" aria-pressed={shown} aria-keyshortcuts="[" aria-label={words.show} title={`${words.show} ([)`} onclick={() => ontoggle?.()}>
+          <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
+        </button>
+      </li>
+      {#each model.foot.filter((l) => l.href === '/settings') as l (l.href)}
+        <li>
+          <a class="s-ricon tap" href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined} aria-label={l.label} title={l.label}><Icon name={l.icon as IconName} size="m" /></a>
+        </li>
+      {/each}
+    </ul>
+  </nav>
+{:else}
+  <aside class="s-side" aria-label={words.side}>
+    <!-- THE HEAD, ON THE BAR'S LINE: the record's mark and name, and the button that hides the column. -->
+    <div class="s-shead">
+      <RecordMenu />
+      <button type="button" class="s-hide tap" aria-pressed={shown} aria-keyshortcuts="[" aria-label={shown ? words.hide : words.show} title={`${shown ? words.hide : words.show} ([)`} onclick={() => ontoggle?.()}>
+        <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
+      </button>
+    </div>
+    <nav class="s-scroll" aria-label={words.nav}>
+      <ul class="s-list">
+        {#each model.places as p (p.key)}{@render place(p)}{/each}
+      </ul>
+      {@render projectsPart()}
+      {#if model.more.length > 0}<div class="s-rule" role="presentation"></div>{/if}
+      {@render morePart()}
+      {@render footPart()}
+    </nav>
     <!-- THE EDGE, DRAGGED. A separator with its value is a widget, so it takes focus and the arrows move it too. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -494,41 +635,88 @@
 {/if}
 
 <style>
-  /* ON THE BOARD, the work's own ground, a hairline at its end edge, scrolling by itself under the bar. */
+  /* ON THE NAV'S SURFACE, the bar's, the window's full height, a hairline at its end edge, scrolling by itself. */
   .s-side {
     position: relative;
     display: flex;
+    flex-direction: column;
     box-sizing: border-box;
     inline-size: 100%;
     block-size: 100%;
     min-inline-size: 0;
+    background: var(--nav);
     border-inline-end: 1px solid var(--rule);
   }
 
-  /* A COLUMN, so the foot (suggested changes, Settings) sits at the bottom when the rest is short. */
+  /* THE HEAD: 56 tall, its hairline on the bar's, the switcher at the start and the hide button at the end. */
+  .s-shead {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    flex: none;
+    block-size: calc(56px + var(--shell-inset, 0px));
+    padding: var(--shell-inset, 0px) var(--sp-3) 0 var(--sp-3);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .s-hide {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 32px;
+    block-size: 32px;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+
+  .s-side-glyph {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* A COLUMN, so the foot (the inbox, add-ons, usage, Settings) sits at the bottom when the rest is short. */
   .s-scroll {
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-block-size: 0;
     min-inline-size: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--sp-5) var(--sp-3) var(--sp-6);
+    padding: var(--sp-2) var(--sp-2) var(--sp-3);
   }
 
   .s-head {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    padding-inline: var(--sp-3) 0;
-    margin-block-end: var(--sp-3);
+    padding-inline: var(--sp-2) 0;
+    margin-block: var(--sp-4) var(--sp-1);
   }
 
   .s-title {
+    padding: 2px var(--sp-1);
+    margin-inline-start: calc(-1 * var(--sp-1));
+    border-radius: var(--r-xs);
     color: var(--ink);
-    font-size: var(--fs-body);
+    font-size: var(--fs-ctl);
     font-weight: var(--fw-semi);
     text-decoration: none;
+  }
+
+  .s-title[aria-current='page'] {
+    background: var(--nav-selected);
   }
 
   .s-head .s-count {
@@ -572,17 +760,16 @@
     background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
 
-  /* A ROW: 32 tall, a caret in its gutter, the mark at 20, the name at 14/500, then "late" and the dot at its end. */
+  /* A ROW: 30 tall, a glyph or the project's mark, the name at 14/500, then its count, "late" or the dot at its end. */
   .s-row,
-  .s-part,
-  .s-fold {
+  .s-part {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 32px;
-    padding-inline: var(--sp-1) var(--sp-3);
+    min-block-size: 30px;
+    padding-inline: var(--sp-2);
     border: 0;
     background: none;
     border-radius: var(--r-ctl);
@@ -595,27 +782,25 @@
     cursor: pointer;
   }
 
-  /* ROOM FOR THE PIN, which shows at the row's end under a pointer or on focus. */
-  .s-row {
-    padding-inline-end: calc(var(--sp-3) + 20px);
+  .s-row :global(.icon) {
+    flex: none;
+    color: var(--ink-3);
   }
 
+  /* ROOM FOR THE PIN, which shows at the row's end under a pointer or on focus. */
+  .s-proj {
+    padding-inline-end: calc(var(--sp-2) + 20px);
+  }
+
+  /* THE ONE LIT ROW: the nav's chosen fill, the words in ink at 600. */
   .s-row[aria-current='page'] {
+    background: var(--nav-selected);
     color: var(--ink);
     font-weight: var(--fw-semi);
   }
 
-  .s-caret {
-    display: grid;
-    place-items: center;
-    flex: none;
-    inline-size: 12px;
-    color: var(--ink-3);
-    opacity: 0;
-  }
-
-  .s-row[aria-current='page'] .s-caret {
-    opacity: 1;
+  .s-row[aria-current='page'] :global(.icon) {
+    color: var(--ink);
   }
 
   .s-name {
@@ -624,6 +809,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A ROW UNDER ITS PLACE: in under the place's name, a step smaller, no glyph. */
+  .s-nested .s-row {
+    min-block-size: 28px;
+    padding-inline-start: calc(var(--sp-2) + var(--icon-s, 16px) + var(--sp-2));
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  .s-nested .s-proj {
+    padding-inline-start: var(--sp-2);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+  }
+
+  .s-nested .s-row[aria-current='page'] {
+    font-weight: var(--fw-semi);
   }
 
   /* THE PROJECT'S MARK: 20 square, its slot's tint with the glyph or letter in its slot's colour. */
@@ -644,6 +847,7 @@
   .s-pm :global(.icon[data-size]) {
     inline-size: 13px;
     block-size: 13px;
+    color: inherit;
   }
 
   .s-late {
@@ -661,10 +865,18 @@
     background: var(--live);
   }
 
+  .s-count {
+    flex: none;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* THE PIN: a 24 square at the row's end, quiet; a pinned row shows it at rest. */
   .s-pin {
     position: absolute;
-    inset-block-start: 4px;
+    inset-block-start: 3px;
     inset-inline-end: var(--sp-1);
     display: grid;
     place-items: center;
@@ -712,75 +924,57 @@
     visibility: hidden;
   }
 
-  /* THE OPEN PROJECT'S PARTS: under its name, a hairline at their start, the one in view on the soft fill. */
+  /* THE OPEN PROJECT'S PARTS: under its name, a hairline at their start, the one in view in ink. Never lit: the
+     project is the page's one lit row. */
   .s-parts {
     margin-block: 2px var(--sp-1);
-    margin-inline-start: 28px;
+    margin-inline-start: 18px;
     padding-inline-start: var(--sp-2);
     border-inline-start: 1px solid var(--rule);
   }
 
   .s-part {
-    min-block-size: 30px;
-    padding-inline: var(--sp-2) var(--sp-3);
-    font-weight: var(--fw-regular);
-  }
-
-  .s-part :global(.icon) {
-    flex: none;
-    color: var(--ink-3);
-  }
-
-  .s-part[aria-current='location'] {
-    background: var(--nav-selected);
-    color: var(--ink);
-    font-weight: var(--fw-semi);
-  }
-
-  .s-part .s-count,
-  .s-fold .s-count {
-    flex: none;
-    color: var(--ink-3);
+    min-block-size: 28px;
     font-size: var(--fs-meta);
     font-weight: var(--fw-regular);
   }
 
-  /* PARKED AND FINISHED, FOLDED AT THE FOOT, a hairline over them. */
-  .s-foot {
-    margin-block-start: var(--sp-3);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .s-fold {
-    padding-inline-start: var(--sp-3);
-    color: var(--ink-3);
-  }
-
-  .s-fold :global(.icon) {
-    flex: none;
+  .s-part[aria-current='location'] {
+    color: var(--ink);
+    font-weight: var(--fw-semi);
   }
 
   .s-fold-caret {
     display: inline-grid;
+    flex: none;
     color: var(--ink-3);
     transition: rotate var(--d-state) var(--ease-out);
   }
 
-  .s-fold[aria-expanded='false'] .s-fold-caret {
+  .s-fold[aria-expanded='false'] .s-fold-caret,
+  .s-open[aria-expanded='false'] .s-fold-caret {
     rotate: -90deg;
   }
 
-  .s-foot .s-list {
-    margin-block: var(--sp-1);
+  .s-fold[aria-expanded='false'] .s-fold-caret:dir(rtl),
+  .s-open[aria-expanded='false'] .s-fold-caret:dir(rtl) {
+    rotate: 90deg;
+  }
+
+  .s-rule {
+    block-size: 1px;
+    margin: var(--sp-3) var(--sp-2);
+    background: var(--rule);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .s-row:hover,
-    .s-part:hover:not([aria-current]),
-    .s-fold:hover,
+    .s-row:not([aria-current='page']):hover,
+    .s-part:hover,
     .s-add:hover,
-    .s-pin:hover {
+    .s-pin:hover,
+    .s-hide:hover,
+    .s-title:not([aria-current='page']):hover,
+    .s-ricon:not([aria-current='page']):hover {
       background: var(--hover);
       color: var(--ink);
     }
@@ -817,54 +1011,10 @@
     scroll-margin-block-start: 80px;
   }
 
-  /* LISTS: a heading like the projects', then a row or a folded group each, a glyph where a project has its mark. */
-  .s-lists {
-    display: block;
-    margin: var(--sp-5) 0 var(--sp-2);
-    padding-inline: var(--sp-3) 0;
-  }
-
-  .s-link {
-    padding-inline-start: var(--sp-3);
-  }
-
-  .s-link[data-nested] {
-    padding-inline-start: calc(var(--sp-3) + 20px + var(--sp-2));
-  }
-
-  .s-link :global(.icon),
-  .s-group :global(.icon) {
-    flex: none;
-    color: var(--ink-3);
-  }
-
-  .s-link[aria-current='page'] {
-    background: var(--nav-selected);
-  }
-
-  .s-link .s-count,
-  .s-group .s-count {
-    flex: none;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-regular);
-  }
-
-  .s-group {
-    color: var(--ink-2);
-  }
-
-  /* A LIST'S ROW HOLDS THE CARET'S PLACE A FOLD'S ROW DRAWS, so every count in a column ends on one edge. */
-  .s-list-link::after {
-    content: '';
-    flex: none;
-    inline-size: var(--icon-s, 16px);
-  }
-
-  /* THE FOOT: suggested changes when any, then Settings, a hairline over them, at the bottom of the column. */
+  /* THE FOOT: the record's tools and Settings, a hairline over them, at the bottom of the column. */
   .s-end {
     margin-block-start: auto;
-    padding-block-start: var(--sp-3);
+    padding-block-start: var(--sp-2);
     border-block-start: 1px solid var(--rule);
   }
 
@@ -873,38 +1023,146 @@
     margin-block-end: var(--sp-5);
   }
 
-  /* ── The phone's Projects tab ── */
+  /* ── The narrow rail ── */
+  .s-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    inline-size: 100%;
+    block-size: 100%;
+    background: var(--nav);
+    border-inline-end: 1px solid var(--rule);
+  }
+
+  .s-rhead {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: none;
+    inline-size: 100%;
+    block-size: calc(56px + var(--shell-inset, 0px));
+    padding-block-start: var(--shell-inset, 0px);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .s-rlist {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-1);
+    padding-block: var(--sp-2);
+  }
+
+  .s-rfoot {
+    margin-block-start: auto;
+  }
+
+  .s-ricon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .s-ricon[aria-current='page'] {
+    background: var(--nav-selected);
+    color: var(--ink);
+  }
+
+  .s-rbadge {
+    position: absolute;
+    inset-block-start: -2px;
+    inset-inline-end: -4px;
+    display: flex;
+  }
+
+  .s-rdot {
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-end: 7px;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: var(--r-round);
+    background: var(--live);
+    outline: 2px solid var(--nav);
+  }
+
+  /* ── The phone's Menu ── */
   .s-phone {
-    padding: 0 var(--gutter) var(--sp-5);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--gutter) var(--sp-5);
   }
 
   .s-phone .s-tile {
-    margin-block-start: var(--sp-4);
     padding: var(--sp-2);
     background: var(--tile);
     border-radius: var(--r-tile);
   }
 
+  .s-who {
+    display: flex;
+  }
+
+  .s-said {
+    margin: var(--sp-2) var(--sp-2) 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .s-phone .s-head {
+    margin-block-start: var(--sp-2);
+  }
+
   .s-phone .s-row {
-    min-block-size: 52px;
+    min-block-size: var(--tap);
     gap: var(--sp-3);
-    padding-inline: var(--sp-3);
+    padding-inline: var(--sp-2);
     font-size: var(--fs-body);
+  }
+
+  .s-phone .s-place {
+    padding-inline-end: calc(var(--tap) + var(--sp-1));
+  }
+
+  .s-phone .s-nested .s-row {
+    padding-inline-start: calc(var(--sp-2) + var(--icon-s, 16px) + var(--sp-3));
+    font-size: var(--fs-ctl);
   }
 
   .s-phone .s-pm {
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: 28px;
+    block-size: 28px;
     border-radius: var(--r-ctl);
-    font-size: var(--fs-body);
+    font-size: var(--fs-ctl);
   }
 
-  .s-phone .s-pm :global(.icon[data-size]) {
-    inline-size: 18px;
-    block-size: 18px;
+  /* THE BUTTON THAT OPENS A PLACE'S OWN ROWS ON THE PHONE, a 44 square at the row's end. */
+  .s-open {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    inline-size: var(--tap);
+    block-size: var(--tap);
+    padding: 0;
+    border: 0;
+    background: none;
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
+    cursor: pointer;
   }
 
-  /* THE NAME WITH ITS LANE AND NEXT STEP UNDER IT, on the phone's Projects tab. */
+  /* THE NAME WITH ITS LANE AND NEXT STEP UNDER IT, on the phone's Menu. */
   .s-two {
     display: flex;
     flex: 1;
@@ -944,44 +1202,6 @@
     color: var(--good);
   }
 
-  .s-phone .s-fold {
-    min-block-size: 44px;
-  }
-
-  /* PARKED AND FINISHED ARE CARDS ON A PHONE, as every other group is, not grey rows on the page. */
-  .s-phone .s-fold:not(.s-group) {
-    margin-block-end: var(--sp-2);
-    padding-inline-end: var(--sp-3);
-    border-radius: var(--r-tile);
-    background: var(--tile);
-    color: var(--ink-2);
-  }
-
-  .s-phone-lists {
-    margin-block-start: var(--sp-4);
-    padding: var(--sp-2) var(--sp-2) var(--sp-3);
-    background: var(--tile);
-    border-radius: var(--r-tile);
-  }
-
-  .s-phone-lists .s-lists {
-    margin-block-start: var(--sp-2);
-  }
-
-  /* A FOLD AND A ROW SHARE ONE LINE OF GLYPHS AND NAMES. */
-  .s-phone .s-link,
-  .s-phone .s-group {
-    gap: var(--sp-3);
-    min-block-size: 44px;
-    padding-inline-start: var(--sp-3);
-    font-size: var(--fs-body);
-  }
-
-  .s-none {
-    margin: 0;
-    color: var(--ink-3);
-  }
-
   .sr-only {
     position: absolute;
     inline-size: 1px;
@@ -989,5 +1209,12 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  @media (forced-colors: active) {
+    .s-row[aria-current='page'],
+    .s-ricon[aria-current='page'] {
+      outline: 1px solid CanvasText;
+    }
   }
 </style>
