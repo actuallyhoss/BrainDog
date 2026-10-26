@@ -281,6 +281,7 @@ const REGISTER = {
     unit: 'on a duration, how it is said',
     derive: '{sum: [a, b, ...]}, {diff: [a, b]}, {product: [a, b]}, {ratio: [a, b]}, {band: {of, steps: [{upto, is}], else?}}, {via: {ref, field}} or {normalise: {of, how: lower, trim or digits}}: worked out from other fields of the row at read and never stored or written; a field it reads may be worked out too, never in a ring',
     derived: "the record's own; never write it",
+    hidden_from_agents: "true: the field's own bookkeeping, such as a mark or a hue; an agent's short answers leave it out and format full keeps it",
     when: '{holds: [people]}: the field is there only while the record holds those lists or roles (rates, meets, org). Never on a required field',
   },
   example: {
