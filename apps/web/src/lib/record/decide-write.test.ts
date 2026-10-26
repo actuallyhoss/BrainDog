@@ -38,6 +38,15 @@ test('an answer the record takes is written, sent as decide with the option and 
   assert.deepEqual(sent[0]!.body, { id: 'SG2', decide: { option: 'product', reason: 'Matches how the fonts are used.' } });
 });
 
+test('a pick that left entries changed since says so in the record\'s line, and so does a question closed with none written', async () => {
+  const said = 'One was written. "Gym" was left as it is, because it changed after this was asked.';
+  const left = host(() => json(200, { ok: true, value: { decision: 'D9', suggestion: 'SG4', status: 'resolved', wrote: ['01A'], skipped: { count: 1, said } } }));
+  assert.deepEqual(await answerQuestion(BASE, 'SG4', 'last', undefined, left.io), { from: 'written', decision: 'D9', said });
+  const line = 'All 2 entries this changes changed after this was asked, so nothing was written and the question is closed.';
+  const none = host(() => json(200, { ok: true, value: { decision: null, suggestion: 'SG5', status: 'resolved', wrote: [], settled: line } }));
+  assert.deepEqual(await answerQuestion(BASE, 'SG5', 'last', undefined, none.io), { from: 'written', decision: null, said: line });
+});
+
 test('parking sends the day and the why, and nothing carries approve lines of its own', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: { suggestion: 'SG2', status: 'deferred' } }));
   assert.deepEqual(await parkQuestion(BASE, 'SG2', '2026-10-01', ' Waiting on the quote. ', io), { from: 'written', decision: null });

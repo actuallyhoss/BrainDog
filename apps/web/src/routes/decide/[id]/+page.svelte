@@ -756,6 +756,8 @@
     committed = { ...a, title: shown, reason: said?.trim() ?? '' };
     noteOffered = notedAfter(a.option, rows !== undefined);
     toasts.push(copy.decisionRecorded(shown), { intent: 'good' });
+    /* AND WHAT THE PICK LEFT, said as the record says it: how many entries changed since and were not written. */
+    if (out.from === 'written' && out.said) toasts.push(out.said, { intent: 'warn' });
     if (accepting && out.from === 'written' && had) {
       applied = appliedLines(out.applied ?? {}, accepting.body);
       await invalidateAll();

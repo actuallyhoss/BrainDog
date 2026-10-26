@@ -45,7 +45,7 @@ import { forget, type Fetch } from './boot-live.ts';
 export type Verdict = { decide: { option: string; reason?: string; rows?: number[]; parts?: string[] } } | { defer: { until: string; why: string } };
 
 export type Written =
-  | { from: 'written'; decision: string | null; applied?: Record<string, string[]>; open?: true }
+  | { from: 'written'; decision: string | null; applied?: Record<string, string[]>; open?: true; said?: string }
   | { from: 'refused'; fix: string; wants?: 'reason' }
   | { from: 'conflict'; fix: string };
 
@@ -76,7 +76,7 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
   const said = missing(verdict);
   if (said !== null) return { from: 'refused', fix: said };
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ decision?: unknown; applied?: unknown; status?: unknown }>('decide', { id, ...trimmed(verdict) });
+  const out = await client.call<{ decision?: unknown; applied?: unknown; status?: unknown; skipped?: unknown; settled?: unknown }>('decide', { id, ...trimmed(verdict) });
   if (out.ok) {
     forget();
     const decision = out.value && typeof out.value.decision === 'string' ? out.value.decision : null;
@@ -84,7 +84,11 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
     const applied = out.value && typeof out.value.applied === 'object' && out.value.applied !== null ? (out.value.applied as Record<string, string[]>) : undefined;
     /* AND ONE TAKEN IN PART IS STILL OPEN, holding the parts left (`govern.ts` `decide`, `status: 'open'`). */
     const open = out.value && out.value.status === 'open';
-    return { from: 'written', decision, ...(applied ? { applied } : {}), ...(open ? { open: true as const } : {}) };
+    /* AND WHAT IT LEFT, IN THE RECORD'S WORDS: entries a pick did not write because they changed since it was asked
+       (`skipped`), or the line a question closed in when none could be (`settled`). */
+    const skipped = out.value?.skipped as { said?: unknown } | undefined;
+    const said = typeof skipped?.said === 'string' ? skipped.said : typeof out.value?.settled === 'string' ? out.value.settled : undefined;
+    return { from: 'written', decision, ...(applied ? { applied } : {}), ...(open ? { open: true as const } : {}), ...(said ? { said } : {}) };
   }
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
   const wants = out.refusal.code === 'REQUIRED_MISSING' && out.refusal.at === 'reason';
