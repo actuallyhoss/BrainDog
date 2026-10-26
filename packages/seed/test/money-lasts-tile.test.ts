@@ -107,7 +107,16 @@ test("MONEY'S PAGE DECLARES BOTH: Lasts, calm, while there is cash, and Runs out
      THE CASH LASTS WITH NOTHING COMING IN (the UI pass of 20 October, money F3), which the line no longer says. */
   const due = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
   assert.deepEqual(runs!.cells, [due]);
-  assert.deepEqual(lasts!.cells, [due, { metric: 'lasts-no-income', label: 'If nothing more comes in' }]);
+  /* ONE FIGURE AND THE SENTENCE THAT SAYS WHY, SINCE money-core 3.27.0: "Lasts past" a year away beside "79 days" was two
+     answers with nothing saying what each assumed. The day the walk with what comes in runs out is its own sentence,
+     said only while there is one. */
+  assert.deepEqual(lasts!.cells, [
+    {
+      metric: 'lasts-no-income',
+      label: 'With no money coming in',
+      note: 'If all money in stopped, {{every-month-in.names}} too, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due. With what comes in it still runs out on {{runs-out-on}}.',
+    },
+  ]);
   /* ONE OR THE OTHER, never both: at or above nought, and below it. Lasts waits for an account, as the accounts do. */
   assert.deepEqual(lasts!.when, { all: [{ metric: 'cash-accounts', gt: 0 }, { metric: 'cash-now', gte: 0 }] });
   assert.deepEqual(runs!.when, { metric: 'cash-now', lt: 0 });
@@ -149,8 +158,15 @@ test('CASH ABOVE NOUGHT THAT RUNS OUT ON WHAT IS DUE STILL READS LASTS, calm, wi
     const lasts = tiles.get('Lasts');
     assert.ok(shown(lasts), 'Lasts is not drawn over cash that runs out on what is due');
     assert.equal(lasts!.tone, undefined, 'cash that runs out in two months is drawn in the danger colour');
-    /* GBP 1,200.00 pays the rent on 10 September and 10 October and goes under on 10 November, 68 days on. */
-    assert.equal(lasts!.readings?.[0]?.reading?.value, Math.floor(NOW / 86_400_000) + 68);
+    /* GBP 1,200.00 pays the rent on 10 September and 10 October and goes under on 10 November, 68 days on, and the
+       sentence under the figure says that day and what falls due on it. Nothing comes in, so the walk with what comes
+       in goes under the same day, and so does its sentence. */
+    assert.equal(lasts!.readings?.[0]?.reading?.value, 68);
+    const values = (lasts as { values?: Record<string, unknown> }).values ?? {};
+    assert.equal(values['lasts-no-income.on'], day(68));
+    assert.equal(values['lasts-no-income.because'], 'Rent');
+    assert.equal(values['runs-out-on'], day(68));
+    assert.equal(values['every-month-in.names'], undefined, 'nothing comes in, so no repeating money in is named');
     assert.ok(!read(tiles.get('Runs out')) && !shown(tiles.get('Runs out')));
   }
 });

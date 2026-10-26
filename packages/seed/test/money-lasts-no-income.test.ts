@@ -126,6 +126,8 @@ test('MONEY\'S LASTS TILE SAYS IT, and the one line drawn says what there is and
     'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.',
   );
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
-  assert.deepEqual(blocks.find((b) => b.heading === 'Lasts')?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
+  /* ONE FIGURE SINCE money-core 3.27.0, with the day it ends on in the sentence under it: the line says it lasts the year
+     on what is due, so the tile no longer says "Lasts past" beside it. */
+  assert.deepEqual(blocks.find((b) => b.heading === 'Lasts')?.cells?.map((c) => c.metric), ['lasts-no-income']);
   assert.equal(reading(k, 'lasts-no-income').value, 68);
 });

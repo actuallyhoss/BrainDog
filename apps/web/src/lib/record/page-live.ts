@@ -2106,7 +2106,8 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     /* BY THE FIGURE'S OWN NAME, a parameter taken off (`cash-as-of:hsbc` is `cash-as-of`), so a figure read for one
        group of a grouped day figure is a day too: "3 Sep", never 20,699. */
     const figure = path.includes(':') ? path.slice(0, path.indexOf(':')) : path;
-    const dayFigure = Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day';
+    /* `<figure>.on` IS THE DAY A WALK GOES UNDER (`pages.ts` `crossingValue`), said as any day figure is. */
+    const dayFigure = (Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day') || path.endsWith('.on');
     /* A DAY FIGURE THE RECORD ANSWERED AS ITS ISO DAY (`pages.ts` `valueAt`) is said as the same figure is said from its
        count of days, so "the last part on 1 Jun" and never "on 2027-06-01". */
     if (dayFigure && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v) && !Number.isNaN(Date.parse(v))) return format('day', Date.parse(v) / 86_400_000);

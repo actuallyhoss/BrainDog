@@ -756,7 +756,7 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      more hours east of UTC (New Zealand in summer), so every leg's `where` would be read from tomorrow. */
   const at = clockOf(ctx);
   const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at };
-  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: () => null, hydrate: (id: string) => {
+  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string) => {
       /* A ROW IS HYDRATED ONCE FOR A READ, since every walk over the same legs asks for the same ones. */
       const key = `row:${id}`;
       if (ctx.walks?.has(key)) return ctx.walks.get(key) as Entry | null;
@@ -899,6 +899,10 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(converted ? { fx: { into: home.home, home: home.home, asOf: converted.asOf, forward: converted.forward, stale: converted.stale, missing: [] } } : {}),
     ...(beyond ? { beyond } : {}),
+    /* AND THE STEP THAT TAKES IT UNDER, for a sentence that says why the money runs out on that day (`crossingValue`). */
+    ...(toZero && !under && total !== null && walk.value.crossed
+      ? { under: { day: walk.value.crossed.day, label: walk.value.crossed.label, amount: Math.max(0, -walk.value.crossed.delta), currency: walk.value.currency } }
+      : {}),
     ...(monthly
       ? {
           current: bucketOf(today, 'month')!,

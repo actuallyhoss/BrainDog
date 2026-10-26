@@ -3,11 +3,25 @@
 /* THE CELL BOTH TILES DRAW: the day the money runs out on what is due, with the days left under it. */
 const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
 
-/* AND HOW LONG IT LASTS IF NOTHING COMES IN, beside it in the one tile (the UI pass of 20 October, money F3): the line
-   over the page said "19 days with no income" while this tile said "30 Oct, in 57 days", two answers to one question
-   a screen apart, neither saying what the other assumed. Now both are here, each named by what it assumes, and the
-   line says what there is. */
-const NOTHING_IN = { metric: 'lasts-no-income', label: 'If nothing more comes in' };
+/**
+ * HOW LONG IT LASTS IF NOTHING COMES IN, the one tile's since the UI pass of 20 October (money F3): the line over the
+ * page said "19 days with no income" while this tile said "30 Oct, in 57 days", two answers to one question a screen
+ * apart. The line says what there is, and this tile how long it lasts.
+ *
+ * ONE FIGURE AND THE SENTENCE THAT SAYS WHY, SINCE money-core 3.27.0. The tile drew "Lasts past" a day a year away
+ * beside "79 days", two answers to one question with nothing saying what each assumed or what happens on the day the
+ * shorter one ends. Now it is the days the money lasts with nothing coming in, and under it the day that ends on and
+ * what falls due then (`lasts-no-income.on`, `.because`), naming the repeating money in that stops
+ * (`every-month-in.names`). Only while the walk with what is due and expected also goes under inside the year is that
+ * day said, as a sentence of its own; while it does not, the sentence goes whole (`noteOf`).
+ */
+const LASTS_SAID = {
+  metric: 'lasts-no-income',
+  label: 'With no money coming in',
+  note:
+    'If all money in stopped, {{every-month-in.names}} too, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due. ' +
+    'With what comes in it still runs out on {{runs-out-on}}.',
+};
 
 /**
  * HOW LONG THE MONEY LASTS, CALM, SINCE money-core 3.17.0 (REC-B07 step 8, "runway in info colour, danger only below
@@ -29,7 +43,7 @@ export const LASTS: Record<string, unknown>[] = [
     icon: 'calendar',
     span: 12,
     area: 'rail',
-    cells: [{ ...ON_WHAT_IS_DUE }, { ...NOTHING_IN }],
+    cells: [{ ...LASTS_SAID }],
     when: { all: [{ metric: 'cash-accounts', gt: 0 }, { metric: 'cash-now', gte: 0 }] },
   },
 ];

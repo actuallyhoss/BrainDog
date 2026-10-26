@@ -775,23 +775,24 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(drawn.some((b) => b.kind === 'note' && b.lead === true && b.drawn !== false), 'the sample draws no line over Money, so this asks nothing');
   assert.equal(drawn.find((b) => b.heading === 'Cash ahead')?.headline, 'under');
 
-  /* LASTS SAYS THE DAY THE WALK GOES UNDER, SINCE money-core 3.12.0 (the count of days from 3.11.0; Runs out until
-     3.17.0). The sample's cash is above nought, so the calm tile carries the day, with no tone: the money runs out
-     inside the year, so the tile is drawn. The day is the count's own: today and the days the money lasts, as whole
-     days since 1970. */
-  const runs = drawn.find((b) => b.heading === 'Lasts')! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[] };
-  assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no Runs out');
+  /* LASTS SAYS HOW LONG THE MONEY LASTS WITH NOTHING COMING IN, AND WHY, SINCE money-core 3.27.0 (the day the walk goes
+     under since 3.12.0, the count of days from 3.11.0; Runs out until 3.17.0). The sample's cash is above nought, so the
+     calm tile is drawn with no tone. Its sentence says the day the money with nothing in lasts to and what falls due
+     then, and, since the sample's walk with what comes in also goes under inside the year, that day too, which is the
+     count's own: today and the days the money lasts. */
+  const runs = drawn.find((b) => b.heading === 'Lasts')! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[]; values?: Record<string, unknown> };
+  assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no Lasts');
   assert.equal(runs.tone, undefined, 'cash above nought is drawn in the danger colour');
-  /* AND HOW LONG IT LASTS WITH NOTHING COMING IN, beside the day, since the UI pass of 20 October (money F3). */
-  assert.deepEqual(runs.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
-  assert.equal(runs.cells?.[0]?.note, 'In {{runway-days}}', 'the days left are the line under the day');
+  assert.deepEqual(runs.cells?.map((c) => c.metric), ['lasts-no-income']);
   const days = reading(k, 'runway-days');
-  const on = runs.readings?.[0]?.reading?.value;
-  assert.equal(on, reading(k, 'runs-out-on'));
-  assert.ok(typeof days === 'number' && typeof on === 'number', `no day to hold the tile to: ${String(days)}, ${String(on)}`);
+  const dry = runs.readings?.[0]?.reading?.value;
+  assert.ok(typeof days === 'number' && typeof dry === 'number', `no days to hold the tile to: ${String(days)}, ${String(dry)}`);
+  assert.ok(dry <= days, 'money with nothing coming in lasts longer than money with what comes in');
+  const on = reading(k, 'runs-out-on');
   assert.equal(on, Math.floor(NOW / 86_400_000) + days, 'the day is not the count of days from today');
-  const target = runs.readings?.[0]?.target as { gte: number };
-  assert.ok(on < target.gte, 'a day the money runs out on meets its target');
+  assert.equal(runs.values?.['runs-out-on'], new Date((on as number) * 86_400_000).toISOString().slice(0, 10), 'the sentence does not say the day the walk with what comes in goes under');
+  assert.equal(runs.values?.['lasts-no-income.on'], new Date(NOW + dry * 86_400_000).toISOString().slice(0, 10), 'the sentence does not say the day the days end on');
+  assert.equal(typeof runs.values?.['lasts-no-income.because'], 'string', 'the sentence does not say what falls due that day');
   assert.equal((METRICS['runs-out-on'] as { format?: string }).format, 'day');
 });
 

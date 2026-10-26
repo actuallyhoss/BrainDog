@@ -128,3 +128,25 @@ test('A STAT CELL WITH ahead: DRAWS THE WALK FROM TODAY, a balance a day, and sa
   assert.deepEqual(cell!.ahead, { from: '2026-10-20', currency: 'EGP', low: { day: '2026-11-13', value: 30_000 } });
   sql.close();
 });
+
+test('A WALK TO ZERO SAYS WHERE IT GOES UNDER: the day, what falls due then and its money, and nothing when it never does', async () => {
+  const { k, sql } = await record();
+  /* WITH NOTHING COMING IN, the opening 1,000.00 meets the house's 1,200.00 on 13 November and goes under there. */
+  const OUT_ONLY = LEGS.map((leg) => ({ ...leg, where: 'direction is out' }));
+  const dry = { ...RUNWAY, metric: 'dry', legs: OUT_ONLY };
+  const lines = ['Lasts {{dry}}, to {{dry.on}}, when {{dry.because}} ({{dry.because_amount}}) is due.', 'With pay: {{runway.on}}.'];
+  const made = await k.install([metric(dry), { id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Desk', blocks: lines.map((body) => ({ kind: 'note', body })) } } as never]);
+  assert.ok(made.ok, JSON.stringify(made));
+  assert.equal(read(k, dry).value, 24);
+  assert.deepEqual(read(k, dry).under, { day: '2026-11-13', label: 'House, part 2 of 30', amount: 120_000, currency: 'EGP' });
+  type Block = { values?: Record<string, unknown>; unnamed?: string[] };
+  const out = k.page('desk') as { ok: boolean; value: { blocks: Block[] } };
+  assert.ok(out.ok, JSON.stringify(out));
+  const [said, paid] = out.value.blocks;
+  assert.deepEqual(said!.values, { dry: 24, 'dry.on': '2026-11-13', 'dry.because': 'House, part 2 of 30', 'dry.because_amount': { amount: 120_000, currency: 'EGP' } });
+  /* THE PAY KEEPS IT ABOVE NOUGHT ALL YEAR: no day to name, and the path is named all the same, so it draws no words. */
+  assert.equal(paid!.values?.['runway.on'], undefined);
+  assert.deepEqual(paid!.unnamed ?? [], []);
+  assert.equal(read(k, RUNWAY).under, undefined);
+  sql.close();
+});

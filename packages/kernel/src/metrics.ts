@@ -446,6 +446,11 @@ export type Reading = {
   trend?: TrendSaid;
   /** How far a walk to zero looked when it never went under: its last day and the days to it. Beside value, never in it (`Beyond` in money-figures.ts). */
   beyond?: { day: string; days: number };
+  /**
+   * ON A WALK TO ZERO THAT GOES UNDER, THE STEP THAT TAKES IT THERE: its day, what the walk calls it, and its money as an
+   * amount going out, in the walk's currency. Absent when the walk never goes under or opens under (`readWalk`).
+   */
+  under?: { day: string; label: string; amount: number; currency: string | null };
 };
 
 /** The entry a running total reached its line at. `at` is a day or an instant as it is kept, or a number. */
@@ -915,6 +920,8 @@ export type EvalContext = {
   point?: true | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
+  /** The field a list's rows are named by, for a walk that says what each step is. Absent names each by its day. */
+  titleOf?: ((register: string) => string | null) | undefined;
   /** A ref written by name: `thing is Kiln`, every row bearing it. Absent means a sentence cannot name one. */
   refByTitle?: ((register: string, title: string) => string | readonly string[] | null) | undefined;
   /** The register a row id's row is on, deleted or not; `SentenceDeps.refById` says why it is asked. */

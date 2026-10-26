@@ -174,7 +174,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.27.0',
-      notes: 'The months ahead of In and out, by month are what Cash ahead walks, every part of a plan in the month it falls due, and Cash ahead opens on twelve weeks.',
+      notes: 'The months ahead of In and out, by month are what Cash ahead walks, every part of a plan in the month it falls due, and Cash ahead opens on twelve weeks. Lasts says how long the money lasts with nothing coming in, the day that ends on and what falls due then.',
     },
     {
       version: '3.26.0',

@@ -268,9 +268,11 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
   /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October (E24). */
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
-  /* AND LASTS DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
-  const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Lasts');
-  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
+  /* AND LASTS SAYS THE DAY, over the figure the update brought with it (money-core 3.12.0): in the sentence under how long
+     the money lasts with nothing coming in since 3.27.0, where it was a figure of its own. */
+  const runs = (page.blocks as { heading?: string; cells?: { metric: string; note?: string }[] }[]).find((b) => b.heading === 'Lasts');
+  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['lasts-no-income']);
+  assert.match(runs?.cells?.[0]?.note ?? '', /\{\{runs-out-on\}\}/u);
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });
@@ -887,7 +889,8 @@ const withoutRetired38 = (doc: Body): Body => ({
  */
 /**
  * MONEY 3.27.0 COMES OFF BEFORE ALL: no figures of what the walk moves in each month ahead, In and out, by month reads
- * bills due once and what repeats at its monthly share again, and Cash ahead opens on ten weeks.
+ * bills due once and what repeats at its monthly share again, Cash ahead opens on ten weeks, and Lasts draws its two
+ * figures again with no sentence under them.
  */
 const AHEAD_27 = new Set(['in-ahead-by-month', 'out-ahead-by-month']);
 const tenWeeks = (b: Body): Body => (b.kind === 'forecast' && b.horizon === 84 ? { ...b, horizon: 70, horizons: [70, 90, 180, 365, 730, 1825, 'last'] } : b);
@@ -908,7 +911,9 @@ const withoutAhead27 = (doc: Body): Body => ({
                       { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
                     ],
                   }
-                : tenWeeks(b),
+                : b.heading === 'Lasts' && b.kind === 'stat'
+                  ? { ...b, cells: [{ metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' }, { metric: 'lasts-no-income', label: 'If nothing more comes in' }] }
+                  : tenWeeks(b),
             ),
           }
         : d,

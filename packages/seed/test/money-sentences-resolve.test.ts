@@ -12,7 +12,7 @@
  * sentence and each sentence of its `says`, the cells a person wrote, the note under a figure and a column's label, with
  * code spans lifted out. A typed form (`{{money:amount}}`) is read by its argument. What a name may be (`pathOf` there):
  * a figure, `<figure>.change` or the rows it counts (`.first`, `.names`, `.more`, `.since`, and `.first_<field>`, a field
- * of the first of them), or a count of one of Money's own lists, whole or by a state its list declares. ON A PAGE OF EACH ROW (`for:`), a field of that row and `spoken` are filled first, everywhere on the
+ * of the first of them), where a walk to zero goes under (`.on`, `.because`, `.because_amount`), or a count of one of Money's own lists, whole or by a state its list declares. ON A PAGE OF EACH ROW (`for:`), a field of that row and `spoken` are filled first, everywhere on the
  * page (`fill`), so `{{name}}` there is the book's name and not a figure. A name anywhere else on a page is never filled,
  * and printed as written, so it is a fault wherever it is.
  */
@@ -31,6 +31,8 @@ type Field = { id: string; type?: string; values?: string[] };
 const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct', 'ref']);
 /** What `<figure>.<part>` may ask besides the figure itself. */
 const FIGURE_PARTS = new Set(['change', 'moved', 'first', 'names', 'more', 'since']);
+/** What `<figure>.<part>` may ask of a walk to zero: where it goes under (`crossingValue`), since money-core 3.27.0. */
+const CROSSING_PARTS = new Set(['on', 'because', 'because_amount']);
 /** Where on a page the record fills a name from the figures: the places `pathsOf` reads. */
 const SAID = [/\.blocks\[\d+\]\.(?:heading|body|empty)$/, /\.blocks\[\d+\]\.says\[\d+\]\.body$/, /\.cells\[\d+\]\.note$/, /\.columns\[\d+\]\.label$/, /\.authored\[\d+\]\.cells\[\d+\]$/];
 
@@ -60,6 +62,11 @@ export function unresolved(doc: { declarations: Decl[] }): string[] {
     if (parts.length !== 2) return false;
     const [head, tail] = parts as [string, string];
     if (FIGURE_PARTS.has(tail) && isFigure(head)) return true;
+    if (CROSSING_PARTS.has(tail)) {
+      const walked = doc.declarations.find((d) => d.metric === head);
+      const walk = (walked?.value as { walk?: unknown } | undefined)?.walk;
+      return walked?.source === 'forecast.runway' && (walk === 'days_to_zero' || walk === 'zero_on');
+    }
     /* `first_<field>` IS ONE FIELD OF THE FIRST ROW A FIGURE COUNTS, a field its list declares (`rowsValue`). */
     if (tail.startsWith('first_')) {
       const source = doc.declarations.find((d) => d.metric === head)?.source;

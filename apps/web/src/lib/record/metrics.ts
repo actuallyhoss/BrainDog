@@ -838,21 +838,43 @@ export function withParam(decl: MetricDecl, it: string): MetricDecl {
  *
  * A FIGURE THE NOTE NAMES THAT CANNOT BE READ TAKES ITS CLAUSE WITH IT, as it does in a lead (`leadOf`): "Lasts to"
  * and a dash under Cash now, on a record whose money outlasts the walk, said a hole where there was nothing to say.
+ *
+ * AND A FIGURE'S PART IS NAMED AS A FIGURE IS (`{{lasts-no-income.on}}`, `{{every-month-in.names}}`), so a cell's note
+ * can say why its figure is what it is, and drops the clause as a figure does when the part has nothing to say.
  */
 export function noteOf(template: string, said: (id: string) => string | null | typeof UNNAMED): string {
   /* A CLAUSE THAT ONLY SAYS NOUGHT IS LEFT OUT. "0 with an agent, 0 kept for later" under a new record's Open tasks is
      two things to read that say nothing; a clause whose every figure is 0 goes, and a note with none left is empty.
      The template's own commas are the clauses, split before a figure like 1,200 is written in. */
-  const FIGURE = /\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu;
-  const kept = template.split(/,\s+/u).filter((clause) => {
-    const ids = [...clause.matchAll(FIGURE)].map((m) => m[1]!);
-    return ids.length === 0 || (ids.every((id) => said(id) !== null) && ids.some((id) => said(id) !== '0'));
-  });
+  const FIGURE = /\{\{\s*([a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/gu;
+  const clausesOf = (sentence: string): string[] =>
+    sentence.split(/,\s+/u).filter((clause) => {
+      const ids = [...clause.matchAll(FIGURE)].map((m) => m[1]!);
+      return ids.length === 0 || (ids.every((id) => said(id) !== null) && ids.some((id) => said(id) !== '0'));
+    });
+  /* SENTENCE BY SENTENCE WHERE THERE ARE TWO OR MORE, as a lead is (`leadOf`): a sentence whose every figure went goes
+     whole, and one that lost its last clause keeps its full stop. One sentence is cut by its clauses alone, as always. */
+  const sentences = template.split(SENTENCE_END);
+  const kept =
+    sentences.length === 1
+      ? clausesOf(template)
+      : [
+          sentences
+            .flatMap((sentence) => {
+              const left = clausesOf(sentence);
+              const figured = FIGURE.test(sentence);
+              FIGURE.lastIndex = 0;
+              if (figured && !left.some((c) => c.match(FIGURE) !== null)) return [];
+              const joined = left.join(', ');
+              return [/[.!?]$/u.test(sentence) && !/[.!?]$/u.test(joined) ? `${joined}.` : joined];
+            })
+            .join(' '),
+        ];
   /* A PATH THAT NAMES NOTHING (`UNNAMED`) IS THE AUTHOR'S OWN WORDS, printed as written, never the dash a figure that
      could not be read gets: the dash would say a figure is missing where the author's typo is. */
   return kept
     .join(', ')
-    .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => {
+    .replace(/\{\{\s*([a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/gu, (_, id: string) => {
       const v = said(id);
       return v === UNNAMED ? id : (v ?? '');
     })

@@ -52,7 +52,7 @@ import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Pa
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
-import { beyondOf, figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
+import { beyondOf, figureLists, isRolled, pointedIn, WALK_SOURCE, walksToZero, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { factsOf, type CardFact } from './card-facts.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
@@ -5133,8 +5133,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const owned = two && beside ? moduleFigure(beside, two.head, two.tail) : null;
       if (owned) addFigure(owned.metric);
       const isList = (id: string): boolean => LIST_ID.test(id) && (owned === null || (beside?.lists?.() ?? []).some((l) => l.id === id));
-      if ('change' in said || 'rowsOf' in said) {
-        const head = 'change' in said ? said.change : said.rowsOf;
+      if ('change' in said || 'rowsOf' in said || 'crossingOf' in said) {
+        const head = 'change' in said ? said.change : 'rowsOf' in said ? said.rowsOf : said.crossingOf;
         const isFigure = (metric?.(head) ?? builtInFigure(head)) !== null;
         if (isFigure) addFigure(head);
         /* A LIST OF THAT NAME IS NAMED TOO when the record has one, since a state it holds is read first (`twoOf`). */
@@ -5253,6 +5253,7 @@ function pathOf(
   | { metric: string; param?: string }
   | { change: string; words?: true }
   | { rowsOf: string; part: RowPart; field?: string }
+  | { crossingOf: string; part: CrossingPart }
   | { register: string; seq: number; field: string }
   | { register: string; seq: number; field: string; then: string }
   | { register: string; count: true }
@@ -5292,6 +5293,9 @@ function pathOf(
   /* `<figure>.first`, `.names`, `.more` AND `.since` ARE THE ROWS A FIGURE COUNTS (`rowsValue`), decided between a figure
      and a list's state of that name exactly as `.change` is. */
   if ((ROW_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: tail as RowPart };
+  /* `<figure>.on`, `.because` AND `.because_amount` ARE WHERE A WALK TO ZERO GOES UNDER (`crossingValue`): its day, what
+     falls due that day and its money, so a sentence says why the money runs out on the day it does. */
+  if ((CROSSING_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { crossingOf: head, part: tail as CrossingPart };
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
   /* A MODULE'S ID MAY HOLD A DASH where a list's may not, so `money-core.cash-now` is two words to ask the order about. */
@@ -5389,6 +5393,7 @@ type PathSaid = NonNullable<ReturnType<typeof pathOf>>;
 function twoOf(said: PathSaid): Two | null {
   if ('change' in said) return { head: said.change, tail: 'words' in said ? 'moved' : 'change' };
   if ('rowsOf' in said) return { head: said.rowsOf, tail: said.field === undefined ? said.part : `first_${said.field}` };
+  if ('crossingOf' in said) return { head: said.crossingOf, tail: said.part };
   if ('count' in said && 'register' in said) return { head: said.register, tail: 'count' };
   if ('state' in said) return { head: said.register, tail: said.state };
   return null;
@@ -5455,12 +5460,18 @@ const PATH_ORDER: readonly PathRule[] = [
     /* A FIGURE'S PART, when a figure has the name: how far it moved, or the rows it counts. */
     as: 'figure',
     reads: (deps, said) => {
-      const decl = 'change' in said ? deps.metric(said.change) : 'rowsOf' in said ? deps.metric(said.rowsOf) : null;
+      const decl = 'change' in said ? deps.metric(said.change) : 'rowsOf' in said ? deps.metric(said.rowsOf) : 'crossingOf' in said ? deps.metric(said.crossingOf) : null;
       if (!decl) return null;
+      if ('crossingOf' in said) return { value: crossingValue(deps, decl, said.part) };
       return { value: 'rowsOf' in said ? rowsValue(deps, decl, said.part, said.field) : changeOf(deps, decl, 'words' in said) };
     },
     names: (deps, said) => {
       if ('change' in said) return figureNamed(deps, said.change);
+      /* A CROSSING IS NAMED BY A FIGURE THAT WALKS TO ZERO, and by no other: `cash-now.on` is the author's slip. */
+      if ('crossingOf' in said) {
+        const decl = deps.metric(said.crossingOf);
+        return decl !== null && decl.source === WALK_SOURCE && walksToZero((decl.value as { walk?: unknown } | undefined)?.walk);
+      }
       if (!('rowsOf' in said) || !figureNamed(deps, said.rowsOf)) return false;
       if (said.field === undefined) return true;
       /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
@@ -5706,6 +5717,30 @@ function stepSpec(deps: PageDeps, said: { register: string; field: string; then:
 /** What a sentence may say about the rows a figure counts: the first one's name, a few names, how many besides, and since when. */
 const ROW_PARTS = ['first', 'names', 'more', 'since'] as const;
 type RowPart = (typeof ROW_PARTS)[number];
+
+/** The parts of a walk to zero a sentence may name: the day it goes under, what falls due then, and that money. */
+const CROSSING_PARTS = ['on', 'because', 'because_amount'] as const;
+type CrossingPart = (typeof CROSSING_PARTS)[number];
+
+/**
+ * `{{lasts-no-income.on}}`: where a figure's walk to zero goes under, as a sentence names it, so "79 days" can say it
+ * lasts to Wed 13 Jan, when the second part of the house is due.
+ *
+ * - `on` is the day of the step that leaves the balance under, the same day `zero_on` holds; `because` what that step
+ *   is, as the walk labels it; `because_amount` its money, said as an amount going out.
+ * - THE FIGURE'S OWN WALK, read as the figure is (`readWalk`'s `under`), so the day and the count of days cannot
+ *   disagree. A walk that never goes under, that opens under, or that a reader may not see has none, and a sentence
+ *   then drops the clause, as it does any figure it cannot read.
+ */
+function crossingValue(deps: PageDeps, decl: MetricDecl, part: CrossingPart): Json | undefined {
+  if (decl.source !== WALK_SOURCE || !walksToZero((decl.value as { walk?: unknown } | undefined)?.walk) || !mayRead(deps, decl)) return undefined;
+  const read = deps.read(decl);
+  const under = read.ok ? read.value.under : undefined;
+  if (!under) return undefined;
+  if (part === 'on') return under.day;
+  if (part === 'because') return under.label !== '' ? under.label : undefined;
+  return under.currency !== null ? { amount: under.amount, currency: under.currency } : under.amount;
+}
 
 /** How many rows `.names` names before it says how many more. */
 const NAMED_MOST = 3;

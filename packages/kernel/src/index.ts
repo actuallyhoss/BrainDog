@@ -6969,6 +6969,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* WITH THE HOP (`hopSchemaOf`), for a declared figure's `pointed`: reach holds the figure to every list it hops to
        (`figureLists` in `money-figures.ts`). A rule compiles against the shared `schemaOf` it is handed, with none. */
     schemaOf: (register) => hopSchemaOf(register) ?? null,
+    /* THE FIELD A LIST'S ROWS ARE NAMED BY, so a figure over the walk names the step it goes under on as the forecast does. */
+    titleOf: (register) => registers.get(register)?.title ?? null,
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
        The title field is the register's own, so the lookup is one indexed read per name.
 
