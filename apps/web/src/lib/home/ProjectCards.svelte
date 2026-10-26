@@ -45,6 +45,8 @@
     keep: 'Keep it',
     notOne: 'Not a project',
     all: 'All projects',
+    /** Past the cards Today draws: how many more, and the door to them on Projects. */
+    more: (n: number) => `${n.toLocaleString('en-GB')} more`,
     inPlay: 'In play',
   } as const;
 
@@ -150,7 +152,7 @@
           {/each}
         </Segmented>
       {/if}
-      <a class="p-more tap" href={at(allHref)}>{words.all}<Icon name="arrow" size="s" /></a>
+      <a class="p-more tap" href={at(allHref)}>{more > 0 ? words.more(more) : words.all}<Icon name="arrow" size="s" /></a>
     </header>
     <ul class="cards">
       {#each inLane as c (c.key)}

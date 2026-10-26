@@ -72,7 +72,57 @@ export function unasked(lines: readonly HomeLine[], questions: readonly { about?
   if (questions.length === 0) return [...lines];
   const abouts = new Set(questions.map((q) => q.about).filter((a): a is string => typeof a === 'string' && a !== ''));
   const asked = questions.map((q) => (typeof q.question === 'string' ? q.question : ''));
-  return lines.filter((l) => !abouts.has(l.key) && !(l.title !== '' && asked.some((q) => q.startsWith(`${l.title} `) || q.startsWith(`${l.title}:`))));
+  /* AND A QUESTION THAT NAMES THE ROW'S WHOLE TITLE INSIDE IT (UX22): "Mark Wave 0: nav, … done?" asks about the late
+     task "Wave 0: nav, …", so it is shown once, in Needs you. Only a title long enough to be a name and not a word. */
+  const names = (q: string, title: string): boolean => {
+    if (title.length < TITLE_NAMED) return false;
+    const at = q.indexOf(title);
+    return at >= 0 && !/[\p{L}\p{N}]/u.test(q.charAt(at + title.length)) && (at === 0 || !/[\p{L}\p{N}]/u.test(q.charAt(at - 1)));
+  };
+  return lines.filter((l) => !abouts.has(l.key) && !(l.title !== '' && asked.some((q) => q.startsWith(`${l.title} `) || q.startsWith(`${l.title}:`) || names(q, l.title))));
+}
+
+/** The fewest characters a title has before a question that holds it is read as asking about it. */
+const TITLE_NAMED = 12;
+
+/** The headings Today's urgent work and the work handed back are declared under (`default-home.ts`), by their mark. */
+export type BandHeadings = { urgent: string; back: string };
+
+/**
+ * URGENT WORK AND WORK HANDED BACK, AS LINES OF THE LATE BAND (UX8, UX9): they sat under seventeen project cards, 2,600px
+ * down a laptop and 6,600px down a phone. Each drawn `todo` block declared under one of the two headings gives its rows
+ * as lines, each with its tick and how it got here in words; a row already in the late list is not said twice. `at` is
+ * where each such block stands, so the page marks it not drawn.
+ */
+export function bandOf(blocks: readonly LiveBlock[], headings: BandHeadings, said: { urgent: string; back: string }, already: ReadonlySet<string>): { lines: HomeLine[]; at: number[] } {
+  const lines: HomeLine[] = [];
+  const at: number[] = [];
+  const seen = new Set(already);
+  blocks.forEach((b, n) => {
+    if (!b.drawn || b.kind !== 'todo') return;
+    const mark = b.heading === headings.urgent ? 'urgent' : b.heading === headings.back ? 'back' : null;
+    if (mark === null) return;
+    at.push(n);
+    b.rows.forEach((row, i) => {
+      const r = row as { key?: unknown; href?: unknown; cells?: unknown[] };
+      const entry = b.entries[i];
+      const key = typeof r.key === 'string' && r.key !== '' ? r.key : entry && typeof entry.seq === 'number' && typeof b.source === 'string' && b.source.startsWith('register.') ? `${b.source.slice('register.'.length)}#${entry.seq}` : null;
+      if (key === null || seen.has(key)) return;
+      seen.add(key);
+      const what = (entry?.fields as Record<string, unknown> | undefined)?.what;
+      const title = typeof what === 'string' && what.trim() !== '' ? what.trim() : String(r.cells?.[0] ?? '').trim();
+      lines.push({
+        key,
+        title,
+        when: mark === 'urgent' ? said.urgent : said.back,
+        ...(typeof r.href === 'string' && r.href !== '' ? { href: r.href } : {}),
+        late: false,
+        mark,
+        ...(typeof entry?.seq === 'number' ? { tick: entry.seq } : {}),
+      });
+    });
+  });
+  return { lines, at };
 }
 
 /** Whether two late lines are one thing kept in two lists: one name, one day, and one amount where both carry one. */

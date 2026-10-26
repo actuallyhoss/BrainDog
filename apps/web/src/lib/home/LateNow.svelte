@@ -4,9 +4,11 @@
   Today's late list (`home-rows.ts` `lateLines`: every list's deadlines before today, and the late tasks) was folded
   behind More, and on his record a 13 days late salary, a 9 days late instalment and a 14 days late fee stood on no part
   of Today's first screen. Here they lead the desk: a line a thing, its name opening its row, how late in red and the day
-  it fell due, its amount whole at the right, and the one press that finishes it in the words the row's own page leads
-  with ("Mark paid", "Mark done"), with an Undo (`late-finish.ts`, fetched on the press). A list that has no way to
-  finish a row opens the row instead. A line Needs you already asks about is answered there and is not here (`unasked`).
+  it fell due. A BILL (UX4) carries its amount to the cent in its own currency and two answers: Paid, the one primary,
+  and Not yet, which puts it aside until tomorrow in this browser. A TASK is a quiet tick at its start, never a red
+  "Mark done". Each finishes through the row's own write with an Undo (`late-finish.ts`, fetched on the press); a list
+  with no way to finish a row opens the row instead. A line Needs you already asks about is answered there and is not
+  here (`unasked`). URGENT WORK AND WORK HANDED BACK stand under the late lines (UX8, UX9), each with its tick.
 
   A FEW AT REST, four at a desk and three on a phone, so the first screen holds the greeting, the brief and the first
   things to do; the rest open in place.
@@ -16,11 +18,12 @@
   import { apiBase, at } from '$lib/at.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { exponentOf, writeAmount } from 'braindog-render';
+  import { writeAmount } from 'braindog-render';
   import type { HomeLine } from './home-rows.ts';
-  import { verbOf } from './late-verb.ts';
+  import { asideToday, isBill, lateWords, putAside, verbOf } from './late-verb.ts';
 
   let {
     lines,
@@ -30,9 +33,9 @@
     writes,
     onfinished,
   }: {
-    /** The late lines to show, tasks and money, in the page's order. */
+    /** The late lines to show, tasks and money, in the page's order, then urgent work and work handed back. */
     lines: readonly HomeLine[];
-    /** The list's own name ("Late", "Late or due today"). */
+    /** The list's own name ("Late", "Late and urgent"). */
     heading: string;
     /** Late things past what the lines hold. */
     more?: number;
@@ -56,17 +59,18 @@
   /** The lines pressed and on their way, by key: their button waits, and a finished one fades until Today reads again. */
   let busy = $state.raw<ReadonlySet<string>>(new Set());
   let done = $state.raw<ReadonlySet<string>>(new Set());
+  /* A BILL ANSWERED "NOT YET" IS OUT OF LATE UNTIL TOMORROW, in this browser: nothing is written to the record. */
+  let aside = $state.raw<ReadonlySet<string>>(asideToday());
 
-  const shown = $derived(open ? lines : lines.slice(0, most));
-  const hidden = $derived(lines.length - shown.length);
+  const kept = $derived(lines.filter((l) => !aside.has(l.key)));
+  const shown = $derived(open ? kept : kept.slice(0, most));
+  const hidden = $derived(kept.length - shown.length);
 
-  /** An amount whole, as a person says it: "$4,012", "EGP 467,915". */
+  /** An amount to the cent, in its own currency, as a person says it: "$287.15", "EGP 467,915". */
   function amountSaid(line: HomeLine): string | null {
     if (!line.money) return line.amount ? line.amount.text.replace(/^[+−-]/u, '') : null;
     const { minor, currency } = line.money;
-    const exp = exponentOf(currency);
-    const whole = Math.round(Math.abs(minor) / 10 ** exp) * 10 ** exp;
-    return writeAmount({ minor: whole, currency }, homeCurrency(), 'read')?.text ?? null;
+    return writeAmount({ minor: Math.abs(minor), currency }, homeCurrency(), 'read')?.text ?? null;
   }
 
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -91,26 +95,43 @@
       busy = new Set([...busy].filter((k) => k !== line.key));
     }
   }
+
+  function notYet(line: HomeLine): void {
+    putAside(line.key);
+    aside = new Set([...aside, line.key]);
+    toasts.push(lateWords.notYetSaid(line.title));
+  }
 </script>
 
-<Tile icon="clock" title={heading} count={lines.length + more} data-late-tile>
+<Tile icon="clock" title={heading} count={kept.length + more} data-late-tile>
   <ul class="late">
     {#each shown as line (line.key)}
       {@const verb = verbOf(line, writes)}
+      {@const bill = isBill(line)}
       {@const amount = amountSaid(line)}
-      <li class="ln" data-row={line.key} data-done={done.has(line.key) ? '' : undefined}>
+      <li class="ln" data-row={line.key} data-bill={bill ? '' : undefined} data-done={done.has(line.key) ? '' : undefined}>
+        {#if !bill && verb}
+          <!-- A TASK IS A QUIET TICK at the line's start (UX4): the row's own verb is its name for a screen reader. -->
+          <button type="button" class="ln-tick tap" aria-label={`${verb}: ${line.title}`} title={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}
+            ><Icon name="check" size="s" /></button
+          >
+        {/if}
         {#if line.href}<a class="ln-title" href={at(line.href)}>{line.title}</a>{:else}<span class="ln-title">{line.title}</span>{/if}
         {#if amount}<span class="ln-amount num">{amount}</span>{/if}
         <p class="ln-when">
-          {#if line.when}<span data-late={line.late ? '' : undefined}>{line.when}</span>{/if}{#if line.day && line.late}{#if line.when}<span class="sep">{' · '}</span>{/if}<span class="ln-day">{words.due(dayWords(line.day))}</span>{/if}
+          {#if line.when}<span data-late={line.late || line.mark === 'urgent' ? '' : undefined}>{line.when}</span>{/if}{#if line.day && line.late}{#if line.when}<span class="sep">{' · '}</span>{/if}<span class="ln-day">{words.due(dayWords(line.day))}</span>{/if}
         </p>
-        <span class="ln-acts">
-          {#if verb}
-            <Button weight="primary" disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}>{verb}</Button>
-          {:else if line.href}
-            <Button href={line.href}>{words.open}</Button>
-          {/if}
-        </span>
+        {#if bill}
+          <span class="ln-acts">
+            {#if verb}
+              <!-- A BILL IS ANSWERED PAID OR NOT YET: Paid is the one primary, Not yet puts it aside until tomorrow. -->
+              <Button weight="primary" size="sm" aria-label={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}>{lateWords.paid}</Button>
+              <Button size="sm" disabled={busy.has(line.key) || done.has(line.key)} onclick={() => notYet(line)}>{lateWords.notYet}</Button>
+            {:else if line.href}
+              <Button size="sm" href={line.href}>{words.open}</Button>
+            {/if}
+          </span>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -132,10 +153,10 @@
   /* A LINE IS TWO ROWS: the name and the amount, then how late with the day it fell due, and the button at the right. */
   .ln {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      'title amount'
-      'when acts';
+      'tick title amount'
+      'tick when acts';
     align-items: center;
     gap: var(--sp-1) var(--sp-4);
     padding-block: var(--sp-3);
@@ -194,6 +215,45 @@
     gap: var(--sp-2);
   }
 
+  /* A TASK'S QUIET TICK (UX4): an empty ring at the line's start that fills with the check under the pointer, never
+     a red button. 24 to the eye, a thumb's 44 under one. */
+  .ln-tick {
+    display: grid;
+    grid-area: tick;
+    place-items: center;
+    align-self: center;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    border: 1.5px solid var(--rule-strong);
+    border-radius: 50%;
+    background: none;
+    color: transparent;
+    cursor: pointer;
+    transition: color var(--d-state) var(--ease-out), border-color var(--d-state) var(--ease-out);
+  }
+
+  .ln-tick:hover:not(:disabled),
+  .ln-tick:focus-visible {
+    border-color: var(--ink-2);
+    color: var(--ink-2);
+  }
+
+  .ln[data-done] .ln-tick {
+    border-color: var(--good);
+    background: var(--good);
+    color: var(--on-red, #fff);
+  }
+
+  @media (pointer: coarse) {
+    .ln-tick {
+      inline-size: var(--tap, 44px);
+      block-size: var(--tap, 44px);
+      border: 0;
+      background: radial-gradient(circle, transparent 10px, var(--rule-strong) 10.5px, var(--rule-strong) 12px, transparent 12.5px);
+    }
+  }
+
   .ln[data-done] :is(.ln-title, .ln-amount) {
     color: var(--ink-3);
     text-decoration: line-through;
@@ -201,11 +261,11 @@
 
   /* ON A PHONE THE BUTTON IS A ROW OF ITS OWN under how late, at the start, where a thumb reaches it. */
   @media (width < 640px) {
-    .ln {
+    .ln[data-bill] {
       grid-template-areas:
-        'title amount'
-        'when when'
-        'acts acts';
+        'tick title amount'
+        'tick when when'
+        'tick acts acts';
     }
 
     .ln-acts {
@@ -219,10 +279,13 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--red);
+    color: var(--ink);
     font: inherit;
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 30%, transparent);
+    text-underline-offset: 3px;
     cursor: pointer;
   }
 

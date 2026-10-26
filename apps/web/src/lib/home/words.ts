@@ -23,6 +23,11 @@ export const words = {
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',
   urgent: 'Urgent',
+  /** The late tile's name once urgent work or work handed back stands in it too (UX8). */
+  lateAndUrgent: 'Late and urgent',
+  /** How a line that is not late came to stand in the late band, said where how late it is would be. */
+  urgentWhy: 'urgent',
+  backWhy: 'handed back to you',
   money: 'Cash ahead',
   cashNow: 'Cash now',
   /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */

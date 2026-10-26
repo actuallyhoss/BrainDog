@@ -37,6 +37,11 @@ export type HomeLine = {
   late: boolean;
   /** The task's number in its list, on a line a person may tick done where it is shown. */
   tick?: number;
+  /**
+   * WHY A LINE THAT IS NOT LATE STANDS IN THE LATE BAND (UX8, UX9): urgent work, or work handed back for him to check.
+   * `when` says it in words; the mark is what the tile colours by.
+   */
+  mark?: 'urgent' | 'back';
 };
 
 /** One day of Coming up: the chip's two words, what a screen reader is told, and what falls due that day. */

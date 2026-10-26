@@ -90,11 +90,11 @@ export const COMING_UP_LIMIT = 5;
 export const NEEDS_YOU_LIMIT = 3;
 
 /**
- * On a phone, four (the Bento phone board, 22 October): the first answered where it stands, with its buttons, and the
- * three after it rows a tap opens, so the first screen holds four of what waits and not two. It was two (today F8),
- * each with its buttons, and two of eight was all the first screen said.
+ * On a phone, two (the phone order of 27 October, UX9): the first answered where it stands with its suggested answer,
+ * the second a row a tap opens, and "N more" the door to the rest, so the phone's Today holds what needs him, what is
+ * late and urgent, who is at work, cash and what is next in about two screens.
  */
-export const NEEDS_YOU_LIMIT_PHONE = 4;
+export const NEEDS_YOU_LIMIT_PHONE = 2;
 
 /**
  * HOW MANY OPEN QUESTIONS TODAY ASKS THE RECORD FOR, so it can put the money first (`needsYouOrder`) before it shows the

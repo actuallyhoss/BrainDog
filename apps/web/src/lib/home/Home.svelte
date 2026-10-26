@@ -108,7 +108,7 @@
   import { afterNavigate } from '$app/navigation';
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
-  import { greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
+  import { bandOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
   import { verbOf } from '$lib/home/late-verb.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { toldNow } from '$lib/home/told-now.svelte.ts';
@@ -744,12 +744,15 @@
        the first late block of the page is drawn as the desk's late tile, a line a thing with its button, and any other
        late block is marked not drawn at its place. */
     const lateAt = board ? (late?.at ?? []) : [];
-    const lateTile = lateShown.length > 0 ? lateAt[0] : undefined;
+    /* URGENT WORK AND WORK HANDED BACK STAND IN THE LATE BAND (UX8, UX9), under the late lines, each with its tick: their
+       own tiles are not drawn, and with nothing late the first of them carries the band. */
+    const bandAt = board ? band.at : [];
+    const lateTile = bandShown.length > 0 ? (lateShown.length > 0 ? lateAt[0] : bandAt[0]) : undefined;
     const named = (id: string): string => data.lists.find((l) => l.id === id)?.name ?? '';
     const blocks: Desked<LiveBlock>[] = deskedOf(
       shaped.blocks.map((b, n): Desked<LiveBlock> => {
-        if (n === lateTile) return { ...b, desk: { kind: 'late', lines: lateShown, heading: late?.heading || voice.overdue, more: late?.more ?? 0, most: 4 } };
-        if (lateAt.includes(n)) return { ...b, drawn: false };
+        if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? words.lateAndUrgent : late?.heading || voice.overdue, more: late?.more ?? 0, most: phone.current ? 3 : 5 } };
+        if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
         return board && phone.current && b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b;
       }),
       recordNow(),
@@ -927,6 +930,8 @@
   const lateLines = $derived(late ? onceEach(late.lines, (line) => verbOf(line, (list) => may(data, 'write', list)) !== null) : []);
   const queued = $derived(shaped?.blocks.find((b) => b.key === 'needs-you')?.queue ?? []);
   const lateShown = $derived(inBriefOrder(unasked(lateLines, queued)));
+  const band = $derived(board && shaped ? bandOf(shaped.blocks, { urgent: words.urgent, back: words.toCheck }, { urgent: words.urgentWhy, back: words.backWhy }, new Set(lateLines.map((l) => l.key))) : { lines: [], at: [] });
+  const bandShown = $derived([...lateShown, ...unasked(band.lines, queued)]);
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
   const lands = $derived(landing(data));
@@ -1277,13 +1282,77 @@
     }
   }
 
-  /* ON A PHONE, NEEDS YOU'S FIRST QUESTION IS ANSWERED WHERE IT STANDS AND THE REST ARE ROWS (the Bento phone board): each
-     after the first loses its buttons, its title wraps to three lines, and the whole row is the title's link to its page. */
+  /* NOT ON A PHONE'S TODAY AT ALL (UX14): the ⋯ stood alone beside the greeting with nothing a thumb arranges there, and
+     Edit layout is offered from 900px. */
   @media (width < 600px) {
-    /* THE FIRST QUESTION IS ANSWERED WHERE IT STANDS, so it is read whole enough to answer: five lines, not a cut at three. */
+    .today-head + .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .home-tools) {
+      display: none;
+    }
+
+    .today-head:has(+ .body[data-board] :global(.home-tools :is(button, a))) {
+      padding-inline-end: 0;
+    }
+  }
+
+  /* THE PHONE'S OWN ORDER (UX9, the Bento phone board): what needs you first, two of it, then what is late and urgent,
+     who is at work, cash with its week, and what is next. The few key numbers, the projects, what arrived and the
+     people are a tab away (Projects, Money, Activity), so the phone's Today is about two screens and not six. */
+  @media (width < 600px) {
+    .body.body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot])) {
+      order: 1;
+    }
+
+    .body.body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
+      order: 2;
+    }
+
+    .body.body[data-board] > :global([data-working]),
+    .body.body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
+      order: 3;
+    }
+
+    .body.body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
+      order: 4;
+    }
+
+    .body.body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      order: 5;
+    }
+
+    .body.body[data-board] :global(.home-page > .page > .block-slot:is([data-key='week-due'], [data-key='coming-up'])) {
+      order: 6;
+    }
+
+    .body.body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .page > :is(.block-slot:is([data-key='numbers'], [data-key='projects'], [data-key='faces']), [data-landed])),
+    .body.body[data-board]:not(:has(:global(.home-page[data-arranging]))) > :global([data-landed]) {
+      display: none;
+    }
+
+    /* AT WORK, ONE LINE A RUN: who and what it is doing, cut at the line's end; the rest is on Agents. */
+    .body[data-board] :global([data-working] .run :is(.r-doing, .r-holds)) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .body[data-board] :global([data-working] .run) {
+      grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+      grid-template-areas: 'face who doing time do';
+    }
+
+    .body[data-board] :global([data-working] .run :is(.r-holds, .r-project)) {
+      display: none;
+    }
+
+    .body[data-board] :global([data-working] .run .r-face) {
+      align-self: center;
+      padding-block-start: 0;
+    }
+
+    /* THE FIRST QUESTION IS ANSWERED WHERE IT STANDS, at most two lines with "Read all" for the rest (UX6). */
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa:first-child .queue-question) {
-      line-clamp: 6;
-      -webkit-line-clamp: 6;
+      line-clamp: 2;
+      -webkit-line-clamp: 2;
     }
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa :is(.dc-actions, .dr-actions)) {
@@ -1296,8 +1365,12 @@
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .queue-question) {
       overflow: hidden;
-      line-clamp: 3;
-      -webkit-line-clamp: 3;
+      line-clamp: 2;
+      -webkit-line-clamp: 2;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .dc-read) {
+      display: none;
     }
 
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa ~ .qa .dc-open::after) {
@@ -1452,10 +1525,10 @@
     padding-block-start: var(--sp-3);
   }
 
-  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in the red, as wide as its words. */
+  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in ink (UX81), as wide as its words. */
   .body :global(.block-slot[data-key='coming-up'] > a.block-more) {
     align-self: flex-start;
-    color: var(--red);
+    color: var(--ink);
     font-weight: var(--fw-medium);
     text-decoration: none;
   }
@@ -1606,6 +1679,21 @@
 
     .body[data-board]:has(:global(.desk-part[data-desk='late'])):has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
       grid-row: 4;
+    }
+
+    /* THE WEEK'S MONEY IS THE FOOT OF CASH AHEAD (UX10), one tile and not a second one floating under it: cash fills its
+       track, its lower corners square, and the week's money butts it with a hairline between, as Needs you's foot does. */
+    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+      align-self: stretch;
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
+    }
+
+    .body[data-board]:has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      margin-block-start: calc(var(--tile-gap) * -1);
+      border-start-start-radius: 0;
+      border-start-end-radius: 0;
+      box-shadow: inset 0 1px 0 var(--rule);
     }
 
     /* TWO LISTS OF TASKS AT THE FOOT (Handed back, Urgent) SIT SIDE BY SIDE, not each a full row of one line; one alone
