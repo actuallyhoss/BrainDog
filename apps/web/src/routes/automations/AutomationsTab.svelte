@@ -86,7 +86,7 @@
       placed = new Map(rows.map((r) => [r.id, r.enabled]));
       from = 'ready';
       oncount(rows.length);
-      onsentence?.(hubSentence(rows));
+      onsentence?.(hubSentence(rows, listSaid));
     } else if (out.absent) from = 'absent';
     else {
       fix = out.first.refusal.fix;
@@ -157,7 +157,7 @@
       return void toasts.push(out.refusal.fix, { intent: 'warn' });
     }
     rows = rows.map((r) => (r.id === id ? { ...r, enabled: out.value.enabled, version: out.value.version || r.version } : r));
-    onsentence?.(hubSentence(rows));
+    onsentence?.(hubSentence(rows, listSaid));
     toasts.push(out.value.enabled ? editWords.turnedOn : editWords.turnedOff, { undo: () => void turn(id, !out.value.enabled) });
   }
 
@@ -184,7 +184,7 @@
     <div class="tiles">
       <Tile icon="refresh" title={w.runsMonth} meta={w.runsMonthMeta(split.runs)}>
         <Bars items={bars} subject={w.runsMonthSubject} />
-        {#if bars.some((b) => b.tone === 'danger')}<p class="key">Red bars had failed runs.</p>{/if}
+        {#if bars.some((b) => (b.part ?? 0) > 0)}<p class="key">The red part of a bar is its failed runs.</p>{/if}
         <p class="reading">{monthReading(rows)}</p>
       </Tile>
       <Tile icon="check" title={w.endedTitle}>

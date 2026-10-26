@@ -33,7 +33,9 @@ export type Tab = 'automations' | 'scheduled' | 'scripts' | 'doors' | 'runs';
 export const TABS: readonly { id: Tab; path: string }[] = [
   { id: 'automations', path: '/automations' },
   { id: 'scheduled', path: '/automations?tab=scheduled' },
-  { id: 'scripts', path: '/automations?tab=scripts' },
+  /* THE SCRIPTS SCREEN ITSELF, SINCE the pass of 27 October (UX58): it wears these tabs too, so Scripts is one place
+     whichever way it is reached, and `?tab=scripts` still opens the hub's short list for an old link. */
+  { id: 'scripts', path: '/scripts' },
   { id: 'doors', path: '/automations?tab=doors' },
   { id: 'runs', path: '/automations/runs' },
 ];
@@ -219,15 +221,16 @@ export type Sentence = { text: string; needs: string };
  * one to open; failing ones are only counted past two names. Otherwise the month's failed runs are counted, and a month
  * with none says so without red. A record whose host sends no month says nothing about it rather than "none failed".
  */
-export function hubSentence(rows: readonly AutomationRow[]): Sentence | null {
+export function hubSentence(rows: readonly AutomationRow[], listSaid?: (id: string) => string): Sentence | null {
   if (rows.length === 0) return null;
   const on = rows.filter((r) => r.enabled);
+  const counted = counts(on, listSaid);
   const first =
     on.length === 0
       ? rows.length === 1
         ? 'The one automation here is turned off'
         : 'Every automation here is turned off'
-      : `${spell(on.length, true)} ${on.length === 1 ? 'automation runs by itself' : 'automations run by themselves'}`;
+      : (counted ?? `${spell(on.length, true)} ${on.length === 1 ? 'automation runs by itself' : 'automations run by themselves'}`);
   const failing = on.filter((r) => r.last?.state === 'failed').map((r) => r.name);
   const monthly = rows.filter((r) => r.month !== null);
   const failed = monthly.reduce((n, r) => n + (r.month?.failures ?? 0), 0);
@@ -241,6 +244,33 @@ export function hubSentence(rows: readonly AutomationRow[]): Sentence | null {
   if (needs) return { text: `${first}, and ${needs}.`, needs };
   if (monthly.length > 0 && on.length > 0) return { text: `${first}, and none failed this month.`, needs: '' };
   return { text: `${first}.`, needs: '' };
+}
+
+/** Past this many rules on one list, the sentence names them apart: a record that files by payee grows one a payee. */
+export const ONE_LIST_MANY = 10;
+
+/**
+ * THE ON RULES AS THE RECORD COUNTS THEM (the pass of 27 October, UX59): how many are on, the list most of them are
+ * rules on when it holds more than `ONE_LIST_MANY`, and how many have run against how many never have. "100 automations
+ * run by themselves" stood over 64 Ledger filing rules and 43 that had never run. `null` from a host that sends no count,
+ * and the sentence is then said as before.
+ */
+function counts(on: readonly AutomationRow[], listSaid?: (id: string) => string): string | null {
+  if (on.length === 0 || !on.every((r) => typeof r.fired === 'number')) return null;
+  const ran = on.filter((r) => (r.fired ?? 0) > 0).length;
+  const never = on.length - ran;
+  const by = new Map<string, number>();
+  for (const r of on) if (r.register) by.set(r.register, (by.get(r.register) ?? 0) + 1);
+  const [list, most] = [...by].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
+  const lead = `${spell(on.length, true)} ${on.length === 1 ? 'automation is' : 'automations are'} on`;
+  const many = list !== null && listSaid && most > ONE_LIST_MANY ? `, ${spell(most)} of them rules on ${listSaid(list)}` : '';
+  const done =
+    never === 0
+      ? on.length === 1 ? 'it has run' : 'every one has run'
+      : ran === 0
+        ? on.length === 1 ? 'it has never run' : 'none has run yet'
+        : `${spell(ran)} ${ran === 1 ? 'has' : 'have'} run and ${spell(never)} never ${never === 1 ? 'has' : 'have'}`;
+  return `${lead}${many}; ${done}`;
 }
 
 /* ── an automation's row ────────────────────────────────────────────────── */
@@ -366,7 +396,7 @@ export const nextOf = (row: AutomationRow, now: number): string | undefined =>
 
 /* ── the Automations tab's tiles ────────────────────────────────────────── */
 
-export type Bar = { label: string; value: number; tone?: string | undefined; note?: string | undefined };
+export type Bar = { label: string; value: number; tone?: string | undefined; note?: string | undefined; part?: number | undefined };
 
 /** The automations that ran this month, most runs first: the ones in the month's record, and only with a run. */
 function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { month: { runs: number; failures: number } })[] {
@@ -385,7 +415,9 @@ export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
     .map((r) => ({
       label: r.name,
       value: r.month.runs,
-      tone: r.month.failures > 0 ? 'danger' : undefined,
+      /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR (the pass of 27 October, UX59), red from its start, and the rest of
+         the bar is the runs that finished: "3 failed" of 20 drew the whole bar red. */
+      part: r.month.failures > 0 ? Math.min(r.month.failures, r.month.runs) : undefined,
       note: r.month.failures > 0 ? hubWords.failedNote(r.month.failures) : undefined,
     }));
 }

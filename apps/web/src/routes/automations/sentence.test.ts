@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Sentenced } from '$lib/flow/source.ts';
-import { addStep, applyOption, askable, composeSentence, dropStep, exampleOf, isCurrent, keepOf, keyMove, moveStep, sentenceWords, swapStep, underSentence } from './sentence.ts';
+import { addStep, applyOption, askable, composeSentence, dropStep, exampleOf, isCurrent, keepOf, keyMove, moveStep, sentenceWords, swapStep, underSentence, wholeSentence } from './sentence.ts';
 
 const read = (over: Partial<Sentenced> = {}): Sentenced => ({
   rule: 'when-a-bill-is-due',
@@ -85,4 +85,15 @@ test('the box example is the record’s own: its first list with a due date, by 
   assert.equal(exampleOf([{ name: 'Orders', fields: [{ id: 'ship_by', type: 'day', deadline: true }] }]), 'When an order is due in 3 days, tell me');
   assert.equal(exampleOf([{ name: 'Notes' }]), sentenceWords.placeholder);
   assert.equal(sentenceWords.hint('When a bill is due in 3 days, tell me'), 'For example: When a bill is due in 3 days, tell me.');
+});
+
+/* THE PASS OF 27 OCTOBER (UX60): an automation's page says it whole first, its script named. */
+test('an automation is said whole: what starts it, then each step in order', () => {
+  assert.equal(
+    wholeSentence('When an item in Bills and invoices has its Status set to paid', ['Run the script Move a repeating line on']),
+    'When an item in Bills and invoices has its Status set to paid, run the script Move a repeating line on.',
+  );
+  assert.equal(wholeSentence('Every day at 9:00', ['Tell you: Bills due', 'Run the script Tidy up.']), 'Every day at 9:00, tell you: Bills due, then run the script Tidy up.');
+  assert.equal(wholeSentence('When anything arrives', []), '');
+  assert.equal(wholeSentence('', ['Run a script']), '');
 });

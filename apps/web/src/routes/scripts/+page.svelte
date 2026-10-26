@@ -33,7 +33,13 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { copy } from '$lib/copy.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
-  import { sentenceOf } from './reading.ts';
+  import { sentenceOf, troubleOf } from './reading.ts';
+  import HubTabs from '../automations/HubTabs.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
+
+  /* THE HUB'S TABS, AS ON AUTOMATIONS (the pass of 27 October, UX58): beside the name at a desk's width, under the
+     sentence on a phone, with Scripts the one marked. */
+  const phone = new MediaQuery('(width < 900px)', false);
 
   let { data }: { data: Shell } = $props();
 
@@ -118,6 +124,9 @@
   /* THE PAGE'S OWN LINE IS THE HEAD'S, so it is not drawn again as a tile under it. */
   /* THE ONES THAT RAN COME FIRST, the latest on top, and "Not run yet" closes the list. */
   const ranAt = (e: { fields: Record<string, unknown> }): number => (typeof e.fields.last_at === 'string' ? Date.parse(e.fields.last_at) || 0 : 0);
+  /* AND WHAT HAS STOPPED COMES BEFORE THEM ALL (the pass of 27 October, UX55): a refused last run, then a paused script,
+     the ones the head names in red. The refused one sat ninth, under "9 more". */
+  const trouble = (e: { fields: Record<string, unknown> }): number => troubleOf(e.fields);
   const drawn = $derived<Opened | null>(
     live
       ? {
@@ -128,7 +137,7 @@
               b.kind === 'note' && (b as { lead?: unknown }).lead === true
                 ? { ...b, drawn: false }
                 : b.source === 'scripts' && b.entries
-                  ? { ...b, entries: [...b.entries].sort((x, y) => ranAt(y) - ranAt(x)) }
+                  ? { ...b, entries: [...b.entries].sort((x, y) => trouble(x) - trouble(y) || ranAt(y) - ranAt(x)) }
                   : b,
             ),
           },
@@ -155,16 +164,19 @@
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
 <PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} sentence={told ? sentence : undefined}>
   {#snippet actions()}
+    {#if !phone.current}<HubTabs here="scripts" />{/if}
     <!-- THE ONE PRIMARY: its word, and on a phone the 44px button with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>
   {/snippet}
+  {#snippet below()}{#if phone.current}<HubTabs here="scripts" full />{/if}{/snippet}
 </PageHead>
 <div class="page">
   {#if none}
     <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
   {:else}
     <!-- BARS UNTIL THE RECORD ANSWERS, AND ITS SENTENCE WHERE IT REFUSES, as on every page (`PageView`). -->
-    <PageView slug={SLUG} got={drawn} mode="home" {reread} />
+    <!-- EVERY SCRIPT, never folded under "N more": the rows are the screen (UX55). -->
+    <PageView slug={SLUG} got={drawn} mode="home" unfolded {reread} />
   {/if}
 </div>
 

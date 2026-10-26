@@ -63,6 +63,16 @@ export function sentenceOf(rows: readonly SaidRow[]): Said | null {
   return [...out, { text: '.' }];
 }
 
+/**
+ * Where a script's row sorts by what has stopped (the pass of 27 October, UX55): 0 for a refused or failed last run, 1
+ * for a paused script, 2 for one running as it should. The head names the first two in red, so the list leads with them.
+ */
+export function troubleOf(fields: Record<string, unknown>): number {
+  if (fields.status !== 'paused' && (fields.last === 'refused' || fields.last === 'failed')) return 0;
+  if (fields.status === 'paused') return 1;
+  return 2;
+}
+
 /** The sentence as plain words, for a test or a title. */
 export const plain = (said: Said): string => said.map((p) => p.text).join('');
 
@@ -92,7 +102,16 @@ export function recentOf(s: Pick<Script, 'recent'> & Partial<Pick<Script, 'month
 
 export const words = {
   recentSubject: 'Recent runs that went through',
-  legend: (n: number) => (n === 1 ? 'One bar for its last run; dark when it went through.' : `One bar for each of its last ${n} runs; dark bars went through, pale ones did not.`),
+  /* THE KEY SAYS ONLY THE BARS THAT ARE DRAWN (the pass of 27 October, UX57): five dark bars stood over "pale ones did
+     not", a bar nobody could find. `ok` is how many went through. */
+  legend: (n: number, ok: number = n) =>
+    n === 1
+      ? 'One bar for its last run.'
+      : ok === n
+        ? `One bar for each of its last ${n} runs.`
+        : ok === 0
+          ? `One bar for each of its last ${n} runs; a pale bar did not go through.`
+          : `One bar for each of its last ${n} runs; dark bars went through, pale ones did not.`,
   edit: 'Edit',
   editOne: (title: string) => `Edit ${title}`,
 };

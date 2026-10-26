@@ -99,6 +99,7 @@
     was = null,
     select = false,
     whole = false,
+    unfolded = false,
     offer,
     opens,
     between,
@@ -125,6 +126,8 @@
     select?: boolean;
     /** Whether a home's questions are drawn whole (Decide) rather than compact (everywhere else). */
     whole?: boolean;
+    /** A home whose lists are drawn whole, never folded under "N more" (`PageBody`'s `unfolded`). */
+    unfolded?: boolean;
     /**
      * The pen's offer for this page (uc6-places-47), drawn UNDER THE PAGE'S OWN BLOCKS and inside `.hosted`. It was
      * drawn between the header and the first tile, where on Money it took a phone's whole first screen and stood over
@@ -989,6 +992,7 @@
     <PageBody
       mode="home"
       {whole}
+      {unfolded}
       page={toArrange?.page ?? live.page.page}
       blocks={all}
       now={toArrange?.now ?? live.now}

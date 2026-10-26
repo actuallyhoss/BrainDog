@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Run } from '../../lib/record/scripts.ts';
-import { plain, recentOf, sentenceOf, toneOf, type SaidRow } from './reading.ts';
+import { plain, recentOf, sentenceOf, toneOf, troubleOf, words, type SaidRow } from './reading.ts';
 
 type Row = SaidRow;
 const row = (over: Partial<Row>): Row => ({
@@ -88,7 +88,7 @@ test('a row of the page’s scripts block says what starts it and where it stand
 test('the screen draws the declared page through the one reader, and says its own line in the head', async () => {
   const { readFileSync } = await import('node:fs');
   const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
-  assert.match(screen, /<PageView slug=\{SLUG\} got=\{drawn\} mode="home" \{reread\} \/>/u);
+  assert.match(screen, /<PageView slug=\{SLUG\} got=\{drawn\} mode="home" unfolded \{reread\} \/>/u, 'every script is drawn, none folded');
   assert.match(screen, /from '@braindog\/seed\/packs\/scripts'/u);
   assert.match(screen, /sentenceOf\(rows\)/u);
   assert.doesNotMatch(screen, /HubRows/u, 'the list is the page’s table now, not rows built by hand');
@@ -117,4 +117,24 @@ test('the Scripts page is the Scripts screen: its address goes there', async () 
   const { readFileSync } = await import('node:fs');
   const route = readFileSync(new URL('../p/[slug]/+page.ts', import.meta.url), 'utf8');
   assert.match(route, /SCREENS[^=]*=\s*\{[^}]*\bscripts: '\/scripts'/u);
+});
+
+/* THE PASS OF 27 OCTOBER (UX55): the script refused on its last run sat ninth, folded under "9 more". */
+test('a refused last run sorts first, then a paused script, then the rest', () => {
+  const rows = [
+    { title: 'Fine', status: 'on', last: 'ok' },
+    { title: 'Paused', status: 'paused', last: 'refused' },
+    { title: 'Refused', status: 'on', last: 'refused' },
+    { title: 'Failed', status: 'on', last: 'failed' },
+  ];
+  const sorted = [...rows].sort((a, b) => troubleOf(a) - troubleOf(b));
+  assert.deepEqual(sorted.map((r) => r.title), ['Refused', 'Failed', 'Paused', 'Fine']);
+});
+
+/* THE PASS OF 27 OCTOBER (UX57): the key named pale bars over five dark ones. */
+test('the bars\' key says only the bars that are drawn', () => {
+  assert.equal(words.legend(5, 5), 'One bar for each of its last 5 runs.');
+  assert.equal(words.legend(5, 0), 'One bar for each of its last 5 runs; a pale bar did not go through.');
+  assert.equal(words.legend(5, 3), 'One bar for each of its last 5 runs; dark bars went through, pale ones did not.');
+  assert.equal(words.legend(1, 1), 'One bar for its last run.');
 });

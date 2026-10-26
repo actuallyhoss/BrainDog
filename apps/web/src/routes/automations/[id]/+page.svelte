@@ -71,7 +71,8 @@
   import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
   import { FlowDraft } from '$lib/flow/flow.svelte.ts';
-  import { ROOT, callsIn, freshId, learnScripts, listsIn, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
+  import { ROOT, callsIn, freshId, learnScripts, listsIn, sayStart, sayStep, triggerKind, words } from '$lib/flow/flow.ts';
+  import { wholeSentence } from '../sentence.ts';
   import { learn } from '$lib/record/remote.ts';
   import {
     diffLines,
@@ -355,6 +356,9 @@
   const saveWord = $derived(busy ? words.saving : !owner ? words.save : row ? editWords.saveChanges : editWords.saveOn);
   /* THE SENTENCE UNDER THE TITLE: the last run and the next, the failed clause red. None for a draft never saved. */
   const said = $derived(pageSentence(row, now));
+  /* WHAT IT DOES, WHOLE: the trigger and each step in order, each step said with no title to repeat, so its script is
+     named (`sayStep` with no `own`). */
+  const whole = $derived(wholeSentence(sayStart(flow.draft, listSaid), flow.draft.steps.map((n) => sayStep(n.step))));
   /* THE PLAN THE RUNNER NUMBERS STEPS BY, so "failed at step 3" counts the steps as the canvas draws them. */
   const places = $derived(row?.body ? planPlaces(row.body) : null);
   const durations = $derived(runDurations(runs));
@@ -740,6 +744,9 @@
     </PageHead>
     {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
+      <!-- THE SENTENCE FIRST (the pass of 27 October, UX60): the whole automation in words, the script it runs named,
+           over the tabs that take it apart. Said from the draft, so an edit on the canvas says itself here too. -->
+      {#if whole}<p class="whole">{whole}</p>{/if}
       <Segmented class="tabs" role="group" aria-label={title}>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
         {#if row}
@@ -1130,6 +1137,15 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
+  }
+
+  /* THE AUTOMATION AS ONE SENTENCE, over the tabs, at the reading size and the measure a sentence keeps. */
+  .whole {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
 
   /* THE ONE LINE SAYING WHY THIS OPENS READ ONLY, under the head, in the head's own muted words. */

@@ -10,6 +10,9 @@
 
   THE SCALE IS SHARED WHEN YOU SAY SO: pass `max` to put several charts on one scale.
 
+  A PART OF A BAR IN ITS OWN TONE: an item's `part` is how much of its value is that part, drawn from the bar's start
+  in `partTone` (`danger` by default) over the bar, at its true share. "3 failed" of 20 runs was a whole red bar.
+
   The label column takes the longest label up to two fifths of the width. A label longer than that
   puts every label over its bar instead, with the value at the end of the label's line, so at phone
   width no bar is drawn over its words. Text keeps its size at any width.
@@ -27,7 +30,7 @@
     summary,
     format,
   }: {
-    items: readonly { label: string; value: number; tone?: Tone | undefined; note?: string | undefined }[];
+    items: readonly { label: string; value: number; tone?: Tone | undefined; note?: string | undefined; part?: number | undefined; partTone?: Tone | undefined }[];
     /** The value a full bar stands for; the largest value by default. */
     max?: number | undefined;
     /** One earlier value per item, for two periods side by side. */
@@ -56,6 +59,11 @@
       {/if}
       {#if row.bar.w > 0}
         <rect class="viz-fill viz-grow-x" data-tone={p.tone} style:--c={p.colour} x={row.bar.x} y={row.bar.y} width={row.bar.w} height={row.bar.h} rx={row.bar.rx} />
+      {/if}
+      {@const part = items[i]?.part ?? 0}
+      {#if part > 0 && row.bar.w > 0 && (items[i]?.value ?? 0) > 0}
+        {@const q = paint(items[i]?.partTone ?? 'danger', 'g2')}
+        <rect class="viz-fill viz-grow-x" data-tone={q.tone} style:--c={q.colour} x={row.bar.x} y={row.bar.y} width={Math.max(2, row.bar.w * Math.min(1, part / (items[i]?.value ?? 1)))} height={row.bar.h} rx={row.bar.rx} />
       {/if}
       {#if row.pair && row.pair.w > 0}
         <rect class="viz-fill viz-grow-x" data-tone="g4" x={row.pair.x} y={row.pair.y} width={row.pair.w} height={row.pair.h} rx={row.pair.rx} />

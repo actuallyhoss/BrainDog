@@ -76,7 +76,7 @@
        runs went. No chart when the history held none of its runs. -->
   {#if recent}
     <Segments total={recent.total} done={recent.ok} subject={shown.recentSubject} />
-    <p class="reading legend">{shown.legend(recent.total)}</p>
+    <p class="reading legend">{shown.legend(recent.total, recent.ok)}</p>
   {/if}
   <p class="reading">{startsBy(s)} {recent?.said ?? words.noRuns}</p>
 

@@ -71,6 +71,7 @@
     pick = null,
     onwalk = null,
     whole = false,
+    unfolded = false,
     captured = -1,
     under = null,
     opens = null,
@@ -83,6 +84,8 @@
     mode: 'page' | 'home' | 'preview';
     /** Questions drawn whole, as Decide's own form draws them, never in the compact form a home uses elsewhere. */
     whole?: boolean;
+    /** A home whose lists are drawn whole, never folded under "N more": Scripts, whose rows are the screen. */
+    unfolded?: boolean;
     /** The page as the record answered it, whose `layout` says whether there is a rail. */
     page: LivePageDecl;
     /** Every block the page draws, declared then added, each at the index its slot keeps. */
@@ -1304,7 +1307,7 @@
     {arranging}
     {now}
     {level}
-    fold={mode === 'home'}
+    fold={mode === 'home' && !unfolded}
     compact={compactAt(slot.i, block.kind)}
     rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
     verbs={verbsFor(slot.i)}
