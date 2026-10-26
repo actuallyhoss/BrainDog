@@ -74,7 +74,7 @@ test('THREE QUESTIONS DECIDED IN KILN READ AS THREE DATED LINES THERE, newest fi
   const price = value<{ id: string }>(
     await api.propose({ question: 'Price the specimen proof?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: task, version: at.version, patch: { cost: { amount: 900, currency: 'EUR' } } }] } }, inKiln),
   );
-  const archive = value<{ id: string }>(await api.propose({ question: 'Archive the old specimen?', body_kind: 'options', body: { options: [{ id: 'yes', label: 'Archive it', because: 'Nobody opens it.' }, { id: 'no', label: 'Keep it', because: 'It may come back.' }] } }, inKiln));
+  const archive = value<{ id: string }>(await api.propose({ question: 'Archive the old specimen?', body_kind: 'options', body: { options: [{ id: 'yes', label: 'Yes, it can go', because: 'Nobody opens it.' }, { id: 'no', label: 'Keep it', because: 'It may come back.' }] } }, inKiln));
 
   clock.advance(MIN);
   value(await api.decide({ id: domain.id, decide: { option: 'renew', reason: 'The PDFs.' } }, owner));
